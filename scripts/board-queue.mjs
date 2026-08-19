@@ -6,6 +6,7 @@
 //   node scripts/board-queue.mjs set <N> "<text>"   # write one point's prose
 //   node scripts/board-queue.mjs set <N> --title --text-stdin      # …its German title
 //   node scripts/board-queue.mjs set <N> --estimate "~2 h"         # …its estimate
+//   node scripts/board-queue.mjs set <N> --estimate "~1 h" --if-estimate "~2 h"
 //   node scripts/board-queue.mjs import             # add cards the data lacks, from the board
 //
 // GERMAN TEXT GOES IN ON STDIN (point 439, the rule of point 410): `--text-stdin`
@@ -47,10 +48,12 @@ import {
   parseSetArgs,
   parseTaskTitles,
   queueImportOffenders,
+  estimateCompareDecision,
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
 } from './board-queue-core.mjs'
+import { withBoardEditLock } from './board-edit-lock.mjs'
 import { CALIBRATION_PATH, parseCriticality } from './queue-calibration-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
@@ -58,7 +61,9 @@ import { gateReport, gateSets } from './user-gate-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
-const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
+const dataFile = process.env.HOA_QUEUE_DATA_FILE
+  ? resolve(process.env.HOA_QUEUE_DATA_FILE)
+  : resolve(REPO_ROOT, QUEUE_DATA_PATH)
 const tasksFile = resolve(REPO_ROOT, 'TASKS.md')
 const [cmd, ...rest] = process.argv.slice(2)
 
@@ -178,28 +183,52 @@ try {
     }
     const fields = ['title', 'body', 'estimate'].filter((f) => parsed[f])
     if (!parsed.point || fields.length === 0) {
-      throw new Error('usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--text-stdin]')
+      throw new Error(
+        'usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--if-estimate "~old h"] [--text-stdin]',
+      )
     }
-    writeData(setQueueEntry(readData(), parsed.point, parsed))
-    console.log(`${fields.join(' + ')} for point ${parsed.point} stored in ${QUEUE_DATA_PATH}`)
-    console.log('Render it into the board: node scripts/board-queue.mjs')
+    const result = withBoardEditLock(() => {
+      const current = readData()
+      if (parsed.ifEstimate !== null) {
+        const stored = current?.points?.[String(Number(parsed.point))]?.estimate ?? null
+        const decision = estimateCompareDecision(stored, parsed.ifEstimate)
+        if (!decision.matched) return { refused: true, decision }
+      }
+      writeData(setQueueEntry(current, parsed.point, parsed))
+      return { refused: false }
+    })
+    if (result.refused) {
+      console.error(
+        `compare-and-set refused for point ${parsed.point}: expected ${JSON.stringify(result.decision.expected)}, ` +
+          `found ${JSON.stringify(result.decision.current)}; nothing was written`,
+      )
+      process.exitCode = 3
+    } else {
+      console.log(`${fields.join(' + ')} for point ${parsed.point} stored in ${QUEUE_DATA_PATH}`)
+      console.log('Render it into the board: node scripts/board-queue.mjs')
+    }
   } else if (cmd === 'import') {
     // Seed the data from cards the board carries but the data does not know yet.
     // ADDITIVE ONLY (point 530): a stored body is never replaced, and nothing is
     // written at all while the result would put an over-long card on the board.
-    const { data, added, kept } = mergeQueueImport(readData(), importQueueFromHtml(readFileSync(boardFile, 'utf8')), {
-      titles: parseTaskTitles(readFileSync(tasksFile, 'utf8')),
-    })
-    const offenders = queueImportOffenders(data)
-    if (offenders.length) {
-      throw new Error(
-        `import refused — ${offenders.length} card(s) would go on the board too long or unbroken: ` +
-          `${offenders.map((o) => `${o.point}: ${o.reason}`).join(' | ')}. ` +
-          'Nothing was written. Give each of them its paragraphs back (a blank line splits them): ' +
-          'node scripts/board-queue.mjs set <N> --text-stdin',
+    const { added, kept } = withBoardEditLock(() => {
+      const { data, added: nextAdded, kept: nextKept } = mergeQueueImport(
+        readData(),
+        importQueueFromHtml(readFileSync(boardFile, 'utf8')),
+        { titles: parseTaskTitles(readFileSync(tasksFile, 'utf8')) },
       )
-    }
-    writeData(data)
+      const offenders = queueImportOffenders(data)
+      if (offenders.length) {
+        throw new Error(
+          `import refused — ${offenders.length} card(s) would go on the board too long or unbroken: ` +
+            `${offenders.map((o) => `${o.point}: ${o.reason}`).join(' | ')}. ` +
+            'Nothing was written. Give each of them its paragraphs back (a blank line splits them): ' +
+            'node scripts/board-queue.mjs set <N> --text-stdin',
+        )
+      }
+      writeData(data)
+      return { added: nextAdded, kept: nextKept }
+    })
     console.log(
       `import: ${added.length} card(s) added${added.length ? ` (${added.join(', ')})` : ''}, ` +
         `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,
@@ -229,7 +258,9 @@ try {
       console.log('Publish it: node scripts/board-publish.mjs')
     }
   } else {
-    console.error('usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] | import')
+    console.error(
+      'usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] [--if-estimate …] | import',
+    )
     process.exitCode = 2
   }
 } catch (e) {

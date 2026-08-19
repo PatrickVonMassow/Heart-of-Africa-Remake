@@ -13,40 +13,35 @@
 // class factors read near 1.0, and the next time the batch changes pace they do
 // not. Every run names the window it used, so two readings are comparable.
 //
-// WHY IT WRITES ONCE INSTEAD OF CALLING `board-queue.mjs set` 200 TIMES: it
-// applies through `setQueueEntry`, the exact pure writer that path uses, and then
-// writes the file ONCE, atomically. Two hundred read-modify-write cycles against
-// a file the main session also writes is a race; one is not.
-//
-// THE APPLY RE-READS THE FILE AND CHECKS EACH CARD BEFORE IT WRITES. Atomic
-// writing prevents a TORN file, not a LOST UPDATE: the measurement takes a while,
-// and a `board-queue.mjs set` in between would be erased by a stale whole-file
-// snapshot. So the plan is computed from the file as read, and applied to the
-// file as it stands at that moment — card by card, and only where the card still
-// says what the plan expected. One that moved under us is REPORTED and left.
+// APPLY USES THE BOARD'S OWN SET COMMAND, one child per changed card. Each child
+// takes the cross-process board-edit lock and compares the stored estimate under
+// that lock before writing. That is the transaction boundary: a preflight read
+// saves needless children, but cannot prevent a lost update by itself.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
-import { isBackendSensitivePath } from './render-verify-core.mjs'
-import { QUEUE_DATA_PATH, normaliseQueueData, openPointsOf, parseQueueDataFile, setQueueEntry } from './board-queue-core.mjs'
+import { QUEUE_DATA_PATH, normaliseQueueData, openPointsOf, parseQueueDataFile } from './board-queue-core.mjs'
 import {
   applicableChanges,
   AXES,
   attributeMerges,
   CALIBRATION_PATH,
   calibrationReading,
+  elapsedHoursToTick,
   estimateForLanding,
   inheritanceDefaults,
   inheritedEstimateForClass,
   ledgerAfterApply,
   MIN_CLASS_SAMPLES,
+  parseCalibrationArgs,
   parseCriticality,
   parseEstimateHours,
   parseFirstParentChain,
   parseTickEvents,
+  pictureVerifiedPoints,
   rewritePlan,
   SPAN_MEASURED,
   SPAN_NO_BRANCH,
@@ -57,29 +52,24 @@ import {
 const COMMIT_MARK = '@@COMMIT@@'
 const HOUR = 3600
 
-const args = process.argv.slice(2)
-const flag = (name, fallback = null) => {
-  const i = args.indexOf(name)
-  return i >= 0 && args[i + 1] ? args[i + 1] : fallback
+let options
+try {
+  options = parseCalibrationArgs(process.argv.slice(2))
+} catch (e) {
+  console.error(`queue-calibration: ${e.message}`)
+  process.exit(1)
 }
-const has = (name) => args.includes(name)
 
 // `--state-dir` exists because `.claude/board-queue.json` is git-ignored and
 // therefore lives ONLY in the main working tree: a run from an isolation worktree
 // has to be pointed at it, or it would measure against a file that is not there.
-const stateDir = resolve(flag('--state-dir', resolve(REPO_ROOT, '.claude')))
+const stateDir = resolve(options.stateDir ?? resolve(REPO_ROOT, '.claude'))
 const dataFile = resolve(stateDir, 'board-queue.json')
 const storeFile = resolve(stateDir, 'queue-calibration.json')
+const renderStateFile = resolve(stateDir, 'render-verify-state.json')
+const boardQueueScript = resolve(REPO_ROOT, 'scripts/board-queue.mjs')
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 256e6, windowsHide: true })
-
-/** Seconds back from now for `14d` / `36h` / an ISO date. */
-function sinceSeconds(spec) {
-  const rel = /^(\d+(?:\.\d+)?)([dh])$/.exec(String(spec ?? ''))
-  if (rel) return Math.floor(Date.now() / 1000) - Number(rel[1]) * (rel[2] === 'd' ? 86400 : HOUR)
-  const t = Date.parse(String(spec ?? ''))
-  return Number.isFinite(t) ? Math.floor(t / 1000) : null
-}
 
 /** Every point that has ever been ticked on main, with when it was. */
 function landedPoints() {
@@ -98,7 +88,7 @@ function firstParentChain() {
 }
 
 /**
- * The branch's first commit to the LANDING, in hours, plus what it touched.
+ * The branch's first commit to the TICK, in hours.
  *
  * The end is the TICK, not the merge: gate, picture check and board update all
  * happen after the merge, and they are part of what the estimate promises.
@@ -106,17 +96,26 @@ function firstParentChain() {
 function landingSpan(merge, landedAt) {
   try {
     const stamps = git('log', '--pretty=%ct', `${merge.sha}^1..${merge.sha}^2`).trim().split('\n').filter(Boolean).map(Number)
-    const files = git('diff', '--name-only', `${merge.sha}^1`, merge.sha).trim().split('\n').filter(Boolean)
-    if (!stamps.length) return { elapsedHours: null, spanBasis: SPAN_UNKNOWN, files }
-    const first = Math.min(...stamps)
+    if (!stamps.length) return { elapsedHours: null, spanBasis: SPAN_UNKNOWN }
+    const elapsedHours = elapsedHoursToTick(Math.min(...stamps), landedAt)
     // A tick that predates the branch's first commit is not a span but a clock
     // artefact; it is reported as unknown rather than as a negative duration.
-    if (!(landedAt >= first)) return { elapsedHours: null, spanBasis: SPAN_UNKNOWN, files }
-    return { elapsedHours: (landedAt - first) / HOUR, spanBasis: SPAN_MEASURED, files }
+    if (elapsedHours === null) return { elapsedHours: null, spanBasis: SPAN_UNKNOWN }
+    return { elapsedHours, spanBasis: SPAN_MEASURED }
   } catch {
     // A history rewrite can leave a merge whose second parent is gone. It still
     // landed, so it still counts for the cadence — only its span is unknown.
-    return { elapsedHours: null, spanBasis: SPAN_UNKNOWN, files: [] }
+    return { elapsedHours: null, spanBasis: SPAN_UNKNOWN }
+  }
+}
+
+/** Retained per-branch picture attestations; absent or malformed state means none. */
+function verifiedPicturePoints() {
+  try {
+    const state = JSON.parse(readFileSync(renderStateFile, 'utf8'))
+    return pictureVerifiedPoints(state?.clearedHeads)
+  } catch {
+    return new Set()
   }
 }
 
@@ -149,72 +148,82 @@ try {
   // next run judges a landing against what stood while the point was still open.
   const ledger = updateEstimateLedger(previousStore.estimates, { cards, open })
 
-  const since = sinceSeconds(flag('--since', '14d'))
-  const limit = Number(flag('--limit', '0')) || 0
+  const since = options.sinceSeconds
+  const limit = options.limit
   const allTicks = landedPoints()
   let landings = allTicks.filter((l) => (since === null ? true : l.at >= since))
   if (limit > 0) landings = landings.slice(-limit)
   if (!landings.length) throw new Error('no landed points in the window — widen it with --since or --limit')
 
   const merges = attributeMerges(firstParentChain(), allTicks)
+  const picturePoints = verifiedPicturePoints()
   const rows = landings.map((l) => {
     const found = merges.get(l.point)
-    const { elapsedHours, spanBasis, files } = found
+    const { elapsedHours, spanBasis } = found
       ? landingSpan(found.merge, l.at)
-      : // No merge is not a missing measurement but the shape of main-session
-        // work: there is no branch, so there is nothing to measure a span from.
-        { elapsedHours: null, spanBasis: SPAN_NO_BRANCH, files: null }
+      : { elapsedHours: null, spanBasis: SPAN_UNKNOWN }
     const { estimate, source } = estimateForLanding(ledger, l.point, cards[l.point]?.estimate ?? null)
+    const contextEstimateHours = parseEstimateHours(estimate)
     return {
       point: l.point,
       landedAt: l.at,
-      delegated: !!found,
-      attribution: found?.attribution ?? null,
+      lane: found?.attribution === 'named' ? 'delegated' : 'lane-unestablished',
+      attribution: found?.attribution ?? 'none',
       elapsedHours,
       spanBasis,
-      estimateHours: parseEstimateHours(estimate),
+      estimateHours: source === 'snapshot' ? contextEstimateHours : null,
+      contextEstimateHours,
       estimateSource: source,
       criticality: criticality.get(l.point) ?? null,
-      picture: files === null ? null : files.some(isBackendSensitivePath),
+      pictureClass: picturePoints.has(l.point) ? 'picture-verified' : 'picture-unestablished',
     }
   })
   const cadenceHours = rows.slice(1).map((r, i) => (r.landedAt - rows[i].landedAt) / HOUR)
-  const window = { from: rows[0].landedAt, to: rows[rows.length - 1].landedAt, landings: rows.length, since: flag('--since', '14d'), limit }
+  const window = { from: rows[0].landedAt, to: rows[rows.length - 1].landedAt, landings: rows.length, since: options.since, limit }
   const reading = calibrationReading(rows, { cadenceHours, window })
 
   console.log(`WINDOW  ${iso(window.from)} → ${iso(window.to)} UTC · ${window.landings} landed point(s)` + (limit ? ` (--limit ${limit})` : ` (--since ${window.since})`))
   console.log('')
-  console.log('PER POINT — the first commit to the LANDING, against the estimate its card carried')
-  console.log('  point  crit      lane  pic  src   estimate  actual   ratio')
+  console.log('PER POINT — first branch commit to the TICK; cadence is TICK → TICK for the same reader-visible reason')
+  console.log('  point  crit      lane                  picture                  merge     src       context   actual   ratio')
   for (const r of rows) {
     console.log(
       `  ${String(r.point).padEnd(6)} ${String(r.criticality ?? 'untagged').padEnd(9)} ` +
-        `${r.delegated ? 'brnch' : 'main '} ${r.picture === null ? ' ? ' : r.picture ? ' P ' : ' . '}  ` +
-        `${(r.estimateSource === 'snapshot' ? 'snap' : r.estimateSource === 'current' ? 'live' : '—').padEnd(5)} ` +
-        `${fmt(r.estimateHours, ' h').padStart(8)}  ${fmt(r.elapsedHours, ' h').padStart(8)}  ` +
+        `${String(r.lane).padEnd(21)} ${String(r.pictureClass).padEnd(24)} ${String(r.attribution).padEnd(9)} ` +
+        `${(r.estimateSource === 'snapshot' ? 'snapshot' : r.estimateSource === 'unreconstructable' ? 'context' : '—').padEnd(9)} ` +
+        `${fmt(r.contextEstimateHours, ' h').padStart(8)}  ${fmt(r.elapsedHours, ' h').padStart(8)}  ` +
         `${r.elapsedHours !== null && r.estimateHours ? fmt(r.elapsedHours / r.estimateHours, '×') : '—'}`,
     )
   }
   const provenance = {
     snapshot: rows.filter((r) => r.estimateSource === 'snapshot').length,
-    current: rows.filter((r) => r.estimateSource === 'current').length,
+    unreconstructable: rows.filter((r) => r.estimateSource === 'unreconstructable').length,
     none: rows.filter((r) => !r.estimateSource).length,
   }
   const spans = {
     measured: rows.filter((r) => r.spanBasis === SPAN_MEASURED).length,
     noBranch: rows.filter((r) => r.spanBasis === SPAN_NO_BRANCH).length,
     unknown: rows.filter((r) => r.spanBasis === SPAN_UNKNOWN).length,
-    guessed: rows.filter((r) => r.attribution === 'nearest-merge').length,
+    inferred: rows.filter((r) => r.attribution === 'inferred').length,
   }
   console.log('')
   console.log(
-    `ESTIMATE PROVENANCE     ${provenance.snapshot} snapshotted while the point was open · ${provenance.current} read off ` +
-      `today's file (no snapshot yet — ${QUEUE_DATA_PATH} is git-ignored, so nothing older is recoverable) · ${provenance.none} unestimated`,
+    `ESTIMATE PROVENANCE     ${provenance.snapshot} snapshot(s) compared · ${provenance.unreconstructable} live value(s) shown only as context, ` +
+      `NOT compared · ${provenance.none} unestimated`,
   )
   console.log(
-    `SPAN PROVENANCE         ${spans.measured} measured (${spans.guessed} of them via a merge inferred from the landing ` +
-      `sequence) · ${spans.noBranch} main-session, no branch to measure · ${spans.unknown} merge found but span unreadable`,
+    `  LIMIT: ${QUEUE_DATA_PATH} and the board HTML are both untracked, so estimates older than this ledger are unrecoverable; ` +
+      'the ledger begins with this command’s first run.',
   )
+  if (provenance.snapshot === 0) console.log('  NO FACTOR CAN BE MEASURED YET: this window contains zero landing-time snapshots.')
+  console.log(
+    `SPAN PROVENANCE         ${spans.measured} measured (${spans.inferred} via a merge inferred from the landing sequence) · ` +
+      `${spans.noBranch} explicitly no-branch · ${spans.unknown} without a readable attributed span`,
+  )
+  console.log('CLASSIFICATION LIMIT — LANE: only a merge subject naming the point’s branch establishes delegated; every other row is lane-unestablished.')
+  console.log('CLASSIFICATION LIMIT — PICTURE: render-verify-state.json is git-ignored, bounded to 40 runs and clearedHeads is pruned at branch end; only a retained branch entry establishes picture verification.')
+  console.log('CONFOUNDER: the small measured window is all process/infrastructure points and has no render point with a picture check; do not carry its factor to render points.')
+  console.log('CONFOUNDER: point 713 still stands at 14 do-not-merge rounds, so the review loop is not universally healed.')
   console.log('')
   console.log(`ELAPSED PER POINT (h)   ${five(reading.overall.elapsed, ' h')}`)
   console.log(`ACTUAL ÷ ESTIMATE       ${five(reading.overall.ratio, '×')}`)
@@ -227,13 +236,11 @@ try {
       console.log(
         `  ${String(c.name).padEnd(15)} points ${String(c.points).padStart(3)}  measured ${String(c.ratio.n).padStart(3)}  ` +
           `median elapsed ${fmt(c.elapsed.median, ' h').padStart(8)}  median ratio ${fmt(c.ratio.median, '×').padStart(8)}` +
-          // A class that CANNOT be measured must not read like one that is merely
-          // young: no further landing will ever give this one a comparable.
-          (c.structural
-            ? '  (no branch to measure — never comparable)'
+          (c.unknowable
+            ? '  (missing-information class — excluded from comparison)'
             : c.comparable
               ? ''
-              : `  (fewer than ${MIN_CLASS_SAMPLES} measured — no comparable)`),
+              : `  (PENDING: fewer than ${MIN_CLASS_SAMPLES} measured — no comparable yet)`),
       )
     }
   }
@@ -242,7 +249,8 @@ try {
   for (const s of reading.decision.spreads) {
     console.log(
       `  ${s.axis.padEnd(12)} comparable classes ${s.classes}  spread ${fmt(s.spread, '×')}` +
-        (s.structural.length ? `  (not measurable: ${s.structural.join(', ')})` : ''),
+        (s.unknowable.length ? `  (missing information: ${s.unknowable.join(', ')})` : '') +
+        (s.pending.length ? `  (pending: ${s.pending.join(', ')})` : ''),
     )
   }
   console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
@@ -255,8 +263,8 @@ try {
   console.log(`REWRITE — ${changed.length} card(s) move, ${kept.length} keep what they have`)
   for (const p of changed) console.log(`  ${String(p.point).padEnd(6)} ${String(p.from).padEnd(16)} → ${String(p.to).padEnd(16)} ${p.reason}`)
   const reasons = new Map()
-  for (const p of kept) reasons.set(p.reason, (reasons.get(p.reason) ?? 0) + 1)
-  for (const [reason, n] of reasons) console.log(`  kept ×${n}: ${reason}`)
+  for (const p of kept) reasons.set(p.reason, [...(reasons.get(p.reason) ?? []), p.point])
+  for (const [reason, points] of reasons) console.log(`  kept ${points.join(', ')}: ${reason}`)
 
   const defaults = inheritanceDefaults(reading)
   console.log('')
@@ -264,20 +272,37 @@ try {
   for (const [name] of Object.entries(defaults)) console.log(`  ${name.padEnd(13)} ${inheritedEstimateForClass(name, defaults)}`)
 
   let estimates = ledger
-  if (has('--apply')) {
-    // RE-READ, then compare-and-set. The measurement above took seconds to
-    // minutes, and the main session writes this same file.
+  if (options.apply) {
+    // The fresh read is only a cheap pre-filter. Each child repeats the compare
+    // while holding the board-edit lock, then writes inside that transaction.
     const live = readCards()
-    const { written, skipped } = applicableChanges(changed, live)
-    let data = { points: live }
-    for (const p of written) data = setQueueEntry(data, p.point, { estimate: p.to })
-    writeTextAtomic(dataFile, `${JSON.stringify(data, null, 2)}\n`)
+    const { written: candidates, skipped } = applicableChanges(changed, live)
+    const written = []
+    const refused = []
+    for (const p of candidates) {
+      try {
+        execFileSync(process.execPath, [boardQueueScript, 'set', String(p.point), '--estimate', p.to, '--if-estimate', p.from], {
+          encoding: 'utf8',
+          windowsHide: true,
+          env: { ...process.env, HOA_QUEUE_DATA_FILE: dataFile },
+        })
+        written.push(p)
+      } catch (e) {
+        if (e.status === 3) {
+          refused.push({ ...p, detail: String(e.stderr ?? '').trim() })
+          continue
+        }
+        throw new Error(`board-queue set failed for ${p.point}: ${String(e.stderr ?? e.message).trim()}`)
+      }
+    }
     estimates = ledgerAfterApply(ledger, [...written, ...plan.filter((p) => p.factor && !p.changed)])
     console.log('')
     console.log(`APPLIED: ${written.length} estimate(s) written to ${QUEUE_DATA_PATH}. Render them: node scripts/board-queue.mjs`)
+    for (const p of written) console.log(`  ${p.point} ${p.from} → ${p.to}`)
     for (const s of skipped) {
       console.log(`  SKIPPED ${s.point}: the card changed while this ran (${s.from} → ${s.now}); it keeps the newer value`)
     }
+    for (const r of refused) console.log(`  REFUSED ${r.point}: ${r.detail || 'compare-and-set found a different estimate'}`)
   } else {
     console.log('')
     console.log('Nothing was written to the queue data — re-run with --apply to store the rewrite.')

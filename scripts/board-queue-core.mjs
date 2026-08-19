@@ -53,7 +53,7 @@ import {
 import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
-import { inheritedEstimate } from './queue-calibration-core.mjs'
+import { INHERITED_ESTIMATE_NOTE, inheritedEstimate } from './queue-calibration-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — three slots,
 // three candidates. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
@@ -599,7 +599,12 @@ export function importQueueFromHtml(html) {
     // THE GATED META IS NOT AN ESTIMATE (point 450). Importing it would store
     // "wartet auf deine Entscheidung" as the point's duration, and one rebuild
     // later the card would carry that string for ever — even after the answer.
-    const isGated = metaRaw.trim().startsWith(QUEUE_GATED_META)
+    const meta = metaRaw.trim()
+    const isGated = meta.startsWith(QUEUE_GATED_META)
+    // A rendered class median is a derived fallback, not an authored estimate.
+    // Importing it would freeze the inheritance and let calibration multiply a
+    // value derived from that same calibration a second time.
+    const isInherited = meta.includes(INHERITED_ESTIMATE_NOTE)
     points[point] = {
       gated: isGated || undefined,
       // UNESCAPED, like the body (four-eyes finding 2): the card renders its
@@ -611,7 +616,7 @@ export function importQueueFromHtml(html) {
       // would make the card count as described and silence the "no prose yet"
       // report for ever.
       body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
-      estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META && !isGated ? metaRaw.trim() : null,
+      estimate: meta && meta !== QUEUE_STUB_META && !isGated && !isInherited ? meta : null,
     }
   }
   return { points }
@@ -737,7 +742,16 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
 export const SET_STDIN_FLAG = '--text-stdin'
 
 /** Every flag `set` knows — named back at a caller that mistyped one. */
-export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG, '--'])
+export const SET_FLAGS = Object.freeze(['--title', '--estimate', '--if-estimate', SET_STDIN_FLAG, '--'])
+
+/** Exact compare decision used by `set --if-estimate`, kept pure for tests. */
+export function estimateCompareDecision(current, expected) {
+  return {
+    matched: current === expected,
+    current: current ?? null,
+    expected: expected ?? null,
+  }
+}
 
 /**
  * Split `set`'s argv into its buckets (point 439). PURE, so the flag handling is
@@ -755,10 +769,11 @@ export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG,
 export function parseSetArgs(rest) {
   const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
   const buckets = { body: [], title: [], estimate: [] }
-  const out = { point: args[0], title: null, body: null, estimate: null, stdinField: null }
+  const out = { point: args[0], title: null, body: null, estimate: null, ifEstimate: null, stdinField: null }
   let field = 'body'
   let literal = false
-  for (const a of args.slice(1)) {
+  for (let i = 1; i < args.length; i += 1) {
+    const a = args[i]
     if (!literal) {
       // A bare `--` ends the flags for the CURRENT field, so a text that begins
       // with a dash stays writable without a second command.
@@ -768,6 +783,14 @@ export function parseSetArgs(rest) {
       }
       if (a === '--title' || a === '--estimate') {
         field = a.slice(2)
+        continue
+      }
+      if (a === '--if-estimate') {
+        const expected = args[i + 1]
+        if (!expected || expected.startsWith('--')) throw new Error('board-queue: --if-estimate needs an estimate value')
+        if (out.ifEstimate !== null) throw new Error('board-queue: --if-estimate was given more than once')
+        out.ifEstimate = expected
+        i += 1
         continue
       }
       if (a === SET_STDIN_FLAG) {

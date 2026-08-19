@@ -8,6 +8,7 @@ import {
   classSummaries,
   estimateForLanding,
   estimateTail,
+  elapsedHoursToTick,
   ESTIMATE_FLOOR_HOURS,
   factorForCard,
   formatEstimate,
@@ -15,13 +16,16 @@ import {
   inheritanceDefaults,
   inheritedEstimate,
   inheritedEstimateForClass,
+  INHERITED_ESTIMATE_NOTE,
   ledgerAfterApply,
   mergedBranchPoint,
   MIN_CLASS_SAMPLES,
   parseCriticality,
+  parseCalibrationArgs,
   parseEstimateHours,
   parseFirstParentChain,
   parseTickEvents,
+  pictureVerifiedPoints,
   rewritePlan,
   roundHours,
   SPAN_NO_BRANCH,
@@ -128,13 +132,13 @@ describe('attributing a merge to a point', () => {
 
   it('trusts a merge that names its own branch', () => {
     const out = attributeMerges(chain, [{ point: 42, sha: 'tick1', at: 300 }])
-    expect(out.get(42)).toMatchObject({ attribution: 'branch-name' })
+    expect(out.get(42)).toMatchObject({ attribution: 'named' })
     expect(out.get(42).merge.sha).toBe('merge1x')
   })
 
   it('recovers the merge of a written-subject landing from the landing sequence', () => {
     const out = attributeMerges(chain, [{ point: 99, sha: 'tick2', at: 500 }])
-    expect(out.get(99)).toMatchObject({ attribution: 'nearest-merge' })
+    expect(out.get(99)).toMatchObject({ attribution: 'inferred' })
     expect(out.get(99).merge.sha).toBe('merge2')
   })
 
@@ -167,7 +171,7 @@ describe('attributing a merge to a point', () => {
       { point: 42, sha: 'tick2', at: 500 },
     ])
     expect(out.has(96)).toBe(false)
-    expect(out.get(42)).toMatchObject({ attribution: 'branch-name' })
+    expect(out.get(42)).toMatchObject({ attribution: 'named' })
     expect(out.get(42).merge.sha).toBe('merge1x')
   })
 
@@ -185,8 +189,20 @@ describe('attributing a merge to a point', () => {
       ['tickY 10600 mergeY\tTick a point', 'mergeY 10000 base sideY\tA written merge subject', 'base 100\tRoot'].join('\n'),
     )
     expect(attributeMerges(fresh, [{ point: 94, sha: 'tickY', at: 10600 }]).get(94)).toMatchObject({
-      attribution: 'nearest-merge',
+      attribution: 'inferred',
     })
+  })
+
+  it('fences a named merge at the tick, so later rework cannot build an earlier landing', () => {
+    const reworked = parseFirstParentChain(
+      [
+        "later 500 old side2\tMerge branch 'feat/42-named-branch'",
+        'tick 400 earlier\tTick the first landing',
+        "earlier 300 base side1\tMerge branch 'feat/42-named-branch'",
+        'base 100\tRoot',
+      ].join('\n'),
+    )
+    expect(attributeMerges(reworked, [{ point: 42, sha: 'tick', at: 400 }]).get(42).merge.sha).toBe('earlier')
   })
 
   it('reads a branch name off a merge subject, and nothing else', () => {
@@ -197,6 +213,15 @@ describe('attributing a merge to a point', () => {
 })
 
 describe('distributions', () => {
+  it('the elapsed span ends at the tick and not at the merge', () => {
+    const firstCommit = 1000
+    const merge = 1600
+    const tick = 1900
+    expect(elapsedHoursToTick(firstCommit, tick)).toBe(0.25)
+    expect(elapsedHoursToTick(firstCommit, tick)).not.toBe((merge - firstCommit) / 3600)
+    expect(elapsedHoursToTick(tick, firstCommit)).toBeNull()
+  })
+
   it('reports five numbers and no average', () => {
     expect(summarise([4, 1, 3, 2])).toEqual({ n: 4, min: 1, p25: 2, median: 2.5, p75: 4, max: 4 })
     expect(summarise([])).toEqual({ n: 0, min: null, p25: null, median: null, p75: null, max: null })
@@ -207,29 +232,32 @@ describe('distributions', () => {
   it('classifies a landing on all three axes', () => {
     expect(classesOf(landing({ criticality: null, delegated: false, picture: true }))).toEqual({
       criticality: UNTAGGED,
-      lane: 'main-session',
-      picture: 'picture',
+      lane: 'lane-unestablished',
+      picture: 'picture-verified',
     })
-    // No merge means no file list, so whether a picture check happened is UNKNOWN.
-    expect(classesOf(landing({ picture: null })).picture).toBe('picture-unknown')
+    expect(classesOf(landing({ picture: false })).picture).toBe('picture-unestablished')
   })
 
-  it('counts a class that has no measurable span but still exists', () => {
+  it('counts an unestablished lane without relabelling it main-session', () => {
     const rows = [...classOf(6, 0.3), ...mainSessionLandings(1)]
     const lanes = classSummaries(rows, 'lane')
-    const main = lanes.find((c) => c.name === 'main-session')
-    expect(main.points).toBe(1)
-    expect(main.ratio.n).toBe(0)
-    expect(main.comparable).toBe(false)
-    // …and says WHY: no branch, so no further landing will ever measure it.
-    expect(main.structural).toBe(true)
+    const unknown = lanes.find((c) => c.name === 'lane-unestablished')
+    expect(unknown.points).toBe(1)
+    expect(unknown.ratio.n).toBe(0)
+    expect(unknown.comparable).toBe(false)
+    expect(unknown.unknowable).toBe(true)
   })
 
-  it('separates a class that CANNOT be measured from one that merely is not yet', () => {
-    const thin = [...classOf(6, 0.3), landing({ point: 9, delegated: false, elapsedHours: 0.4 })]
-    const main = classSummaries(thin, 'lane').find((c) => c.name === 'main-session')
-    // This one has a span, so the class is thin, not unknowable.
-    expect(main.structural).toBe(false)
+  it('keeps an all-no-branch criticality class pending rather than permanently structural', () => {
+    const low = classSummaries(mainSessionLandings(3, { criticality: 'low' }), 'criticality')[0]
+    expect(low.name).toBe('low')
+    expect(low.comparable).toBe(false)
+    expect(low.unknowable).toBe(false)
+  })
+
+  it('establishes picture verification only from retained branch records', () => {
+    expect([...pictureVerifiedPoints({ 'feat/42-view': 'abc', main: 'def', 'feat/no-number': 'ghi' })]).toEqual([42])
+    expect([...pictureVerifiedPoints(null)]).toEqual([])
   })
 })
 
@@ -240,19 +268,19 @@ describe('is one global factor honest?', () => {
     picture: classSummaries(rows, 'picture'),
   })
 
-  it('adopts one factor when every axis that CAN be compared stays together', () => {
-    // Exactly the shape the command produces: two measurable classes per usable
-    // axis, plus main-session landings that carry no span at all. The lane axis
-    // is therefore not decidable — which is a stated residual, not a vote.
+  it('adopts one factor when measured classes agree and missing-information axes are named residuals', () => {
     const rows = [
       ...classOf(6, 0.3, { criticality: 'medium', picture: false, delegated: true }),
       ...classOf(6, 0.32, { criticality: 'high', picture: true, delegated: true }),
-      ...mainSessionLandings(4, { criticality: 'low' }),
+      ...mainSessionLandings(4, { criticality: 'medium' }),
     ].map((r, i) => ({ ...r, point: 200 + i }))
     const decision = globalFactorDecision(axesFrom(rows))
     expect(decision.adopted).toBe(true)
-    expect(decision.reason).toMatch(/adopted — criticality, picture compared/)
-    expect(decision.undecidable).toEqual(['lane not decidable — main-session can carry no measured span'])
+    expect(decision.reason).toMatch(/adopted — criticality compared/)
+    expect(decision.undecidable).toEqual([
+      'lane excluded — lane-unestablished groups landings whose lane is not established',
+      'picture excluded — picture-unestablished groups landings whose picture is not established',
+    ])
   })
 
   it('REFUSES it while a measurable class is merely thin', () => {
@@ -266,19 +294,19 @@ describe('is one global factor honest?', () => {
     ].map((r, i) => ({ ...r, point: 200 + i }))
     const decision = globalFactorDecision(axesFrom(rows))
     expect(decision.adopted).toBe(false)
-    expect(decision.reason).toMatch(/lane has 1 comparable class\(es\), too few to compare/)
+    expect(decision.reason).toMatch(/criticality pending classes lack comparables: low/)
   })
 
-  it('REFUSES it when the classes differ, and names the axis that refused', () => {
+  it('REFUSES it when establishable classes differ, and names the axis that refused', () => {
     const rows = [
       ...classOf(6, 0.25, { criticality: 'medium', picture: false, delegated: true }),
       ...classOf(6, 0.25, { criticality: 'high', picture: false, delegated: true }),
-      // The picture class takes four times as long as its estimate promised.
+      // The low criticality class takes four times as long as its estimate promised.
       ...classOf(6, 1.2, { criticality: 'low', picture: true, delegated: true }),
     ].map((r, i) => ({ ...r, point: 300 + i }))
     const decision = globalFactorDecision(axesFrom(rows))
     expect(decision.adopted).toBe(false)
-    expect(decision.reason).toMatch(/picture classes differ by/)
+    expect(decision.reason).toMatch(/criticality classes differ by/)
     expect(decision.factor).toBeNull()
   })
 
@@ -297,15 +325,26 @@ describe('is one global factor honest?', () => {
       { name: 'b', comparable: true, points: 5, ratio: { median: 0.6 } },
       { name: 'c', comparable: false, points: 1, ratio: { median: 99 } },
     ]
-    expect(axisSpread(summaries)).toEqual({ classes: 2, spread: 2, structural: [], pending: 1 })
-    expect(axisSpread([summaries[0]])).toEqual({ classes: 1, spread: null, structural: [], pending: 0 })
-    // A structural class is named, and does NOT count as one that could grow.
-    expect(axisSpread([summaries[0], { name: 'main-session', comparable: false, structural: true, points: 3, ratio: {} }])).toEqual({
+    expect(axisSpread(summaries)).toEqual({ classes: 2, spread: 2, unknowable: [], pending: ['c'] })
+    expect(axisSpread([summaries[0]])).toEqual({ classes: 1, spread: null, unknowable: [], pending: [] })
+    expect(axisSpread([summaries[0], { name: 'lane-unestablished', comparable: false, unknowable: true, points: 3, ratio: {} }])).toEqual({
       classes: 1,
       spread: null,
-      structural: ['main-session'],
-      pending: 0,
+      unknowable: ['lane-unestablished'],
+      pending: [],
     })
+  })
+
+  it('REFUSES a global factor when a third establishable class is still pending', () => {
+    const summary = (name, n, median) => ({ name, comparable: n >= MIN_CLASS_SAMPLES, points: n, ratio: { n, median }, unknowable: false })
+    const byAxis = {
+      criticality: [summary('low', 5, 0.5), summary('medium', 5, 0.52), summary('maximum', 1, 9)],
+      lane: [{ ...summary('lane-unestablished', 3, null), unknowable: true }],
+      picture: [{ ...summary('picture-unestablished', 3, null), unknowable: true }],
+    }
+    const decision = globalFactorDecision(byAxis)
+    expect(decision.adopted).toBe(false)
+    expect(decision.reason).toMatch(/criticality pending classes lack comparables: maximum/)
   })
 })
 
@@ -361,22 +400,51 @@ describe('the rewrite plan', () => {
     expect(plan[0].reason).toMatch(/leaves it where it is/)
   })
 
-  it('uses the global factor for every card once one was adopted', () => {
+  it('uses a global factor only for a class that itself has landed comparables', () => {
     const flat = [
       ...classOf(6, 0.5, { criticality: 'high', picture: true, delegated: true }),
       ...classOf(6, 0.52, { criticality: 'low', picture: false, delegated: true }),
-      ...mainSessionLandings(3),
+      ...mainSessionLandings(3, { criticality: 'high' }),
     ].map((r, i) => ({ ...r, point: 600 + i }))
     const uniform = calibrationReading(flat)
     // ASSERTED, not conditional: a test that only checks the global factor when
     // one was adopted asserts nothing the day adoption breaks.
     expect(uniform.decision.adopted).toBe(true)
-    expect(factorForCard(uniform, 'anything-at-all').basis).toBe('global')
-    expect(factorForCard(uniform, 'anything-at-all').factor).toBe(uniform.overall.ratio.median)
+    expect(factorForCard(uniform, 'high').basis).toBe('global')
+    expect(factorForCard(uniform, 'high').factor).toBe(uniform.overall.ratio.median)
+    expect(factorForCard(uniform, 'anything-at-all')).toMatchObject({ factor: null, basis: null })
     // The reading above REFUSES it, so the per-class fallback is what holds there.
     expect(reading.decision.adopted).toBe(false)
     expect(factorForCard(reading, 'maximum').factor).toBeNull()
     expect(factorForCard(reading, 'medium').basis).toBe('criticality:medium')
+  })
+
+  it('plans an unseen class unchanged even under an adopted global factor', () => {
+    const flat = [
+      ...classOf(6, 0.5, { criticality: 'high', picture: true }),
+      ...classOf(6, 0.52, { criticality: 'low', picture: true }),
+      ...mainSessionLandings(3, { criticality: 'high' }),
+    ]
+    const uniform = calibrationReading(flat)
+    expect(uniform.decision.adopted).toBe(true)
+    const [planned] = rewritePlan(uniform, {
+      cards: { 99: { estimate: '~8 h' } },
+      open: [99],
+      criticality: new Map([[99, 'maximum']]),
+    })
+    expect(planned).toMatchObject({ point: 99, from: '~8 h', to: '~8 h', changed: false })
+    expect(planned).not.toHaveProperty('factor')
+    expect(planned.reason).toMatch(/class "maximum" has no landed comparable/)
+  })
+
+  it('never corrects an inherited class median into a stored baseline', () => {
+    const [planned] = rewritePlan(reading, {
+      cards: { 15: { estimate: `~2 h ${INHERITED_ESTIMATE_NOTE}` } },
+      open: [15],
+      criticality: new Map([[15, 'medium']]),
+    })
+    expect(planned).toMatchObject({ point: 15, changed: false, to: `~2 h ${INHERITED_ESTIMATE_NOTE}` })
+    expect(planned.reason).toMatch(/inherited class median/)
   })
 })
 
@@ -439,8 +507,35 @@ describe('the baseline ledger', () => {
 
   it('names where a landing\'s estimate came from', () => {
     expect(estimateForLanding({ 10: { baseline: '~4 h' } }, 10, '~1 h')).toEqual({ estimate: '~4 h', source: 'snapshot' })
-    expect(estimateForLanding({}, 10, '~1 h')).toEqual({ estimate: '~1 h', source: 'current' })
+    expect(estimateForLanding({}, 10, '~1 h')).toEqual({ estimate: '~1 h', source: 'unreconstructable' })
     expect(estimateForLanding({}, 10, null)).toEqual({ estimate: null, source: null })
+  })
+
+  it('keeps a pre-ledger live estimate as context but out of every ratio', () => {
+    const context = estimateForLanding({}, 10, '~1 h')
+    const measured = calibrationReading([landing({ estimateHours: context.source === 'snapshot' ? parseEstimateHours(context.estimate) : null })])
+    expect(context).toMatchObject({ estimate: '~1 h', source: 'unreconstructable' })
+    expect(measured.overall.elapsed.n).toBe(1)
+    expect(measured.overall.ratio.n).toBe(0)
+    expect(measured.factors).toEqual({})
+  })
+})
+
+describe('calibration command arguments', () => {
+  it('refuses a missing option value instead of swallowing --apply', () => {
+    expect(() => parseCalibrationArgs(['--since', '--apply'])).toThrow(/--since needs a value/)
+  })
+
+  it('requires explicit all and a positive integer limit', () => {
+    expect(parseCalibrationArgs(['--since', 'all', '--limit', '4'])).toMatchObject({ sinceSeconds: null, limit: 4 })
+    expect(() => parseCalibrationArgs(['--since', 'nonsense'])).toThrow(/not a duration, date, or "all"/)
+    for (const value of ['0', '-1', '1.5', 'x']) {
+      expect(() => parseCalibrationArgs(['--limit', value])).toThrow(/positive integer/)
+    }
+  })
+
+  it('refuses every unrecognised argument', () => {
+    expect(() => parseCalibrationArgs(['--aply'])).toThrow(/unrecognised argument/)
   })
 })
 

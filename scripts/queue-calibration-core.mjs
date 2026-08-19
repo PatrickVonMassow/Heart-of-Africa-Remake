@@ -17,11 +17,11 @@
 // smaller of the two whenever it does. Averaging them would produce a figure
 // that is true of neither. They are computed apart and reported apart.
 //
-// THE SPAN ENDS AT THE LANDING, NOT AT THE MERGE. The estimate this measures is
-// defined as the time by which the work is VISIBLY DONE — merged, gated, ticked,
-// board updated. A span that stopped at the merge left the gate, the picture
-// check and the board update outside the very duration the promise is calibrated
-// against, and every one of those happens after it.
+// BOTH ENDPOINTS ARE TICKS. A point's elapsed span ends at its own work-order
+// TICK, and cadence runs from one work-order TICK to the next. The estimate is
+// the time by which the work is VISIBLY DONE — merge, gate, picture check and
+// board update all happen before that tick reaches the reader. Ending at the
+// merge would calibrate the promise against a moment the reader never sees.
 //
 // A DISTRIBUTION, NEVER A MEAN. The elapsed times are heavy-tailed — a branch cut
 // early and merged days later sits in the same sample as one built and landed in
@@ -29,11 +29,12 @@
 // five-number summary, and every correction factor is a MEDIAN of ratios.
 //
 // THE CLASSES DECIDE WHETHER ONE FACTOR IS HONEST. The reading is split three
-// ways — the point's criticality tag, whether it was delegated to a branch or
-// done in the main session, and whether a picture verification was part of it —
-// and a single global factor is adopted ONLY if no axis separates. When one does,
-// the global factor is REFUSED by name and the rewrite falls back to the one axis
-// that is knowable BEFORE a point starts: its criticality tag.
+// ways — the point's criticality tag, an established delegated lane or an
+// unestablished lane, and an established picture verification or an
+// unestablished picture class. Missing-information classes are residuals, never
+// negative evidence. A single global factor is adopted ONLY if every eligible
+// axis agrees; otherwise the rewrite falls back to criticality, the one axis a
+// queued card already establishes.
 
 /**
  * Where the measured defaults live — beside the board data they serve, and
@@ -64,7 +65,63 @@ export const UNTAGGED = 'untagged'
 /** The axes the reading is split by, in report order. */
 export const AXES = Object.freeze(['criticality', 'lane', 'picture'])
 
+/** Missing-information classes can never become comparisons by adding members. */
+export const UNKNOWABLE_CLASSES = new Set(['lane-unestablished', 'picture-unestablished'])
+
 const asNumber = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+/** Parse the calibration command without letting an option consume another one. */
+export function parseCalibrationArgs(argv, { now = Date.now() } = {}) {
+  const args = (Array.isArray(argv) ? argv : []).map(String)
+  const out = { apply: false, since: '14d', sinceSeconds: null, limit: 0, stateDir: null }
+  const seen = new Set()
+  const valueAfter = (i, name) => {
+    const value = args[i + 1]
+    if (!value || value.startsWith('--')) throw new Error(`${name} needs a value`)
+    return value
+  }
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i]
+    if (seen.has(arg)) throw new Error(`${arg} was given more than once`)
+    if (arg === '--apply') {
+      seen.add(arg)
+      out.apply = true
+      continue
+    }
+    if (arg === '--since') {
+      seen.add(arg)
+      out.since = valueAfter(i, arg)
+      i += 1
+      continue
+    }
+    if (arg === '--limit') {
+      seen.add(arg)
+      const value = valueAfter(i, arg)
+      if (!/^\d+$/.test(value) || Number(value) <= 0) throw new Error('--limit must be a positive integer')
+      out.limit = Number(value)
+      i += 1
+      continue
+    }
+    if (arg === '--state-dir') {
+      seen.add(arg)
+      out.stateDir = valueAfter(i, arg)
+      i += 1
+      continue
+    }
+    throw new Error(`unrecognised argument "${arg}"`)
+  }
+  if (out.since === 'all') return out
+  const relative = /^(\d+(?:\.\d+)?)([dh])$/.exec(out.since)
+  if (relative) {
+    const seconds = Number(relative[1]) * (relative[2] === 'd' ? 86400 : 3600)
+    out.sinceSeconds = Math.floor(now / 1000 - seconds)
+    return out
+  }
+  const parsed = Date.parse(out.since)
+  if (!Number.isFinite(parsed)) throw new Error(`--since value "${out.since}" is not a duration, date, or "all"`)
+  out.sinceSeconds = Math.floor(parsed / 1000)
+  return out
+}
 
 /**
  * Hours out of a stored estimate: `~1,5 h · Feature` → 1.5.
@@ -243,23 +300,25 @@ export function parseFirstParentChain(log) {
 export function attributeMerges(chain, ticks, { lookback = MERGE_LOOKBACK, maxLagHours = MERGE_MAX_LAG_HOURS } = {}) {
   const rows = Array.isArray(chain) ? chain : []
   const index = new Map(rows.map((c, i) => [c.sha, i]))
-  const named = new Map()
   const owner = new Map()
   for (const c of rows) {
     const point = mergedBranchPoint(c.subject)
     if (point === null) continue
     owner.set(c.sha, point)
-    if (!named.has(point)) named.set(point, c)
   }
   const claimed = new Set()
   const out = new Map()
   const events = [...(Array.isArray(ticks) ? ticks : [])].sort((a, b) => a.at - b.at)
   // PASS 1 — every merge that names its own branch, before any guess is made.
   for (const tick of events) {
-    const byName = named.get(tick.point)
+    // `rows` is newest-first: this is the newest matching merge on or BEFORE
+    // the first tick. A later rework merge cannot build an earlier landing.
+    const byName = rows.find(
+      (c) => owner.get(c.sha) === tick.point && c.at <= tick.at && !claimed.has(c.sha),
+    )
     if (!byName || claimed.has(byName.sha)) continue
     claimed.add(byName.sha)
-    out.set(tick.point, { merge: byName, attribution: 'branch-name' })
+    out.set(tick.point, { merge: byName, attribution: 'named' })
   }
   // PASS 2 — the landing sequence, for the ticks that pass 1 left over.
   const maxLag = Math.max(0, Number(maxLagHours) || 0) * 3600
@@ -277,7 +336,7 @@ export function attributeMerges(chain, ticks, { lookback = MERGE_LOOKBACK, maxLa
       // Older still means further away, so nothing behind this one can qualify.
       if (tick.at - c.at > maxLag) break
       claimed.add(c.sha)
-      out.set(tick.point, { merge: c, attribution: 'nearest-merge' })
+      out.set(tick.point, { merge: c, attribution: 'inferred' })
       break
     }
   }
@@ -301,20 +360,13 @@ export function summarise(values) {
 }
 
 /**
- * WHY a landing has, or has not, a measurable span — the difference between
- * "nobody has measured this yet" and "this can never be measured".
- *
- * `no-branch` is STRUCTURAL: a point done in the main session leaves no branch,
- * so no amount of further landings will ever give its class a span. `unknown` is
- * incidental — a merge exists but its second parent is gone after a history
- * rewrite — and more landings WILL fill that class in.
+ * WHY a landing has, or has not, a measurable span. These describe individual
+ * rows only; they never make a criticality class permanently unmeasurable.
+ * Future delegated landings can always add measured spans to that class.
  */
 export const SPAN_MEASURED = 'branch-to-landing'
 export const SPAN_NO_BRANCH = 'no-branch'
 export const SPAN_UNKNOWN = 'unknown'
-
-/** The bases that no further landing of the same kind can ever turn into a span. */
-const STRUCTURAL_SPAN_BASES = new Set([SPAN_NO_BRANCH])
 
 /** A landing's span basis — inferred for a row that does not carry one. */
 export function spanBasisOf(landing) {
@@ -326,29 +378,52 @@ export function spanBasisOf(landing) {
 /**
  * Which class a landing falls into on each axis.
  *
- * A landing whose merge was never found has no file list either, so whether a
- * picture check was part of it is UNKNOWN — not "no picture". Saying "no" there
- * would be the same silent guess the lane axis was making.
+ * Absence of a named merge does not establish main-session work, and absence of
+ * retained render state does not establish "no picture". Both become explicit
+ * missing-information classes instead of proxy-derived answers.
  */
 export function classesOf(landing) {
-  const picture = landing?.picture
+  const lane = landing?.lane ?? (landing?.delegated === true ? 'delegated' : 'lane-unestablished')
+  const picture = landing?.pictureClass ?? (landing?.picture === true ? 'picture-verified' : 'picture-unestablished')
   return {
     criticality: landing?.criticality ?? UNTAGGED,
-    lane: landing?.delegated ? 'delegated' : 'main-session',
-    picture: picture === null || picture === undefined ? 'picture-unknown' : picture ? 'picture' : 'no-picture',
+    lane,
+    picture,
   }
+}
+
+/** Points whose still-retained branch record establishes a picture verification. */
+export function pictureVerifiedPoints(clearedHeads) {
+  const out = new Set()
+  const heads = clearedHeads && typeof clearedHeads === 'object' && !Array.isArray(clearedHeads) ? clearedHeads : {}
+  for (const branch of Object.keys(heads)) {
+    const m = /^(?:origin\/)?feat\/(\d+)-/.exec(branch)
+    if (m) out.add(Number(m[1]))
+  }
+  return out
+}
+
+/**
+ * Elapsed hours from a branch's first commit to the work-order TICK.
+ *
+ * The merge time is deliberately not an input. The gate, picture check and
+ * board update sit after it, and the reader sees completion only at the tick.
+ */
+export function elapsedHoursToTick(firstCommitAt, tickAt) {
+  const first = asNumber(firstCommitAt)
+  const tick = asNumber(tickAt)
+  return first !== null && tick !== null && tick >= first ? (tick - first) / 3600 : null
 }
 
 /**
  * One axis's classes, each with its elapsed and ratio distributions.
  *
  * A landing with no MEASURABLE elapsed time still counts towards the class's
- * size — a main-session point has no branch, so it has no first-commit-to-landing
- * span at all, and reporting the class as empty would hide that it exists.
+ * size. Reporting only rated members would hide the evidence gaps themselves.
  *
- * A class where EVERY member is unmeasurable for a structural reason is marked
- * `structural`, and that mark is what keeps the decision below honest: such a
- * class is not thin, it is unknowable, and the two must not be reported alike.
+ * Only a class whose NAME records missing information is unknowable. Every
+ * criticality class and every established process class is pending when thin:
+ * more measured landings can settle it.
  */
 export function classSummaries(landings, axis) {
   const groups = new Map()
@@ -360,14 +435,15 @@ export function classSummaries(landings, axis) {
   const out = []
   for (const [name, members] of groups) {
     const rated = members.filter((m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours))
+    const unknowable = UNKNOWABLE_CLASSES.has(name)
     out.push({
       axis,
       name,
       points: members.length,
       elapsed: summarise(members.map((m) => m.elapsedHours)),
       ratio: summarise(rated.map((m) => m.elapsedHours / m.estimateHours)),
-      comparable: rated.length >= MIN_CLASS_SAMPLES,
-      structural: members.length > 0 && members.every((m) => STRUCTURAL_SPAN_BASES.has(spanBasisOf(m))),
+      comparable: !unknowable && rated.length >= MIN_CLASS_SAMPLES,
+      unknowable,
     })
   }
   return out.sort((a, b) => b.ratio.n - a.ratio.n || String(a.name).localeCompare(String(b.name)))
@@ -377,17 +453,15 @@ export function classSummaries(landings, axis) {
  * How far apart an axis's trustworthy classes sit — max factor over min — plus
  * WHY it could not be measured when it could not.
  *
- * `structural` names the classes that can never carry a span; `pending` counts
- * the ones that merely have too few measured landings so far. An axis with a
- * null spread means something different in each case, and the decision below
- * treats them differently.
+ * `unknowable` names missing-information buckets; `pending` names establishable
+ * classes that merely have too few measured landings so far.
  */
 export function axisSpread(summaries) {
   const rows = Array.isArray(summaries) ? summaries : []
   const factors = rows.filter((s) => s.comparable).map((s) => s.ratio.median).filter((f) => asNumber(f) && f > 0)
-  const structural = rows.filter((s) => s.structural).map((s) => s.name)
-  const pending = rows.filter((s) => !s.comparable && !s.structural && (s.points ?? 0) > 0).length
-  const base = { classes: factors.length, structural, pending }
+  const unknowable = rows.filter((s) => !s.comparable && s.unknowable).map((s) => s.name)
+  const pending = rows.filter((s) => !s.comparable && !s.unknowable && (s.points ?? 0) > 0).map((s) => s.name)
+  const base = { classes: factors.length, unknowable, pending }
   if (factors.length < 2) return { ...base, spread: null }
   return { ...base, spread: Math.max(...factors) / Math.min(...factors) }
 }
@@ -406,25 +480,27 @@ export function axisSpread(summaries) {
  * the first run of this command adopted a global factor while the picture axis —
  * under-sampled, and therefore mute — sat at 7.5× against 0.28×.
  *
- * BUT AN AXIS THAT CAN NEVER BE COMPARED IS NOT A VOTE AGAINST. The lane axis is
- * exactly that: main-session work leaves no branch, so its class carries no span
- * and never will. Counting it as "too few measured" made the refusal permanent
- * and the adopt path unreachable — a decision that always says the same thing
- * decides nothing. Such an axis is reported as NOT DECIDABLE, by name and with
- * its classes, and is left out of the vote; the residual it leaves is stated
- * rather than dressed up as evidence. An axis whose classes are merely THIN still
- * refuses, because more landings would settle it.
+ * An axis whose only non-comparable classes are missing-information buckets is
+ * excluded from the vote and reported as a residual. A PENDING class always
+ * refuses adoption, even when two already-comparable neighbours agree: the
+ * unseen establishable class may still be radically different.
  */
 export function globalFactorDecision(byAxis, { tolerance = GLOBAL_FACTOR_TOLERANCE } = {}) {
   const spreads = AXES.map((axis) => ({ axis, ...axisSpread(byAxis[axis] ?? []) }))
-  const compared = spreads.filter((s) => asNumber(s.spread) !== null)
+  const undecidable = spreads.filter((s) => s.pending.length === 0 && s.unknowable.length > 0)
+  const compared = spreads.filter((s) => asNumber(s.spread) !== null && !undecidable.includes(s))
   const offenders = compared.filter((s) => s.spread > tolerance)
-  const undecidable = spreads.filter((s) => asNumber(s.spread) === null && s.pending === 0 && s.structural.length > 0)
-  const mute = spreads.filter((s) => asNumber(s.spread) === null && !undecidable.includes(s))
-  const residual = undecidable.map((u) => `${u.axis} not decidable — ${u.structural.join(', ')} can carry no measured span`)
-  if (offenders.length || mute.length || !compared.length) {
+  const pending = spreads.filter((s) => s.pending.length > 0)
+  const mute = spreads.filter(
+    (s) => asNumber(s.spread) === null && !undecidable.includes(s) && !pending.includes(s),
+  )
+  const residual = undecidable.map(
+    (u) => `${u.axis} excluded — ${u.unknowable.join(', ')} groups landings whose ${u.axis} is not established`,
+  )
+  if (offenders.length || pending.length || mute.length || !compared.length) {
     const said = [
       ...offenders.map((o) => `${o.axis} classes differ by ${o.spread.toFixed(2)}×`),
+      ...pending.map((p) => `${p.axis} pending classes lack comparables: ${p.pending.join(', ')}`),
       ...mute.map((m) => `${m.axis} has ${m.classes} comparable class(es), too few to compare`),
       ...(compared.length ? [] : ['no axis was compared at all']),
     ]
@@ -487,12 +563,21 @@ export function calibrationReading(landings, { cadenceHours = [], window = null,
  */
 export function factorForCard(reading, criticality) {
   const label = criticality ?? UNTAGGED
+  const ownClass = (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
+  if (!ownClass?.comparable || ownClass.ratio?.n < MIN_CLASS_SAMPLES) {
+    return {
+      factor: null,
+      basis: null,
+      label,
+      reason: `class "${label}" has no landed comparable (fewer than ${MIN_CLASS_SAMPLES} measured landings)`,
+    }
+  }
   if (reading?.decision?.adopted && asNumber(reading.decision.factor)) {
-    return { factor: reading.decision.factor, basis: 'global', label }
+    return { factor: reading.decision.factor, basis: 'global', label, reason: null }
   }
   const factor = asNumber(reading?.factors?.[label])
-  if (factor && factor > 0) return { factor, basis: `criticality:${label}`, label }
-  return { factor: null, basis: null, label }
+  if (factor && factor > 0) return { factor, basis: `criticality:${label}`, label, reason: null }
+  return { factor: null, basis: null, label, reason: `class "${label}" has no usable factor` }
 }
 
 /**
@@ -529,7 +614,7 @@ export function updateEstimateLedger(ledger, { cards = {}, open = [], now = Math
   const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0)) {
     const current = cards?.[point]?.estimate ?? null
-    if (!current) continue
+    if (!current || String(current).includes(INHERITED_ESTIMATE_NOTE)) continue
     const prev = ledgerEntry(out, point)
     // Our own last write, or the untouched baseline: the baseline stands.
     if (prev && (prev.applied?.estimate === current || prev.baseline === current)) continue
@@ -541,14 +626,17 @@ export function updateEstimateLedger(ledger, { cards = {}, open = [], now = Math
 /**
  * The estimate a landing is judged against, and where it came from.
  *
- * `snapshot` is the frozen promise; `current` is the live card, used only where
- * no snapshot exists yet — every landing from before this ledger was introduced.
- * The difference is REPORTED rather than smoothed over.
+ * `snapshot` is the frozen promise. Without one, today's mutable value is only
+ * CONTEXT and is marked `unreconstructable`; callers must not put it into a
+ * ratio. Both queue data and board HTML are untracked, so there is no history
+ * from which the landing-time value could be recovered.
  */
 export function estimateForLanding(ledger, point, currentEstimate) {
   const entry = ledgerEntry(ledger, point)
-  if (entry?.baseline) return { estimate: entry.baseline, source: 'snapshot' }
-  if (currentEstimate) return { estimate: currentEstimate, source: 'current' }
+  if (entry?.baseline && !String(entry.baseline).includes(INHERITED_ESTIMATE_NOTE)) {
+    return { estimate: entry.baseline, source: 'snapshot' }
+  }
+  if (currentEstimate) return { estimate: currentEstimate, source: 'unreconstructable' }
   return { estimate: null, source: null }
 }
 
@@ -570,8 +658,19 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     const from = cards?.[point]?.estimate ?? null
     const entry = ledgerEntry(ledger, point)
     const baseline = entry?.baseline ?? from
+    if (String(from ?? '').includes(INHERITED_ESTIMATE_NOTE) || String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)) {
+      plan.push({
+        point,
+        from,
+        baseline,
+        to: from,
+        changed: false,
+        reason: `inherited class median (${INHERITED_ESTIMATE_NOTE}) is not a stored baseline — estimate kept`,
+      })
+      continue
+    }
     const hours = parseEstimateHours(baseline)
-    const { factor, basis, label } = factorForCard(reading, crit.get(point))
+    const { factor, basis, label, reason: factorReason } = factorForCard(reading, crit.get(point))
     if (!hours) {
       plan.push({ point, from, baseline, to: from, changed: false, reason: 'no stored estimate to correct — the card keeps its "no estimate yet" marker' })
       continue
@@ -583,7 +682,7 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
         baseline,
         to: from,
         changed: false,
-        reason: `class "${label}" has no landed comparable (fewer than ${MIN_CLASS_SAMPLES} measured landings) — estimate kept`,
+        reason: `${factorReason ?? `class "${label}" has no landed comparable`} — estimate kept`,
       })
       continue
     }
@@ -612,10 +711,9 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
  * WHICH PLANNED CHANGES MAY STILL BE WRITTEN, given the file as it stands NOW.
  *
  * The measurement takes seconds to minutes and the main session writes the same
- * file, so the plan is checked against a FRESH read before anything is stored: a
- * card that still says what the plan read is written, one that has moved since is
- * left alone and named. Atomic writing prevents a torn file; only this prevents a
- * lost update.
+ * file, so this cheap pre-filter avoids spawning a writer for a card already
+ * known to have moved. It does NOT close the race: the board command's lock and
+ * compare-and-set guard make the later comparison and write one transaction.
  */
 export function applicableChanges(plan, liveCards = {}) {
   const written = []

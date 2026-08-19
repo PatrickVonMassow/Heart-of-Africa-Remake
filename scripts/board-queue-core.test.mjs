@@ -49,6 +49,7 @@ import {
   commissionDecision,
   commissionRefusal,
   COMMISSION_OVERRIDE_CMD,
+  estimateCompareDecision,
 } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
@@ -401,6 +402,11 @@ describe('the one-time import from a hand-written board', () => {
     const html = board(renderQueueCard({ point: 4, title: 'Vier', body: null, meta: QUEUE_STUB_META }))
     expect(importQueueFromHtml(html).points[4].body).toBeNull()
   })
+
+  it('does not import an inherited class median as an authored estimate', () => {
+    const html = board(renderQueueCard({ point: 4, title: 'Vier', body: 'Text.', meta: '~2 h · Klassenmedian' }))
+    expect(importQueueFromHtml(html).points[4].estimate).toBeNull()
+  })
 })
 
 describe('a data file that does not parse stops the command (point 530, finding 1)', () => {
@@ -673,6 +679,25 @@ describe('parseSetArgs — the flags behind one `set` call', () => {
       title: 'Ein Titel',
       estimate: '~2 h Der Text.',
     })
+  })
+  it('parses an optional exact estimate guard without storing it as card text', () => {
+    expect(parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '~2 h'])).toMatchObject({
+      point: '452',
+      estimate: '~1 h',
+      ifEstimate: '~2 h',
+    })
+    expect(() => parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '--title'])).toThrow(
+      /--if-estimate needs an estimate value/,
+    )
+  })
+  it('makes the compare-and-set decision by exact stored value', () => {
+    expect(estimateCompareDecision('~2 h', '~2 h')).toEqual({ matched: true, current: '~2 h', expected: '~2 h' })
+    expect(estimateCompareDecision('~2,5 h', '~2 h')).toEqual({
+      matched: false,
+      current: '~2,5 h',
+      expected: '~2 h',
+    })
+    expect(estimateCompareDecision(null, '~2 h').matched).toBe(false)
   })
   it('names which field --text-stdin fills — the umlaut-safe path for a TITLE', () => {
     expect(parseSetArgs(['452', '--text-stdin']).stdinField).toBe('body')
