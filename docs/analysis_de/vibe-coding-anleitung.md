@@ -33,13 +33,20 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
   verfügbare Version.
 - Ein **sekundäres, anderes Modell** übernimmt das **Vier-Augen-Prinzip**, die
   **Ausweichstufe** — und die **harten Fälle**: als schwierig/fehleranfällig
-  Eingeschätztes, und was nach einer Nachbesserung immer noch durchfällt.
+  Eingeschätztes.
+- Hat ein Modell ein **knappes** Kontingent, ist es die **Eskalationsstufe**, und die
+  greift erst nach **mehreren** erfolglosen Prüfrunden, nicht nach der ersten. Eine
+  Schwelle von eins verbrennt die knappste Spur an Arbeit, die eine weitere gewöhnliche
+  Runde erledigt hätte. Die Zahl steht an **genau einer** Stelle im Code; steht sie in
+  fünf Formulierungen, veraltet sie in vieren.
 
 > *Prompt:* „Gewöhnliche Arbeit macht **\<primäres Modell\>**. **\<sekundäres Modell\>**
 > übernimmt Vier-Augen, Ausweichstufe und als schwierig/fehleranfällig eingeschätzte
-> Aufgaben — ebenso Arbeit, die nach einer Nachbesserung erneut durchfällt. Etabliere
-> einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells erkennt und die
-> Arbeit stoppt, statt sie stillschweigend zu übernehmen."
+> Aufgaben. Ist eine Spur knapp, gehe erst nach **\<n\>** erfolglosen Prüfrunden dorthin,
+> zähle die Runden aus dem Prüfprotokoll statt aus einem Schalter, und halte die Zahl als
+> eine einzige Konstante. Etabliere einen Mechanismus, der ein Arbeitsergebnis eines
+> **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
+> übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
@@ -409,4 +416,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b7e491ceaf552bab2b48162930e381292e6243d334cdea2661dcbd2dfe5fbdc0 -->
+<!-- GUIDE-FINGERPRINT: 0f29ac9a6c99b803a450e2eb3afd29ce4aea322171a766e72975f6e4f1c3df88 -->
