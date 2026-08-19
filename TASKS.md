@@ -140,6 +140,62 @@ put it is the mistake this line exists to stop.
   it, and the redundancy is what makes such a drift invisible.
   Bundle: Modell & Wächter.
 
+- [ ] 727. A repeated review round is re-framed, and the spec is examined before the lane escalates
+  (user 19.08.2026, chat: "4. klingt gut. Mach das so und reihe das hinter 726 ein"). Point 726
+  raises the Fable escalation to five unsuccessful review rounds; this point is what happens
+  DURING those five, and it depends on 726 for the count and the constant. Today a round that
+  returns problems is answered by repeating the same commission — same lane, same framing, same
+  spec — and only the counter moves. Measured 18./19.08.2026: point 713 reached its SIXTH review
+  round with rounds 3–5 driven by Fable, so the scarcest pool paid for a point that was not
+  converging, and nothing in its record says whether five rounds meant a hard problem or an
+  ambiguous spec. Point 712 shows the other shape — a Fable round (7 commits) followed by a Sol
+  AUTHORING round (12 commits), an interlude rather than a handover. CLAUDE.md §6 already names
+  the remedy for the correlated case (a re-run of one model varies least where it is confidently
+  blind, so the weaker fallback is DECORRELATED BY FRAMING); nothing applies it to a re-authoring
+  round.
+  FINAL STATE:
+  - A RE-AUTHORING ROUND IS DECORRELATED, NEVER REPEATED. Every round after the first carries,
+    beside the review's findings, an explicit decorrelating FRAMING — the hostile-tester framing
+    of §6 — and `scripts/author-sol.mjs` composes it into the commission and RECORDS which framing
+    that round ran under. Two consecutive rounds of one point never carry the same framing; a
+    round whose record names no framing is reported as a repeat rather than counted as a fresh
+    attempt.
+  - THE SPEC IS EXAMINED BEFORE THE LANE ESCALATES. On reaching the round DERIVED from
+    `FABLE_ESCALATION_ROUNDS` (the round before the threshold — no second literal), the next
+    commission is not an authoring round at all: the point's own text and its
+    `scripts/point-brief.mjs` brief are read against the findings of the rounds so far, and the
+    result is either an amendment of the point in the work order or a recorded verdict that the
+    spec is sound and the difficulty is real. Only then does the count advance to Fable. A point
+    whose examination is recorded is never examined twice.
+  - THE EXAMINATION IS CROSS-VENDOR AND COSTS THE SCARCE POOL NOTHING. It reads text, runs no
+    suite, and goes to the vendor that did NOT author the rounds — `node scripts/ask-sol.mjs
+    --kind audit` where Claude authored, a Claude read where Sol authored — per §6's cross-vendor
+    rule. It is a read-only ask: it writes no commit.
+  - THE ROUND HISTORY IS ONE READING. `scripts/author-sol.mjs` reports in its lane verdict the
+    number of unsuccessful rounds (726's ledger-derived count), the framing each ran under, and
+    whether the spec examination has happened — so a dispatcher sees WHY the point stands where it
+    does instead of reconstructing it from commit trailers, which is how the 713 history had to be
+    read.
+  - THE OPERATOR OVERRIDE AND THE MERGER ROLE ARE UNTOUCHED. An explicit `override` or an
+    `Author lane: fable` line still sends a point to Fable at once. The blind-merge MERGER — the
+    model that authored neither list (§6) — is decided by `scripts/blind-merge.mjs` /
+    `mechanism-review.mjs --merged-by`, which consult no lane function (measured 19.08.2026); this
+    point introduces no route that would make an authoring lane decide a merge.
+  VERIFIABLE: Vitest over the pure core — round 1 commissions without a framing; rounds 2 to
+  `FABLE_ESCALATION_ROUNDS - 2` each carry a framing, and a different one from the round before;
+  the round derived from the constant returns the spec-examination step instead of an authoring
+  commission, and returns the ordinary commission once an examination is recorded for that point;
+  a point with no record is round 0 and commissions normally; every reason string and every
+  boundary is pinned to the constant, so changing 5 moves the tests with it; and a case FAILS on a
+  round-number literal introduced outside the constant. Plus one observed run of
+  `scripts/author-sol.mjs --routing` on a real point that has turned at least two rounds, whose
+  report names its rounds, their framings and the examination state.
+  Criticality: medium — nothing renders wrong and no state is corrupted, but this mechanism decides
+  where the scarcest model pool is spent, and a wrong answer is silent.
+  DEPENDS ON 726: the round count and the exported constant come from there, so this point is
+  not started before 726 has landed.
+  Bundle: Modell & Wächter.
+
 - [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
   in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
   leer. Soll das so sein?«; and at 20:07: »Lege einen neuen Punkt an, um das Problem mit dem
@@ -367,17 +423,25 @@ put it is the mistake this line exists to stop.
   closed point with an armed launcher; a spent budget with a written handoff and an armed
   launcher joins it. Every other stop stays illegal, so the guard can never be talked into
   an idle stop by writing a handoff for work that was never started.
-  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
-  covers the session that hands over deliberately; it does nothing for the agent that dies
-  without one, and that is the case that actually cost work. Two feature branches sat in
-  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
-  one fully superseded — and the only thing that found them was a resuming session running
-  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
-  `main` does not contain and no live agent behind it, with its point, its last commit and
-  its age, exactly as it reports the work order; and a branch whose work has landed under
-  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
-  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
-  contained branch is not — plus the resume hook printing it.
+  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE. The handoff covers the session
+  that hands over deliberately; it does nothing for the agent that dies without one, and
+  that is the case that actually cost work. MEASURED 19.08.2026 09:20 on `main`, by a
+  resuming session that ran `git worktree list` on a hunch — the same hunch that first
+  found the problem on 11.08.: SEVEN feature branches carry commits `main` does not
+  contain, with no process behind any of them — `feat/687-roam-bound-fixes` (45),
+  `feat/687-bank-game` (35), `feat/713-now-section-derived` (25), `feat/686-five-word-lexicon`
+  (14), `feat/595-598-verification-ladder-brief` (6), `feat/336-croc-staging` (5),
+  `feat/581-settlement-boundary-contrast` (3). Nothing reports them, so the work reads as
+  untouched from the work order while it sits built in the tree. THE SECOND COST IS THE
+  DELEGATION: every point disjoint enough to fill a free pool slot is one of these
+  branches, so a free slot cannot be filled by a fresh agent at all — it needs a careful
+  REVIVAL (merge `main` in, verify on the synced state, land) that nobody is prompted to
+  do. So the resume path REPORTS every branch that has commits `main` does not contain and
+  no live agent behind it, with its point, its last commit and its age, exactly as it
+  reports the work order, and names the revival as the action; and a branch whose work has
+  landed under another number is ENDED at that landing rather than left to be re-triaged.
+  VERIFIABLE by Vitest on the pure core — an orphan is listed, a branch with a live agent
+  is not, a contained branch is not — plus the resume hook printing it.
   MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
   for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
   starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
@@ -7925,7 +7989,21 @@ to land than a mechanism that needs a review.
   outage at spawn puts a multi-hour session on the scarcest pool. The evidence gap is the load-bearing
   part: neither `.claude/autostart.log` nor `.claude/batch-launcher.log` records WHICH model a session
   runs on or whether the fallback fired — the commit trailers are the only trace, and they appear
-  hours in.
+  hours in. NARROWED 19.08.2026 by the user's ruling, which strikes the quota reading this point
+  once carried: an exhausted Opus pool cannot leave a Fable pool standing, so QUOTA IS NOT A ROUTE
+  to the fallback — `SPAWN_FALLBACK_MODEL` exists for UNREACHABILITY alone, and reordering the chain
+  to save quota is ruled out. What survives is the OBSERVABILITY half, and it survives intact: no log
+  records which model a session came up on, so the Fable block of 17.08. (10:00–14:36) still cannot
+  be told apart from a hand-set model — the window that read it was on Fable because a VS Code
+  setting said so, not because a fallback fired. Part (3) below is exactly that fix. Measured in the
+  same reading, on what the lane is actually spent on: of 461 review records Fable is the MERGER in 3
+  and the REVIEWER in 190, but every one of those falls on or before 13.08., when the cross-vendor
+  rule moved reviewing to Sol. Classifying all 235 Fable commits since 01.08. by where they sit
+  REVERSES the 17.08. weighting this point opens with: 179 of them (76 %) are on merged FEATURE
+  branches, only 43 direct on `main`, and two points ate more than half — 714 with 87 and 700 with
+  39. Under the current policy the serving share is the MINORITY and the escalation lane is the
+  consumer, so the load-bearing fixes are the threshold and its round-level twin, not a reordered
+  chain. The merger role consults no lane function and is untouched by either — it must stay that way.
   FINAL STATE, three halves from two incidents:
   (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
   already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
