@@ -162,9 +162,13 @@ put it is the mistake this line exists to stop.
   FINAL STATE:
   - THE CALIBRATION IS MEASURED, NOT GUESSED. One command reads the landed points out of git and
     reports, as a DISTRIBUTION rather than an average, the actual elapsed time per point (the
-    branch's first commit to its merge) beside the estimate that point's card carried, plus the
-    queue-drain cadence (merge to merge), which is the smaller number whenever the pool ran
-    several points at once. The two are reported separately and never averaged into one figure.
+    branch's first commit to the TICK that marks the landing) beside the estimate that point's
+    card carried, plus the queue-drain cadence (tick to tick), which is the smaller number
+    whenever the pool ran several points at once. The two are reported separately and never
+    averaged into one figure. BOTH ENDPOINTS ARE THE TICK, not the merge, and that is the whole
+    of it: the estimate promises the time by which the work is VISIBLY DONE, and gate, picture
+    check and board update all sit AFTER the merge. Measuring to the merge would calibrate the
+    promise against a moment the reader never sees.
   - THE READING IS SPLIT BY WHAT ACTUALLY DISTINGUISHES A POINT — its criticality tag, whether it
     was delegated or authored in the main session, and whether a picture verification was part of
     it. A single global correction factor is adopted ONLY if the measurement shows the classes do
