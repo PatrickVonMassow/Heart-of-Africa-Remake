@@ -34,6 +34,7 @@ import {
   incompleteClosureFor,
   droppedLinesOf,
   SUSPECT_UNNAMED,
+  TRUNCATED_KIND,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
@@ -1040,8 +1041,15 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // The two shapes on file: what the recorder writes TODAY (the field), and what
   // it wrote before the field existed (the synthetic red under its stable key) —
   // the runs of 13.08.2026 are the second kind and must be recognised.
-  const truncatedNow = (backend, at, overrides = {}) =>
-    redRun(backend, at, [red('a check that DID fit in the buffer')], {
+  /** The synthetic entry the recorder unshifts for the lines the cap ate, in the
+   *  kind no charge may name. */
+  const truncationNow = { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: TRUNCATED_KIND, point: null }
+  /** EXACTLY what the recorder writes today: the field, the count, the synthetic
+   *  entry FIRST and the reds that DID fit in the buffer behind it. Built this
+   *  way since the review of 19.08.2026 — the fixture carried the field alone, so
+   *  no case drove a production-shaped record through a closure or a re-run. */
+  const truncatedNow = (backend, at, observed = [red('a check that DID fit in the buffer')], overrides = {}) =>
+    redRun(backend, at, [truncationNow, ...observed], {
       truncated: true,
       droppedLines: 115,
       ...overrides,
@@ -1212,6 +1220,47 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(still).toHaveLength(1)
     expect(still[0].status).toBe('red')
     expect(still[0].reds[0]).toMatch(/GPUValidationError/)
+  })
+
+  // THE SHAPE THE RECORDER REALLY WRITES (review, 19.08.2026). Every case that
+  // drives a truncated record through a closure or a re-recording built it by
+  // hand in the legacy shape, so nothing pinned that a PRODUCTION record — the
+  // field, the count, the synthetic entry and the reds that did fit — keeps its
+  // observed reds and covers nothing once the truncation is answered.
+  it('keeps a PRODUCTION-shaped record\'s observed reds through both routes, and covers nothing', () => {
+    const broken = truncatedNow('webgpu', 1500)
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    expect(runVerdict(broken, { openPoints }).status).toBe('incomplete')
+    for (const [runs, closures] of [
+      [[broken, again], null],
+      [[broken], [closure('webgpu', 'polish', 1500)]],
+    ]) {
+      const still = unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })
+      expect(still).toHaveLength(1)
+      expect(still[0].status).toBe('red')
+      // The synthetic entry is gone — that IS the part the route closed — and
+      // the red the run really recorded is what is left standing.
+      expect(still[0].reds).toEqual(['a check that DID fit in the buffer'])
+    }
+    // And neither route turns it into coverage: the backend still needs a run.
+    expect(coveringRun([broken], 'webgpu', 1000, { openPoints })).toBeNull()
+    const result = evaluate(
+      renderChange({
+        runs: [broken, run('webgl', 2100)],
+        openPoints,
+        incompleteClosures: [closure('webgpu', 'polish', 1500)],
+      }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/RENDER CHANGE NOT VERIFIED ON WEBGPU/)
+  })
+
+  it('...and that observed red closes the ordinary way on a production-shaped record too', () => {
+    const broken = truncatedNow('webgpu', 1500, [red('the drummer struck without a message')])
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const ledger = [{ point: 546, kind: 'check', match: /the drummer struck/, why: 'filed as the point that owns it' }]
+    expect(unexplainedRuns([broken, again], 1000, { openPoints })).toHaveLength(1)
+    expect(unexplainedRuns([broken, again], 1000, { openPoints, ledger })).toEqual([])
   })
 
   // A RETRY THAT ALSO TRUNCATED (review, 19.08.2026). It exited 0, so the

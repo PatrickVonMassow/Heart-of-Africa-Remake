@@ -1231,12 +1231,19 @@ identity, and the lost part has none):
    node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" [--at <iso|ms>] --evidence "<why>"
    ```
 
-   It names ONE run by identity (backend, suite, exact timestamp) and refuses an
-   ambiguous selector rather than resolving it; it demands written evidence, and
+   It names ONE run by identity (backend, suite, exact timestamp — `at`, or the
+   start time where that cannot be read, the same reading the re-recording route
+   uses) and refuses an ambiguous selector rather than resolving it; a record
+   with NO readable stamp at all is refused too, because a signature that names
+   no run closes none (stated residual: such a record has no per-run way out —
+   the loud `--defer`, which signs for a judgment rather than for a run, is what
+   is left). It demands written evidence, and
    a closure carrying none closes nothing; it clears no backend — the run stays
    `incomplete`, never a green; and it closes **only the part nobody can know**.
    Every red the run DID record was really observed, so it keeps blocking and
-   closes the three ordinary ways. That last limit is what keeps this far
+   closes the three ordinary ways — and for a run that also passed on the RETRY
+   those reds are the FIRST attempt's, which it never carries in `reds` of its
+   own. That last limit is what keeps this far
    narrower than the waiver it replaces — but not airtight, and the residual is
    stated rather than glossed (review, 19.08.2026): what the closure signs away
    is exactly the part nobody can read, so it cannot tell an unavoidable
