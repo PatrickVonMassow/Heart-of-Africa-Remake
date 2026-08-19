@@ -109,6 +109,15 @@ describe('parseNowCardPoints', () => {
     expect(parseNowCardPoints(null).size).toBe(0)
     expect(parseNowCardPoints(undefined).size).toBe(0)
   })
+  it('lets the focus name ANY standing card, not only the first (point 713)', () => {
+    // Measured 17.08.2026: `board.mjs now` prepends and the focus tooling read
+    // the FIRST card, so opening strand 697 silently moved the focus off 700.
+    // focus.mjs set/confirm match membership in this SET, so the section's
+    // order carries no focus meaning — the render decides it (focused first).
+    const set = parseNowCardPoints(boardHtml({ nowCards: [697, 700] }))
+    expect(set.has(700)).toBe(true)
+    expect(set.has(697)).toBe(true)
+  })
 })
 
 describe('parseQueuePoints', () => {

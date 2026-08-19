@@ -365,9 +365,12 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
 }
 
 /**
- * Put a rendered card at the TOP of the current-work section — not the bottom:
- * the focus guard reads the FIRST now-card, so the point just taken up must
- * lead, or declaring focus on it immediately contradicts the board.
+ * Put a rendered card at the TOP of the current-work section. The order is
+ * cosmetic between renders — the focus reconciliation matches the declared
+ * focus against ANY now-card, and `reconcileNowProjection` reorders the
+ * section itself (the focused strand first; point 713) — but the point just
+ * taken up is also the point just focused, so leading with it matches what
+ * the next render decides anyway.
  */
 function insertAsFirstNowCard(html, card) {
   const head = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
