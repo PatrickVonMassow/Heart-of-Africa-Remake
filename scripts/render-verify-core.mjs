@@ -297,6 +297,21 @@ function exitOf(run) {
   return finite(run?.exit) ?? 1
 }
 
+/**
+ * THE TIMESTAMP A RUN CAN BE NAMED BY, or null (point 734). One reading in one
+ * place, because two of them disagreeing is how a run stops being closable: the
+ * signature route keyed on `at` alone while the re-recording route already fell
+ * back to `startedAt`, so a record whose `at` is unreadable could be signed for —
+ * the CLI even reported success — and the closure then matched nothing.
+ *
+ * Null stays null and is never folded to 0: a record with NO readable stamp
+ * cannot be named at all, and pretending otherwise let one signature close a
+ * different run (review, 19.08.2026).
+ */
+export function runStamp(run) {
+  return finite(run?.at) ?? finite(run?.startedAt)
+}
+
 /** A chargeable-point set built from whatever a caller handed in. `[...x]` THROWS
  *  on a truthy non-iterable, and this runs inside the gate's decision: an
  *  exception here reaches the wrapper, which fails OPEN and allows the turn the
@@ -488,9 +503,14 @@ export function incompleteClosureFor(run, closures) {
       if (!c || c.backend !== run.backend || c.suite !== run.suite) continue
       // BOTH timestamps must be READABLE and equal. Folding an unreadable one to
       // 0 made two records that carry no `at` look like the same run, so one
-      // signature closed the other (review finding, 19.08.2026).
+      // signature closed the other (review finding, 19.08.2026). The RUN is named
+      // by runStamp — the same reading the re-recording route uses — so a record
+      // whose `at` is unreadable but whose `startedAt` is not can still be signed
+      // for; where neither is readable the run has no identity and nothing
+      // closes it (the CLI refuses to write such a signature rather than
+      // reporting a success that binds nothing).
       const closureAt = finite(c.at)
-      const runAt = finite(run.at)
+      const runAt = runStamp(run)
       if (closureAt === null || runAt === null || closureAt !== runAt) continue
       // The evidence IS the mechanism: an entry that carries none is a silent
       // waiver wearing a closure's shape, so it closes nothing.
@@ -796,12 +816,12 @@ export function unexplainedRuns(runs, since, options) {
     // WITHOUT A READABLE TIMESTAMP, NOTHING CAN BE SHOWN TO BE LATER. Folding an
     // unreadable `at` to 0 let any dated covering run "re-record" an undated
     // truncation (review, 19.08.2026).
-    const when = finite(r?.at) ?? finite(r?.startedAt)
+    const when = runStamp(r)
     if (when === null) return false
     return all.some((later) => {
       if (!later || later === r || later.partial === true) return false
       if (later.backend !== r.backend || later.suite !== r.suite) return false
-      const laterAt = finite(later.at) ?? finite(later.startedAt)
+      const laterAt = runStamp(later)
       if (laterAt === null || laterAt <= when) return false
       return sawCodeSince(later, from) && runVerdict(later, { openPoints, ledger }).covers
     })

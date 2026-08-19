@@ -15,8 +15,10 @@ import {
   BaselineDiffError,
   commitMissing,
   gatherRenderVerifyInputs,
+  incompleteClosureDraft,
   openIncompleteRuns,
 } from './render-verify-guard.mjs'
+import { incompleteClosureFor } from './render-verify-core.mjs'
 
 const boom = (what) => () => {
   throw new Error(`${what} exploded`)
@@ -184,6 +186,65 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
     expect(openIncompleteRuns(null)).toEqual([])
     expect(openIncompleteRuns({ runs: 'nope' })).toEqual([])
     expect(() => openIncompleteRuns({ runs: [null, 7], incompleteClosures: 'nope' })).not.toThrow()
+  })
+
+  // WHAT THE COMMAND WOULD WRITE — the judgment, without a state file. It used
+  // to stamp `at: Number(run.at)`: NaN for a record whose timestamp is
+  // unreadable, so the command reported a SUCCESS and the matcher then refused
+  // the closure it had just written (review, 19.08.2026).
+  describe('incompleteClosureDraft — the signature the CLI would write', () => {
+    const signed = { selector: 'webgpu/settings', evidence: 'the host has no browser (point 732)' }
+
+    it('names the run by its stamp, and the closure it writes really MATCHES that run', () => {
+      const run = truncated(1500)
+      const draft = incompleteClosureDraft({ runs: [run] }, signed)
+      expect(draft.error).toBeUndefined()
+      expect(draft.closure.at).toBe(1500)
+      expect(incompleteClosureFor(run, [draft.closure])).toEqual(draft.closure)
+    })
+
+    // A record whose `at` is unreadable but which began at a readable time is
+    // still ONE identifiable run — the re-recording route already read it that
+    // way, and the signature route refusing to left it closable by nothing.
+    it('falls back to the start time, so a record with an unreadable `at` can still be signed for', () => {
+      const run = { ...truncated(1500), at: undefined, startedAt: 1490 }
+      const draft = incompleteClosureDraft({ runs: [run] }, signed)
+      expect(draft.closure.at).toBe(1490)
+      expect(incompleteClosureFor(run, [draft.closure])).toEqual(draft.closure)
+    })
+
+    // And where NEITHER is readable the run has no identity at all: refuse, and
+    // say what is left, rather than report a success that binds nothing.
+    it('refuses a record with no readable timestamp instead of writing a closure that matches nothing', () => {
+      const run = { ...truncated(1500), at: 'soon', startedAt: null }
+      const draft = incompleteClosureDraft({ runs: [run] }, signed)
+      expect(draft.closure).toBeUndefined()
+      expect(draft.error).toMatch(/no readable timestamp/)
+      expect(draft.error).toMatch(/--defer/)
+    })
+
+    it('refuses an empty evidence, an unnamed run, an unreadable --at and a selector that matches none', () => {
+      const state = { runs: [truncated(1500)] }
+      expect(incompleteClosureDraft(state, { ...signed, evidence: '  ' }).error).toMatch(/--evidence/)
+      expect(incompleteClosureDraft(state, { ...signed, selector: '' }).error).toMatch(/name the run as/)
+      expect(incompleteClosureDraft(state, { ...signed, at: 'whenever' }).error).toMatch(/is not a timestamp/)
+      expect(incompleteClosureDraft(state, { ...signed, selector: 'webgl/settings' }).error).toMatch(/no OPEN incomplete recording/)
+    })
+
+    it('refuses an ambiguous selector, and offers each open run by its stamp', () => {
+      const state = { runs: [truncated(1500), { ...truncated(2500), at: undefined, startedAt: 2500 }] }
+      const draft = incompleteClosureDraft(state, signed)
+      expect(draft.error).toMatch(/matches 2 open incomplete recordings/)
+      expect(draft.choices).toHaveLength(2)
+      // …and naming one of them by that stamp resolves it, undated record included.
+      expect(incompleteClosureDraft(state, { ...signed, at: '2500' }).closure.at).toBe(2500)
+    })
+
+    it('is total on a missing state and missing options', () => {
+      expect(() => incompleteClosureDraft(null, null)).not.toThrow()
+      expect(incompleteClosureDraft(null, null).error).toMatch(/--evidence/)
+      expect(incompleteClosureDraft(null, signed).error).toMatch(/no OPEN incomplete recording/)
+    })
   })
 })
 

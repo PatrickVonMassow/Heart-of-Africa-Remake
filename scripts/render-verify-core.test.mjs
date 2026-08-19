@@ -1170,6 +1170,11 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     for (const [runAt, closureAt] of [[null, ''], ['', false], [false, null]]) {
       expect(incompleteClosureFor({ ...undated, at: runAt }, [{ backend: 'webgpu', suite: 'polish', at: closureAt, evidence: 'signed' }])).toBeNull()
     }
+    // But the run's START is a readable stamp, and one identity is what makes a
+    // record closable at all: the re-recording route already named a run that
+    // way, and the signature route refusing to left such a record closable by
+    // NOTHING while the CLI reported success (review, 19.08.2026).
+    expect(incompleteClosureFor(undated, [{ backend: 'webgpu', suite: 'polish', at: 1500, evidence: 'signed' }])).not.toBeNull()
   })
 
   it('cannot be RE-RECORDED either without a readable timestamp of its own', () => {

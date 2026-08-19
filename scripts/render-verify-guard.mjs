@@ -54,6 +54,7 @@ import {
   isIncompleteRecording,
   incompleteClosureFor,
   droppedLinesOf,
+  runStamp,
 } from './render-verify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
@@ -287,6 +288,87 @@ export function openIncompleteRuns(state) {
   return runs.filter((r) => isIncompleteRecording(r) && !incompleteClosureFor(r, state?.incompleteClosures))
 }
 
+/**
+ * THE CLOSURE A `--incomplete` INVOCATION WOULD WRITE, or the reason it writes
+ * none. Pure and exported so the CLI's whole judgment is testable without a
+ * state file — and it needed testing: the writer stamped `at: Number(run.at)`,
+ * which is NaN for a record whose timestamp is unreadable, so the command
+ * printed a SUCCESS and `incompleteClosureFor` then refused the very closure it
+ * had just written. A run is named here by `runStamp`, the same reading the
+ * matcher and the re-recording route use.
+ *
+ * @returns {{ closure: object } | { error: string, choices?: object[] }}
+ *   `choices` is set only where the selector matched several open runs, so the
+ *   caller can print each with its own --at. Total.
+ */
+export function incompleteClosureDraft(state, options) {
+  const { selector = '', at = '', evidence = '' } = options ?? {}
+  if (!String(evidence).trim()) {
+    return {
+      error:
+        'render-verify-guard --incomplete: --evidence "<why this recording cannot be redone>" is required. ' +
+        'The evidence is the whole difference between this and a silent waiver.',
+    }
+  }
+  if (!String(selector).trim()) {
+    return {
+      error:
+        'render-verify-guard --incomplete: name the run as "<backend>/<suite>" (add --at <iso|ms> when more ' +
+        'than one is open). A closure names ONE run and can never pre-clear a future one.',
+    }
+  }
+  const wanted = at ? new Date(/^\d+$/.test(at) ? Number(at) : at).getTime() : null
+  if (at && !Number.isFinite(wanted)) {
+    return { error: `render-verify-guard --incomplete: --at "${at}" is not a timestamp (ISO or epoch ms).` }
+  }
+  const open = openIncompleteRuns(state).filter(
+    (r) => `${r.backend}/${r.suite}` === selector && (wanted === null || runStamp(r) === wanted),
+  )
+  if (open.length === 0) {
+    return {
+      error:
+        `render-verify-guard --incomplete: no OPEN incomplete recording matches "${selector}"` +
+        `${at ? ` at ${at}` : ''}. Run \`node scripts/render-verify-guard.mjs status\` to see which runs ` +
+        'are truncated.',
+    }
+  }
+  if (open.length > 1) {
+    return {
+      error:
+        `render-verify-guard --incomplete: "${selector}" matches ${open.length} open incomplete recordings. ` +
+        'A closure signs for ONE run, so name it — each is its own judgment and its own reason:',
+      choices: open,
+    }
+  }
+  const [run_] = open
+  const stamp = runStamp(run_)
+  // A RECORD WITH NO READABLE TIMESTAMP HAS NO IDENTITY, and a signature that
+  // names no run closes none. Refused loudly rather than written and silently
+  // ignored — the earlier writer reported success on exactly this record (review,
+  // 19.08.2026). STATED RESIDUAL: such a record therefore has no per-run way out
+  // at all, because the information a closure needs is not in it; the loud
+  // --defer, which signs for a judgment rather than for a run, is what is left.
+  if (stamp === null) {
+    return {
+      error:
+        `render-verify-guard --incomplete: the ${run_.backend}/${run_.suite} record carries no readable ` +
+        'timestamp (neither `at` nor `startedAt`), so no closure can name it and any signature written for ' +
+        'it would bind nothing. Re-run the suite; where that is impossible, sign for the JUDGMENT instead: ' +
+        'node scripts/render-verify-guard.mjs --defer "<reason>".',
+    }
+  }
+  return {
+    closure: {
+      backend: run_.backend,
+      suite: run_.suite,
+      at: stamp,
+      droppedLines: droppedLinesOf(run_),
+      evidence: String(evidence),
+      closedAt: Date.now(),
+    },
+  }
+}
+
 const arg = isMainModule(import.meta.url) ? process.argv[2] : '__imported__'
 
 // --defer "<reason>": the LOUD escape valve for the honest case where one
@@ -324,7 +406,11 @@ if (arg === '--defer') {
 // blocking and close the ordinary ways, it clears NO backend, and it names
 // exactly ONE run, so two truncated runs need two signatures with two reasons.
 // Ambiguity is REFUSED rather than resolved (review finding, 19.08.2026): a
-// selector matching several open runs prints each with its own --at.
+// selector matching several open runs prints each with its own --at, and a
+// record whose timestamp is unreadable is refused as well — a signature that can
+// name no run closes none, and saying so beats reporting a success that binds
+// nothing. The judgment itself is incompleteClosureDraft above, so it is
+// testable without a state file.
 if (arg === '--incomplete') {
   try {
     const rest = process.argv.slice(3)
@@ -343,61 +429,22 @@ if (arg === '--incomplete') {
     // value another flag consumed, found by INDEX: comparing by value would drop
     // the selector whenever an evidence text happened to read the same.
     const selector = rest.find((a, i) => !consumed.has(i) && !a.startsWith('--')) ?? ''
-    if (!evidence) {
-      console.error(
-        'render-verify-guard --incomplete: --evidence "<why this recording cannot be redone>" is required. ' +
-          'The evidence is the whole difference between this and a silent waiver.',
-      )
-      process.exit(1)
-    }
-    if (!selector) {
-      console.error(
-        'render-verify-guard --incomplete: name the run as "<backend>/<suite>" (add --at <iso|ms> when more ' +
-          'than one is open). A closure names ONE run and can never pre-clear a future one.',
-      )
-      process.exit(1)
-    }
     const state = readRenderState() ?? {}
-    const wanted = at ? new Date(/^\d+$/.test(at) ? Number(at) : at).getTime() : null
-    if (at && !Number.isFinite(wanted)) {
-      console.error(`render-verify-guard --incomplete: --at "${at}" is not a timestamp (ISO or epoch ms).`)
+    const draft = incompleteClosureDraft(state, { selector, at, evidence })
+    if (draft.error) {
+      console.error(draft.error)
+      for (const r of draft.choices ?? []) {
+        console.error(`  --at ${isoText(runStamp(r) ?? r.at)}   (${droppedLinesOf(r)} line(s) dropped)`)
+      }
       process.exit(1)
     }
-    const open = openIncompleteRuns(state).filter(
-      (r) => `${r.backend}/${r.suite}` === selector && (wanted === null || Number(r.at) === wanted),
-    )
-    if (open.length === 0) {
-      console.error(
-        `render-verify-guard --incomplete: no OPEN incomplete recording matches "${selector}"` +
-          `${at ? ` at ${at}` : ''}. Run \`node scripts/render-verify-guard.mjs status\` to see which runs ` +
-          'are truncated.',
-      )
-      process.exit(1)
-    }
-    if (open.length > 1) {
-      console.error(
-        `render-verify-guard --incomplete: "${selector}" matches ${open.length} open incomplete recordings. ` +
-          'A closure signs for ONE run, so name it — each is its own judgment and its own reason:',
-      )
-      for (const r of open) console.error(`  --at ${isoText(r.at)}   (${droppedLinesOf(r)} line(s) dropped)`)
-      process.exit(1)
-    }
-    const [run_] = open
-    const closures = (Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []).concat([
-      {
-        backend: run_.backend,
-        suite: run_.suite,
-        at: Number(run_.at),
-        droppedLines: droppedLinesOf(run_),
-        evidence,
-        closedAt: Date.now(),
-      },
-    ])
+    const { closure } = draft
+    const closures = (Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []).concat([closure])
     while (closures.length > MAX_INCOMPLETE_CLOSURES) closures.shift()
     mergeRenderState({ incompleteClosures: closures })
     console.log(
-      `⚠ INCOMPLETE RECORDING SIGNED OFF: ${run_.backend}/${run_.suite} @${isoText(run_.at)} ` +
-        `(${droppedLinesOf(run_)} result line(s) dropped) — "${evidence}". This closes the RECORD, not the ` +
+      `⚠ INCOMPLETE RECORDING SIGNED OFF: ${closure.backend}/${closure.suite} @${isoText(closure.at)} ` +
+        `(${closure.droppedLines} result line(s) dropped) — "${closure.evidence}". This closes the RECORD, not the ` +
         'picture: the run still covers no backend and is never a pass, and every red it DID record still ' +
         'blocks until it is fixed, charged or filed. Re-run the suite at the first chance.',
     )
