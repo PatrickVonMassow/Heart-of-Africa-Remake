@@ -1151,28 +1151,71 @@ export function evidencePoint(item, { worktreeRef = () => null } = {}) {
 }
 
 /**
+ * Only these lstat failures PROVE a path is absent (fourth cross-vendor
+ * round): EACCES, EIO, ELOOP, a missing mount and every other error may be
+ * hiding a path that still exists — treating any `false`/failure as
+ * disappearance retired existing work.
+ */
+export function fsErrorProvesAbsence(code) {
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
+/**
+ * `git show-ref --verify --quiet` answers absence with exit 1 — for a missing
+ * ref and for a name no ref could ever carry, both of which can testify to
+ * nothing. Every other exit (not a repository, git broken) proves nothing.
+ */
+export function gitExitProvesRefAbsence(status) {
+  return status === 1
+}
+
+/**
+ * The point a worktree path's own NAME still testifies to once the tree is
+ * gone: the `point-<N>` directory of the workflow's worktree convention
+ * (`.claude/worktrees/point-<N>`). Used ONLY by the retire decision below —
+ * while the tree exists, the branch it is on stays the sole authority.
+ */
+export function pointOfWorktreePath(path) {
+  const segments = String(path ?? '').split(/[\\/]+/).filter(Boolean)
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const m = /^point-(\d+)$/.exec(segments[i])
+    if (m) {
+      const n = Number(m[1])
+      return Number.isInteger(n) && n > 0 ? n : null
+    }
+  }
+  return null
+}
+
+/**
  * Partition a declaration's evidence at the exit of one point, per item and by
  * the SAME resolution the read side uses. Three verdicts:
  * - resolves to the exited point → exited (dropped with its point);
  * - resolves to another point, or to none while its artefact may still exist
  *   → kept: it may testify to real work, and the read side reports an
  *   unresolvable survivor loudly rather than this filter dropping it silently;
- * - resolves to none AND its artefact is provably gone (`evidenceGone`) →
- *   retired. Evidence that no longer exists testifies to nothing, and keeping
- *   it would wedge every later exit and publish on a probe that can never
- *   succeed again (second cross-vendor round: a worktree removed between read
- *   and exit left a permanently unretractable strand). Retired items are
- *   RETURNED so the caller says so out loud — never a silent disappearance.
+ * - resolves to none AND its artefact is PROVABLY gone (`evidenceGone`, a
+ *   positive proof — never a bare failed probe) → retired, UNLESS what is left
+ *   of the item still names ANOTHER point (a gone worktree's `point-<N>` path):
+ *   no exit ever retires a different point's evidence (fourth cross-vendor
+ *   round); that item waits for its own point's exit. Without a gone-check the
+ *   unresolvable item wedges every later exit and publish on a probe that can
+ *   never succeed again (second round). Retired items are RETURNED so the
+ *   caller says so out loud — never a silent disappearance.
  */
 export function partitionEvidenceOnExit(evidence, exitPoint, { worktreeRef = () => null, evidenceGone = () => false } = {}) {
   const kept = []
   const retired = []
+  const exit = Number(exitPoint)
   for (const item of Array.isArray(evidence) ? evidence : []) {
     const point = evidencePoint(item, { worktreeRef })
-    if (point === Number(exitPoint)) continue
+    if (point === exit) continue
     if (point == null && evidenceGone(item) === true) {
-      retired.push(item)
-      continue
+      const named = item?.kind === 'worktree' ? pointOfWorktreePath(item.path) : null
+      if (named == null || named === exit) {
+        retired.push(item)
+        continue
+      }
     }
     kept.push(item)
   }
