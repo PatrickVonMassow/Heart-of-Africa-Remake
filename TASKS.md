@@ -76,6 +76,43 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 732. No browser suite can run on this host, so every picture check and the closing are
+  blocked (measured 19.08.2026, 13:1x, and independently by the delegated author of point 581
+  before it). MEASURED TWICE, on `main` in the MAIN tree and on a detached `origin/main` checkout
+  in a worktree: `node scripts/verify/run-logged.mjs --suites startup` fails with
+  `page.waitForFunction: Timeout 180000ms exceeded` at startup.mjs:76 — the wait for
+  `window.__renderer` — on BOTH backends, and writes 0 of 1 frames. The browser console shows
+  `Failed to create WebGPU Context Provider` and then the WebGL 2 fallback dying on
+  `canvas.getContext('webgl2') === null`. So it is not one backend degrading to the other: the
+  verify browser gets NO GPU backend at all. It reproduces on unmodified `main`, so it is the HOST
+  or the browser launch, never a product change.
+  WHY THIS IS AHEAD OF THE QUEUE: it is not one red suite, it is the whole verification lane.
+  CLAUDE.md §7.2 makes the picture the judge of every render/GUI change and `render-verify-guard`
+  blocks such a landing without it; the closing cycle (§9) demands a LARGE regression on BOTH
+  backends. While this holds, point 581 cannot be verified, no render point can land, and no
+  version can be tagged. Every hour it stands, render work piles up unverifiable.
+  FINAL STATE:
+  - THE CAUSE IS NAMED, not worked around. Which layer lost the GPU — the container's device
+    passthrough, the browser binary the launcher picks, its flags, or a driver the image carries —
+    is established by MEASUREMENT, and the finding says which, with the command that shows it.
+  - THE LANE RUNS AGAIN on both backends: `startup` green on WebGPU and on WebGL 2 from the main
+    tree AND from a fresh worktree, since a worktree is where delegated authors verify.
+  - THE OUTAGE CANNOT RECUR SILENTLY. Today it surfaced as a 180 s timeout inside one suite, which
+    reads like a slow machine or a product hang — the two things it is not. A bring-up probe
+    decides BEFORE the suites whether a GPU backend exists at all and says so in one line, so the
+    next occurrence costs one command instead of a delegated round; `scripts/verify-bringup.mjs`
+    is where that belongs if it fits.
+  - AND IT IS DISTINGUISHED FROM A PRODUCT HANG: the probe's verdict names the layer, so a future
+    red says "no backend on this host" or "the app did not come up", never one dressed as the
+    other.
+  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on both backends from the
+  main tree and from a fresh worktree; the bring-up probe reports the backend it found and fails
+  LOUD and FAST (seconds, not the 180 s wait) on a host without one; a Vitest case over the probe's
+  pure verdict for present, absent and degraded.
+  Criticality: HIGH — nothing renders unverifiable for long without something shipping unseen, and
+  this blocks 581, every later render point and the release.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 730. The board's queue estimates are calibrated for a slower batch than the one running
   (user 19.08.2026, reading the live board: »Seit den Umstellungen gestern scheint die
   Abarbeitung der Punkte schneller zu laufen als bisher. Die Schätzungen der zukünftigen Tasks
