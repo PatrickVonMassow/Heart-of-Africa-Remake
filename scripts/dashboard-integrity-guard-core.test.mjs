@@ -75,9 +75,26 @@ describe('nowProjectionStopDecision — exact declared active set', () => {
   const active = { ok: true, points: [700, 697, 711], focusPoint: 700 }
   const knownPoints = new Set([697, 700, 711, 712])
 
+  // The projection reads the REAL board's section markup: since the fifth
+  // cross-vendor round a document without the `sect`-wrapped now-heading is
+  // REFUSED rather than read as one big now-section, so this fixture carries
+  // the published board's four sections, not the bare-h2 shorthand above.
+  const projBoard = (nowTitles = [], nowExtra = '') => {
+    const now = nowTitles
+      .map(
+        (t) => `<details class="now" open><summary><span class="t">${t}</span></summary>
+<div class="body"><p>Status: in Arbeit.</p></div></details>`,
+      )
+      .join('\n')
+    return `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n${now}\n${nowExtra}\n</details>\n` +
+      '<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>\n' +
+      '<details class="sect"><summary><h2>Erledigt</h2></summary>\n</details>\n</main>\n'
+  }
+
   it('names 697 and 711 on the measured board that showed only 700', () => {
     const result = nowProjectionStopDecision({
-      dashboardHtml: boardHtml({ nowTitles: ['700 — Kontext'] }),
+      dashboardHtml: projBoard(['700 — Kontext']),
       activeWork: active,
       knownPoints,
     })
@@ -87,12 +104,12 @@ describe('nowProjectionStopDecision — exact declared active set', () => {
 
   it('blocks an empty section with all three named and allows exact equality', () => {
     expect(nowProjectionStopDecision({
-      dashboardHtml: boardHtml({ nowTitles: [] }),
+      dashboardHtml: projBoard([]),
       activeWork: active,
       knownPoints,
     })).toMatchObject({ block: true, comparison: { missing: [700, 697, 711] } })
     expect(nowProjectionStopDecision({
-      dashboardHtml: boardHtml({ nowTitles: ['700 — A', '697 — B', '711 — C'] }),
+      dashboardHtml: projBoard(['700 — A', '697 — B', '711 — C']),
       activeWork: active,
       knownPoints,
     }).block).toBe(false)
@@ -100,12 +117,12 @@ describe('nowProjectionStopDecision — exact declared active set', () => {
 
   it('reports extra and duplicate cards instead of hiding them behind set equality', () => {
     expect(nowProjectionStopDecision({
-      dashboardHtml: boardHtml({ nowTitles: ['700 — A', '697 — B', '711 — C', '712 — Alt'] }),
+      dashboardHtml: projBoard(['700 — A', '697 — B', '711 — C', '712 — Alt']),
       activeWork: active,
       knownPoints,
     })).toMatchObject({ block: true, comparison: { extra: [712] } })
     expect(nowProjectionStopDecision({
-      dashboardHtml: boardHtml({ nowTitles: ['700 — A', '700 — A2', '697 — B', '711 — C'] }),
+      dashboardHtml: projBoard(['700 — A', '700 — A2', '697 — B', '711 — C']),
       activeWork: active,
       knownPoints,
     })).toMatchObject({ block: true, comparison: { duplicates: [700] } })
@@ -114,28 +131,32 @@ describe('nowProjectionStopDecision — exact declared active set', () => {
   it('accepts verified zero only with the dedicated non-card state', () => {
     const zero = { ok: true, points: [], focusPoint: null }
     expect(nowProjectionStopDecision({
-      dashboardHtml: boardHtml({ nowTitles: [] }).replace('<h2>Von dir zu klären</h2>', `${NOW_EMPTY_STATE_MARKUP}\n<h2>Von dir zu klären</h2>`),
+      dashboardHtml: projBoard([], NOW_EMPTY_STATE_MARKUP),
       activeWork: zero,
       knownPoints,
     }).block).toBe(false)
-    expect(nowProjectionStopDecision({ dashboardHtml: boardHtml({ nowTitles: [] }), activeWork: zero }).block).toBe(true)
+    expect(nowProjectionStopDecision({ dashboardHtml: projBoard([]), activeWork: zero }).block).toBe(true)
   })
 
   it('fails open for source errors, another owner and a paused batch', () => {
-    const mismatch = { dashboardHtml: boardHtml({ nowTitles: [] }), activeWork: active, knownPoints }
+    const mismatch = { dashboardHtml: projBoard([]), activeWork: active, knownPoints }
     expect(nowProjectionStopDecision({ ...mismatch, activeWork: { ok: false, points: [] } }).block).toBe(false)
     expect(nowProjectionStopDecision({ ...mismatch, heldByOther: true }).block).toBe(false)
     expect(nowProjectionStopDecision({ ...mismatch, paused: true }).block).toBe(false)
   })
 
   it('does not let the old no-board escape suppress a known nonempty declaration', () => {
+    // A document without the section heading now REFUSES in the comparison
+    // (fifth cross-vendor round): the decision still blocks — the escape stays
+    // closed — but by naming the missing section, not by counting cards it
+    // would have had to invent a section for.
     const result = evaluate({
       dashboardHtml: '<p>no sections</p>',
       tasksMd: tasksMd([{ n: 697 }, { n: 700 }, { n: 711 }]),
       activeWork: active,
     })
     expect(result.block).toBe(true)
-    expect(result.reason).toMatch(/NOW-SECTION DOES NOT MATCH.*missing 700, 697, 711/)
+    expect(result.reason).toMatch(/NOW-SECTION DOES NOT MATCH.*section heading is missing/)
   })
 })
 
