@@ -33,6 +33,7 @@ import {
   isIncompleteRecording,
   incompleteClosureFor,
   droppedLinesOf,
+  runIdentity,
   SUSPECT_UNNAMED,
   TRUNCATED_KIND,
 } from './render-verify-core.mjs'
@@ -1078,7 +1079,15 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   /** The same, but it also recorded a red it really did observe. */
   const truncatedWithRed = (backend, at, name = 'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError') =>
     redRun(backend, at, [truncationEntry, red(name, null, 'console')])
-  const closure = (backend, suite, at) => ({ backend, suite, at, evidence: 'the host cannot run a browser suite (point 732)' })
+  /** A closure AS THE CLI WRITES IT: bound to one record's content identity
+   *  (round-5 review, 19.08.2026 — a stamp was not an identity). */
+  const closureOf = (run_, evidence = 'the host cannot run a browser suite (point 732)') => ({
+    run: runIdentity(run_),
+    backend: run_.backend,
+    suite: run_.suite,
+    at: run_.at ?? null,
+    evidence,
+  })
 
   it('recognises both record shapes, and reads how much was lost', () => {
     expect(isIncompleteRecording(truncatedNow('webgpu', 1500))).toBe(true)
@@ -1137,7 +1146,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const unfiled = redRun('webgpu', 1600, [red('a NEW check nobody filed')])
     const runs = [unfiled, run('webgpu', 2000), run('webgl', 2100)]
     const result = evaluate(
-      renderChange({ runs, openPoints, incompleteClosures: [closure('webgpu', 'polish', 1600)] }),
+      renderChange({ runs, openPoints, incompleteClosures: [closureOf(unfiled)] }),
     )
     expect(result.decision).toBe('block')
     expect(result.reason).toMatch(/UNEXPLAINED RED/)
@@ -1148,7 +1157,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
     expect(evaluate(renderChange({ runs, openPoints })).decision).toBe('block')
     const result = evaluate(
-      renderChange({ runs, openPoints, incompleteClosures: [closure('webgpu', 'polish', 1500)], deferral: null }),
+      renderChange({ runs, openPoints, incompleteClosures: [closureOf(broken)], deferral: null }),
     )
     expect(result.decision).toBe('allow')
   })
@@ -1159,7 +1168,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   it('signs off only the LOST part — a red the run really recorded keeps blocking', () => {
     const broken = truncatedWithRed('webgpu', 1500)
     const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
-    const closures = [closure('webgpu', 'polish', 1500)]
+    const closures = [closureOf(broken)]
     const result = evaluate(renderChange({ runs, openPoints, incompleteClosures: closures }))
     expect(result.decision).toBe('block')
     // And it is now reported as the RED it is, not as an incomplete recording.
@@ -1173,34 +1182,41 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const broken = truncatedWithRed('webgpu', 1500)
     const ledger = [{ point: 506, kind: 'console', match: /GPUValidationError/, why: 'the compat lane cannot multisample' }]
     const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
-    const closures = [closure('webgpu', 'polish', 1500)]
+    const closures = [closureOf(broken)]
     expect(evaluate(renderChange({ runs, openPoints, incompleteClosures: closures })).decision).toBe('block')
     expect(evaluate(renderChange({ runs, openPoints, incompleteClosures: closures, ledger })).decision).toBe('allow')
   })
 
   it('a closure carrying no EVIDENCE closes nothing — that is the whole difference', () => {
     const broken = truncatedLegacy('webgpu', 1500)
-    const blank = [{ backend: 'webgpu', suite: 'polish', at: 1500, evidence: '   ' }]
+    const blank = [{ ...closureOf(broken), evidence: '   ' }]
+    const none = [{ ...closureOf(broken), evidence: undefined }]
     expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: blank })).toHaveLength(1)
-    expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [{ backend: 'webgpu', suite: 'polish', at: 1500 }] })).toHaveLength(1)
+    expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: none })).toHaveLength(1)
   })
 
-  // Two records that both lack a timestamp are not the same run. Folding every
-  // unreadable `at` to 0 made one signature close the other (review, 19.08.2026).
-  it('matches on a READABLE timestamp only — two undated records are not one run', () => {
-    const undated = { ...truncatedLegacy('webgpu', 1500), at: undefined, startedAt: 1500 }
-    const closure_ = [{ backend: 'webgpu', suite: 'polish', at: undefined, evidence: 'signed' }]
-    expect(incompleteClosureFor(undated, closure_)).toBeNull()
-    expect(incompleteClosureFor(undated, [{ backend: 'webgpu', suite: 'polish', at: 'soon', evidence: 'signed' }])).toBeNull()
-    // `Number()` turns each of these into 0, which made them all the same run.
-    for (const [runAt, closureAt] of [[null, ''], ['', false], [false, null]]) {
-      expect(incompleteClosureFor({ ...undated, at: runAt }, [{ backend: 'webgpu', suite: 'polish', at: closureAt, evidence: 'signed' }])).toBeNull()
-    }
-    // But the run's START is a readable stamp, and one identity is what makes a
-    // record closable at all: the re-recording route already named a run that
-    // way, and the signature route refusing to left such a record closable by
-    // NOTHING while the CLI reported success (review, 19.08.2026).
-    expect(incompleteClosureFor(undated, [{ backend: 'webgpu', suite: 'polish', at: 1500, evidence: 'signed' }])).not.toBeNull()
+  // One signature must bind ONE record. The stamp route let a closure written
+  // for `{at: 100}` also close a DIFFERENT run named only by `startedAt: 100`
+  // (runStamp falls back), and two parallel runs sharing a millisecond were not
+  // separable at all (round 5, findings 2/5). Content identity separates every
+  // pair that differs in ANY field — and identifies a record with no stamp too.
+  it('binds by CONTENT: a shared millisecond closes no second run, and an undated record is still closable', () => {
+    const byAt = truncatedLegacy('webgpu', 100)
+    const byStart = { ...truncatedLegacy('webgpu', 100), at: undefined, startedAt: 100 }
+    const signed = closureOf(byAt)
+    expect(incompleteClosureFor(byAt, [signed])).toEqual(signed)
+    // The finding-2 collision: same runStamp reading, different run — unclosed.
+    expect(incompleteClosureFor(byStart, [signed])).toBeNull()
+    // The finding-5 collision: two parallel runs in the same millisecond.
+    const parallel = { ...truncatedLegacy('webgpu', 100), screenshotCount: 3 }
+    expect(incompleteClosureFor(parallel, [signed])).toBeNull()
+    expect(incompleteClosureFor(parallel, [closureOf(parallel)])).not.toBeNull()
+    // A record with NO readable stamp has a content identity all the same — it
+    // used to be closable by NOTHING (the stated residual of the last round).
+    const undated = { ...truncatedLegacy('webgpu', 1500), at: undefined, startedAt: undefined }
+    expect(incompleteClosureFor(undated, [closureOf(undated)])).not.toBeNull()
+    // And a closure that names no identity closes nothing, whatever its stamps.
+    expect(incompleteClosureFor(byAt, [{ backend: 'webgpu', suite: 'polish', at: 100, evidence: 'signed' }])).toBeNull()
   })
 
   it('cannot be RE-RECORDED either without a readable timestamp of its own', () => {
@@ -1212,7 +1228,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   it('signs off ONE run, never a suite/backend pair — the NEXT truncated run blocks again', () => {
     const first = truncatedLegacy('webgpu', 1500)
     const second = truncatedLegacy('webgpu', 2500)
-    const closures = [closure('webgpu', 'polish', 1500)]
+    const closures = [closureOf(first)]
     expect(unexplainedRuns([first], 1000, { openPoints, incompleteClosures: closures })).toEqual([])
     const still = unexplainedRuns([first, second], 1000, { openPoints, incompleteClosures: closures })
     expect(still.map((u) => u.at)).toEqual([2500])
@@ -1251,7 +1267,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(runVerdict(broken, { openPoints }).status).toBe('incomplete')
     for (const [runs, closures] of [
       [[broken, again], null],
-      [[broken], [closure('webgpu', 'polish', 1500)]],
+      [[broken], [closureOf(broken)]],
     ]) {
       const still = unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })
       expect(still).toHaveLength(1)
@@ -1266,7 +1282,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
       renderChange({
         runs: [broken, run('webgl', 2100)],
         openPoints,
-        incompleteClosures: [closure('webgpu', 'polish', 1500)],
+        incompleteClosures: [closureOf(broken)],
       }),
     )
     expect(result.decision).toBe('block')
@@ -1307,7 +1323,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     // lost measurement and neither may close the first attempt.
     for (const [runs, closures] of [
       [[broken, again], null],
-      [[broken], [closure('webgpu', 'polish', 1500)]],
+      [[broken], [closureOf(broken)]],
     ]) {
       const still = unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })
       expect(still).toHaveLength(1)
@@ -1348,7 +1364,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // with nothing but a signed-off run behind it is still uncovered.
   it('never turns a signed-off run into coverage', () => {
     const broken = truncatedLegacy('webgpu', 1500)
-    const closures = [closure('webgpu', 'polish', 1500)]
+    const closures = [closureOf(broken)]
     expect(coveringRun([broken], 'webgpu', 1000, { openPoints })).toBeNull()
     const result = evaluate(renderChange({ runs: [broken, run('webgl', 2100)], openPoints, incompleteClosures: closures }))
     expect(result.decision).toBe('block')
@@ -1362,7 +1378,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true }
     expect(runVerdict(crashedToo, { openPoints }).status).toBe('red')
     expect(runVerdict(crashedToo, { openPoints }).unaccounted[0].name).toMatch(/crash/)
-    const closures = [closure('webgpu', 'polish', 1500)]
+    const closures = [closureOf(crashedToo)]
     const again = { ...run('webgpu', 2000), suite: 'polish' }
     for (const runs of [[crashedToo], [crashedToo, again]]) {
       expect(unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })).toHaveLength(1)
@@ -1377,7 +1393,7 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
       renderChange({
         runs: [broken, run('webgl', 2100)],
         openPoints,
-        incompleteClosures: [closure('webgpu', 'polish', 1500)],
+        incompleteClosures: [closureOf(broken)],
       }),
     )
     expect(result.decision).toBe('block')

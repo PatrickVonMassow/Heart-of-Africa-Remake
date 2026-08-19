@@ -485,17 +485,61 @@ export function droppedLinesOf(run) {
   return 0
 }
 
+/** A value as canonical JSON text — object keys sorted recursively, so the same
+ *  record read twice off disk canonicalises identically whatever a writer's key
+ *  order was. Non-JSON leaves (symbols, functions) read as null, the same
+ *  collapse JSON.stringify performs. */
+function canonicalText(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
+  if (Array.isArray(value)) return `[${value.map(canonicalText).join(',')}]`
+  const keys = Object.keys(value).sort()
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalText(value[k])}`).join(',')}}`
+}
+
+/**
+ * THE IDENTITY A CLOSURE NAMES A RUN BY (point 734, round-5 review): a hash of
+ * the record's WHOLE canonical content, as hex text. A stamp was not an identity
+ * — the matcher keyed on `runStamp`, which falls back `at` → `startedAt`, so a
+ * closure written for `{at: 100}` also closed a DIFFERENT run `{startedAt: 100}`
+ * of the same suite, and two parallel runs sharing a millisecond were not
+ * separable at all. Content is: two records that differ in ANY field hash apart,
+ * and records that hash together are observationally indistinguishable — no
+ * signature could tell them apart by any reading. Null for a non-record; never
+ * throws (the wrapper's fail-open depends on it).
+ */
+export function runIdentity(run) {
+  if (!run || typeof run !== 'object') return null
+  try {
+    const s = canonicalText(run)
+    // FNV-1a over the text, twice with decorrelated accumulators — 64 identity
+    // bits from pure arithmetic, because this core must stay import-free.
+    let h1 = 0x811c9dc5
+    let h2 = (0x811c9dc5 ^ 0x5bd1e995) >>> 0
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i)
+      h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0
+      h2 = (Math.imul(h2 ^ c, 0x01000193) + 0x9e3779b9) >>> 0
+    }
+    return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')
+  } catch {
+    return null
+  }
+}
+
 /**
  * THE CLOSURE THAT AN INCOMPLETE RECORDING HAS AND A RED DOES NOT (point 734).
  * A red closes by its CAUSE — fixed, charged, or filed as a point (point 640) —
  * and all three need to know WHAT the red was. A truncated run cannot supply
  * that by construction, so those three routes are shut and the only exit left
  * was the hand-written `--defer`: the very waiver the charge ledger exists to
- * abolish.
+ * abolish. Since the recorder stopped capping red lines, no NEW record can
+ * truncate — this closure exists for the records written before that fix.
  *
  * So the incompleteness gets its own closure, which is not a waiver, and the
  * limits are what make that true:
- *   - it is signed for ONE RUN by identity — backend, suite and the exact `at`;
+ *   - it is signed for ONE RECORD by its content identity (`run: runIdentity`),
+ *     so a signature can neither close a second, different run that shares a
+ *     stamp nor be pre-written for a future one;
  *   - it carries WRITTEN EVIDENCE, and a closure without any closes nothing;
  *   - it NEVER makes the run cover a backend: runVerdict still answers
  *     `incomplete`, so the backend still needs a real covering run;
@@ -508,20 +552,16 @@ export function droppedLinesOf(run) {
  */
 export function incompleteClosureFor(run, closures) {
   if (!run || typeof run !== 'object') return null
+  const id = runIdentity(run)
+  if (id === null) return null
   for (const c of Array.isArray(closures) ? closures : []) {
     try {
       if (!c || c.backend !== run.backend || c.suite !== run.suite) continue
-      // BOTH timestamps must be READABLE and equal. Folding an unreadable one to
-      // 0 made two records that carry no `at` look like the same run, so one
-      // signature closed the other (review finding, 19.08.2026). The RUN is named
-      // by runStamp — the same reading the re-recording route uses — so a record
-      // whose `at` is unreadable but whose `startedAt` is not can still be signed
-      // for; where neither is readable the run has no identity and nothing
-      // closes it (the CLI refuses to write such a signature rather than
-      // reporting a success that binds nothing).
-      const closureAt = finite(c.at)
-      const runAt = runStamp(run)
-      if (closureAt === null || runAt === null || closureAt !== runAt) continue
+      // THE SIGNATURE BINDS BY CONTENT, never by a stamp: `runStamp` equality
+      // let one closure hit both a run named by `at` and a different one named
+      // only by `startedAt` (round-5 review, 19.08.2026). A closure that names
+      // no identity closes nothing — the strict direction.
+      if (typeof c.run !== 'string' || c.run === '' || c.run !== id) continue
       // The evidence IS the mechanism: an entry that carries none is a silent
       // waiver wearing a closure's shape, so it closes nothing.
       if (!text(c.evidence).trim()) continue

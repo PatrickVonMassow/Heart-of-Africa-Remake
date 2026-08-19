@@ -55,6 +55,7 @@ import {
   incompleteClosureFor,
   droppedLinesOf,
   runStamp,
+  runIdentity,
 } from './render-verify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
@@ -282,27 +283,38 @@ export function isoText(at) {
   }
 }
 
-/** The recorded runs whose recording is incomplete and NOT yet signed off. */
+/** The recorded runs whose EFFECTIVE verdict is `incomplete` and that are NOT
+ *  yet signed off. Judged by runVerdict, not by the truncation marker alone
+ *  (round-5 review, 19.08.2026): a run that truncated AND crashed stays `red`
+ *  (a crash outranks everything) and one that truncated on a `--section` probe
+ *  stays `partial` (it blocks nobody) — offering either a closure would let the
+ *  CLI report a sign-off that lifts nothing. */
 export function openIncompleteRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
-  return runs.filter((r) => isIncompleteRecording(r) && !incompleteClosureFor(r, state?.incompleteClosures))
+  return runs.filter(
+    (r) =>
+      isIncompleteRecording(r) &&
+      runVerdict(r).status === 'incomplete' &&
+      !incompleteClosureFor(r, state?.incompleteClosures),
+  )
 }
 
 /**
  * THE CLOSURE A `--incomplete` INVOCATION WOULD WRITE, or the reason it writes
  * none. Pure and exported so the CLI's whole judgment is testable without a
- * state file — and it needed testing: the writer stamped `at: Number(run.at)`,
- * which is NaN for a record whose timestamp is unreadable, so the command
- * printed a SUCCESS and `incompleteClosureFor` then refused the very closure it
- * had just written. A run is named here by `runStamp`, the same reading the
- * matcher and the re-recording route use.
+ * state file. The closure names its run by CONTENT identity (`runIdentity`),
+ * never by a stamp: the stamp route let one signature close a second, different
+ * run that happened to share a millisecond, and left a record with no readable
+ * timestamp closable by nothing at all (round-5 review, 19.08.2026) — content
+ * identifies both. `--at` and `--run` narrow the SELECTION; the written
+ * signature always binds the one record's full content.
  *
  * @returns {{ closure: object } | { error: string, choices?: object[] }}
  *   `choices` is set only where the selector matched several open runs, so the
- *   caller can print each with its own --at. Total.
+ *   caller can print each with its own --run. Total.
  */
 export function incompleteClosureDraft(state, options) {
-  const { selector = '', at = '', evidence = '' } = options ?? {}
+  const { selector = '', at = '', run = '', evidence = '' } = options ?? {}
   if (!String(evidence).trim()) {
     return {
       error:
@@ -313,26 +325,35 @@ export function incompleteClosureDraft(state, options) {
   if (!String(selector).trim()) {
     return {
       error:
-        'render-verify-guard --incomplete: name the run as "<backend>/<suite>" (add --at <iso|ms> when more ' +
-        'than one is open). A closure names ONE run and can never pre-clear a future one.',
+        'render-verify-guard --incomplete: name the run as "<backend>/<suite>" (add --at <iso|ms> or ' +
+        '--run <id> when more than one is open). A closure names ONE run and can never pre-clear a ' +
+        'future one.',
     }
   }
   const wanted = at ? new Date(/^\d+$/.test(at) ? Number(at) : at).getTime() : null
   if (at && !Number.isFinite(wanted)) {
     return { error: `render-verify-guard --incomplete: --at "${at}" is not a timestamp (ISO or epoch ms).` }
   }
+  const wantedId = String(run).trim()
   const open = openIncompleteRuns(state).filter(
-    (r) => `${r.backend}/${r.suite}` === selector && (wanted === null || runStamp(r) === wanted),
+    (r) =>
+      `${r.backend}/${r.suite}` === selector &&
+      (wanted === null || runStamp(r) === wanted) &&
+      (wantedId === '' || runIdentity(r) === wantedId),
   )
   if (open.length === 0) {
     return {
       error:
         `render-verify-guard --incomplete: no OPEN incomplete recording matches "${selector}"` +
-        `${at ? ` at ${at}` : ''}. Run \`node scripts/render-verify-guard.mjs status\` to see which runs ` +
-        'are truncated.',
+        `${at ? ` at ${at}` : ''}${wantedId ? ` with id ${wantedId}` : ''}. Run ` +
+        '`node scripts/render-verify-guard.mjs status` to see which runs are truncated.',
     }
   }
-  if (open.length > 1) {
+  // Several matches that are one and the same CONTENT are one identity — sign
+  // it once. Distinct contents are distinct judgments: refuse, and offer each
+  // by the id that separates them even where their stamps cannot.
+  const distinct = new Set(open.map((r) => runIdentity(r)))
+  if (distinct.size > 1) {
     return {
       error:
         `render-verify-guard --incomplete: "${selector}" matches ${open.length} open incomplete recordings. ` +
@@ -341,27 +362,13 @@ export function incompleteClosureDraft(state, options) {
     }
   }
   const [run_] = open
-  const stamp = runStamp(run_)
-  // A RECORD WITH NO READABLE TIMESTAMP HAS NO IDENTITY, and a signature that
-  // names no run closes none. Refused loudly rather than written and silently
-  // ignored — the earlier writer reported success on exactly this record (review,
-  // 19.08.2026). STATED RESIDUAL: such a record therefore has no per-run way out
-  // at all, because the information a closure needs is not in it; the loud
-  // --defer, which signs for a judgment rather than for a run, is what is left.
-  if (stamp === null) {
-    return {
-      error:
-        `render-verify-guard --incomplete: the ${run_.backend}/${run_.suite} record carries no readable ` +
-        'timestamp (neither `at` nor `startedAt`), so no closure can name it and any signature written for ' +
-        'it would bind nothing. Re-run the suite; where that is impossible, sign for the JUDGMENT instead: ' +
-        'node scripts/render-verify-guard.mjs --defer "<reason>".',
-    }
-  }
   return {
     closure: {
+      // The binding identity; everything after it is for the human reader.
+      run: runIdentity(run_),
       backend: run_.backend,
       suite: run_.suite,
-      at: stamp,
+      at: runStamp(run_),
       droppedLines: droppedLinesOf(run_),
       evidence: String(evidence),
       closedAt: Date.now(),
@@ -419,22 +426,25 @@ if (arg === '--incomplete') {
       return i === -1 ? '' : String(rest[i + 1] ?? '').trim()
     }
     const consumed = new Set()
-    for (const flag of ['--evidence', '--at']) {
+    for (const flag of ['--evidence', '--at', '--run']) {
       const i = rest.indexOf(flag)
       if (i !== -1) consumed.add(i).add(i + 1)
     }
     const evidence = valueOf('--evidence')
     const at = valueOf('--at')
+    const runSel = valueOf('--run')
     // Positional selector = the first argument that is neither a flag nor a
     // value another flag consumed, found by INDEX: comparing by value would drop
     // the selector whenever an evidence text happened to read the same.
     const selector = rest.find((a, i) => !consumed.has(i) && !a.startsWith('--')) ?? ''
     const state = readRenderState() ?? {}
-    const draft = incompleteClosureDraft(state, { selector, at, evidence })
+    const draft = incompleteClosureDraft(state, { selector, at, run: runSel, evidence })
     if (draft.error) {
       console.error(draft.error)
       for (const r of draft.choices ?? []) {
-        console.error(`  --at ${isoText(runStamp(r) ?? r.at)}   (${droppedLinesOf(r)} line(s) dropped)`)
+        console.error(
+          `  --run ${runIdentity(r)}   (@${isoText(runStamp(r) ?? r.at)}, ${droppedLinesOf(r)} line(s) dropped)`,
+        )
       }
       process.exit(1)
     }
@@ -526,7 +536,7 @@ if (arg === 'status') {
     for (const r of openIncomplete) {
       console.log(
         `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
-          `@${isoText(r.at)} — ${droppedLinesOf(r)} result line(s) dropped by the ` +
+          `@${isoText(r.at)} (id ${runIdentity(r)}) — ${droppedLinesOf(r)} result line(s) dropped by the ` +
           'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
           `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
       )

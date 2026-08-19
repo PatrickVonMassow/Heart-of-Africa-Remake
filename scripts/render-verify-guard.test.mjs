@@ -18,7 +18,7 @@ import {
   incompleteClosureDraft,
   openIncompleteRuns,
 } from './render-verify-guard.mjs'
-import { incompleteClosureFor } from './render-verify-core.mjs'
+import { incompleteClosureFor, runIdentity } from './render-verify-core.mjs'
 
 const boom = (what) => () => {
   throw new Error(`${what} exploded`)
@@ -174,10 +174,26 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
     expect(open.map((r) => r.at)).toEqual([1500])
   })
 
+  // The sign-off may only be OFFERED where it would lift something (round 5,
+  // finding 6). A truncated run that also CRASHED stays `red` (a crash outranks
+  // everything, and no signature lifts it), and a truncated `--section` probe
+  // stays `partial` (it blocks nobody) — listing either as an open incomplete
+  // recording had the CLI report "SIGNED OFF" on a closure that binds nothing.
+  it('offers no closure for a truncated run that CRASHED, or for a truncated --section probe', () => {
+    const crashed = { ...truncated(1500), crashed: true }
+    const probe = { ...truncated(1600), partial: true, section: 'traa-toggle' }
+    expect(openIncompleteRuns({ runs: [crashed, probe, truncated(1700)] }).map((r) => r.at)).toEqual([1700])
+    // And the draft therefore refuses them by name, rather than signing.
+    const draft = incompleteClosureDraft({ runs: [crashed] }, { selector: 'webgpu/settings', evidence: 'e' })
+    expect(draft.closure).toBeUndefined()
+    expect(draft.error).toMatch(/no OPEN incomplete recording/)
+  })
+
   it('drops a run that is already signed off, and keeps the next one', () => {
+    const one = truncated(1500)
     const state = {
-      runs: [truncated(1500), truncated(2500)],
-      incompleteClosures: [{ backend: 'webgpu', suite: 'settings', at: 1500, evidence: 'no browser on this host' }],
+      runs: [one, truncated(2500)],
+      incompleteClosures: [{ run: runIdentity(one), backend: 'webgpu', suite: 'settings', at: 1500, evidence: 'no browser on this host' }],
     }
     expect(openIncompleteRuns(state).map((r) => r.at)).toEqual([2500])
   })
@@ -213,14 +229,32 @@ describe('openIncompleteRuns — what the sign-off may close', () => {
       expect(incompleteClosureFor(run, [draft.closure])).toEqual(draft.closure)
     })
 
-    // And where NEITHER is readable the run has no identity at all: refuse, and
-    // say what is left, rather than report a success that binds nothing.
-    it('refuses a record with no readable timestamp instead of writing a closure that matches nothing', () => {
+    // A record with NO readable stamp still has a CONTENT identity — under the
+    // stamp scheme it was closable by nothing while the CLI reported success;
+    // the hash names it like any other record (round 5, finding 5).
+    it('signs a record with no readable timestamp by its content identity', () => {
       const run = { ...truncated(1500), at: 'soon', startedAt: null }
       const draft = incompleteClosureDraft({ runs: [run] }, signed)
-      expect(draft.closure).toBeUndefined()
-      expect(draft.error).toMatch(/no readable timestamp/)
-      expect(draft.error).toMatch(/--defer/)
+      expect(draft.error).toBeUndefined()
+      expect(draft.closure.run).toBe(runIdentity(run))
+      expect(draft.closure.at).toBeNull()
+      expect(incompleteClosureFor(run, [draft.closure])).toEqual(draft.closure)
+    })
+
+    // Two parallel runs can share a millisecond (finding 5): --at then matches
+    // both, but their CONTENT differs, so --run separates what no stamp can —
+    // and the one signature binds only the run it names.
+    it('separates two runs that share a stamp by --run, and the signature binds only that one', () => {
+      const a = truncated(1500)
+      const b = { ...truncated(1500), screenshotCount: 3 }
+      const state = { runs: [a, b] }
+      const ambiguous = incompleteClosureDraft(state, { ...signed, at: '1500' })
+      expect(ambiguous.error).toMatch(/matches 2 open incomplete recordings/)
+      expect(ambiguous.choices).toHaveLength(2)
+      const draft = incompleteClosureDraft(state, { ...signed, run: runIdentity(b) })
+      expect(draft.error).toBeUndefined()
+      expect(incompleteClosureFor(b, [draft.closure])).toEqual(draft.closure)
+      expect(incompleteClosureFor(a, [draft.closure])).toBeNull()
     })
 
     it('refuses an empty evidence, an unnamed run, an unreadable --at and a selector that matches none', () => {
