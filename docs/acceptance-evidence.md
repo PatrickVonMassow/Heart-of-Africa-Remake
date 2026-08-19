@@ -1197,7 +1197,10 @@ line always lies inside the part of the give-way the player sees change), pin th
 fall as concentrated at the boundary, and prove the tone step is a RATIO that
 survives both ends of the year against the real season curve — plus, since 581,
 the value the band actually reads at against the ground it sits on, over every
-place kind and every settlement palette in the game, above a stated minimum
+place kind and every settlement palette in the game, above a stated minimum, and
+the one number there that is a MEASUREMENT rather than a calibration — the level
+the swept side is flattened to — re-measured from a mirror of the shader's own
+mottling noise, so it cannot drift away from the mean it stands for
 (`src/render/edgeBand.test.ts`); a source-level test refuses a second hand-rolled
 distance-against-radius test in the scene (`src/scenes/place/boundary.test.ts`).
 Live, the picture is measured by ATTRIBUTION rather than correlation — the
