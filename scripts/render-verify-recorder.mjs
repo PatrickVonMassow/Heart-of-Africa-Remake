@@ -213,6 +213,19 @@ export function armRunRecorder(backend) {
             `NOTE  ${armed.suite} consulted no section gate, so it ran WHOLE — but ${SECTION_ENV}=${armed.section} is set, so this run is recorded PARTIAL and proves no coverage. Unset it.`,
           )
         }
+        // THE TAIL LINE IS READ WHATEVER THE EXIT CODE (review, 19.08.2026).
+        // A stream's last line carries no newline when the process dies
+        // mid-write, and flushing only on a red left the cap open from the
+        // other side: 400 newline-terminated result lines plus an unterminated
+        // 401st never reached the counter, so `dropped` stayed 0, the record
+        // omitted `truncated`, and a run whose reds nobody read COVERED the
+        // backend. Flushed here, before anything is judged, so the truncation
+        // field and the red accounting below read the same capture.
+        try {
+          flush()
+        } catch {
+          /* never fail a suite over the bookkeeping */
+        }
         // A green run has nothing to account for; only a RED one is charged, and
         // it is charged HERE, at record time, against the ledger as it stood
         // when the run happened. A later ledger edit therefore cannot bless a
@@ -220,7 +233,6 @@ export function armRunRecorder(backend) {
         let reds = []
         if (exit !== 0) {
           try {
-            flush()
             reds = chargeReds(failedChecks(armed.lines.join('\n')), {
               suite: armed.suite,
               backend: armed.backend,

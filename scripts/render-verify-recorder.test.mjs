@@ -255,6 +255,22 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(runVerdict(record, { openPoints }).covers).toBe(false)
   })
 
+  // The same bypass through the other door (review, 19.08.2026): the flush that
+  // reads a stream's unterminated last line sat inside the red branch, so a run
+  // that filled the buffer with whole lines and printed ONE more without a
+  // newline recorded `dropped: 0` on exit 0 — no `truncated` field, clean
+  // verdict, backend covered. Exactly 400 + 1 lines, because 400 is the cap.
+  it('sees the line the cap ate even when it never got its newline and the run exited 0', async () => {
+    const run = await armed('polish')
+    for (let i = 0; i < 400; i++) process.stdout.write(`ERR: a tolerated console error #${i}\n`)
+    process.stdout.write('FAIL  the one line that overflowed the buffer — and it never got its newline')
+    const record = run.exit(0)
+    expect(record.truncated).toBe(true)
+    expect(record.droppedLines).toBe(1)
+    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints }).covers).toBe(false)
+  })
+
   it('leaves a green run with no accounting at all', async () => {
     const run = await armed('polish')
     const record = run.exit(0)
