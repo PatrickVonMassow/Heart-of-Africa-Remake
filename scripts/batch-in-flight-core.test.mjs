@@ -53,6 +53,7 @@ import {
   POOL_CAP,
   COMMISSION_RECORD_PATH,
   pointOfBranch,
+  normalizeActiveWork,
   describeBranchAge,
   parseCommissionRecord,
   commissionOverrideFor,
@@ -98,6 +99,7 @@ import {
   worktreeActiveAt,
   worktreeFilesActiveAt,
   runningBranchFiles,
+  tagEvidencePoint,
 } from './batch-in-flight.mjs'
 import { selfCommandLine } from './verify/run-record.mjs'
 
@@ -135,6 +137,72 @@ const declaration = (over = {}) => ({
 
 const assess = (over = {}, probeOver = {}) =>
   assessInFlight({ declaration: declaration(over), sid: SID, now: NOW, ...probes(probeOver) })
+
+describe('normalizeActiveWork — the board\'s structured point source', () => {
+  const openPoints = new Set([697, 700, 711])
+
+  it('combines the focused point with tagged strands and deduplicates repeated evidence', () => {
+    const result = normalizeActiveWork({
+      focusPoint: 700,
+      openPoints,
+      declaration: {
+        evidence: [
+          { kind: 'branch', point: 697, phase: 'authoring' },
+          { kind: 'worktree', point: 697, phase: 'counter-read' },
+          { kind: 'pid', point: 711, phase: 'verification' },
+        ],
+      },
+    })
+    expect(result).toMatchObject({ ok: true, points: [700, 697, 711], focusPoint: 700 })
+  })
+
+  it('keeps transfer and landing continuity active but excludes explicit exit phases', () => {
+    const result = normalizeActiveWork({
+      openPoints,
+      declaration: {
+        evidence: [
+          { point: 697, phase: 'transferred' },
+          { point: 700, phase: 'ready-to-land' },
+          { point: 711, phase: 'returned' },
+        ],
+      },
+    })
+    expect(result).toMatchObject({ ok: true, points: [697, 700] })
+  })
+
+  it('does not promote undeclared feat branches into active work', () => {
+    expect(normalizeActiveWork({ openPoints, declaration: null, focusPoint: null, openBranches: [
+      'feat/697-a', 'feat/700-b', 'feat/711-c', 'feat/1', 'feat/2', 'feat/3', 'feat/4', 'feat/5', 'feat/6',
+    ] })).toMatchObject({ ok: true, points: [] })
+  })
+
+  it('stamps branch/worktree evidence from its own strand and pid/log evidence from the declared focus', () => {
+    expect(tagEvidencePoint({ kind: 'branch', ref: 'feat/697-a' }, { currentPoint: 700 })).toMatchObject({
+      point: 697,
+      phase: 'authoring',
+    })
+    expect(tagEvidencePoint({ kind: 'worktree', path: '/w/711' }, {
+      currentPoint: 700,
+      worktreeRef: 'refs/heads/feat/711-c',
+    })).toMatchObject({ point: 711 })
+    expect(tagEvidencePoint({ kind: 'log', path: '/w/run.log' }, { currentPoint: 700, phase: 'verification' }))
+      .toMatchObject({ point: 700, phase: 'verification' })
+  })
+
+  it.each([
+    ['unreadable source', { readable: false }],
+    ['untagged legacy evidence', { declaration: { evidence: [{ kind: 'branch', ref: 'feat/697-x' }] } }],
+    ['malformed point', { declaration: { evidence: [{ point: 'x' }] } }],
+    ['closed point', { declaration: { evidence: [{ point: 699 }] } }],
+    ['unknown phase', { declaration: { evidence: [{ point: 697, phase: 'maybe' }] } }],
+    ['contradicted checkpoint', { checkpointContradicted: true }],
+  ])('returns unknown rather than an empty active set for %s', (_label, over) => {
+    const result = normalizeActiveWork({ openPoints, ...over })
+    expect(result.ok).toBe(false)
+    expect(result.points).toEqual([])
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
+})
 
 // ---------------------------------------------------------------------------
 describe('checkEvidence — every kind is answered by a probe, never by the claim', () => {

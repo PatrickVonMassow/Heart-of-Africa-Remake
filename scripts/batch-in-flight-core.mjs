@@ -1126,6 +1126,101 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/** Phases that keep a declared strand on the board until an explicit exit. */
+export const ACTIVE_WORK_PHASES = Object.freeze([
+  'authoring',
+  'counter-read',
+  'verification',
+  'ready-to-land',
+  'landing',
+  'transferred',
+  'awaiting-adoption',
+  'adopted',
+  'handover',
+])
+
+/** Phases whose lifecycle command has already moved the point elsewhere. */
+export const TERMINAL_WORK_PHASES = Object.freeze([
+  'completed',
+  'landed',
+  'returned',
+  'decommissioned',
+  'abandoned',
+  'blocked-on-user',
+])
+
+/**
+ * Normalize the ONE structured active-work source into the ordered point set
+ * projected by the board. Evidence must carry its point explicitly; inferring
+ * from every open `feat/*` branch would recreate the stale-branch ambiguity
+ * this record exists to remove. The owner focus is part of the same source
+ * snapshot and leads the order, so a render can put the focused strand first.
+ *
+ * Returns `{ ok, points, focusPoint, errors }` and never throws. An unreadable,
+ * malformed, untagged, closed or checkpoint-contradictory source is UNKNOWN,
+ * never the empty set. A missing declaration is a valid zero-strand record when
+ * no numbered focus stands.
+ */
+export function normalizeActiveWork({
+  readable = true,
+  declaration = null,
+  focusPoint = null,
+  openPoints = [],
+  checkpointContradicted = false,
+} = {}) {
+  try {
+    const errors = []
+    if (readable !== true) errors.push('the active-work record is unreadable')
+    if (checkpointContradicted === true) errors.push('a transferred checkpoint contradicts the recorded strand')
+
+    const open = openPoints instanceof Set
+      ? openPoints
+      : new Set(Array.isArray(openPoints) ? openPoints.map(Number).filter(Number.isInteger) : [])
+    const ordered = []
+    const seen = new Set()
+    const add = (raw, where) => {
+      const point = Number(raw)
+      if (!Number.isInteger(point) || point <= 0) {
+        errors.push(`${where} has no valid point number`)
+        return
+      }
+      if (open.size > 0 && !open.has(point)) {
+        errors.push(`${where} names point ${point}, which is not open`)
+        return
+      }
+      if (!seen.has(point)) {
+        seen.add(point)
+        ordered.push(point)
+      }
+    }
+
+    if (focusPoint != null) add(focusPoint, 'the owner focus')
+    if (declaration != null) {
+      if (!declaration || typeof declaration !== 'object' || !Array.isArray(declaration.evidence)) {
+        errors.push('the active-work declaration is malformed')
+      } else {
+        declaration.evidence.forEach((item, index) => {
+          if (!item || typeof item !== 'object') {
+            errors.push(`evidence item ${index + 1} is malformed`)
+            return
+          }
+          const phase = String(item.phase ?? declaration.phase ?? 'authoring').trim().toLowerCase()
+          if (TERMINAL_WORK_PHASES.includes(phase)) return
+          if (!ACTIVE_WORK_PHASES.includes(phase)) {
+            errors.push(`evidence item ${index + 1} has unknown phase "${phase || '<blank>'}"`)
+            return
+          }
+          add(item.point, `evidence item ${index + 1}`)
+        })
+      }
+    }
+
+    return { ok: errors.length === 0, points: errors.length ? [] : ordered, focusPoint: Number(focusPoint) || null, errors }
+  } catch (error) {
+    return { ok: false, points: [], focusPoint: null, errors: [`active-work normalization failed: ${error?.message ?? error}`] }
+  }
+}
+
 /** Shell quoting stripped off a captured branch name: `git switch -c
  *  'feat/712-work'` reaches the `(\S+)` capture WITH its quotes, and a name the
  *  normaliser cannot read walks past both refusals (fourth review, finding 2).

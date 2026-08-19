@@ -63,6 +63,7 @@ import {
   openPointSpecs,
   waitEtaRefusal,
   openBranchSlots,
+  pointOfBranch,
   parseCommissionRecord,
   COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
@@ -70,7 +71,7 @@ import {
   RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
-import { boardFilePath } from './dashboard-state.mjs'
+import { boardFilePath, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
 
 export { IN_FLIGHT_PATH }
@@ -102,6 +103,13 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
   } catch {
     return false
   }
+}
+
+/** Stamp one newly-declared evidence item with the point the board projects. */
+export function tagEvidencePoint(item, { currentPoint = null, worktreeRef = null, phase = 'authoring' } = {}) {
+  const explicit = Number(currentPoint)
+  const point = pointOfBranch(item?.ref ?? worktreeRef) ?? (Number.isInteger(explicit) && explicit > 0 ? explicit : null)
+  return { ...item, point, phase }
 }
 
 // --- The probes ----------------------------------------------------------------
@@ -1138,7 +1146,7 @@ if (isMain) {
     process.exit(1)
   }
   const usage =
-    'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
+    'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--point N] [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
     '--agent-check [--worktree PATH] [--branch REF] [--log PATH] | --handover-check | --adopt'
 
@@ -1253,10 +1261,18 @@ if (isMain) {
     if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
+    const focus = readJson(FOCUS_PATH)
+    let currentPoint = Number.isInteger(focus?.point) && focus.point > 0 ? focus.point : null
     for (let i = 2; i < argv.length; i += 2) {
       const flag = argv[i]
       const value = argv[i + 1]
       if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+      if (flag === '--point') {
+        const point = Number(value)
+        if (!Number.isInteger(point) || point <= 0) fail(`--point needs a positive work-order point, got "${value}".\n${usage}`)
+        currentPoint = point
+        continue
+      }
       if (flag === '--slots-free') {
         // Point 427: not evidence, a REASON. It answers "why do the free pool slots
         // stay free", and the guard demands it only when they demonstrably could not.
@@ -1276,7 +1292,7 @@ if (isMain) {
               'equivalent). Nothing recorded.',
           )
         }
-        evidence.push({ kind: 'pid', pid, startedAt: probe.startedAt })
+        evidence.push(tagEvidencePoint({ kind: 'pid', pid, startedAt: probe.startedAt }, { currentPoint, phase: 'verification' }))
       }
       // WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
       // 28.07.2026, finding B). Both of the following used to be recorded raw:
@@ -1289,10 +1305,27 @@ if (isMain) {
       //     named the checkout itself without being recognised as it. And a
       //     relative path is meaningless to the launcher anyway: it probes from
       //     its own cwd, not from the one the declaration was written in.
-      else if (flag === '--branch') evidence.push({ kind: 'branch', ref: resolveRefName(value) ?? value })
-      else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: absPath(value) })
-      else if (flag === '--log') evidence.push({ kind: 'log', path: absPath(value) })
+      else if (flag === '--branch') {
+        const ref = resolveRefName(value) ?? value
+        evidence.push(tagEvidencePoint({ kind: 'branch', ref }, { currentPoint }))
+      }
+      else if (flag === '--worktree') {
+        const path = absPath(value)
+        const ref = worktreeBranch(path)
+        evidence.push(tagEvidencePoint({ kind: 'worktree', path }, { currentPoint, worktreeRef: ref }))
+      }
+      else if (flag === '--log') {
+        evidence.push(tagEvidencePoint({ kind: 'log', path: absPath(value) }, { currentPoint, phase: 'verification' }))
+      }
       else fail(`unknown option "${flag}".\n${usage}`)
+    }
+    const untagged = evidence.filter((item) => !Number.isInteger(item.point) || item.point <= 0)
+    if (untagged.length) {
+      fail(
+        `${untagged.length} evidence item(s) name no point, so the board could not derive which now-card they ` +
+          'require. Declare the owner focus first (`node scripts/focus.mjs set <N> "<what>"`) or put `--point <N>` ' +
+          'before the item. Nothing recorded.',
+      )
     }
     // Evidence that cannot go quiet is refused HERE (four-eyes review
     // 28.07.2026): the repo root is git-active whenever the session runs any git
