@@ -257,6 +257,21 @@ describe('derived now-section membership', () => {
       .toThrow(/source unresolved.*broken JSON/)
     expect(before).toContain('700 — A')
   })
+
+  it('projects the publish-time active set and keeps the surviving authored prose', () => {
+    const authored = nowEntry(700, 'Kontext', '20:07', 'Bleibt genau so stehen.')
+    const before = fullBoard({ now: authored, queue: queueEntry(697, 'Wartend', '~2 h') + queueEntry(711, 'Wartend', '~1 h') })
+    const { html, comparison } = projectNowForPublish(before, { ok: true, points: [700, 697, 711], focusPoint: 700 })
+    expect(html).toContain('<span class="t">700 — Kontext</span>')
+    expect(html).toContain('Bleibt genau so stehen.')
+    expect(html.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(2)
+    expect(comparison).toMatchObject({ ok: true })
+  })
+
+  it('refuses verified zero when only an authored handover card stands there', () => {
+    expect(() => projectNowForPublish(fullBoard({ now: handover }), { ok: true, points: [], focusPoint: null }))
+      .toThrow(/refusing to replace an authored unnumbered handover card/)
+  })
 })
 
 // Point 410: the shell is what broke the umlauts, so the text must be able to

@@ -197,14 +197,24 @@ const fail = (reason) => {
   process.exit(1)
 }
 
+  const original = readFileSync(boardFile, 'utf8')
+  const tasksText = readFileSync(tasksPath, 'utf8')
+  const { open } = parseTasks(tasksText)
+  let repoBytes = original
+
+  try {
+    repoBytes = projectNowForPublish(repoBytes, gatherActiveWorkSource({ tasksText }), {
+      knownPoints: openPointNumbers(tasksText),
+    }).html
+  } catch (e) {
+    console.error(`board-publish REFUSED — the derived now-section could not be rendered (${e.message}).`)
+    console.error('No publication beats a knowingly false board. Reconcile the active-work source and retry publish.')
+    process.exit(1)
+  }
+
 // The footer's date and open-point count are derived, not typed — same parse as
 // the audit, so the two cannot disagree.
 try {
-  const html = readFileSync(boardFile, 'utf8')
-  const tasksText = readFileSync(tasksPath, 'utf8')
-  const { open } = parseTasks(tasksText)
-  const activeWork = gatherActiveWorkSource({ tasksText })
-  const projected = projectNowForPublish(html, activeWork, { knownPoints: openPointNumbers(tasksText) }).html
   // LF-NORMALISED HERE TOO (point 439). This is the last write before the bytes
   // go out, so whatever wrote the file before — a hand edit in Windows text mode
   // included — the published board and the local one agree on their newlines,
@@ -221,25 +231,30 @@ try {
   // too means a board that was last written by an older version can still be
   // published — a strict gate must never be reachable without a way out.
   const refreshed = normaliseLineEndings(
-    upgradeNowCards(applyFooterNote(refreshFooter(projected, { openCount: open.length }), share)),
+    upgradeNowCards(applyFooterNote(refreshFooter(repoBytes, { openCount: open.length }), share)),
   )
-  if (refreshed !== html) {
-    // Atomic (point 443, four-eyes F3) — and this one writes the very file the
-    // next lines read, hash and push to the public page.
-    writeTextAtomic(boardFile, refreshed)
-    console.log(`footer refreshed: ${open.length} open point(s)`)
-    if (upgradeNowCards(html) !== html) console.log('current-work card(s) lifted into the numbered chip')
-  }
+  repoBytes = refreshed
 } catch (e) {
   // A publish must never be blocked by the footer; the audit still catches a
   // stale one, and saying why beats failing silently.
   console.error(`board-publish: footer not refreshed (${e.message})`)
 }
 
+if (repoBytes !== original) {
+  // Atomic (point 443, four-eyes F3) — and this one writes the very file the
+  // next lines read, hash and push to the public page.
+  writeTextAtomic(boardFile, repoBytes)
+  if (repoBytes !== original && repoBytes.includes('data-state="stub"') && !original.includes('data-state="stub"')) {
+    console.log('current-work section reconciled to the active-work record')
+  }
+  if (repoBytes !== original) console.log(`footer refreshed: ${open.length} open point(s)`)
+  if (upgradeNowCards(original) !== original) console.log('current-work card(s) lifted into the numbered chip')
+}
+
 // ONE read of the board from here on: the gates below, the bytes that go out and
 // the hash that is recorded must all be the SAME bytes, or a gate passes on one
 // version while another is published.
-const repoBytes = readFileSync(boardFile, 'utf8')
+repoBytes = readFileSync(boardFile, 'utf8')
 
 // STRUCTURE BEFORE PUBLISH: a malformed board must not be publishable at all.
 // The gate sits before the bytes leave, exactly as in dashboard-publish.mjs —
@@ -264,7 +279,7 @@ if (!fingerprint) fail('the work order could not be read, so the page would carr
 // deadlock: editing the board is never blocked by any gate, and the deny that
 // asks for a publish fires at most once per turn.
 let openPoints = []
-try { openPoints = parseTasks(readFileSync(tasksPath, 'utf8')).open } catch { /* judged unreadable above */ }
+try { openPoints = open } catch { /* judged unreadable above */ }
 const uncovered = boardMissingPoints(repoBytes, openPoints)
 if (uncovered.length) {
   console.error(`board-publish REFUSED — the board does not show open point(s) ${uncovered.join(', ')}.`)
@@ -287,7 +302,7 @@ if (uncovered.length) {
 // second time. Reported, never refused: the board must stay publishable, the
 // session must simply not be able to publish these unknowingly.
 try {
-  const report = boardTitleReport(repoBytes, parseTaskTitles(readFileSync(tasksPath, 'utf8')))
+  const report = boardTitleReport(repoBytes, parseTaskTitles(tasksText))
   if (report.untranslated.length) {
     console.error(`board-publish: point(s) ${report.untranslated.join(', ')} still carry the ENGLISH work-order`)
     console.error(`  headline as their card title. Give them German ones: ${TITLE_CMD}`)
