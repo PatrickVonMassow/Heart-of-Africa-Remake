@@ -50,9 +50,28 @@ the normalisation of the same one, so the point's own constraint holds.
   publish preflight, which must fail CLOSED, is open. A missing section must
   refuse, not guess.
 
+## Where the branch actually stands (19.08.2026, 07:0x)
+
+The source side of the rework IS built and rescued to `55c9e445` (a `[skip ci]`
+rescue commit, pushed): the guessing helpers are gone, the exit filters on the
+recorded `point`, the write and adoption paths stamp it, and an unattributable
+item is reported loudly with `--clear` as the named way out. The author confirmed
+no write path lacks the mapping.
+
+WHAT IS LEFT, and the unit layer is RED until the first of them is done:
+
+- The tests still import the removed exports — rewrite them onto the new
+  direction (migration persists `point`, unattributable evidence stays and stays
+  loud, the `--clear` path including `clearDeclaration`).
+- The two board-core findings above (carry the idle prose over; make a missing
+  now-section refuse in BOTH the render and the comparison).
+- Then the gates, and a commit per step.
+
 ## Note for the successor
 
-A subagent does NOT survive the end of its session. The author working on this
-direction when the watermark fired was lost with it, exactly as the previous
-session's author was. Only pushed commits carry over — check the branch tip
-before assuming any of the above is already built.
+A subagent does NOT survive the end of its session, and this one was additionally
+frozen mid-rework by the idle-claim guard the handover card raises: with
+"nothing is running" on the board, every state-changing call in the agent's
+session is refused, commits included. Put point 713 back into the now-section
+BEFORE re-delegating, or the next author hits the same wall. Only pushed commits
+carry over — check the branch tip before assuming any of the above is built.
