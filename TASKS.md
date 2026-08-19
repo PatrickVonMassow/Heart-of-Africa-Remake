@@ -168,12 +168,19 @@ put it is the mistake this line exists to stop.
   point reports its measured token spend rather than zero.
   Criticality: high — it governs how the scarcest model pool is spent, and its absence has
   already put 58 % of a week's volume into a single point that never landed.
-  OPEN, FOR THE USER: the serving chain of CLAUDE.md §6 names Opus 5 → Fable 5 → Opus 4.8, but
-  `scripts/batch-autostart-core.mjs` lines 51/52 spawn with `--model claude-opus-5[1m]
-  --fallback-model claude-fable-5`, and the CLI takes only ONE fallback — so Opus 4.8 is never
-  reached and the scarcest pool catches the most ordinary driving work (reading the board,
-  running gates, merging, publishing). Whether that is rewired is the user's decision and is not
-  part of this point until they take it.
+  THE SERVING FALLBACK IS NOT PART OF THIS POINT — it is decided and correct. The 18 % above is
+  not escalation at all and not an exhausted quota either: measured from both transcripts, the
+  switch reads verbatim `Switched to Fable 5 due to high demand for Opus 5 (1M context)` with
+  `trigger: overloaded`, so it is capacity overload. The user decided it on 19.08.2026: »Dieser
+  Fallback ist nur theoretisch … dann sollte auf ein Modell im gleichen Haus zurückgefallen
+  werden — also Fable — damit ein eventuelles Review noch aus einem anderen Haus kommt.« Keeping
+  the author at Anthropic is exactly what keeps the cross-vendor review with Sol, so the fallback
+  target stays `claude-fable-5` and nothing here changes it. UNMEASURED RESIDUE, recorded so it
+  is not lost and not acted on: the overload was on `claude-opus-5[1m]` while another session ran
+  247 turns on plain `claude-opus-5` at the same time. If the non-1M variant has capacity in such
+  a moment, "plain Opus 5 first, then Fable" would hold the user's same-house rule and spare the
+  Fable pool — a hypothesis from one observation, and the CLI takes only one `--fallback-model`,
+  so it would need a mechanism rather than the flag.
   Bundle: Modell & Wächter.
 - [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
   set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
