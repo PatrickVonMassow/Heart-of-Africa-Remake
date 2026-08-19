@@ -9,7 +9,7 @@ import {
   transitionActiveDeclaration,
 } from './active-work-source.mjs'
 import { UNATTRIBUTABLE_EVIDENCE_REMEDY, withRecordedEvidencePoint } from './batch-in-flight-core.mjs'
-import { clearDeclaration, tagEvidencePoint } from './batch-in-flight.mjs'
+import { clearDeclaration, tagEvidencePoint, writeDeclaration } from './batch-in-flight.mjs'
 import { projectNowForPublish } from './board-core.mjs'
 
 const TASKS = '- [ ] 697. A\n- [ ] 700. B\n- [ ] 711. C\n- [ ] 712. DEFERRED later\n'
@@ -208,6 +208,39 @@ describe('the write side records the evidence→point mapping', () => {
       expect(existsSync(path)).toBe(false)
       // Clearing what is already gone stays a success: the wedge is open either way.
       expect(clearDeclaration(path)).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('repairs an unattributable item the intended way: block loudly, clear, re-declare the real work', () => {
+    // The whole repair path, not only the file removal (sixth cross-review,
+    // finding on the destructive-only test): a declaration carrying one
+    // unattributable item beside a real strand is UNKNOWN as a whole — the
+    // read side blocks loudly naming --clear and never publishes the good
+    // half alone. The human then clears and RE-DECLARES what is really
+    // running through the stamping write path, and the source resolves again
+    // with the real points — the repair ends in a working declaration, not
+    // an empty one.
+    const root = mkdtempSync(join(tmpdir(), 'in-flight-repair-'))
+    try {
+      const declarationPath = join(root, 'in-flight.json')
+      const focusPath = join(root, 'focus.json')
+      const tasksText = '- [ ] 700. A\n- [ ] 697. B\n'
+      writeFileSync(declarationPath, JSON.stringify({
+        evidence: [
+          { kind: 'branch', ref: 'feat/700-context-fence' },
+          { kind: 'worktree', path: '/gone-forever' },
+        ],
+      }))
+      const blocked = gatherActiveWorkSource({ tasksText, declarationPath, focusPath, worktreeRef: () => null })
+      expect(blocked).toMatchObject({ ok: false, points: [] })
+      expect(blocked.errors.join(' ')).toContain(UNATTRIBUTABLE_EVIDENCE_REMEDY)
+      // The named way out, then the re-declaration of the surviving strand.
+      expect(clearDeclaration(declarationPath)).toBe(true)
+      writeDeclaration({ evidence: [tagEvidencePoint({ kind: 'branch', ref: 'feat/700-context-fence' })] }, declarationPath)
+      expect(gatherActiveWorkSource({ tasksText, declarationPath, focusPath, worktreeRef: () => null }))
+        .toMatchObject({ ok: true, points: [700] })
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
