@@ -70,7 +70,8 @@ const git = (args, opts = {}) => sh('git', args, opts)
 
 const readIf = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
 
-const firstLine = (e) => `${(e && (e.stderr || e.message)) || e}`.split('\n').filter(Boolean).slice(-1)[0] ?? ''
+/** The LAST line an error said — where git and node put the reason. */
+const lastLine = (e) => `${(e && (e.stderr || e.message)) || e}`.split('\n').filter(Boolean).slice(-1)[0] ?? ''
 
 /**
  * One board transaction: promote the card and close it into Erledigt in the SAME
@@ -268,7 +269,7 @@ function main(argv) {
     writeTextAtomic(ARCHIVE, checked.moved.archive)
     writeTextAtomic(TASKS, checked.moved.tasks)
   } catch (e) {
-    step('tick', VERDICT.failed, firstLine(e))
+    step('tick', VERDICT.failed, lastLine(e))
     error = new LandingError('the work order could not be written', {
       step: 'tick',
       repair: 'check the working tree with git status — nothing else has run yet',
@@ -312,7 +313,7 @@ function main(argv) {
       // and the fold leaves no half state.
       writeTextAtomic(TASKS, tasksText)
       writeTextAtomic(ARCHIVE, archiveText)
-      step('board', VERDICT.failed, firstLine(e))
+      step('board', VERDICT.failed, lastLine(e))
       error = new LandingError('the board edit failed — the tick was ROLLED BACK', {
         step: 'board',
         repair:
@@ -331,7 +332,7 @@ function main(argv) {
       git(['commit', '-m', message, '--', ...COMMIT_PATHS], { stdio: ['ignore', 'pipe', 'pipe'] })
       step('commit', VERDICT.ok, COMMIT_PATHS.join(', '))
     } catch (e) {
-      step('commit', VERDICT.failed, firstLine(e))
+      step('commit', VERDICT.failed, lastLine(e))
       error = new LandingError('the fold could not be committed', {
         step: 'commit',
         repair: `git commit -- ${COMMIT_PATHS.join(' ')} — the tick and the board are DONE but not durable`,
@@ -354,7 +355,7 @@ function main(argv) {
   console.log(
     '\nDONE BY THIS COMMAND: the tick, the archive move, the Erledigt card, the board\n' +
       'publish and the commit.\n' +
-      `NOT DONE: the push — run: git push origin main`,
+      'NOT DONE: the push — run: git push origin main',
   )
   return 0
 }
