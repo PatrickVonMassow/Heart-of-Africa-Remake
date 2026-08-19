@@ -50,6 +50,9 @@ export const MODES = Object.freeze(['review', 'blind-parallel'])
 /** The mode whose weaker same-model fallback is decorrelated by a framing. */
 export const BLIND_PARALLEL = 'blind-parallel'
 
+/** Outcomes of the one pre-escalation reading recorded beside a review. */
+export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
+
 /** The verdict that blocks as loudly as a missing record. */
 export const BLOCKING_VERDICT = 'do-not-merge'
 
@@ -514,6 +517,8 @@ export const FLAG_SPEC = Object.freeze({
   '--point': true,
   '--mode': true,
   '--framing': true,
+  '--author-framing': true,
+  '--spec-examination': true,
   '--merged-by': true,
   '--merge-fallback': true,
   '--accounting': true,
@@ -550,6 +555,8 @@ const VALUE_KEY = Object.freeze({
   '--point': 'point',
   '--mode': 'mode',
   '--framing': 'framing',
+  '--author-framing': 'authorFraming',
+  '--spec-examination': 'specExamination',
   '--merged-by': 'mergedBy',
   '--merge-fallback': 'mergeFallback',
   '--accounting': 'accounting',
@@ -928,6 +935,8 @@ export function validateRecord({
   authoredBy,
   mode,
   framing,
+  authorFraming,
+  specExamination,
   mergedBy,
   mergeFallback,
   accounting,
@@ -938,6 +947,29 @@ export function validateRecord({
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
+  const authorFrame = String(authorFraming ?? '').trim()
+  const examination = String(specExamination ?? '').trim()
+  if (authorFrame && String(mode ?? '').trim() !== 'review') {
+    errors.push('--author-framing belongs to --mode review: it names the re-authoring commission that review judges')
+  }
+  if (authorFrame && authorFrame.length < 8) {
+    errors.push('--author-framing "<one line>": the hostile-tester stance the authoring round received, not a word')
+  }
+  if (authorFrame && /[\r\n]/.test(authorFrame)) {
+    errors.push('--author-framing must be one line so it cannot forge the round-history report')
+  }
+  if (examination && !SPEC_EXAMINATION_VERDICTS.includes(examination)) {
+    errors.push(`--spec-examination <v>: one of ${SPEC_EXAMINATION_VERDICTS.join(' | ')}`)
+  }
+  if (examination && String(mode ?? '').trim() !== 'review') {
+    errors.push('--spec-examination belongs to --mode review: it is the cross-vendor reading of the point and brief')
+  }
+  if (examination && String(verdict ?? '').trim() !== 'merge') {
+    errors.push('--spec-examination records its own sound/amended outcome and therefore uses --verdict merge')
+  }
+  if (examination && authorFrame) {
+    errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
+  }
   errors.push(...validatePass({ pass, passFiles, passCommits }).errors)
   errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
@@ -1112,7 +1144,14 @@ export function evaluateMechanismReview({
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
     const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
-    const sound = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
+    // A SPEC EXAMINATION READS TEXT, NOT CODE. It deliberately shares the
+    // append-only ledger with reviews, but it cannot satisfy this gate: in
+    // particular, its merge verdict at a descendant sha must never discharge
+    // a do-not-merge that demanded a code fix. Keep it out of `sound` so it can
+    // neither clear an otherwise unreviewed commit nor answer a refusal.
+    const sound = wellFormed.filter(
+      (r) => !r?.specExamination && !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit),
+    )
 
     // AUTHORSHIP-SCOPED PASSES ADVANCE PER CONTRIBUTION. Unlike the legacy
     // size-only split below, these rows name the commits whose changes were in

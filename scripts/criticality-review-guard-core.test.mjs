@@ -356,6 +356,20 @@ describe('evaluateCriticalityReview', () => {
     expect(v.block).toBe(false)
   })
 
+  it('does not let a descendant spec examination answer a review refusal', () => {
+    const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const examination = record({
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      at: 1_787_000_002_000,
+      descendsFrom: ['a'.repeat(40)],
+      specExamination: 'sound',
+    })
+    const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, examination] })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('unresolved')
+  })
+
   it('BLOCKS when the later merge judges the SAME commit — nothing was fixed between them', () => {
     const refused = record({ sha: 'a'.repeat(40), verdict: 'do-not-merge', at: 1_787_000_001_000 })
     const rerun = record({ sha: 'a'.repeat(40), verdict: 'merge', at: 1_787_000_002_000, descendsFrom: [] })

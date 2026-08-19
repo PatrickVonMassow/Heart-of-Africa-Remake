@@ -2,7 +2,8 @@
 //
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
 //       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
-//       --mode <review|blind-parallel> [--framing "<one line>"] [--point <N>]
+//       --mode <review|blind-parallel> [--framing "<one line>"] [--point <N>] \
+//       [--author-framing "<one line>" | --spec-examination <sound|amended>]
 //   node scripts/mechanism-review.mjs --list
 //
 // `--mode` names which half of the four-eyes principle the verdict covers
@@ -149,6 +150,8 @@ export function buildRecord({
   point = '',
   mode = '',
   framing = '',
+  authorFraming = '',
+  specExamination = '',
   mergedBy = '',
   mergeFallback = '',
   accounting = '',
@@ -177,6 +180,8 @@ export function buildRecord({
         evidence,
         mode,
         framing,
+        authorFraming,
+        specExamination,
         mergedBy,
         mergeFallback,
         accounting,
@@ -200,6 +205,8 @@ export function buildRecord({
       evidence,
       mode,
       framing,
+      authorFraming,
+      specExamination,
       mergedBy,
       mergeFallback,
       accounting,
@@ -271,6 +278,8 @@ export function buildRecord({
     authors: commit.authors,
     mode,
     framing,
+    authorFraming,
+    specExamination,
     mergedBy,
     mergeFallback,
     accounting: receipt,
@@ -326,6 +335,8 @@ export function buildRecord({
       // outlives the CLI that wrote it.
       mode: String(mode).trim(),
       ...(String(framing).trim() ? { framing: String(framing).trim() } : {}),
+      ...(String(authorFraming).trim() ? { authorFraming: String(authorFraming).trim() } : {}),
+      ...(String(specExamination).trim() ? { specExamination: String(specExamination).trim() } : {}),
       // WHO FOLDED THE TWO LISTS (point 634). A blind-parallel record carries it
       // — the merge is the one step where a finding can vanish, so the model
       // that wrote neither list does it and the record NAMES that model. Rows
@@ -619,6 +630,7 @@ export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
+  `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
   `           --merged-by "<model>" --accounting "<the blind-merge summary line>" \\\n` +
   `           [--merge-fallback "<which model was unavailable>"]           (blind-parallel)\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
@@ -630,6 +642,10 @@ export const usage = () =>
   `                       same inputs without seeing each other's result\n` +
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
+  `--author-framing records the hostile-tester stance of a re-authoring commission\n` +
+  `       beside the review that followed it. Rounds zero and one have none.\n` +
+  `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
+  `       sound when the text survived the findings, amended when the work order changed.\n` +
   `--merged-by names the model that folded the two lists into the union — the one that\n` +
   `       wrote NEITHER of them, because a merge can lose a finding silently — and the\n` +
   `       COUNT says none did. Hand over the FILES and it is counted here:\n` +
@@ -719,6 +735,8 @@ if (isMainModule(import.meta.url)) {
             // never as one of the two modes.
             `[${oneLine(r.mode) || 'mode not recorded'}]  ${oneLine(r.atIso ?? '')}` +
             `\n      ${oneLine(r.evidence ?? '')}${r.framing ? `\n      framing: ${oneLine(r.framing)}` : ''}` +
+            `${r.authorFraming ? `\n      author framing: ${oneLine(r.authorFraming)}` : ''}` +
+            `${r.specExamination ? `\n      spec examination: ${oneLine(r.specExamination)}` : ''}` +
             `${r.mergedBy ? `\n      union merged by: ${oneLine(r.mergedBy)}${r.mergeFallback ? ` (two-model fallback: ${oneLine(r.mergeFallback)})` : ''}` : ''}` +
             `${r.accounting ? `\n      accounting: ${oneLine(r.accounting)}` : ''}` +
             // Quoted like every structural path list (round-2 pass 3): a path

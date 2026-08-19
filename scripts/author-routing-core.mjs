@@ -47,6 +47,54 @@ export const LANE_MODEL = Object.freeze({
 /** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
 export const FABLE_ESCALATION_ROUNDS = 5
 
+/** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
+export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
+
+/**
+ * The hostile-tester stances used to make successive re-authoring commissions
+ * ask materially different questions of the same lane. These are instructions,
+ * not labels: the prompt can hand either one to an author without another
+ * judgment call in the dispatcher.
+ */
+export const AUTHORING_FRAMINGS = Object.freeze([
+  'Act as a hostile tester: assume the previous fix is confidently wrong, reproduce every finding from first principles, and search the adjacent state transitions for the same failure.',
+  'Act as a hostile contract tester: treat every sentence of the point as an adversarial boundary, construct the smallest counterexample to the current implementation, and repair the invariant rather than the example.',
+])
+
+/** The two outcomes a completed examination may record. */
+export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
+
+/** A pre-dispatch receipt written by author-sol for a round governed by this mechanism. */
+export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+
+const isUnsuccessfulReview = (record, wanted) => {
+  if (Number(record?.point) !== wanted) return false
+  if (record?.mode && record.mode !== 'review') return false
+  if (record?.specExamination) return false
+  if (record?.aborted || record?.shortfall || record?.completed === false) return false
+  return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
+}
+
+const isExaminationRecord = (record, wanted) =>
+  Number(record?.point) === wanted &&
+  record?.mode === 'review' &&
+  record?.verdict === 'merge' &&
+  SPEC_EXAMINATION_VERDICTS.includes(String(record?.specExamination)) &&
+  !record?.aborted &&
+  !record?.shortfall &&
+  record?.completed !== false &&
+  String(record?.evidence ?? '').trim().length >= 10
+
+/** The examiner is always the other vendor and never the scarce Fable pool. */
+export function specExaminerFor(history = {}, fallbackAuthor = '') {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const author = [...rounds].reverse().find((round) => round.authoredBy)?.authoredBy || String(fallbackAuthor)
+  if (/\bsol\b/i.test(author)) {
+    return { vendor: 'claude', model: 'Opus 5', route: 'claude-read', author }
+  }
+  return { vendor: 'sol', model: 'GPT-5.6 Sol', route: 'ask-sol', author }
+}
+
 /**
  * An unsuccessful round is a completed review whose verdict was not a pass.
  * A run that aborted, did not run or had a material shortfall is not completed
@@ -56,12 +104,167 @@ export const FABLE_ESCALATION_ROUNDS = 5
 export function unsuccessfulReviewRounds(records = [], point = '') {
   const wanted = Number(point)
   if (!Number.isInteger(wanted) || wanted < 0) return 0
-  return (Array.isArray(records) ? records : []).filter((record) => {
-    if (Number(record?.point) !== wanted) return false
-    if (record?.mode && record.mode !== 'review') return false
-    if (record?.aborted || record?.shortfall || record?.completed === false) return false
-    return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
-  }).length
+  return (Array.isArray(records) ? records : []).filter((record) => isUnsuccessfulReview(record, wanted)).length
+}
+
+/**
+ * Read the re-authoring history once, in ledger order.
+ *
+ * Outcomes of authoring rounds zero and one carry no framing. Every later fresh
+ * attempt must name one and must differ from the preceding fresh attempt. A
+ * missing or repeated framing remains visible as a repeat, but does not buy
+ * progress toward the scarce Fable lane.
+ */
+export function authorRoundHistory(records = [], point = '') {
+  const wanted = Number(point)
+  if (!Number.isInteger(wanted) || wanted < 0) {
+    return { unsuccessfulRounds: 0, freshRounds: 0, rounds: [], examination: null }
+  }
+  const rows = Array.isArray(records) ? records : []
+  // This is also the number of the NEXT commission: the first review row is
+  // the outcome of round zero, the second the outcome of round one, and so on.
+  let freshRounds = 0
+  let previousFraming = ''
+  const rounds = []
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const record = rows[rowIndex]
+    if (!isUnsuccessfulReview(record, wanted)) continue
+    const index = rounds.length
+    const reviewFraming = String(record?.authorFraming ?? '').trim()
+    const commission = [...rows.slice(0, rowIndex)].reverse().find(
+      (candidate) =>
+        candidate?.kind === AUTHORING_COMMISSION_KIND &&
+        Number(candidate?.point) === wanted &&
+        Number(candidate?.round) === index,
+    )
+    const commissionedFraming = String(commission?.authorFraming ?? '').trim()
+    const framing = commissionedFraming || reviewFraming
+    // No old ledger row could carry a commission receipt or the confirmation
+    // flag: those rows are real pre-mechanism attempts, not malformed uses of
+    // a rule that did not exist. Once either marker exists, enforce the rule.
+    const governed = Boolean(commission || reviewFraming)
+    // Every ledger outcome consumes its own attempt number, including a
+    // repeat. Freshness controls escalation credit; it must not also control
+    // the ordinal, or one bad row makes every later row retry the same rules.
+    const reviewedRound = index
+    let repeat = ''
+    if (commission && reviewFraming && reviewFraming !== commissionedFraming) {
+      repeat = 'the review framing does not match the recorded commission'
+    }
+    if (governed && reviewedRound <= 1 && framing) repeat = 'rounds zero and one must carry no author framing'
+    if (governed && reviewedRound > 1 && !framing) repeat = 'no author framing was recorded'
+    if (governed && framing && !AUTHORING_FRAMINGS.includes(framing)) {
+      repeat = 'the record names no recognized hostile-tester framing'
+    }
+    if (governed && framing && previousFraming && framing === previousFraming) {
+      repeat = 'the author framing repeats the preceding fresh round'
+    }
+    if (!repeat) {
+      freshRounds += 1
+      previousFraming = framing
+    }
+    rounds.push({
+      ledgerRound: index + 1,
+      freshRound: repeat ? null : reviewedRound,
+      framing,
+      commissioned: Boolean(commission),
+      repeat,
+      evidence: String(record?.evidence ?? '').trim(),
+      authoredBy: String(record?.authoredBy ?? '').trim(),
+    })
+  }
+  const expectedExaminer = specExaminerFor({ rounds })
+  const examination =
+    [...rows]
+      .reverse()
+      .find((record) => {
+        if (!isExaminationRecord(record, wanted)) return false
+        if (!expectedExaminer.author) return true
+        return expectedExaminer.route === 'claude-read'
+          ? /\bopus\b/i.test(String(record?.model))
+          : /\bsol\b/i.test(String(record?.model))
+      }) ?? null
+  return { unsuccessfulRounds: rounds.length, freshRounds, rounds, examination }
+}
+
+/** Pick a known hostile-tester stance that is not the preceding one. */
+export function nextAuthoringFraming(previous = '') {
+  const before = String(previous ?? '').trim()
+  return AUTHORING_FRAMINGS.find((framing) => framing !== before) ?? AUTHORING_FRAMINGS[0]
+}
+
+/**
+ * What happens after the history just read: an authoring commission or the one
+ * spec examination immediately before the automatic Fable threshold.
+ * `escalationRounds` is injectable only so the test can prove every boundary
+ * moves with the exported constant instead of hiding a round-number literal.
+ */
+export function nextAuthoringStep({
+  records = [],
+  point = '',
+  reworkRounds,
+  escalationRounds = FABLE_ESCALATION_ROUNDS,
+} = {}) {
+  const history = authorRoundHistory(records, point)
+  const examinationRound =
+    escalationRounds === FABLE_ESCALATION_ROUNDS ? SPEC_EXAMINATION_ROUND : escalationRounds - 1
+  const overridden = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : null
+  const freshRounds = overridden ?? history.freshRounds
+  const round = overridden ?? history.unsuccessfulRounds
+  if (freshRounds === examinationRound && !history.examination) {
+    return {
+      kind: 'spec-examination',
+      round,
+      framing: '',
+      history,
+      reason:
+        `${freshRounds} fresh attempts have reached the step before the Fable escalation threshold of ${escalationRounds}; ` +
+        'the point text and generated brief must be examined against every finding before another commission',
+    }
+  }
+  const previous = [...history.rounds].reverse().find((round) => round.freshRound !== null)?.framing ?? ''
+  const framing = round > 1 ? nextAuthoringFraming(previous) : ''
+  return {
+    kind: 'commission',
+    round,
+    framing,
+    history,
+    reason: framing
+      ? `re-authoring round ${round} is decorrelated with a hostile-tester framing`
+      : `authoring round ${round} is the unframed baseline`,
+  }
+}
+
+/** The whole ledger-derived history as a compact dispatcher-facing reading. */
+export function formatAuthorRoundHistory(history = {}) {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const oneLine = (value) =>
+    String(value ?? '')
+      .replace(/\s+/g, ' ')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+      .trim()
+  const lines = [
+    `  review record: ${Number(history?.unsuccessfulRounds) || 0} unsuccessful round(s); ` +
+      `${Number(history?.freshRounds) || 0} fresh attempt(s)`,
+  ]
+  if (!rounds.length) lines.push('  round history: no unsuccessful reviews recorded')
+  for (const round of rounds) {
+    if (round.repeat) {
+      lines.push(`  ledger review ${round.ledgerRound}: REPEAT — ${round.repeat}`)
+      continue
+    }
+    lines.push(
+      `  round ${round.freshRound}: ${round.framing ? `framing — ${oneLine(round.framing)}` : 'unframed baseline'}`,
+    )
+  }
+  const examination = history?.examination
+  lines.push(
+    examination
+      ? `  spec examination: ${oneLine(examination.specExamination)} — ${oneLine(examination.evidence)}`
+      : '  spec examination: not recorded',
+  )
+  return lines.join('\n')
 }
 
 /**
