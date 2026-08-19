@@ -30,7 +30,7 @@ import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
-import { readOwnerLock } from './batch-singleton.mjs'
+import { markHandover, readOwnerLock } from './batch-singleton.mjs'
 import { gatherClaim } from './batch-claim.mjs'
 import { reservationDecision } from './batch-claim-core.mjs'
 import {
@@ -467,9 +467,11 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
  * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
  * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
  * throwing transfer leaves NO marker, because the marker is what authorises the
- * stop and nothing may follow it. `write` is injectable for exactly that proof.
+ * stop. The ownership handover follows the marker inside this same commit — it
+ * may no longer depend on `batch-progress-guard` being the first Stop guard to
+ * allow. Both writes are injectable for an ordered proof.
  */
-export function commitSealedBoundary({ transfer, marker, write = writeBoundary } = {}) {
+export function commitSealedBoundary({ transfer, marker, write = writeBoundary, handover = null } = {}) {
   let transferred = null
   if (transfer && typeof transfer.commit === 'function') {
     try {
@@ -487,6 +489,17 @@ export function commitSealedBoundary({ transfer, marker, write = writeBoundary }
     // session to re-do a transfer that is done and to distrust a state that is
     // half-taken. The caller says which half, honestly.
     throw Object.assign(new Error(String(cause?.message ?? cause)), { stage: 'marker', cause, transferred })
+  }
+  if (typeof handover === 'function') {
+    const result = handover()
+    if (!result || result.handed !== true) {
+      const why = result?.reason === 'write-failed' ? String(result?.error?.message ?? result.error) : result?.reason
+      throw Object.assign(new Error(why || 'handover failed'), {
+        stage: 'handover',
+        transferred,
+        handover: result ?? null,
+      })
+    }
   }
   return transferred
 }
@@ -668,6 +681,7 @@ if (isMain) {
       try {
         transferred = commitSealedBoundary({
           transfer,
+          handover: () => markHandover(sid, { point: null }),
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -688,14 +702,19 @@ if (isMain) {
             ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
                 `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
                 'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
-            : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+            : e?.stage === 'handover'
+              ? `the boundary marker is COMMITTED, but the batch lock could not be marked handed-over ` +
+                `(${e?.message ?? e}) — the launcher still sees this session as the live owner. Retry this exact ` +
+                'commit; the transfer and marker writes are idempotent, and the retry finishes the handover.'
+              : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
                 'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
         )
       }
       console.log(
         `boundary COMMITTED at the context watermark (${wm.tokens} >= ${wm.watermark} tokens). This was the ` +
           'last repository action of this session — END IT NOW and SAY in your closing message that the ' +
-          'context watermark is why. ' +
+          'context watermark is why. The batch lock is HANDED OVER already; no later Stop guard can prevent ' +
+          'the launcher from seeing this boundary. ' +
           (handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
             ? `The batch goes to claiming window ${handover.claimantSid}. `
             : `The launcher (${launcherRemedy().name}) starts the fresh session. `) +
@@ -847,6 +866,7 @@ if (isMain) {
     try {
       transferred = commitSealedBoundary({
         transfer,
+        handover: () => markHandover(sid, { point }),
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,
@@ -867,7 +887,11 @@ if (isMain) {
           ? `the transfer stage succeeded${e.transferred ? ` (${e.transferred})` : ''} but the boundary MARKER ` +
               `could not be written (${e?.message ?? e}) — the boundary is NOT taken. Retry this exact commit: ` +
               'it is idempotent (an already-transferred declaration is not re-judged), and only the marker is missing.'
-          : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
+          : e?.stage === 'handover'
+            ? `the boundary marker is COMMITTED, but the batch lock could not be marked handed-over ` +
+              `(${e?.message ?? e}) — the launcher still sees this session as the live owner. Retry this exact ` +
+              'commit; the transfer and marker writes are idempotent, and the retry finishes the handover.'
+            : `the in-flight declaration could not be marked transferred (${e?.message ?? e}) — nothing recorded. ` +
               'Retry, or check `node scripts/batch-in-flight.mjs --status`.',
       )
     }
@@ -878,7 +902,8 @@ if (isMain) {
 
     console.log(
       `boundary COMMITTED: point ${point} is landed and the launcher is armed. This was the last repository ` +
-        `action of this session — END IT NOW. ${destinationLine}Any further mutation is DENIED loudly ` +
+        `action of this session — END IT NOW. The batch lock is HANDED OVER already. ${destinationLine}` +
+        `Any further mutation is DENIED loudly ` +
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )

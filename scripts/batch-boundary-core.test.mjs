@@ -818,15 +818,16 @@ describe('assessBoundary — the context-watermark cause', () => {
   })
 })
 
-describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/4)', () => {
-  it('records the transfer first, then writes the marker', () => {
+describe('commitSealedBoundary — the marker and ownership handover are one commit', () => {
+  it('records the transfer, writes the marker, then hands the lock over', () => {
     const order = []
     const out = commitSealedBoundary({
       transfer: { commit: () => (order.push('transfer'), 'feat/x@abcd') },
       marker: { v: 2 },
       write: () => order.push('marker'),
+      handover: () => (order.push('handover'), { handed: true }),
     })
-    expect(order).toEqual(['transfer', 'marker'])
+    expect(order).toEqual(['transfer', 'marker', 'handover'])
     expect(out).toBe('feat/x@abcd')
   })
 
@@ -877,6 +878,23 @@ describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/
     let marker = null
     expect(commitSealedBoundary({ transfer: null, marker: { v: 2, point: 675 }, write: (m) => (marker = m) })).toBeNull()
     expect(marker).toEqual({ v: 2, point: 675 })
+  })
+
+  it('a failed ownership handover names the stage and leaves the committed marker explicit', () => {
+    let marker = null
+    let caught = null
+    try {
+      commitSealedBoundary({
+        marker: { v: 2, cause: 'context' },
+        write: (m) => (marker = m),
+        handover: () => ({ handed: false, reason: 'write-failed', error: new Error('lock busy') }),
+      })
+    } catch (e) {
+      caught = e
+    }
+    expect(marker).toEqual({ v: 2, cause: 'context' })
+    expect(caught?.stage).toBe('handover')
+    expect(caught?.message).toBe('lock busy')
   })
 })
 
