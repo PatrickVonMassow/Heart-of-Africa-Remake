@@ -99,31 +99,46 @@ put it is the mistake this line exists to stop.
   demands are not in that set at all: `board-queue.mjs` and `finding.mjs --drain` are denied even
   bare, so a sealed session can neither inspect the board's queue nor so much as LOOK at the
   carrier it is being blocked for.
+  IT IS NOT ONE GUARD (measured 19.08.2026, 19:44, at 151,593 tokens): `rule-review-guard`
+  demanded at the same turn end the review of the rule corpus, grown to 127 entries, and the
+  fence refused exactly that work — delegating it to Sol was rejected as new work, and reviewing
+  it in the session would have burst the ceiling. Same clamp, a different guard. So the fix may
+  not exempt ONE demand; it needs a rule for every mandatory guard.
   FINAL STATE:
-  1. `carrier-not-drained` does not fire against a session the fence has closed. The precedent
+  1. THE RULE, of which everything below is an instance: a duty a fenced session CANNOT
+     discharge is handed to the successor, never demanded at the exit. A Stop guard whose remedy
+     the fence forbids does not block that session's turn end; it records the debt against the
+     successor and says so. The exit of a fenced turn hangs on no duty the session is no longer
+     allowed to perform, and a guard added later inherits this by construction rather than by
+     being remembered — the fenced state is asked once, in one place, and every mandatory guard
+     consults it.
+  2. `carrier-not-drained` does not fire against a session the fence has closed. The precedent
      stands in the same file: `request-not-queued` is already scoped to the boundary "because
      demanding it mid-branch would block a session for something the workflow forbids it to do,
      and that is how a guard gets routed around" (`scripts/findings-core.mjs`). The drain demand
      is scoped the same way — it is owed by a session that MAY write the work order, and a
      session past the trigger may not.
-  2. The carrier is then explicitly the handover channel rather than a debt: entries written past
+  3. The carrier is then explicitly the handover channel rather than a debt: entries written past
      the fence are the successor's inbox, and the successor's FIRST turn is where the drain is
      owed. The guard's message names which session owes it.
-  3. A committed context boundary reaches the handover even when another Stop guard blocks. The
+  4. `rule-review-guard` is scoped the same way, as the second measured instance of the rule: the
+     rule-corpus review is owed by a session that may still do the work, and is deferred to the
+     successor for one the fence has closed.
+  5. A committed context boundary reaches the handover even when another Stop guard blocks. The
      lock is marked handed over as part of COMMITTING the boundary, not only from the branch
      `batch-progress-guard` reaches after every other guard has allowed the stop, so a blocked
      turn end can no longer leave a dead session owning the batch and the launcher unable to
      spawn.
-  4. A Stop guard that blocks a session which has already committed its boundary names the
+  6. A Stop guard that blocks a session which has already committed its boundary names the
      boundary and the one command that finishes it, instead of repeating a demand the fence
      forbids the session to satisfy.
-  5. THE WAY OUT IS NEVER DENIED. Withdrawing the boundary passes whatever output decoration the
+  7. THE WAY OUT IS NEVER DENIED. Withdrawing the boundary passes whatever output decoration the
      call carries — a `2>&1` merge, a trailing pager, either or both — because that decoration
      writes nothing. What stays denied is what it was written for: redirection to a FILE,
      command substitution, and any second segment that is not itself a closing-set invocation.
      The rule is general, not an exemption for one script: a command whose only non-closing part
      is output handling is output handling.
-  6. Every command a Stop guard can DEMAND of a sealed session is in the closing set, so no guard
+  8. Every command a Stop guard can DEMAND of a sealed session is in the closing set, so no guard
      can ask for something the seal refuses. That includes reading the queue and the carrier —
      `board-queue.mjs` and `finding.mjs` join `board`, `board-publish` and the rest — and a test
      pins the set against the guards' own remedy commands, so a guard added later that names a
@@ -132,7 +147,9 @@ put it is the mistake this line exists to stop.
   entries produces no `carrier-not-drained` violation while the same owner below the trigger
   still does; a case asserting the lock carries `handedOver` after a committed context boundary
   whose turn end was blocked by an unrelated guard; and a case that the drain is demanded of the
-  successor's first turn. Over `isClosingSetCommand`: `--clear` survives bare, with `2>&1`, with
+  successor's first turn; and the same two cases over `rule-review-guard`, which is the second
+  instance and proves the rule is not one guard's exemption. Over `isClosingSetCommand`: `--clear`
+  survives bare, with `2>&1`, with
   a trailing pager and with both, while a redirection to a file, a command substitution and a
   chained `git commit` stay denied; and every remedy command the Stop guards name resolves inside
   the closing set.
