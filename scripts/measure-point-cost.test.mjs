@@ -37,6 +37,10 @@ describe('point-cost IO over recorded trees', () => {
     expect(read).toMatchObject({ claudeFiles: 2, codexFiles: 3, codexCandidates: 4 })
     expect(new Set(read.turns.map((turn) => turn.provider))).toEqual(new Set(['anthropic', 'openai']))
     expect(read.turns.some((turn) => turn.candidateMatch === false && turn.tokens === 200)).toBe(true)
+
+    const early = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex'), points: [900], until: Date.parse('2026-08-18T08:45:00Z') })
+    expect(early).toMatchObject({ claudeFiles: 0, codexFiles: 0, codexCandidates: 1 })
+    expect(early.turns.map((turn) => turn.tokens)).toEqual([200])
   })
 
   it('prints the per-point split, all lever verdicts and the three measured suspects', () => {
