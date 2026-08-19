@@ -762,15 +762,36 @@ export function withoutOutputDescriptorMerges(command) {
 }
 
 /**
- * A TRAILING `&` DETACHES THE WHOLE LINE, and a detached call is not the closing
- * work it names (Sol re-review of 0de0a948). `--clear &` and `--clear 2>&1 &`
- * both end in an empty segment the split silently drops, so the line read as
- * closing while the shell backgrounded it and moved on — the boundary was never
- * withdrawn by the time the next call was judged. An `&` BETWEEN two segments is
- * different and stays allowed: both commands run, and each is judged on its own,
- * which is the chain the set has always accepted.
+ * A standalone `&` DETACHES THE COMMAND TO ITS LEFT, wherever it stands, and a
+ * detached call is not the closing work it names (Sol re-review of 0de0a948;
+ * Claude review of 114bbdd7). `--clear &`, `--clear 2>&1 &` and `--clear & tail`
+ * all let the shell move on before the closing command has withdrawn the
+ * boundary. Even when the command on the right is itself in the closing set,
+ * the left one was backgrounded, so the whole line is refused. `&&` remains a
+ * sequencing operator rather than detachment.
  */
-const TRAILING_DETACH_RE = /(^|[^&])&\s*$/
+const DETACH_RE = /(^|[^&])&(?!&)/
+
+/**
+ * Split a shell line while RETAINING the separator that introduces each
+ * segment. Pager tolerance depends on that identity: only `| tail` consumes
+ * output from the preceding closing command; `; tail`, `&& tail` and `|| tail`
+ * launch a second command and must be judged as such. Empty segments are kept
+ * so malformed or dangling chains fail closed instead of disappearing.
+ */
+function commandSegments(command) {
+  const segments = []
+  const separatorRe = /&&|\|\||[;&|]|\r\n?|\n/g
+  let separator = null
+  let start = 0
+  for (const match of command.matchAll(separatorRe)) {
+    segments.push({ separator, text: command.slice(start, match.index).trim() })
+    separator = match[0]
+    start = match.index + match[0].length
+  }
+  segments.push({ separator, text: command.slice(start).trim() })
+  return segments
+}
 
 /**
  * A PURE OUTPUT PAGER — a segment that only looks at what the segment before it
@@ -796,20 +817,19 @@ export function isOutputPagerSegment(segment) {
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
   const stripped = withoutOutputDescriptorMerges(command)
-  if (TRAILING_DETACH_RE.test(stripped)) return false
-  const segments = stripped
-    .split(/&&|\|\||[;|&\n\r]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
+  if (DETACH_RE.test(stripped)) return false
+  const segments = commandSegments(stripped)
   let sawClosing = false
   for (let i = 0; i < segments.length; i += 1) {
-    const seg = segments[i]
+    const { separator, text: seg } = segments[i]
+    if (!seg) return false
     if (OPAQUE_SEGMENT_RE.test(seg)) return false
     if (/^(?:cd|set-location|pushd|popd)\b/i.test(seg)) continue
     // A pager is tolerated ONLY as the final segment of a line that has already
-    // shown a closing script. In the middle it would hide whatever follows it, and
-    // on its own it is not a closing line at all.
-    if (i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
+    // shown a closing script AND only when a PIPE introduces it. In the middle it
+    // would hide whatever follows it; after a sequencing operator it is an
+    // independent command; and on its own it is not a closing line at all.
+    if (separator === '|' && i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
     const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
     if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
     sawClosing = true

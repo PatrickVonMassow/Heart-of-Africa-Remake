@@ -340,8 +340,9 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     // through `npm test` — a successor could then spawn beside a working session.
     expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
     expect(call({ command: 'npm test & node scripts/board.mjs' }).survives).toBe(false)
-    // …and a genuine chain of closing commands still survives it.
-    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(true)
+    // Even two closing invocations are unsafe when the first is detached: the
+    // shell starts the second before the first has withdrawn the boundary.
+    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(false)
   })
 
   it('a segment that can run or write something unseen is not closing', () => {
@@ -378,6 +379,8 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
       'node scripts/batch-boundary.mjs --clear 2> errors.txt',
       'node scripts/batch-boundary.mjs --clear $(git status)',
       'node scripts/batch-boundary.mjs --clear && git commit -m carry-on',
+      'node scripts/batch-boundary.mjs --clear & tail -3',
+      'node scripts/batch-boundary.mjs --clear ; tail /tmp/file',
     ]) {
       expect(call({ command }).survives, command).toBe(false)
     }
@@ -406,9 +409,9 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     ]) {
       expect(call({ command }).survives, command).toBe(false)
     }
-    // An & BETWEEN two closing commands is a chain, not a detachment: both run and
-    // both are judged, which the set has always accepted.
-    expect(call({ command: 'node scripts/board.mjs attest & node scripts/board-publish.mjs' }).survives).toBe(true)
+    // An & BETWEEN commands still detaches the one on its left, even if both
+    // invocations otherwise belong to the closing set.
+    expect(call({ command: 'node scripts/board.mjs attest & node scripts/board-publish.mjs' }).survives).toBe(false)
     expect(call({ command: 'node scripts/board.mjs attest && node scripts/board-publish.mjs' }).survives).toBe(true)
   })
 
@@ -449,6 +452,11 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     // A pager in the MIDDLE would hide whatever follows it.
     expect(call({ command: 'node scripts/focus.mjs show | tail -2 | npm test' }).survives).toBe(false)
     expect(call({ command: 'node scripts/focus.mjs show | tail -2 && git push' }).survives).toBe(false)
+    // Pager names only mean output handling after a pipe. Sequencing starts an
+    // independent command, which therefore has to belong to the closing set.
+    expect(call({ command: 'node scripts/focus.mjs show ; tail /tmp/file' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show && tail -2' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show || tail -2' }).survives).toBe(false)
   })
 
   it('a pager ALONE is not a closing line', () => {
