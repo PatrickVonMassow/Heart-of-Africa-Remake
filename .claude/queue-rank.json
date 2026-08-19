@@ -68,10 +68,6 @@
       "at": "2026-08-13T20:19:36.791Z",
       "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
     },
-    "684": {
-      "at": "2026-08-13T20:19:40.069Z",
-      "why": "Betrifft die Abdeckung jeder Gegenpruefung, aber kein ausgeliefertes Spielverhalten — nach den Release-Bugfixes"
-    },
     "685": {
       "at": "2026-08-13T21:09:57.053Z",
       "why": "Kleine Nachbesserung am gerade gelieferten Symbol; sie kostet nichts, wenn sie hinter den Release-Bugfixes wartet"
@@ -139,10 +135,14 @@
     "724": {
       "at": "2026-08-19T01:04:46.783Z",
       "why": "Hygiene of the branch pool, not a bugfix or a requested extension — the queue takes those first, and the debris it names is already parked, so nothing waits on it."
+    },
+    "725": {
+      "at": "2026-08-19T02:12:32.321Z",
+      "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright."
     }
   },
   "settled": {
-    "at": "2026-08-19T01:36:42.709Z",
+    "at": "2026-08-19T02:12:32.322Z",
     "points": [
       174,
       184,
@@ -317,7 +317,6 @@
       681,
       682,
       683,
-      684,
       685,
       686,
       687,
@@ -346,7 +345,8 @@
       719,
       720,
       722,
-      724
+      724,
+      725
     ]
   }
 }

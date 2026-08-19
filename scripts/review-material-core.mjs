@@ -943,6 +943,80 @@ export function passByIndex(plan, index) {
 }
 
 /**
+ * Coverage of a complete pass plan, or of one selected pass within it.
+ *
+ * This is FILE-CONTRIBUTION coverage, deliberately: pass records clear named
+ * files and, for authorship splits, named commit contributions. A mixed-vendor
+ * file therefore has one assignment per contribution group and is reported as
+ * split; a character-weighted percentage would claim a precision the ledger
+ * cannot reproduce.
+ */
+export function reviewCoverage(plan = null, pass = null) {
+  const passes = Array.isArray(plan?.passes) ? plan.passes : []
+  const allAssignments = passes.flatMap((candidate) => candidate?.files ?? []).map(String)
+  const uncoverable = (plan?.uncoverable ?? []).map((item) => String(item?.path ?? '')).filter(Boolean)
+  const unreviewable = (plan?.unreviewable ?? []).flatMap((item) => item?.files ?? []).map(String)
+  const unassigned = [...uncoverable, ...unreviewable]
+  const assigned = pass ? (pass.files ?? []).map(String) : allAssignments
+  const counts = new Map()
+  for (const path of allAssignments) counts.set(path, (counts.get(path) ?? 0) + 1)
+  const splitFiles = [...counts].filter(([, count]) => count > 1).map(([path]) => path)
+  const selected = pass ?? (passes.length === 1 ? passes[0] : null)
+  const diffOnly = [...new Set((selected?.patchOnly ?? []).map(String))]
+  const opaque = [...new Set((selected?.absentByDesign ?? []).map((item) => String(item?.path ?? '')).filter(Boolean))]
+  const whole = [...new Set(assigned)].filter((path) => !diffOnly.includes(path) && !opaque.includes(path))
+  const assignedElsewhere = pass
+    ? [...new Set(passes.filter((candidate) => candidate !== pass).flatMap((candidate) => candidate?.files ?? []).map(String))]
+    : []
+  const total = allAssignments.length + unassigned.length
+  const percent = total ? Math.floor((assigned.length / total) * 100) : 100
+  return {
+    total,
+    covered: assigned.length,
+    percent,
+    whole,
+    diffOnly,
+    opaque,
+    assignedElsewhere,
+    dropped: unassigned,
+    splitFiles,
+    partial: Boolean(pass && Number(pass.total) > 1),
+    complete: !pass && percent === 100 && unassigned.length === 0,
+  }
+}
+
+/** The coverage statement printed beside a verdict, never inferred from it. */
+export function formatReviewCoverage(plan, pass = null) {
+  const coverage = reviewCoverage(plan, pass)
+  const label = coverage.partial || !coverage.complete ? 'PARTIAL REVIEW' : 'FULL REVIEW'
+  const blockCount = plan?.passes?.length || 1
+  const block = pass ? `; block ${pass.index}/${pass.total}` : `; ${blockCount} block(s)`
+  const names = (paths) => (paths.length ? paths.map(quotePassFile).join(', ') : 'none')
+  return [
+    `Coverage: ${label} — ${coverage.percent}% of file contributions (${coverage.covered}/${coverage.total})${block}.`,
+    `  files read whole: ${names(coverage.whole)}`,
+    `  oversized files read as complete diff only: ${names(coverage.diffOnly)}`,
+    `  opaque bodies declared, with their complete diff read: ${names(coverage.opaque)}`,
+    `  files split across blocks: ${names(coverage.splitFiles)}`,
+    ...(pass ? [`  assigned to other blocks, not dropped: ${names(coverage.assignedElsewhere)}`] : []),
+    `  dropped: ${names(coverage.dropped)}`,
+  ].join('\n')
+}
+
+/** Coverage of the plan before any round is spent. */
+export function formatCoveragePlan(plan) {
+  const coverage = reviewCoverage(plan)
+  const status = coverage.complete ? '100% planned coverage' : `${coverage.percent}% planned coverage`
+  const dropped = coverage.dropped.length
+    ? coverage.dropped.map(quotePassFile).join(', ')
+    : 'nothing dropped'
+  const split = coverage.splitFiles.length
+    ? `; split across blocks: ${coverage.splitFiles.map(quotePassFile).join(', ')}`
+    : ''
+  return `  Coverage plan: ${status} (${coverage.covered}/${coverage.total} file contributions); ${dropped}${split}.`
+}
+
+/**
  * The line the caller must see BEFORE a round is spent: the threshold, this
  * range's real size, and — when it does not fit — the passes it needs.
  */

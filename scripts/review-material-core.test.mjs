@@ -6,6 +6,8 @@ import {
   formatBudgetNotice,
   formatPassFiles,
   formatPassManifest,
+  formatCoveragePlan,
+  formatReviewCoverage,
   formatShortfall,
   gitlinkPathsFromRawDiff,
   isBinaryPatchSection,
@@ -830,6 +832,7 @@ describe('the passes a range too large is cut into', () => {
     expect([...covered].sort()).toEqual([...paths].sort())
     expect(covered).toHaveLength(new Set(covered).size)
     for (const pass of plan.passes) expect(pass.total).toBe(plan.passes.length)
+    expect(formatCoveragePlan(plan)).toContain('100% planned coverage (4/4 file contributions); nothing dropped')
   })
 
   it('sends a file bigger than a whole round as its DIFF, and says so', () => {
@@ -843,6 +846,7 @@ describe('the passes a range too large is cut into', () => {
     expect(holder.patchOnly).toEqual(['archive.md'])
     expect(plan.uncoverable).toEqual([])
     expect(plan.passes.flatMap((p) => p.files)).toContain('guard.mjs')
+    expect(formatReviewCoverage(plan, holder)).toContain('oversized files read as complete diff only: archive.md')
   })
 
   it('names a file whose DIFF alone exceeds a round as beyond reach, and covers it in NO pass', () => {
@@ -851,6 +855,7 @@ describe('the passes a range too large is cut into', () => {
     expect(plan.uncoverable.map((u) => u.path)).toEqual(['x.md'])
     expect(plan.passes.flatMap((p) => p.files)).not.toContain('x.md')
     expect(plan.fits).toBe(false)
+    expect(formatCoveragePlan(plan)).toContain('0% planned coverage (0/1 file contributions); x.md')
   })
 
   it('costs a deleted file from the patch alone, so it is not lost from the plan', () => {
@@ -936,6 +941,48 @@ describe('the passes a range too large is cut into', () => {
       })
       expect(out.fit).toBe(true)
     }
+  })
+
+  it('reports a fitting range through the unchanged single-block path at 100%', () => {
+    const plan = planPasses({
+      stat: 's',
+      patch: patchFor(['a.mjs']),
+      files: [file('a.mjs', 100)],
+      budget: 20_000,
+    })
+    expect(plan.fits).toBe(true)
+    expect(formatReviewCoverage(plan)).toContain('Coverage: FULL REVIEW — 100% of file contributions (1/1); 1 block(s).')
+    expect(formatReviewCoverage(plan)).toContain('files split across blocks: none')
+    expect(formatReviewCoverage(plan)).toContain('dropped: none')
+  })
+
+  it('marks one block verdict partial and distinguishes other blocks from dropped files', () => {
+    const paths = ['a.mjs', 'b.mjs', 'c.mjs', 'd.mjs']
+    const plan = planPasses({
+      stat: 's',
+      patch: patchFor(paths),
+      files: paths.map((path) => file(path, 3000)),
+      budget: 10_000,
+    })
+    const report = formatReviewCoverage(plan, plan.passes[0])
+    expect(report).toContain('Coverage: PARTIAL REVIEW')
+    expect(report).toContain(`block 1/${plan.passes.length}`)
+    expect(report).toContain('assigned to other blocks, not dropped:')
+    expect(report).toContain('dropped: none')
+  })
+
+  it('reports a mixed-authorship file as split contributions rather than duplicate coverage', () => {
+    const plan = {
+      passes: [
+        { index: 1, total: 2, files: ['shared.mjs'], patchOnly: [], absentByDesign: [] },
+        { index: 2, total: 2, files: ['shared.mjs'], patchOnly: [], absentByDesign: [] },
+      ],
+      uncoverable: [],
+      unreviewable: [],
+    }
+    expect(formatCoveragePlan(plan)).toContain('100% planned coverage (2/2 file contributions)')
+    expect(formatReviewCoverage(plan, plan.passes[0])).toContain('50% of file contributions (1/2)')
+    expect(formatReviewCoverage(plan, plan.passes[0])).toContain('files split across blocks: shared.mjs')
   })
 })
 
