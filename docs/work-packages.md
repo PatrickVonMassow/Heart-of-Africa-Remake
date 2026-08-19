@@ -79,21 +79,21 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 
 | Name | Id | What it is | Points |
 |---|---|---|---|
-| **Dorfleben** | A | Village life | 648, 350, 351, 356, 357, 359, 360, 394, 578 (648 first — the user is blocked on it) |
-| **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385 |
-| **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604 |
+| **Dorfleben** | A | Village life | 648, 350, 351, 356, 357, 359, 360, 394, 578, 653, 680, 681, 682, 686, 687, 688, 689, 690, 691, 692, 694, 698 (648 first — the user is blocked on it) |
+| **Wetter & Wasser** | B | Weather, ground and water surface | 314, 320, 321, 323, 348, 353, 354, 358, 384, 385, 500, 501, 522, 523, 548, 603 |
+| **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604, 611 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
 | **Monumente** | E | Monument sites | 315, 379, 391 |
 | **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575, 725 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
-| **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
-| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629, 646, 649 (646 is the doctor-side twin of 629 — the same deletion reached by a different route; 649 holds the holes the fifth review found in 629's own lock protocol; 553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
-| **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613, 630, 631, 632, 634, 638, 639, 640, 726 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
-| **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557, 563, 564, 566, 567, 568, 569, 570, 571, 572, 573, 574, 641, 642, 647 (564/566/567 all came out of the point-342 verification: what a red is believed to mean, what a repair costs, and what a killed session leaves running) |
-| **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555, 645 — the rest landed 30.07.2026 (459) |
-| **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
-| **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562, 612 |
-| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579, and of 10.08.2026: 605 |
+| **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539, 491, 508, 520, 621, 625, 664, 665, 699, 704, 705, 706, 713, 720, 728, 730, 731 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
+| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629, 646, 649, 614, 660, 676, 683, 696, 708, 710, 724, 733, 734 (646 is the doctor-side twin of 629 — the same deletion reached by a different route; 649 holds the holes the fifth review found in 629's own lock protocol; 553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
+| **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540, 560, 561, 613, 630, 631, 632, 634, 638, 639, 640, 726, 495, 497, 542, 559, 596, 598, 599, 609, 650, 652, 669, 677, 678, 693, 715, 718, 722, 729, 735, 736, 737 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
+| **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557, 563, 564, 566, 567, 568, 569, 570, 571, 572, 573, 574, 641, 642, 647, 498, 506, 507, 510, 514, 518, 521, 552, 558, 595, 597, 615, 620, 622, 626, 627, 643, 668, 670, 695 (564/566/567 all came out of the point-342 verification: what a red is believed to mean, what a repair costs, and what a killed session leaves running) |
+| **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555, 645, 511, 512, 531, 607, 619 — the rest landed 30.07.2026 (459) |
+| **Steuerung & Performance** | M | Controls and performance | 310, 342, 347, 551, 618 |
+| **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562, 612, 504, 515, 517, 528, 616, 617, 658, 663, 716, 719 |
+| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 519, 659 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579, and of 10.08.2026: 605 |
 
 **Urlaubsfestigkeit** was cut on 30.07.2026 on the user's demand that the batch be
 worked for two weeks without them, surviving an outage of Claude, of their internet
@@ -117,6 +117,9 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **285**.
 - **393** — sequenced behind 264, so it moves with that point rather than with a
   bundle.
+- **529** — confined to the protected user configuration outside the repository.
+- **591** — checks rule compliance across the whole repository.
+- **602** — inventories unused mechanisms repository-wide.
 
 ## Order of work
 
