@@ -680,10 +680,12 @@ export const CLOSING_SET_FILES = new Set([
  *  handover card IS ending (its absence from this list was one of the measured
  *  marker deletions of 13.08.2026), and transferring/adopting the in-flight
  *  declaration is boundary bookkeeping, not batch work. The less obvious
- *  readers and remedy runners below are here for the same reason: a Stop guard
- *  can print them after the seal is committed, so refusing their targets would
- *  leave the session unable either to satisfy the guard or to end. The boundary
- *  test derives that inventory from the live Stop chain and its imported cores. */
+ *  readers and boundary-bookkeeping commands below are here for the same
+ *  reason: a Stop guard can print them after the seal is committed, so refusing
+ *  their targets would leave the session unable either to inspect the debt or
+ *  to end. Real work is deliberately absent; its guard hands the debt to the
+ *  successor instead. The boundary test derives that inventory from the live
+ *  Stop chain and its imported cores. */
 export const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
@@ -718,12 +720,9 @@ export const CLOSING_SET_SCRIPTS = [
   'prep-guard',
   'queue-rank',
   'render-verify-guard',
-  'review-sol',
   'rule-echo',
   'rule-review',
-  'throttle-probe',
   'vdzk-answer',
-  'verify/run-all',
   'verify/run-wait',
   'worktree-cleanup',
 ]

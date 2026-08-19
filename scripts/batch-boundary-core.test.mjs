@@ -55,6 +55,8 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
+import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
+import { evaluateMechanismReview } from './mechanism-review-core.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -905,7 +907,27 @@ function stopGuardRemedies(root, guard) {
   return { remedies, unclassifiable }
 }
 
-describe('every Stop-guard remedy stays inside the closing set', () => {
+describe('every Stop-guard remedy is closing work or explicitly deferred at the fence', () => {
+  it('keeps the reviewed additions to reads and boundary bookkeeping, one by one', () => {
+    const closingAdditions = new Map([
+      ['batch-launcher', 'arms the successor launcher'],
+      ['chat-reply', 'delivers the closing reply'],
+      ['pages-deploy-unblock', 'settles the CI handover state'],
+      ['rule-echo', 'reads and reports the standing rule'],
+      ['vdzk-answer', 'records the closing answer receipt'],
+      ['guard-health-guard', 'reads the guard-health status'],
+      ['guide-brevity-guard', 'reads the guide-budget status'],
+      ['verify/run-wait', 'reads the existing verify receipt or waits for it'],
+      ['worktree-cleanup', 'performs the boundary worktree bookkeeping'],
+    ])
+    for (const [script, reason] of closingAdditions) {
+      expect(isClosingSetCommand(`node scripts/${script}.mjs`), reason).toBe(true)
+    }
+    for (const script of ['review-sol', 'throttle-probe', 'verify/run-all']) {
+      expect(isClosingSetCommand(`node scripts/${script}.mjs`), `${script} starts real work`).toBe(false)
+    }
+  })
+
   it('derives remedy scripts from the authoritative hook chain, not a copied guard list', () => {
     const root = process.cwd()
     const settings = JSON.parse(readFileSync(resolve(root, '.claude/settings.json'), 'utf8'))
@@ -937,9 +959,40 @@ describe('every Stop-guard remedy stays inside the closing set', () => {
       'ci-status-guard.mjs via ci-status-guard-core.mjs: <runtime>Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
       'ci-status-guard.mjs via ci-failure-cause-core.mjs: Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
     ])
+    const closedFence = { closed: true, successor: 'the successor session' }
+    const deferredGuards = new Map([
+      ['render-verify-guard.mjs', evaluateRenderVerify({
+        head: 'head',
+        clearedHead: 'base',
+        changedRenderPaths: ['src/render/pending.ts'],
+        fence: closedFence,
+        sessionId: 'sealed-session',
+      })],
+      ['mechanism-review-guard.mjs', evaluateMechanismReview({
+        baseline: 'base',
+        head: 'head',
+        pendingCommits: [{
+          sha: 'a'.repeat(40),
+          subject: 'Change a guard',
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/pending-guard.mjs'],
+          coveringRecordShas: [],
+        }],
+        records: [],
+        fence: closedFence,
+        sessionId: 'sealed-session',
+      })],
+    ])
+    const deferredRemedies = []
     for (const { guard, source, command } of remedies) {
-      expect(isClosingSetCommand(command), `${guard} via ${source} demands ${command}`).toBe(true)
+      if (isClosingSetCommand(command)) continue
+      const verdict = deferredGuards.get(guard)
+      expect(verdict?.deferred, `${guard} via ${source} demands real work without fenced deferral: ${command}`).toBe(true)
+      deferredRemedies.push(command)
     }
+    expect(new Set(deferredRemedies.map((command) => /scripts[\\/]([\w/-]+)\.mjs/.exec(command)?.[1]))).toEqual(
+      new Set(['review-sol', 'throttle-probe', 'verify/run-all']),
+    )
   })
 
   it('keeps a shell continuation after the remedy script in the classified command', () => {
