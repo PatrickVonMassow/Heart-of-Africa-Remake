@@ -19324,3 +19324,84 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   proving `batch-claim.mjs` is refused past the watermark and named with `/clear`.
   Criticality: medium — the guards themselves are reviewed and tested; what is at
   stake is that a wrongly placed hook line disables a chain silently.
+
+- [x] 751. The turn-end gate and the context fence contradict each other, so a session past the
+  watermark can neither drain nor stop (measured 19.08.2026, 19:18-19:27). The session that
+  crossed the mark committed its context boundary at 19:21 (marker `committed`, cause `context`,
+  173,893 tokens). Its Stop chain then blocked on `carrier-not-drained` — three findings written
+  at 19:18 sat in the memory carrier while it held the batch — and the context fence denied the
+  only remedy it named: writing them into `TASKS.md` is authoring a point, which the fence
+  refuses past the watermark, while the fence's own instruction is that findings go to the
+  carrier. The session could therefore neither drain nor end cleanly, `batch-progress-guard`
+  never reached its `allow-boundary` branch, `markHandover` was never called, and the lock kept
+  naming a session the user had already cleared. The launcher's 19:14 tick skipped on "owner
+  alive", no successor was spawned, and the user received the same "please /clear" answer five
+  times while the batch stood still; it took a hand-run `batch-singleton.mjs release` in the
+  attended window to move it.
+  THE SEAL DENIES ITS OWN WAY OUT (measured 19.08.2026, 19:49 against
+  `isClosingSetCommand`): `node scripts/batch-boundary.mjs --clear` passes bare, but the same
+  call written `--clear 2>&1 | tail -3` is REFUSED, because `OPAQUE_SEGMENT_RE` treats the `2>&1`
+  merge as a redirection. The refusal text names `--clear` as the deliberate way back, so a
+  session that follows its own instruction — and every session pipes, to keep the output
+  small — is told to run a command the seal then blocks. `board.mjs attest 2>&1 | tail -3` fails
+  the same way although `board` IS in the closing set, and two commands a blocked Stop chain
+  demands are not in that set at all: `board-queue.mjs` and `finding.mjs --drain` are denied even
+  bare, so a sealed session can neither inspect the board's queue nor so much as LOOK at the
+  carrier it is being blocked for.
+  IT IS NOT ONE GUARD (measured 19.08.2026, 19:44, at 151,593 tokens): `rule-review-guard`
+  demanded at the same turn end the review of the rule corpus, grown to 127 entries, and the
+  fence refused exactly that work — delegating it to Sol was rejected as new work, and reviewing
+  it in the session would have burst the ceiling. Same clamp, a different guard. So the fix may
+  not exempt ONE demand; it needs a rule for every mandatory guard.
+  FINAL STATE:
+  1. THE RULE, of which everything below is an instance: a duty a fenced session CANNOT
+     discharge is handed to the successor, never demanded at the exit. A Stop guard whose remedy
+     the fence forbids does not block that session's turn end; it records the debt against the
+     successor and says so. The exit of a fenced turn hangs on no duty the session is no longer
+     allowed to perform, and a guard added later inherits this by construction rather than by
+     being remembered — the fenced state is asked once, in one place, and every mandatory guard
+     consults it.
+  2. `carrier-not-drained` does not fire against a session the fence has closed. The precedent
+     stands in the same file: `request-not-queued` is already scoped to the boundary "because
+     demanding it mid-branch would block a session for something the workflow forbids it to do,
+     and that is how a guard gets routed around" (`scripts/findings-core.mjs`). The drain demand
+     is scoped the same way — it is owed by a session that MAY write the work order, and a
+     session past the trigger may not.
+  3. The carrier is then explicitly the handover channel rather than a debt: entries written past
+     the fence are the successor's inbox, and the successor's FIRST turn is where the drain is
+     owed. The guard's message names which session owes it.
+  4. `rule-review-guard` is scoped the same way, as the second measured instance of the rule: the
+     rule-corpus review is owed by a session that may still do the work, and is deferred to the
+     successor for one the fence has closed.
+  5. A committed context boundary reaches the handover even when another Stop guard blocks. The
+     lock is marked handed over as part of COMMITTING the boundary, not only from the branch
+     `batch-progress-guard` reaches after every other guard has allowed the stop, so a blocked
+     turn end can no longer leave a dead session owning the batch and the launcher unable to
+     spawn.
+  6. A Stop guard that blocks a session which has already committed its boundary names the
+     boundary and the one command that finishes it, instead of repeating a demand the fence
+     forbids the session to satisfy.
+  7. THE WAY OUT IS NEVER DENIED. Withdrawing the boundary passes whatever output decoration the
+     call carries — a `2>&1` merge, a trailing pager, either or both — because that decoration
+     writes nothing. What stays denied is what it was written for: redirection to a FILE,
+     command substitution, and any second segment that is not itself a closing-set invocation.
+     The rule is general, not an exemption for one script: a command whose only non-closing part
+     is output handling is output handling.
+  8. Every command a Stop guard can DEMAND of a sealed session is in the closing set, so no guard
+     can ask for something the seal refuses. That includes reading the queue and the carrier —
+     `board-queue.mjs` and `finding.mjs` join `board`, `board-publish` and the rest — and a test
+     pins the set against the guards' own remedy commands, so a guard added later that names a
+     command outside the set fails the suite rather than the session.
+  VERIFIABLE: Vitest over `auditFindings` — an owner past the trigger with pending carrier
+  entries produces no `carrier-not-drained` violation while the same owner below the trigger
+  still does; a case asserting the lock carries `handedOver` after a committed context boundary
+  whose turn end was blocked by an unrelated guard; and a case that the drain is demanded of the
+  successor's first turn; and the same two cases over `rule-review-guard`, which is the second
+  instance and proves the rule is not one guard's exemption. Over `isClosingSetCommand`: `--clear`
+  survives bare, with `2>&1`, with
+  a trailing pager and with both, while a redirection to a file, a command substitution and a
+  chained `git commit` stay denied; and every remedy command the Stop guards name resolves inside
+  the closing set.
+  Criticality: high — the failure mode is the batch standing still with a dead session owning the
+  lock, and the only way out was a hand-run release from the user's own window.
+  Bundle: Session- & Repo-Hygiene.
