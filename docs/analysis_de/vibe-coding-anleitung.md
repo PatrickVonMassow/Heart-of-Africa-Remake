@@ -22,56 +22,33 @@ Regel —, ab der ersten Formulierung, nicht erst beim zweiten Schaden.
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze; wo einer
-**nicht** möglich ist, steht das dabei. Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den
-Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
+**nicht** möglich ist, steht das dabei. *(Kosten ≈ 2x)* meint den Mehrverbrauch der
+betroffenen Arbeit, nicht des Projekts.
 
-### Primäres und sekundäres Modell — und optional ein drittes
+### Primäres und sekundäres Modell
 
 Lege **zwei** Modelle fest, mit klaren Rollen:
 
-- Ein **primäres Modell** macht die gewöhnliche Arbeit. Nimm die jeweils stärkste
-  verfügbare Version.
-- Ein **sekundäres, anderes Modell** übernimmt das **Vier-Augen-Prinzip**, die
-  **Ausweichstufe** — und die **harten Fälle**: als schwierig/fehleranfällig
-  Eingeschätztes. Ist seine Spur **knapp**, eskaliere erst nach **mehreren** erfolglosen
-  Runden.
+- Ein **primäres Modell** macht die gewöhnliche Arbeit. Nimm die stärkste Version.
+- Ein **sekundäres, anderes Modell** übernimmt **Vier-Augen**, **Ausweichstufe** und die
+  **harten Fälle**. Ist seine Spur **knapp**, eskaliere erst nach **mehreren** Fehlrunden.
+- Optional, besser: ein **drittes Modell vereinigt** die blinden Ergebnisse.
 
 > *Prompt:* „Gewöhnliche Arbeit macht **\<primäres Modell\>**. **\<sekundäres Modell\>**
-> übernimmt Vier-Augen, Ausweichstufe und als schwierig/fehleranfällig eingeschätzte
-> Aufgaben; zur knappen Spur eskalierst du erst nach **\<n\>** erfolglosen Runden;
-> **\<n\>** ist eine Konstante. Etabliere einen Mechanismus, der ein
-> Arbeitsergebnis eines **anderen** Modells erkennt und die Arbeit stoppt, statt sie
-> stillschweigend zu übernehmen."
+> übernimmt Vier-Augen, Ausweichstufe und die harten Fälle; zur knappen Spur eskalierst du
+> erst nach **\<n\>** Fehlrunden, **\<n\>** als Konstante. Etabliere einen
+> Mechanismus, der ein fremdes Arbeitsergebnis erkennt und stoppt, statt es
+> stillschweigend zu übernehmen. **Vereinigt** wird von einem **dritten Modell**, das an
+> keiner Liste mitschrieb; jeder Eintrag steht als **nur A**, **nur B** oder **verschmolzen**."
 
 Ein zweites Modell nützt nicht, weil es *besser* ist, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
 steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test
 zeigt, nie.
 
-**Optional, und deutlich besser: ein *drittes* Modell für die Zusammenführung.** Wo zwei
-Modelle **blind parallel** arbeiten, muss am Ende jemand die beiden Ergebnisse vereinigen —
-und genau dort verschwindet ein Befund lautlos, wenn einer der beiden Autoren es tut: Er misst
-die fremde Liste an seiner eigenen. Ein drittes Modell, das an **keiner** Liste mitschrieb,
-hat an keinem Eintrag ein Interesse.
-
-Der zweite, weniger offensichtliche Gewinn: Mit nur zwei Modellen kannst du sie **nicht
-vergleichen**. Prüft A immer B und B immer A, ist jede Rückweisungsquote untrennbar mit dem
-Prüfer vermischt — ein strenger Prüfer lässt seinen Autor schlecht aussehen, ein milder gut,
-und aus den Zahlen ist beides nicht zu trennen. Erst ein neutraler Dritter liefert ein Urteil,
-das nicht am Gegenüber hängt.
-
-> *Prompt:* „Die **Zusammenführung** zweier blind-paralleler Ergebnisse macht ein **drittes
-> Modell**, das an **keiner** der beiden Listen mitgeschrieben hat. Vereinigt wird nach
-> **Bedeutung**, und die Vereinigung wird **abgerechnet**: Jeder Eintrag trägt eine Kennung,
-> und für jeden steht am Ende **nur A**, **nur B** oder **verschmolzen mit \<Kennung\>** —
-> keiner darf unerwähnt verschwinden. Halte fest, **wer** zusammengeführt hat, und weise einen
-> der beiden Autoren als Zusammenführer zurück; gibt es wirklich nur zwei Modelle, sag das
-> **ausdrücklich**, statt einen Autor heimlich vereinigen zu lassen."
-> *(Kosten ≈ gering: das dritte Modell liest und vereinigt, es baut nicht.)*
-
 **Kontingent ist nicht austauschbar.** Ist ein Modell knapp, behalte ihm vor, was **nur** es
-kann; Code zu schreiben, der größte Verbraucher, geht ans andere. Ein Verteiler, der den
-Füllstand nicht liest, empfiehlt ein leeres Modell.
+kann; Code zu schreiben, der größte Verbraucher, geht ans andere. Ein Verteiler ohne
+Füllstand empfiehlt ein leeres Modell.
 
 > *Prompt:* „Sag mir vor Ende eines Kontingents, welche Arbeit an das Modell mit Restvolumen
 > geht; eine leere Spur empfiehlst du nie. Ist das zweite Modell nicht erreichbar, melde die
@@ -261,8 +238,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt.
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
-  Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
-  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb." *(≈ 2x)*
+  Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die
+  Begründung**." *(≈ 2x)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft, nicht
