@@ -19427,3 +19427,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   300-500 for a tool call. A hook is a mechanism, so the change needs the other model's recorded
   review before it lands.
   Bundle: Chat & Tafel.
+
+- [x] 743. The watermark is set where its own arithmetic holds (user 19.08.2026, on being
+  shown that a handover AT the mark means the damage is already done: "Wenn bei 150.000
+  abgegeben wird, ist das Kind ja schon in den Brunnen gefallen"). `CONTEXT_WATERMARK_TOKENS`
+  (`scripts/context-watermark-core.mjs`) is 150,000 and is used as the TRIGGER while being
+  spoken of as the CEILING. One number cannot be both: the trigger must sit far enough below
+  the ceiling that everything which still happens after it fits underneath. Measured
+  19.08.2026: the fence first fired at 167,277 tokens — the mark had been crossed with
+  nothing firing, because no STARTING call lay on the way up — and the boundary was committed
+  at 194,613, i.e. 44,613 past it, of which 27,336 were spent purely on leaving. THE SAME
+  FAILURE MODE WAS MEASURED A SECOND TIME the same evening: at 19:18 the fence denied a
+  document edit at 164,737 tokens, 14,737 past the mark, again because no earlier call of that
+  turn was classified as a START. So the overshoot is a SERIES, not one reading, and a
+  backward-looking check cannot refuse growth that has already been paid for — which is the
+  same evidence point 745's prospective admission rests on.
+  FINAL STATE: the two numbers become two NAMED constants, because one name for both is how
+  the confusion got in — `CONTEXT_CEILING_TOKENS = 150000` and `CONTEXT_TRIGGER_TOKENS =
+  82000`, and every consumer names the one it means: point 742's incident record and point
+  747's rollback measure against the CEILING, the fence's admission decision against the
+  TRIGGER (GPT-5.6 Sol, review of 19.08.2026 — while `CONTEXT_WATERMARK_TOKENS` carries both
+  meanings, an incident threshold and a ceiling overshoot are silently the same number and
+  neither is right). The commit that sets them CARRIES ITS
+  ARITHMETIC in a comment beside the constant: ceiling 150,000 − largest observed single
+  response 40,000 − measured cost of leaving 27,336 = 82,664. This is deliberately the
+  CONSERVATIVE cut and not the 100,000 a first draft proposed: 100,000 + 40,000 + 15,000
+  already exceeds the ceiling, so that value never held its own worst case (GPT-5.6 Sol,
+  audit of 19.08.2026). The resulting working window of roughly 52,000 tokens after startup
+  is the honest price of an uncapped output channel; points 744 and 597 buy it back, and
+  point 747 raises the trigger again once they have.
+  BOTH PREMISES ARE OBSERVATIONS, NOT BOUNDS, and the point says so rather than pretending
+  otherwise (GPT-5.6 Sol, review 19.08.2026): the 40,000 jump is one reading and point 742
+  itself calls it neither a maximum nor an expected value, and the 27,336 leaving cost is the
+  contaminated measurement point 744 replaces. This point is therefore not the guarantee — it
+  is the cheap, immediate margin, and points 597, 745 and 744 are what turn the margin into a
+  bound. IT IS RANKED AHEAD OF 744 DELIBERATELY, and the contamination is why that is safe:
+  the two gates that contradicted each other made leaving MORE expensive than a clean handover
+  will be, so 27,336 is biased HIGH and subtracting it errs toward a lower, safer trigger.
+  When 744 lands its clean measurement, this constant is recomputed from it.
+  NOT IN THIS POINT: deriving the trigger automatically. That is point 745, which replaces
+  this constant with a computed remaining-budget function; until then the number stands as a
+  written, justified value rather than a formula.
+  VERIFIABLE: a Vitest case pinning both constants AND the inequality they must satisfy —
+  trigger + largest-observed-jump + measured-boundary-cost <= ceiling — so a later change to
+  any of the three fails the gate rather than silently breaking the ceiling; a case asserting
+  no consumer reads the ceiling where it means the trigger or the reverse; plus the existing
+  watermark tests re-run green against the new value.
+  Criticality: low — one constant, immediately reversible, and it only makes an existing
+  mechanism fire earlier.
+  Bundle: Session- & Repo-Hygiene.
