@@ -113,6 +113,44 @@ put it is the mistake this line exists to stop.
   this blocks 581, every later render point and the release.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
+  19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
+  MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
+  1/1: the `startup` suite's assertion "the loading picture never freezes longer than the balance
+  budget (4000 ms, design.md §21.2)" fails with a worst standstill of 7632 / 8167 / 7833 / 7801 ms
+  across the two runs' two sections — roughly 2x the budget. The breakdown is the same every time:
+  blocked thread ~3.3 s, inside ONE animation frame ~2.3 s, unpainted ~7.8 s.
+  IT IS NOT LOAD, and that was checked rather than assumed: the four readings sit within 7 % of
+  each other across two runs at load average 3.1–4.7, where a load artefact scatters. It is also
+  not new breakage — it is newly VISIBLE: the lane could not run on this host at all until 732, so
+  this assertion had never been evaluated here.
+  WHAT IS NOT YET KNOWN, and is the first half of the work: whether the freeze belongs to the APP
+  (startup work on the main thread) or to the BACKEND the lane now uses. Point 732 restored the
+  picture through ANGLE's surfaceless EGL route, and the WebGPU lane rides a COMPATIBILITY adapter
+  there; a compat adapter's shader compilation could plausibly own the 2.3 s inside one frame. The
+  two are distinguished by MEASUREMENT before anything is changed — the same run on the WebGL 2
+  lane, and against the deployed build the user actually plays, decides which it is. Naming the
+  wrong half here would rebuild the wrong thing.
+  FINAL STATE:
+  - THE CAUSE IS NAMED with a measurement that separates app from backend, and the answer is
+    written down where the next reader finds it — including the case "the budget is right and the
+    app is too slow" and the case "this backend cannot meet a budget written for another one",
+    which have different remedies.
+  - THE STANDSTILL COMES UNDER THE §21.2 BUDGET on the lane the player uses, or the budget is
+    re-derived FROM A MEASUREMENT on the backends we actually ship and design.md §21.2 moves with
+    it in the same commit. The budget is not simply raised to whatever the current number is: it
+    is a promise to the player about the loading picture, so a raise needs the reason a player
+    would accept.
+  - THE 2.3 s INSIDE ONE ANIMATION FRAME is accounted for by name. A single frame holding the main
+    thread that long is the sharpest clue in the reading and the most likely single cause.
+  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on BOTH backends, and
+  the measurement that separated app from backend recorded with its numbers, so a later regression
+  can be compared against it rather than re-argued.
+  Criticality: medium — it fails no player-visible correctness rule and the game does start, but
+  it is a §21.2 promise the build currently breaks by 2x, and it keeps the `startup` suite red,
+  which is the suite every other run is judged beside.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 730. The board's queue estimates are calibrated for a slower batch than the one running
   (user 19.08.2026, reading the live board: »Seit den Umstellungen gestern scheint die
   Abarbeitung der Punkte schneller zu laufen als bisher. Die Schätzungen der zukünftigen Tasks
