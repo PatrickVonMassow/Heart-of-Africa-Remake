@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
+import { AUTHORING_COMMISSION_KIND, recordAuthoringCommission } from './author-sol.mjs'
 
 const root = resolve(process.cwd())
 const script = resolve(root, 'scripts', 'author-sol.mjs')
@@ -29,6 +30,54 @@ function route(records, extra = []) {
 
 afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
+})
+
+describe('author-sol records a commission before dispatch', () => {
+  it('appends and durably commits the exact point, round and framing once', () => {
+    const events = []
+    const input = {
+      records: [],
+      point,
+      round: 3,
+      framing: AUTHORING_FRAMINGS[0],
+      sha: 'b'.repeat(40),
+      now: 1_787_130_000_000,
+      append: (record) => events.push(['append', record]),
+      commit: (record) => events.push(['commit', record]),
+    }
+    const first = recordAuthoringCommission(input)
+    expect(first.written).toBe(true)
+    expect(first.record).toMatchObject({
+      kind: AUTHORING_COMMISSION_KIND,
+      point: Number(point),
+      round: 3,
+      authorFraming: AUTHORING_FRAMINGS[0],
+      sha: 'b'.repeat(40),
+    })
+    expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
+
+    const retry = recordAuthoringCommission({ ...input, records: [first.record] })
+    expect(retry).toEqual({ written: false, record: first.record })
+    expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
+  })
+
+  it('refuses to rewrite the framing already recorded for a round', () => {
+    const prior = {
+      kind: AUTHORING_COMMISSION_KIND,
+      point: Number(point),
+      round: 3,
+      authorFraming: AUTHORING_FRAMINGS[0],
+    }
+    expect(() =>
+      recordAuthoringCommission({
+        records: [prior],
+        point,
+        round: 3,
+        framing: AUTHORING_FRAMINGS[1],
+        sha: 'b'.repeat(40),
+      }),
+    ).toThrow(/different framing/)
+  })
 })
 
 describe('author-sol routing reads unsuccessful rounds from the review ledger', () => {

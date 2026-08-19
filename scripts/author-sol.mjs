@@ -34,7 +34,7 @@ import {
 } from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
-import { readRecords } from './mechanism-review.mjs'
+import { appendRecord, readRecords, RECORDS_PATH } from './mechanism-review.mjs'
 import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -78,6 +78,62 @@ export function pointBody(number, text = readTasksOpen()) {
 export function recordedReworkRounds(number, { records } = {}) {
   const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
   return authorRoundHistory(rows, number).freshRounds
+}
+
+/** The durable evidence written before a commissioned model sees its prompt. */
+export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+
+/**
+ * Append one commission to the shared ledger and make that append durable.
+ * The injected callbacks keep the state transition unit-testable; production
+ * appends to the tracked review ledger and commits it before Sol starts.
+ */
+export function recordAuthoringCommission({
+  records = [],
+  point = '',
+  round = 0,
+  framing = '',
+  sha = '',
+  now = Date.now(),
+  append = () => {},
+  commit = () => {},
+} = {}) {
+  const wanted = Number(point)
+  const attempt = Number(round)
+  const frame = String(framing ?? '').trim()
+  const commitSha = String(sha ?? '').trim()
+  if (!Number.isSafeInteger(wanted) || wanted < 0) throw new Error('an authoring commission needs a numeric point')
+  if (!Number.isSafeInteger(attempt) || attempt < 0) throw new Error('an authoring commission needs a non-negative round')
+  if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) throw new Error('an authoring commission needs the current commit sha')
+
+  const existing = (Array.isArray(records) ? records : []).find(
+    (record) =>
+      record?.kind === AUTHORING_COMMISSION_KIND &&
+      Number(record?.point) === wanted &&
+      Number(record?.round) === attempt,
+  )
+  if (existing) {
+    if (String(existing.authorFraming ?? '').trim() !== frame) {
+      throw new Error(`authoring round ${attempt} already has a different framing on record`)
+    }
+    return { written: false, record: existing }
+  }
+
+  const at = Number(now)
+  if (!Number.isSafeInteger(at) || at < 0) throw new Error('an authoring commission needs a millisecond timestamp')
+  const record = {
+    sha: commitSha,
+    kind: AUTHORING_COMMISSION_KIND,
+    point: wanted,
+    round: attempt,
+    authorFraming: frame,
+    model: SOL_MODEL_NAME,
+    at,
+    atIso: new Date(at).toISOString(),
+  }
+  append(record)
+  commit(record)
+  return { written: true, record }
 }
 
 /** The lane a point belongs to, with the reasons that decided it. */
@@ -501,6 +557,46 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
+    // RECORD THE COMMISSION BEFORE IT RUNS. The review sha is not known yet,
+    // but the point, attempt number and exact prompt framing are. Keeping that
+    // fact in the append-only ledger makes the later --author-framing flag a
+    // confirmation rather than the only evidence, and committing it now means
+    // a killed authoring run cannot erase which commission was actually sent.
+    const commissionSha = git(['rev-parse', 'HEAD'], { cwd, required: true })
+    const recordsPath = process.env.AUTHOR_REVIEW_RECORDS_FILE || RECORDS_PATH
+    const commissioned = recordAuthoringCommission({
+      records,
+      point,
+      round: authoringStep.round,
+      framing: authoringStep.framing,
+      sha: commissionSha,
+      append: (record) => appendRecord(record, recordsPath),
+      commit: () => {
+        git(['add', '--', recordsPath], { cwd, required: true })
+        git(
+          [
+            'commit',
+            '-m',
+            'Record hostile-test authoring commission',
+            '-m',
+            'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
+          ],
+          { cwd, required: true },
+        )
+      },
+    })
+    if (commissioned.written) {
+      records.push(commissioned.record)
+      const saved = pushBranch(branch, { cwd })
+      console.error(
+        saved.ok
+          ? 'author-sol: recorded and pushed the authoring commission before starting it'
+          : `author-sol: recorded the authoring commission locally; its immediate push failed — ${saved.why}`,
+      )
+    }
+
+    // The commission receipt is orchestration, not authored work. Start the
+    // delivered range after it so the report and reviewer see only Sol's edits.
     const base = git(['rev-parse', 'HEAD'], { cwd, required: true })
     console.error(
       `author-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) is authoring point ${point} on ${branch}` +
