@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
+import { AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 
 const root = resolve(process.cwd())
 const script = resolve(root, 'scripts', 'author-sol.mjs')
@@ -40,22 +40,54 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
   })
 
   it('derives N non-passing reviews and moves at the exported boundary', () => {
+    const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, (_, round) => ({
+      point: Number(point),
+      mode: 'review',
+      verdict: 'do-not-merge',
+      ...(round > 1 ? { authorFraming: AUTHORING_FRAMINGS[round % AUTHORING_FRAMINGS.length] } : {}),
+    }))
+    rows.splice(FABLE_ESCALATION_ROUNDS - 1, 0, {
+      point: Number(point),
+      mode: 'review',
+      verdict: 'merge',
+      specExamination: 'sound',
+      evidence: 'the specification is coherent and the difficulty is real',
+    })
+    rows.unshift({ point: Number(point), mode: 'review', verdict: 'merge' })
+    const result = route(ledger(rows))
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`point ${point} → fable`)
+    expect(result.stdout).toContain(
+      `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
+    )
+    expect(result.stdout).toContain(`round 2: framing — ${AUTHORING_FRAMINGS[0]}`)
+    expect(result.stdout).toContain('spec examination: sound')
+  })
+
+  it('reports an unframed later review as a repeat and does not advance the lane', () => {
     const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, () => ({
       point: Number(point),
       mode: 'review',
       verdict: 'do-not-merge',
     }))
-    rows.unshift({ point: Number(point), mode: 'review', verdict: 'merge' })
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → fable`)
-    expect(result.stdout).toContain(`review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s)`)
+    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
+    expect(result.stdout).toContain('REPEAT — no author framing was recorded')
   })
 
   it('accepts an explicit numeric override for history outside the ledger', () => {
     const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`point ${point} → fable`)
+  })
+
+  it('turns the override immediately before the threshold into the examination step', () => {
+    const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS - 1)])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('next step: spec-examination')
+    expect(result.stdout).toContain(`threshold of ${FABLE_ESCALATION_ROUNDS}`)
   })
 
   it('rejects a numeric spelling that cannot be represented as an integer', () => {

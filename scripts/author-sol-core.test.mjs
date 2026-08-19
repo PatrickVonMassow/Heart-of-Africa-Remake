@@ -12,6 +12,7 @@ import {
   AUTHOR_TIMEOUT_MS,
   authoringCodexArgs,
   buildAuthoringPrompt,
+  buildSpecExaminationPrompt,
   childEnv,
   formatAuthoringReport,
   gatesProblem,
@@ -204,6 +205,31 @@ describe('buildAuthoringPrompt', () => {
     expect(prompt).toMatch(/Answer every/)
     // The brief is not repeated: what is under discussion is the review.
     expect(prompt).not.toMatch(/=== THE BRIEF ===/)
+  })
+
+  it('carries a hostile-tester framing beside the findings in a later round', () => {
+    const framing = 'Act as a hostile tester and break the adjacent state transitions.'
+    const prompt = buildAuthoringPrompt({ point: 651, findings: 'F1 | the state sticks', branch: 'b', framing })
+    expect(prompt).toContain(framing)
+    expect(prompt).toContain('F1 | the state sticks')
+    expect(prompt).toMatch(/supplements the findings/)
+  })
+})
+
+describe('buildSpecExaminationPrompt', () => {
+  it('puts the point, generated brief and every round finding into a read-only examination', () => {
+    const prompt = buildSpecExaminationPrompt({
+      point: 651,
+      pointText: 'The point text.',
+      brief: 'The generated brief.',
+      history: { rounds: [{ freshRound: 0, evidence: 'F0' }, { freshRound: null, evidence: 'repeat F1' }] },
+    })
+    expect(prompt).toContain('The point text.')
+    expect(prompt).toContain('The generated brief.')
+    expect(prompt).toContain('round 0: F0')
+    expect(prompt).toContain('round repeat: repeat F1')
+    expect(prompt).toMatch(/not an authoring commission/i)
+    expect(prompt).toMatch(/Do not run a suite and do not write a commit/)
   })
 })
 
@@ -402,6 +428,13 @@ describe('formatAuthoringReport', () => {
   it('says a failed push first, because only that work is at risk', () => {
     const judged = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: answered })
     expect(formatAuthoringReport({ point: 1, judged, parsed: answered, pushed: false })).toMatch(/PUSH FAILED/)
+  })
+
+  it('puts the exact author framing on the command that records the following review', () => {
+    const judged = judgeAuthoring({ outcome: okRun, commits: [solCommit('a'.repeat(40))], parsed: answered })
+    const framing = 'Act as a hostile tester and probe every adjacent transition.'
+    const text = formatAuthoringReport({ point: 1, judged, parsed: answered, framing })
+    expect(text).toContain(`--mode review --point 1 --author-framing "${framing}"`)
   })
 
   it('offers no next step where nothing was authored', () => {

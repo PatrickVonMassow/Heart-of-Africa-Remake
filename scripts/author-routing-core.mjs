@@ -146,31 +146,63 @@ export function nextAuthoringFraming(previous = '') {
  * `escalationRounds` is injectable only so the test can prove every boundary
  * moves with the exported constant instead of hiding a round-number literal.
  */
-export function nextAuthoringStep({ records = [], point = '', escalationRounds = FABLE_ESCALATION_ROUNDS } = {}) {
+export function nextAuthoringStep({
+  records = [],
+  point = '',
+  reworkRounds,
+  escalationRounds = FABLE_ESCALATION_ROUNDS,
+} = {}) {
   const history = authorRoundHistory(records, point)
   const examinationRound = escalationRounds - 1
-  if (history.freshRounds === examinationRound && !history.examination) {
+  const round = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : history.freshRounds
+  if (round === examinationRound && !history.examination) {
     return {
       kind: 'spec-examination',
-      round: history.freshRounds,
+      round,
       framing: '',
       history,
       reason:
-        `round ${history.freshRounds} is the one before the Fable escalation threshold of ${escalationRounds}; ` +
+        `round ${round} is the one before the Fable escalation threshold of ${escalationRounds}; ` +
         'the point text and generated brief must be examined against every finding before another commission',
     }
   }
   const previous = [...history.rounds].reverse().find((round) => round.freshRound !== null)?.framing ?? ''
-  const framing = history.freshRounds > 1 ? nextAuthoringFraming(previous) : ''
+  const framing = round > 1 ? nextAuthoringFraming(previous) : ''
   return {
     kind: 'commission',
-    round: history.freshRounds,
+    round,
     framing,
     history,
     reason: framing
-      ? `re-authoring round ${history.freshRounds} is decorrelated with a hostile-tester framing`
-      : `authoring round ${history.freshRounds} is the unframed baseline`,
+      ? `re-authoring round ${round} is decorrelated with a hostile-tester framing`
+      : `authoring round ${round} is the unframed baseline`,
   }
+}
+
+/** The whole ledger-derived history as a compact dispatcher-facing reading. */
+export function formatAuthorRoundHistory(history = {}) {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const lines = [
+    `  review record: ${Number(history?.unsuccessfulRounds) || 0} unsuccessful round(s); ` +
+      `${Number(history?.freshRounds) || 0} fresh attempt(s)`,
+  ]
+  if (!rounds.length) lines.push('  round history: no unsuccessful reviews recorded')
+  for (const round of rounds) {
+    if (round.repeat) {
+      lines.push(`  ledger review ${round.ledgerRound}: REPEAT — ${round.repeat}`)
+      continue
+    }
+    lines.push(
+      `  round ${round.freshRound}: ${round.framing ? `framing — ${round.framing}` : 'unframed baseline'}`,
+    )
+  }
+  const examination = history?.examination
+  lines.push(
+    examination
+      ? `  spec examination: ${String(examination.specExamination)} — ${String(examination.evidence ?? '').trim()}`
+      : '  spec examination: not recorded',
+  )
+  return lines.join('\n')
 }
 
 /**

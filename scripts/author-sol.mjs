@@ -24,10 +24,12 @@ import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  authorRoundHistory,
   authorLaneFor,
+  formatAuthorRoundHistory,
   formatLaneReport,
   LANE_MODEL,
-  unsuccessfulReviewRounds,
+  nextAuthoringStep,
 } from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
@@ -40,6 +42,7 @@ import {
   AUTHOR_TIMEOUT_MS,
   authoringCodexArgs,
   buildAuthoringPrompt,
+  buildSpecExaminationPrompt,
   childEnv,
   formatAuthoringReport,
   judgeAuthoring,
@@ -73,14 +76,20 @@ export function pointBody(number, text = readTasksOpen()) {
 /** The ledger-derived escalation signal. No record is the ordinary zero case. */
 export function recordedReworkRounds(number, { records } = {}) {
   const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-  return unsuccessfulReviewRounds(rows, number)
+  return authorRoundHistory(rows, number).freshRounds
 }
 
 /** The lane a point belongs to, with the reasons that decided it. */
 export function laneFor(number, { override = '', reworkRounds, records } = {}) {
   const body = pointBody(number)
-  const rounds = reworkRounds ?? recordedReworkRounds(number, { records })
-  return { body, ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds }) }
+  const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+  const roundHistory = authorRoundHistory(rows, number)
+  const rounds = reworkRounds ?? roundHistory.freshRounds
+  return {
+    body,
+    roundHistory,
+    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds }),
+  }
 }
 
 /** The brief, cut by the project's own command — never a reading assignment. */
@@ -321,12 +330,16 @@ if (isMainModule(import.meta.url)) {
         const rows = parsePointBlocks(readTasksOpen())
           .filter((b) => !b.done)
           .map((b) => {
-            const reworkRounds = unsuccessfulReviewRounds(records, b.n)
+            const roundHistory = authorRoundHistory(records, b.n)
+            const reworkRounds = roundHistory.freshRounds
             const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds })
             return {
               number: b.n,
               ...decided,
-              why: [`${decided.why[0]} (${reworkRounds} unsuccessful review round(s) recorded)`],
+              why: [
+                `${decided.why[0]} (${roundHistory.unsuccessfulRounds} unsuccessful review round(s), ` +
+                  `${reworkRounds} fresh attempt(s), spec examination ${roundHistory.examination ? 'recorded' : 'not recorded'})`,
+              ],
             }
           })
         console.log(formatLaneReport(rows))
@@ -338,10 +351,13 @@ if (isMainModule(import.meta.url)) {
         console.error(usage())
         process.exit(2)
       }
-      const decided = laneFor(number, { reworkRounds: roundsOverride })
+      const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+      const decided = laneFor(number, { reworkRounds: roundsOverride, records })
       if (!decided.body) console.error(`author-sol: point ${number} is not in the OPEN work order — routing what is known.`)
       console.log(`author-sol: point ${number} → ${decided.lane} (${LANE_MODEL[decided.lane]})`)
-      console.log(`  review record: ${decided.signals.reworkRounds} unsuccessful round(s)`)
+      console.log(formatAuthorRoundHistory(decided.roundHistory))
+      const step = nextAuthoringStep({ records, point: number, reworkRounds: roundsOverride })
+      console.log(`  next step: ${step.kind} — ${step.reason}`)
       for (const why of decided.why) console.log(`  because ${why}`)
       process.exit(0)
     }
@@ -381,11 +397,15 @@ if (isMainModule(import.meta.url)) {
     // THE LANE IS THE POINT'S OWN ANSWER, not the dispatcher's mood (point 667).
     // Its automatic escalation signal comes from the review ledger. `--rounds`
     // is the deliberate override for a history that the ledger cannot know.
-    const decided = laneFor(point, { reworkRounds: roundsOverride })
+    const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+    const decided = laneFor(point, { reworkRounds: roundsOverride, records })
+    const authoringStep = nextAuthoringStep({ records, point, reworkRounds: roundsOverride })
     console.error(
       `author-sol: lane verdict for point ${point}: ${decided.lane} (${LANE_MODEL[decided.lane]}); ` +
-        `${decided.signals.reworkRounds} unsuccessful review round(s) recorded.`,
+        `${decided.roundHistory.unsuccessfulRounds} unsuccessful review round(s), ` +
+        `${decided.signals.reworkRounds} fresh attempt(s).`,
     )
+    console.error(formatAuthorRoundHistory(decided.roundHistory))
     if (decided.lane !== 'sol' && !argv.includes('--anyway')) {
       console.error(
         `author-sol: point ${point} routes to the ${decided.lane} lane (${LANE_MODEL[decided.lane]}), not to ${SOL_MODEL_NAME}:\n` +
@@ -423,13 +443,49 @@ if (isMainModule(import.meta.url)) {
     }
 
     // The brief is cut fresh: a stale one describes a work order that has moved.
-    const brief = findings ? '' : briefFor(point)
+    // The examination reads BOTH the point and this generated view even when a
+    // findings file was supplied, so it is the one later-round path that still
+    // asks for the brief.
+    const brief = !findings || authoringStep.kind === 'spec-examination' ? briefFor(point) : ''
     if (!findings && !brief) {
       console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — refusing to author from nothing.`)
       process.exit(2)
     }
 
-    const prompt = buildAuthoringPrompt({ point, brief, branch, findings })
+    if (authoringStep.kind === 'spec-examination') {
+      if (!brief) {
+        console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
+        process.exit(2)
+      }
+      const lastAuthor = [...decided.roundHistory.rounds]
+        .reverse()
+        .find((round) => round.authoredBy)?.authoredBy ?? SOL_MODEL_NAME
+      const solAuthored = /\bsol\b/i.test(lastAuthor)
+      const examiner = solAuthored ? 'Opus 5' : SOL_MODEL_NAME
+      const route = solAuthored
+        ? 'Claude reads this packet directly because Sol authored the round.'
+        : 'Run `node scripts/ask-sol.mjs --kind audit` with this packet because Claude authored the round.'
+      const packet = buildSpecExaminationPrompt({
+        point,
+        pointText: decided.body,
+        brief,
+        history: decided.roundHistory,
+      })
+      const head = git(['rev-parse', 'HEAD'], { cwd, required: true })
+      console.log(
+        `author-sol: SPEC EXAMINATION REQUIRED before another authoring commission.\n` +
+          `  ${authoringStep.reason}\n` +
+          `  cross-vendor route: ${route}\n\n` +
+          `${packet}\n\n` +
+          `Record the result once it has been read (use amended only after the point text is amended):\n` +
+          `  node scripts/mechanism-review.mjs --record ${head} --model "${examiner}" --verdict merge ` +
+          `--evidence "<what the examination established>" --mode review --point ${point} ` +
+          `--spec-examination <sound|amended>`,
+      )
+      process.exit(4)
+    }
+
+    const prompt = buildAuthoringPrompt({ point, brief, branch, findings, framing: authoringStep.framing })
     const withheld = withheldEnvNames(process.env)
     if (dryRun) {
       console.log(`author-sol: DRY RUN — nothing is spent and nothing is written.\n`)
@@ -500,7 +556,7 @@ if (isMainModule(import.meta.url)) {
     })
     const said = String(run.finalMessage ?? '').trim()
     if (said) console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end ---\n`)
-    console.log(formatAuthoringReport({ point, branch, judged, parsed, pushed }))
+    console.log(formatAuthoringReport({ point, branch, judged, parsed, pushed, framing: authoringStep.framing }))
     // 0 only for a clean run that produced work; 3 says "look at this before you
     // treat it as a delivery", which is what a script chaining on it must see.
     process.exit(judged.clean ? 0 : 3)

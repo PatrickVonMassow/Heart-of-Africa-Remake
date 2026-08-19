@@ -10,6 +10,7 @@ import {
   authorRoundHistory,
   authorLaneFor,
   FABLE_ESCALATION_ROUNDS,
+  formatAuthorRoundHistory,
   formatLaneReport,
   HARD_MARKERS,
   LANE_MODEL,
@@ -318,6 +319,36 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
       kind: 'spec-examination',
       round: alternateThreshold - 1,
     })
+  })
+
+  it('applies a numeric history override to the step boundary without inventing records', () => {
+    expect(
+      nextAuthoringStep({ records: [], point: 727, reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }),
+    ).toMatchObject({ kind: 'spec-examination', round: FABLE_ESCALATION_ROUNDS - 1 })
+  })
+
+  it('renders the count, every framing or repeat, and the examination as one reading', () => {
+    const history = authorRoundHistory(
+      [
+        failed(),
+        failed(),
+        failed({ authorFraming: AUTHORING_FRAMINGS[0] }),
+        failed(),
+        {
+          point: 727,
+          mode: 'review',
+          verdict: 'merge',
+          specExamination: 'sound',
+          evidence: 'the difficulty is real',
+        },
+      ],
+      727,
+    )
+    const report = formatAuthorRoundHistory(history)
+    expect(report).toContain('4 unsuccessful round(s); 3 fresh attempt(s)')
+    expect(report).toContain(`round 2: framing — ${AUTHORING_FRAMINGS[0]}`)
+    expect(report).toContain('ledger review 4: REPEAT — no author framing was recorded')
+    expect(report).toContain('spec examination: sound — the difficulty is real')
   })
 })
 
