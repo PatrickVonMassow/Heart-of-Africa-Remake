@@ -72,6 +72,26 @@ const isUnsuccessfulReview = (record, wanted) => {
   return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
 }
 
+const isExaminationRecord = (record, wanted) =>
+  Number(record?.point) === wanted &&
+  record?.mode === 'review' &&
+  record?.verdict === 'merge' &&
+  SPEC_EXAMINATION_VERDICTS.includes(String(record?.specExamination)) &&
+  !record?.aborted &&
+  !record?.shortfall &&
+  record?.completed !== false &&
+  String(record?.evidence ?? '').trim().length >= 10
+
+/** The examiner is always the other vendor and never the scarce Fable pool. */
+export function specExaminerFor(history = {}, fallbackAuthor = '') {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const author = [...rounds].reverse().find((round) => round.authoredBy)?.authoredBy || String(fallbackAuthor)
+  if (/\bsol\b/i.test(author)) {
+    return { vendor: 'claude', model: 'Opus 5', route: 'claude-read', author }
+  }
+  return { vendor: 'sol', model: 'GPT-5.6 Sol', route: 'ask-sol', author }
+}
+
 /**
  * An unsuccessful round is a completed review whose verdict was not a pass.
  * A run that aborted, did not run or had a material shortfall is not completed
@@ -98,13 +118,6 @@ export function authorRoundHistory(records = [], point = '') {
     return { unsuccessfulRounds: 0, freshRounds: 0, rounds: [], examination: null }
   }
   const rows = Array.isArray(records) ? records : []
-  const examination =
-    [...rows]
-      .reverse()
-      .find(
-        (record) =>
-          Number(record?.point) === wanted && SPEC_EXAMINATION_VERDICTS.includes(String(record?.specExamination)),
-      ) ?? null
   // This is also the number of the NEXT commission: the first review row is
   // the outcome of round zero, the second the outcome of round one, and so on.
   let freshRounds = 0
@@ -115,6 +128,7 @@ export function authorRoundHistory(records = [], point = '') {
     let repeat = ''
     if (reviewedRound <= 1 && framing) repeat = 'rounds zero and one must carry no author framing'
     if (reviewedRound > 1 && !framing) repeat = 'no author framing was recorded'
+    if (framing && !AUTHORING_FRAMINGS.includes(framing)) repeat = 'the record names no recognized hostile-tester framing'
     if (framing && previousFraming && framing === previousFraming) {
       repeat = 'the author framing repeats the preceding fresh round'
     }
@@ -131,6 +145,17 @@ export function authorRoundHistory(records = [], point = '') {
       authoredBy: String(record?.authoredBy ?? '').trim(),
     }
   })
+  const expectedExaminer = specExaminerFor({ rounds })
+  const examination =
+    [...rows]
+      .reverse()
+      .find((record) => {
+        if (!isExaminationRecord(record, wanted)) return false
+        if (!expectedExaminer.author) return true
+        return expectedExaminer.route === 'claude-read'
+          ? /\bopus\b/i.test(String(record?.model))
+          : /\bsol\b/i.test(String(record?.model))
+      }) ?? null
   return { unsuccessfulRounds: rounds.length, freshRounds, rounds, examination }
 }
 
@@ -182,6 +207,12 @@ export function nextAuthoringStep({
 /** The whole ledger-derived history as a compact dispatcher-facing reading. */
 export function formatAuthorRoundHistory(history = {}) {
   const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const oneLine = (value) =>
+    String(value ?? '')
+      .replace(/\s+/g, ' ')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+      .trim()
   const lines = [
     `  review record: ${Number(history?.unsuccessfulRounds) || 0} unsuccessful round(s); ` +
       `${Number(history?.freshRounds) || 0} fresh attempt(s)`,
@@ -193,13 +224,13 @@ export function formatAuthorRoundHistory(history = {}) {
       continue
     }
     lines.push(
-      `  round ${round.freshRound}: ${round.framing ? `framing — ${round.framing}` : 'unframed baseline'}`,
+      `  round ${round.freshRound}: ${round.framing ? `framing — ${oneLine(round.framing)}` : 'unframed baseline'}`,
     )
   }
   const examination = history?.examination
   lines.push(
     examination
-      ? `  spec examination: ${String(examination.specExamination)} — ${String(examination.evidence ?? '').trim()}`
+      ? `  spec examination: ${oneLine(examination.specExamination)} — ${oneLine(examination.evidence)}`
       : '  spec examination: not recorded',
   )
   return lines.join('\n')

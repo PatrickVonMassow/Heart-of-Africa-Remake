@@ -30,6 +30,7 @@ import {
   formatLaneReport,
   LANE_MODEL,
   nextAuthoringStep,
+  specExaminerFor,
 } from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
@@ -457,12 +458,8 @@ if (isMainModule(import.meta.url)) {
         console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
         process.exit(2)
       }
-      const lastAuthor = [...decided.roundHistory.rounds]
-        .reverse()
-        .find((round) => round.authoredBy)?.authoredBy ?? SOL_MODEL_NAME
-      const solAuthored = /\bsol\b/i.test(lastAuthor)
-      const examiner = solAuthored ? 'Opus 5' : SOL_MODEL_NAME
-      const route = solAuthored
+      const examinationRoute = specExaminerFor(decided.roundHistory, SOL_MODEL_NAME)
+      const route = examinationRoute.route === 'claude-read'
         ? 'Claude reads this packet directly because Sol authored the round.'
         : 'Run `node scripts/ask-sol.mjs --kind audit` with this packet because Claude authored the round.'
       const packet = buildSpecExaminationPrompt({
@@ -470,6 +467,7 @@ if (isMainModule(import.meta.url)) {
         pointText: decided.body,
         brief,
         history: decided.roundHistory,
+        currentFindings: findings,
       })
       const head = git(['rev-parse', 'HEAD'], { cwd, required: true })
       console.log(
@@ -478,7 +476,7 @@ if (isMainModule(import.meta.url)) {
           `  cross-vendor route: ${route}\n\n` +
           `${packet}\n\n` +
           `Record the result once it has been read (use amended only after the point text is amended):\n` +
-          `  node scripts/mechanism-review.mjs --record ${head} --model "${examiner}" --verdict merge ` +
+          `  node scripts/mechanism-review.mjs --record ${head} --model "${examinationRoute.model}" --verdict merge ` +
           `--evidence "<what the examination established>" --mode review --point ${point} ` +
           `--spec-examination <sound|amended>`,
       )

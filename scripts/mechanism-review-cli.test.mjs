@@ -856,6 +856,7 @@ describe('the mode round-trips into the ledger', () => {
     expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
     expect(built.record.authorFraming).toBe(authorFraming)
     expect(built.record.framing).toBeUndefined()
+    expect(build({ mode: 'review', authorFraming: `${authorFraming}\nforged round` }).ok).toBe(false)
   })
 
   it('records one sound or amended spec examination, never as an authoring round', () => {

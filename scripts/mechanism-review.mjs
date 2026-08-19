@@ -2,7 +2,8 @@
 //
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
 //       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
-//       --mode <review|blind-parallel> [--framing "<one line>"] [--point <N>]
+//       --mode <review|blind-parallel> [--framing "<one line>"] [--point <N>] \
+//       [--author-framing "<one line>" | --spec-examination <sound|amended>]
 //   node scripts/mechanism-review.mjs --list
 //
 // `--mode` names which half of the four-eyes principle the verdict covers

@@ -223,11 +223,13 @@ describe('buildSpecExaminationPrompt', () => {
       pointText: 'The point text.',
       brief: 'The generated brief.',
       history: { rounds: [{ freshRound: 0, evidence: 'F0' }, { freshRound: null, evidence: 'repeat F1' }] },
+      currentFindings: 'The complete current findings hand-off.',
     })
     expect(prompt).toContain('The point text.')
     expect(prompt).toContain('The generated brief.')
     expect(prompt).toContain('round 0: F0')
     expect(prompt).toContain('round repeat: repeat F1')
+    expect(prompt).toContain('The complete current findings hand-off.')
     expect(prompt).toMatch(/not an authoring commission/i)
     expect(prompt).toMatch(/Do not run a suite and do not write a commit/)
   })

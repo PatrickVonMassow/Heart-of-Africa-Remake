@@ -18,6 +18,7 @@ import {
   laneTagIn,
   nextAuthoringStep,
   SPEC_EXAMINATION_ROUND,
+  specExaminerFor,
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
@@ -283,6 +284,15 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     ])
   })
 
+  it('counts only the known hostile-tester framings as fresh later attempts', () => {
+    const history = authorRoundHistory(
+      [failed(), failed(), failed({ authorFraming: 'Take another ordinary look at the same implementation.' })],
+      727,
+    )
+    expect(history.freshRounds).toBe(2)
+    expect(history.rounds.at(-1).repeat).toMatch(/no recognized hostile-tester framing/)
+  })
+
   it('returns the examination step immediately before the threshold, once only', () => {
     const records = [failed()]
     let framing = ''
@@ -349,6 +359,35 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     expect(report).toContain(`round 2: framing — ${AUTHORING_FRAMINGS[0]}`)
     expect(report).toContain('ledger review 4: REPEAT — no author framing was recorded')
     expect(report).toContain('spec examination: sound — the difficulty is real')
+  })
+
+  it('routes the examination to the vendor that did not author the rounds, never Fable', () => {
+    expect(specExaminerFor({ rounds: [{ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }] })).toMatchObject({
+      vendor: 'claude',
+      model: 'Opus 5',
+      route: 'claude-read',
+    })
+    expect(specExaminerFor({ rounds: [{ authoredBy: 'Claude Opus 5 <noreply@anthropic.com>' }] })).toMatchObject({
+      vendor: 'sol',
+      model: 'GPT-5.6 Sol',
+      route: 'ask-sol',
+    })
+  })
+
+  it('does not accept a malformed, aborted or same-vendor examination as the one reading', () => {
+    const solRound = failed({ authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' })
+    const examination = (extra = {}) => ({
+      point: 727,
+      mode: 'review',
+      verdict: 'merge',
+      model: 'Opus 5',
+      specExamination: 'sound',
+      evidence: 'the point and brief agree with every finding',
+      ...extra,
+    })
+    expect(authorRoundHistory([solRound, examination({ aborted: true })], 727).examination).toBeNull()
+    expect(authorRoundHistory([solRound, examination({ model: 'GPT-5.6 Sol' })], 727).examination).toBeNull()
+    expect(authorRoundHistory([solRound, examination()], 727).examination).toMatchObject({ specExamination: 'sound' })
   })
 })
 

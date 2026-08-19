@@ -955,6 +955,9 @@ export function validateRecord({
   if (authorFrame && authorFrame.length < 8) {
     errors.push('--author-framing "<one line>": the hostile-tester stance the authoring round received, not a word')
   }
+  if (authorFrame && /[\r\n]/.test(authorFrame)) {
+    errors.push('--author-framing must be one line so it cannot forge the round-history report')
+  }
   if (examination && !SPEC_EXAMINATION_VERDICTS.includes(examination)) {
     errors.push(`--spec-examination <v>: one of ${SPEC_EXAMINATION_VERDICTS.join(' | ')}`)
   }

@@ -283,7 +283,13 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
  * other vendor the point text, the generated brief and every recorded finding
  * in one read, and asks for the only two outcomes the ledger accepts.
  */
-export function buildSpecExaminationPrompt({ point = '', pointText = '', brief = '', history = {} } = {}) {
+export function buildSpecExaminationPrompt({
+  point = '',
+  pointText = '',
+  brief = '',
+  history = {},
+  currentFindings = '',
+} = {}) {
   const rounds = Array.isArray(history?.rounds) ? history.rounds : []
   const findings = rounds.length
     ? rounds.map((round) => `round ${round.freshRound ?? 'repeat'}: ${round.evidence || '(no finding text recorded)'}`).join('\n')
@@ -301,6 +307,9 @@ export function buildSpecExaminationPrompt({ point = '', pointText = '', brief =
     String(brief ?? '').trim() || '(generated brief unavailable)',
     '=== FINDINGS SO FAR ===',
     findings,
+    ...(String(currentFindings ?? '').trim()
+      ? ['=== CURRENT FINDINGS HAND-OFF ===', String(currentFindings).trim()]
+      : []),
   ].join('\n')
 }
 
