@@ -76,6 +76,24 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 685. The board's tab icon stands on a transparent ground, not on a beige plate (user
+  13.08.2026, 23:00, on the deployed icon: »Das Afrika-Symbol für den Browser-Tab finde ich gut.
+  Eine kleine Änderung: Der Hintergrund sollte nicht beige sondern transparent sein.«). The
+  silhouette is right, but its beige plate reads as a card wedged between the other tabs, whose
+  favicons all stand free.
+  FINAL STATE:
+  - `public/board/favicon.svg` drops the `<rect width="64" height="64" fill="#f0e8d2"/>` behind
+    the silhouette. Nothing else about the drawing changes — same viewBox, same path, same size.
+  - Because the plate went, the silhouette now sits on whatever the browser paints behind the
+    tab. It therefore carries its own theme rule: the path is filled `#3a2e1c` by default and
+    `#e9dfc2` under `@media (prefers-color-scheme: dark)`, written as an internal `<style>` in
+    the SVG. A browser that ignores it keeps the dark silhouette, which is today's picture — so
+    the fallback is never worse than what ships now.
+  VERIFIABLE: the existing favicon test in the Vitest layer additionally asserts that the file
+  contains no opaque full-size background rect and that both fills are present; plus the
+  PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
+  Criticality: low — it is a one-element correction to the icon point 679 delivered.
+
 - [ ] 727. A repeated review round is re-framed, and the spec is examined before the lane escalates
   (user 19.08.2026, chat: "4. klingt gut. Mach das so und reihe das hinter 726 ein"). Point 726
   raises the Fable escalation to five unsuccessful review rounds; this point is what happens
@@ -8203,24 +8221,6 @@ to land than a mechanism that needs a review.
   Criticality: medium — the seal holds against every other mutation, so this is the last gap
   in it rather than an open door.
 
-- [ ] 685. The board's tab icon stands on a transparent ground, not on a beige plate (user
-  13.08.2026, 23:00, on the deployed icon: »Das Afrika-Symbol für den Browser-Tab finde ich gut.
-  Eine kleine Änderung: Der Hintergrund sollte nicht beige sondern transparent sein.«). The
-  silhouette is right, but its beige plate reads as a card wedged between the other tabs, whose
-  favicons all stand free.
-  FINAL STATE:
-  - `public/board/favicon.svg` drops the `<rect width="64" height="64" fill="#f0e8d2"/>` behind
-    the silhouette. Nothing else about the drawing changes — same viewBox, same path, same size.
-  - Because the plate went, the silhouette now sits on whatever the browser paints behind the
-    tab. It therefore carries its own theme rule: the path is filled `#3a2e1c` by default and
-    `#e9dfc2` under `@media (prefers-color-scheme: dark)`, written as an internal `<style>` in
-    the SVG. A browser that ignores it keeps the dark silhouette, which is today's picture — so
-    the fallback is never worse than what ships now.
-  VERIFIABLE: the existing favicon test in the Vitest layer additionally asserts that the file
-  contains no opaque full-size background rect and that both fills are present; plus the
-  PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
-  Criticality: low — it is a one-element correction to the icon point 679 delivered.
-
 - [ ] 693. The author routing recommends a lane whose pool is empty (measured 14.08.2026,
   01:33–01:40, at the start of an autonomous batch session). `scripts/author-routing-core.mjs`
   routed point 666 to Fable 5 — "tagged HIGH criticality, a hard case by definition" — and the
@@ -8640,3 +8640,35 @@ to land than a mechanism that needs a review.
   frame it was written for hides the next regression as reliably as this one.
   Bundle: Tierverhalten.
 
+
+- [ ] 728. The chat responder answers while a session owns the batch, and answers one message
+  three times (user 19.08.2026, 09:00, in the board chat: »Du hast bzg. 685 jetzt dreimal
+  geantwortet.«). `scripts/chat-watcher.mjs` may spawn a light responder from the chat inbox
+  ONLY when no session owns the batch and no claim is honoured (CLAUDE.md §6). Measured on this
+  run: the ordinary delivery path applied that rule correctly — three later polls logged
+  `{"decision":"skip","reason":"owner-live"}` — but the `defer-sweep` path did not consult it at
+  all and logged `{"decision":"spawn","reason":"defer-expired"}` at 08:58:04Z while this session
+  held `.claude/batch-lock.json` and was working. The spawned responder (pid 2957441, one
+  message) then wrote THREE replies into the board chat within 90 s, each one a complete answer
+  to the same message, with four `Execution error` lines between them in
+  `.claude/chat-responder-run.log`.
+  FINAL STATE:
+  - THE OWNER CHECK IS ONE FUNCTION, ASKED BY EVERY SPAWN PATH. The condition "no live owner and
+    no honoured claim" is applied where the responder is SPAWNED, not per call site, so a path
+    added later inherits it. `defer-sweep` decides `skip` with the same reason string the polling
+    path already logs.
+  - A DEFERRED MESSAGE IS NOT LOST WHEN THE SPAWN IS SKIPPED. It stays pending for the owning
+    session, which is the session that can act on it — the message that triggered this had to be
+    carried into the work order by the owner anyway.
+  - ONE MESSAGE, ONE REPLY. A responder run sends AT MOST ONE reply per message; a retry after an
+    execution error resumes the run without re-sending what already went out, and a second send
+    for a message already answered is refused at the reply layer rather than left to the run's
+    own discipline. The receipt in `.claude/chat-reply-receipt.json` is what decides it.
+  VERIFIABLE: Vitest over the pure spawn decision — every spawn path (poll, defer-sweep, and a
+  synthetic third) returns `skip`/`owner-live` against a live lock, returns `spawn` without one,
+  and a case FAILS if a path reaches the spawn without consulting the function; plus Vitest over
+  the reply layer — a second send for an already-receipted message is refused, and a run
+  interrupted by an execution error re-sends nothing.
+  Criticality: medium — nothing is corrupted, but the user reads the duplicates, and a responder
+  running beside a live owner writes to the same chat and carrier from two processes at once.
+  Bundle: Chat & Tafel.
