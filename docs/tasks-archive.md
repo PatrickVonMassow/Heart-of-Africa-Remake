@@ -19058,3 +19058,67 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   where the CI verdict is red surfacing as a block rather than as `not judged`.
   Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 726. Fable is escalated to only after FIVE unsuccessful review rounds, and that number
+  lives in ONE place (user 19.08.2026, board chat: escalate to Fable only after 5 unsuccessful
+  review rounds, and record the rule consistently and without redundancies). Today the cut
+  escalates on the FIRST unsuccessful round: `authorLaneFor` in `scripts/author-routing-core.mjs`
+  takes a BOOLEAN `reworked` and returns `fable` the moment it is set (`if (reworked) return
+  decide('fable', …)`), and `scripts/author-sol.mjs` sets it from the manual `--reworked` flag.
+  Fable's weekly pool is the scarcest of the three, so a threshold of one spends it on work a
+  further Sol or Opus round would have finished. The threshold is also WRITTEN in several places
+  at once — `CLAUDE.md` §6, `docs/sol-routing.md` ("the CUT reaches Fable by ONE route only,
+  `--reworked`"), the lane comment at the head of `author-routing-core.mjs`, the SessionStart text
+  in `scripts/batch-resume-hook.mjs`, `scripts/batch-autostart-core.mjs`, whatever
+  `scripts/rule-echo-core.mjs` echoes, and the memories `fable-sparingly` /
+  `hard-cases-go-to-sol` — which is the redundancy half of the same instruction: a number stated
+  in six wordings drifts the moment one of them is edited alone.
+  FINAL STATE:
+  - THE THRESHOLD IS A SINGLE EXPORTED CONSTANT. `scripts/author-routing-core.mjs` exports
+    `FABLE_ESCALATION_ROUNDS = 5` with a one-line comment naming the user decision and its date;
+    the cut, the CLIs, the reason string and every test read it from there. No second numeric
+    literal of this threshold exists in the mechanism, and changing 5 to another number is a
+    one-line edit in one file.
+  - THE SIGNAL IS A COUNT, NOT A BOOLEAN. `authorLaneFor` takes the number of unsuccessful review
+    rounds (`reworkRounds: number`) instead of `reworked` and returns `fable` only once the count
+    REACHES the constant. Below it the point keeps the lane its other signals give it — a
+    re-worked hard or HIGH-criticality point stays with Sol per the 18.08.2026 ruling, an ordinary
+    one stays where it was — so a fourth round re-authors in the SAME lane rather than falling
+    through to a default. The boolean is REPLACED, not kept beside the count: two spellings of one
+    fact is what this point removes.
+  - AN UNSUCCESSFUL ROUND IS DEFINED where the constant is: a completed review whose verdict was
+    not a pass. A round that never ran, aborted, or came back short of material (the `shortfall`
+    case in `scripts/review-sol-core.mjs`) does NOT count — otherwise a tooling failure escalates
+    a point nobody re-authored.
+  - THE COUNT COMES FROM THE RECORD, not from a hand-typed flag. `scripts/review-sol.mjs` already
+    records each review it runs; the count for a point is read from that record, and
+    `scripts/author-sol.mjs` reports it in its lane verdict so the reader sees WHY the lane fell
+    as it did. A point with no recorded review is zero rounds, never an error. The old
+    `--reworked` flag is REMOVED rather than aliased; an explicit numeric `--rounds <n>` remains
+    as the deliberate override for what the ledger cannot know.
+  - THE OPERATOR OVERRIDE IS UNTOUCHED. An explicit `override` and an `Author lane: fable` line in
+    a point's spec still send that point to Fable immediately; the threshold governs the automatic
+    CUT, not the operator's own decision.
+  - THE PROSE SAYS IT ONCE. `CLAUDE.md` §6 is the single prose statement of the rule ("Fable is
+    the escalation, reached only after five unsuccessful review rounds"); `docs/sol-routing.md`,
+    the resume-hook text, `scripts/batch-autostart-core.mjs`, `scripts/rule-echo-core.mjs` and the
+    memories `fable-sparingly` / `hard-cases-go-to-sol` POINT AT §6 instead of restating the
+    number, and any site that merely repeats what §6 says is DELETED rather than reworded. All of
+    it lands in the SAME commit as the code, per the docs-in-lockstep rule, and the commit names
+    every place that was checked — including the ones found to need no change — so the audit is on
+    the record and not repeated later.
+  VERIFIABLE: Vitest over the pure core in `scripts/author-routing-core.test.mjs` — round counts
+  0..`FABLE_ESCALATION_ROUNDS - 1` return the lane the point's text demands (including a hard/HIGH
+  point, which must stay with Sol) and the count AT the constant returns `fable`, with the
+  boundary DERIVED from the exported constant so raising or lowering it moves the test with it; an
+  explicit `Author lane: fable` still routes to Fable at round 0 while a lane tag loses at five;
+  an aborted or short round does not increment; the reason string is pinned to the constant; the
+  ledger-derived count is proven (no reviews → 0, N non-passing records → N) at CLI level; and a
+  consistency case FAILS when a second statement of the threshold appears outside the constant and
+  CLAUDE.md §6 (the shape of `src/config/qualityDoc.test.ts`). Because this changes the routing
+  mechanism, it needs the other vendor's recorded review (`scripts/mechanism-review.mjs --record`)
+  before the turn ends.
+  Criticality: high — this cut decides which model authors every point and spends the scarcest
+  weekly pool; a wrong count either burns that pool or strands work in a lane that already failed
+  it, and the redundancy is what makes such a drift invisible.
+  Bundle: Modell & Wächter.
