@@ -1089,6 +1089,24 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const keptEvidence = evidence
     .filter((_, i) => items[i]?.ok === true)
     .map((e) => withRecordedEvidencePoint(e, { worktreeRef }))
+  // A kept item that stays unattributable after the migration REFUSES the
+  // adoption BEFORE anything is written (seventh cross-review): the sixth
+  // round only said it out loud beside `adopted: true`, so the CLI printed
+  // ADOPTED and exited 0 while the read side discarded the whole record one
+  // look later. Nothing is stripped here either — the item may be the only
+  // trace of running work, so a human attributes or clears it, exactly as
+  // the alert says.
+  const unattributable = unattributableEvidenceAlerts(keptEvidence, {
+    worktreeRef,
+    declarationPhase: declaration.phase,
+  })
+  if (unattributable.length > 0) {
+    return {
+      adopted: false,
+      reason: 'unattributable-evidence',
+      alerts: [...assessment.alerts, ...unattributable],
+    }
+  }
   writeDeclaration(
     {
       ...declaration,
@@ -1104,11 +1122,7 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   return {
     adopted: true,
     reason: 'adopted',
-    // A kept item that stays unattributable after the migration is said OUT
-    // LOUD with the adoption (sixth cross-review): the read side will refuse
-    // the whole record on the next look, and a plain success followed by a
-    // silently empty result is the failure this alert names.
-    alerts: [...assessment.alerts, ...unattributableEvidenceAlerts(keptEvidence, { worktreeRef })],
+    alerts: assessment.alerts,
     kept: assessment.kept.length,
     dropped: assessment.dropped.length,
   }
@@ -1199,6 +1213,15 @@ if (isMain) {
       // denies exactly that.
       if (a.reason === 'own-commit' || a.reason === 'own-transfer' || a.reason === 'sealed-commit') {
         fail('ADOPTION REFUSED — this record is not this session\'s to adopt; see the alert above for the way forward.')
+      }
+      if (a.reason === 'unattributable-evidence') {
+        fail(
+          'ADOPTION REFUSED — the transferred declaration carries live evidence that resolves to NO point ' +
+            '(named above), and adopting it would only move the refusal to the next read. LOOK at each named ' +
+            'item yourself; then clear the record (`node scripts/batch-in-flight.mjs --clear`, withdrawing the ' +
+            'boundary first if it refuses) and RE-DECLARE what is really running with its point ' +
+            '(`--waiting-on "…" --point N …`). Nothing was adopted, nothing written.',
+        )
       }
       fail(
         a.reason === 'no-transferred-declaration'

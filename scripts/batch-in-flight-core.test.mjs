@@ -2639,6 +2639,90 @@ describe('gatherHandoverTransfer — session-bound and idempotent', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// THE ADOPTION ITSELF, run for real against the declaration file (seventh
+// cross-review): the sixth round's alert stood BESIDE `adopted: true`, so the
+// CLI printed ADOPTED and exited 0 while the read side discarded the whole
+// record one look later. These cases pin the WRITE path, not the alert helper.
+// ---------------------------------------------------------------------------
+describe('adoptTransferred — unattributable kept evidence refuses BEFORE the write', () => {
+  const withTempLock = (fn) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-adopt-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      fn({ dir, lockPath, path: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  /** A transferred declaration whose evidence is FRESH log files — the probe
+   *  keeps them, so the attribution question is what decides the adoption. */
+  const transferred = (evidence) => ({
+    v: 1,
+    sessionId: 'session-predecessor',
+    at: Date.now(),
+    waitingOn: 'a delegated agent',
+    transfer: { v: 1, by: 'session-predecessor', at: Date.now(), checkpoints: [] },
+    evidence,
+  })
+
+  it('refuses with the human way out and writes NOTHING while a kept live item resolves to no point', () => {
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const before = transferred([
+        { kind: 'log', path: log, point: 700, phase: 'authoring' },
+        { kind: 'log', path: log },
+      ])
+      writeDeclaration(before, path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a.adopted).toBe(false)
+      expect(a.reason).toBe('unattributable-evidence')
+      expect(a.alerts.join(' ')).toContain('batch-in-flight.mjs --clear')
+      // The record was NOT rewritten: no adopted stamp, still the
+      // predecessor's, its evidence byte-identical.
+      const after = readDeclaration(path)
+      expect(after.adopted).toBeUndefined()
+      expect(after.sessionId).toBe('session-predecessor')
+      expect(after.evidence).toEqual(before.evidence)
+    })
+  })
+
+  it('adopts point-carrying pid/log evidence cleanly — attribution is the recorded field, never the kind', () => {
+    // The valid adoption a kind-based complaint would block (finding 3's
+    // hostile implementation): the log item carries its point, so it adopts.
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration(transferred([{ kind: 'log', path: log, point: 700, phase: 'authoring' }]), path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      const after = readDeclaration(path)
+      expect(after.sessionId).toBe('session-successor')
+      expect(after.adopted.from).toBe('session-predecessor')
+    })
+  })
+
+  it('a point-less TERMINAL item never blocks the adoption — the read side skips it the same way', () => {
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration(
+        transferred([
+          { kind: 'log', path: log, point: 700, phase: 'authoring' },
+          { kind: 'log', path: log, phase: 'landed' },
+        ]),
+        path,
+      )
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted' })
+      expect(readDeclaration(path).sessionId).toBe('session-successor')
+    })
+  })
+})
+
 describe('selfAdoptionRefusal — the transferrer is never the adopter (point 675)', () => {
   const transferred = declaration({ transfer: { v: 1, by: SID, at: 1, checkpoints: [] } })
   const sealed = { v: 2, phase: 'committed', cause: 'point', sessionId: SID, point: 675, at: NOW - 1000 }
