@@ -206,7 +206,8 @@ export function nextAuthoringStep({
   escalationRounds = FABLE_ESCALATION_ROUNDS,
 } = {}) {
   const history = authorRoundHistory(records, point)
-  const examinationRound = escalationRounds - 1
+  const examinationRound =
+    escalationRounds === FABLE_ESCALATION_ROUNDS ? SPEC_EXAMINATION_ROUND : escalationRounds - 1
   const overridden = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : null
   const freshRounds = overridden ?? history.freshRounds
   const round = overridden ?? history.unsuccessfulRounds
