@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
+import { gatherActiveWorkSource, openPointNumbers, transitionActiveDeclaration } from './active-work-source.mjs'
 
 const TASKS = '- [ ] 697. A\n- [ ] 700. B\n- [ ] 711. C\n- [ ] 712. DEFERRED later\n'
 
@@ -31,5 +31,14 @@ describe('active-work source I/O boundary', () => {
     expect(openPointNumbers(TASKS)).toEqual(new Set([697, 700, 711]))
     const io = files({ d: JSON.stringify({ evidence: [{ point: 712 }] }) })
     expect(gatherActiveWorkSource({ tasksText: TASKS, declarationPath: 'd', focusPath: 'f', ...io }).ok).toBe(false)
+  })
+
+  it('removes only the explicitly exited point and records the successor focus', () => {
+    const declaration = { focusPoint: 700, evidence: [{ point: 700 }, { point: 697 }, { point: 700 }] }
+    expect(transitionActiveDeclaration(declaration, { exitPoint: 700, focusPoint: 711 })).toEqual({
+      focusPoint: 711,
+      evidence: [{ point: 697 }],
+    })
+    expect(declaration.evidence).toHaveLength(3)
   })
 })

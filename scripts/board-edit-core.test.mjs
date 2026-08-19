@@ -7,7 +7,7 @@ import { boardHtml } from './dashboard-guard-fixtures.mjs'
 const tasks = (...points) => points.map((point) => `- [ ] ${point}. Open`).join('\n')
 const questionTitles = (html) => parseCards(sliceSections(html).sections['Von dir zu klären']).map((card) => card.title)
 
-function harness(initialHtml, tasksText, publish = () => 'board PUBLISHED') {
+function harness(initialHtml, tasksText, publish = () => 'board PUBLISHED', preparePublish = () => {}) {
   const state = { html: initialHtml, writes: 0, publishes: 0, stdout: [], stderr: [] }
   const edit = (transform, done = 'open question added: Kartenschrift wählen') =>
     runBoardEdit({
@@ -20,6 +20,7 @@ function harness(initialHtml, tasksText, publish = () => 'board PUBLISHED') {
         state.writes += 1
       },
       rotate: () => 'archive rotation: unchanged',
+      preparePublish,
       publish: () => {
         state.publishes += 1
         return publish()
@@ -71,5 +72,17 @@ describe('runBoardEdit — publish preflight and honest partial failure', () => 
       'REFUSED\nremedy line one\nremedy line two',
       'The LIVE page was NOT updated — fix the above, then: node scripts/board-publish.mjs',
     ])
+  })
+
+  it('updates the active-work source after the board write and before publishing', () => {
+    const order = []
+    const { edit } = harness(
+      boardHtml(),
+      tasks(210, 211, 204),
+      () => { order.push('publish'); return 'board PUBLISHED' },
+      () => order.push('active-source'),
+    )
+    edit((html) => addVdzk(html, 'Eine Frage', 'Wie weiter?'))
+    expect(order).toEqual(['active-source', 'publish'])
   })
 })

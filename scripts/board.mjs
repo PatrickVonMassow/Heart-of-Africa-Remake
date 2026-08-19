@@ -71,6 +71,9 @@ import { recordDecisionCardKeep } from './decision-card-guard.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
 import { readJson } from './dashboard-state.mjs'
+import { FOCUS_PATH } from './dashboard-state.mjs'
+import { readDeclaration, writeDeclaration } from './batch-in-flight.mjs'
+import { transitionActiveDeclaration } from './active-work-source.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -117,12 +120,12 @@ function fallbackSubject(point) {
  * resurrects one edit. Rotation and publish stay inside too, so the transaction
  * reports and publishes the board version it actually wrote.
  */
-function edit(fn, done) {
-  return withBoardEditLock(() => applyEdit(fn, done))
+function edit(fn, done, preparePublish = () => {}) {
+  return withBoardEditLock(() => applyEdit(fn, done, preparePublish))
 }
 
 /** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
-function applyEdit(fn, done) {
+function applyEdit(fn, done, preparePublish = () => {}) {
   // Both ends of the round trip name their encoding (point 410). The write used
   // to take the platform default, which is the other half of the way a German
   // card could reach the file as something the reader sees as damage.
@@ -151,11 +154,33 @@ function applyEdit(fn, done) {
     done,
     write: (html) => writeTextAtomic(BOARD, html),
     rotate: () => run(['scripts/board-archive-rotate.mjs']),
+    preparePublish,
     publish: () => run([PUBLISH_SCRIPT, '--locked']),
     stdout: (line) => console.log(line),
     stderr: (line) => console.error(line),
   })
   if (!result.published) process.exitCode = 1
+}
+
+/** Update the structured active source inside the same board transaction. */
+function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, note = 'board lifecycle transition' } = {}) {
+  return () => {
+    const declaration = readDeclaration()
+    if (declaration && exitPoint != null) {
+      writeDeclaration(transitionActiveDeclaration(declaration, {
+        exitPoint,
+        focusPoint: focusPoint === undefined ? declaration.focusPoint ?? null : focusPoint,
+      }))
+    }
+    if (focusPoint !== undefined) {
+      console.log(run(['scripts/focus.mjs', 'set', focusPoint == null ? '-' : String(focusPoint), note]).trim())
+    } else if (exitPoint != null) {
+      const focus = readJson(FOCUS_PATH)
+      if (Number(focus?.point) === Number(exitPoint)) {
+        console.log(run(['scripts/focus.mjs', 'set', '-', note]).trim())
+      }
+    }
+  }
 }
 
 const [cmd, ...rest] = process.argv.slice(2)
@@ -191,12 +216,17 @@ try {
     edit(
       (html) => toNow(html, point, textOf(words), { stamp: at }),
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
+      prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: current work` }),
     )
     if (noEstimate) console.error(noEstimate)
   } else if (cmd === 'queue') {
     const [point, ...words] = rest
     if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
-    edit((html) => toQueue(html, point, { text: textOf(words) }), `${point} returned to the queue`)
+    edit(
+      (html) => toQueue(html, point, { text: textOf(words) }),
+      `${point} returned to the queue`,
+      prepareActiveTransition({ exitPoint: Number(point), note: `point ${point}: returned to queue` }),
+    )
   } else if (cmd === 'done') {
     // ONE edit, one write (point 416): archiving and the successor go into the
     // same document, so the board is never observed without current work.
@@ -225,6 +255,11 @@ try {
         : hasNone
           ? `${point} archived as done at ${at}; the board now names why nothing is running`
           : `${point} archived as done at ${at}`,
+      prepareActiveTransition({
+        exitPoint: Number(point),
+        focusPoint: next == null ? null : Number(next),
+        note: next == null ? `point ${point}: completed` : `point ${next}: current work after ${point}`,
+      }),
     )
     if (noEstimate) console.error(noEstimate)
   } else if (cmd === 'none') {
@@ -308,6 +343,7 @@ try {
     edit(
       (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
       `${point} promoted to current work`,
+      prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: promoted to current work` }),
     )
   } else if (cmd === 'merge-done') {
     // One point, one Erledigt card. `done` folds them at write time; this is for

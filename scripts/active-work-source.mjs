@@ -56,3 +56,15 @@ export function gatherActiveWorkSource({
     return { ok: false, points: [], focusPoint: null, errors: [`active-work source failed: ${error?.message ?? error}`] }
   }
 }
+
+/** Pure lifecycle edit applied by board commands before their locked publish. */
+export function transitionActiveDeclaration(declaration, { exitPoint = null, focusPoint = undefined } = {}) {
+  if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) return declaration
+  return {
+    ...declaration,
+    ...(focusPoint === undefined ? {} : { focusPoint }),
+    evidence: Array.isArray(declaration.evidence) && exitPoint != null
+      ? declaration.evidence.filter((item) => Number(item?.point) !== Number(exitPoint))
+      : declaration.evidence,
+  }
+}

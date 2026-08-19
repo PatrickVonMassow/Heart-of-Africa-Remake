@@ -28,6 +28,7 @@ export function runBoardEdit({
   done,
   write,
   rotate,
+  preparePublish = () => {},
   publish,
   stdout = () => {},
   stderr = () => {},
@@ -62,9 +63,10 @@ export function runBoardEdit({
 
   let published
   try {
+    preparePublish()
     published = firstLine(publish())
   } catch (error) {
-    return reportFailure('board publish', error)
+    return reportFailure('board publish preparation', error)
   }
 
   stdout(done)
