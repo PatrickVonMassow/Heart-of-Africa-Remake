@@ -50,17 +50,21 @@
 // the claim is honoured ahead of a valid boundary.
 // Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
 // instead of silently reading "complete". Fail-open on any error.
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import {
   acquire,
+  assessOwner,
+  bootTimeMs,
   detectParallel,
   markHandover,
   raiseParallelAlert,
   readUnhandledAlert,
   progressGuardDecision,
+  probePid,
   readOwnerLock,
+  ownsLock,
+  LOCK_PATH,
   BOUNDARY_LOG_PATH,
   DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
@@ -74,8 +78,10 @@ import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
+import { isMainModule } from './is-main.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
+const TASKS = repoPath('TASKS.md')
 // One source of truth with the withdrawal that cancels these lines (finding 3):
 // both sit beside the lock, so a redirected lock redirects the log with it.
 const BOUNDARY_LOG = BOUNDARY_LOG_PATH
@@ -90,19 +96,6 @@ const record = (line) => {
   }
 }
 
-let sid = ''
-let transcriptPath = ''
-try {
-  const payload = JSON.parse(readFileSync(0, 'utf8'))
-  sid = payload.session_id || ''
-  // The hook's own transcript path is the context watermark's measuring point
-  // (point 675, defeat 3) — the one file that records what this session's
-  // context actually measures.
-  transcriptPath = payload.transcript_path || ''
-} catch {
-  /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
-}
-
 /**
  * Has a doctor run already cleared THIS state — this HEAD beside these sessions
  * (point 431, second half)? The decision is pure (`gateDemandSatisfied`); this
@@ -113,7 +106,7 @@ function gateAlreadySatisfied(otherSids) {
   try {
     const state = JSON.parse(readFileSync(DOCTOR_STATE_PATH, 'utf8'))
     const head = execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      cwd: REPO_ROOT,
       encoding: 'utf8',
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'ignore'],
@@ -121,6 +114,186 @@ function gateAlreadySatisfied(otherSids) {
     return gateDemandSatisfied({ state, head, parallelSids: otherSids })
   } catch {
     return false
+  }
+}
+
+function taskProgress(text) {
+  const open = []
+  let sawCheckbox = false
+  let sawDone = false
+  for (const line of String(text ?? '').split('\n')) {
+    if (/^- \[/.test(line)) sawCheckbox = true
+    if (/^- \[x\] \d+\./.test(line)) sawDone = true
+    const match = line.match(/^- \[ \] (\d+)\./)
+    if (match && !/\bDEFERRED\b/.test(line)) open.push(Number(match[1]))
+  }
+  return { open, formatSuspect: open.length === 0 && sawCheckbox && !sawDone }
+}
+
+/** Predict acquisition without creating, refreshing, replacing or handing over
+ * the lock. The real atomic acquire remains authoritative; every probe here is
+ * read-only, which is the preflight's contract. */
+function readOnlyOwnership(sessionId, {
+  lockPath = LOCK_PATH,
+  lock: suppliedLock,
+  now = Date.now(),
+  ownerWork,
+  readLock = readOwnerLock,
+} = {}) {
+  if (!sessionId) return 'none'
+  const lock = suppliedLock === undefined ? readLock(lockPath) : suppliedLock
+  if (!lock) {
+    // A present-but-unreadable lock cannot safely be predicted as acquirable.
+    if (existsSync(lockPath)) return 'held'
+    try {
+      if (!reservationDecision({ assessment: gatherClaim(sessionId) }).acquire) return 'held'
+    } catch {
+      /* an unreadable claim reserves nothing, matching the real guard */
+    }
+    return 'acquired'
+  }
+  if (ownsLock(sessionId, { lockPath, lock, now }).mine) return 'mine'
+  const probe = lock.pid ? probePid(lock.pid) : null
+  const work = ownerWork ?? gatherOwnerWork(lock, { now })
+  return assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work }).alive ? 'held' : 'acquired'
+}
+
+/** Read-only batch-progress variant for guard-preflight. It answers whether a
+ * boundary stop would be permitted from the same pure decision as the Stop hook,
+ * but performs none of that hook's writes: no acquire/heartbeat, alert, claim
+ * clear, release, handover or boundary-log entry. */
+export function gatherBatchProgressInputs({
+  sessionId = '',
+  transcriptPath = '',
+  tasksText,
+  paused: suppliedPaused,
+  lockPath = LOCK_PATH,
+  lock,
+  now = Date.now(),
+  probes = {},
+} = {}) {
+  const paused = suppliedPaused ?? isPaused()
+  if (paused) return { applicable: false, why: 'the batch is paused' }
+
+  const ownership = readOnlyOwnership(sessionId, { lockPath, lock, now })
+  if (ownership !== 'mine' && ownership !== 'acquired') {
+    return {
+      applicable: false,
+      why: sessionId ? 'another live session owns the batch lock' : 'no session id identifies the batch owner',
+      cause: 'not-lock-owner',
+    }
+  }
+
+  const { open, formatSuspect } = taskProgress(tasksText ?? readFileSync(TASKS, 'utf8'))
+  if (open.length === 0 || formatSuspect) {
+    return {
+      applicable: true,
+      inputs: { sid: sessionId, paused, openCount: open.length, formatSuspect, ownership, open },
+    }
+  }
+
+  let claimInfo = { claim: null, honour: false, reason: 'not-gathered', claimantSid: null, mine: false }
+  try {
+    claimInfo = (probes.gatherClaim ?? gatherClaim)(sessionId, { ownerLock: lock ?? readOwnerLock(lockPath) })
+  } catch {
+    /* no readable claim */
+  }
+
+  let unhandledAlert = false
+  try {
+    const parallel = (probes.detectParallel ?? detectParallel)(sessionId, {
+      exclude: (claimInfo.honour || claimInfo.reserve) && claimInfo.claimantSid ? [claimInfo.claimantSid] : [],
+    })
+    const alert = (probes.readUnhandledAlert ?? readUnhandledAlert)()
+    const others = alert ? otherSessionsIn({ alert, readerSid: sessionId, ownerSid: sessionId }) : []
+    unhandledAlert = parallel.length > 0 || (others.length > 0 && !(probes.gateAlreadySatisfied ?? gateAlreadySatisfied)(others))
+  } catch {
+    /* unreadable alert state invents no block */
+  }
+
+  let bound = { marker: null, boundary: null, launcher: 'unknown', due: null }
+  try {
+    bound = (probes.gatherBoundary ?? gatherBoundary)(sessionId, { now })
+  } catch {
+    /* ordinary continue verdict */
+  }
+  let inFlight = { live: false, reason: 'not-gathered', summary: '', declaration: null }
+  try {
+    inFlight = (probes.gatherInFlight ?? gatherInFlight)(sessionId)
+  } catch {
+    /* ordinary continue verdict */
+  }
+  let watermarkDemand = false
+  try {
+    const watermark = (probes.gatherWatermark ?? gatherWatermark)({ transcriptPath, sid: sessionId })
+    if (watermark.state === 'past' && !(bound.boundary && bound.boundary.valid)) {
+      watermarkDemand =
+        (bound.launcher === 'armed' ? 'armed' : (probes.probeLauncherState ?? probeLauncherState)()) === 'armed'
+    }
+  } catch {
+    /* an unreadable watermark cannot invent a handover demand */
+  }
+  let inFlightTransferable = true
+  if (inFlight.live === true && (bound.due || watermarkDemand)) {
+    try {
+      inFlightTransferable = (probes.gatherHandoverTransfer ?? gatherHandoverTransfer)(sessionId).blocked !== true
+    } catch {
+      inFlightTransferable = false
+    }
+  }
+  let claimVerdict = { verdict: 'none', reason: claimInfo.reason }
+  if (claimInfo.honour) {
+    try {
+      claimVerdict = releaseDecision({
+        assessment: claimInfo,
+        inFlightLive: inFlight.live === true,
+        gitOperation: (probes.gitOperationInProgress ?? gitOperationInProgress)(),
+      })
+    } catch {
+      claimVerdict = { verdict: 'wait', reason: 'cleanliness-unverifiable' }
+    }
+  }
+  return {
+    applicable: true,
+    inputs: {
+      sid: sessionId,
+      paused,
+      openCount: open.length,
+      formatSuspect,
+      ownership,
+      unhandledAlert,
+      boundary: bound.boundary,
+      launcher: bound.launcher,
+      boundaryDue: bound.due,
+      inFlight: inFlight.live === true,
+      inFlightTransferable,
+      slotsNeedReason: inFlight.slots?.needsReason === true,
+      claim: claimVerdict.verdict,
+      contextPastWatermark: watermarkDemand,
+      open,
+    },
+  }
+}
+
+const PROGRESS_SETTLEMENT = {
+  'block-format': 'Inspect and repair the work-order checkbox format before ending the turn.',
+  'block-remediate': 'Run `node scripts/batch-doctor.mjs --gate` in this turn.',
+  'block-launcher': 'Run `node scripts/batch-boundary.mjs --status` and restore the launcher it names.',
+  'block-take-boundary': 'Take the boundary with `node scripts/batch-boundary.mjs --prepare <point>`, its bookkeeping, then `--commit <point>`.',
+  'block-context-handover': 'Take a context boundary with `node scripts/batch-boundary.mjs --prepare --context`, its bookkeeping, then `--commit --context`.',
+  'block-slots-free': 'Run `node scripts/batch-in-flight.mjs --status` and fill or explain every free slot.',
+  'block-continue': 'Continue the next open point, or record a provable wait/pause/boundary in this turn.',
+}
+
+export function decideBatchProgress(inputs = {}) {
+  const decision = progressGuardDecision(inputs)
+  const block = decision.startsWith('block-')
+  return {
+    block,
+    reason: block
+      ? `batch-progress-guard would return ${decision}. ${PROGRESS_SETTLEMENT[decision] ?? 'Settle that condition in this turn.'}`
+      : `read-only boundary-stop verdict: ${decision}; the batch lock was not acquired, refreshed, released or handed over`,
+    decision,
   }
 }
 
@@ -146,20 +319,25 @@ const warn = (message) => {
   }
 }
 
+export function runBatchProgressGuard() {
+let sid = ''
+let transcriptPath = ''
+try {
+  const payload = JSON.parse(readFileSync(0, 'utf8'))
+  sid = payload.session_id || ''
+  // The hook's own transcript path is the context watermark's measuring point
+  // (point 675, defeat 3) — the one file that records what this session's
+  // context actually measures.
+  transcriptPath = payload.transcript_path || ''
+} catch {
+  /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
+}
+
 try {
   const paused = isPaused()
 
   const text = readFileSync(TASKS, 'utf8')
-  const open = []
-  let sawCheckbox = false
-  let sawDone = false
-  for (const l of text.split('\n')) {
-    if (/^- \[/.test(l)) sawCheckbox = true
-    if (/^- \[x\] \d+\./.test(l)) sawDone = true
-    const m = l.match(/^- \[ \] (\d+)\./)
-    if (m && !/\bDEFERRED\b/.test(l)) open.push(Number(m[1]))
-  }
-  const formatSuspect = open.length === 0 && sawCheckbox && !sawDone
+  const { open, formatSuspect } = taskProgress(text)
 
   // Ownership through the atomic acquire ONLY (it refuses while a live other
   // owner exists, resolves races to one winner, and refreshes when it is ours).
@@ -600,3 +778,6 @@ try {
   )
   process.exit(0)
 }
+}
+
+if (isMainModule(import.meta.url)) runBatchProgressGuard()

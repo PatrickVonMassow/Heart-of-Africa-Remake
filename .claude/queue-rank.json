@@ -108,10 +108,6 @@
       "at": "2026-08-17T14:29:14.683Z",
       "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig"
     },
-    "707": {
-      "at": "2026-08-17T14:29:14.742Z",
-      "why": "Zug-Ersparnis, kein Produktfehler; sie zahlt sich ueber viele Sitzungen aus und hat keine Frist"
-    },
     "708": {
       "at": "2026-08-17T14:29:14.792Z",
       "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
@@ -142,7 +138,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-19T02:12:32.322Z",
+    "at": "2026-08-19T02:44:39.001Z",
     "points": [
       174,
       184,
@@ -335,7 +331,6 @@
       704,
       705,
       706,
-      707,
       708,
       710,
       713,

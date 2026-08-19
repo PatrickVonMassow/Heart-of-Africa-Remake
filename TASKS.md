@@ -197,53 +197,6 @@ put it is the mistake this line exists to stop.
   the user has asked for the cause twice.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 707. The preflight cannot judge four wired guards, and those four then block one at a time
-  (measured 17.08.2026). `guard-preflight.mjs --for answer` says so itself: `ci-status-guard,
-  timestamp-guard, decision-card-guard, batch-progress-guard are wired and were NOT JUDGED here`.
-  Exactly those four blocked the turn afterwards, one after another, and a blocked turn produces
-  nothing — the loop around `batch-progress-guard` alone cost seven answers after the marker carried
-  the predecessor's session id while the hook measured the current one. The preflight is blind where
-  it would be worth the most: the whole point of the tool is to name every objection in ONE pass.
-  FINAL STATE:
-  - `ci-status-guard` is judged in the pass. It is read-only decidable — it costs a network round
-    trip, which the report makes rather than skips.
-  - `timestamp-guard` and `decision-card-guard` judge a reply that does not exist yet, so the report
-    names the CONDITION they will be judged against — which time form is expected, which "Von dir zu
-    klären" cards stand — instead of only `not judged`.
-  - `batch-progress-guard` gets a read-only variant that answers "would a boundary stop be
-    permitted" without acquiring or handing over the batch lock, and the report uses that.
-  - Where a guard is genuinely not decidable in advance, the report names WHICH ACTION settles it,
-    so that action can fall into the same turn.
-  ALSO: when point 712 lands its two refusals — the pick checked against the front of the queue,
-  and the slot counted in open branches — the preflight REPORTS both for the action that starts
-  work on a point, including any recorded override reason, so a session sees them in the same
-  single pass as everything else rather than at the moment it is denied. The decision itself
-  stays in 712's cores; this point only carries it into the report.
-  AND ONE GUARD IS MISSING THE STAND-DOWN EVERY OTHER ONE HAS (measured 17.08.2026, 20:03 with
-  `guard-preflight --for answer`): 17 guards report `not-applicable: another live session owns the
-  batch lock` and `guide-brevity-guard` ALONE reports `would-block`. It honours
-  `.claude/batch-paused` but has no `heldByOtherLiveOwner` check, unlike `bundle-first-guard`,
-  `ci-status-guard`, `dashboard-guard`, `dashboard-card-topic-guard`, `queue-order-guard` and
-  `branch-hygiene-guard`. Observed live the same evening: the batch owner pushed the beginner guide
-  over its budget, and the Stop chain of a DIFFERENT, stood-down session was blocked by it, demanding
-  that session shorten a file the live owner was editing at that moment. Two sessions editing one
-  file is the collision the lease exists to prevent, so the demand is not merely misdirected but
-  harmful. FINAL STATE: `guide-brevity-guard` takes the same stand-down as its siblings; its budget
-  verdict is unchanged and stays the OWNER's to satisfy. A case pins the stand-down, and a second
-  pins that the owner still gets the verdict.
-  ALSO IN SCOPE, measured 17.08.2026 (runs 32054043421, 32055125370, 32055597148): each deploy step
-  got HTTP 503 from the Pages API with nothing stuck, and `ci-status-guard` blocked every turn end
-  naming a remedy that reports `no in-progress Pages deployment found` — an instruction that
-  provably cannot apply. Its outage waiver misses the case because the build job DID run, so only
-  the deploy job is red. FINAL STATE: a red whose cause is provably outside the repository and for
-  which the guard holds no executable remedy passes with a named deadline and an alert, instead of
-  repeating an impossible instruction.
-  VERIFIABLE: Vitest over the preflight core — each of the four reported with its new status, the
-  read-only progress variant leaving the lock file untouched (asserted on its mtime), and a fixture
-  where the CI verdict is red surfacing as a block rather than as `not judged`.
-  Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 705. The board is republished once per guard correction, instead of once at the end
   (measured 17.08.2026). One session published the whole board about a dozen times in fifty
   minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card

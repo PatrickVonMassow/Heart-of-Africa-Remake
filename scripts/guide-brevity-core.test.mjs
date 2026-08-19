@@ -9,6 +9,7 @@ import {
   strayLines,
   formatViolations,
 } from './guide-brevity-core.mjs'
+import { gatherGuideBrevityInputs } from './guide-brevity-guard.mjs'
 
 // Vitest rewrites import.meta.url, so resolve from the repo root it runs in.
 const GUIDE = resolve(process.cwd(), 'docs/analysis_de/vibe-coding-anleitung.md')
@@ -195,6 +196,39 @@ describe('formatViolations', () => {
     const msg = formatViolations(auditGuide(doc(entry('Lang', 9))).violations)
     expect(msg).toContain('retrospektive-zusammenarbeit.md')
     expect(msg).toMatch(/Zeile \d+/)
+  })
+})
+
+describe('guide-brevity ownership', () => {
+  const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(4000)}\n`
+
+  it('stands down when another live session owns the batch', () => {
+    const gathered = gatherGuideBrevityInputs({
+      sessionId: 'non-owner',
+      paused: false,
+      otherOwner: true,
+      guideExists: true,
+      guideText: overBudget,
+    })
+    expect(gathered).toMatchObject({
+      applicable: false,
+      why: 'another live session owns the batch lock',
+      cause: 'not-lock-owner',
+    })
+  })
+
+  it('still gives the owner the unchanged budget verdict', () => {
+    const gathered = gatherGuideBrevityInputs({
+      sessionId: 'owner',
+      paused: false,
+      otherOwner: false,
+      guideExists: true,
+      guideText: overBudget,
+    })
+    expect(gathered.applicable).toBe(true)
+    const verdict = auditGuide(gathered.inputs.guideText)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.violations.map((v) => v.kind)).toContain('length')
   })
 })
 

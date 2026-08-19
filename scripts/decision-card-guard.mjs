@@ -55,6 +55,49 @@ export function vdzkTitles(html) {
   return parseCards(section).map((c) => c.title)
 }
 
+/** The reply does not exist at preflight time, so this reports the condition it
+ * will face rather than judging the previous transcript message. The live card
+ * titles are the matching set the core will use once the reply exists. */
+export function gatherDecisionCardCondition({
+  sessionId = '',
+  paused,
+  otherOwner,
+  dashboardExists,
+  dashboardHtml,
+} = {}) {
+  if ((paused ?? existsSync(PAUSE)) === true) return { applicable: false, why: 'the batch is paused' }
+  if ((otherOwner ?? heldByOtherLiveOwner(sessionId)) === true) {
+    return {
+      applicable: false,
+      why: 'another live session owns the batch lock',
+      cause: 'not-lock-owner',
+    }
+  }
+  if ((dashboardExists ?? existsSync(DASHBOARD)) !== true) {
+    return { applicable: false, why: 'the dashboard is not in this checkout' }
+  }
+  const titles = vdzkTitles(dashboardHtml ?? readFileSync(DASHBOARD, 'utf8'))
+  if (!Array.isArray(titles)) {
+    return {
+      applicable: false,
+      cause: 'not-judged',
+      why:
+        'the "Von dir zu klären" section could not be parsed. Action: run `node scripts/board-publish.mjs --check` ' +
+        'and repair/publish the board in this turn before composing the reply.',
+    }
+  }
+  const standing = titles.length ? titles.map((title) => JSON.stringify(title)).join(', ') : 'none'
+  return {
+    applicable: true,
+    condition: true,
+    why:
+      `The not-yet-written reply will be judged for any request that asks the user to decide. ` +
+      `"Von dir zu klären" currently holds: ${standing}. Action: if the reply asks for a decision, ` +
+      'add a matching card with `node scripts/board.mjs vdzk-add "<Titel der Frage>" --text-stdin` in this turn; ' +
+      'otherwise compose it without decision/question phrasing.',
+  }
+}
+
 export const readDecisionCardState = () => {
   try {
     const state = JSON.parse(readFileSync(STATE_PATH, 'utf8'))
