@@ -4927,7 +4927,7 @@ Build order, chosen so no two parallel agents own the same file:
   The gate is right to hold it there: a beginner guide that grows without bound stops being
   read. But it means the guide can no longer absorb a new lesson at all, and the currency
   guard will keep asking for one — two mechanisms pulling opposite ways, with no path
-  through. TWO lessons are now waiting, and each is a pitfall in the guide's own form:
+  through. THREE lessons are now waiting, and each is a pitfall in the guide's own form:
   (A) changing WHERE or HOW something is delivered does not carry the old path's guarantees
   along, and what no test pins falls away SILENTLY — the page still loads, the tests stay
   green, only a promise no longer holds. Point 419 measured four such losses from one move.
@@ -4939,6 +4939,14 @@ Build order, chosen so no two parallel agents own the same file:
   demands, blocks forever on an stdin that only the automatic call supplies. The test question
   belongs in the guide: what happens when someone follows the instruction to the letter, and
   what when they additionally invoke it by hand?
+  (C) two rules block each other, so the helper can neither act nor stop (19.08.2026, the
+  mechanism half is point 751): what one rule demands at the exit is what another forbids,
+  and the helper repeats the same refusal instead of getting out. Its prompt: every lock
+  needs an exit no other rule takes back — and if you find yourself repeating, that
+  repetition IS the finding, not the answer. The entry is owed in FOUR lines: written out
+  once, it cost 5 lines and 79 words over the budget and was taken back out because
+  `guide-brevity-core.test.mjs` was the unit layer's only red and blocked every push — which
+  is this point's forcing function doing its job, not a reason to skip the lesson.
   DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
   now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
   displacing one, not by widening the frame; (2) if genuinely nothing is weaker, raise both
