@@ -518,6 +518,19 @@ export function waitReason(target, classification) {
   )
 }
 
+/** The ntfy text for a red pushed ref. Unactionable reds normally stay terse;
+ * one carrying `alertDetail` has a time-bound condition the alert itself must
+ * name, because the turn is deliberately allowed to continue. */
+export function ciRedAlertMessage({ target = {}, classification = {}, standDown = false } = {}) {
+  const c = classification
+  return (
+    `CI failed for pushed ${target.ref ?? '?'} ${String(target.sha ?? '').slice(0, 7)}: ` +
+    `"${c.workflowName ?? '?'}" run ${c.runId ?? '?'} (${c.conclusion ?? '?'}, cause: ${c.cause ?? 'unknown'}` +
+    `${standDown ? ', nothing in the repository can clear it' : ''}). ${c.url ?? ''}` +
+    (c.escalate || c.alertDetail ? ` ${c.detail ?? ''}. ${c.remedy ?? ''}` : '')
+  )
+}
+
 /** Push exactly once per failing sha (the state file remembers the last one). */
 export function shouldNotify(state, alreadyNotifiedSha, headSha) {
   return state === 'failed' && Boolean(headSha) && alreadyNotifiedSha !== headSha
