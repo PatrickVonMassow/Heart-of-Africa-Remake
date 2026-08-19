@@ -227,6 +227,25 @@ describe('derived now-section membership', () => {
       .toThrow(/beside the standing[\s\S]*nothing is running/)
   })
 
+  it('replaces a LONE idle card when work resumes — the publish path renders the transition', () => {
+    // Idleness ends, work resumes: the declaration names a point while the
+    // board still carries only the handover card. The render must produce the
+    // derived stub — a throw here killed exactly this transition for
+    // board-publish and land-point (fourth cross-vendor round).
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">16:45</span></span></summary>\n' +
+      '  <div class="body">\n<p><span class="stamp">Stand 16:45</span> Sitzungsgrenze; der Nachfolger nimmt ' +
+      'Punkt 700.</p>\n  </div>\n</details>\n'
+    const { html, comparison } = projectNowForPublish(
+      fullBoard({ now: idleReason, queue: queueEntry(700, 'Wartend', '~2 h') }),
+      { ok: true, points: [700], focusPoint: 700 },
+    )
+    expect(comparison).toMatchObject({ ok: true, idleCards: 0, emptyStateCount: 0 })
+    expect(html).toContain('Text für diesen Punkt fehlt noch')
+    expect(html).not.toContain(NO_CURRENT_WORK_TITLE)
+  })
+
   it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
     const authored = nowEntry(700, 'Die Übergabe', '20:07', 'Umlaute, <a href="/x">Link</a> und Text.')
     const before = fullBoard({

@@ -570,12 +570,19 @@ export function reconcileNowProjection(
   if (expected.length === 0 && unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle'))) {
     throw new Error('board: refusing to replace an authored unnumbered non-idle card with the empty-state element')
   }
-  // The idle card claims "nothing is running"; rendering numbered work beside
-  // it would publish a board saying two things at once, and dropping the card
-  // here would blank its written reason. Refused (second cross-vendor round) —
-  // the sanctioned promotions (`board.mjs now` / `done --next`) strip the
-  // state card as they write the work, which is the way out this error names.
-  if (expected.length > 0 && unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))) {
+  // The idle card claims "nothing is running". BESIDE numbered cards that is
+  // the board saying two things at once — refused, because dropping either
+  // side here would blank authored text; only a hand-edit can reach the pair
+  // (the sanctioned writers refuse or strip it). Standing ALONE it is the
+  // legitimate lifecycle moment "idleness ends, work resumes": the render
+  // REPLACES it with the derived cards, exactly as `promoteToNow` does — a
+  // throw here killed that transition on the publish path (fourth
+  // cross-vendor round).
+  if (
+    expected.length > 0 &&
+    numbered.length > 0 &&
+    unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))
+  ) {
     throw new Error(
       `board: refusing to render active point(s) ${expected.join(', ')} beside the standing ` +
         '"nothing is running" card — the board would contradict itself in one screen. Promote the ' +
@@ -613,7 +620,11 @@ export function reconcileNowProjection(
     .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
       const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
       const { chip, legacy } = summaryPoint(summary)
-      return chip != null || legacy != null ? '' : card
+      if (chip != null || legacy != null) return ''
+      // Active work ENDS the idle state: a lone idle card is replaced by the
+      // derived cards (the beside-numbered contradiction threw above).
+      if (expected.length > 0 && isTrulyStateCard(card, 'idle')) return ''
+      return card
     })
     .replace(emptyStatePattern(), '')
     .trim()
