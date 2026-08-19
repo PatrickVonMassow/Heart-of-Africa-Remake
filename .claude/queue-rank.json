@@ -167,10 +167,14 @@
     "741": {
       "at": "2026-08-19T17:02:06.150Z",
       "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately."
+    },
+    "754": {
+      "at": "2026-08-19T19:59:31.708Z",
+      "why": "Rangfolge bleibt hinter der Deckenprogramm-Kette; Gruppe A ist zwar hoch kritisch, aber der Modell-Verstoss wird von model-guard nachtraeglich gefangen — die Sitzung ist am Kontext-Zaun und darf den Work Order nicht mehr umschichten (Punkt 751), deshalb ordnet der Nachfolger die Gruppe A gegebenenfalls vor"
     }
   },
   "settled": {
-    "at": "2026-08-19T17:45:15.415Z",
+    "at": "2026-08-19T19:59:31.708Z",
     "points": [
       174,
       184,
@@ -393,7 +397,9 @@
       748,
       749,
       750,
-      751
+      752,
+      753,
+      754
     ]
   }
 }
