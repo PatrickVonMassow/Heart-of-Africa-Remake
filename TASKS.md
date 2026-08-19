@@ -8654,3 +8654,21 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing is corrupted, but the user reads the duplicates, and a responder
   running beside a live owner writes to the same chat and carrier from two processes at once.
   Bundle: Chat & Tafel.
+
+- [ ] 729. A truthful "5 skipped" reads as a failed gate (found by the point 727 run,
+  19.08.2026, and older than it). `gatesProblem` in `scripts/author-sol-core.mjs` matches the
+  word `skipped` with its NOT_GREEN pattern, so a Vitest summary that honestly reports skipped
+  cases — which this suite always does — is classified as a non-green gate. Both of today's
+  authoring runs tripped it while their gates were green, and the supervising session then looks
+  for a cause that does not exist.
+  FINAL STATE:
+  - THE PATTERN MATCHES FAILURE, NOT ABSENCE. `gatesProblem` reads a gate as not green on the
+    words that mean a failure; a summary line reporting skipped cases beside passing ones is
+    green, and a gate that genuinely did not run stays reported as not run — the two are distinct
+    verdicts and neither is folded into the other.
+  VERIFIABLE: Vitest over `gatesProblem` with REAL summary text — a green run naming `5 skipped`
+  is green, a run with a failed file is not green, and a gate that was never executed reports as
+  not run; plus a case that FAILS if the pattern is widened back to any word containing "skip".
+  Criticality: low — it misreports a green run as red, which costs a diagnosis, but it never
+  passes a red one as green.
+  Bundle: Modell & Wächter.
