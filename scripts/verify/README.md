@@ -1236,8 +1236,15 @@ identity, and the lost part has none):
    a closure carrying none closes nothing; it clears no backend — the run stays
    `incomplete`, never a green; and it closes **only the part nobody can know**.
    Every red the run DID record was really observed, so it keeps blocking and
-   closes the three ordinary ways. That last limit is what keeps this from being
-   the waiver it replaces: flooding a suite's output on purpose buries nothing.
+   closes the three ordinary ways. That last limit is what keeps this far
+   narrower than the waiver it replaces — but not airtight, and the residual is
+   stated rather than glossed (review, 19.08.2026): what the closure signs away
+   is exactly the part nobody can read, so it cannot tell an unavoidable
+   overflow from output flooded on purpose. A suite made to overflow deliberately
+   could bury a red among the dropped lines and then sign the recording off. What
+   it can NEVER do is bury a red that reached the record, and the signature is
+   named, dated and evidenced, so the deliberate case is visible to a reader even
+   where the mechanism cannot refuse it.
 
 **Why the cap was not simply lifted for red lines** (measured 19.08.2026, and the
 measurement is what decided it): the only overflow on record — two
