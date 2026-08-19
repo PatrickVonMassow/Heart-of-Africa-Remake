@@ -100,10 +100,6 @@
       "at": "2026-08-17T09:44:54.861Z",
       "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
     },
-    "703": {
-      "at": "2026-08-17T13:31:30.746Z",
-      "why": "Kleiner Tafel-Fix, den der Nutzer heute angestoßen hat; laeuft bereits bei Sol und landet noch heute, die Reihung dahinter ist folgenlos"
-    },
     "704": {
       "at": "2026-08-17T13:43:56.910Z",
       "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos"
@@ -143,10 +139,14 @@
     "722": {
       "at": "2026-08-18T16:54:33.891Z",
       "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first"
+    },
+    "724": {
+      "at": "2026-08-19T01:04:46.783Z",
+      "why": "Hygiene of the branch pool, not a bugfix or a requested extension — the queue takes those first, and the debris it names is already parked, so nothing waits on it."
     }
   },
   "settled": {
-    "at": "2026-08-18T18:38:20.618Z",
+    "at": "2026-08-19T01:04:46.783Z",
     "points": [
       174,
       184,
@@ -334,18 +334,15 @@
       694,
       695,
       696,
-      697,
       698,
       699,
       701,
-      703,
       704,
       705,
       706,
       707,
       708,
       710,
-      712,
       713,
       715,
       716,
@@ -353,7 +350,8 @@
       718,
       719,
       720,
-      722
+      722,
+      724
     ]
   }
 }
