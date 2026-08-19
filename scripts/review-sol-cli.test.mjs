@@ -1064,4 +1064,11 @@ describe('a range too large for one round', () => {
     expect(r.stderr).toContain('commit/file contributions')
     expect(calls()).toEqual([])
   })
+
+  it('states that answer commits still require the confirming clean pass', () => {
+    const r = run([])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('answer a recorded finding is itself a new contribution by design')
+    expect(r.stderr).toContain('confirming clean pass reviews it too')
+  })
 })

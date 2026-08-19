@@ -336,8 +336,11 @@ describe('validateRecord', () => {
   })
 
   it('accepts a record whose commit has no readable author model', () => {
-    // Unknown authorship is not evidence of a self-review; refusing here would
-    // make a merge commit unrecordable.
+    // ACCEPTED RESIDUAL: an empty value read from the commit cannot be
+    // distinguished from a hand-typed empty value in a ledger row. Both remain
+    // unknown authorship; refusing would make an honestly unreadable merge
+    // commit unrecordable. This ambiguity fails away from a false self-review
+    // claim and is deliberately stated rather than claimed closed.
     expect(validateRecord({ ...good, authoredBy: '' }).ok).toBe(true)
   })
 })

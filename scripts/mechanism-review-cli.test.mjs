@@ -13,7 +13,15 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { appendRecord, buildRecord, KNOWN_FLAGS, readRecords, resolveCommit, usage } from './mechanism-review.mjs'
+import {
+  appendRecord,
+  buildRecord,
+  KNOWN_FLAGS,
+  readRecords,
+  resolveCommit,
+  reviewFileSetKey,
+  usage,
+} from './mechanism-review.mjs'
 import { MODES, VERDICTS } from './mechanism-review-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
@@ -29,7 +37,7 @@ describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
     const flags = [
       '--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing',
-      '--pass', '--pass-files', '--pass-commits', '--list',
+      '--pass', '--pass-files', '--pass-commits', '--carried-from', '--list',
     ]
     for (const flag of flags) {
       expect(KNOWN_FLAGS.has(flag), `${flag} must be accepted`).toBe(true)
@@ -45,6 +53,21 @@ describe('the flag surface', () => {
     // the difference between a usage block and a git error.
     expect(text).toContain('mechanism-review-guard.mjs --status')
     expect(text).toContain('criticality-review-guard.mjs --status')
+  })
+
+  it('states the accepted clean-pass convergence cost', () => {
+    expect(usage()).toContain('answer a finding is still a NEW contribution by design')
+    expect(usage()).toContain('confirming clean pass')
+  })
+})
+
+describe('review pass file-set identity', () => {
+  it('is injective where a newline-joined key collides', () => {
+    const left = ['a\nb', 'c']
+    const right = ['a', 'b\nc']
+    expect([...left].sort().join('\n')).toBe([...right].sort().join('\n'))
+    expect(reviewFileSetKey(left)).not.toBe(reviewFileSetKey(right))
+    expect(reviewFileSetKey(left)).toBe(reviewFileSetKey([...left].reverse()))
   })
 })
 
@@ -460,9 +483,11 @@ describe('the mode round-trips into the ledger', () => {
       git('config', 'user.name', 'Test')
       writeFileSync(join(repo, 'fileA.mjs'), 'alpha\n')
       writeFileSync(join(repo, 'fileB.mjs'), 'beta\n')
+      writeFileSync(join(repo, 'gone.mjs'), 'present only at the source\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'Lay down the pair\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
       const S = git('rev-parse', 'HEAD').stdout.trim()
+      rmSync(join(repo, 'gone.mjs'))
       writeFileSync(join(repo, 'fileC.mjs'), 'gamma\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'Add a third file\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
@@ -510,6 +535,10 @@ describe('the mode round-trips into the ledger', () => {
       // A file the source never read (or that does not exist there) refuses.
       const unread = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileC.mjs')
       expect(unread.status).toBe(1)
+      expect(unread.stderr).toContain(`fileC.mjs does not exist at ${S.slice(0, 7)} — nothing there to carry`)
+      const deleted = runRecorder('--record', H, '--carried-from', S, '--pass', '1/2', '--pass-files', 'gone.mjs')
+      expect(deleted.status).toBe(1)
+      expect(deleted.stderr).toContain(`gone.mjs does not exist at ${H.slice(0, 7)} — deleted content cannot be covered`)
       // Carrying FROM a carried row is refused IN ISOLATION (fourth landing
       // round, pass 2): H3 changes neither carried file, so blob identity
       // holds H..H3 and the ONLY refusal reason is the chained source.
@@ -530,7 +559,8 @@ describe('the mode round-trips into the ledger', () => {
       const H2 = git('rev-parse', 'HEAD').stdout.trim()
       const changed = runRecorder('--record', H2, '--carried-from', S, '--pass', '1/2', '--pass-files', 'fileA.mjs,fileB.mjs')
       expect(changed.status).toBe(1)
-      expect(changed.stderr).toContain('CHANGED')
+      expect(changed.stderr).toContain(`CHANGED between ${S.slice(0, 7)} and ${H2.slice(0, 7)}`)
+      expect(changed.stderr).toContain('review it fresh')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

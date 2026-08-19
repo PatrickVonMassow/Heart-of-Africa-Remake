@@ -752,6 +752,8 @@ export const usage = () =>
     'commit ships the current content of the files it touches.',
     'Recorded scoped passes remain cleared at their exact commit/file contributions; later',
     'plans owe only new contributions. No carry record or carry planning flag is needed.',
+    'A commit written to answer a recorded finding is itself a new contribution by design:',
+    'the confirming clean pass reviews it too. The convergence cost is accepted, not hidden.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
     'that authored no part of the reviewed range — the recorded review always names the',

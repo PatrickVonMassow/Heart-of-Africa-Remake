@@ -29,6 +29,7 @@ import {
   unquoteGitPath,
   worstVerdict,
 } from './review-material-core.mjs'
+import { formatReviewReport, OUTCOME } from './review-sol-core.mjs'
 
 const file = (path, size, ch = 'x') => ({ path, text: ch.repeat(size) })
 const patchFor = (paths) =>
@@ -453,6 +454,51 @@ describe('opaque file bodies are absent by design', () => {
     expect(plan.uncoverable.map((u) => u.path)).toContain('ghost.mjs')
     expect(plan.fits).toBe(false)
     expect(planShortfall(plan)).not.toBe(null)
+  })
+})
+
+// These two reviewer-facing rulings are formatted in review-sol-core.mjs, but
+// belong in the material suite too: a reader checking pass delivery here must
+// see that one recorded pass never reads as range clearance, and that the route
+// to the remainder consults the ledger rather than assuming numeric order.
+describe('the pass report keeps the range warning and ledger pointer', () => {
+  const pass = { index: 2, total: 3, files: ['b.mjs'] }
+  const assertRulings = (text) => {
+    expect(text).toContain('NOT cleared until every pass 1..3 is recorded')
+    expect(text).toContain('node scripts/mechanism-review.mjs --list')
+  }
+
+  it('pins them on both a completed review and a hand-off template', () => {
+    assertRulings(
+      formatReviewReport({
+        decision: {
+          fellBack: false,
+          ready: true,
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          evidence: 'read this pass whole and found no issue',
+        },
+        sha: 'a'.repeat(40),
+        shortfall: null,
+        pass,
+      }),
+    )
+    assertRulings(
+      formatReviewReport({
+        decision: {
+          fellBack: true,
+          ready: false,
+          kind: OUTCOME.SWITCHED_OFF,
+          cause: 'the share switch is claude-only',
+          model: 'Opus 5',
+          verdict: '',
+          evidence: '',
+        },
+        sha: 'b'.repeat(40),
+        shortfall: null,
+        pass,
+      }),
+    )
   })
 })
 
