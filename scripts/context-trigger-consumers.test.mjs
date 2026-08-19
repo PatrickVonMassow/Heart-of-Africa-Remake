@@ -14,8 +14,8 @@ import {
 import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
 
 describe('the trigger/ceiling consumer split', () => {
-  it('routes admission to 82k and overshoot to 150k', () => {
-    const trigger = 82_000
+  it('routes admission to 110k and overshoot to 150k', () => {
+    const trigger = 110_000
     const ceiling = 150_000
     const aboveTriggerMargin = trigger + CONTEXT_MARGIN_TOKENS + 1
     const aboveCeilingMargin = ceiling + CONTEXT_MARGIN_TOKENS + 1

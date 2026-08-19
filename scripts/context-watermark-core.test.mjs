@@ -14,6 +14,11 @@ import { triggerTokens } from './context-watermark.mjs'
 
 const LARGEST_OBSERVED_SINGLE_RESPONSE_TOKENS = 40_000
 const MEASURED_BOUNDARY_COST_TOKENS = 27_336
+// The startup cost of a session that has done NO work, measured 19./20.08.2026
+// across four autostarted sessions: 85,225 / 83,079 / 86,416, plus one that
+// reached 91,605 on orientation alone. The trigger must clear this, or it
+// forbids a fresh session its first call.
+const MEASURED_STARTUP_FLOOR_TOKENS = 86_416
 
 const usageLine = (over = {}, top = {}) =>
   JSON.stringify({
@@ -79,14 +84,37 @@ describe('parseContextTokens — the reading is the NEWEST real usage record', (
 })
 
 describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
-  it('pins the ceiling, trigger, and the observed arithmetic the trigger must satisfy', () => {
+  it('pins the ceiling, the trigger, and the FLOOR the trigger must clear', () => {
     expect(CONTEXT_CEILING_TOKENS).toBe(150_000)
-    expect(CONTEXT_TRIGGER_TOKENS).toBe(82_000)
-    expect(
+    expect(CONTEXT_TRIGGER_TOKENS).toBe(110_000)
+
+    // THE BINDING RULE (user 20.08.2026). A trigger below the measured startup
+    // cost of an idle session bounds nothing — it refuses that session its
+    // FIRST call, which is how four sessions in a row stranded without
+    // beginning a point. The trigger clears the floor with room to work.
+    expect(CONTEXT_TRIGGER_TOKENS).toBeGreaterThan(MEASURED_STARTUP_FLOOR_TOKENS)
+    expect(CONTEXT_TRIGGER_TOKENS).toBeLessThan(CONTEXT_CEILING_TOKENS)
+  })
+
+  it('NAMES the worst case the raised trigger no longer covers — the residual is stated, not hidden', () => {
+    // The old 82,000 was derived from this sum fitting under the ceiling. At
+    // 110,000 it no longer does, and that is the accepted cost of a usable
+    // window: a session that takes its largest observed single response right
+    // AT the trigger and then pays the measured cost of leaving lands past the
+    // ceiling. Both premises are single observations, not bounds. Point 744
+    // recomputes the exit cost from clean measurement and point 747
+    // recalibrates the ceiling from the recorded overshoot series; until then
+    // the overshoot is MEASURED by the incident record rather than prevented.
+    const worstCase =
       CONTEXT_TRIGGER_TOKENS +
-        LARGEST_OBSERVED_SINGLE_RESPONSE_TOKENS +
-        MEASURED_BOUNDARY_COST_TOKENS,
-    ).toBeLessThanOrEqual(CONTEXT_CEILING_TOKENS)
+      LARGEST_OBSERVED_SINGLE_RESPONSE_TOKENS +
+      MEASURED_BOUNDARY_COST_TOKENS
+    expect(worstCase).toBeGreaterThan(CONTEXT_CEILING_TOKENS)
+    // …while the ordinary case — a trigger firing and the boundary taken
+    // straight away — still fits, which is what the trigger is FOR.
+    expect(CONTEXT_TRIGGER_TOKENS + MEASURED_BOUNDARY_COST_TOKENS).toBeLessThanOrEqual(
+      CONTEXT_CEILING_TOKENS,
+    )
   })
 
   it('the admission consumer fires on the trigger, not the ceiling', () => {
@@ -110,12 +138,14 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
   it('a calibrated watermark is honoured; a broken one falls back to the named default', () => {
     expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: 50_000 }).state).toBe('past')
     expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: 0 }).state).toBe('below')
-    expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: NaN }).watermark).toBe(82_000)
+    expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: NaN }).watermark).toBe(
+      110_000,
+    )
   })
 
   it('a real reading carries its tokens through to the verdict', () => {
-    const d = watermarkDecision({ reading: { tokens: 83_000 } })
-    expect(d).toEqual({ state: 'past', tokens: 83_000, watermark: 82_000, alert: false })
+    const d = watermarkDecision({ reading: { tokens: 111_000 } })
+    expect(d).toEqual({ state: 'past', tokens: 111_000, watermark: 110_000, alert: false })
   })
 })
 

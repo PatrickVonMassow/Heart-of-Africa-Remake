@@ -22,17 +22,24 @@ export const CONTEXT_CEILING_TOKENS = 150_000
  * THE TRIGGER, in tokens of context. Admission decisions use this lower number
  * so the observed work still paid after a trigger can fit below the ceiling.
  *
- * Arithmetic (19.08.2026): ceiling 150,000 - largest observed single response
- * 40,000 - measured cost of leaving 27,336 = 82,664; round down to 82,000.
- * The rejected 100,000 draft did not hold even its own stated worst case:
- * 100,000 + 40,000 + 15,000 already exceeds the ceiling.
- * Both premises are observations, not bounds: the response jump is one reading,
- * and the leaving cost is contaminated by contradictory gates. That
- * contamination biases the leaving cost high, so subtracting it is the safer
- * immediate margin until clean measurement and prospective admission replace
- * this written trigger.
+ * THE FLOOR RULE: this number may never sit below the measured startup cost of
+ * a session that has done no work, plus a margin. A trigger under that floor
+ * bounds nothing — it forbids a fresh session its FIRST call, and the batch
+ * cannot advance a point at all.
+ *
+ * That is what the previous 82,000 did. Four autostarted sessions in a row
+ * stood above it before any work of their own: 85,225 (19.08., 23:44), 83,079
+ * (20.08., 00:17), 86,416 (20.08., 00:31), and one that reached 91,605 on
+ * orientation alone — each refused its first delegation and able only to hand
+ * over. The floor underneath is measured too: a freshly cleared session's first
+ * response already carries 61,372 tokens before a single tool call.
+ *
+ * 110,000 (user decision 20.08.2026) clears that ~87k startup floor with room
+ * to work and stays 40,000 below the ceiling. It is an INTERIM value, not a
+ * result: point 744 recomputes it from the clean handover measurement and
+ * point 747 recalibrates the ceiling from the recorded series.
  */
-export const CONTEXT_TRIGGER_TOKENS = 82_000
+export const CONTEXT_TRIGGER_TOKENS = 110_000
 
 /**
  * The CURRENT CONTEXT SIZE from a transcript tail. PURE.
