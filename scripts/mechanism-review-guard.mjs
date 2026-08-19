@@ -51,6 +51,7 @@ import {
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import { guardOutcome, reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
+import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -276,7 +277,7 @@ function rangeCommits(base, head, files) {
  * git work, which would drift and hand back a false "clean". Read-only: arming
  * and advancing the baseline stay in the main path below.
  */
-export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
+export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gatherGuardDutyContext } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
     return {
@@ -396,7 +397,14 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     // using its conservative raw fallback, but that unproved range can never
     // support a gap waiver.
     rangeBase,
-    inputs: { baseline: effective, head, pendingCommits, records },
+    inputs: {
+      baseline: effective,
+      head,
+      pendingCommits,
+      records,
+      sessionId,
+      fence: guardDuty({ sessionId }),
+    },
     commits,
     debt,
     authorshipPlan,
@@ -489,6 +497,13 @@ if (isMainModule(import.meta.url)) {
     }
 
     const verdict = evaluateMechanismReview(gathered.inputs)
+
+    if (verdict.deferred) {
+      // Leave the baseline behind the pending mechanism range: that range is
+      // the successor's inbox, not a clearance by the fenced session.
+      process.stdout.write(JSON.stringify({ systemMessage: verdict.reason }))
+      process.exit(0)
+    }
 
     // THE GAP CLAUSE (point 714, c06a02d2): while the range's material CANNOT
     // be assembled for review at all, demanding that review traps the session

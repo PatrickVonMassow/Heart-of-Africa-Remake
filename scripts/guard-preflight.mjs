@@ -198,7 +198,10 @@ export const GUARDS = [
     gather: gatherMechanismReviewInputs,
     decide: (inputs) => {
       const verdict = evaluateMechanismReview(inputs)
-      return { block: verdict.block, reason: formatMechanismReviewVerdict(verdict) }
+      return {
+        block: verdict.block,
+        reason: verdict.deferred ? verdict.reason : formatMechanismReviewVerdict(verdict),
+      }
     },
   },
   {
