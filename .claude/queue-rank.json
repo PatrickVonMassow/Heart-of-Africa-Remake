@@ -175,10 +175,14 @@
     "755": {
       "at": "2026-08-19T20:42:12.049Z",
       "why": "Es ist der Nachfolger von 751 in derselben Kontext-Programm-Reihe; die vorderen Punkte 743/742/744 stehen davor, und 755 blockiert nichts, was vor ihm liegt"
+    },
+    "756": {
+      "at": "2026-08-19T21:23:30.975Z",
+      "why": "Shares the fence's classifier files with the running context-ceiling programme, so it must not run beside it; the defect has a working workaround (reword the card), so it waits behind 755 rather than displacing anything"
     }
   },
   "settled": {
-    "at": "2026-08-19T20:42:12.049Z",
+    "at": "2026-08-19T21:23:30.976Z",
     "points": [
       174,
       184,
@@ -403,7 +407,8 @@
       752,
       753,
       754,
-      755
+      755,
+      756
     ]
   }
 }
