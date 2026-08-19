@@ -9550,3 +9550,29 @@ to land than a mechanism that needs a review.
   policy forbids, which is the breach `model-guard` exists to catch after the fact; medium for
   the rest.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 755. Three more mandatory Stop guards demand at the exit what the context fence forbids,
+  because point 751 scoped only the four it had measured (measured 19.08.2026, 22:0x, on the
+  session that landed 751 itself at 173,544 tokens). After that landing `bundle-first-guard`
+  demanded the freshly filed point 754 be placed in a bundle in `docs/work-packages.md`, and the
+  fence DENIED that edit as "authoring a document section" — the same mutual block 751 removed,
+  in a guard that does not consult the mechanism 751 built (`scopeMandatoryDuty` +
+  `gatherGuardDutyContext` in `scripts/guard-duty-core.mjs`). `queue-order-guard` has the same
+  shape: ranking an appended point moves TASKS.md blocks, which the fence denies, and only the
+  `--ranked` escape let that session past. `retro-currency-guard` has it twice over: its refresh
+  runs, but the German prose paragraph it then demands for a new problem class and the
+  beginner-guide attestation are both authoring. `dashboard-conciseness-guard` is the harmless
+  case and stays as it is — a card rewrite is board work, which the fence allows, and it passed.
+  FINAL STATE: every MANDATORY Stop guard asks the fenced state through the ONE shared scope, so
+  a fenced session's exit hangs on no duty it may no longer discharge; the duty is handed to the
+  successor through the carrier instead, exactly as 751's clause 1 requires. The guards to scope
+  are `bundle-first-guard`, `queue-order-guard` and `retro-currency-guard`.
+  VERIFIABLE: Vitest over each of the three guard cores — past the fence each returns the
+  handover verdict rather than a block, and below it blocks exactly as today — plus one case
+  that ENUMERATES the mandatory Stop guards from `.claude/settings.json` and fails if any of
+  them reaches its verdict without consulting `scopeMandatoryDuty`, so the next guard added
+  inherits the rule instead of repeating the defect.
+  Criticality: medium — it cannot corrupt the repository, but it traps the exit of exactly the
+  sessions that are already over their ceiling, which is where a trapped turn is most expensive.
+  A guard change is a mechanism, so it needs the other model's recorded review before it lands.
+  Bundle: Session- & Repo-Hygiene.
