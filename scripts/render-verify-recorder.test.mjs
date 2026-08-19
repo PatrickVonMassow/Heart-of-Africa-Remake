@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { tapOutput } from './render-verify-recorder.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
-import { RETRY_ENV, chargeReds, formatSuspectEnv, runVerdict } from './render-verify-core.mjs'
+import { RETRY_ENV, TRUNCATED_KIND, chargeReds, formatSuspectEnv, runVerdict } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
 // the REAL exit handler, and a test must never append to the checkout's own
@@ -220,7 +220,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(runVerdict(record, { openPoints }).status).toBe('red')
   })
 
-  it('turns a capture that hit its cap into an UNACCOUNTED red (F3)', async () => {
+  it('turns a capture that hit its cap into an INCOMPLETE RECORDING, not a red (F3, point 734)', async () => {
     const run = await armed('polish')
     // A per-frame assert flood, then the one new red that must not vanish.
     for (let i = 0; i < 420; i++) {
@@ -232,7 +232,27 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     const record = run.exit(1)
     expect(record.reds[0].point).toBeNull()
     expect(record.reds[0].name).toMatch(/exceeded the capture cap/)
-    expect(runVerdict(record, { openPoints }).status).toBe('red')
+    // The truncation is said as a FIELD, not only as a red's wording, and its
+    // kind is one no charge may name.
+    expect(record.truncated).toBe(true)
+    expect(record.droppedLines).toBeGreaterThan(0)
+    expect(record.reds[0].kind).toBe(TRUNCATED_KIND)
+    // NOT an unexplained red: there is nothing in it to explain.
+    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints }).covers).toBe(false)
+  })
+
+  // A truncated run that still exited 0 is the case the old accounting could not
+  // see at all: `dropped` was only consulted on a red exit, so a "pass" whose
+  // result lines were thrown away covered a backend. It must not.
+  it('records the truncation even when the run exited 0, and that run covers nothing', async () => {
+    const run = await armed('polish')
+    for (let i = 0; i < 420; i++) process.stdout.write('ERR: something the suite decided to tolerate\n')
+    const record = run.exit(0)
+    expect(record.truncated).toBe(true)
+    expect(record.reds).toBeUndefined()
+    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
+    expect(runVerdict(record, { openPoints }).covers).toBe(false)
   })
 
   it('leaves a green run with no accounting at all', async () => {

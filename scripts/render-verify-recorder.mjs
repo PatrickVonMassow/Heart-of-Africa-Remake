@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
-import { RETRY_ENV, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
+import { RETRY_ENV, TRUNCATED_KIND, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
 // working-directory fallback: under the test runner `import.meta.url` is not
@@ -58,8 +58,22 @@ const SCREENSHOT_DIR = (() => {
  *  the triage lane, so the two can never drift into different readings of a red. */
 const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
 
-/** A cap, because the buffer lives for the whole run: 400 result lines is far
- *  more than any suite's failing half and bounds the memory either way. */
+/**
+ * A cap, because the buffer lives for the whole run and the lines it holds are
+ * NOT bounded by the suite's checks: every suite prints one `ERR:` line per
+ * console-error OCCURRENCE (`for (const e of errors) console.log('ERR:', …)`),
+ * and a page error that repeats per frame multiplies one red without bound. So
+ * the cap stays — and a run that hits it is recorded INCOMPLETE (point 734)
+ * rather than half-recorded, because a fragment of a red set explains nothing.
+ *
+ * MEASURED 19.08.2026 (the numbers that chose "fail loudly" over "no cap on red
+ * lines"): the only overflow on record, two webgpu/settings runs of 13.08.2026,
+ * dropped 115 and 116 lines beyond this cap — 515/516 result lines — and yielded
+ * 18/19 DISTINCT reds, i.e. a WebGPU validation cascade repeating a handful of
+ * errors, not a large red set. Across the 47 stored suite logs in local/ that
+ * carry result lines at all, the maximum is 12 kept lines and 7 distinct reds.
+ * The distinct set is small and bounded; the LINES are what runs away.
+ */
 const MAX_KEPT_LINES = 400
 
 /** How many charged reds one record keeps — a bound on the state file, which
@@ -221,12 +235,13 @@ export function armRunRecorder(backend) {
           }
           // A capture that lost lines cannot claim to have read the run's reds:
           // one synthetic UNACCOUNTED red, first in the list so no truncation
-          // can drop it either.
+          // can drop it either. Its KIND is `truncated`, which no charge may
+          // name — what was never captured cannot be owned by anybody.
           if (armed.dropped > 0) {
             reds.unshift({
               name: `${armed.dropped} further result line(s) exceeded the capture cap — this run's reds were NOT all read`,
               key: 'capture-truncated',
-              kind: 'check',
+              kind: TRUNCATED_KIND,
               point: null,
             })
           }
@@ -243,6 +258,13 @@ export function armRunRecorder(backend) {
           screenshots: shots.slice(0, 12),
           ...(armed.section ? { partial: true, section: armed.section } : {}),
           ...(armed.suspectOf.length ? { suspect: true, suspectOf: armed.suspectOf } : {}),
+          // THE RECORDING IS INCOMPLETE, SAID AS A FIELD (point 734). Written
+          // whatever the exit code: a run that printed more result lines than
+          // the cap holds and still exited 0 is precisely a "pass" nobody read,
+          // and runVerdict must be able to refuse it as coverage too. Stated
+          // once, at the top level, so no consumer has to recognise the
+          // synthetic red by its wording.
+          ...(armed.dropped > 0 ? { truncated: true, droppedLines: armed.dropped } : {}),
           ...(exit !== 0 ? { reds: reds.slice(0, MAX_RECORDED_REDS), crashed: armed.crashed } : {}),
         })
       } catch {

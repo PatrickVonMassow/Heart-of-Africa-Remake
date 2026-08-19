@@ -329,7 +329,78 @@ export function suspectRedsOf(run) {
 }
 
 /**
- * WHAT ONE RECORDED RUN IS WORTH (point 550). Five verdicts, and the difference
+ * DID THE CAPTURE CAP EAT THIS RUN'S REDS (point 734)? Two readings, because the
+ * records outlive the field: the recorder now says `truncated: true` outright,
+ * and a record written before it did carries the synthetic red under the stable
+ * key `capture-truncated`. Either one means the same thing — the run printed
+ * more result lines than the buffer holds, so what the record lists is a
+ * FRAGMENT of its red set and not the set.
+ *
+ * Deliberately reads the run's OWN reds only. A SUSPECT run's `suspectOf` marker
+ * can carry its own truncation note ("further red(s) … were NOT carried"), but
+ * that is the retry marker running out of room — the first attempt has a full
+ * record of its own, and mistaking the two would excuse a run whose reds ARE all
+ * on file. Total: never throws on a malformed record.
+ */
+export function isIncompleteRecording(run) {
+  if (!run || typeof run !== 'object') return false
+  if (run.truncated === true) return true
+  const reds = Array.isArray(run.reds) ? run.reds : []
+  return reds.some((red) => red?.key === 'capture-truncated' || red?.kind === TRUNCATED_KIND)
+}
+
+/** How many result lines the cap swallowed, as the record knows it — the number
+ *  the new field carries, or the one the old synthetic red states in its text.
+ *  0 when the run is not truncated or the count cannot be read. */
+export function droppedLinesOf(run) {
+  const n = Number(run?.droppedLines)
+  if (Number.isFinite(n) && n > 0) return Math.trunc(n)
+  const reds = Array.isArray(run?.reds) ? run.reds : []
+  for (const red of reds) {
+    if (red?.key !== 'capture-truncated' && red?.kind !== TRUNCATED_KIND) continue
+    const m = /^(\d+)\s+further result line/.exec(text(red?.name))
+    if (m) return Number(m[1])
+  }
+  return 0
+}
+
+/**
+ * THE CLOSURE THAT AN INCOMPLETE RECORDING HAS AND A RED DOES NOT (point 734).
+ * A red closes by its CAUSE — fixed, charged, or filed as a point (point 640) —
+ * and all three need to know WHAT the red was. A truncated run cannot supply
+ * that by construction, so those three routes are shut and the only exit left
+ * was the hand-written `--defer`: the very waiver the charge ledger exists to
+ * abolish.
+ *
+ * So the incompleteness gets its own closure, which is not a waiver: it is
+ * signed for one RUN by identity (backend, suite and the exact `at`), it carries
+ * written evidence, and it NEVER makes the run cover a backend — runVerdict
+ * still answers `incomplete`. Closing it says "this record is not evidence",
+ * never "the picture was fine"; the backend still needs a covering run.
+ *
+ * RESIDUAL, named rather than hidden: a run can be pushed into this state on
+ * purpose by flooding a suite's output, and its recorded reds then go with it.
+ * That buys nothing — the closure clears no backend and the suite must still be
+ * re-run — but it is the side this mechanism can be abused from, and the reason
+ * a closure is per-run and never per suite/backend pair.
+ */
+export function incompleteClosureFor(run, closures) {
+  if (!run || typeof run !== 'object') return null
+  const at = Number(run.at)
+  for (const c of Array.isArray(closures) ? closures : []) {
+    try {
+      if (!c || c.backend !== run.backend || c.suite !== run.suite) continue
+      if (Number(c.at) !== at) continue
+      return c
+    } catch {
+      /* a malformed closure closes nothing — the run keeps blocking */
+    }
+  }
+  return null
+}
+
+/**
+ * WHAT ONE RECORDED RUN IS WORTH (point 550). Six verdicts, and the difference
  * between the first two must stay visible everywhere it is reported:
  *
  *   clean     — exit 0. The picture was judged and nothing was red.
@@ -344,6 +415,14 @@ export function suspectRedsOf(run) {
  *               so the record says nothing about the rest. Judged FIRST, before
  *               the exit code, because its exit code is exactly what must not
  *               clear the gate.
+ *   incomplete— THE CAPTURE CAP ATE ITS REDS (point 734): the run printed more
+ *               result lines than the recorder's buffer holds, so its red list is
+ *               a fragment and no reader can say what it found. Judged before the
+ *               exit code, like partial, because an exit 0 whose result lines were
+ *               dropped is exactly a pass nobody read. It is NOT an unexplained
+ *               red — there is nothing to explain, only a recording to redo — and
+ *               it closes by its own signed route (incompleteClosureFor), never by
+ *               the three ways of point 640, which all need the red's identity.
  *   suspect   — it PASSED ON THE RETRY (point 640): the first attempt of the same
  *               suite failed, and nothing about the second run explains why. "It
  *               worked the next time" is consistent with a fixed defect, a rare
@@ -376,6 +455,26 @@ export function runVerdict(run, options) {
       covers: false,
       charges: [],
       unaccounted: [{ name: `the run covered only section ${which} of the suite (--section)`, point: null }],
+    }
+  }
+  // Judged before the exit code and before the reds, because BOTH are unreadable
+  // here: the red list is a fragment of the run's red set, and an exit 0 that
+  // dropped result lines is a pass nobody read. Behind `partial`, so a
+  // one-section probe stays the harmless instrument it is.
+  if (isIncompleteRecording(run)) {
+    const dropped = droppedLinesOf(run)
+    return {
+      status: 'incomplete',
+      covers: false,
+      charges: [],
+      unaccounted: [
+        {
+          name:
+            `the capture cap dropped ${dropped > 0 ? `${dropped} ` : ''}result line(s) — this run's reds ` +
+            'were NOT all recorded, so nothing in it can be explained',
+          point: null,
+        },
+      ],
     }
   }
   if (run.suspect === true && Number(run.exit) === 0) {
@@ -553,7 +652,7 @@ export function coveringRun(runs, backend, since, options) {
  * Total: never throws on partial input.
  */
 export function unexplainedRuns(runs, since, options) {
-  const { openPoints = null, ledger = RED_CHARGES } = options ?? {}
+  const { openPoints = null, ledger = RED_CHARGES, incompleteClosures = null } = options ?? {}
   const from = Number.isFinite(since) ? since : 0
   const all = Array.isArray(runs) ? runs : []
   /**
@@ -600,9 +699,26 @@ export function unexplainedRuns(runs, since, options) {
     // list once that demonstration exists.
     if (!sawCodeSince(r, from) && shownGone(r)) continue
     const verdict = runVerdict(r, { openPoints })
-    if (verdict.status !== 'red' && verdict.status !== 'suspect') continue
+    if (verdict.status !== 'red' && verdict.status !== 'suspect' && verdict.status !== 'incomplete') continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
     const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
+    // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), and its own closure
+    // is the only thing that lifts it: the ledger cannot, because a charge needs
+    // the red's identity and this record has none to give. Reported apart from
+    // the reds so the guard can name it as what it is.
+    if (verdict.status === 'incomplete') {
+      if (incompleteClosureFor(r, incompleteClosures)) continue
+      out.push({
+        backend,
+        suite,
+        at,
+        status: 'incomplete',
+        droppedLines: droppedLinesOf(r),
+        unaccounted: verdict.unaccounted,
+        reds: verdict.unaccounted.map((u) => u.name),
+      })
+      continue
+    }
     // A crash explains nothing about the picture whatever its reds say, so it is
     // never talked away by the ledger — runVerdict says so and this must not
     // undo it.
@@ -754,6 +870,7 @@ export function evaluate(input) {
     deferral = null,
     openPoints = null,
     ledger = RED_CHARGES,
+    incompleteClosures = null,
   } = input ?? {}
 
   // Garbage where the path list should be: fail open, but do NOT advance the
@@ -767,7 +884,7 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const opts = { openPoints, ledger }
+  const opts = { openPoints, ledger, incompleteClosures }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
@@ -826,28 +943,56 @@ export function evaluate(input) {
   // (Where a backend is missing too, the message below says so with the same
   // three ways out — this one is for the case the old gate waved through.)
   if (missing.length === 0 && unexplained.length > 0) {
-    const named = unexplained
-      .slice(0, 3)
-      .map((u) => {
-        const what = u.status === 'suspect' ? 'passed only on the RETRY' : `${u.unaccounted.length} unaccounted red(s)`
-        const first = u.unaccounted[0]?.name
-        return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
-      })
-      .join(' | ')
-    return {
-      decision: 'block',
-      reason:
-        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${unexplained.length} recorded run(s) failed and nothing ` +
-        `says why — ${named}${unexplained.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
-        'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
-        'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
-        'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
-        'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
-        'point of its own, charged there. Is it load? MEASURE it: ' +
-        `node scripts/throttle-probe.mjs ${unexplained[0].suite} --section=<name> --runs 8. If the cause lies ` +
-        'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
-        'node scripts/render-verify-guard.mjs --defer "<reason>".',
+    // THE TWO FAMILIES ARE NAMED APART (point 734). An incomplete recording sent
+    // the reader hunting for a defect that was never captured, because the gate
+    // called it an unexplained red; it is the opposite — a record with nothing
+    // in it to explain, and a different way out.
+    const incomplete = unexplained.filter((u) => u.status === 'incomplete')
+    const reds = unexplained.filter((u) => u.status !== 'incomplete')
+    const parts = []
+    if (reds.length > 0) {
+      const named = reds
+        .slice(0, 3)
+        .map((u) => {
+          const what = u.status === 'suspect' ? 'passed only on the RETRY' : `${u.unaccounted.length} unaccounted red(s)`
+          const first = u.unaccounted[0]?.name
+          return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
+        })
+        .join(' | ')
+      parts.push(
+        `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${reds.length} recorded run(s) failed and nothing ` +
+          `says why — ${named}${reds.length > 3 ? ', …' : ''}. A LATER GREEN DOES NOT CLOSE IT (point 640): ` +
+          'three greens are consistent with a fixed defect, a rare one, a timing race and an idle machine alike. ' +
+          'A red closes in exactly THREE ways: (1) its CAUSE is named and FIXED — the fix edits the code, which ' +
+          'moves this window past the red; (2) it is CHARGED in scripts/render-verify-charges.mjs to the OPEN ' +
+          'point that owns it — the charge counts at once, no re-run needed; (3) it becomes an OPEN ' +
+          'point of its own, charged there. Is it load? MEASURE it: ' +
+          `node scripts/throttle-probe.mjs ${reds[0].suite} --section=<name> --runs 8. If the cause lies ` +
+          'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
+          'node scripts/render-verify-guard.mjs --defer "<reason>".',
+      )
     }
+    if (incomplete.length > 0) {
+      const named = incomplete
+        .slice(0, 3)
+        .map(
+          (u) =>
+            `${u.backend}/${u.suite} @${new Date(u.at).toISOString()}` +
+            (u.droppedLines > 0 ? ` (${u.droppedLines} line(s) dropped)` : ''),
+        )
+        .join(' | ')
+      parts.push(
+        `INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED: ${incomplete.length} recorded run(s) printed more ` +
+          `result lines than the capture buffer holds — ${named}${incomplete.length > 3 ? ', …' : ''}. Do NOT ` +
+          'hunt a defect in them: what they list is a FRAGMENT of their red set, so the three closings of ' +
+          'point 640 cannot apply — all three need the red\'s identity, and this record has none. RE-RUN the ' +
+          'suite to get a real recording; where that is impossible, sign the recording off as broken: ' +
+          'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot ' +
+          'be re-recorded>". That closure discards the RECORD, never the picture — the backend still needs a ' +
+          'covering run, and it is never counted as a green.',
+      )
+    }
+    return { decision: 'block', reason: parts.join(' ') }
   }
 
   if (missing.length === 0) {
@@ -875,6 +1020,18 @@ export function evaluate(input) {
     if (!run) continue
     const verdict = runVerdict(run, opts)
     if (verdict.unaccounted.length === 0) continue
+    // Same distinction as above: an incomplete recording is not a red anybody
+    // can chase, so the reader is sent to a re-run rather than to the ledger.
+    if (verdict.status === 'incomplete') {
+      const dropped = droppedLinesOf(run)
+      whyNot.push(
+        `${b}: the last run (${run.suite ?? 'unknown'}) recorded INCOMPLETELY — the capture cap dropped ` +
+          `${dropped > 0 ? `${dropped} ` : ''}result line(s), so it lists a FRAGMENT of its reds and explains ` +
+          'nothing. Re-run it; where that is impossible, sign the recording off with ' +
+          'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"',
+      )
+      continue
+    }
     const named = verdict.unaccounted
       .slice(0, 3)
       .map((u) => (u.point === null ? `"${u.name}" (charged to nothing)` : `"${u.name}" (point ${u.point} is not open)`))

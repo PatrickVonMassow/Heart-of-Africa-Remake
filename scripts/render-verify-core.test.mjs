@@ -30,6 +30,9 @@ import {
   parseSuspectReds,
   suspectRedsOf,
   unexplainedRuns,
+  isIncompleteRecording,
+  incompleteClosureFor,
+  droppedLinesOf,
   SUSPECT_UNNAMED,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
@@ -1025,6 +1028,132 @@ describe('evaluate — a red is not closed by the runs that FOLLOWED it (point 6
     expect(() => unexplainedRuns([null, 7, { at: 'soon' }], 0)).not.toThrow()
     const found = unexplainedRuns([unfiled('webgl', 2000), unfiled('webgpu', 1000)], 0, { openPoints })
     expect(found.map((u) => u.at)).toEqual([1000, 2000])
+  })
+})
+
+// Point 734. The capture cap could produce a run nobody could ever close: point
+// 640's three closings all need the red's identity, and a truncated recording has
+// none — so it blocked every later render change until somebody hand-wrote a
+// --defer, which is the waiver the charge ledger exists to abolish.
+describe('an INCOMPLETE RECORDING is its own class, and has its own way out (point 734)', () => {
+  const openPoints = [506, 546]
+  // The two shapes on file: what the recorder writes TODAY (the field), and what
+  // it wrote before the field existed (the synthetic red under its stable key) —
+  // the runs of 13.08.2026 are the second kind and must be recognised.
+  const truncatedNow = (backend, at, overrides = {}) =>
+    redRun(backend, at, [red('a check that DID fit in the buffer')], {
+      truncated: true,
+      droppedLines: 115,
+      ...overrides,
+    })
+  const truncatedLegacy = (backend, at) =>
+    redRun(backend, at, [
+      { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null },
+      red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError', null, 'console'),
+    ])
+  const closure = (backend, suite, at) => ({ backend, suite, at, evidence: 'the host cannot run a browser suite (point 732)' })
+
+  it('recognises both record shapes, and reads how much was lost', () => {
+    expect(isIncompleteRecording(truncatedNow('webgpu', 1500))).toBe(true)
+    expect(isIncompleteRecording(truncatedLegacy('webgpu', 1500))).toBe(true)
+    expect(isIncompleteRecording(redRun('webgpu', 1500, [red('an ordinary red')]))).toBe(false)
+    expect(droppedLinesOf(truncatedNow('webgpu', 1500))).toBe(115)
+    expect(droppedLinesOf(truncatedLegacy('webgpu', 1500))).toBe(115)
+    expect(droppedLinesOf(run('webgpu', 1500))).toBe(0)
+  })
+
+  it('classifies a capped run as INCOMPLETE, never as an unexplained red', () => {
+    for (const r of [truncatedNow('webgpu', 1500), truncatedLegacy('webgpu', 1500)]) {
+      const verdict = runVerdict(r, { openPoints })
+      expect(verdict.status).toBe('incomplete')
+      expect(verdict.covers).toBe(false)
+      expect(verdict.unaccounted[0].name).toMatch(/were NOT all recorded/)
+    }
+  })
+
+  // The loud half of the cap: an exit 0 whose result lines were thrown away is a
+  // pass nobody read, so it must not cover a backend either.
+  it('refuses a TRUNCATED run as coverage even when it exited 0', () => {
+    const green = { ...run('webgpu', 1500), truncated: true, droppedLines: 7 }
+    expect(runVerdict(green, { openPoints }).status).toBe('incomplete')
+    expect(coveringRun([green], 'webgpu', 1000, { openPoints })).toBeNull()
+  })
+
+  // A --section probe stays the harmless instrument point 566 made it, whatever
+  // its output volume: partial is judged first and blocks nobody.
+  it('leaves a PARTIAL run partial, even when it truncated', () => {
+    const probe = { ...truncatedNow('webgpu', 1500), partial: true, section: 'goat-stance' }
+    expect(runVerdict(probe, { openPoints }).status).toBe('partial')
+  })
+
+  it('says WHICH IT IS: an incomplete recording is named apart from an unexplained red', () => {
+    const result = evaluate(
+      renderChange({ runs: [truncatedLegacy('webgpu', 1500), run('webgpu', 2000), run('webgl', 2100)], openPoints }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED/)
+    expect(result.reason).toMatch(/--incomplete/)
+    // It must NOT send the reader hunting a defect that was never captured.
+    expect(result.reason).not.toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
+  })
+
+  it('still names an ordinary unexplained red as one, beside an incomplete recording', () => {
+    const unfiled = redRun('webgpu', 1600, [red('a NEW check nobody filed')])
+    const result = evaluate(
+      renderChange({ runs: [truncatedLegacy('webgpu', 1500), unfiled, run('webgpu', 2000), run('webgl', 2100)], openPoints }),
+    )
+    expect(result.reason).toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
+    expect(result.reason).toMatch(/INCOMPLETE RECORDING/)
+  })
+
+  it('a genuinely unexplained red is NOT closable this way — the closure is per run', () => {
+    const unfiled = redRun('webgpu', 1600, [red('a NEW check nobody filed')])
+    const runs = [unfiled, run('webgpu', 2000), run('webgl', 2100)]
+    const result = evaluate(
+      renderChange({ runs, openPoints, incompleteClosures: [closure('webgpu', 'polish', 1600)] }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNEXPLAINED RED/)
+  })
+
+  it('a SIGNED-OFF incomplete recording stops blocking a later render edit — with no --defer', () => {
+    const broken = truncatedLegacy('webgpu', 1500)
+    const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
+    expect(evaluate(renderChange({ runs, openPoints })).decision).toBe('block')
+    const result = evaluate(
+      renderChange({ runs, openPoints, incompleteClosures: [closure('webgpu', 'polish', 1500)], deferral: null }),
+    )
+    expect(result.decision).toBe('allow')
+  })
+
+  it('signs off ONE run, never a suite/backend pair — the NEXT truncated run blocks again', () => {
+    const first = truncatedLegacy('webgpu', 1500)
+    const second = truncatedLegacy('webgpu', 2500)
+    const closures = [closure('webgpu', 'polish', 1500)]
+    expect(unexplainedRuns([first], 1000, { openPoints, incompleteClosures: closures })).toEqual([])
+    const still = unexplainedRuns([first, second], 1000, { openPoints, incompleteClosures: closures })
+    expect(still.map((u) => u.at)).toEqual([2500])
+    expect(still[0].status).toBe('incomplete')
+  })
+
+  // The closure discards a RECORD; it never says the picture was fine. A backend
+  // with nothing but a signed-off run behind it is still uncovered.
+  it('never turns a signed-off run into coverage', () => {
+    const broken = truncatedLegacy('webgpu', 1500)
+    const closures = [closure('webgpu', 'polish', 1500)]
+    expect(coveringRun([broken], 'webgpu', 1000, { openPoints })).toBeNull()
+    const result = evaluate(renderChange({ runs: [broken, run('webgl', 2100)], openPoints, incompleteClosures: closures }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/RENDER CHANGE NOT VERIFIED ON WEBGPU/)
+  })
+
+  it('is total on malformed closures and records', () => {
+    const broken = truncatedLegacy('webgpu', 1500)
+    expect(() => unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [null, 7, {}] })).not.toThrow()
+    expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [null, 7, {}] })).toHaveLength(1)
+    expect(isIncompleteRecording(null)).toBe(false)
+    expect(incompleteClosureFor(null, null)).toBeNull()
+    expect(droppedLinesOf({ droppedLines: 'many' })).toBe(0)
   })
 })
 
