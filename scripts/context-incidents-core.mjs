@@ -568,7 +568,10 @@ export function formatSeriesReport(summary, { malformed = 0, sources = [] } = {}
   }
   lines.push(`  span: ${summary.first} … ${summary.last}`)
   lines.push(
-    `  overshoot past the ceiling: min ${num(summary.overshoot.min)}, median ${num(summary.overshoot.median)}, ` +
+    // The MARK, not "the ceiling": a boundary overshoot is measured against the
+    // cost ceiling and a startup reading against the admission trigger, and each
+    // record names its own in `watermark`.
+    `  overshoot past the record's own mark: min ${num(summary.overshoot.min)}, median ${num(summary.overshoot.median)}, ` +
       `p${q} ${num(summary.overshoot.p)}, max ${num(summary.overshoot.max)} tokens`,
   )
   lines.push('  PER INCIDENT (what the session was doing):')

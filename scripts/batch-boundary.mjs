@@ -58,7 +58,8 @@ import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
 import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
-import { CONTEXT_CEILING_TOKENS, contextDistanceNote } from './context-watermark-core.mjs'
+import { CONTEXT_CEILING_TOKENS, CONTEXT_MARGIN_TOKENS, contextDistanceNote } from './context-watermark-core.mjs'
+import { noteBoundaryIncident } from './context-incidents.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -69,6 +70,35 @@ export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
  * ceiling. Admission uses the lower trigger through gatherWatermark. */
 export function boundaryContextDistanceNote(tokens) {
   return contextDistanceNote({ tokens, ceiling: CONTEXT_CEILING_TOKENS })
+}
+
+/**
+ * APPEND THE OVERSHOOT TO THE SERIES (point 742) — the printed distance was a
+ * number nobody could count twice; this keeps it, with the session's per-turn
+ * growth and the growth per KIND of call.
+ *
+ * IT CANNOT FAIL THE BOUNDARY. The handover is what keeps the batch alive and the
+ * bookkeeping is evidence, so every failure degrades to a printed warning — the
+ * recorder swallows its own errors and this call site swallows anything left
+ * (a broken series file must never cost a session its handover).
+ * Same condition as the distance note: only a measured reading further past the
+ * ceiling than the stated margin is an incident.
+ */
+export function recordBoundaryOvershoot({ tokens, cause, sid, point = null, transcript = '', note = noteBoundaryIncident } = {}) {
+  try {
+    return note({
+      tokens,
+      sessionId: sid,
+      point,
+      cause,
+      transcriptPath: transcript,
+      ceiling: CONTEXT_CEILING_TOKENS,
+      margin: CONTEXT_MARGIN_TOKENS,
+    })
+  } catch (error) {
+    console.log(`\nWARNING: the context-overshoot record could not be taken (${error?.message ?? error}); the boundary stands.`)
+    return { written: false, reason: 'write-failed', record: null, error }
+  }
 }
 
 const readText = (p) => {
@@ -736,6 +766,15 @@ if (isMain) {
       // deliberately measures the separate cost ceiling.
       const distance = boundaryContextDistanceNote(wm.tokens)
       if (distance) console.log(`\n${distance}`)
+      // …and the number is KEPT (point 742), so the next reading does not start
+      // from zero. Evidence only: nothing is filed or ranked from it.
+      recordBoundaryOvershoot({
+        tokens: wm.tokens,
+        cause: BOUNDARY_CAUSES.CONTEXT,
+        sid,
+        point: null,
+        transcript: wm.transcript ?? '',
+      })
       process.exit(0)
     }
 
@@ -919,5 +958,14 @@ if (isMain) {
     // line. The trigger in wmPoint is for admission, not this overshoot record.
     const distance = boundaryContextDistanceNote(contextTokens)
     if (distance) console.log(`\n${distance}`)
+    // A POINT boundary overshoots too (the 311,039-token handover of 19.08.2026
+    // was one), so it records on the same condition — point 742.
+    recordBoundaryOvershoot({
+      tokens: contextTokens,
+      cause: BOUNDARY_CAUSES.POINT,
+      sid,
+      point,
+      transcript: wmPoint.transcript ?? '',
+    })
   }
 }
