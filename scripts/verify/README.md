@@ -1197,12 +1197,46 @@ point. The mechanics:
 What still does **not** clear: a red charged to nothing (that is a FINDING, file
 it — a ledger entry is not where an unfiled red goes), a red charged to a point
 that is ticked or deferred (the exception expires with the point that owned it),
-a run that failed without reporting a single red, a run whose output flooded past
-the capture cap (the dropped line may have been the unfiled red, so the cap
-itself becomes an unaccounted red), and a run that CRASHED rather than reported —
-`uncaughtExceptionMonitor` catches that, because node prints an uncaught
-exception straight to fd 2 where no tapped stream write can see it. `--defer`
-stays for what genuinely cannot be judged headless.
+a run that failed without reporting a single red, and a run that CRASHED rather
+than reported — `uncaughtExceptionMonitor` catches that, because node prints an
+uncaught exception straight to fd 2 where no tapped stream write can see it.
+`--defer` stays for what genuinely cannot be judged headless.
+
+### A flooded run is an INCOMPLETE RECORDING, not a red (point 734)
+
+A run whose output floods past the capture cap records a FRAGMENT of its red
+set. That used to be judged an unaccounted red — and it was unclosable by
+construction, because all three closings of point 640 need the red's identity:
+it blocked every later render change until somebody hand-wrote a `--defer`, i.e.
+exactly the waiver the charge ledger exists to abolish.
+
+So the cap stays, and hitting it FAILS LOUDLY instead. The record says
+`truncated: true` whatever the exit code (a pass whose result lines were thrown
+away is a pass nobody read), `runVerdict` answers `incomplete` — a class of its
+own, covering nothing — and the guard names it apart from an unexplained red, so
+nobody hunts a defect that was never captured. Its way out is not the ledger but
+a signed closure:
+
+```
+node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot be re-recorded>"
+```
+
+It signs off ONE run by identity (backend, suite, exact timestamp), so the next
+truncated run of that pair blocks again; it demands written evidence; and it
+clears no backend — the run stays `incomplete`, never a green. The first answer
+is always to RE-RUN the suite; the closure is for a recording that genuinely
+cannot be redone.
+
+**Why the cap was not simply lifted for red lines** (measured 19.08.2026, and the
+measurement is what decided it): the only overflow on record — two
+`webgpu/settings` runs of 13.08.2026 — dropped 115 and 116 lines beyond the
+400-line cap, i.e. 515/516 result lines, and yielded 18/19 DISTINCT reds, a
+WebGPU validation cascade repeating a handful of errors. Across the 47 stored
+suite logs carrying result lines at all, the maximum is 12 kept lines and 7
+distinct reds. The distinct red set is small and bounded by the suite's checks;
+the LINES are not — every suite prints one `ERR:` line per console-error
+OCCURRENCE, and a page error that repeats per frame multiplies one red without
+bound. Red lines are exactly the unbounded ones, so they cannot go uncapped.
 
 ## The world seed is pinned AT THE LAUNCHER (points 549/557)
 
