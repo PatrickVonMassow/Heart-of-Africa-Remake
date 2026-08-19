@@ -1209,6 +1209,49 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(still[0].reds[0]).toMatch(/GPUValidationError/)
   })
 
+  // A RETRY THAT ALSO TRUNCATED (review, 19.08.2026). It exited 0, so the
+  // recorder wrote it NO reds of its own — its real failure is the first
+  // attempt's, in `suspectOf`. Judging the residual from `r.reds` therefore
+  // dropped that whole first attempt the moment the truncation was lifted, and
+  // the run left the list silently: the retry laundered what the flood could not.
+  const truncatedRetry = (backend, at, first = 'a NEW check nobody filed', overrides = {}) => ({
+    backend,
+    suite: 'polish',
+    startedAt: at - 10,
+    at,
+    exit: 0,
+    asserted: true,
+    truncated: true,
+    droppedLines: 115,
+    suspect: true,
+    suspectOf: [{ name: first, kind: 'check' }],
+    ...overrides,
+  })
+
+  it('keeps a truncated RETRY suspect once the truncation is lifted — by either route', () => {
+    const broken = truncatedRetry('webgpu', 1500)
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    // Route (1), the re-recording, and route (2), the signature: both close the
+    // lost measurement and neither may close the first attempt.
+    for (const [runs, closures] of [
+      [[broken, again], null],
+      [[broken], [closure('webgpu', 'polish', 1500)]],
+    ]) {
+      const still = unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })
+      expect(still).toHaveLength(1)
+      expect(still[0].status).toBe('suspect')
+      expect(still[0].reds).toEqual(['a NEW check nobody filed'])
+    }
+  })
+
+  it('...and lets that first attempt close the ordinary ways, once it is CHARGED', () => {
+    const broken = truncatedRetry('webgpu', 1500, 'the drummer struck without a message')
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const ledger = [{ point: 506, kind: 'check', match: /the drummer struck/, why: 'the software lane cannot answer a rate question' }]
+    expect(unexplainedRuns([broken, again], 1000, { openPoints })).toHaveLength(1)
+    expect(unexplainedRuns([broken, again], 1000, { openPoints, ledger })).toEqual([])
+  })
+
   it('but only that pair: another suite, another backend, or an older run proves nothing', () => {
     const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
     const otherSuite = { ...run('webgpu', 2000), suite: 'settings' }

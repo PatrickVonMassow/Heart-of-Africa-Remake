@@ -421,6 +421,28 @@ function isTruncationEntry(red) {
   return red?.key === 'capture-truncated' || red?.kind === TRUNCATED_KIND
 }
 
+/**
+ * WHAT A LIFTED TRUNCATION LEAVES BEHIND — the run judged by ORDINARY semantics,
+ * as if it had never truncated (review, 19.08.2026). Reading `r.reds` alone here
+ * lost a whole class: a SUSPECT run exited 0 and therefore carries NO reds of its
+ * own, because its real failure is the FIRST attempt's, held in `suspectOf`. So a
+ * truncated run that also passed on the retry dropped its first attempt's reds
+ * the moment the truncation was lifted, and left the list silently.
+ *
+ * The synthetic truncation entry is removed — it stands for what nobody
+ * recorded, which is exactly the part that was closed. The SUSPECT marker's own
+ * overflow note is NOT that entry (it means the retry marker ran out of room,
+ * and the first attempt has a full record of its own), so it survives here and
+ * stays unowned, as it does in the ordinary path. Total.
+ */
+function residualOf(run) {
+  if (run?.suspect === true && exitOf(run) === 0) {
+    return { status: 'suspect', reds: suspectRedsOf(run) }
+  }
+  const reds = (Array.isArray(run?.reds) ? run.reds : []).filter((red) => !isTruncationEntry(red))
+  return { status: 'red', reds }
+}
+
 /** How many result lines the cap swallowed, as the record knows it — the number
  *  the new field carries, or the one the old synthetic red states in its text.
  *  0 when the run is not truncated or the count cannot be read. */
@@ -850,15 +872,17 @@ export function unexplainedRuns(runs, since, options) {
       // really observed, so it is judged here exactly like any other red:
       // charged reds are accounted for, an unowned one keeps blocking and closes
       // the three ordinary ways. This is what stops either route being a waiver:
-      // a flood cannot bury a red that reached the file.
-      const observed = (Array.isArray(r.reds) ? r.reds : []).filter((red) => !isTruncationEntry(red))
-      const unowned = observed.filter((red) => !owned(red, suite, backend, level))
+      // a flood cannot bury a red that reached the file. And the residual is read
+      // by the run's OWN class — a truncated run that also passed on the RETRY
+      // keeps its first attempt's reds, which reading `r.reds` had thrown away.
+      const residual = residualOf(r)
+      const unowned = residual.reds.filter((red) => !owned(red, suite, backend, level))
       if (unowned.length === 0) continue
       out.push({
         backend,
         suite,
         at,
-        status: 'red',
+        status: residual.status,
         unaccounted: unowned.map((red) => ({
           name: text(red?.name) || '(unnamed red)',
           point: Number.isInteger(red?.point) ? red.point : null,
