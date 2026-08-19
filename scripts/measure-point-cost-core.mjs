@@ -111,7 +111,8 @@ export function itemForTool(tool = {}) {
 }
 
 function signalsForTools(tools = [], extraText = '') {
-  const text = `${extraText}\n${tools.map(toolText).join('\n')}`
+  const toolOnly = tools.map(toolText).join('\n')
+  const text = `${extraText}\n${toolOnly}`
   const wholeDocumentRead = tools.some((tool) => {
     if (!WHOLE_SPEC_PATH.test(toolText(tool))) return false
     if (tool.name === 'Read') {
@@ -123,16 +124,22 @@ function signalsForTools(tools = [], extraText = '') {
   const delegationBrief = /point-brief\.mjs\s+\d+|DELEGATION BRIEF — WORK-ORDER POINT/i.test(text)
   return {
     delegationBrief,
-    boundedVerifyDigest: /run-logged\.mjs|run-wait\.mjs/.test(text),
+    boundedVerifyDigest: /run-logged\.mjs|run-wait\.mjs/.test(toolOnly),
     openArchiveSplit: delegationBrief || /tasks-source\.mjs/.test(text),
-    docBudgets: /doc-budget(?:-guard|-core)?\.mjs|document budget (?:exceeded|guard)/i.test(text),
+    docBudgets:
+      /(?:node|npm\s+(?:run\s+)?)\s+[^\n"']*doc-budget-guard\.mjs/i.test(toolOnly) ||
+      /doc-budget-guard:\s*(?:OK|BLOCK|REFUS)/i.test(extraText),
     wholeDocumentRead,
   }
 }
 
 function classifyRole({ scope = 'top-level', prompt = '' } = {}) {
   if (scope === 'top-level') return 'main'
-  return REVIEW_PROMPT.test(prompt) ? 'review' : 'agent'
+  const opening = String(prompt).slice(0, 6000)
+  // Authoring briefs themselves say that a reviewer will later read every line. The
+  // exact role declaration must win before those later words are considered.
+  if (/AUTHORING work-order point|Du arbeitest an Arbeitsauftrags-Punkt|DEIN AUFTRAG IST EINE NACHARBEIT/i.test(opening)) return 'agent'
+  return REVIEW_PROMPT.test(opening) ? 'review' : 'agent'
 }
 
 /**
@@ -203,15 +210,28 @@ export function parseClaudeTranscript(text = '', { file = 'session.jsonl', scope
       const tool = { id: block.id, name: block.name ?? '', input: block.input ?? {} }
       toolById.set(block.id, tool)
       if (!group.tools.some((known) => known.id === tool.id)) group.tools.push(tool)
-      const item = itemForTool(tool)
-      if (item) group.items.add(item)
     }
   }
 
-  return order.map((group) => {
+  return order.map((group, index) => {
     const usage = foldUsage(group.usages)
-    const signals = signalsForTools(group.tools, `${group.prompt}\n${group.evidenceText}`)
-    return { ...group, usage, tokens: claudeTokens(usage), items: [...group.items], signals, usages: undefined }
+    // A top-level transcript spans MANY points. Its complete prompt history may name
+    // all of them, so only the user/tool result immediately preceding this response is
+    // evidence. A delegated transcript is one job and may use its opening prompt.
+    const sessionPrompt = group.scope === 'subagent' && index === 0 ? group.prompt : ''
+    const signals = signalsForTools(group.tools, `${sessionPrompt}\n${group.evidenceText}`)
+    return {
+      ...group,
+      // One delegated transcript is one job. Keeping its very large opening prompt on
+      // every response made point assignment quadratic in prompt size; the first turn
+      // carries it and the session rule fills the rest.
+      prompt: sessionPrompt,
+      usage,
+      tokens: claudeTokens(usage),
+      items: [...group.items],
+      signals,
+      usages: undefined,
+    }
   })
 }
 
@@ -267,11 +287,9 @@ export function parseCodexTranscript(text = '', { file = 'rollout.jsonl' } = {})
     const usage = codexUsage(payload.info)
     const at = Date.parse(row.timestamp ?? '')
     if (!Number.isFinite(at) || codexTokens(usage) <= 0) continue
+    // A call REQUESTS an image/report/log; the following response pays to consume the
+    // result. Only `consumed` is charged here, never the request itself.
     const items = new Set(consumed)
-    for (const tool of currentTools) {
-      const item = itemForTool(tool)
-      if (item) items.add(item)
-    }
     const evidenceText = first ? prompt : ''
     const signals = signalsForTools(currentTools, evidenceText)
     turns.push({
@@ -282,11 +300,13 @@ export function parseCodexTranscript(text = '', { file = 'rollout.jsonl' } = {})
       sessionBase: sessionId,
       scope: 'subagent',
       role,
-      agent: role === 'agent' ? `codex:${String(sessionId).slice(0, 8)}` : null,
+      // The first UUID segment is timestamp-derived and collides across concurrent
+      // rollouts (observed as several `01a017b0-*` agents). Include the next segment.
+      agent: role === 'agent' ? `codex:${String(sessionId).split('-').slice(0, 2).join('-')}` : null,
       branch: meta.git?.branch ?? '',
       cwd: meta.cwd ?? '',
       file,
-      prompt,
+      prompt: first ? prompt : '',
       evidenceText,
       tools: currentTools,
       usage,
@@ -335,7 +355,7 @@ function directPoint(turn, candidates) {
     {
       branch: turn.branch,
       cwd: turn.cwd,
-      text: `${turn.evidenceText ?? ''}\n${turn.prompt ?? ''}\n${(turn.tools ?? []).map(toolText).join('\n')}`,
+      text: `${turn.evidenceText ?? ''}\n${turn.scope === 'subagent' ? (turn.prompt ?? '') : ''}\n${(turn.tools ?? []).map(toolText).join('\n')}`,
     },
     candidates,
   )
@@ -518,7 +538,15 @@ export function aggregatePointLedger({ landed = [], turns = [], boundaryEvents =
       assignedBy: Object.fromEntries(Object.entries(row.assignedBy).map(([key, value]) => [key, Math.round(value)])),
     }
   })
-  const effectiveness = Object.fromEntries(LEVERS.map((lever) => [lever, leverEffect(ledger, lever)]))
+  const effectiveness = Object.fromEntries(
+    LEVERS.map((lever) => [
+      lever,
+      {
+        events: ledger.reduce((sum, row) => sum + row.leverEvents[lever], 0),
+        ...leverEffect(ledger, lever),
+      },
+    ]),
+  )
   const total = ledger.reduce((sum, row) => sum + row.tokens, 0)
   const items = Object.fromEntries(
     Object.keys(ITEM_LABELS).map((item) => {
@@ -543,7 +571,13 @@ export function selectLandedPoints(merges = [], count = 10) {
     const point = Number(String(branch).match(/feat\/(\d+)(?:-|\/|\b)/)?.[1])
     if (!Number.isInteger(point) || seen.has(point)) continue
     seen.add(point)
-    rows.push({ point, sha: merge.sha ?? null, landedAt: merge.landedAt ?? merge.mergedAt ?? null, subject })
+    rows.push({
+      point,
+      sha: merge.sha ?? null,
+      landedAt: merge.landedAt ?? merge.mergedAt ?? null,
+      startedAt: merge.startedAt ?? merge.firstBranchCommitAt ?? null,
+      subject,
+    })
     if (rows.length >= count) break
   }
   return rows

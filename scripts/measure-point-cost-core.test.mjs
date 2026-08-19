@@ -55,7 +55,7 @@ describe('recorded Codex fixtures', () => {
     expect(turns.reduce((sum, turn) => sum + turn.tokens, 0)).toBe(3300)
     expect(turns[0].usage.cache_read_input_tokens).toBe(400)
     expect(turns[0].usage.input_tokens).toBe(600)
-    expect(turns[0]).toMatchObject({ role: 'agent', agent: 'codex:codex-au' })
+    expect(turns[0]).toMatchObject({ role: 'agent', agent: 'codex:codex-author' })
   })
 
   it('classifies a second-pair-of-eyes rollout as review cost', () => {
@@ -114,7 +114,7 @@ describe('boundary events and the landed-point ledger', () => {
     const originTotal = row.origins.mainSession + row.origins.crossVendorReviews + Object.values(row.origins.agents).reduce((a, b) => a + b, 0)
     expect(originTotal).toBe(row.tokens)
     expect(row.origins.crossVendorReviews).toBe(800)
-    expect(Object.keys(row.origins.agents)).toEqual(['codex:codex-au', 'claude:a900'])
+    expect(Object.keys(row.origins.agents)).toEqual(['codex:codex-author', 'claude:a900'])
     expect(row.items.agentReports).toBeGreaterThan(0)
     expect(row.items.pictureReads).toBeGreaterThan(0)
     expect(row.items.reviewRounds).toBe(800)
