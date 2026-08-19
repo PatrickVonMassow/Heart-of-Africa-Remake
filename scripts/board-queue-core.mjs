@@ -53,6 +53,7 @@ import {
 import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
+import { inheritedEstimate } from './queue-calibration-core.mjs'
 // The pool cap is the width of the queue's front (point 712) — three slots,
 // three candidates. It is IMPORTED rather than restated: a second 3 in this file
 // would be a second home for the number CLAUDE.md §6 states.
@@ -356,8 +357,13 @@ export function gatedMeta(since) {
  * gated point that already has its "Von dir zu klären" card is excluded by the
  * caller anyway; this is the honest state of the window before that card exists,
  * or after somebody forgot it.)
+ *
+ * `calibration` is what `queue-calibration.mjs` measured (point 730). A point
+ * nobody has estimated inherits the MEASURED MEDIAN of its criticality class
+ * instead of showing the "no estimate yet" marker — the marker is not retired,
+ * it is what still stands when the point carries no class the measurement covers.
  */
-export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null } = {}) {
+export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null, calibration = null } = {}) {
   const { points } = normaliseQueueData(data)
   const g = normaliseGates(gates)
   const skip = new Set((Array.isArray(exclude) ? exclude : [...exclude]).map(Number))
@@ -372,7 +378,7 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
       point,
       title,
       body: entry.body ?? [QUEUE_STUB_BODY],
-      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || QUEUE_STUB_META,
+      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || inheritedEstimate(point, calibration ?? {}) || QUEUE_STUB_META,
       stub,
       gated,
       // The fallback is still TAKEN — it is no longer taken SILENTLY.
@@ -536,10 +542,10 @@ export function queueSectionBounds(html) {
  * a request that has since been queued disappears from the board on the next
  * rebuild without anything having to remember it.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null, calibration = null } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
-  const entries = queueEntries({ open, data, exclude, titles, gates })
+  const entries = queueEntries({ open, data, exclude, titles, gates, calibration })
   const cards = `${renderQueueCards(entries)}${renderRequestsCard(requests)}`
   return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }

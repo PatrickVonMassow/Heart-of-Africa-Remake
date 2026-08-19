@@ -28,6 +28,7 @@ import { QUEUE_DATA_PATH, normaliseQueueData, openPointsOf, parseQueueDataFile, 
 import {
   AXES,
   attributeMerges,
+  CALIBRATION_PATH,
   calibrationReading,
   inheritanceDefaults,
   inheritedEstimateForClass,
@@ -38,9 +39,6 @@ import {
   parseTickEvents,
   rewritePlan,
 } from './queue-calibration-core.mjs'
-
-/** Where the measured defaults live — beside the board data they serve. */
-export const CALIBRATION_PATH = '.claude/queue-calibration.json'
 
 const COMMIT_MARK = '@@COMMIT@@'
 const HOUR = 3600

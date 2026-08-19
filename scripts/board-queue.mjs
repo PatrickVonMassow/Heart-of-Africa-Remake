@@ -51,6 +51,7 @@ import {
   unestimatedPoints,
   untranslatedTitlePoints,
 } from './board-queue-core.mjs'
+import { CALIBRATION_PATH, parseCriticality } from './queue-calibration-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
 import { gateReport, gateSets } from './user-gate-core.mjs'
@@ -123,6 +124,26 @@ function carrierRequests() {
   }
 }
 
+/**
+ * WHAT A CARD NOBODY ESTIMATED INHERITS (point 730) — the measured medians per
+ * criticality class, written by `queue-calibration.mjs`.
+ *
+ * FAIL-SOFT: the file is git-ignored state like the queue data itself, so a fresh
+ * checkout simply has none, and a queue rebuild must not stop for that. Without
+ * it every unestimated card shows the "no estimate yet" marker exactly as before.
+ */
+function calibration(tasksText) {
+  try {
+    const file = resolve(REPO_ROOT, CALIBRATION_PATH)
+    if (!existsSync(file)) return null
+    const { defaults } = JSON.parse(readFileSync(file, 'utf8')) ?? {}
+    if (!defaults || typeof defaults !== 'object') return null
+    return { defaults, criticality: parseCriticality(tasksText) }
+  } catch {
+    return null
+  }
+}
+
 /** Board, work order and the exclusions the other sections already own. */
 function inputs() {
   if (!existsSync(boardFile)) throw new Error(`board not found: ${boardFile}`)
@@ -133,6 +154,7 @@ function inputs() {
     tasks,
     open: openPointsOf(tasks),
     titles: parseTaskTitles(tasks),
+    calibration: calibration(tasks),
     // The user gate (point 450): which points wait on the user, which he has
     // answered, and since when.
     gates: gateSets(tasks),
@@ -183,8 +205,8 @@ try {
         `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,
     )
   } else if (cmd === '--check' || cmd === undefined) {
-    const { html, tasks, open, titles, exclude, requests, gates } = inputs()
-    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates })
+    const { html, tasks, open, titles, exclude, requests, gates, calibration: measured } = inputs()
+    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates, calibration: measured })
     const saySoIfRequests = () => {
       if (requests.length) {
         console.log(`  ${requests.length} deposited request(s) named under the queue — node scripts/finding.mjs --requests`)

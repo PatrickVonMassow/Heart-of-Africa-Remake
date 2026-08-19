@@ -139,6 +139,23 @@ describe('queueEntries — every open point gets a card, and never two', () => {
       stub: false,
     })
   })
+  // POINT 730 — a card nobody has estimated inherits the MEASURED median of its
+  // criticality class, and the "no estimate yet" marker stays for the rest.
+  it('inherits the measured median of its class when nobody estimated the point', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe('~1 h · Klassenmedian')
+  })
+  it('keeps the "no estimate yet" marker when the point\'s class was never measured', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'maximum']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe(QUEUE_STUB_META)
+    // …and with no measurement at all, nothing about the card changes.
+    expect(queueEntries({ open: [412] })[0].meta).toBe(QUEUE_STUB_META)
+  })
+  it('never overrides a stored estimate with an inherited one', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    const data = { points: { 412: { title: null, body: 'Text.', estimate: '~3 h' } } }
+    expect(queueEntries({ open: [412], data, calibration })[0].meta).toBe('~3 h')
+  })
   it('REFUSES to re-add a point another section already claims', () => {
     // The double-listing trap: the point moved to the now-card must not come
     // back as a queue card, or invariant 4b blocks the very turn that published.

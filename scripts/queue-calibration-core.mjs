@@ -29,6 +29,14 @@
 // the global factor is REFUSED by name and the rewrite falls back to the one axis
 // that is knowable BEFORE a point starts: its criticality tag.
 
+/**
+ * Where the measured defaults live — beside the board data they serve, and
+ * git-ignored like it. The constant sits in the PURE core because the command
+ * itself measures at import time: a consumer that only wants the path must not
+ * have to run the tool to learn it.
+ */
+export const CALIBRATION_PATH = '.claude/queue-calibration.json'
+
 /** How many landed comparables a class needs before its factor is trusted. */
 export const MIN_CLASS_SAMPLES = 5
 
