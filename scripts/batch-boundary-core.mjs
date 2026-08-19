@@ -685,7 +685,9 @@ export const CLOSING_SET_SCRIPTS = [
   'dashboard-sync',
   'focus',
   'board',
+  'board-queue',
   'board-publish',
+  'finding',
   'mechanism-review',
   'retro-refresh',
   'batch-boundary',
@@ -716,12 +718,24 @@ export function isClosingSetPath(p) {
  * because a kept handover plus a long enough silence lets a successor spawn
  * beside a working session.
  *
- * A segment must also be nothing but the invocation: any command substitution
- * (`$(…)`, backticks) or redirection (`>`, `<`) makes it non-closing, whatever
- * its head reads as. Those run or write something this function cannot see, and
- * the head is no longer evidence of what the segment does.
+ * A segment must also be nothing but the invocation and harmless OUTPUT
+ * handling: any command substitution (`$(…)`, backticks) or redirection to a
+ * file (`>`, `<`) makes it non-closing, whatever its head reads as. A descriptor
+ * merge such as `2>&1` is different: it only selects where already-produced
+ * output is displayed, and is removed before separators are classified.
  */
 const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
+
+/**
+ * Remove shell descriptor-to-descriptor OUTPUT merges before splitting on `&`.
+ * They write no file and run no command. Anchoring both descriptors to decimal
+ * file-descriptor syntax keeps `> result.txt`, `>& result.txt` and an arbitrary
+ * ampersand expression opaque. The residual `>`/`<` check below remains the
+ * authority for every other redirection.
+ */
+export function withoutOutputDescriptorMerges(command) {
+  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=\s|$)/g, '$1')
+}
 
 /**
  * A PURE OUTPUT PAGER — a segment that only looks at what the segment before it
@@ -746,7 +760,7 @@ export function isOutputPagerSegment(segment) {
 
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
-  const segments = command
+  const segments = withoutOutputDescriptorMerges(command)
     .split(/&&|\|\||[;|&\n\r]+/)
     .map((s) => s.trim())
     .filter(Boolean)

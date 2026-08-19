@@ -24,6 +24,7 @@ import {
   isClosingSetPath,
   isClosingSetCommand,
   isOutputPagerSegment,
+  withoutOutputDescriptorMerges,
   describeWithdrawalTrigger,
   hookCallTimestamp,
   berlinMinuteOfDay,
@@ -313,6 +314,8 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
       'node scripts/batch-boundary.mjs 388',
       'cd /repo && node scripts/board.mjs move 388 done',
       'node "C:/repo/scripts/retro-refresh.mjs"',
+      'node scripts/board-queue.mjs',
+      'node scripts/finding.mjs --drain',
     ]) {
       expect(call({ command: c })).toMatchObject({ survives: true })
     }
@@ -349,6 +352,37 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     ]) {
       expect(call({ command: c }).survives).toBe(false)
     }
+  })
+
+  it('THE WAY OUT SURVIVES harmless output decoration', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear',
+      'node scripts/batch-boundary.mjs --clear 2>&1',
+      'node scripts/batch-boundary.mjs --clear | tail -3',
+      'node scripts/batch-boundary.mjs --clear 2>&1 | tail -3',
+      'node scripts/board.mjs attest 2>&1 | tail -3',
+      'node scripts/board-queue.mjs 2>&1 | head -3',
+      'node scripts/finding.mjs --drain 2>&1 | more',
+    ]) {
+      expect(call({ command }).survives, command).toBe(true)
+    }
+  })
+
+  it('keeps file writes, substitutions and second work outside the closing set', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear > boundary.txt',
+      'node scripts/batch-boundary.mjs --clear 2> errors.txt',
+      'node scripts/batch-boundary.mjs --clear $(git status)',
+      'node scripts/batch-boundary.mjs --clear && git commit -m carry-on',
+    ]) {
+      expect(call({ command }).survives, command).toBe(false)
+    }
+  })
+
+  it('recognises only descriptor merges as harmless redirection', () => {
+    expect(withoutOutputDescriptorMerges('x 2>&1 1>&2')).toBe('x  ')
+    expect(withoutOutputDescriptorMerges('x > out 2> err')).toBe('x > out 2> err')
+    expect(withoutOutputDescriptorMerges('x >& out')).toBe('x >& out')
   })
 
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
