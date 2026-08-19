@@ -374,6 +374,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
+- **Die Regel kennt nur die Hinfahrt.** „Nach fünf Fehlversuchen nimm das stärkere Modell" hängt
+  an einer Zahl, die nie wieder sinkt: Ein einmal hochgestufter Punkt bleibt oben, auch wenn nur
+  noch drei Testfälle fehlen — und weil niemand einen Rückweg gebaut hat, hilft auch kein
+  Handgriff.
+  → *Prompt:* „Zu jedem automatischen Übergang, der etwas Teures verbraucht, gehören **Rückweg
+  und Handgriff**: die Bedingung fürs Zurückfallen, und ein Schalter, der die Entscheidung auch
+  **oberhalb** der Schwelle überstimmt. Frag nicht nur ‚ist die Bedingung richtig', sondern: **wie
+  komme ich wieder heraus, wenn sie es nicht ist?**"
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -412,4 +421,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 52b460ae5069ab7ade76a784e9699e7cc0b726625fbf1d0c8efa8c4a0caabeff -->
+<!-- GUIDE-FINGERPRINT: f58d1255cbdb02bb9a58010abc53dd86ac18a1c9a343b88f918842b247e4063a -->

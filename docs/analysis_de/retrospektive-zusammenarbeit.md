@@ -1313,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 19.08.2026, 14:09 · Quellen-Fingerprint: `52b460ae5069…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 15:33 · Quellen-Fingerprint: `f58d1255cbdb…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1337,6 +1337,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
+| Never measure a model's spend by commit trailers — unlanded, looping work has no commits and is the most expensive kind | 2 | mittel | commit-scope-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | container-ask-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, decision-card-guard.mjs | ✔ Mechanismus |
@@ -1404,10 +1405,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 61 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
+Erfasste Quellen: 84 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 61 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
 
-<!-- RETRO-FINGERPRINT: 52b460ae5069ab7ade76a784e9699e7cc0b726625fbf1d0c8efa8c4a0caabeff -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T12:09:34.520Z -->
+<!-- RETRO-FINGERPRINT: f58d1255cbdb02bb9a58010abc53dd86ac18a1c9a343b88f918842b247e4063a -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T13:33:33.710Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1779,3 +1780,34 @@ während das, wofür sie bürgt, vollständig ausgefallen ist?* Und die zweite H
 dazu: Der Ausfall muss sich vom Produktfehler UNTERSCHEIDEN. Solange »kein Backend auf
 diesem Rechner« und »die Anwendung kam nicht hoch« dasselbe Rot erzeugen, wird jedes Mal
 neu diagnostiziert, was einmal benannt gehört.
+
+### 3.127 Der Zähler stieg, und es gab keinen Weg zurück — auch keinen von Hand
+
+Am 19.08.2026 fiel beim Nachmessen des Modellverbrauchs auf, dass 58 Prozent des
+Wochenkontingents des KNAPPSTEN Modells in einem einzigen, nie gelandeten Punkt steckten,
+und 79 Prozent insgesamt in der Eskalationsspur. Die Regel, die diese Spur öffnet, ist
+sauber gebaut und begründet: Kommt ein Punkt fünf Prüfrunden lang nicht durch, schreibt ihn
+ein stärkeres Modell. Gebaut wurde nur die Hinfahrt. Die Entscheidung hängt an der
+Rundenzahl, und Rundenzahlen sinken nie — ein einmal eskalierter Punkt bleibt für immer
+oben, gleichgültig wie weit er inzwischen konvergiert ist. Die letzte Runde des teuersten
+Punktes lautete »drei Testfälle ergänzen und einen Fehlerpfad schließen«.
+
+Zwei Dinge daran sind lehrreich, und das zweite mehr als das erste. Erstens: Eine
+Eskalationsregel ist erst vollständig, wenn sie auch eine DEeskalation kennt. Wer nur die
+Bedingung fürs Hinauf schreibt, baut eine Einbahnstraße und merkt es nicht, weil in dem
+Moment, in dem sie greift, alles richtig aussieht. Zweitens, und das ist der eigentliche
+Befund: Es gab auch von Hand keinen Ausweg. Der Punkt konnte sich per Spur-Kennzeichen
+selbst eine günstigere Spur zuweisen — nur wird dieses Kennzeichen erst NACH der
+Eskalationsschwelle gelesen, also genau dort nicht mehr, wo es gebraucht wird. Der einzige
+Parameter, der die Entscheidung überstimmt, wird von keinem Kommandozeilenwerkzeug gesetzt.
+Der Zustand war also nicht nur automatisch unumkehrbar, sondern überhaupt unumkehrbar, bis
+jemand einen Mechanismus dafür baut.
+
+**Lehre:** Zu jedem automatischen Übergang, der etwas Teures oder Knappes verbraucht,
+gehören zwei Dinge, die nicht später nachgereicht werden können — der Rückweg und der
+HANDGRIFF. Der Rückweg, weil eine Bedingung, die nur in eine Richtung prüft, keinen Zustand
+beschreibt, sondern eine Falle. Der Handgriff, weil zwischen »der Mechanismus ist falsch«
+und »der Mechanismus ist repariert« immer eine Strecke liegt, die jemand überbrücken muss;
+ohne ihn kostet jeder Fehlgriff genau so lange, wie das Bauen des nächsten Mechanismus
+dauert. Und die Prüffrage dazu lautet nicht »ist die Bedingung richtig«, sondern: *Wie komme
+ich hier wieder heraus, wenn sie es nicht ist?*
