@@ -100,11 +100,18 @@ export const SWEPT_GROUND_BY_KIND: Record<PlaceKind, SweptLook> = {
  * coverage instead, so the blotches disappear at constant value and the tone
  * step lands whole.
  *
- * The value is the mean of the shader's own patch term over the ground —
- * calibratable, and mirrored by `sweptGroundLevel` so the CPU contrast model and
- * the shader cannot drift apart.
+ * The value is the MEASURED mean of the shader's own patch term over the ground
+ * — not a guess: `(1 - clamp(worley, 0, 1))^3` averaged over the plane the
+ * ground material samples it on, 0.396 ± 0.001 (`edgeBand.test.ts` re-measures
+ * it from a mirror of that noise, so the constant cannot drift away from the
+ * mottling it is supposed to average). One constant serves both sides — the CPU
+ * model levels with it in `openGroundLevel`, the shader in `createGroundMaterial`'s
+ * `levelled` term — so the contrast model and the picture cannot part company.
+ * It is the one number here that is a measurement rather than a calibration: set
+ * it too low and the swept side is levelled BRIGHTER than the ground it replaces,
+ * which is the residue of the bug this work-order removed.
  */
-export const SWEPT_PATCH_MEAN = 0.34
+export const SWEPT_PATCH_MEAN = 0.396
 
 // --- Pure math (mirrored by the shader below) ---------------------------------
 

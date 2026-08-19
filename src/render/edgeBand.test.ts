@@ -19,6 +19,7 @@ import {
   EDGE_CORE_HALF,
   MIN_EDGE_CONTRAST,
   SWEPT_GROUND_BY_KIND,
+  SWEPT_PATCH_MEAN,
   clampWander,
   clearEdgeBand,
   edgeBandBounds,
@@ -333,6 +334,64 @@ describe('the edge READS against the ground it sits on (work-order 581)', () => 
       expect(groundLuma(sweptGroundColor(open, 1, look)), label)
         .toBeCloseTo(groundLuma(sweptGroundColor(open, 1, noDesat)), 9)
     }
+  })
+
+  // `SWEPT_PATCH_MEAN` is the one number in the band that is a MEASUREMENT, not a
+  // calibration: the level the swept side is flattened to has to be the mottled
+  // ground's own mean, or losing the blotches moves brightness and eats part of
+  // the tone step — which is precisely how the shipped edge became invisible. So
+  // it is re-measured here from a mirror of the shader's own noise instead of
+  // being taken on trust.
+  it('SWEPT_PATCH_MEAN really is the mean of the shader patch term it stands for', () => {
+    // Mirror of `mx_worley_noise_float(vec3(p·0.22, 9.0))` as the ground material
+    // calls it: three's MaterialX worley with jitter 1 and metric 1, i.e. the
+    // SQUARED distance to the nearest jittered point of a unit cell grid, with no
+    // final sqrt. Sampled on the z = 9.0 plane the material fixes — an exact cell
+    // boundary, whose statistics differ from a generic slice, so the plane is part
+    // of the measurement. The jitter comes from a fixed integer hash rather than
+    // three's, since only its UNIFORMITY enters the mean; the run is deterministic.
+    const hash = (x: number, y: number, z: number, k: number): number => {
+      let h = (x * 374761393 + y * 668265263 + z * 2147483647 + k * 1274126177) | 0
+      h = Math.imul(h ^ (h >>> 13), 1274126177)
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296
+    }
+    const patchTerm = (px: number, py: number): number => {
+      const X = Math.floor(px)
+      const Y = Math.floor(py)
+      const lx = px - X
+      const ly = py - Y
+      let nearest = Infinity
+      for (let x = -1; x <= 1; x++) {
+        for (let y = -1; y <= 1; y++) {
+          for (let z = -1; z <= 1; z++) {
+            const dx = x + hash(X + x, Y + y, 9 + z, 0) - lx
+            const dy = y + hash(X + x, Y + y, 9 + z, 1) - ly
+            const dz = z + hash(X + x, Y + y, 9 + z, 2) // localpos.z is exactly 0 on the plane
+            const d2 = dx * dx + dy * dy + dz * dz
+            if (d2 < nearest) nearest = d2
+          }
+        }
+      }
+      return (1 - Math.min(1, Math.max(0, nearest))) ** 3
+    }
+    // A stratified sweep over many cells: the sampling error on the mean is well
+    // under the tolerance below, so a failure means the constant moved, not noise.
+    const CELLS = 48
+    const SUB = 12
+    let sum = 0
+    let n = 0
+    for (let cx = 0; cx < CELLS; cx++) {
+      for (let cy = 0; cy < CELLS; cy++) {
+        for (let i = 0; i < SUB; i++) {
+          for (let j = 0; j < SUB; j++) {
+            sum += patchTerm(cx + (i + 0.5) / SUB, cy + (j + 0.5) / SUB)
+            n++
+          }
+        }
+      }
+    }
+    const measured = sum / n
+    expect(Math.abs(measured - SWEPT_PATCH_MEAN), `measured ${measured.toFixed(4)}`).toBeLessThan(0.02)
   })
 
   it('the swept side is LEVELLED, not bleached: losing the blotches costs no brightness', () => {
