@@ -12,8 +12,8 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -2702,6 +2702,75 @@ describe('adoptTransferred — unattributable kept evidence refuses BEFORE the w
       const after = readDeclaration(path)
       expect(after.sessionId).toBe('session-successor')
       expect(after.adopted.from).toBe('session-predecessor')
+      // The ROUNDTRIP holds (eighth cross-review): the adopted record still
+      // carries the evidence with its point — an adoption that stamped
+      // `adopted: true` but blanked the evidence or damaged the point would
+      // leave the read side silently empty one look later.
+      expect(after.evidence).toEqual([{ kind: 'log', path: log, point: 700, phase: 'authoring' }])
+      expect(normalizeActiveWork({ declaration: after, openPoints: [700] })).toMatchObject({
+        ok: true,
+        points: [700],
+      })
+    })
+  })
+
+  it('adopts LIVE PID evidence with its recorded point kept verbatim — attribution is never decided by kind', () => {
+    // Eighth cross-review: the pid path had only reached the alert helper. This
+    // runs the real adoption over a pid the real probe confirms alive, so an
+    // adoption that ignored or stripped `point` on pid items, or reported every
+    // pid as unattributable by kind, fails here.
+    withTempLock(({ lockPath, path }) => {
+      const probe = probePid(process.pid)
+      expect(probe.exists).toBe(true)
+      const item = { kind: 'pid', pid: process.pid, startedAt: probe.startedAt, point: 700, phase: 'authoring' }
+      writeDeclaration(transferred([item]), path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      const after = readDeclaration(path)
+      expect(after.evidence).toEqual([item])
+      expect(normalizeActiveWork({ declaration: after, openPoints: [700] })).toMatchObject({ ok: true, points: [700] })
+    })
+  })
+
+  it('judges attribution on the KEPT evidence only — a stale point-less item is dropped and named, never a refusal', () => {
+    // Eighth cross-review: the refusal case fed both items from one fresh log,
+    // so an implementation that questioned already-EXPIRED point-less items
+    // before the probe — refusing an otherwise valid adoption — stayed green.
+    withTempLock(({ dir, lockPath, path }) => {
+      const live = join(dir, 'live.log')
+      writeFileSync(live, 'still writing')
+      const stale = join(dir, 'stale.log')
+      writeFileSync(stale, 'long finished')
+      const old = new Date(Date.now() - LOG_FRESH_MS - 3_600_000)
+      utimesSync(stale, old, old)
+      writeDeclaration(
+        transferred([
+          { kind: 'log', path: live, point: 700, phase: 'authoring' },
+          { kind: 'log', path: stale, phase: 'authoring' },
+        ]),
+        path,
+      )
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 1 })
+      expect(a.alerts.join(' ')).toContain('expired')
+      // The dropped item does not survive into the adopted record.
+      expect(readDeclaration(path).evidence).toEqual([{ kind: 'log', path: live, point: 700, phase: 'authoring' }])
+    })
+  })
+
+  it('hands the DECLARATION-level phase to the attribution check — terminal at the record, point-less item adopts', () => {
+    // Eighth cross-review: the declaration-phase fallback was only proven at
+    // the helper; a wiring that never passed `declaration.phase` through would
+    // default the item to "authoring" and falsely refuse this adoption.
+    withTempLock(({ dir, lockPath, path }) => {
+      const log = join(dir, 'agent.log')
+      writeFileSync(log, 'still writing')
+      writeDeclaration({ ...transferred([{ kind: 'log', path: log }]), phase: 'landed' }, path)
+      const a = adoptTransferred('session-successor', { lockPath })
+      expect(a).toMatchObject({ adopted: true, reason: 'adopted', kept: 1, dropped: 0 })
+      expect(a.alerts).toEqual([])
+      expect(readDeclaration(path).sessionId).toBe('session-successor')
     })
   })
 
@@ -2718,7 +2787,81 @@ describe('adoptTransferred — unattributable kept evidence refuses BEFORE the w
       )
       const a = adoptTransferred('session-successor', { lockPath })
       expect(a).toMatchObject({ adopted: true, reason: 'adopted' })
+      // No alert rides beside the success (eighth cross-review): the sixth
+      // round's defect was exactly an adoption that succeeded AND printed a
+      // false clear-alarm — a terminal item must produce neither.
+      expect(a.alerts).toEqual([])
       expect(readDeclaration(path).sessionId).toBe('session-successor')
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE CLI ITSELF (eighth cross-review): every case above calls
+// `adoptTransferred` in-process, so a CLI that ignored `--adopt`, routed it
+// elsewhere, or printed ADOPTED and exited 0 regardless of the result stayed
+// green. Spawned inside an isolated temp repo, like board-focus-behaviour —
+// nothing here touches the repository's own .claude/.
+// ---------------------------------------------------------------------------
+describe('batch-in-flight.mjs --adopt (spawned) — the CLI answers with the real verdict, exit code and write', () => {
+  const withCliRepo = (fn) => {
+    const repo = mkdtempSync(join(tmpdir(), 'hoa-adopt-cli-'))
+    try {
+      cpSync(join(REPO_ROOT, 'scripts'), join(repo, 'scripts'), {
+        recursive: true,
+        filter: (src) => !/[\\/](git-hooks)([\\/]|$)/.test(src),
+      })
+      mkdirSync(join(repo, '.claude'), { recursive: true })
+      const lockPath = join(repo, '.claude', 'batch-lock.json')
+      writeFileSync(lockPath, JSON.stringify({ sessionId: 'session-successor', claimedAt: Date.now() }))
+      fn({ repo, declarationPath: statePathsFor(lockPath).inFlightPath })
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  }
+  const runAdopt = (repo) =>
+    spawnSync(process.execPath, [join(repo, 'scripts', 'batch-in-flight.mjs'), '--adopt'], {
+      windowsHide: true,
+      cwd: repo,
+      encoding: 'utf8',
+      timeout: 60_000,
+    })
+  const transferred = (evidence) => ({
+    v: 1,
+    sessionId: 'session-predecessor',
+    at: Date.now(),
+    waitingOn: 'a delegated agent',
+    transfer: { v: 1, by: 'session-predecessor', at: Date.now(), checkpoints: [] },
+    evidence,
+  })
+
+  it('adopts through the real entry point: exit 0, ADOPTED said, the record rewritten with its evidence intact', () => {
+    withCliRepo(({ repo, declarationPath }) => {
+      const log = join(repo, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const item = { kind: 'log', path: log, point: 700, phase: 'authoring' }
+      writeFileSync(declarationPath, JSON.stringify(transferred([item])))
+      const r = runAdopt(repo)
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout).toContain('ADOPTED the transferred declaration')
+      const after = JSON.parse(readFileSync(declarationPath, 'utf8'))
+      expect(after.sessionId).toBe('session-successor')
+      expect(after.adopted.from).toBe('session-predecessor')
+      expect(after.evidence).toEqual([item])
+    })
+  })
+
+  it('refuses through the real entry point: exit 1, the alert and the way out on stderr, the record untouched', () => {
+    withCliRepo(({ repo, declarationPath }) => {
+      const log = join(repo, 'agent.log')
+      writeFileSync(log, 'still writing')
+      const before = JSON.stringify(transferred([{ kind: 'log', path: log, phase: 'authoring' }]))
+      writeFileSync(declarationPath, before)
+      const r = runAdopt(repo)
+      expect(r.status).toBe(1)
+      expect(r.stderr).toContain('ALERT:')
+      expect(r.stderr).toContain('ADOPTION REFUSED')
+      expect(readFileSync(declarationPath, 'utf8')).toBe(before)
     })
   })
 })
