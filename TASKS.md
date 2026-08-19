@@ -8046,6 +8046,16 @@ to land than a mechanism that needs a review.
   attached all yield "no payload", which every caller already handles as a manual run. A bounded
   read guards the remaining case so an inherited-but-silent pipe cannot hang either. Every
   enforcer that reads stdin today uses it; none keeps a private copy.
+  AN ABSENT PAYLOAD MUST NOT READ AS A FOREIGN SESSION (measured 19.08.2026, the second half of
+  the same defect — there the handrail hangs, here it lies). `node
+  scripts/mechanism-review-guard.mjs --status` answers "stands down: another live session owns the
+  batch lock" while THIS session holds it: the wrapper takes the session id from the payload alone,
+  so without one it is empty, and `heldByOtherLiveOwner('')` is TRUE. There is no `--session` flag
+  and `CLAUDE_SESSION_ID` is not read, so only `echo {"session_id":"…"} | node …` tells the truth.
+  The shared helper therefore falls back to the environment and to the lock when no payload
+  arrives, a `--session` flag names the session explicitly, and the stand-down check distinguishes
+  UNKNOWN from provably foreign — unknown may never stand a guard down. The same ~25 enforcers are
+  affected.
   VERIFIABLE: a Vitest case per branch of the helper (TTY, closed stdin, valid JSON payload,
   non-JSON payload, an open pipe that never writes) proving it returns rather than blocks; a
   repository check that no enforcer calls `readFileSync(0, …)` outside the helper, so the shape
@@ -8827,6 +8837,12 @@ to land than a mechanism that needs a review.
     the handover text it prints, so the paste passes the publish gate unedited. Where no open
     point remains, it prints the wording the gate accepts for that case rather than a number that
     does not exist.
+  - THE TEMPLATE NAMES EVERY STEP THE CARD NEEDS (measured 19.08.2026, 17:27, at a watermark
+    handover). `board.mjs none` additionally refuses the card while a now-card stands, so the
+    point has to be sent back to the queue first — three steps the printed template does not
+    mention, at the most expensive place in the session: its end, above the watermark, where
+    nothing new may begin. The printed handover therefore names sending the now-card back as its
+    first step, and the way through is the template's, not a lucky combination of two texts.
   - THE AGREEMENT IS PINNED, NOT COINCIDENTAL. The gate's requirement and the boundary's text are
     checked against each other, so a later change to either side fails a test instead of
     surfacing at the next handover.
