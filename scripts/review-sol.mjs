@@ -79,6 +79,7 @@ import {
   assembleMaterial,
   formatPassManifest,
   formatShortfall,
+  gitlinkPathsFromRawDiff,
   isBinaryPatchSection,
   joinPatchSections,
   materialShortfall,
@@ -241,12 +242,8 @@ function gatherRange(sha, base, onlyPaths = null) {
   // The patch travels RAW too (fourth round): trimming it ate a trailing space
   // off a rename destination's last line together with the final newline — a
   // silently different path, with the accounting none the wiser.
-  // `--binary` because a declared binary file's CHANGE must actually travel
-  // (round-1 passes 3/4): the ordinary diff writes only `Binary files …
-  // differ`, which delivers no byte — arbitrary binary content was then
-  // cleared unread. The base85 `GIT binary patch` is pure ASCII, so it rides
-  // the text pipeline losslessly, and assembleMaterial refuses the binary
-  // declaration where that section is missing. `--no-textconv` because a
+  // Binary bytes are absent by design: ordinary Git patch text names the
+  // change, while no base85 payload enters the review material. `--no-textconv` because a
   // configured textconv driver replaces file bytes with a transformed
   // representation while avoiding the binary marker — the real blob then
   // reaches no pass while the accounting reports complete delivery (round-1
@@ -255,37 +252,18 @@ function gatherRange(sha, base, onlyPaths = null) {
   // per-path external driver REPLACES git's own patch generation, so a helper
   // emitting plausible `diff --git` sections could deliver transformed or
   // incomplete content the section accounting accepts as the real patch.
-  const patch = git(['diff', '--binary', '--no-textconv', '--no-ext-diff', range, ...pathspec], { raw: true })
-  // A BINARY FILE'S BYTES CANNOT TRAVEL AS REVIEW TEXT (fourth cross-vendor
-  // round, pass 4, finding 7). An ADDED binary was skipped as "covered by the
-  // patch" while the ordinary diff carries only `Binary files … differ` — the
-  // blob never travelled and nothing recorded the loss; a MODIFIED one came
-  // back through the utf8 read as mojibake recorded complete. Binary paths are
-  // read off the patch's own sections and travel DECLARED (assembleMaterial
-  // writes the marker the reviewer sees and the accounting carries).
+  const patch = git(['diff', '--no-textconv', '--no-ext-diff', range, ...pathspec], { raw: true })
+  // Binary bodies are a named absence, never a decode attempt. The ordinary
+  // patch marker identifies Git's binary section without carrying the bytes.
   const binaryPaths = new Set(
     splitPatchByFile(patch)
       .filter((s) => isBinaryPatchSection(s.text))
       .map((s) => s.path),
   )
-  // A MODIFIED GITLINK IS ITS PATCH (final-round pass 8): a submodule entry
-  // points at a COMMIT object, so `git show sha:path` answers `bad object` —
-  // which reads as corruption and fails the round — or, with the submodule
-  // present, would ship commit output as file content. The pointer change IS
-  // the whole change, and the patch carries it; the path travels with no
-  // content of its own. CLASSIFIED BY MODE EVIDENCE ALONE (landing-round
-  // pass 8): a `+Subproject commit <hex>` line is hunk CONTENT, and a normal
-  // text file adding that literal line was classified a gitlink — its real
-  // content silently omitted while the accounting read complete. Only git's
-  // own section headers prove the 160000 entry: the mode lines, or the index
-  // line's trailing mode. Hunk lines carry a +/-/space prefix, so a header
-  // anchored at line start cannot be forged from file content.
-  const gitlinkPaths = new Set(
-    splitPatchByFile(patch)
-      .filter((s) =>
-        /^(?:(?:old|new|deleted file|new file) mode 160000|index [0-9a-f]+\.\.[0-9a-f]+ 160000)$/m.test(s.text),
-      )
-      .map((s) => s.path),
+  // A submodule pointer is absent by design too. Identity comes from Git's raw
+  // entry modes, never from patch content that an ordinary text file can forge.
+  const gitlinkPaths = gitlinkPathsFromRawDiff(
+    git(['diff', '--raw', '-z', '--no-renames', range, ...pathspec], { raw: true }),
   )
   // A file the patch ADDS whole is already there in full; sending its content
   // again only spends the budget the other files need — but only while the patch
@@ -294,11 +272,11 @@ function gatherRange(sha, base, onlyPaths = null) {
   const files = []
   for (const path of [...new Set(paths)]) {
     if (binaryPaths.has(path)) {
-      files.push({ path, binary: true })
+      files.push({ path, absentByDesign: 'binary' })
       continue
     }
     if (gitlinkPaths.has(path)) {
-      files.push({ path, text: '' })
+      files.push({ path, absentByDesign: 'submodule pointer' })
       continue
     }
     if (added.has(path)) continue
@@ -315,7 +293,7 @@ function gatherRange(sha, base, onlyPaths = null) {
       text = git(['show', `${sha}:${path}`], { required: false, raw: true })
     } catch (e) {
       if (!e?.undecodable) throw e
-      files.push({ path, binary: true })
+      files.push({ path, absentByDesign: 'binary' })
       continue
     }
     // Null = the commit does not carry that path (it was deleted); the patch
@@ -325,7 +303,7 @@ function gatherRange(sha, base, onlyPaths = null) {
     // still cannot travel as text. NUL in the blob is git's own binary
     // heuristic, and shipping the utf8 read would record mojibake as complete.
     if (text.includes('\0')) {
-      files.push({ path, binary: true })
+      files.push({ path, absentByDesign: 'binary' })
       continue
     }
     files.push({ path, text })
@@ -774,6 +752,8 @@ export const usage = () =>
     'commit ships the current content of the files it touches.',
     'Recorded scoped passes remain cleared at their exact commit/file contributions; later',
     'plans owe only new contributions. No carry record or carry planning flag is needed.',
+    'A commit written to answer a recorded finding is itself a new contribution by design:',
+    'the confirming clean pass reviews it too. The convergence cost is accepted, not hidden.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
     'that authored no part of the reviewed range — the recorded review always names the',

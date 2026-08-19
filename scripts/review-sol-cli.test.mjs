@@ -331,9 +331,8 @@ beforeAll(() => {
   oddSha = commit(ODD_NAME, 'the odd-named file, revised in this range\n', 'Revise the odd-named file', 'Opus 5')
 
   // …and a branch adding a GITLINK (a submodule pointer, mode 160000): its
-  // blob cannot be shown — the entry names a COMMIT object — so the pointer
-  // change must travel as its patch (final-round pass 8). cacheinfo writes
-  // the entry without any submodule machinery.
+  // entry names a COMMIT object, so its body is absent by design. cacheinfo
+  // writes the entry without any submodule machinery.
   git('checkout', '-q', '-b', 'gitlink', 'main')
   git('update-index', '--add', '--cacheinfo', `160000,${'f'.repeat(40)},vendor-sub`)
   git('commit', '--no-verify', '-q', '-m', 'Pin the vendored subproject\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
@@ -460,7 +459,7 @@ describe('the file bodies travel byte-exact', () => {
 })
 
 describe('a binary file in the range', () => {
-  it('travels DECLARED in the material rather than vanishing or arriving as mojibake', () => {
+  it('travels absent-by-design in the material rather than vanishing or arriving as mojibake', () => {
     // Fourth cross-vendor round, pass 4, finding 7: an added binary was
     // skipped as "covered by the patch" while the ordinary diff carries only
     // "Binary files differ" — the blob never travelled, nothing was recorded.
@@ -473,8 +472,10 @@ describe('a binary file in the range', () => {
     const r = run(['--sha', sha, '--brief', 'judge the blob'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
-    expect(sent).toContain('FILE IS BINARY')
+    expect(sent).toContain('FILE BODY ABSENT BY DESIGN — binary')
     expect(sent).toContain('blob.bin')
+    expect(sent).not.toContain('GIT binary patch')
+    expect(sent).not.toContain('literal ')
     // The declaration is not a loss: the record command is still offered.
     expect(r.stdout).toContain('mechanism-review.mjs --record')
   })
@@ -785,16 +786,16 @@ describe('a path git writes in quotes', () => {
   })
 })
 
-// FINAL-ROUND PASS 8: a submodule entry points at a COMMIT object, so its blob
-// cannot travel — the pointer change is the patch, and the round must complete
-// rather than fail on `bad object`.
+// A submodule entry points at a COMMIT object, not a file blob. Its body is a
+// named deliberate absence, and the round never tries to read it as content.
 describe('a modified gitlink', () => {
-  it('travels as its patch, and the round completes', () => {
+  it('is named absent-by-design, and the round completes', () => {
     provenId()
     const r = run(['--sha', gitlinkSha, '--brief', 'judge the submodule pin'])
     expect(r.status, r.stderr).toBe(0)
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent).toContain(`+Subproject commit ${'f'.repeat(40)}`)
+    expect(sent).toContain('FILE BODY ABSENT BY DESIGN — submodule pointer: vendor-sub ===')
     expect(sent).not.toContain('OMITTED ENTIRELY')
   })
 
@@ -1062,5 +1063,12 @@ describe('a range too large for one round', () => {
     expect(r.stderr).toContain('--carry-from is obsolete')
     expect(r.stderr).toContain('commit/file contributions')
     expect(calls()).toEqual([])
+  })
+
+  it('states that answer commits still require the confirming clean pass', () => {
+    const r = run([])
+    expect(r.status).toBe(2)
+    expect(r.stderr).toContain('answer a recorded finding is itself a new contribution by design')
+    expect(r.stderr).toContain('confirming clean pass reviews it too')
   })
 })

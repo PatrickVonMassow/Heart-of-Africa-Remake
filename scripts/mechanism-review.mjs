@@ -57,6 +57,9 @@ import { quotePassFile } from './review-material-core.mjs'
 // import path for its callers.
 export { KNOWN_FLAGS }
 
+/** An injective identity for an unordered set of Git paths. */
+export const reviewFileSetKey = (files = []) => JSON.stringify([...(files ?? [])].map(String).sort())
+
 /** The tracked ledger of recorded mechanism reviews (JSON Lines). */
 export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
 
@@ -425,13 +428,13 @@ export function buildCarriedRecord({
   }
   const all = records ?? readRecords()
   // The same INJECTIVE set key as verifyCarried.
-  const wantedSet = JSON.stringify([...(passCheck.pass?.files ?? [])].map(String).sort())
+  const wantedSet = reviewFileSetKey(passCheck.pass?.files)
   const sources = all.filter(
     (r) =>
       r.sha === source.sha &&
       r.pass &&
       Array.isArray(r.pass.files) &&
-      JSON.stringify([...r.pass.files].map(String).sort()) === wantedSet &&
+      reviewFileSetKey(r.pass.files) === wantedSet &&
       VERDICTS.includes(String(r.verdict)) &&
       // The source must be the ORIGINAL reading: blob identity is transitive,
       // so where the source is itself carried, carry from ITS original.
@@ -524,14 +527,14 @@ export function verifyCarried(records, allRecords = null) {
         // An INJECTIVE set key (JSON, never a join): a legal path may contain any
         // separator a join could pick, and a collision would let one file set
         // impersonate another.
-        const wantedSet = JSON.stringify([...files].map(String).sort())
+        const wantedSet = reviewFileSetKey(files)
         const source = ledger.find(
           (s) =>
             s !== r &&
             s.carried === undefined &&
             String(s.sha) === from &&
             Array.isArray(s.pass?.files) &&
-            JSON.stringify([...s.pass.files].map(String).sort()) === wantedSet &&
+            reviewFileSetKey(s.pass.files) === wantedSet &&
             String(s.model) === String(r.model) &&
             String(s.verdict) === String(r.verdict) &&
             String(s.mode) === String(r.mode) &&
@@ -634,6 +637,8 @@ export const usage = () =>
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
   `       An authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
   `       file is credited only at the commit boundaries this reviewer actually read.\n` +
+  `       A commit written to answer a finding is still a NEW contribution by design: the\n` +
+  `       confirming clean pass must review and record it. This convergence cost is accepted.\n` +
   `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
   `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
   `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +

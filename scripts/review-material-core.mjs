@@ -20,7 +20,6 @@
 // answers about the wrong thing in both directions.
 //
 import { createHash } from 'node:crypto'
-import { inflateSync } from 'node:zlib'
 
 // SPLITTING BY COMMIT DOES NOT HELP, which is why planPasses cuts through the
 // FILE SET (measured 18.08.2026 over 41 commits): the material ships the CURRENT
@@ -100,7 +99,7 @@ export function formatPassManifest(plan, pass) {
   const total = Number(pass?.total ?? 0)
   const index = Number(pass?.index ?? 0)
   const patchOnly = new Set(pass?.patchOnly ?? [])
-  const binary = new Set(pass?.binary ?? [])
+  const absentByDesign = new Map((pass?.absentByDesign ?? []).map((entry) => [entry.path, entry.reason]))
   const carried = pass?.files ?? []
   const lines = [
     `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
@@ -111,8 +110,8 @@ export function formatPassManifest(plan, pass) {
   ]
   for (const path of carried) {
     lines.push(
-      binary.has(path)
-        ? `  · ${quotePassFile(path)} — BINARY, declared: its bytes cannot travel as text; the PATCH marks the change`
+      absentByDesign.has(path)
+        ? `  · ${quotePassFile(path)} — ABSENT BY DESIGN, ${absentByDesign.get(path)}`
         : patchOnly.has(path)
           ? `  · ${quotePassFile(path)} — DIFF ONLY, by design (content larger than a round; its PATCH is complete)`
           : `  · ${quotePassFile(path)} — complete: its diff in the PATCH, its current content below`,
@@ -172,116 +171,20 @@ const unbackedHeader = (path) =>
 const difflessHeader = (path) =>
   `=== FILE OMITTED ENTIRELY (its diff is not in the PATCH above, so the change itself was never delivered): ${quotePassFile(path)} ===`
 
-/** The declared marker of a file whose bytes cannot travel as review text. */
-const binaryHeader = (path) =>
-  `=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: ${quotePassFile(path)} ===`
+/** A file whose body is deliberately outside review material, with the reason named. */
+const absentByDesignHeader = (path, reason) =>
+  `=== FILE BODY ABSENT BY DESIGN — ${reason}: ${quotePassFile(path)} ===`
 
 /**
- * Is this per-file patch section a BINARY change? git writes `Binary files …
- * differ` (ordinary diff) or `GIT binary patch` (--binary) as bare lines only
- * in binary sections; content lines always carry a +/-/space prefix, so the
- * bare form cannot be forged by reviewed text.
+ * Is this per-file patch section a BINARY change? The ordinary diff writes
+ * `Binary files … differ` as a bare line only in binary sections; content lines
+ * always carry a +/-/space prefix, so the bare form cannot be forged by text.
  */
 export function isBinaryPatchSection(text) {
   for (const line of String(text ?? '').split('\n')) {
-    if (line === 'GIT binary patch') return true
     if (/^Binary files .* differ$/.test(line)) return true
   }
   return false
-}
-
-/**
- * Does this binary file's patch section DELIVER its change (round-1 passes
- * 3/4)? Three shapes, licensing different answers:
- *   - `GIT binary patch` — the bytes themselves, base85: delivered.
- *   - `Binary files … differ` — a marker and NOTHING else: the content changed
- *     and none of it travelled, so a record over it would clear bytes nobody
- *     saw. NOT delivered.
- *   - neither — a metadata-only section (pure rename, mode change): the whole
- *     change IS the metadata, which the section carries whole. Delivered.
- */
-export function binarySectionDeliversChange(text) {
-  const lines = String(text ?? '').split('\n')
-  const at = lines.indexOf('GIT binary patch')
-  if (at >= 0) {
-    // THE BYTES MUST ACTUALLY BE THERE (round-3 pass 5, tightened twice):
-    //  - only the LITERAL form delivers (round-5 pass 4): a delta stream needs
-    //    the ORIGINAL blob to reconstruct the bytes, and binary contents are
-    //    deliberately never sent — a reviewer holding a delta holds nothing;
-    //  - the first payload line must be a WELL-FORMED git base85 line (round-5
-    //    pass 5): its leading letter encodes 1..52 decoded bytes, and the data
-    //    must be exactly the ceil(bytes/4)*5 characters that length demands —
-    //    "any non-empty text" blessed payloads real git would never write.
-    return literalStreamDelivers(lines, at)
-  }
-  return !lines.some((line) => /^Binary files .* differ$/.test(line))
-}
-
-/** git's own base85 alphabet, in decode order (base85.c). */
-const B85_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~'
-const B85_VALUE = new Map([...B85_ALPHABET].map((ch, i) => [ch, i]))
-
-/** Decode ONE payload line (length letter A..Z = 1..26, a..z = 27..52, then 5
- *  encoded characters per 4 decoded bytes) — null on any malformation. */
-function decodeBase85Line(line) {
-  const s = String(line ?? '')
-  const c = s.charCodeAt(0)
-  let bytes = 0
-  if (c >= 65 && c <= 90) bytes = c - 64
-  else if (c >= 97 && c <= 122) bytes = c - 70
-  else return null
-  const data = s.slice(1)
-  if (data.length !== Math.ceil(bytes / 4) * 5) return null
-  const out = Buffer.alloc(Math.ceil(bytes / 4) * 4)
-  for (let g = 0; g < data.length / 5; g++) {
-    let acc = 0
-    for (let k = 0; k < 5; k++) {
-      const v = B85_VALUE.get(data[g * 5 + k])
-      if (v === undefined) return null
-      acc = acc * 85 + v
-    }
-    if (acc > 0xffffffff) return null
-    out.writeUInt32BE(acc, g * 4)
-  }
-  return out.subarray(0, bytes)
-}
-
-/** THE WHOLE STREAM, NOT ITS FIRST LINE (round-6 pass 5): a first line alone
- *  accepted `literal 1000` over six characters — a fabricated or truncated
- *  literal recorded as delivered bytes. Delivered means: every payload line
- *  decodes, the concatenation INFLATES, and the inflated length IS the
- *  declared one. */
-/** The most a binary literal may inflate to before validation refuses it
- *  (landing-round pass 5): inflateSync without an output bound hands an
- *  attacker-controlled stream the process's memory — a highly compressible
- *  literal can declare and deliver gigabytes from a few fitting lines. Above
- *  this bound the declaration refuses, which routes the file to the honest
- *  uncoverable/omission path ("review it by another means"); a repository
- *  binary this size has no business inside review material anyway. */
-export const MAX_INFLATED_BINARY_BYTES = 64 * 1024 * 1024
-
-function literalStreamDelivers(lines, at) {
-  const m = /^literal (\d+)$/.exec(lines[at + 1] ?? '')
-  if (!m) return false
-  const declared = Number(m[1])
-  // Refused BEFORE the inflate, off the declaration alone: maxOutputLength
-  // below caps what the stream may produce, and this caps what a declaration
-  // may demand — either way nothing inflates past the bound.
-  if (!Number.isSafeInteger(declared) || declared > MAX_INFLATED_BINARY_BYTES) return false
-  const chunks = []
-  for (let i = at + 2; i < lines.length && lines[i] !== ''; i++) {
-    const decoded = decodeBase85Line(lines[i])
-    if (!decoded) return false
-    chunks.push(decoded)
-  }
-  if (!chunks.length) return false
-  try {
-    // A stream inflating past its own declaration throws here and refuses —
-    // the strict output bound the unbounded call was missing.
-    return inflateSync(Buffer.concat(chunks), { maxOutputLength: Math.max(1, declared) }).length === declared
-  } catch {
-    return false
-  }
 }
 
 /**
@@ -365,7 +268,7 @@ export function assembleMaterial({
     truncated: [],
     omitted: [],
     patchOnly: [],
-    binary: [],
+    absentByDesign: [],
     sent: [],
   }
   let rawSize = statText.length + patchText.length
@@ -385,24 +288,15 @@ export function assembleMaterial({
     const path = String(file?.path ?? '?')
     const text = String(file?.text ?? '')
     rawSize += text.length
-    // A BINARY FILE IS DECLARED, NEVER DROPPED OR MANGLED (fourth cross-vendor
-    // round, pass 4, finding 7): an added binary used to be skipped as "the
-    // patch carries it" while the ordinary diff holds only `Binary files …
-    // differ` — the blob travelled nowhere and nothing recorded the loss — and
-    // a modified one came back through the utf8 read as mojibake recorded
-    // complete. The material now names it binary, in a header the reviewer
-    // sees; the declaration is verified against the patch exactly like the
-    // patch-only one, and refuses to an omission where nothing backs it.
-    if (file?.binary) {
-      // BACKED means the change itself travelled (round-1 passes 3/4): a
-      // section holding only `Binary files … differ` delivers no byte, so the
-      // declaration over it cleared content the reviewer never received — the
-      // patch must carry the `GIT binary patch` bytes, or be a metadata-only
-      // section whose metadata IS the whole change. An erroneous binary flag
-      // on a text section degrades to patch-alone delivery, never below it.
-      const section = account.patchTruncated ? undefined : patchSections().get(path)
-      const backed = typeof section === 'string' && binarySectionDeliversChange(section)
-      const header = binaryHeader(path)
+    // BINARY BLOBS AND SUBMODULE POINTERS ARE A DELIBERATE CUT (18.08.2026),
+    // not a failed attempt to deliver content. Their bodies never enter this
+    // text pipeline; the material names the absence and its reason. This deletes
+    // the base85/inflate validation class and the false promise that opaque
+    // bytes became reviewable merely because Git encoded them as ASCII.
+    const absentReason = typeof file?.absentByDesign === 'string' ? file.absentByDesign.trim() : ''
+    if (absentReason) {
+      const backed = !account.patchTruncated && patchSections().has(path)
+      const header = absentByDesignHeader(path, absentReason)
       // `out.push(header, '')` grows the joined text by header + TWO separators,
       // so that is what the room is charged (see HEADER_PAIR_COST).
       if (!backed || left <= header.length + HEADER_PAIR_COST) {
@@ -411,7 +305,7 @@ export function assembleMaterial({
         continue
       }
       out.push(header, '')
-      account.binary.push(path)
+      account.absentByDesign.push({ path, reason: absentReason })
       left -= header.length + HEADER_PAIR_COST
       continue
     }
@@ -675,6 +569,37 @@ export function undecodablePaths(paths = []) {
   return (paths ?? []).map((p) => String(p ?? '')).filter((p) => p.includes('�'))
 }
 
+/**
+ * Submodule paths from `git diff --raw -z --no-renames`.
+ *
+ * A gitlink is an entry MODE (160000), not text that resembles Git's rendered
+ * `Subproject commit` line. Reading the raw mode record removes that content
+ * classifier and its false-positive surface: an ordinary text file may contain
+ * any pointer-looking sentence without losing its body.
+ */
+export function gitlinkPathsFromRawDiff(raw = '') {
+  const fields = String(raw ?? '').split('\0')
+  const paths = new Set()
+  for (let i = 0; i < fields.length; ) {
+    const header = fields[i++]
+    if (!header) continue
+    const match = /^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ ([A-Z])\d*$/.exec(header)
+    if (!match) throw new Error(`malformed git raw-diff record: ${header}`)
+    const first = fields[i++]
+    if (first === undefined || first === '') throw new Error(`git raw-diff record has no path: ${header}`)
+    const recordPaths = [first]
+    if (match[3] === 'R' || match[3] === 'C') {
+      const second = fields[i++]
+      if (second === undefined || second === '') throw new Error(`git raw-diff rename/copy has no destination: ${header}`)
+      recordPaths.push(second)
+    }
+    if (match[1] === '160000' || match[2] === '160000') {
+      for (const path of recordPaths) paths.add(path)
+    }
+  }
+  return paths
+}
+
 /** One C-quoted token starting at `from`, or null if it never closes. */
 function readQuoted(text, from) {
   for (let i = from + 1; i < text.length; i++) {
@@ -900,17 +825,14 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       path,
       content: String(file?.text ?? ''),
       patchText: sections.get(path) ?? '',
-      // A binary file travels as its declared marker (assembleMaterial), so it
-      // costs a pass its header and patch section, never content.
-      binary: Boolean(file?.binary),
+      // An absent-by-design body costs its named declaration and patch section,
+      // never content. The reason is data so the plan and manifest cannot drift.
+      absentByDesign:
+        typeof file?.absentByDesign === 'string' ? file.absentByDesign.trim() : '',
     })
   }
   for (const [path, text] of sections) {
-    // A SECTION-ONLY PATH KEEPS ITS BINARY CLASSIFICATION (round-3 pass 4): a
-    // deleted binary arrives here with no content entry to carry the caller's
-    // flag, and reading it as text let a bare `Binary files … differ` marker
-    // pack as deliverable while a GIT binary patch missed its declared line.
-    if (!seen.has(path)) entries.push({ path, content: '', patchText: text, binary: isBinaryPatchSection(text) })
+    if (!seen.has(path)) entries.push({ path, content: '', patchText: text, absentByDesign: '' })
   }
   // A RENAME'S ONE SECTION IS CHARGED ONCE (round-4 pass 4): it sits under
   // both its spellings, and the assembly's join deduplicates it — a plan that
@@ -937,22 +859,11 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       // and the uncoverable ruling keep the full length: alone in a pass, the
       // section is paid for in full.
       const sectionLen = entry.patchText.length
-      // A PASS MAY ONLY PROMISE WHAT THE ASSEMBLY WOULD DELIVER (round-2 pass
-      // 3): a carried path with no patch section is an omission the assembly
-      // refuses, and a binary declaration whose section carries no change (the
-      // bare 'Binary files … differ' marker, or no section at all) is refused
-      // the same way — so a plan that packed either certified material the
-      // round could never send, and the plan-only hand-off paths offered a
-      // record over an undelivered change. Both are named beyond reach. This
-      // ruling reads the SECTION's own length, never the alias-deduped cost.
-      // SIZE IS JUDGED FIRST (landing-round pass 5): the binary-delivery check
-      // inflates the section's stream, and running it on a section the pass
-      // could never hold spent unbounded memory proving a point the length
-      // alone already settles.
+      // A PASS MAY ONLY PROMISE WHAT THE ASSEMBLY WOULD DELIVER: every path
+      // needs its patch section, including an absent-by-design body whose mode
+      // is named but whose contextual change still belongs in the patch.
       const oversized = frame + sectionLen > room
-      const undeliverable =
-        oversized ||
-        (entry.binary ? sectionLen === 0 || !binarySectionDeliversChange(entry.patchText) : sectionLen === 0)
+      const undeliverable = oversized || sectionLen === 0
       if (undeliverable) {
         uncoverable.push({ path: entry.path, patchChars: sectionLen, contentChars: entry.content.length })
         continue
@@ -963,19 +874,21 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       const shape = (sections) => {
         const patchLen = sections?.has(entry.patchText) ? 0 : sectionLen
         const whole = frame + patchLen + entry.content.length
-        const patchOnly = !entry.binary && whole > room
-        return { patchLen, patchOnly, cost: patchOnly || entry.binary ? frame + patchLen : whole }
+        const patchOnly = !entry.absentByDesign && whole > room
+        return { patchLen, patchOnly, cost: patchOnly || entry.absentByDesign ? frame + patchLen : whole }
       }
       let placed = shape(currentSections)
       if (!current || current.size + placed.cost > room) {
-        current = { files: [], patchOnly: [], binary: [], patchChars: 0, size: 0 }
+        current = { files: [], patchOnly: [], absentByDesign: [], patchChars: 0, size: 0 }
         currentSections = new Set()
         passes.push(current)
         placed = shape(currentSections)
       }
       current.files.push(entry.path)
       if (placed.patchOnly) current.patchOnly.push(entry.path)
-      if (entry.binary) current.binary.push(entry.path)
+      if (entry.absentByDesign) {
+        current.absentByDesign.push({ path: entry.path, reason: entry.absentByDesign })
+      }
       current.patchChars += placed.patchLen
       current.size += placed.cost
       currentSections.add(entry.patchText)
@@ -1009,7 +922,7 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       total,
       files: p.files,
       patchOnly: p.patchOnly,
-      binary: p.binary,
+      absentByDesign: p.absentByDesign,
       size: p.size,
       // The patch of a pass is MANDATORY material, so it gets whatever room it
       // needs rather than the standing half-share — the packing above already

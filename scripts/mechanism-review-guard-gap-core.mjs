@@ -103,6 +103,10 @@ export function decideReviewGap({
   // no plan can exist and the gap is proven without one; a floor below that
   // ceiling proves nothing either way, and an unproven claim keeps blocking.
   if (oversizeProven) {
+    // ACCEPTED RESIDUAL: the byte-to-character floor can sit in the hairline
+    // below the real rendered size. In that band this branch keeps blocking
+    // even though the real material could justify a waiver. The error is only
+    // false-negative: an under-estimate never grants a gap ruling.
     // AT the ceiling exactly the material still cannot travel (landing-round
     // pass 3): every recordable pass spends part of its budget on its own
     // manifest and receipt, so the deliverable payload of any split is
