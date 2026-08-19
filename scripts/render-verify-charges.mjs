@@ -40,6 +40,10 @@
  * @property {string} why      one dated sentence of evidence
  * @property {string} [suite]  only this suite's reds (omitted: any suite)
  * @property {'webgpu'|'webgl'} [backend] only this backend's reds (omitted: both)
+ * @property {'core'|'compatibility'} [featureLevel] only runs recorded AT that WebGPU
+ *   feature level (point 505). For a lane fault the player never meets: the
+ *   compatibility adapter loses MSAA, so its errors must stay REAL reds on a core
+ *   adapter. A run that recorded no level matches no level-scoped charge.
  * @property {'check'|'console'} [kind]   only a failing check, or only a console error
  */
 
@@ -170,6 +174,7 @@ export const RED_CHARGES = [
     point: 514,
     suite: 'settings',
     backend: 'webgpu',
+    featureLevel: 'compatibility',
     kind: 'console',
     why:
       'THE SAME LANE FAULT FROM THE OTHER SIDE, charged 19.08.2026. The entry above already ' +
@@ -181,10 +186,11 @@ export const RED_CHARGES = [
       'support multisampling` arrives as an uncaptured GPUValidationError, and the invalid ' +
       'msaa-texture/view/command-buffer and async-pipeline errors are its downstream. Read off the ' +
       'two 13.08.2026 webgpu/settings records, where they sit beside the checks the entry above ' +
-      'already charges. Suite-, backend- and kind-scoped, and it dies with point 514. RESIDUAL, ' +
-      'stated rather than hidden: on a CORE WebGPU adapter one of these texts would be a real ' +
-      'defect and is excused here too — but the check that would have caught it is excused by the ' +
-      'entry above already, so this closes a door that was open, it does not open a new one.',
+      'already charges, and BOTH recorded featureLevel=compatibility. Scoped to that LEVEL as well ' +
+      'as to suite, backend and kind (cross-model review, 19.08.2026: three of the texts are ' +
+      'generic WebGPU cascade wording, so unscoped they would excuse a real defect on the CORE ' +
+      'adapter the player runs). On core each of these stays a real red, and the charge dies with ' +
+      'point 514.',
     match:
       /(RGBA16Float|Invalid Texture "(output|normal)-msaa"|Invalid TextureView|Invalid CommandBuffer from CommandEncoder|Async render pipeline creation failed)/i,
   },

@@ -224,6 +224,10 @@ export function armRunRecorder(backend) {
             reds = chargeReds(failedChecks(armed.lines.join('\n')), {
               suite: armed.suite,
               backend: armed.backend,
+              // The WebGPU feature level this run really came up at, so a charge
+              // written for the compatibility lane cannot excuse the core
+              // adapter the player runs (point 505 + review, 19.08.2026).
+              featureLevel: armed.featureLevel,
             })
             // UNACCOUNTED reds first, so the cap below can only ever drop a
             // charged one. Truncation must never be able to turn a red run into

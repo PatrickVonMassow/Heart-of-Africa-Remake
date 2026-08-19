@@ -190,7 +190,7 @@ export function chargeablePoints(text) {
  * other. Total: a malformed entry matches nothing rather than throwing.
  */
 export function chargeFor(red, options) {
-  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
+  const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   const name = text(red?.name)
   const detail = text(red?.detail)
   if (!name) return null
@@ -199,6 +199,12 @@ export function chargeFor(red, options) {
       if (!charge || !Number.isInteger(charge.point)) continue
       if (charge.suite && charge.suite !== suite) continue
       if (charge.backend && charge.backend !== backend) continue
+      // A charge may scope to ONE WebGPU feature level (point 505): the
+      // compatibility lane loses MSAA, so a red that is that lane's own fault
+      // must not be excused on the core adapter the player runs. An entry that
+      // names a level and a run that never recorded one do not match — an
+      // unrecorded level is not evidence of the lane (review, 19.08.2026).
+      if (charge.featureLevel && charge.featureLevel !== featureLevel) continue
       if (charge.kind && red?.kind && charge.kind !== red.kind) continue
       if (!charge.match?.test?.(name)) continue
       // Some checks have more than one red cause behind the same stable label.
@@ -217,9 +223,9 @@ export function chargeFor(red, options) {
  *  it). Written into the run record at record time, so the record itself names
  *  what was charged and a later ledger edit cannot bless a run after the fact. */
 export function chargeReds(reds, options) {
-  const { suite = '', backend = '', ledger = RED_CHARGES } = options ?? {}
+  const { suite = '', backend = '', featureLevel = null, ledger = RED_CHARGES } = options ?? {}
   return (Array.isArray(reds) ? reds : []).map((red) => {
-    const charge = chargeFor(red, { suite, backend, ledger })
+    const charge = chargeFor(red, { suite, backend, featureLevel, ledger })
     return {
       name: text(red?.name).slice(0, 200),
       key: red?.key ?? '',
@@ -259,14 +265,43 @@ function text(value) {
   }
 }
 
-/** A value as a finite number, or 0 — `Number(x)` itself THROWS on a symbol, and
- *  every record here is read off disk. Total. */
-function number(value) {
+/** A value as a finite number, or null — `Number(x)` itself THROWS on a symbol,
+ *  and every record here is read off disk. Total, and it keeps "unreadable"
+ *  DISTINCT from 0: collapsing both to zero made two records with no timestamp
+ *  read as the same run (review finding, 19.08.2026). */
+function finite(value) {
   try {
     const n = Number(value)
-    return Number.isFinite(n) ? n : 0
+    return Number.isFinite(n) ? n : null
   } catch {
-    return 0
+    return null
+  }
+}
+
+/** The same, with 0 where nothing is readable — for the places a missing number
+ *  genuinely means none (a line count, an ordering key). */
+function number(value) {
+  return finite(value) ?? 0
+}
+
+/** A run's exit code, with 1 where none can be read. Unreadable means FAILED,
+ *  never 0: a record whose exit cannot be parsed must not read as a clean pass. */
+function exitOf(run) {
+  return finite(run?.exit) ?? 1
+}
+
+/** A chargeable-point set built from whatever a caller handed in. `[...x]` THROWS
+ *  on a truthy non-iterable, and this runs inside the gate's decision: an
+ *  exception here reaches the wrapper, which fails OPEN and allows the turn the
+ *  gate meant to stop. Total; an unreadable set charges nothing, which is the
+ *  strict direction. */
+function pointSet(openPoints) {
+  try {
+    if (Array.isArray(openPoints)) return new Set(openPoints)
+    if (!openPoints) return new Set()
+    return new Set([...openPoints])
+  } catch {
+    return new Set()
   }
 }
 
@@ -422,7 +457,12 @@ export function incompleteClosureFor(run, closures) {
   for (const c of Array.isArray(closures) ? closures : []) {
     try {
       if (!c || c.backend !== run.backend || c.suite !== run.suite) continue
-      if (number(c.at) !== number(run.at)) continue
+      // BOTH timestamps must be READABLE and equal. Folding an unreadable one to
+      // 0 made two records that carry no `at` look like the same run, so one
+      // signature closed the other (review finding, 19.08.2026).
+      const closureAt = finite(c.at)
+      const runAt = finite(run.at)
+      if (closureAt === null || runAt === null || closureAt !== runAt) continue
       // The evidence IS the mechanism: an entry that carries none is a silent
       // waiver wearing a closure's shape, so it closes nothing.
       if (!text(c.evidence).trim()) continue
@@ -512,7 +552,7 @@ export function runVerdict(run, options) {
       ],
     }
   }
-  if (run.suspect === true && Number(run.exit) === 0) {
+  if (run.suspect === true && exitOf(run) === 0) {
     const names = suspectRedsOf(run).map((r) => r.name)
     const which = names.length ? names.map((n) => `"${n}"`).join('; ') : SUSPECT_UNNAMED
     return {
@@ -527,7 +567,7 @@ export function runVerdict(run, options) {
       ],
     }
   }
-  if (Number(run.exit) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
+  if (exitOf(run) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
   if (run.crashed === true) {
     return {
       status: 'red',
@@ -545,7 +585,7 @@ export function runVerdict(run, options) {
       unaccounted: [{ name: 'the run failed without reporting a single red', point: null }],
     }
   }
-  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  const open = pointSet(openPoints)
   const charges = []
   const unaccounted = []
   for (const red of reds) {
@@ -624,10 +664,8 @@ export function sawCodeSince(run, since) {
   // No edit time known (or none at all): the freshness question does not apply,
   // and the guard's fail-open posture says accept rather than invent a window.
   if (from <= 0) return true
-  const started = Number(run?.startedAt)
-  const ended = Number(run?.at)
-  const when = Number.isFinite(started) ? started : ended
-  return Number.isFinite(when) && when >= from
+  const when = finite(run?.startedAt) ?? finite(run?.at)
+  return when !== null && when >= from
 }
 
 export function coveringRun(runs, backend, since, options) {
@@ -639,7 +677,7 @@ export function coveringRun(runs, backend, since, options) {
     if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
     if (!sawCodeSince(r, since)) continue
-    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
+    if (!best || number(r.at) > number(best.at)) best = r
   }
   return best
 }
@@ -701,8 +739,8 @@ export function unexplainedRuns(runs, since, options) {
    * can resolve it.
    */
   const shownGone = (r) => {
-    const when = Number(r?.startedAt ?? r?.at)
-    if (!Number.isFinite(when) || from <= when) return false
+    const when = finite(r?.startedAt) ?? finite(r?.at)
+    if (when === null || from <= when) return false
     return all.some(
       (later) =>
         later &&
@@ -732,22 +770,22 @@ export function unexplainedRuns(runs, since, options) {
         sawCodeSince(later, from) &&
         runVerdict(later, { openPoints, ledger }).covers,
     )
-  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  const open = pointSet(openPoints)
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
-  const owned = (red, suite, backend) => {
+  const owned = (red, suite, backend, featureLevel) => {
     // Reds that never reached the record cannot be owned by anything.
     if (red?.kind === TRUNCATED_KIND) return false
     const recorded = Number.isInteger(red?.point) ? red.point : null
     if (recorded !== null && open.has(recorded)) return true
-    const now = chargeFor(red, { suite, backend, ledger })
+    const now = chargeFor(red, { suite, backend, featureLevel, ledger })
     return !!now && open.has(now.point)
   }
   const out = []
   for (const r of Array.isArray(runs) ? runs : []) {
     if (!r || typeof r !== 'object') continue
-    const at = Number(r.at ?? 0)
-    if (!Number.isFinite(at)) continue
+    const at = finite(r.at) ?? 0
+
     // A red is carried until its own suite is shown green on newer code. Runs
     // that saw the current code are judged directly; older ones only leave the
     // list once that demonstration exists.
@@ -756,23 +794,33 @@ export function unexplainedRuns(runs, since, options) {
     if (verdict.status !== 'red' && verdict.status !== 'suspect' && verdict.status !== 'incomplete') continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
     const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
+    // The WebGPU feature level this run really came up at, so a charge scoped to
+    // the compatibility lane cannot excuse the core adapter the player runs.
+    const level = r.featureLevel === 'core' || r.featureLevel === 'compatibility' ? r.featureLevel : null
     // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
     // the reds so the guard can name it as what it is. Two things lift it, and
     // NEITHER is the ledger — a charge needs the red's identity, and the lost
     // part has none to give:
     if (verdict.status === 'incomplete') {
-      // (1) A REAL RE-RECORDING. This is not the fourth closing point 640
-      // forbids, and the difference is the whole reason the class exists: a RED
-      // is an observation that a later green cannot un-observe, while a
-      // truncation is a MEASUREMENT THAT WAS LOST — and a lost measurement is
-      // answered by taking it again. The bar is the strongest one available: a
-      // COVERING run of the same suite on the same backend, later than this one
-      // and on code since the last render edit. Without it the advertised
-      // "re-run the suite" remedy did nothing inside the current window, which
-      // left the sign-off as the only exit (review finding, 19.08.2026).
-      if (reRecorded(r)) continue
-      const closure = incompleteClosureFor(r, incompleteClosures)
-      if (!closure) {
+      // TWO ROUTES LIFT THE TRUNCATION, AND NEITHER LIFTS A RED.
+      //
+      // (1) A REAL RE-RECORDING: a COVERING run of the same suite on the same
+      // backend, later than this one and on code since the last render edit.
+      // That is not the fourth closing point 640 forbids, and the difference is
+      // the whole reason this class exists — a RED is an observation no later
+      // green un-observes, while a truncation is a MEASUREMENT THAT WAS LOST,
+      // and a lost measurement is answered by taking it again. Without this the
+      // advertised "re-run the suite" remedy did nothing inside the current
+      // window, which left the signature as the only exit (review, 19.08.2026).
+      //
+      // (2) The SIGNED CLOSURE, for a recording that cannot be redone.
+      //
+      // Both stop at the SAME line: they close what nobody could record, never
+      // what the run did record. Letting the re-run skip the accounting below
+      // would have laundered every red in the truncated run — the same hole the
+      // signature had, through the other door (review, 19.08.2026).
+      const lifted = reRecorded(r) || incompleteClosureFor(r, incompleteClosures)
+      if (!lifted) {
         out.push({
           backend,
           suite,
@@ -784,13 +832,13 @@ export function unexplainedRuns(runs, since, options) {
         })
         continue
       }
-      // (2) THE SIGNED CLOSURE — and it closes ONLY the unknowable part. What
-      // the run DID record was really observed, so it is judged here exactly
-      // like any other red: charged reds are accounted for, an unowned one keeps
-      // blocking and closes the three ordinary ways. This is what stops the
-      // closure being a waiver: a flood cannot bury a red that reached the file.
+      // LIFTED — but only the unknowable part. What the run DID record was
+      // really observed, so it is judged here exactly like any other red:
+      // charged reds are accounted for, an unowned one keeps blocking and closes
+      // the three ordinary ways. This is what stops either route being a waiver:
+      // a flood cannot bury a red that reached the file.
       const observed = (Array.isArray(r.reds) ? r.reds : []).filter((red) => !isTruncationEntry(red))
-      const unowned = observed.filter((red) => !owned(red, suite, backend))
+      const unowned = observed.filter((red) => !owned(red, suite, backend, level))
       if (unowned.length === 0) continue
       out.push({
         backend,
@@ -815,7 +863,7 @@ export function unexplainedRuns(runs, since, options) {
         // Only the reds NOBODY owns are still open. Counting the whole run's
         // reds would report a charged one as waved through beside its
         // unexplained neighbour.
-        unowned = reds.filter((red) => !owned(red, suite, backend))
+        unowned = reds.filter((red) => !owned(red, suite, backend, level))
         if (unowned.length === 0) continue
       }
     }
@@ -852,7 +900,7 @@ export function latestRun(runs, backend, since) {
     // before the edit tested the old code, so quoting its red as "why the last
     // attempt did not count" would point at the wrong code.
     if (!sawCodeSince(r, since)) continue
-    if (!best || Number(r.at ?? 0) > Number(best.at ?? 0)) best = r
+    if (!best || number(r.at) > number(best.at)) best = r
   }
   return best
 }

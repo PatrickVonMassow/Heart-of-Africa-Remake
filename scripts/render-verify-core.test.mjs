@@ -1159,6 +1159,15 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [{ backend: 'webgpu', suite: 'polish', at: 1500 }] })).toHaveLength(1)
   })
 
+  // Two records that both lack a timestamp are not the same run. Folding every
+  // unreadable `at` to 0 made one signature close the other (review, 19.08.2026).
+  it('matches on a READABLE timestamp only — two undated records are not one run', () => {
+    const undated = { ...truncatedLegacy('webgpu', 1500), at: undefined, startedAt: 1500 }
+    const closure_ = [{ backend: 'webgpu', suite: 'polish', at: undefined, evidence: 'signed' }]
+    expect(incompleteClosureFor(undated, closure_)).toBeNull()
+    expect(incompleteClosureFor(undated, [{ backend: 'webgpu', suite: 'polish', at: 'soon', evidence: 'signed' }])).toBeNull()
+  })
+
   it('signs off ONE run, never a suite/backend pair — the NEXT truncated run blocks again', () => {
     const first = truncatedLegacy('webgpu', 1500)
     const second = truncatedLegacy('webgpu', 2500)
@@ -1172,10 +1181,22 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
   // The advertised first remedy has to WORK, or the signature is the only exit
   // and the mechanism is a waiver after all (review finding, 19.08.2026).
   it('a real RE-RECORDING closes it — a covering run of the same suite and backend, later, on this code', () => {
-    const broken = { ...truncatedWithRed('webgpu', 1500), suite: 'polish' }
+    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
     const again = { ...run('webgpu', 2000), suite: 'polish' }
     expect(unexplainedRuns([broken], 1000, { openPoints })).toHaveLength(1)
     expect(unexplainedRuns([broken, again], 1000, { openPoints })).toEqual([])
+  })
+
+  // The re-run stops at exactly the same line as the signature: it closes the
+  // LOST part, never a red the run really recorded. Letting it skip the
+  // accounting laundered every red in a truncated run (review, 19.08.2026).
+  it('but a RE-RECORDING launders nothing — a red the truncated run recorded still blocks', () => {
+    const broken = { ...truncatedWithRed('webgpu', 1500), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    const still = unexplainedRuns([broken, again], 1000, { openPoints })
+    expect(still).toHaveLength(1)
+    expect(still[0].status).toBe('red')
+    expect(still[0].reds[0]).toMatch(/GPUValidationError/)
   })
 
   it('but only that pair: another suite, another backend, or an older run proves nothing', () => {
@@ -1220,6 +1241,22 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     // finding, 19.08.2026) — total means total.
     expect(() => droppedLinesOf({ droppedLines: Symbol('x') })).not.toThrow()
     expect(() => incompleteClosureFor({ backend: 'webgpu', suite: 'polish', at: Symbol('x') }, [{ backend: 'webgpu', suite: 'polish', at: 1, evidence: 'e' }])).not.toThrow()
+  })
+
+  // The gate's own totality, judged where it costs most: an exception inside the
+  // decision reaches the wrapper, which fails OPEN and allows the very turn the
+  // gate meant to stop. `Number()` throws on a symbol and `[...x]` on a truthy
+  // non-iterable, and both sit on the decision path (review, 19.08.2026).
+  it('never throws on a record or a point set that a JSON file could really hold', () => {
+    const nasty = { backend: 'webgpu', suite: 'polish', at: Symbol('t'), startedAt: Symbol('s'), exit: Symbol('e'), reds: [red('x')] }
+    expect(() => runVerdict(nasty, { openPoints })).not.toThrow()
+    expect(() => unexplainedRuns([nasty], 1000, { openPoints })).not.toThrow()
+    for (const bad of [{}, 7, 'nope', true]) {
+      expect(() => runVerdict(redRun('webgpu', 1500, [red('x', 506)]), { openPoints: bad })).not.toThrow()
+      expect(() => unexplainedRuns([redRun('webgpu', 1500, [red('x')])], 1000, { openPoints: bad })).not.toThrow()
+    }
+    // An unreadable exit code is a FAILED run, never a clean pass.
+    expect(runVerdict({ backend: 'webgpu', suite: 'polish', at: 1500, exit: Symbol('e') }, { openPoints }).status).toBe('red')
   })
 
   // A finite but out-of-range timestamp makes `toISOString()` throw — and that
@@ -1458,6 +1495,22 @@ describe('the shipped charge ledger', () => {
         backend: 'webgpu',
       }),
     ).toBeNull()
+  })
+
+  // A LANE FAULT MAY NOT EXCUSE THE PLAYER'S LANE (point 505 + review,
+  // 19.08.2026). The compatibility adapter loses MSAA, so the MSAA cascade in
+  // `settings` is that lane's own; on a CORE adapter each of those texts would be
+  // a real defect, and three of them are generic WebGPU wording.
+  it('charges the compatibility lane\'s MSAA cascade only where the run recorded that LEVEL', () => {
+    const cascade = red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: [Invalid TextureView] is invalid', null, 'console')
+    const scoped = { suite: 'settings', backend: 'webgpu', kind: 'console' }
+    expect(chargeFor(cascade, { ...scoped, featureLevel: 'compatibility' }).point).toBe(514)
+    // The player's adapter, and a run that never recorded a level, are not it.
+    expect(chargeFor(cascade, { ...scoped, featureLevel: 'core' })).toBeNull()
+    expect(chargeFor(cascade, scoped)).toBeNull()
+    // And still not another suite, backend or kind.
+    expect(chargeFor(cascade, { suite: 'polish', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
+    expect(chargeFor(cascade, { suite: 'settings', backend: 'webgl', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
   })
 
   it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
