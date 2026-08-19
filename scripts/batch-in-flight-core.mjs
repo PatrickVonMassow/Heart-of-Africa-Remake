@@ -1130,11 +1130,11 @@ export function pointOfBranch(ref) {
  * The point ONE evidence item names — the single resolution every consumer
  * shares. An explicit `point` field decides (and never falls through to the
  * branch when it is invalid); the legacy branch/worktree forms, which predate
- * the field and still stand in real declarations, derive it from the ref the
- * item itself declares. Returns the positive integer or null. The exit side
- * (`transitionActiveDeclaration`) filters by THIS function too: a second,
- * divergent copy let a legacy worktree item survive the exit of its own point
- * while the read side kept reporting it active (second cross-vendor review).
+ * the field, derive it from the ref the item itself declares. Returns the
+ * positive integer or null. The RECORDED field is the normal case — the write
+ * side stamps it (`tagEvidencePoint`) and `withRecordedEvidencePoint` migrates
+ * a legacy item at the next write — so the legacy derivation exists only until
+ * a declaration written before the field has been rewritten once.
  */
 export function evidencePoint(item, { worktreeRef = () => null } = {}) {
   if (!item || typeof item !== 'object') return null
@@ -1151,76 +1151,29 @@ export function evidencePoint(item, { worktreeRef = () => null } = {}) {
 }
 
 /**
- * Only these lstat failures PROVE a path is absent (fourth cross-vendor
- * round): EACCES, EIO, ELOOP, a missing mount and every other error may be
- * hiding a path that still exists — treating any `false`/failure as
- * disappearance retired existing work.
+ * Migrate one evidence item to its RECORDED form: an item already carrying the
+ * `point` field is returned unchanged, a legacy item gets the point the read
+ * side resolves persisted, so the legacy form disappears at the first write
+ * that touches it (fifth cross-vendor round: five rounds of findings all grew
+ * from the exit having to GUESS an assignment nobody had written down). An
+ * item that resolves to no point is returned UNCHANGED — never guessed at,
+ * never dropped; the read side reports it and names the explicit human way
+ * out (`UNATTRIBUTABLE_EVIDENCE_REMEDY`).
  */
-export function fsErrorProvesAbsence(code) {
-  return code === 'ENOENT' || code === 'ENOTDIR'
+export function withRecordedEvidencePoint(item, { worktreeRef = () => null } = {}) {
+  if (!item || typeof item !== 'object') return item
+  if (Object.hasOwn(item, 'point')) return item
+  const point = evidencePoint(item, { worktreeRef })
+  return point == null ? item : { ...item, point }
 }
 
 /**
- * `git show-ref --verify --quiet` answers absence with exit 1 — for a missing
- * ref and for a name no ref could ever carry, both of which can testify to
- * nothing. Every other exit (not a repository, git broken) proves nothing.
+ * The one way an unattributable evidence item leaves the declaration: a human
+ * reads it and clears explicitly. Named in the read side's error, so the
+ * remedy travels with the complaint.
  */
-export function gitExitProvesRefAbsence(status) {
-  return status === 1
-}
-
-/**
- * The point a worktree path's own NAME still testifies to once the tree is
- * gone: the `point-<N>` directory of the workflow's worktree convention
- * (`.claude/worktrees/point-<N>`). Used ONLY by the retire decision below —
- * while the tree exists, the branch it is on stays the sole authority.
- */
-export function pointOfWorktreePath(path) {
-  const segments = String(path ?? '').split(/[\\/]+/).filter(Boolean)
-  for (let i = segments.length - 1; i >= 0; i -= 1) {
-    const m = /^point-(\d+)$/.exec(segments[i])
-    if (m) {
-      const n = Number(m[1])
-      return Number.isInteger(n) && n > 0 ? n : null
-    }
-  }
-  return null
-}
-
-/**
- * Partition a declaration's evidence at the exit of one point, per item and by
- * the SAME resolution the read side uses. Three verdicts:
- * - resolves to the exited point → exited (dropped with its point);
- * - resolves to another point, or to none while its artefact may still exist
- *   → kept: it may testify to real work, and the read side reports an
- *   unresolvable survivor loudly rather than this filter dropping it silently;
- * - resolves to none AND its artefact is PROVABLY gone (`evidenceGone`, a
- *   positive proof — never a bare failed probe) → retired, UNLESS what is left
- *   of the item still names ANOTHER point (a gone worktree's `point-<N>` path):
- *   no exit ever retires a different point's evidence (fourth cross-vendor
- *   round); that item waits for its own point's exit. Without a gone-check the
- *   unresolvable item wedges every later exit and publish on a probe that can
- *   never succeed again (second round). Retired items are RETURNED so the
- *   caller says so out loud — never a silent disappearance.
- */
-export function partitionEvidenceOnExit(evidence, exitPoint, { worktreeRef = () => null, evidenceGone = () => false } = {}) {
-  const kept = []
-  const retired = []
-  const exit = Number(exitPoint)
-  for (const item of Array.isArray(evidence) ? evidence : []) {
-    const point = evidencePoint(item, { worktreeRef })
-    if (point === exit) continue
-    if (point == null && evidenceGone(item) === true) {
-      const named = item?.kind === 'worktree' ? pointOfWorktreePath(item.path) : null
-      if (named == null || named === exit) {
-        retired.push(item)
-        continue
-      }
-    }
-    kept.push(item)
-  }
-  return { kept, retired }
-}
+export const UNATTRIBUTABLE_EVIDENCE_REMEDY =
+  'inspect the declaration and clear it explicitly: node scripts/batch-in-flight.mjs --clear'
 
 /** Phases that keep a declared strand on the board until an explicit exit. */
 export const ACTIVE_WORK_PHASES = Object.freeze([
@@ -1309,7 +1262,17 @@ export function normalizeActiveWork({
             errors.push(`evidence item ${index + 1} has unknown phase "${phase || '<blank>'}"`)
             return
           }
-          add(evidencePoint(item, { worktreeRef }), `evidence item ${index + 1}`)
+          const point = evidencePoint(item, { worktreeRef })
+          if (point == null) {
+            // Not guessed at, not dropped: the assignment was never recorded
+            // and cannot be resolved, so only a human decides — loudly.
+            errors.push(
+              `evidence item ${index + 1} cannot be attributed to a point (no recorded point, ` +
+                `no resolvable ref) — ${UNATTRIBUTABLE_EVIDENCE_REMEDY}`,
+            )
+            return
+          }
+          add(point, `evidence item ${index + 1}`)
         })
       }
     }

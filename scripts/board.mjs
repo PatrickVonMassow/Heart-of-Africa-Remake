@@ -171,21 +171,14 @@ function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, not
   return () => {
     const declaration = readDeclaration()
     if (declaration && exitPoint != null) {
-      const transition = transitionActiveDeclaration(declaration, {
+      // The exit filters on the RECORDED point alone (and migrates a legacy
+      // item to carry it): nothing is probed, guessed or retired here — an
+      // unattributable item survives and the read side names the human way
+      // out (fifth cross-vendor round).
+      writeDeclaration(transitionActiveDeclaration(declaration, {
         exitPoint,
         focusPoint: focusPoint === undefined ? declaration.focusPoint ?? null : focusPoint,
-      })
-      writeDeclaration(transition.declaration)
-      // Retirement is never silent — and never claimed before it holds: the
-      // report comes AFTER the successful write, so a failed transition or
-      // write does not leave stderr asserting a persistence that never
-      // happened (fourth cross-vendor round).
-      for (const item of transition.retired) {
-        console.error(
-          `active-work evidence retired on exit of ${exitPoint}: ${JSON.stringify(item)} — ` +
-            'its artefact is provably gone, so it can testify to no point',
-        )
-      }
+      }))
     }
     if (focusPoint !== undefined) {
       console.log(run(['scripts/focus.mjs', 'set', focusPoint == null ? '-' : String(focusPoint), note]).trim())

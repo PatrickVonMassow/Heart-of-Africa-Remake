@@ -64,6 +64,7 @@ import {
   waitEtaRefusal,
   openBranchSlots,
   pointOfBranch,
+  withRecordedEvidencePoint,
   parseCommissionRecord,
   COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
@@ -1077,7 +1078,13 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
       pid: typeof lock?.pid === 'number' ? lock.pid : null,
       pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
       at: now,
-      evidence: evidence.filter((_, i) => items[i]?.ok === true),
+      // Adoption is a WRITE, so it migrates: a legacy item that still resolves
+      // gets its point RECORDED here, and the legacy form does not survive the
+      // handover (fifth cross-vendor round — the assignment is written down,
+      // never re-guessed at the exit).
+      evidence: evidence
+        .filter((_, i) => items[i]?.ok === true)
+        .map((e) => withRecordedEvidencePoint(e, { worktreeRef: (p) => worktreeBranch(p, { cwd }) })),
       adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
     },
     path,
