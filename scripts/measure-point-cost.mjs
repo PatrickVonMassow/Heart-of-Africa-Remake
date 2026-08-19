@@ -75,10 +75,11 @@ export function readProviderTurns({ claudeDir, codexDir, since = 0, points = [] 
   for (const path of codexFiles) {
     const text = readFileSync(path, 'utf8')
     // Rollouts repeat a large instruction prefix. The point appears in cwd, branch or
-    // opening prompt; discard unrelated sessions before JSON-parsing every event.
-    if (candidate && !candidate.test(text)) continue
-    codexRead += 1
-    turns.push(...parseCodexTranscript(text, { file: path }))
+    // opening prompt. Retain the pre-filter count as a source-quality reading, but
+    // parse excluded files too so their traffic is named as residual rather than lost.
+    const candidateMatch = !candidate || candidate.test(text)
+    if (candidateMatch) codexRead += 1
+    turns.push(...parseCodexTranscript(text, { file: path }).map((turn) => ({ ...turn, candidateMatch })))
   }
   return { turns, claudeFiles: claudeFiles.length, codexFiles: codexRead, codexCandidates: codexFiles.length }
 }
@@ -116,9 +117,14 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
   const boundaryEvents = associateBoundaryEvents(parseBoundaryLog(boundaryText), assigned)
   const result = aggregatePointLedger({ landed, turns: assigned, boundaryEvents })
   const assignedTurns = assigned.filter((turn) => points.includes(turn.point) && turn.tokens > 0)
+  const residualTurns = assigned.filter((turn) => !points.includes(turn.point) && turn.tokens > 0)
   const providerTokens = {
     anthropic: assignedTurns.filter((turn) => turn.provider === 'anthropic').reduce((sum, turn) => sum + turn.tokens, 0),
     openai: assignedTurns.filter((turn) => turn.provider === 'openai').reduce((sum, turn) => sum + turn.tokens, 0),
+  }
+  const reviewProviderTokens = {
+    anthropic: assignedTurns.filter((turn) => turn.role === 'review' && turn.provider === 'anthropic').reduce((sum, turn) => sum + turn.tokens, 0),
+    openai: assignedTurns.filter((turn) => turn.role === 'review' && turn.provider === 'openai').reduce((sum, turn) => sum + turn.tokens, 0),
   }
   const assignedBy = assignedTurns.reduce(
     (totals, turn) => {
@@ -127,6 +133,21 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
     },
     { evidence: 0, session: 0, neighbour: 0 },
   )
+  const residualFor = (provider) => {
+    const providerTurns = residualTurns.filter((turn) => turn.provider === provider)
+    const unattributed = providerTurns.filter((turn) => turn.point == null)
+    const outsideWindow = providerTurns.filter((turn) => turn.point != null)
+    const totalOf = (rows) => rows.reduce((sum, turn) => sum + turn.tokens, 0)
+    return {
+      tokens: totalOf(providerTurns),
+      turns: providerTurns.length,
+      files: new Set(providerTurns.map((turn) => turn.file)).size,
+      unattributedTokens: totalOf(unattributed),
+      unattributedTurns: unattributed.length,
+      outsideWindowTokens: totalOf(outsideWindow),
+      outsideWindowTurns: outsideWindow.length,
+    }
+  }
   return {
     schemaVersion: 1,
     generatedAt,
@@ -142,6 +163,11 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
       oldestLanding: iso(landed.at(-1)?.landedAt),
     },
     providerTokens,
+    reviewProviderTokens,
+    residualTokens: {
+      anthropic: residualFor('anthropic'),
+      openai: residualFor('openai'),
+    },
     assignedBy,
     ...result,
   }
@@ -171,8 +197,13 @@ export function formatConsole(snapshot) {
   const lines = []
   lines.push(`POINT COST LEDGER — last ${snapshot.window.points} landed points; provider-reported billed tokens`)
   lines.push(`window ${snapshot.window.oldestLanding ?? 'n/a'} → ${snapshot.window.newestLanding ?? 'n/a'}`)
-  lines.push(`sources: Claude ${snapshot.source.claudeFiles ?? 0} transcript(s), Codex ${snapshot.source.codexFiles ?? 0} rollout(s)`)
+  const codexDiscovered = snapshot.source.codexCandidates ?? snapshot.source.codexFiles ?? 0
+  const codexMatched = snapshot.source.codexFiles ?? 0
+  lines.push(`sources: Claude ${snapshot.source.claudeFiles ?? 0} transcript(s), Codex ${codexDiscovered} rollout(s) discovered; ${codexMatched} matched the point pre-filter, ${Math.max(0, codexDiscovered - codexMatched)} did not`)
   lines.push(`assigned: Anthropic ${k(snapshot.providerTokens.anthropic)} · OpenAI ${k(snapshot.providerTokens.openai)} · total ${k(snapshot.totalTokens)}`)
+  lines.push(`cross-vendor review reconciliation: Anthropic ${k(snapshot.reviewProviderTokens.anthropic)} · OpenAI ${k(snapshot.reviewProviderTokens.openai)}`)
+  const codexResidual = snapshot.residualTokens.openai
+  lines.push(`named Codex residual: ${k(codexResidual.tokens)} across ${codexResidual.turns} turn(s) / ${codexResidual.files} file(s): unattributed ${k(codexResidual.unattributedTokens)}, declared outside the landed-point window ${k(codexResidual.outsideWindowTokens)}`)
   lines.push('')
   lines.push('POINT  LANDED               TOTAL     MAIN   REVIEWS   AGENTS (each delegated session)')
   for (const row of snapshot.ledger) {
@@ -208,6 +239,9 @@ export function formatConsole(snapshot) {
 }
 
 export function formatMarkdown(snapshot) {
+  const codexDiscovered = snapshot.source.codexCandidates ?? snapshot.source.codexFiles ?? 0
+  const codexMatched = snapshot.source.codexFiles ?? 0
+  const codexResidual = snapshot.residualTokens.openai
   const lines = [
     '# Cost per finished point',
     '',
@@ -215,7 +249,13 @@ export function formatMarkdown(snapshot) {
     '',
     `${snapshot.accounting.unit}; ${snapshot.accounting.note}`,
     '',
+    `Cross-vendor review reconciliation: ${snapshot.reviewProviderTokens.openai} OpenAI tokens and ${snapshot.reviewProviderTokens.anthropic} Anthropic tokens; the ledger's review origin is the OpenAI total only.`,
+    '',
     `Attribution basis: ${pct(snapshot.assignedBy.evidence / snapshot.totalTokens)} explicit point evidence, ${pct(snapshot.assignedBy.session / snapshot.totalTokens)} delegated-session carry and ${pct(snapshot.assignedBy.neighbour / snapshot.totalTokens)} same-session neighbour carry within the active-episode bound.`,
+    '',
+    `Codex source coverage: ${codexDiscovered} rollout files discovered, ${codexMatched} matched the landed-point pre-filter and ${Math.max(0, codexDiscovered - codexMatched)} did not. All were parsed; the pre-filter gap is a source-quality reading, not silently discarded traffic.`,
+    '',
+    `Named Codex residual outside the ledger: ${codexResidual.tokens} tokens across ${codexResidual.turns} turns in ${codexResidual.files} files (${codexResidual.unattributedTokens} tokens without point evidence; ${codexResidual.outsideWindowTokens} tokens explicitly belonging to points outside this landed-point window).`,
     '',
     '| point | landed | total | main session | cross-vendor reviews | delegated agents |',
     '| ---: | --- | ---: | ---: | ---: | --- |',
@@ -286,6 +326,10 @@ if (isMainModule(import.meta.url)) {
   }
   for (const row of snapshot.ledger) {
     if (originTotal(row) !== row.tokens) throw new Error(`origin split does not reconcile for point ${row.point}`)
+  }
+  const reviewTotal = snapshot.ledger.reduce((sum, row) => sum + row.origins.crossVendorReviews, 0)
+  if (snapshot.reviewProviderTokens.anthropic !== 0 || reviewTotal !== snapshot.reviewProviderTokens.openai) {
+    throw new Error('cross-vendor review split does not reconcile to OpenAI review traffic')
   }
   const writePath = flag('--write')
   const reportPath = flag('--report')

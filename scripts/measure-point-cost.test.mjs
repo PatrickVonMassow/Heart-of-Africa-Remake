@@ -23,21 +23,24 @@ beforeAll(() => {
   copy('claude-main.jsonl', join(claude, 'main.jsonl'))
   copy('claude-agent.jsonl', join(claude, 'main', 'subagents', 'agent-a900.jsonl'))
   copy('codex-author.jsonl', join(codex, 'rollout-author.jsonl'))
+  copy('codex-ask.jsonl', join(codex, 'rollout-ask.jsonl'))
   copy('codex-review.jsonl', join(codex, 'rollout-review.jsonl'))
+  copy('codex-unrelated.jsonl', join(codex, 'rollout-unrelated.jsonl'))
 })
 
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 describe('point-cost IO over recorded trees', () => {
   it('finds nested Codex rollouts and both Claude scopes', () => {
-    expect(listCodexRollouts(join(root, 'codex'))).toHaveLength(2)
-    const read = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex') })
-    expect(read).toMatchObject({ claudeFiles: 2, codexFiles: 2 })
+    expect(listCodexRollouts(join(root, 'codex'))).toHaveLength(4)
+    const read = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex'), points: [900] })
+    expect(read).toMatchObject({ claudeFiles: 2, codexFiles: 3, codexCandidates: 4 })
     expect(new Set(read.turns.map((turn) => turn.provider))).toEqual(new Set(['anthropic', 'openai']))
+    expect(read.turns.some((turn) => turn.candidateMatch === false && turn.tokens === 200)).toBe(true)
   })
 
   it('prints the per-point split, all lever verdicts and the three measured suspects', () => {
-    const read = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex') })
+    const read = readProviderTurns({ claudeDir: claude, codexDir: join(root, 'codex'), points: [900] })
     const snapshot = buildSnapshot({
       landed: [{ point: 900, sha: 'abc', landedAt: '2026-08-18T10:20:00Z' }],
       turns: read.turns,
@@ -52,6 +55,11 @@ describe('point-cost IO over recorded trees', () => {
     expect(consoleReport).toContain('picture reads')
     expect(consoleReport).toContain('agent reports')
     expect(consoleReport).toContain('cross-vendor review rounds')
-    expect(formatMarkdown(snapshot)).toContain('| 900 |')
+    const markdown = formatMarkdown(snapshot)
+    expect(markdown).toContain('| 900 |')
+    expect(markdown).toContain('Named Codex residual')
+    expect(snapshot.residualTokens.openai).toMatchObject({ tokens: 200, outsideWindowTokens: 200 })
+    expect(snapshot.reviewProviderTokens).toEqual({ anthropic: 0, openai: 800 })
+    expect(snapshot.ledger[0].origins.crossVendorReviews).toBe(snapshot.reviewProviderTokens.openai)
   })
 })

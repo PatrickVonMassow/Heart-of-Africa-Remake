@@ -62,6 +62,10 @@ describe('recorded Codex fixtures', () => {
   it('classifies the real review-sol commission as review cost', () => {
     expect(parseCodexTranscript(fixture('codex-review.jsonl'))[0]).toMatchObject({ role: 'review', tokens: 800 })
   })
+
+  it('keeps the real ask-sol commission as delegated agent work', () => {
+    expect(parseCodexTranscript(fixture('codex-ask.jsonl'))[0]).toMatchObject({ role: 'agent', tokens: 450 })
+  })
 })
 
 describe('point attribution is candidate-bounded and evidence-led', () => {
@@ -88,6 +92,16 @@ describe('point attribution is candidate-bounded and evidence-led', () => {
     expect(assigned.map((turn) => turn.point)).toEqual([727, 727])
   })
 
+  it('lets repository metadata win over point numbers quoted in review material', () => {
+    expect(
+      declaredPointFromEvidence({
+        branch: 'feat/714-review-material-budget',
+        cwd: '/workspace/hoa/.claude/worktrees/agent-a5903341fccc6ef7d',
+        text: 'WORK-ORDER POINT 298\nWORK-ORDER POINT 298\nWORK-ORDER POINT 624',
+      }),
+    ).toBe(714)
+  })
+
   it('fills setup and prose within one agent session, never across an idle episode', () => {
     const turns = [
       { at: 0, session: 'a', scope: 'subagent', branch: '', prompt: '', tools: [] },
@@ -107,6 +121,7 @@ describe('boundary events and the landed-point ledger', () => {
       ...parseClaudeTranscript(fixture('claude-main.jsonl'), { file: 'main.jsonl' }),
       ...parseClaudeTranscript(fixture('claude-agent.jsonl'), { file: 'main/subagents/agent-a900.jsonl', scope: 'subagent' }),
       ...parseCodexTranscript(fixture('codex-author.jsonl')),
+      ...parseCodexTranscript(fixture('codex-ask.jsonl')),
       ...parseCodexTranscript(fixture('codex-review.jsonl')),
     ]
     const turns = assignPoints(raw, [900])
@@ -128,7 +143,7 @@ describe('boundary events and the landed-point ledger', () => {
     const originTotal = row.origins.mainSession + row.origins.crossVendorReviews + Object.values(row.origins.agents).reduce((a, b) => a + b, 0)
     expect(originTotal).toBe(row.tokens)
     expect(row.origins.crossVendorReviews).toBe(800)
-    expect(Object.keys(row.origins.agents)).toEqual(['codex:codex-author', 'claude:a900'])
+    expect(Object.keys(row.origins.agents)).toEqual(['codex:codex-author', 'claude:a900', 'codex:codex-ask'])
     expect(row.items.agentReports).toBeGreaterThan(0)
     expect(row.items.pictureReads).toBeGreaterThan(0)
     expect(row.items.reviewRounds).toBe(800)

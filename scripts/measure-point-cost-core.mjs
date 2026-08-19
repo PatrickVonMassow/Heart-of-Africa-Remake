@@ -360,13 +360,24 @@ export function pointFromEvidence({ branch = '', cwd = '', text = '' } = {}, can
  * Otherwise an in-progress point 727 that merely discusses landed point 712 is charged
  * to 712 because 727 was absent from the candidate set. */
 export function declaredPointFromEvidence({ branch = '', cwd = '', text = '' } = {}) {
+  const structural = new Map()
+  const addStructural = (point) => {
+    const n = Number(point)
+    if (Number.isInteger(n)) structural.set(n, (structural.get(n) ?? 0) + 1)
+  }
+  for (const match of String(branch).matchAll(/feat\/(\d+)(?:[-/]|\b)/gi)) addStructural(match[1])
+  for (const match of String(cwd).replace(/\\/g, '/').matchAll(/worktrees\/(?:point-)?(\d+)(?:[-/]|\b)/gi)) addStructural(match[1])
+  // Repository metadata describes the running job. Review material can quote many
+  // other work-order prompts and commit messages, so no amount of quoted prose may
+  // outvote an unambiguous branch/worktree declaration.
+  if (structural.size === 1) return [...structural.keys()][0]
+  if (structural.size > 1) return null
+
   const scores = new Map()
   const add = (point, weight) => {
     const n = Number(point)
     if (Number.isInteger(n)) scores.set(n, (scores.get(n) ?? 0) + weight)
   }
-  for (const match of String(branch).matchAll(/feat\/(\d+)(?:[-/]|\b)/gi)) add(match[1], 20)
-  for (const match of String(cwd).replace(/\\/g, '/').matchAll(/worktrees\/(?:point-)?(\d+)(?:[-/]|\b)/gi)) add(match[1], 20)
   for (const match of String(text).matchAll(/WORK-ORDER POINT(?: NUMBER)?[: ]+(\d+)\b/gi)) add(match[1], 12)
   for (const match of String(text).matchAll(/(?:YOUR BRANCH:\s*)?feat\/(\d+)(?:[-/]|\b)/gi)) add(match[1], 10)
   for (const match of String(text).matchAll(/point-brief\.mjs\s+(\d+)\b/gi)) add(match[1], 8)
