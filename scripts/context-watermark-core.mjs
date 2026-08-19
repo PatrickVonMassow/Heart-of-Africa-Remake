@@ -12,16 +12,27 @@
 // `alert: true`) instead of silently never firing.
 
 /**
- * THE WATERMARK, in tokens of context. One named place, calibratable via
- * HOA_CONTEXT_WATERMARK_TOKENS (read by the IO wrapper so this stays pure).
- *
- * WHY 150 000: it is the measured cost cliff the whole boundary rule exists for
- * — 87–94 % of the batch's token spend sat ABOVE 150k context, one session
- * carrying point after point (CLAUDE.md §6, users 27./28.07.2026). A session at
- * the mark has already consumed the cheap region; everything further multiplies
- * every subsequent turn's cost, so the handover pays for itself immediately.
+ * THE CEILING, in tokens of context. This is the cost cliff against which an
+ * incident overshoot is measured; it is NOT the point at which new work may be
+ * admitted, because a handover begun here would finish beyond the ceiling.
  */
-export const CONTEXT_WATERMARK_TOKENS = 150_000
+export const CONTEXT_CEILING_TOKENS = 150_000
+
+/**
+ * THE TRIGGER, in tokens of context. Admission decisions use this lower number
+ * so the observed work still paid after a trigger can fit below the ceiling.
+ *
+ * Arithmetic (19.08.2026): ceiling 150,000 - largest observed single response
+ * 40,000 - measured cost of leaving 27,336 = 82,664; round down to 82,000.
+ * The rejected 100,000 draft did not hold even its own stated worst case:
+ * 100,000 + 40,000 + 15,000 already exceeds the ceiling.
+ * Both premises are observations, not bounds: the response jump is one reading,
+ * and the leaving cost is contaminated by contradictory gates. That
+ * contamination biases the leaving cost high, so subtracting it is the safer
+ * immediate margin until clean measurement and prospective admission replace
+ * this written trigger.
+ */
+export const CONTEXT_TRIGGER_TOKENS = 82_000
 
 /**
  * The CURRENT CONTEXT SIZE from a transcript tail. PURE.
@@ -94,7 +105,7 @@ export function contextDistanceNote({ tokens, watermark, margin = CONTEXT_MARGIN
       'Say so in the closing report.'
     )
   }
-  const mark = typeof watermark === 'number' && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
+  const mark = typeof watermark === 'number' && watermark > 0 ? watermark : CONTEXT_TRIGGER_TOKENS
   const over = tokens - mark
   if (over <= margin) return null
   return (
@@ -103,8 +114,8 @@ export function contextDistanceNote({ tokens, watermark, margin = CONTEXT_MARGIN
   )
 }
 
-export function watermarkDecision({ reading, watermark = CONTEXT_WATERMARK_TOKENS } = {}) {
-  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
+export function watermarkDecision({ reading, watermark = CONTEXT_TRIGGER_TOKENS } = {}) {
+  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_TRIGGER_TOKENS
   if (!reading || typeof reading.tokens !== 'number' || !(reading.tokens > 0)) {
     return { state: 'unreadable', tokens: null, watermark: mark, alert: true }
   }

@@ -57,7 +57,7 @@ import {
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
-import { gatherWatermark, watermarkTokens } from './context-watermark.mjs'
+import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
 import { contextDistanceNote } from './context-watermark-core.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
@@ -305,9 +305,9 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
 export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } = {}) {
   const marker = readBoundary(path)
   const closure = marker ? closureOf(marker.point) : 'unknown'
-  // The CURRENT configured watermark rides along (Sol final round, finding 1):
+  // The CURRENT configured trigger rides along (Sol final round, finding 1):
   // a context claim must clear it as well as its own recorded mark.
-  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: watermarkTokens() })
+  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: triggerTokens() })
   // Probe the OS only when a boundary is actually claimed — this runs at every
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
