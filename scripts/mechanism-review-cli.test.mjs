@@ -398,6 +398,7 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         // the AUTHOR allowlist, which answers what a model trailer is (point 667)
         'model-guard-core.mjs',
@@ -470,6 +471,7 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         'model-guard-core.mjs',
         'review-material-core.mjs',
@@ -685,6 +687,7 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         'model-guard-core.mjs',
         'review-material-core.mjs',
@@ -770,6 +773,7 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         'model-guard-core.mjs',
         'review-material-core.mjs',

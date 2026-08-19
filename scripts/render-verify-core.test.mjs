@@ -259,6 +259,27 @@ describe('evaluate — the dual-backend gate', () => {
     expect(r.decision).toBe('block')
     expect(r.reason).toContain('…')
   })
+
+  it('hands browser and throttle work to the successor after the context fence closes', () => {
+    const r = evaluate(renderChange({
+      fence: { closed: true, successor: 'the successor session' },
+      sessionId: 'sealed-session',
+    }))
+    expect(r).toMatchObject({ decision: 'defer', deferred: true, debt: { decision: 'block' } })
+    expect(r.reason).toContain('render-verify-guard')
+    expect(r.reason).toContain('successor session')
+    expect(r.reason).toContain('batch-boundary.mjs --clear')
+    expect(r.clear).toBeUndefined()
+  })
+
+  it('still demands the pending render work on the successor\'s first turn', () => {
+    const r = evaluate(renderChange({
+      fence: { closed: false, successor: 'the successor session' },
+      sessionId: 'successor-session',
+    }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toContain('verify/run-all.mjs')
+  })
 })
 
 describe('baselineFor — the per-branch verified baseline (feature-branch workflow)', () => {

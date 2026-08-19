@@ -19,6 +19,7 @@
 // point. The two are never conflated — see runVerdict.
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
+import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
 export const BACKENDS = ['webgpu', 'webgl']
@@ -720,6 +721,26 @@ export function suggestSuite(runs, changedRenderPaths) {
 
 const ALLOW = { decision: 'allow' }
 
+/**
+ * A pending picture check is real work: it runs a browser suite, and may run an
+ * eight-attempt throttle probe. Once the context boundary is committed this
+ * session may not begin either. Keep the original block as the successor's
+ * debt, but turn it into the same explicit handoff used by the other mandatory
+ * Stop duties.
+ */
+function scopeRenderVerification(block, { fence = null, sessionId = '' } = {}) {
+  const scoped = scopeMandatoryDuty({
+    owed: block?.decision === 'block',
+    fence,
+    guardId: 'render-verify-guard',
+    sessionId,
+    duty: 'the pending render verification and any diagnostic reruns it requires',
+  })
+  return scoped.deferred
+    ? { decision: 'defer', deferred: true, reason: scoped.message, debt: block }
+    : block
+}
+
 /** How many waved-through reds one deferral record keeps. A bound, because the
  *  state file is read on every turn — never a silent one: the count that goes
  *  with it is the real number. */
@@ -754,6 +775,8 @@ export function evaluate(input) {
     deferral = null,
     openPoints = null,
     ledger = RED_CHARGES,
+    fence = null,
+    sessionId = '',
   } = input ?? {}
 
   // Garbage where the path list should be: fail open, but do NOT advance the
@@ -834,7 +857,7 @@ export function evaluate(input) {
         return `${u.backend}/${u.suite}: ${what}${first ? ` — "${first}"` : ''}`
       })
       .join(' | ')
-    return {
+    return scopeRenderVerification({
       decision: 'block',
       reason:
         `UNEXPLAINED RED SINCE THE LAST RENDER EDIT: ${unexplained.length} recorded run(s) failed and nothing ` +
@@ -847,7 +870,7 @@ export function evaluate(input) {
         `node scripts/throttle-probe.mjs ${unexplained[0].suite} --section=<name> --runs 8. If the cause lies ` +
         'outside the render set (a fixed helper, a dead dev server), say so loudly instead: ' +
         'node scripts/render-verify-guard.mjs --defer "<reason>".',
-    }
+    }, { fence, sessionId })
   }
 
   if (missing.length === 0) {
@@ -892,7 +915,7 @@ export function evaluate(input) {
     .map((b) => `VERIFY_GL=${b} node scripts/verify/run-all.mjs ${suite}`)
     .join('  AND  ')
   const label = missing.length === 2 ? 'EITHER BACKEND' : missing[0].toUpperCase()
-  return {
+  return scopeRenderVerification({
     decision: 'block',
     reason:
       `RENDER CHANGE NOT VERIFIED ON ${label}: commits since ${String(clearedHead).slice(0, 7)} ` +
@@ -920,5 +943,5 @@ export function evaluate(input) {
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +
       'node scripts/render-verify-guard.mjs --defer "<reason>".',
-  }
+  }, { fence, sessionId })
 }

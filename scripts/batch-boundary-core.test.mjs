@@ -7,6 +7,7 @@
 //   - stopping with a launcher that will never fire, which would not shorten a
 //     session but END the batch.
 import { describe, it, expect } from 'vitest'
+import ts from 'typescript'
 import {
   BOUNDARY_DESTINATIONS,
   BOUNDARY_FRESH_MS,
@@ -24,6 +25,7 @@ import {
   isClosingSetPath,
   isClosingSetCommand,
   isOutputPagerSegment,
+  withoutOutputDescriptorMerges,
   describeWithdrawalTrigger,
   hookCallTimestamp,
   berlinMinuteOfDay,
@@ -47,11 +49,14 @@ import {
   knownPoints,
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
-import { progressGuardDecision } from './batch-singleton.mjs'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { markHandover, progressGuardDecision, readOwnerLock } from './batch-singleton.mjs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
+import { evaluateRuleReview } from './rule-review-core.mjs'
+import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
+import { evaluateMechanismReview } from './mechanism-review-core.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -313,6 +318,8 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
       'node scripts/batch-boundary.mjs 388',
       'cd /repo && node scripts/board.mjs move 388 done',
       'node "C:/repo/scripts/retro-refresh.mjs"',
+      'node scripts/board-queue.mjs',
+      'node scripts/finding.mjs --drain',
     ]) {
       expect(call({ command: c })).toMatchObject({ survives: true })
     }
@@ -336,8 +343,9 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     // through `npm test` — a successor could then spawn beside a working session.
     expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
     expect(call({ command: 'npm test & node scripts/board.mjs' }).survives).toBe(false)
-    // …and a genuine chain of closing commands still survives it.
-    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(true)
+    // Even two closing invocations are unsafe when the first is detached: the
+    // shell starts the second before the first has withdrawn the boundary.
+    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(false)
   })
 
   it('a segment that can run or write something unseen is not closing', () => {
@@ -349,6 +357,65 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     ]) {
       expect(call({ command: c }).survives).toBe(false)
     }
+  })
+
+  it('THE WAY OUT SURVIVES harmless output decoration', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear',
+      'node scripts/batch-boundary.mjs --clear 2>&1',
+      'node scripts/batch-boundary.mjs --clear | tail -3',
+      'node scripts/batch-boundary.mjs --clear 2>&1 | tail -3',
+      'node scripts/board.mjs attest 2>&1 | tail -3',
+      'node scripts/board-queue.mjs 2>&1 | head -3',
+      'node scripts/finding.mjs --drain 2>&1 | more',
+      // A separator closes the merge as surely as a space does.
+      'node scripts/batch-boundary.mjs --clear 2>&1|tail -3',
+      'node scripts/board.mjs attest 2>&1;node scripts/board-publish.mjs',
+    ]) {
+      expect(call({ command }).survives, command).toBe(true)
+    }
+  })
+
+  it('keeps file writes, substitutions and second work outside the closing set', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear > boundary.txt',
+      'node scripts/batch-boundary.mjs --clear 2> errors.txt',
+      'node scripts/batch-boundary.mjs --clear $(git status)',
+      'node scripts/batch-boundary.mjs --clear && git commit -m carry-on',
+      'node scripts/batch-boundary.mjs --clear & tail -3',
+      'node scripts/batch-boundary.mjs --clear ; tail /tmp/file',
+    ]) {
+      expect(call({ command }).survives, command).toBe(false)
+    }
+  })
+
+  it('recognises only descriptor merges as harmless redirection', () => {
+    expect(withoutOutputDescriptorMerges('x 2>&1 1>&2')).toBe('x  ')
+    expect(withoutOutputDescriptorMerges('x > out 2> err')).toBe('x > out 2> err')
+    expect(withoutOutputDescriptorMerges('x >& out')).toBe('x >& out')
+    // The merge ends at a separator too, not only at whitespace.
+    expect(withoutOutputDescriptorMerges('x 2>&1|y')).toBe('x |y')
+    expect(withoutOutputDescriptorMerges('x 2>&1;y')).toBe('x ;y')
+    expect(withoutOutputDescriptorMerges('x 2>&1&& y')).toBe('x && y')
+    // A LONE trailing & backgrounds the call — it is not output handling and the
+    // merge stays in place, so the segment reads as the redirection it is.
+    expect(withoutOutputDescriptorMerges('x 2>&1&')).toBe('x 2>&1&')
+    // A digit that keeps running is not a file descriptor merge we understand.
+    expect(withoutOutputDescriptorMerges('x 2>&1a')).toBe('x 2>&1a')
+  })
+
+  it('a DETACHED closing command is not closing work, however it is spelled', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear &',
+      'node scripts/batch-boundary.mjs --clear 2>&1&',
+      'node scripts/batch-boundary.mjs --clear 2>&1 &',
+    ]) {
+      expect(call({ command }).survives, command).toBe(false)
+    }
+    // An & BETWEEN commands still detaches the one on its left, even if both
+    // invocations otherwise belong to the closing set.
+    expect(call({ command: 'node scripts/board.mjs attest & node scripts/board-publish.mjs' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/board.mjs attest && node scripts/board-publish.mjs' }).survives).toBe(true)
   })
 
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
@@ -388,6 +455,11 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     // A pager in the MIDDLE would hide whatever follows it.
     expect(call({ command: 'node scripts/focus.mjs show | tail -2 | npm test' }).survives).toBe(false)
     expect(call({ command: 'node scripts/focus.mjs show | tail -2 && git push' }).survives).toBe(false)
+    // Pager names only mean output handling after a pipe. Sequencing starts an
+    // independent command, which therefore has to belong to the closing set.
+    expect(call({ command: 'node scripts/focus.mjs show ; tail /tmp/file' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show && tail -2' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show || tail -2' }).survives).toBe(false)
   })
 
   it('a pager ALONE is not a closing line', () => {
@@ -700,6 +772,238 @@ describe('the marker survives everything --prepare prescribes (point 675)', () =
   })
 })
 
+const REMEDY_RUNTIME_VALUE = 'remedy_runtime_value'
+
+function staticRemedyText(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
+  if (ts.isTemplateExpression(node)) {
+    return node.head.text + node.templateSpans.map((span) => REMEDY_RUNTIME_VALUE + span.literal.text).join('')
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = staticRemedyText(node.left)
+    const right = staticRemedyText(node.right)
+    if (left === null && right === null) return null
+    return (left ?? REMEDY_RUNTIME_VALUE) + (right ?? REMEDY_RUNTIME_VALUE)
+  }
+  return null
+}
+
+function staticRemedyTexts(root) {
+  const texts = []
+  const visit = (node) => {
+    const text = staticRemedyText(node)
+    const parentText = node.parent && node.parent !== root.parent ? staticRemedyText(node.parent) : null
+    if (text !== null && parentText === null) texts.push(text)
+    ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return texts
+}
+
+function topLevelDeclarations(sourceFile) {
+  const declarations = new Map()
+  for (const statement of sourceFile.statements) {
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+      declarations.set(statement.name.text, statement)
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) declarations.set(declaration.name.text, declaration)
+      }
+    }
+  }
+  return declarations
+}
+
+function declarationsReachableFrom(sourceFile, importedNames) {
+  const declarations = topLevelDeclarations(sourceFile)
+  const pending = [...importedNames]
+  const reached = []
+  const seen = new Set()
+  while (pending.length) {
+    const name = pending.pop()
+    if (seen.has(name) || !declarations.has(name)) continue
+    seen.add(name)
+    const declaration = declarations.get(name)
+    reached.push(declaration)
+    const visit = (node) => {
+      if (ts.isIdentifier(node) && declarations.has(node.text) && !seen.has(node.text)) pending.push(node.text)
+      ts.forEachChild(node, visit)
+    }
+    visit(declaration)
+  }
+  return reached
+}
+
+function commandEndInPrintedLine(line, start) {
+  let doubleQuoted = false
+  let singleQuoted = false
+  for (let i = start; i < line.length; i += 1) {
+    const char = line[i]
+    if (char === '"' && !singleQuoted) doubleQuoted = !doubleQuoted
+    else if (char === "'" && !doubleQuoted) singleQuoted = !singleQuoted
+    if (doubleQuoted || singleQuoted) continue
+    if (char === '`' || char === ',' || char === '—') return i
+    if (char === '.' && /\s/.test(line[i + 1] ?? '')) return i
+  }
+  return line.length
+}
+
+function remedyCommandsInText(text) {
+  const remedies = []
+  const unclassifiable = []
+  for (const line of String(text).split(/\r?\n/)) {
+    for (const match of line.matchAll(/node\s+scripts[\\/][\w/-]+\.mjs/g)) {
+      const before = line.slice(0, match.index)
+      const clauseStart = Math.max(before.lastIndexOf('`'), before.lastIndexOf('. '), before.lastIndexOf(', ')) + 1
+      const leadingClause = before.slice(clauseStart)
+      const end = commandEndInPrintedLine(line, match.index + match[0].length)
+      const printed = line.slice(match.index, end).trim().replace(/[):]+$/, '')
+      if (/&&|\|\||(^|[^&])&(?!&)/.test(leadingClause)) {
+        unclassifiable.push({
+          printed,
+          context: `${leadingClause}${printed}`.trim().replaceAll(REMEDY_RUNTIME_VALUE, '<runtime>'),
+        })
+        continue
+      }
+      const command = printed.replace(/<[^>\n]+>/g, 'value').replaceAll(REMEDY_RUNTIME_VALUE, 'value')
+      remedies.push({ command, printed })
+    }
+  }
+  return { remedies, unclassifiable }
+}
+
+function stopGuardRemedies(root, guard) {
+  const parse = (file) => {
+    const source = readFileSync(resolve(root, 'scripts', file), 'utf8')
+    return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  }
+  const wrapper = parse(guard)
+  const sources = [{ file: guard, nodes: [wrapper] }]
+
+  for (const statement of wrapper.statements) {
+    if (!ts.isImportDeclaration(statement)) continue
+    const importedFile = statement.moduleSpecifier.text
+    if (!importedFile.startsWith('./') || !importedFile.endsWith('-core.mjs')) continue
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    const importedNames = bindings.elements.map((element) => (element.propertyName ?? element.name).text)
+    const file = importedFile.slice(2)
+    const core = parse(file)
+    sources.push({ file, nodes: declarationsReachableFrom(core, importedNames) })
+  }
+
+  const remedies = []
+  const unclassifiable = []
+  for (const { file, nodes } of sources) {
+    for (const node of nodes) {
+      for (const text of staticRemedyTexts(node)) {
+        const found = remedyCommandsInText(text)
+        remedies.push(...found.remedies.map((remedy) => ({ guard, source: file, ...remedy })))
+        unclassifiable.push(...found.unclassifiable.map((remedy) => ({ guard, source: file, ...remedy })))
+      }
+    }
+  }
+  return { remedies, unclassifiable }
+}
+
+describe('every Stop-guard remedy is closing work or explicitly deferred at the fence', () => {
+  it('keeps the reviewed additions to reads and boundary bookkeeping, one by one', () => {
+    const closingAdditions = new Map([
+      ['batch-launcher', 'arms the successor launcher'],
+      ['chat-reply', 'delivers the closing reply'],
+      ['pages-deploy-unblock', 'settles the CI handover state'],
+      ['rule-echo', 'reads and reports the standing rule'],
+      ['vdzk-answer', 'records the closing answer receipt'],
+      ['guard-health-guard', 'reads the guard-health status'],
+      ['guide-brevity-guard', 'reads the guide-budget status'],
+      ['verify/run-wait', 'reads the existing verify receipt or waits for it'],
+      ['worktree-cleanup', 'performs the boundary worktree bookkeeping'],
+    ])
+    for (const [script, reason] of closingAdditions) {
+      expect(isClosingSetCommand(`node scripts/${script}.mjs`), reason).toBe(true)
+    }
+    for (const script of ['review-sol', 'throttle-probe', 'verify/run-all']) {
+      expect(isClosingSetCommand(`node scripts/${script}.mjs`), `${script} starts real work`).toBe(false)
+    }
+  })
+
+  it('derives remedy scripts from the authoritative hook chain, not a copied guard list', () => {
+    const root = process.cwd()
+    const settings = JSON.parse(readFileSync(resolve(root, '.claude/settings.json'), 'utf8'))
+    const guards = (settings.hooks?.Stop ?? [])
+      .flatMap((entry) => entry.hooks ?? [])
+      .map((hook) => /scripts[\\/]([\w.-]+\.mjs)/.exec(hook.command ?? '')?.[1])
+      .filter(Boolean)
+    expect(guards.length).toBeGreaterThan(5)
+
+    const remedies = []
+    const unclassifiable = []
+    for (const guard of guards) {
+      const found = stopGuardRemedies(root, guard)
+      remedies.push(...found.remedies)
+      unclassifiable.push(...found.unclassifiable)
+    }
+
+    expect(remedies.length).toBeGreaterThan(20)
+    expect(remedies.map(({ command }) => command)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^node scripts\/finding\.mjs --drain/),
+        expect.stringMatching(/^node scripts\/board-queue\.mjs/),
+        expect.stringMatching(/^node scripts\/rule-review\.mjs --reviewed/),
+      ]),
+    )
+    expect(
+      [...new Set(unclassifiable.map(({ guard, source, context }) => `${guard} via ${source}: ${context}`))],
+    ).toEqual([
+      'ci-status-guard.mjs via ci-status-guard-core.mjs: <runtime>Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
+      'ci-status-guard.mjs via ci-failure-cause-core.mjs: Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
+    ])
+    const closedFence = { closed: true, successor: 'the successor session' }
+    const deferredGuards = new Map([
+      ['render-verify-guard.mjs', evaluateRenderVerify({
+        head: 'head',
+        clearedHead: 'base',
+        changedRenderPaths: ['src/render/pending.ts'],
+        fence: closedFence,
+        sessionId: 'sealed-session',
+      })],
+      ['mechanism-review-guard.mjs', evaluateMechanismReview({
+        baseline: 'base',
+        head: 'head',
+        pendingCommits: [{
+          sha: 'a'.repeat(40),
+          subject: 'Change a guard',
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/pending-guard.mjs'],
+          coveringRecordShas: [],
+        }],
+        records: [],
+        fence: closedFence,
+        sessionId: 'sealed-session',
+      })],
+    ])
+    const deferredRemedies = []
+    for (const { guard, source, command } of remedies) {
+      if (isClosingSetCommand(command)) continue
+      const verdict = deferredGuards.get(guard)
+      expect(verdict?.deferred, `${guard} via ${source} demands real work without fenced deferral: ${command}`).toBe(true)
+      deferredRemedies.push(command)
+    }
+    expect(new Set(deferredRemedies.map((command) => /scripts[\\/]([\w/-]+)\.mjs/.exec(command)?.[1]))).toEqual(
+      new Set(['review-sol', 'throttle-probe', 'verify/run-all']),
+    )
+  })
+
+  it('keeps a shell continuation after the remedy script in the classified command', () => {
+    const found = remedyCommandsInText('Run `node scripts/board.mjs && npm test`.')
+    expect(found.remedies).toEqual([
+      { command: 'node scripts/board.mjs && npm test', printed: 'node scripts/board.mjs && npm test' },
+    ])
+    expect(isClosingSetCommand(found.remedies[0].command)).toBe(false)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // THE CONTEXT BOUNDARY (point 675, defeat 3): valid without a closed point,
 // but ONLY on a recorded real measurement.
@@ -784,15 +1088,16 @@ describe('assessBoundary — the context-watermark cause', () => {
   })
 })
 
-describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/4)', () => {
-  it('records the transfer first, then writes the marker', () => {
+describe('commitSealedBoundary — the marker and ownership handover are one commit', () => {
+  it('records the transfer, writes the marker, then hands the lock over', () => {
     const order = []
     const out = commitSealedBoundary({
       transfer: { commit: () => (order.push('transfer'), 'feat/x@abcd') },
       marker: { v: 2 },
       write: () => order.push('marker'),
+      handover: () => (order.push('handover'), { handed: true }),
     })
-    expect(order).toEqual(['transfer', 'marker'])
+    expect(order).toEqual(['transfer', 'marker', 'handover'])
     expect(out).toBe('feat/x@abcd')
   })
 
@@ -843,6 +1148,41 @@ describe('commitSealedBoundary — the marker is the LAST write (Sol findings 1/
     let marker = null
     expect(commitSealedBoundary({ transfer: null, marker: { v: 2, point: 675 }, write: (m) => (marker = m) })).toBeNull()
     expect(marker).toEqual({ v: 2, point: 675 })
+  })
+
+  it('a failed ownership handover names the stage and leaves the committed marker explicit', () => {
+    let marker = null
+    let caught = null
+    try {
+      commitSealedBoundary({
+        marker: { v: 2, cause: 'context' },
+        write: (m) => (marker = m),
+        handover: () => ({ handed: false, reason: 'write-failed', error: new Error('lock busy') }),
+      })
+    } catch (e) {
+      caught = e
+    }
+    expect(marker).toEqual({ v: 2, cause: 'context' })
+    expect(caught?.stage).toBe('handover')
+    expect(caught?.message).toBe('lock busy')
+  })
+
+  it('leaves the lock handed over even when an unrelated Stop duty blocks afterwards', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'boundary-handover-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    writeFileSync(lockPath, JSON.stringify({ sessionId: SID, claimedAt: NOW - 10_000, pid: process.pid }))
+    try {
+      commitSealedBoundary({
+        marker: marker({ cause: 'context', point: null }),
+        write: () => {},
+        handover: () => markHandover(SID, { lockPath, point: null, now: NOW }),
+      })
+      const unrelated = evaluateRuleReview({ now: NOW, lastReviewedAt: null, sessionId: SID })
+      expect(unrelated?.decision).toBe('block')
+      expect(readOwnerLock(lockPath)).toMatchObject({ handedOver: true, handedOverAt: NOW, handoverPoint: null })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

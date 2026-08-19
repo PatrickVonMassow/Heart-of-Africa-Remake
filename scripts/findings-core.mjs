@@ -20,6 +20,7 @@
 //
 // Side-effect free; the wrapper (findings-guard.mjs) reads the tree and is
 // fail-open, so a bug in here can never trap a session.
+import { scopeMandatoryDuty } from './guard-duty-core.mjs'
 
 /** Investigative calls needed before a recordless turn is judged.
  *
@@ -311,6 +312,8 @@ export function auditFindings({
   carrierPending = 0,
   carrierRequests = 0,
   atBoundary = false,
+  fence = null,
+  sessionId = '',
   declarationWrittenAt = null,
   turnStartedAt = null,
   threshold = DEFAULT_THRESHOLD,
@@ -318,6 +321,7 @@ export function auditFindings({
   const t = tally ?? { investigative: 0, agents: 0, records: [] }
   const records = Array.isArray(t.records) ? t.records : []
   const violations = []
+  const deferred = []
 
   // THE DELEGATION EXEMPTION IS EARNED, NOT CLAIMED (point 437 G, four-eyes
   // review 30.07.2026). `wait-declared` is granted from the COMMAND STRING
@@ -370,11 +374,20 @@ export function auditFindings({
     })
   }
 
-  if (ownsBatch && Number(carrierPending) > 0) {
+  const carrierDuty = scopeMandatoryDuty({
+    owed: ownsBatch && Number(carrierPending) > 0,
+    fence,
+    guardId: 'findings-guard',
+    sessionId,
+    duty: `${carrierPending} pending carrier finding(s) must be drained into the work order`,
+  })
+  if (carrierDuty.deferred) deferred.push({ kind: 'carrier-not-drained', detail: carrierDuty.message })
+  if (carrierDuty.owed) {
     violations.push({
       kind: 'carrier-not-drained',
       detail:
         `${carrierPending} Befund(e) liegen noch im Memory-Träger, während diese Sitzung den Batch HÄLT. ` +
+        `Diese Pflicht schuldet Sitzung ${sessionId || '<unknown owner>'}; der Träger ist ihr Eingangskorb. ` +
         'Der Träger ist Transport, nie Lager: übertrage sie in TASKS.md (als Bündel-Mitglied, ' +
         'bundle-first) und leere sie dann mit node scripts/finding.mjs --drained "<Titel>".',
     })
@@ -398,7 +411,7 @@ export function auditFindings({
     })
   }
 
-  return { ok: violations.length === 0, violations }
+  return { ok: violations.length === 0, violations, deferred }
 }
 
 /** Render the audit as the guard's block message. */

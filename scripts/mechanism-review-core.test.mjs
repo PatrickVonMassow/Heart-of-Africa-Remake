@@ -382,6 +382,35 @@ describe('evaluateMechanismReview', () => {
     expect(text).toMatch(/mechanism-review\.mjs --record/)
   })
 
+  it('hands a pending cross-vendor review to the successor after the context fence closes', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [],
+      fence: { closed: true, successor: 'the successor session' },
+      sessionId: 'sealed-session',
+    })
+    expect(v).toMatchObject({ block: false, clear: false, deferred: true })
+    expect(v.findings[0].kind).toBe('no-review')
+    expect(v.reason).toContain('mechanism-review-guard')
+    expect(v.reason).toContain('successor session')
+    expect(v.reason).toContain('batch-boundary.mjs --clear')
+  })
+
+  it('still demands that review on the successor\'s first turn', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [],
+      fence: { closed: false, successor: 'the successor session' },
+      sessionId: 'successor-session',
+    })
+    expect(v.block).toBe(true)
+    expect(formatMechanismReviewVerdict(v)).toContain('mechanism-review.mjs --record')
+  })
+
   it('PASSES once a DIFFERENT model has recorded a review', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',

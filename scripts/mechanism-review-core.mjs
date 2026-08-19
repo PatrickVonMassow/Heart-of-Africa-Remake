@@ -25,6 +25,7 @@ import { modelNamesIn } from './model-guard-core.mjs'
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
 import { parsePassFiles, parsePassSpec, passComposition, worstVerdict } from './review-material-core.mjs'
+import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
@@ -1085,6 +1086,8 @@ export function evaluateMechanismReview({
   head = '',
   pendingCommits = [],
   records = [],
+  fence = null,
+  sessionId = '',
 } = {}) {
   if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
 
@@ -1346,6 +1349,25 @@ export function evaluateMechanismReview({
     }
   }
 
+  const duty = scopeMandatoryDuty({
+    owed: findings.length > 0,
+    fence,
+    guardId: 'mechanism-review-guard',
+    sessionId,
+    duty: 'the pending cross-vendor mechanism review',
+  })
+  if (duty.deferred) {
+    // `findings` and the unchanged baseline are the successor's durable debt.
+    return {
+      block: false,
+      clear: false,
+      bootstrap: false,
+      deferred: true,
+      reason: duty.message,
+      findings,
+      head,
+    }
+  }
   return { block: findings.length > 0, clear: findings.length === 0, bootstrap: false, findings, head }
 }
 

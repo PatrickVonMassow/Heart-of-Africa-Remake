@@ -55,6 +55,7 @@ const SCRIPT_FILES = [
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
+  'mandatory-duty-core.mjs',
   'mechanism-review-range-core.mjs',
   // …which counts a blind-parallel union itself (point 634), so its accounting
   // core travels with it, and asks the AUTHOR allowlist what a model trailer

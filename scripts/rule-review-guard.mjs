@@ -13,6 +13,7 @@ import { evaluateRuleReview } from './rule-review-core.mjs'
 import { countCorpusEntries, STATE_PATH } from './rule-review-state.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -41,6 +42,8 @@ export function gatherRuleReviewInputs({ sessionId = '', ignoreOwnership = false
       entryCount: countCorpusEntries(),
       reviewedCount: Number(state.reviewedCount) || null,
       paused: existsSync(PAUSE),
+      sessionId,
+      fence: gatherGuardDutyContext({ sessionId }),
     },
   }
 }
@@ -66,7 +69,8 @@ if (isMainModule(import.meta.url)) {
       console.log(verdict ? verdict.reason : 'rule-review-guard: keine Durchsicht fällig')
       process.exit(0)
     }
-    if (verdict) process.stdout.write(JSON.stringify(verdict))
+    if (verdict?.decision === 'block') process.stdout.write(JSON.stringify(verdict))
+    else if (verdict?.deferred) process.stdout.write(JSON.stringify({ systemMessage: verdict.reason }))
     process.exit(0)
   } catch (e) {
     console.error(`rule-review-guard error (allowing stop): ${e && e.message}`)

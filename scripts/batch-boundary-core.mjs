@@ -679,21 +679,52 @@ export const CLOSING_SET_FILES = new Set([
  *  `board-publish` and `batch-in-flight` joined for point 675: publishing the
  *  handover card IS ending (its absence from this list was one of the measured
  *  marker deletions of 13.08.2026), and transferring/adopting the in-flight
- *  declaration is boundary bookkeeping, not batch work. */
+ *  declaration is boundary bookkeeping, not batch work. The less obvious
+ *  readers and boundary-bookkeeping commands below are here for the same
+ *  reason: a Stop guard can print them after the seal is committed, so refusing
+ *  their targets would leave the session unable either to inspect the debt or
+ *  to end. Real work is deliberately absent; its guard hands the debt to the
+ *  successor instead. The boundary test derives that inventory from the live
+ *  Stop chain and its imported cores. */
 export const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
   'focus',
   'board',
+  'board-queue',
   'board-publish',
+  'finding',
   'mechanism-review',
   'retro-refresh',
   'batch-boundary',
+  'batch-claim',
+  'batch-doctor',
   'batch-handover-observe',
   'batch-in-flight',
+  'batch-launcher',
   'batch-singleton',
+  'chat-reply',
   'context-watermark',
+  'branch-hygiene-guard',
+  'bundle-first-guard',
+  'ci-status-guard',
+  'container-ask-guard',
+  'criticality-review-guard',
+  'dashboard-guard',
+  'guide-brevity-guard',
+  'guard-health-guard',
   'guard-preflight',
+  'mechanism-review-guard',
+  'model-guard',
+  'pages-deploy-unblock',
+  'prep-guard',
+  'queue-rank',
+  'render-verify-guard',
+  'rule-echo',
+  'rule-review',
+  'vdzk-answer',
+  'verify/run-wait',
+  'worktree-cleanup',
 ]
 
 const CLOSING_SCRIPT_RE = new RegExp(`scripts[\\\\/](?:${CLOSING_SET_SCRIPTS.join('|')})\\.mjs`, 'i')
@@ -716,12 +747,66 @@ export function isClosingSetPath(p) {
  * because a kept handover plus a long enough silence lets a successor spawn
  * beside a working session.
  *
- * A segment must also be nothing but the invocation: any command substitution
- * (`$(…)`, backticks) or redirection (`>`, `<`) makes it non-closing, whatever
- * its head reads as. Those run or write something this function cannot see, and
- * the head is no longer evidence of what the segment does.
+ * A segment must also be nothing but the invocation and harmless OUTPUT
+ * handling: any command substitution (`$(…)`, backticks) or redirection to a
+ * file (`>`, `<`) makes it non-closing, whatever its head reads as. A descriptor
+ * merge such as `2>&1` is different: it only selects where already-produced
+ * output is displayed, and is removed before separators are classified.
  */
 const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
+
+/**
+ * Remove shell descriptor-to-descriptor OUTPUT merges before splitting on `&`.
+ * They write no file and run no command. Anchoring both descriptors to decimal
+ * file-descriptor syntax keeps `> result.txt`, `>& result.txt` and an arbitrary
+ * ampersand expression opaque. The residual `>`/`<` check below remains the
+ * authority for every other redirection.
+ *
+ * A SEPARATOR ENDS THE MERGE AS SURELY AS A SPACE (Claude review of a6bcd9a5):
+ * `--clear 2>&1|tail -3` is the same harmless decoration as the spaced form, and
+ * demanding the space would leave the very shape this point exists to unblock
+ * denied for a typing habit. A LONE TRAILING `&` IS NOT SUCH A SEPARATOR (Sol
+ * re-review of c5a97818): stripping the merge in `--clear 2>&1&` would leave
+ * `--clear &`, whose empty trailing segment disappears in the split, and the call
+ * would pass as closing work while actually running detached. Only `&&`, which
+ * sequences, qualifies — and the detachment itself is refused separately below,
+ * so no spelling of it reaches the segment split.
+ */
+export function withoutOutputDescriptorMerges(command) {
+  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|]|&&|$)/g, '$1')
+}
+
+/**
+ * A standalone `&` DETACHES THE COMMAND TO ITS LEFT, wherever it stands, and a
+ * detached call is not the closing work it names (Sol re-review of 0de0a948;
+ * Claude review of 114bbdd7). `--clear &`, `--clear 2>&1 &` and `--clear & tail`
+ * all let the shell move on before the closing command has withdrawn the
+ * boundary. Even when the command on the right is itself in the closing set,
+ * the left one was backgrounded, so the whole line is refused. `&&` remains a
+ * sequencing operator rather than detachment.
+ */
+const DETACH_RE = /(^|[^&])&(?!&)/
+
+/**
+ * Split a shell line while RETAINING the separator that introduces each
+ * segment. Pager tolerance depends on that identity: only `| tail` consumes
+ * output from the preceding closing command; `; tail`, `&& tail` and `|| tail`
+ * launch a second command and must be judged as such. Empty segments are kept
+ * so malformed or dangling chains fail closed instead of disappearing.
+ */
+function commandSegments(command) {
+  const segments = []
+  const separatorRe = /&&|\|\||[;&|]|\r\n?|\n/g
+  let separator = null
+  let start = 0
+  for (const match of command.matchAll(separatorRe)) {
+    segments.push({ separator, text: command.slice(start, match.index).trim() })
+    separator = match[0]
+    start = match.index + match[0].length
+  }
+  segments.push({ separator, text: command.slice(start).trim() })
+  return segments
+}
 
 /**
  * A PURE OUTPUT PAGER — a segment that only looks at what the segment before it
@@ -746,19 +831,20 @@ export function isOutputPagerSegment(segment) {
 
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
-  const segments = command
-    .split(/&&|\|\||[;|&\n\r]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
+  const stripped = withoutOutputDescriptorMerges(command)
+  if (DETACH_RE.test(stripped)) return false
+  const segments = commandSegments(stripped)
   let sawClosing = false
   for (let i = 0; i < segments.length; i += 1) {
-    const seg = segments[i]
+    const { separator, text: seg } = segments[i]
+    if (!seg) return false
     if (OPAQUE_SEGMENT_RE.test(seg)) return false
     if (/^(?:cd|set-location|pushd|popd)\b/i.test(seg)) continue
     // A pager is tolerated ONLY as the final segment of a line that has already
-    // shown a closing script. In the middle it would hide whatever follows it, and
-    // on its own it is not a closing line at all.
-    if (i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
+    // shown a closing script AND only when a PIPE introduces it. In the middle it
+    // would hide whatever follows it; after a sequencing operator it is an
+    // independent command; and on its own it is not a closing line at all.
+    if (separator === '|' && i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
     const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
     if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
     sawClosing = true
