@@ -7,6 +7,7 @@
 //   - stopping with a launcher that will never fire, which would not shorten a
 //     session but END the batch.
 import { describe, it, expect } from 'vitest'
+import ts from 'typescript'
 import {
   BOUNDARY_DESTINATIONS,
   BOUNDARY_FRESH_MS,
@@ -769,6 +770,141 @@ describe('the marker survives everything --prepare prescribes (point 675)', () =
   })
 })
 
+const REMEDY_RUNTIME_VALUE = 'remedy_runtime_value'
+
+function staticRemedyText(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text
+  if (ts.isTemplateExpression(node)) {
+    return node.head.text + node.templateSpans.map((span) => REMEDY_RUNTIME_VALUE + span.literal.text).join('')
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const left = staticRemedyText(node.left)
+    const right = staticRemedyText(node.right)
+    if (left === null && right === null) return null
+    return (left ?? REMEDY_RUNTIME_VALUE) + (right ?? REMEDY_RUNTIME_VALUE)
+  }
+  return null
+}
+
+function staticRemedyTexts(root) {
+  const texts = []
+  const visit = (node) => {
+    const text = staticRemedyText(node)
+    const parentText = node.parent && node.parent !== root.parent ? staticRemedyText(node.parent) : null
+    if (text !== null && parentText === null) texts.push(text)
+    ts.forEachChild(node, visit)
+  }
+  visit(root)
+  return texts
+}
+
+function topLevelDeclarations(sourceFile) {
+  const declarations = new Map()
+  for (const statement of sourceFile.statements) {
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+      declarations.set(statement.name.text, statement)
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) declarations.set(declaration.name.text, declaration)
+      }
+    }
+  }
+  return declarations
+}
+
+function declarationsReachableFrom(sourceFile, importedNames) {
+  const declarations = topLevelDeclarations(sourceFile)
+  const pending = [...importedNames]
+  const reached = []
+  const seen = new Set()
+  while (pending.length) {
+    const name = pending.pop()
+    if (seen.has(name) || !declarations.has(name)) continue
+    seen.add(name)
+    const declaration = declarations.get(name)
+    reached.push(declaration)
+    const visit = (node) => {
+      if (ts.isIdentifier(node) && declarations.has(node.text) && !seen.has(node.text)) pending.push(node.text)
+      ts.forEachChild(node, visit)
+    }
+    visit(declaration)
+  }
+  return reached
+}
+
+function commandEndInPrintedLine(line, start) {
+  let doubleQuoted = false
+  let singleQuoted = false
+  for (let i = start; i < line.length; i += 1) {
+    const char = line[i]
+    if (char === '"' && !singleQuoted) doubleQuoted = !doubleQuoted
+    else if (char === "'" && !doubleQuoted) singleQuoted = !singleQuoted
+    if (doubleQuoted || singleQuoted) continue
+    if (char === '`' || char === ',' || char === '—') return i
+    if (char === '.' && /\s/.test(line[i + 1] ?? '')) return i
+  }
+  return line.length
+}
+
+function remedyCommandsInText(text) {
+  const remedies = []
+  const unclassifiable = []
+  for (const line of String(text).split(/\r?\n/)) {
+    for (const match of line.matchAll(/node\s+scripts[\\/][\w/-]+\.mjs/g)) {
+      const before = line.slice(0, match.index)
+      const clauseStart = Math.max(before.lastIndexOf('`'), before.lastIndexOf('. '), before.lastIndexOf(', ')) + 1
+      const leadingClause = before.slice(clauseStart)
+      const end = commandEndInPrintedLine(line, match.index + match[0].length)
+      const printed = line.slice(match.index, end).trim().replace(/[):]+$/, '')
+      if (/&&|\|\||(^|[^&])&(?!&)/.test(leadingClause)) {
+        unclassifiable.push({
+          printed,
+          context: `${leadingClause}${printed}`.trim().replaceAll(REMEDY_RUNTIME_VALUE, '<runtime>'),
+        })
+        continue
+      }
+      const command = printed.replace(/<[^>\n]+>/g, 'value').replaceAll(REMEDY_RUNTIME_VALUE, 'value')
+      remedies.push({ command, printed })
+    }
+  }
+  return { remedies, unclassifiable }
+}
+
+function stopGuardRemedies(root, guard) {
+  const parse = (file) => {
+    const source = readFileSync(resolve(root, 'scripts', file), 'utf8')
+    return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+  }
+  const wrapper = parse(guard)
+  const sources = [{ file: guard, nodes: [wrapper] }]
+
+  for (const statement of wrapper.statements) {
+    if (!ts.isImportDeclaration(statement)) continue
+    const importedFile = statement.moduleSpecifier.text
+    if (!importedFile.startsWith('./') || !importedFile.endsWith('-core.mjs')) continue
+    const bindings = statement.importClause?.namedBindings
+    if (!bindings || !ts.isNamedImports(bindings)) continue
+    const importedNames = bindings.elements.map((element) => (element.propertyName ?? element.name).text)
+    const file = importedFile.slice(2)
+    const core = parse(file)
+    sources.push({ file, nodes: declarationsReachableFrom(core, importedNames) })
+  }
+
+  const remedies = []
+  const unclassifiable = []
+  for (const { file, nodes } of sources) {
+    for (const node of nodes) {
+      for (const text of staticRemedyTexts(node)) {
+        const found = remedyCommandsInText(text)
+        remedies.push(...found.remedies.map((remedy) => ({ guard, source: file, ...remedy })))
+        unclassifiable.push(...found.unclassifiable.map((remedy) => ({ guard, source: file, ...remedy })))
+      }
+    }
+  }
+  return { remedies, unclassifiable }
+}
+
 describe('every Stop-guard remedy stays inside the closing set', () => {
   it('derives remedy scripts from the authoritative hook chain, not a copied guard list', () => {
     const root = process.cwd()
@@ -780,23 +916,38 @@ describe('every Stop-guard remedy stays inside the closing set', () => {
     expect(guards.length).toBeGreaterThan(5)
 
     const remedies = []
+    const unclassifiable = []
     for (const guard of guards) {
-      const source = readFileSync(resolve(root, 'scripts', guard), 'utf8')
-      for (const match of source.matchAll(/node\s+scripts[\\/]([\w-]+\.mjs)/g)) {
-        remedies.push({ guard, command: `node scripts/${match[1]}` })
-      }
+      const found = stopGuardRemedies(root, guard)
+      remedies.push(...found.remedies)
+      unclassifiable.push(...found.unclassifiable)
     }
-    // These messages live in imported pure cores rather than their wrappers.
-    remedies.push(
-      { guard: 'findings-guard.mjs', command: 'node scripts/finding.mjs --drain' },
-      { guard: 'findings-guard.mjs', command: 'node scripts/board-queue.mjs' },
-      { guard: 'rule-review-guard.mjs', command: 'node scripts/rule-review.mjs --reviewed' },
-    )
 
     expect(remedies.length).toBeGreaterThan(20)
-    for (const { guard, command } of remedies) {
-      expect(isClosingSetCommand(command), `${guard} demands ${command}`).toBe(true)
+    expect(remedies.map(({ command }) => command)).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^node scripts\/finding\.mjs --drain/),
+        expect.stringMatching(/^node scripts\/board-queue\.mjs/),
+        expect.stringMatching(/^node scripts\/rule-review\.mjs --reviewed/),
+      ]),
+    )
+    expect(
+      [...new Set(unclassifiable.map(({ guard, source, context }) => `${guard} via ${source}: ${context}`))],
+    ).toEqual([
+      'ci-status-guard.mjs via ci-status-guard-core.mjs: <runtime>Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
+      'ci-status-guard.mjs via ci-failure-cause-core.mjs: Reproduce the fast gate locally (npm run build && npm run lint && node scripts/audit-check.mjs && npm run test:unit',
+    ])
+    for (const { guard, source, command } of remedies) {
+      expect(isClosingSetCommand(command), `${guard} via ${source} demands ${command}`).toBe(true)
     }
+  })
+
+  it('keeps a shell continuation after the remedy script in the classified command', () => {
+    const found = remedyCommandsInText('Run `node scripts/board.mjs && npm test`.')
+    expect(found.remedies).toEqual([
+      { command: 'node scripts/board.mjs && npm test', printed: 'node scripts/board.mjs && npm test' },
+    ])
+    expect(isClosingSetCommand(found.remedies[0].command)).toBe(false)
   })
 })
 

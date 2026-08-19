@@ -679,7 +679,11 @@ export const CLOSING_SET_FILES = new Set([
  *  `board-publish` and `batch-in-flight` joined for point 675: publishing the
  *  handover card IS ending (its absence from this list was one of the measured
  *  marker deletions of 13.08.2026), and transferring/adopting the in-flight
- *  declaration is boundary bookkeeping, not batch work. */
+ *  declaration is boundary bookkeeping, not batch work. The less obvious
+ *  readers and remedy runners below are here for the same reason: a Stop guard
+ *  can print them after the seal is committed, so refusing their targets would
+ *  leave the session unable either to satisfy the guard or to end. The boundary
+ *  test derives that inventory from the live Stop chain and its imported cores. */
 export const CLOSING_SET_SCRIPTS = [
   'dashboard-publish',
   'dashboard-sync',
@@ -695,7 +699,9 @@ export const CLOSING_SET_SCRIPTS = [
   'batch-doctor',
   'batch-handover-observe',
   'batch-in-flight',
+  'batch-launcher',
   'batch-singleton',
+  'chat-reply',
   'context-watermark',
   'branch-hygiene-guard',
   'bundle-first-guard',
@@ -703,13 +709,23 @@ export const CLOSING_SET_SCRIPTS = [
   'container-ask-guard',
   'criticality-review-guard',
   'dashboard-guard',
+  'guide-brevity-guard',
+  'guard-health-guard',
   'guard-preflight',
   'mechanism-review-guard',
   'model-guard',
+  'pages-deploy-unblock',
   'prep-guard',
   'queue-rank',
   'render-verify-guard',
+  'review-sol',
+  'rule-echo',
   'rule-review',
+  'throttle-probe',
+  'vdzk-answer',
+  'verify/run-all',
+  'verify/run-wait',
+  'worktree-cleanup',
 ]
 
 const CLOSING_SCRIPT_RE = new RegExp(`scripts[\\\\/](?:${CLOSING_SET_SCRIPTS.join('|')})\\.mjs`, 'i')
