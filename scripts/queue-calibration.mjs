@@ -34,6 +34,7 @@ import {
   estimateForLanding,
   inheritanceDefaults,
   inheritedEstimateForClass,
+  laneForAttribution,
   ledgerAfterApply,
   MIN_CLASS_SAMPLES,
   parseCalibrationArgs,
@@ -167,7 +168,7 @@ try {
     return {
       point: l.point,
       landedAt: l.at,
-      lane: found?.attribution === 'named' ? 'delegated' : 'lane-unestablished',
+      lane: laneForAttribution(found?.attribution),
       attribution: found?.attribution ?? 'none',
       elapsedHours,
       spanBasis,

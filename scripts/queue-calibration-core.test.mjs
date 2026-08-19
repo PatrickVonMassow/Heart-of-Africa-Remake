@@ -18,6 +18,7 @@ import {
   inheritedEstimateForClass,
   INHERITED_ESTIMATE_NOTE,
   ledgerAfterApply,
+  laneForAttribution,
   mergedBranchPoint,
   MIN_CLASS_SAMPLES,
   parseCriticality,
@@ -140,6 +141,13 @@ describe('attributing a merge to a point', () => {
     const out = attributeMerges(chain, [{ point: 99, sha: 'tick2', at: 500 }])
     expect(out.get(99)).toMatchObject({ attribution: 'inferred' })
     expect(out.get(99).merge.sha).toBe('merge2')
+  })
+
+  it('keeps the lane unestablished when a written-subject merge only infers the span', () => {
+    const found = attributeMerges(chain, [{ point: 99, sha: 'tick2', at: 500 }]).get(99)
+    expect(found.attribution).toBe('inferred')
+    expect(laneForAttribution(found.attribution)).toBe('lane-unestablished')
+    expect(laneForAttribution('named')).toBe('delegated')
   })
 
   it('never lets two points claim one merge', () => {

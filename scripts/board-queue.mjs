@@ -29,7 +29,7 @@
 // already promoted would trip the double-listing invariant (4b) and block the
 // turn that published it.
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { parseKlaerungPoints, parseNowCardPoints } from './dashboard-guard-core.mjs'
@@ -64,6 +64,10 @@ const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.ht
 const dataFile = process.env.HOA_QUEUE_DATA_FILE
   ? resolve(process.env.HOA_QUEUE_DATA_FILE)
   : resolve(REPO_ROOT, QUEUE_DATA_PATH)
+// The lock follows the DATA. A calibration process in an isolation worktree can
+// target the main checkout's state file; locking its own worktree would serialize
+// the wrong writers and put the lost-update race back.
+const boardEditLockPath = resolve(dirname(dataFile), 'board-edit-lock.json')
 const tasksFile = resolve(REPO_ROOT, 'TASKS.md')
 const [cmd, ...rest] = process.argv.slice(2)
 
@@ -196,7 +200,7 @@ try {
       }
       writeData(setQueueEntry(current, parsed.point, parsed))
       return { refused: false }
-    })
+    }, { lockPath: boardEditLockPath })
     if (result.refused) {
       console.error(
         `compare-and-set refused for point ${parsed.point}: expected ${JSON.stringify(result.decision.expected)}, ` +
@@ -228,7 +232,7 @@ try {
       }
       writeData(data)
       return { added: nextAdded, kept: nextKept }
-    })
+    }, { lockPath: boardEditLockPath })
     console.log(
       `import: ${added.length} card(s) added${added.length ? ` (${added.join(', ')})` : ''}, ` +
         `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,

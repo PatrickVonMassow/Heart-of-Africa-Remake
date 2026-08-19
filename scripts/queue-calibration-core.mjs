@@ -383,13 +383,18 @@ export function spanBasisOf(landing) {
  * missing-information classes instead of proxy-derived answers.
  */
 export function classesOf(landing) {
-  const lane = landing?.lane ?? (landing?.delegated === true ? 'delegated' : 'lane-unestablished')
+  const lane = landing?.lane ?? laneForAttribution(landing?.attribution ?? (landing?.delegated === true ? 'named' : null))
   const picture = landing?.pictureClass ?? (landing?.picture === true ? 'picture-verified' : 'picture-unestablished')
   return {
     criticality: landing?.criticality ?? UNTAGGED,
     lane,
     picture,
   }
+}
+
+/** Only a self-naming merge establishes delegation; inference establishes a span only. */
+export function laneForAttribution(attribution) {
+  return attribution === 'named' ? 'delegated' : 'lane-unestablished'
 }
 
 /** Points whose still-retained branch record establishes a picture verification. */
