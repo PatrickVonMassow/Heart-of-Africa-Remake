@@ -1133,6 +1133,20 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(result.reason).not.toMatch(/UNEXPLAINED RED SINCE THE LAST RENDER EDIT/)
   })
 
+  // Round-5 finding 3: with backend coverage still MISSING, the message read
+  // only each backend's LATEST run — an older unclosed incomplete recording hid
+  // behind a later genuine red, and the reader was sent hunting the red alone,
+  // never told a recording was broken too.
+  it('names an unclosed incomplete recording even while coverage is missing and a later red stands in front', () => {
+    const broken = truncatedLegacy('webgpu', 1500)
+    const laterRed = redRun('webgpu', 1600, [red('a NEW check nobody filed')])
+    const result = evaluate(renderChange({ runs: [broken, laterRed], openPoints }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/RENDER CHANGE NOT VERIFIED/)
+    expect(result.reason).toMatch(/UNACCOUNTED red\(s\)/)
+    expect(result.reason).toMatch(/INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED/)
+  })
+
   it('still names an ordinary unexplained red as one, beside an incomplete recording', () => {
     const unfiled = redRun('webgpu', 1600, [red('a NEW check nobody filed')])
     const result = evaluate(

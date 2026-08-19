@@ -1077,6 +1077,33 @@ export function suggestSuite(runs, changedRenderPaths) {
   return 'enrichments'
 }
 
+/** The block-message paragraph that names incomplete recordings AS such — used
+ *  by BOTH branches of evaluate() (point 734, round-5 finding 3): with backend
+ *  coverage still missing, the message read only each backend's LATEST run, so
+ *  an older unclosed incomplete recording plus a later genuine red reported as
+ *  the red alone and the broken recording stayed invisible until the red was
+ *  fixed — one blocker wearing the other's message. */
+function incompleteRecordingParagraph(incomplete) {
+  const named = incomplete
+    .slice(0, 3)
+    .map(
+      (u) =>
+        `${u.backend}/${u.suite} @${isoOf(u.at)}` +
+        (u.droppedLines > 0 ? ` (${u.droppedLines} line(s) dropped)` : ''),
+    )
+    .join(' | ')
+  return (
+    `INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED: ${incomplete.length} recorded run(s) printed more ` +
+    `result lines than the capture buffer holds — ${named}${incomplete.length > 3 ? ', …' : ''}. Do NOT ` +
+    'hunt a defect in them: what they list is a FRAGMENT of their red set, so the three closings of ' +
+    'point 640 cannot apply — all three need the red\'s identity, and this record has none. RE-RUN the ' +
+    'suite to get a real recording; where that is impossible, sign the recording off as broken: ' +
+    'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot ' +
+    'be re-recorded>". That closure discards the RECORD, never the picture — the backend still needs a ' +
+    'covering run, and it is never counted as a green.'
+  )
+}
+
 const ALLOW = { decision: 'allow' }
 
 /** How many waved-through reds one deferral record keeps. A bound, because the
@@ -1215,26 +1242,7 @@ export function evaluate(input) {
           'node scripts/render-verify-guard.mjs --defer "<reason>".',
       )
     }
-    if (incomplete.length > 0) {
-      const named = incomplete
-        .slice(0, 3)
-        .map(
-          (u) =>
-            `${u.backend}/${u.suite} @${isoOf(u.at)}` +
-            (u.droppedLines > 0 ? ` (${u.droppedLines} line(s) dropped)` : ''),
-        )
-        .join(' | ')
-      parts.push(
-        `INCOMPLETE RECORDING — NOT AN UNEXPLAINED RED: ${incomplete.length} recorded run(s) printed more ` +
-          `result lines than the capture buffer holds — ${named}${incomplete.length > 3 ? ', …' : ''}. Do NOT ` +
-          'hunt a defect in them: what they list is a FRAGMENT of their red set, so the three closings of ' +
-          'point 640 cannot apply — all three need the red\'s identity, and this record has none. RE-RUN the ' +
-          'suite to get a real recording; where that is impossible, sign the recording off as broken: ' +
-          'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot ' +
-          'be re-recorded>". That closure discards the RECORD, never the picture — the backend still needs a ' +
-          'covering run, and it is never counted as a green.',
-      )
-    }
+    if (incomplete.length > 0) parts.push(incompleteRecordingParagraph(incomplete))
     return { decision: 'block', reason: parts.join(' ') }
   }
 
@@ -1254,6 +1262,12 @@ export function evaluate(input) {
       : { decision: 'allow', clear: true }
   }
 
+  // EVERY unclosed incomplete recording in the window, named AS one whatever
+  // else is blocking (round-5 finding 3): reading only each backend's LATEST
+  // run reported an older broken recording as invisible behind a later genuine
+  // red, which violates the rule that the guard says WHICH it is.
+  const incompleteInWindow = unexplained.filter((u) => u.status === 'incomplete')
+
   // WHY the last attempt on a missing backend did not count — the actionable
   // half of the block message: an unaccounted red is either a real finding, or a
   // known one whose point is missing from the charge ledger.
@@ -1272,21 +1286,22 @@ export function evaluate(input) {
     const reported = unexplained.find(
       (u) => u.backend === b && u.suite === suiteName && u.at === (finite(run.at) ?? 0),
     )
-    // Same distinction as above: an incomplete recording is not a red anybody
-    // can chase, so the reader is sent to a re-run rather than to the ledger.
-    if (verdict.status === 'incomplete' && (!reported || reported.status === 'incomplete')) {
-      const dropped = droppedLinesOf(run)
-      whyNot.push(
-        `${b}: the last run (${suiteName}) recorded INCOMPLETELY — the capture cap dropped ` +
-          `${dropped > 0 ? `${dropped} ` : ''}result line(s), so it lists a FRAGMENT of its reds and explains ` +
-          'nothing' +
-          (reported
-            ? '. Re-run it; where that is impossible, sign the recording off with ' +
-              'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"'
-            : ' — and its truncation is already answered, so it neither blocks nor proves anything. ' +
-              'This backend simply has no covering run yet.'),
-      )
-      continue
+    if (verdict.status === 'incomplete') {
+      // Still an open incomplete recording: the paragraph below names it as its
+      // own class, so saying it here again would only bury the other backends.
+      if (reported && reported.status === 'incomplete') continue
+      // Its truncation is already answered (re-recorded or signed off) and no
+      // residual red blocks — the backend simply has no covering run yet.
+      if (!reported) {
+        whyNot.push(
+          `${b}: the last run (${suiteName}) recorded INCOMPLETELY, but its truncation is already ` +
+            'answered, so it neither blocks nor proves anything. This backend simply has no covering run yet.',
+        )
+        continue
+      }
+      // Lifted, but a red the run DID record still stands — fall through and
+      // report THAT red, never the truncation (a second signature resolves
+      // nothing).
     }
     // ONLY the incomplete fall-through reads the reported entry: every other
     // family's verdict sentence is the one to print (a suspect run's entry
@@ -1336,6 +1351,9 @@ export function evaluate(input) {
         : '') +
       'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +
-      'node scripts/render-verify-guard.mjs --defer "<reason>".',
+      'node scripts/render-verify-guard.mjs --defer "<reason>".' +
+      // Named in THIS branch too: an incomplete recording must never hide
+      // behind a missing backend or a later red (round-5 finding 3).
+      (incompleteInWindow.length > 0 ? ` ${incompleteRecordingParagraph(incompleteInWindow)}` : ''),
   }
 }
