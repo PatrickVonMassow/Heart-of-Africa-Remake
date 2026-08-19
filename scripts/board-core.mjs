@@ -417,17 +417,18 @@ export function nowCard(html, point) {
 }
 
 /**
- * The current-work SECTION as `{ from, end, text }` — the whole document when
- * the section cannot be found, which is what a fragment gives a caller.
+ * The current-work SECTION as `{ from, end, text }`. THROWS when the heading
+ * is missing (sixth cross-review): the old whole-document fallback let a
+ * render read cards out of foreign sections and let the comparison bless the
+ * result — a structural fail-open under a preflight that must fail CLOSED. A
+ * caller with a deliberate fragment semantics (the fail-open Stop predicate
+ * `claimsNoCurrentWork`) scopes itself and says so; nothing gets the whole
+ * document as "the section" by default any more.
  */
 function nowSectionSlice(html) {
   const text = String(html ?? '')
-  try {
-    const { from, end } = sectionBounds(text, 'now')
-    return { from, end, text: text.slice(from, end) }
-  } catch {
-    return { from: 0, end: text.length, text }
-  }
+  const { from, end } = sectionBounds(text, 'now')
+  return { from, end, text: text.slice(from, end) }
 }
 
 /** A card's authored body text, stamp spans stripped — the prose a render owes. */
@@ -1344,7 +1345,18 @@ function standingPointCards(html) {
  * predicate can quietly take the other card with it.
  */
 export function claimsNoCurrentWork(html) {
-  return sectionStateCards(html, 'idle').length > 0 || (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length > 0
+  const text = String(html ?? '')
+  let scope = text
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    scope = text.slice(from, end)
+  } catch {
+    // No section heading — a FRAGMENT is all the caller has, and this is the
+    // fail-open Stop-side predicate, so it is judged as it stands. The
+    // fail-closed paths (render, comparison) refuse instead; this deliberate
+    // local scope is the one place fragment semantics survive (point 713).
+  }
+  return sectionStateCards(text, 'idle').length > 0 || (scope.match(emptyStatePattern()) ?? []).length > 0
 }
 
 /** Does the current-work section say that only closing duties are left? */

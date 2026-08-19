@@ -70,10 +70,15 @@ import {
   projectNowForPublish,
 } from './board-core.mjs'
 
+// A minimal document WITH the section heading: since the sixth cross-review
+// there is no fragment fallback — a writer on a document without the
+// now-section heading refuses instead of treating the whole text as the
+// section.
 const board = (point = 361) =>
-  `<main>\n<details class="now">\n  <summary><span class="t">${point} — Etwas</span>` +
+  '<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n' +
+  `<details class="now">\n  <summary><span class="t">${point} — Etwas</span>` +
   `<span class="right"><span class="meta">10:00 · ~12:00</span></span></summary>\n` +
-  `  <div class="body">\n    <p>alter Text</p>\n  </div>\n</details>\n</main>`
+  `  <div class="body">\n    <p>alter Text</p>\n  </div>\n</details>\n</details>\n</main>`
 
 describe('setCardStatus', () => {
   it('replaces the body with one stamped paragraph', () => {
@@ -88,11 +93,21 @@ describe('setCardStatus', () => {
     const out = setCardStatus(board(), 361, 'X', '09:00')
     expect(out).toMatch(/<details class="now">\s*<summary>/)
     expect(out).toMatch(/<div class="body">\s*<p>/)
-    expect(out.match(/<\/details>/g)).toHaveLength(1)
+    // The card plus its section wrapper — exactly what the fixture carries.
+    expect(out.match(/<\/details>/g)).toHaveLength(2)
   })
 
   it('refuses a point that has no current-work card', () => {
     expect(() => setCardStatus(board(361), 999, 'X', '09:00')).toThrow(/no current-work card/)
+  })
+
+  it('refuses a document without the now-section heading instead of scanning it whole', () => {
+    // Sixth cross-review: the fragment fallback is gone — a missing section
+    // refuses in every consumer of the slice, not only in render and compare.
+    const fragment =
+      '<details class="now">\n  <summary><span class="t">361 — Etwas</span></summary>\n' +
+      '  <div class="body">\n    <p>alter Text</p>\n  </div>\n</details>'
+    expect(() => setCardStatus(fragment, 361, 'X', '09:00')).toThrow(/section not found: now/)
   })
 
   it('refuses an empty status rather than writing a blank card', () => {
@@ -940,11 +955,13 @@ describe('cardParagraphs / renderCardBody — a blank line is a paragraph bounda
   // hand-editing the board HTML, which is what wrecked the line endings.
   it('lets the sanctioned command produce what the conciseness guard demands', () => {
     const long = `${'Wort '.repeat(40).trim()}.\n\n${'Wort '.repeat(40).trim()}.`
+    // board() carries the section heading itself since the fragment fallback
+    // ended (sixth cross-review), so the document goes to the guard as is.
     const html = setCardStatus(board(), 361, long, '16:20')
-    expect(concisenessOffenders(`<h2>Woran ich gerade arbeite</h2>${html}`)).toEqual([])
+    expect(concisenessOffenders(html)).toEqual([])
     // Piped through as ONE paragraph it is exactly the block the guard refuses.
     const squashed = setCardStatus(board(), 361, long.replace(/\n\n/g, ' '), '16:20')
-    expect(concisenessOffenders(`<h2>Woran ich gerade arbeite</h2>${squashed}`)[0].reason).toMatch(/unbroken paragraph/)
+    expect(concisenessOffenders(squashed)[0].reason).toMatch(/unbroken paragraph/)
   })
 
   it('carries a multi-paragraph status over intact when the card MOVES', () => {
