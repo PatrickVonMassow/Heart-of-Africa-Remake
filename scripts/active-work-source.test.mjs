@@ -70,4 +70,43 @@ describe('active-work source I/O boundary', () => {
     })
     expect(declaration.evidence).toHaveLength(3)
   })
+
+  it('exits legacy branch and worktree evidence through the same resolution the read side uses', () => {
+    // The real 19.08.2026 declaration: a `point`-less worktree item that the
+    // gather side resolves to 713. The exit of 713 must remove it, or the
+    // strand stays active on the read side while its card is already archived.
+    const worktree = '/workspace/hoa/.claude/worktrees/point-713'
+    const worktreeRef = (path) => (path === worktree ? 'refs/heads/feat/713-now-section-derived' : null)
+    const declaration = {
+      evidence: [
+        { kind: 'branch', ref: 'refs/heads/feat/713-now-section-derived' },
+        { kind: 'worktree', path: worktree },
+        { kind: 'branch', ref: 'refs/heads/feat/697-goat-foot-planting' },
+      ],
+    }
+    expect(transitionActiveDeclaration(declaration, { exitPoint: 713, focusPoint: null, worktreeRef })).toEqual({
+      focusPoint: null,
+      evidence: [{ kind: 'branch', ref: 'refs/heads/feat/697-goat-foot-planting' }],
+    })
+    // An item that resolves to NO point is unknown, never provably the exited
+    // one — it survives, and the gather side keeps reporting it loudly.
+    const unresolved = { evidence: [{ kind: 'worktree', path: '/gone' }] }
+    expect(transitionActiveDeclaration(unresolved, { exitPoint: 713, worktreeRef: () => null }).evidence)
+      .toEqual([{ kind: 'worktree', path: '/gone' }])
+  })
+
+  it('reads the exited legacy declaration as verified zero afterwards', () => {
+    const worktree = '/w/point-713'
+    const worktreeRef = (path) => (path === worktree ? 'refs/heads/feat/713-now-section-derived' : null)
+    const before = { evidence: [{ kind: 'worktree', path: worktree }] }
+    const after = transitionActiveDeclaration(before, { exitPoint: 713, focusPoint: null, worktreeRef })
+    const io = files({ declaration: JSON.stringify(after), focus: JSON.stringify({ point: null }) })
+    expect(gatherActiveWorkSource({
+      tasksText: '- [ ] 713. Derive the now-section\n',
+      declarationPath: 'declaration',
+      focusPath: 'focus',
+      worktreeRef,
+      ...io,
+    })).toMatchObject({ ok: true, points: [] })
+  })
 })

@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { IN_FLIGHT_PATH } from './batch-singleton.mjs'
 import { FOCUS_PATH } from './dashboard-state.mjs'
-import { normalizeActiveWork } from './batch-in-flight-core.mjs'
+import { evidencePoint, normalizeActiveWork } from './batch-in-flight-core.mjs'
 
 export function openPointNumbers(tasksText) {
   const points = new Set()
@@ -74,14 +74,25 @@ export function gatherActiveWorkSource({
   }
 }
 
-/** Pure lifecycle edit applied by board commands before their locked publish. */
-export function transitionActiveDeclaration(declaration, { exitPoint = null, focusPoint = undefined } = {}) {
+/**
+ * Lifecycle edit applied by board commands before their locked publish. The
+ * exit filter resolves each evidence item through the SAME `evidencePoint`
+ * the read side uses — a `point`-less legacy branch/worktree item must leave
+ * with its point exactly as it was counted for it, or the strand stays
+ * readable-but-unretractable and blocks the very publish that exits it
+ * (second cross-vendor review of this point). `worktreeRef` is injectable for
+ * tests; the default is the same git probe the gather side binds.
+ */
+export function transitionActiveDeclaration(
+  declaration,
+  { exitPoint = null, focusPoint = undefined, worktreeRef = worktreeRefFromGit } = {},
+) {
   if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) return declaration
   return {
     ...declaration,
     ...(focusPoint === undefined ? {} : { focusPoint }),
     evidence: Array.isArray(declaration.evidence) && exitPoint != null
-      ? declaration.evidence.filter((item) => Number(item?.point) !== Number(exitPoint))
+      ? declaration.evidence.filter((item) => evidencePoint(item, { worktreeRef }) !== Number(exitPoint))
       : declaration.evidence,
   }
 }

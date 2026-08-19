@@ -1126,6 +1126,30 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/**
+ * The point ONE evidence item names — the single resolution every consumer
+ * shares. An explicit `point` field decides (and never falls through to the
+ * branch when it is invalid); the legacy branch/worktree forms, which predate
+ * the field and still stand in real declarations, derive it from the ref the
+ * item itself declares. Returns the positive integer or null. The exit side
+ * (`transitionActiveDeclaration`) filters by THIS function too: a second,
+ * divergent copy let a legacy worktree item survive the exit of its own point
+ * while the read side kept reporting it active (second cross-vendor review).
+ */
+export function evidencePoint(item, { worktreeRef = () => null } = {}) {
+  if (!item || typeof item !== 'object') return null
+  if (Object.hasOwn(item, 'point')) {
+    const n = Number(item.point)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }
+  const legacyRef = item.kind === 'branch'
+    ? item.ref
+    : item.kind === 'worktree'
+      ? worktreeRef(item.path)
+      : null
+  return pointOfBranch(legacyRef)
+}
+
 /** Phases that keep a declared strand on the board until an explicit exit. */
 export const ACTIVE_WORK_PHASES = Object.freeze([
   'authoring',
@@ -1213,16 +1237,7 @@ export function normalizeActiveWork({
             errors.push(`evidence item ${index + 1} has unknown phase "${phase || '<blank>'}"`)
             return
           }
-          if (Object.hasOwn(item, 'point')) {
-            add(item.point, `evidence item ${index + 1}`)
-            return
-          }
-          const legacyRef = item.kind === 'branch'
-            ? item.ref
-            : item.kind === 'worktree'
-              ? worktreeRef(item.path)
-              : null
-          add(pointOfBranch(legacyRef), `evidence item ${index + 1}`)
+          add(evidencePoint(item, { worktreeRef }), `evidence item ${index + 1}`)
         })
       }
     }
