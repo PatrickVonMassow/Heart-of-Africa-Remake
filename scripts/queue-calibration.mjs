@@ -225,9 +225,15 @@ try {
     console.log(`BY ${axis.toUpperCase()}`)
     for (const c of reading.byAxis[axis]) {
       console.log(
-        `  ${String(c.name).padEnd(13)} points ${String(c.points).padStart(3)}  measured ${String(c.ratio.n).padStart(3)}  ` +
+        `  ${String(c.name).padEnd(15)} points ${String(c.points).padStart(3)}  measured ${String(c.ratio.n).padStart(3)}  ` +
           `median elapsed ${fmt(c.elapsed.median, ' h').padStart(8)}  median ratio ${fmt(c.ratio.median, '×').padStart(8)}` +
-          (c.comparable ? '' : `  (fewer than ${MIN_CLASS_SAMPLES} measured — no comparable)`),
+          // A class that CANNOT be measured must not read like one that is merely
+          // young: no further landing will ever give this one a comparable.
+          (c.structural
+            ? '  (no branch to measure — never comparable)'
+            : c.comparable
+              ? ''
+              : `  (fewer than ${MIN_CLASS_SAMPLES} measured — no comparable)`),
       )
     }
   }
