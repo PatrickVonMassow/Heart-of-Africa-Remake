@@ -25,7 +25,7 @@ Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merks
 **nicht** möglich ist, steht das dabei. Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den
 Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
 
-### Primäres und sekundäres Modell
+### Primäres und sekundäres Modell — und optional ein drittes
 
 Lege **zwei** Modelle fest, mit klaren Rollen:
 
@@ -47,6 +47,27 @@ Ein zweites Modell nützt nicht, weil es *besser* ist, sondern weil es **andere 
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
 steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test
 zeigt, nie.
+
+**Optional, und deutlich besser: ein *drittes* Modell für die Zusammenführung.** Wo zwei
+Modelle **blind parallel** arbeiten, muss am Ende jemand die beiden Ergebnisse vereinigen —
+und genau dort verschwindet ein Befund lautlos, wenn einer der beiden Autoren es tut: Er misst
+die fremde Liste an seiner eigenen. Ein drittes Modell, das an **keiner** Liste mitschrieb,
+hat an keinem Eintrag ein Interesse.
+
+Der zweite, weniger offensichtliche Gewinn: Mit nur zwei Modellen kannst du sie **nicht
+vergleichen**. Prüft A immer B und B immer A, ist jede Rückweisungsquote untrennbar mit dem
+Prüfer vermischt — ein strenger Prüfer lässt seinen Autor schlecht aussehen, ein milder gut,
+und aus den Zahlen ist beides nicht zu trennen. Erst ein neutraler Dritter liefert ein Urteil,
+das nicht am Gegenüber hängt.
+
+> *Prompt:* „Die **Zusammenführung** zweier blind-paralleler Ergebnisse macht ein **drittes
+> Modell**, das an **keiner** der beiden Listen mitgeschrieben hat. Vereinigt wird nach
+> **Bedeutung**, und die Vereinigung wird **abgerechnet**: Jeder Eintrag trägt eine Kennung,
+> und für jeden steht am Ende **nur A**, **nur B** oder **verschmolzen mit \<Kennung\>** —
+> keiner darf unerwähnt verschwinden. Halte fest, **wer** zusammengeführt hat, und weise einen
+> der beiden Autoren als Zusammenführer zurück; gibt es wirklich nur zwei Modelle, sag das
+> **ausdrücklich**, statt einen Autor heimlich vereinigen zu lassen."
+> *(Kosten ≈ gering: das dritte Modell liest und vereinigt, es baut nicht.)*
 
 **Kontingent ist nicht austauschbar.** Ist ein Modell knapp, behalte ihm vor, was **nur** es
 kann; Code zu schreiben, der größte Verbraucher, geht ans andere. Ein Verteiler, der den
