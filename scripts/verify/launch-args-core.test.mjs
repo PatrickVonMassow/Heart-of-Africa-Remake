@@ -24,12 +24,12 @@ import { coveringRun } from '../render-verify-core.mjs'
 const WINDOWS_WEBGL_ARGS = ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu']
 
 /** The Linux WebGL 2 lane after point 493 put it on the container's real GPU: ANGLE's
- *  `gl` backend reaches Mesa's d3d12 driver through /dev/dxg (7.5× the picture rate of
- *  the software backend it replaced). Frozen, not derived — a lost flag here costs the
- *  hardware silently, which is exactly how the lane sat on SwiftShader unnoticed. */
+ *  `gl-egl` backend reaches Mesa's d3d12 driver through /dev/dxg without requiring a
+ *  live X display (the `gl` route lost both APIs when DISPLAY became stale). Frozen,
+ *  not derived — a lost flag here costs the hardware silently. */
 const LINUX_WEBGL_ARGS = [
   '--disable-features=WebGPU',
-  '--use-angle=gl',
+  '--use-angle=gl-egl',
   '--enable-gpu',
   '--ignore-gpu-blocklist',
   '--disable-dev-shm-usage',
@@ -68,7 +68,7 @@ const LINUX_WEBGPU_GLES_ARGS = [
   '--enable-unsafe-webgpu',
   '--enable-gpu',
   '--use-gl=angle',
-  '--use-angle=gl',
+  '--use-angle=gl-egl',
   '--use-webgpu-adapter=opengles',
   '--force-webgpu-compat',
   '--ignore-gpu-blocklist',
@@ -83,7 +83,12 @@ describe('angleBackend', () => {
 
   it('never asks Linux for Direct3D (the flag names a Windows-only backend)', () => {
     expect(angleBackend('linux')).not.toBe('d3d11')
-    expect(angleBackend('linux')).toBe('gl')
+    expect(angleBackend('linux')).toBe('gl-egl')
+  })
+
+  it('uses the surfaceless EGL route rather than depending on the container X display', () => {
+    expect(angleBackend('linux')).toBe('gl-egl')
+    expect(angleBackend('linux')).not.toBe('gl')
   })
 
   it('gives macOS its only backend', () => {
@@ -353,7 +358,7 @@ describe('verifyLaunchOptions', () => {
 
   it('routes anything else to the platform WebGL 2 lane', () => {
     expect(verifyLaunchOptions('webgl', 'win32')).toEqual({ args: WINDOWS_WEBGL_ARGS })
-    expect(verifyLaunchOptions('webgl', 'linux').args).toContain('--use-angle=gl')
+    expect(verifyLaunchOptions('webgl', 'linux').args).toContain('--use-angle=gl-egl')
   })
 })
 
