@@ -44,9 +44,21 @@ const denyingCall = (over = {}) => ({
 
 describe('constants', () => {
   it('names the state-changing tools and the shell tools', () => {
-    for (const t of ['Edit', 'Write', 'NotebookEdit', 'Agent']) expect(MUTATING_TOOLS.has(t)).toBe(true)
+    for (const t of ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Agent']) expect(MUTATING_TOOLS.has(t)).toBe(true)
     for (const t of ['Bash', 'PowerShell']) expect(SHELL_TOOLS.has(t)).toBe(true)
     expect(MUTATING_TOOLS.has('Read')).toBe(false)
+  })
+
+  it('lets a MultiEdit of the board itself satisfy the gate, like an Edit', () => {
+    const boardPaths = ['/workspace/hoa/.batch-dashboard.html']
+    expect(classifyCall({ toolName: 'MultiEdit', filePath: boardPaths[0], boardPaths })).toEqual({
+      kind: 'escape',
+      segment: '',
+    })
+    expect(classifyCall({ toolName: 'MultiEdit', filePath: '/workspace/hoa/TASKS.md', boardPaths })).toEqual({
+      kind: 'mutating',
+      segment: '',
+    })
   })
 
   it('lists every remedy script the gate must never block', () => {

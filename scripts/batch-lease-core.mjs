@@ -616,7 +616,7 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
   // A PATH ALONE IS NOT AN ACTION: `Read`, `Grep` and `Glob` carry file paths
   // too, and a gate that refuses to let a fenced-out session READ the work order
   // would tell it it is dispossessed by denying it the only way to find out.
-  if (path && (tool === 'Edit' || tool === 'Write' || tool === 'NotebookEdit')) {
+  if (path && (tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit' || tool === 'NotebookEdit')) {
     if (TASKS_FILES.some((f) => path === f || path.endsWith(`/${f}`))) {
       return { kind: 'tasks', what: 'an edit of the work order (the tick / the archive move)' }
     }

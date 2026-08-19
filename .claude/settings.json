@@ -83,6 +83,10 @@
           },
           {
             "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/bundle-first-guard.mjs\""
+          },
+          {
+            "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/rule-echo-guard.mjs\""
           },
           {
@@ -146,7 +150,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
@@ -169,6 +173,33 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/scripts/commission-guard.mjs\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell|Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/path-scope-guard.mjs\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/point-proof-guard.mjs\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/context-fence-guard.mjs\""
           }
         ]
       },

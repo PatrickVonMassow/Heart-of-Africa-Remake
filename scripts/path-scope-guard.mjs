@@ -30,8 +30,12 @@ const PAUSE = repoPath('.claude/batch-paused')
 /** Tools whose payload carries a shell command. */
 export const COMMAND_TOOLS = new Set(['Bash', 'PowerShell'])
 
-/** Tools whose payload carries a first-class filesystem path. */
-export const PATH_TOOLS = new Set(['Read', 'Edit', 'Write', 'NotebookEdit', 'Glob', 'Grep'])
+/** Tools whose payload carries a first-class filesystem path. `MultiEdit` is
+ *  named although this harness does not offer it: the same settings file guards
+ *  it everywhere else a write is guarded (closing-guard, point-proof-guard), and
+ *  a write tool the list forgets is a hole that opens silently the day the
+ *  harness gains it (Sol review of c38d8e9). */
+export const PATH_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep'])
 
 /** The real machine's context: its homes and its top-level directories. */
 export function machineContext() {
