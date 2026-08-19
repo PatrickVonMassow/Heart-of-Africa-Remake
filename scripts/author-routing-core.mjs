@@ -47,6 +47,31 @@ export const LANE_MODEL = Object.freeze({
 /** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
 export const FABLE_ESCALATION_ROUNDS = 5
 
+/** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
+export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
+
+/**
+ * The hostile-tester stances used to make successive re-authoring commissions
+ * ask materially different questions of the same lane. These are instructions,
+ * not labels: the prompt can hand either one to an author without another
+ * judgment call in the dispatcher.
+ */
+export const AUTHORING_FRAMINGS = Object.freeze([
+  'Act as a hostile tester: assume the previous fix is confidently wrong, reproduce every finding from first principles, and search the adjacent state transitions for the same failure.',
+  'Act as a hostile contract tester: treat every sentence of the point as an adversarial boundary, construct the smallest counterexample to the current implementation, and repair the invariant rather than the example.',
+])
+
+/** The two outcomes a completed examination may record. */
+export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
+
+const isUnsuccessfulReview = (record, wanted) => {
+  if (Number(record?.point) !== wanted) return false
+  if (record?.mode && record.mode !== 'review') return false
+  if (record?.specExamination) return false
+  if (record?.aborted || record?.shortfall || record?.completed === false) return false
+  return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
+}
+
 /**
  * An unsuccessful round is a completed review whose verdict was not a pass.
  * A run that aborted, did not run or had a material shortfall is not completed
@@ -56,12 +81,96 @@ export const FABLE_ESCALATION_ROUNDS = 5
 export function unsuccessfulReviewRounds(records = [], point = '') {
   const wanted = Number(point)
   if (!Number.isInteger(wanted) || wanted < 0) return 0
-  return (Array.isArray(records) ? records : []).filter((record) => {
-    if (Number(record?.point) !== wanted) return false
-    if (record?.mode && record.mode !== 'review') return false
-    if (record?.aborted || record?.shortfall || record?.completed === false) return false
-    return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
-  }).length
+  return (Array.isArray(records) ? records : []).filter((record) => isUnsuccessfulReview(record, wanted)).length
+}
+
+/**
+ * Read the re-authoring history once, in ledger order.
+ *
+ * Outcomes of authoring rounds zero and one carry no framing. Every later fresh
+ * attempt must name one and must differ from the preceding fresh attempt. A
+ * missing or repeated framing remains visible as a repeat, but does not buy
+ * progress toward the scarce Fable lane.
+ */
+export function authorRoundHistory(records = [], point = '') {
+  const wanted = Number(point)
+  if (!Number.isInteger(wanted) || wanted < 0) {
+    return { unsuccessfulRounds: 0, freshRounds: 0, rounds: [], examination: null }
+  }
+  const rows = Array.isArray(records) ? records : []
+  const examination =
+    [...rows]
+      .reverse()
+      .find(
+        (record) =>
+          Number(record?.point) === wanted && SPEC_EXAMINATION_VERDICTS.includes(String(record?.specExamination)),
+      ) ?? null
+  // This is also the number of the NEXT commission: the first review row is
+  // the outcome of round zero, the second the outcome of round one, and so on.
+  let freshRounds = 0
+  let previousFraming = ''
+  const rounds = rows.filter((record) => isUnsuccessfulReview(record, wanted)).map((record, index) => {
+    const framing = String(record?.authorFraming ?? '').trim()
+    const reviewedRound = freshRounds
+    let repeat = ''
+    if (reviewedRound <= 1 && framing) repeat = 'rounds zero and one must carry no author framing'
+    if (reviewedRound > 1 && !framing) repeat = 'no author framing was recorded'
+    if (framing && previousFraming && framing === previousFraming) {
+      repeat = 'the author framing repeats the preceding fresh round'
+    }
+    if (!repeat) {
+      freshRounds += 1
+      previousFraming = framing
+    }
+    return {
+      ledgerRound: index + 1,
+      freshRound: repeat ? null : reviewedRound,
+      framing,
+      repeat,
+      evidence: String(record?.evidence ?? '').trim(),
+      authoredBy: String(record?.authoredBy ?? '').trim(),
+    }
+  })
+  return { unsuccessfulRounds: rounds.length, freshRounds, rounds, examination }
+}
+
+/** Pick a known hostile-tester stance that is not the preceding one. */
+export function nextAuthoringFraming(previous = '') {
+  const before = String(previous ?? '').trim()
+  return AUTHORING_FRAMINGS.find((framing) => framing !== before) ?? AUTHORING_FRAMINGS[0]
+}
+
+/**
+ * What happens after the history just read: an authoring commission or the one
+ * spec examination immediately before the automatic Fable threshold.
+ * `escalationRounds` is injectable only so the test can prove every boundary
+ * moves with the exported constant instead of hiding a round-number literal.
+ */
+export function nextAuthoringStep({ records = [], point = '', escalationRounds = FABLE_ESCALATION_ROUNDS } = {}) {
+  const history = authorRoundHistory(records, point)
+  const examinationRound = escalationRounds - 1
+  if (history.freshRounds === examinationRound && !history.examination) {
+    return {
+      kind: 'spec-examination',
+      round: history.freshRounds,
+      framing: '',
+      history,
+      reason:
+        `round ${history.freshRounds} is the one before the Fable escalation threshold of ${escalationRounds}; ` +
+        'the point text and generated brief must be examined against every finding before another commission',
+    }
+  }
+  const previous = [...history.rounds].reverse().find((round) => round.freshRound !== null)?.framing ?? ''
+  const framing = history.freshRounds > 1 ? nextAuthoringFraming(previous) : ''
+  return {
+    kind: 'commission',
+    round: history.freshRounds,
+    framing,
+    history,
+    reason: framing
+      ? `re-authoring round ${history.freshRounds} is decorrelated with a hostile-tester framing`
+      : `authoring round ${history.freshRounds} is the unframed baseline`,
+  }
 }
 
 /**

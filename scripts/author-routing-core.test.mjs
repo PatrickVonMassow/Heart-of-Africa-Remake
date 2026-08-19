@@ -6,6 +6,8 @@
 // regression case rather than as a remembered exception.
 import { describe, expect, it } from 'vitest'
 import {
+  AUTHORING_FRAMINGS,
+  authorRoundHistory,
   authorLaneFor,
   FABLE_ESCALATION_ROUNDS,
   formatLaneReport,
@@ -13,6 +15,8 @@ import {
   LANE_MODEL,
   LANES,
   laneTagIn,
+  nextAuthoringStep,
+  SPEC_EXAMINATION_ROUND,
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
@@ -224,6 +228,96 @@ describe('unsuccessfulReviewRounds — completed ledger evidence only', () => {
         726,
       ),
     ).toBe(0)
+  })
+})
+
+describe('re-authoring rounds — decorrelated before Fable', () => {
+  const failed = (extra = {}) => ({
+    point: 727,
+    mode: 'review',
+    verdict: 'do-not-merge',
+    evidence: 'the reviewer found a concrete remaining defect',
+    ...extra,
+  })
+
+  it('commissions a point with no record as round zero, and round one without a framing', () => {
+    const initial = nextAuthoringStep({ records: [], point: 727 })
+    expect(initial).toMatchObject({ kind: 'commission', round: 0, framing: '' })
+
+    const first = nextAuthoringStep({ records: [failed()], point: 727 })
+    expect(first).toMatchObject({ kind: 'commission', round: 1, framing: '' })
+  })
+
+  it('decorrelates every ordinary round after the first from the one before it', () => {
+    const records = [failed(), failed()]
+    let preceding = ''
+    for (let round = 2; round <= FABLE_ESCALATION_ROUNDS - 2; round += 1) {
+      const step = nextAuthoringStep({ records, point: 727 })
+      expect(step).toMatchObject({ kind: 'commission', round })
+      expect(AUTHORING_FRAMINGS).toContain(step.framing)
+      expect(step.framing).not.toBe(preceding)
+      records.push(failed({ authorFraming: step.framing }))
+      preceding = step.framing
+    }
+  })
+
+  it('reports an unframed or repeated later record as a repeat, not a fresh attempt', () => {
+    const firstFraming = AUTHORING_FRAMINGS[0]
+    const history = authorRoundHistory(
+      [
+        failed(),
+        failed(),
+        failed({ authorFraming: firstFraming }),
+        failed({ authorFraming: firstFraming }),
+      ],
+      727,
+    )
+    expect(history.unsuccessfulRounds).toBe(4)
+    expect(history.freshRounds).toBe(3)
+    expect(history.rounds.map((round) => round.repeat)).toEqual([
+      '',
+      '',
+      '',
+      'the author framing repeats the preceding fresh round',
+    ])
+  })
+
+  it('returns the examination step immediately before the threshold, once only', () => {
+    const records = [failed()]
+    let framing = ''
+    while (authorRoundHistory(records, 727).freshRounds < SPEC_EXAMINATION_ROUND) {
+      const step = nextAuthoringStep({ records, point: 727 })
+      framing = step.framing
+      records.push(failed({ ...(framing ? { authorFraming: framing } : {}) }))
+    }
+    const examination = nextAuthoringStep({ records, point: 727 })
+    expect(examination).toMatchObject({ kind: 'spec-examination', round: SPEC_EXAMINATION_ROUND })
+    expect(examination.reason).toContain(`threshold of ${FABLE_ESCALATION_ROUNDS}`)
+
+    records.push({
+      point: 727,
+      mode: 'review',
+      verdict: 'merge',
+      specExamination: 'sound',
+      evidence: 'the point and its generated brief are consistent with all findings',
+    })
+    const after = nextAuthoringStep({ records, point: 727 })
+    expect(after).toMatchObject({ kind: 'commission', round: SPEC_EXAMINATION_ROUND })
+    expect(after.framing).not.toBe(framing)
+  })
+
+  it('moves every boundary when the one escalation constant moves', () => {
+    const alternateThreshold = FABLE_ESCALATION_ROUNDS + 3
+    const records = [failed()]
+    while (authorRoundHistory(records, 727).freshRounds < alternateThreshold - 1) {
+      const step = nextAuthoringStep({ records, point: 727, escalationRounds: alternateThreshold })
+      expect(step.kind).toBe('commission')
+      records.push(failed({ ...(step.framing ? { authorFraming: step.framing } : {}) }))
+    }
+    expect(nextAuthoringStep({ records, point: 727, escalationRounds: alternateThreshold })).toMatchObject({
+      kind: 'spec-examination',
+      round: alternateThreshold - 1,
+    })
   })
 })
 
