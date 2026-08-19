@@ -76,6 +76,45 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 758. The context fence observes instead of refusing until the consumption-reducing points
+  have landed (user 20.08.2026, 01:34, queue FIRST — before 757, because 757 cannot be executed
+  under the fence as it stands). Verbatim: "Give these tasks generous room so they can do their
+  work. Introducing the limits now was nonsense. That should have happened right at the end, once
+  the outstanding tickets had reduced the consumption. As things stand the new requirements are
+  not satisfiable at all." The record bears it out: the fence refuses writes to every authoring
+  target — TASKS.md, the archive, CLAUDE.md, design.md, docs/*.md, memory/ — which is exactly the
+  file set the floor-cutting point 757 must edit, and three fresh sessions in a row were stopped
+  above the mark before beginning any work (85,225 / 83,079 / 86,416 tokens against a start floor
+  of 61,372). Twice in 24 hours a mandatory Stop guard then demanded at the exit what the fence
+  forbade during the turn (points 755, 756).
+  FINAL STATE:
+  - AN EXPLICIT OBSERVATION MODE, AND IT IS THE DEFAULT until the fence is re-armed. The
+    watermark is still measured and still recorded — point 742's series must not break, and 747
+    needs it to recalibrate — but no action is refused. The mode is a named, single-valued switch
+    read by `scripts/context-fence-guard.mjs`, not a threshold set so high it merely never fires:
+    a disabled gate must be visible as disabled, not disguised as a passing one.
+  - THE HANDOVER STAYS, SEPARATED FROM THE REFUSAL. Refusal threshold and handover threshold are
+    one constant today; this point splits them. The point boundary at the watermark remains in
+    force — without it a session ran to 434k on 17.08.2026 — but it moves close under the ceiling
+    instead of forbidding work well before it.
+  - THE STOP-CHAIN DUTIES KEEP THEIR EXIT OPEN. While the fence is armed again later, no guard
+    may demand at the exit what the fence denies during the turn; observation mode makes that
+    contradiction disappear today, and the point records that this is a stopgap for it, not the
+    fix owed by 755.
+  - VITEST PINS BOTH MODES: in observation mode nothing is refused AND the watermark is written
+    anyway; armed, it refuses exactly as before. A test that only covered the armed path would
+    let the observation mode silently stop recording.
+  IMMEDIATE RELIEF, INDEPENDENT OF THE MERGE: `HOA_CONTEXT_TRIGGER_TOKENS` set wide in the
+  launcher environment — `triggerTokens()` reads it, and `context-fence-guard` and
+  `batch-boundary` take their threshold from there — so sessions stop being stranded before this
+  point lands.
+  RE-ARMING IS NOT PART OF THIS POINT. It is a condition inside point 747: only once the
+  consumption-reducing points (757, 614, 742, 744, 597) have LANDED is the start floor measured
+  anew and the threshold computed from that measurement.
+  Criticality: medium — it disarms a live guard, so the risk is the opposite one (a session
+  running past the ceiling unchecked), which the separated handover threshold is there to hold.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 757. Cut the per-turn document floor: CLAUDE.md, MEMORY.md and the global CLAUDE.md
   (user 20.08.2026, queue FIRST). MEASURED 20.08.2026 from a session's own transcript: the
   FIRST response of a freshly cleared session already stood at 61,372 tokens, before a single
@@ -515,6 +554,47 @@ put it is the mistake this line exists to stop.
   where the quantile fails, a step larger than the cap, and a recorded overshoot triggering
   the rollback; plus a dry run over whatever series exists at the time, printing the value it
   would propose and the value it refuses.
+  THE SERIES HAS ITS FIRST MEMBERS, and they say the trigger had been set below the floor
+  (measured 19./20.08.2026). Three consecutive fresh sessions stood at 85,225 / 83,079 / 86,416
+  tokens after their orientation turn against a trigger of 82,000 and had to hand over without
+  starting a single point; the cause is the 61,372-token start floor standing before the first
+  tool call, which point 757 cuts. The trigger was lifted to 110,000 as an INTERIM value on
+  20.08.2026 (`CONTEXT_TRIGGER_TOKENS`, commit e650c0f6; ceiling unchanged at 150,000), and this
+  point replaces that interim value with one derived from the series.
+  THE TRIGGER IS ANCHORED AT THE CEILING, NEVER AT THE FLOOR (user 20.08.2026, 01:28). Floor and
+  safety distance are independent: the floor sets the SIZE of the working window, the distance
+  the SAFETY before the ceiling — so a falling floor must widen the window without the distance
+  being touched, and the trigger must not travel with the floor. It is therefore ceiling minus
+  the measured EXIT COST in tokens (point 744, attributed per step by 752) minus an upper
+  QUANTILE of the per-call-kind jump from point 742's series. The quantile is CORRECTED FOR THE
+  NUMBER OF ADMISSIONS: the fence prices one jump per admission, but a session with a low floor
+  makes many, and over n draws from the same distribution the probability that one breaks the
+  ceiling is 1-(1-p)^n — so for at most 1 % overshoot per SESSION each single admission needs the
+  quantile 1-0.01/n, or the window is budgeted in ADMISSIONS instead of tokens.
+  A FLOOR RULE binds every future value from below: the trigger is never set under the measured
+  start cost plus a margin, because it otherwise fires before a session can work and turns the
+  batch into a chain of handovers. The commit that moves the value records both measurements.
+  THE CEILING IS BROKEN INSIDE AN ADMITTED UNIT, not between two, and neither the absolute nor
+  the remaining-distance formulation covers that: the fence checks at admission, and a unit that
+  keeps reading afterwards (suite output, whole files) grows unchecked. This point therefore also
+  delivers (a) a RE-CHECK DURING the unit whose only permitted continuation is "finish and hand
+  over", and which may never refuse the handover itself, and (b) a CAP PER UNIT — a tail nobody
+  cuts cannot be paid for with a quantile. That cap is the same measure that lowers the
+  orientation share of the floor (carrier only via `--status`/grep, no point-brief in the main
+  session, the board by targeted excerpt: 22-25k of the four stranded sessions' context was pure
+  orientation) and that point 597 already knows for tool output.
+  THE MEASURED REACH OF THE FENCE stands beside the value, because it decides what a stranded
+  session may still do: beyond the mark `scripts/context-fence-core.mjs` refuses only START work
+  (agents, browser suites, author-sol/review-sol, batch-claim without `--status`/`--withdraw`)
+  and writes to the authoring targets (TASKS.md, the archive, CLAUDE.md, design.md, docs/*.md,
+  memory/); reads, commit, push, merge, `land-point.mjs`, the board, the boundary and the fast
+  gates stay open, `context-watermark-core.mjs` is itself no authoring target, and
+  `HOA_CONTEXT_TRIGGER_TOKENS` is the code-free lever.
+  RE-ARMING IS ITS OWN, LATER STEP and is a CONDITION of this point (user 20.08.2026, 01:34):
+  the fence is relaxed to observation until the consumption-reducing points have LANDED (point
+  758 carries that relaxation), and only then is the start floor MEASURED ANEW and the threshold
+  computed from the then-valid measurement. Arming it before those points existed was the wrong
+  decision this condition takes back.
   Criticality: low — it only moves a number, and its dangerous direction (raising too far) is
   the one the rollback covers.
   Bundle: Session- & Repo-Hygiene.
