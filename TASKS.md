@@ -76,28 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 684. A whole-branch cross-review falls into the material limit and judges a cropped
-  PICTURE (measured 13.08.2026 over TWELVE review rounds on point 675). Every whole-branch
-  round hit the ~200k-character material limit of `scripts/review-sol.mjs`, and Sol said so in
-  every verdict ("patch truncated, full file bodies omitted"). Not one round could read the
-  whole branch: the findings are line-local on whatever happened to be visible, while the
-  verdict READS as a judgment on the branch — the confusion point 650 names (coverage is read
-  off the verdict) and retrospective 3.x records ("the measurement saw less than it claimed").
-  FINAL STATE: `review-sol.mjs` does not crop oversized material silently. It SPLITS the
-  material into covering blocks, reviews each, and REPORTS the coverage beside the verdict —
-  which files were read whole, which were split, and that nothing was dropped. A verdict
-  reached over incomplete material is marked a PARTIAL REVIEW and, on its own, cannot satisfy
-  a review CLAUDE.md §7.2 demands; the recorded ledger entry carries that mark, so a later
-  reader cannot mistake it for a full one.
-  VERIFIABLE: Vitest over the split (every file appears exactly once, coverage reported as
-  100 %, an oversized SINGLE file is reported as such rather than silently truncated, and a
-  material under the limit takes the unchanged single-block path); plus one real run against a
-  branch over the limit whose verdict names its coverage.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the review path every mechanism
-  review runs through.
-  Criticality: high — it decides what our four-eyes principle actually covers, and it has been
-  overstating that coverage on every large branch.
-
 - [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
   in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
   leer. Soll das so sein?«; and at 20:07: »Lege einen neuen Punkt an, um das Problem mit dem
