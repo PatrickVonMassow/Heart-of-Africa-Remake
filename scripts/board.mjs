@@ -372,9 +372,19 @@ try {
     )
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
-    if (!point) throw new Error('usage: board.mjs focus <point> "<note>"|--text-stdin')
+    const note = textOf(words)
+    if (!point || !note) throw new Error('usage: board.mjs focus <point> "<note>"|--text-stdin')
+    // A focus switch is an active-work TRANSITION like now/done (seventh
+    // cross-review): writing only the focus FILE left the structured source's
+    // declaration.focusPoint on the old strand — a split-brain the publish
+    // could project as the old order while the set-check blessed it. The
+    // shared transition writes both stores in the same locked publish.
+    const focusPoint = point === '-' || point.toLowerCase() === 'none' ? null : Number(point)
+    if (focusPoint !== null && (!Number.isInteger(focusPoint) || focusPoint <= 0)) {
+      throw new Error(`board: focus "${point}" is neither a TASKS point number nor "-"`)
+    }
     withBoardEditLock(() => {
-      console.log(run(['scripts/focus.mjs', 'set', point, textOf(words)]).trim())
+      prepareActiveTransition({ focusPoint, note })()
       console.log(run([PUBLISH_SCRIPT, '--locked']).trim().split('\n')[0])
     })
   } else if (cmd === 'attest') {
