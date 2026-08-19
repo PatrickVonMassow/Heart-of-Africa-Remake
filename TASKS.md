@@ -121,6 +121,60 @@ put it is the mistake this line exists to stop.
   Sol rounds and shorter wall clock per point, NOT a large token saving, and it does not touch
   the Fable pool at all (Fable ran 0 reviews this week; its volume is authoring).
   Bundle: Modell & Wächter.
+- [ ] 736. The escalation lane has no way back DOWN, so one point sits on the scarcest model
+  for good (measured 19.08.2026 from the harness transcripts under
+  `/home/node/.claude/projects/-workspace-hoa`, window since 18.08. 19:00). Fable ran 1137 turns
+  for 164.9M cache-read tokens: point 713 (escalation authoring, six Fable agents, rounds 3 to 8)
+  95.1M = 58 %; point 712 (escalated after four do-not-merge rounds) 35.0M = 21 %; two
+  batch-serving sessions that came up on Fable instead of Opus 5 33.3M = 18 %. Escalation
+  authoring is 79 % of the Fable spend and ONE open point is 58 % of it. WHY THE COMMIT COUNT
+  HIDES IT: read from the `Co-Authored-By` trailers Fable has zero commits on 19.08., which reads
+  as "the spend stopped". It did not — point 713 NEVER LANDED, so its Fable work appears in no
+  commit on `main`. The commit proxy misses exactly the most expensive case there is: a grinding
+  escalation that never lands. THE DEFECT IS IN THE LANE, NOT IN THE REVIEWING.
+  `scripts/author-routing-core.mjs` line 445 decides `rounds >= FABLE_ESCALATION_ROUNDS → fable`
+  off a MONOTONE counter; round counts never fall, so a point escalated once stays on the
+  scarcest model forever, however far it has converged. And 713 IS converging: round 6 returned
+  do-not-merge only, round 7 two merge-with-fixes beside two do-not-merge, round 8 one merge, two
+  merge-with-fixes and one do-not-merge, with the findings growing narrower and staying real
+  (round 8: three coverage gaps in one test file, one error path after the write). Round 8's work
+  is "add three test cases and close a fail-open path" — that does not need the escalation lane.
+  Point 726 rules WHEN the escalation engages and nothing rules the way back; point 596 (the
+  cost-tail hook at three times the median) touches the theme, is open, and does not cover it.
+  FINAL STATE:
+  - NOTHING HERE LETS A POINT LAND WITH OPEN GAPS. The lane decides WHICH MODEL writes the next
+    round, never whether the findings must be answered. A do-not-merge stays a do-not-merge on
+    every lane.
+  - THE LANE FALLS BACK WHEN THE POINT CONVERGES. The routing reads the TREND of the recorded
+    verdicts, not only their count: a point whose rounds are moving from do-not-merge toward
+    merge-with-fixes and merge drops back to a cheaper lane, so the scarcest pool carries the
+    hard rounds and not the tail. The trend is read from the recorded review verdicts
+    (`.claude/mechanism-reviews.jsonl`), so a session that ran none of the earlier rounds sees
+    the same number.
+  - AT A ROUND THRESHOLD THE POINT REACHES A DECISION, NEVER AN AUTOMATIC ABORT (the wording of
+    point 596 is the model). Three answers are offered and the one taken is recorded with the
+    point: re-cut it smaller, staff it differently, or deliberately continue. 713 entered its
+    first review with 17 files and 1155 lines and is judged in 4 to 6 passes; a smaller cut would
+    have converged in fewer rounds, so re-cutting is the first answer offered, not the last.
+  - SPEND IS MEASURED IN TOKENS, NOT COMMITS. The check that answers "what has this point cost"
+    reads the transcripts, because an unlanded point produces no commit and the commit proxy
+    reports zero for the most expensive case. Where the transcripts are unavailable that is
+    reported as unmeasured, never as zero.
+  VERIFIABLE: Vitest over the pure routing decision — a point with a flat do-not-merge trend
+  stays escalated, a point whose recorded verdicts improve falls back to the cheaper lane, a
+  point at the threshold returns the decision with all three answers and never an abort, a
+  point whose ledger holds rounds from several sessions counts them all, and a case that FAILS
+  if the counter is fed commits instead of review records; plus a fixture proving an unlanded
+  point reports its measured token spend rather than zero.
+  Criticality: high — it governs how the scarcest model pool is spent, and its absence has
+  already put 58 % of a week's volume into a single point that never landed.
+  OPEN, FOR THE USER: the serving chain of CLAUDE.md §6 names Opus 5 → Fable 5 → Opus 4.8, but
+  `scripts/batch-autostart-core.mjs` lines 51/52 spawn with `--model claude-opus-5[1m]
+  --fallback-model claude-fable-5`, and the CLI takes only ONE fallback — so Opus 4.8 is never
+  reached and the scarcest pool catches the most ordinary driving work (reading the board,
+  running gates, merging, publishing). Whether that is rewired is the user's decision and is not
+  part of this point until they take it.
+  Bundle: Modell & Wächter.
 - [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
   set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
   12 unexplained red runs, the oldest from 17.08.2026 — `webgpu/enrichments` from 08:25 on, and
@@ -8780,42 +8834,3 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs one hand-rewrite per session boundary and risks the drift the
   verbatim rule was built to stop, but nothing is lost.
   Bundle: Chat & Tafel.
-
-- [ ] 736. The escalation lane has no stopping rule, and one point burns the Fable pool in it
-  (measured 19.08.2026 from the harness transcripts under `/home/node/.claude/projects/-workspace-hoa`,
-  window since 18.08. 19:00). Fable ran 1137 turns for 164.9M cache-read tokens. The split:
-  point 713 (escalation authoring, six Fable agents, rounds 3 to 8) 95.1M = 58 %; point 712
-  (escalated after four do-not-merge rounds) 35.0M = 21 %; two batch-serving sessions that came
-  up on Fable instead of Opus 5 33.3M = 18 %; the session that asked about the spend 1.5M.
-  Escalation authoring is therefore 79 % of the Fable spend and ONE open point is 58 % of it.
-  WHY THE COMMIT COUNT HIDES IT: read from the `Co-Authored-By` trailers, Fable has zero commits
-  on 19.08., which reads as "the spend stopped". It did not — point 713 NEVER LANDED, so its
-  Fable work appears in no commit on `main`. The commit proxy misses exactly the most expensive
-  work there is: a grinding escalation that never lands. THE GAP: point 726 rules WHEN the
-  escalation to Fable engages (after five failed review rounds) and nothing rules when it STOPS.
-  Point 713 stands at 14 do-not-merge verdicts and in its EIGHTH cross-review round, each round a
-  fresh Fable agent. Point 596 (the cost-tail hook at three times the median) touches the theme,
-  is open, and does not cover this; no other open point covers it.
-  FINAL STATE:
-  - THE ESCALATION HAS A CEILING, AND REACHING IT STOPS THE POINT. A bounded number of escalation
-    rounds is spent on one point; on the last one the point STOPS rather than commissioning
-    another author. It is then re-cut into smaller points or put to the user as a decision, and
-    which of the two happened is recorded with the point. A stopped point is never silently
-    re-entered by the next session.
-  - THE COUNT IS READ FROM THE RECORD THAT EXISTS. The rounds are counted from the recorded review
-    verdicts of the point (`.claude/mechanism-reviews.jsonl`), not from a hand-kept tally, so a
-    session that did not run the earlier rounds sees the same number.
-  - SPEND IS MEASURED IN TOKENS, NOT COMMITS. The check that answers "what has this point cost"
-    reads the transcripts, because an unlanded point produces no commit and the commit proxy
-    reports zero for the most expensive case. Where the transcripts are unavailable, that is
-    reported as unmeasured rather than as zero.
-  - THE STOP IS ENFORCED, NOT REMEMBERED. Commissioning an escalation round past the ceiling is
-    refused by the same path that commissions the author, with the remedy named in the refusal.
-  VERIFIABLE: Vitest over the pure round-counting and ceiling decision — a point below the
-  ceiling commissions normally, a point at the ceiling is refused with the re-cut/decide remedy,
-  a point whose ledger holds rounds from several sessions counts them all, and a case that FAILS
-  if the counter is fed commits instead of review records; plus a fixture proving an unlanded
-  point reports its measured token spend rather than zero.
-  Criticality: high — it governs how the scarcest model pool is spent, and its absence has
-  already put 58 % of a week's Fable volume into a single point that never landed.
-  Bundle: Modell & Wächter.
