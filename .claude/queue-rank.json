@@ -135,14 +135,10 @@
     "725": {
       "at": "2026-08-19T02:12:32.321Z",
       "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright."
-    },
-    "726": {
-      "at": "2026-08-19T06:41:45.377Z",
-      "why": "Nutzerauftrag von heute zum Routing-Schnitt: gehoert vor die grossen Finder-Punkte (200/285/205/203/207), aber hinter die bereits eingeordnete Kopfreihe — die Stelle, an die append-and-defer ihn gesetzt hat, ist die richtige."
     }
   },
   "settled": {
-    "at": "2026-08-19T07:20:03.912Z",
+    "at": "2026-08-19T08:26:52.058Z",
     "points": [
       174,
       184,
@@ -346,7 +342,6 @@
       722,
       724,
       725,
-      726,
       727
     ]
   }
