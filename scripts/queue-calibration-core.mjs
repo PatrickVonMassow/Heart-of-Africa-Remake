@@ -609,6 +609,26 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
 }
 
 /**
+ * WHICH PLANNED CHANGES MAY STILL BE WRITTEN, given the file as it stands NOW.
+ *
+ * The measurement takes seconds to minutes and the main session writes the same
+ * file, so the plan is checked against a FRESH read before anything is stored: a
+ * card that still says what the plan read is written, one that has moved since is
+ * left alone and named. Atomic writing prevents a torn file; only this prevents a
+ * lost update.
+ */
+export function applicableChanges(plan, liveCards = {}) {
+  const written = []
+  const skipped = []
+  for (const p of (Array.isArray(plan) ? plan : []).filter((x) => x?.changed)) {
+    const now = liveCards?.[p.point]?.estimate ?? null
+    if (now !== p.from) skipped.push({ ...p, now })
+    else written.push(p)
+  }
+  return { written, skipped }
+}
+
+/**
  * The ledger after a rewrite was APPLIED — each corrected card remembers the
  * baseline it came from and the factor that was used, which is what makes the
  * next run recognise its own writing instead of correcting it a second time.

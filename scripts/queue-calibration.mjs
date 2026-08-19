@@ -33,6 +33,7 @@ import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { isBackendSensitivePath } from './render-verify-core.mjs'
 import { QUEUE_DATA_PATH, normaliseQueueData, openPointsOf, parseQueueDataFile, setQueueEntry } from './board-queue-core.mjs'
 import {
+  applicableChanges,
   AXES,
   attributeMerges,
   CALIBRATION_PATH,
@@ -261,18 +262,9 @@ try {
     // RE-READ, then compare-and-set. The measurement above took seconds to
     // minutes, and the main session writes this same file.
     const live = readCards()
+    const { written, skipped } = applicableChanges(changed, live)
     let data = { points: live }
-    const written = []
-    const skipped = []
-    for (const p of changed) {
-      const now = live[p.point]?.estimate ?? null
-      if (now !== p.from) {
-        skipped.push({ ...p, now })
-        continue
-      }
-      data = setQueueEntry(data, p.point, { estimate: p.to })
-      written.push(p)
-    }
+    for (const p of written) data = setQueueEntry(data, p.point, { estimate: p.to })
     writeTextAtomic(dataFile, `${JSON.stringify(data, null, 2)}\n`)
     estimates = ledgerAfterApply(ledger, [...written, ...plan.filter((p) => p.factor && !p.changed)])
     console.log('')

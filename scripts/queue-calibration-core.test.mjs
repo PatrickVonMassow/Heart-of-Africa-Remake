@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applicableChanges,
   attributeMerges,
   axisSpread,
   calibrationReading,
@@ -422,6 +423,18 @@ describe('the baseline ledger', () => {
     // promised — that is the whole provenance the ratio is measured against.
     const landed = updateEstimateLedger(before, { cards: { 10: { estimate: '~3 h' } }, open: [], now: 9 })
     expect(landed[10]).toEqual(before[10])
+  })
+
+  it('writes only the cards that still say what the plan read', () => {
+    const plan = [
+      { point: 10, from: '~4 h', to: '~1 h', changed: true },
+      { point: 11, from: '~2 h', to: '~0,5 h', changed: true },
+      { point: 12, from: '~2 h', to: '~2 h', changed: false },
+    ]
+    // 11 was rewritten by the main session while the measurement ran.
+    const { written, skipped } = applicableChanges(plan, { 10: { estimate: '~4 h' }, 11: { estimate: '~6 h' } })
+    expect(written.map((p) => p.point)).toEqual([10])
+    expect(skipped).toEqual([{ point: 11, from: '~2 h', to: '~0,5 h', changed: true, now: '~6 h' }])
   })
 
   it('names where a landing\'s estimate came from', () => {
