@@ -188,13 +188,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Nenne mir die **gemessenen** Treiber, schick jedem Helfer seinen Auftrag als
   fertigen Kurzbrief mit und fang je Aufgabe einen **frischen Kontext** an."
 
-- **Zwei Regeln, die sich gegenseitig ausschließen — und der Lauf dreht sich im Kreis.** Die eine
-  verlangt beim Abschluss, was die andere gerade verboten hat; der Helfer kann weder handeln noch
-  aufhören und schreibt dir dieselbe Bitte fünfmal.
-  → *Prompt:* „Jede Sperre bekommt einen **Ausgang**, den keine andere Sperre zurücknehmen kann:
-  wer gehen soll, muss gehen dürfen. Prüf bei jeder neuen Regel, **was sie im Ausnahmezustand
-  verlangt** — und wenn du dich wiederholst, ist das der Befund, nicht die Antwort."
-
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe, und bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
@@ -417,4 +410,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9ddba0b8b6b0f03110fd49426ea87a431bc5bbbc40bfd5f13a1d3a39a6762580 -->
+<!-- GUIDE-FINGERPRINT: 2e5d9913b228f92431f809eb05db755bf798e88210efef966780aeaff3d42a5a -->
