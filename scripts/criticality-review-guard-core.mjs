@@ -299,16 +299,20 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       findings.push({ kind: 'malformed-record', tick, records: malformedRefusals })
       continue
     }
+    // A SPEC EXAMINATION READS THE POINT AND BRIEF, NOT THE CODE. It shares the
+    // ledger, but cannot clear this gate or answer a refusal at a descendant
+    // sha; only an actual review belongs in the valid/self-review distinction.
+    const reviews = wellFormed.filter((r) => !r?.specExamination)
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a
     // file anyone can hand-edit.
-    const valid = wellFormed.filter((r) => !sameModel(r.model, r.authoredBy))
+    const valid = reviews.filter((r) => !sameModel(r.model, r.authoredBy))
 
     if (!valid.length) {
       let kind = 'no-review'
-      if (wellFormed.length) kind = 'self-review'
+      if (reviews.length) kind = 'self-review'
       else if (all.length && !reachable.length) kind = 'not-in-history'
-      findings.push({ kind, tick, records: wellFormed.length ? wellFormed : all })
+      findings.push({ kind, tick, records: reviews.length ? reviews : all })
       continue
     }
 
