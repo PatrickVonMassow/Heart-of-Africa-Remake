@@ -287,7 +287,7 @@ coverage map live in `scripts/verify/README.md`.
   with pushed checkpoints is transferred at the commit and ADOPTED by the
   successor (`batch-in-flight.mjs --adopt`); unpushed work drains first, but a
   RUNNING verify transfers via its run record. Past
-  the CONTEXT WATERMARK (150k measured tokens, `context-watermark.mjs`) the
+  the 82k CONTEXT TRIGGER (150k CEILING; `context-watermark.mjs`) the
   same handover fires with `--context`, and the board card says so; a
   PreToolUse fence (`context-fence-guard.mjs`, point 700) then DENIES starting
   new work — agents, browser suites, authoring points/docs/memories (findings

@@ -371,8 +371,8 @@ How it works:
    later mutation is DENIED loudly (`--clear` is the deliberate way back; the
    user's own prompt still withdraws). Both refuse unless the work order
    confirms the point closed and the launcher is armed, so the session finds out
-   at the boundary rather than at a blocked turn end. The CONTEXT WATERMARK
-   closes the third defeat: past 150k measured context tokens
+   at the boundary rather than at a blocked turn end. The 82k CONTEXT TRIGGER
+   (150k CEILING) closes the third defeat: once measured context reaches it
    (`scripts/context-watermark.mjs`, read from the session's own transcript — an
    unobtainable reading fails loudly, never silently) the guard demands the same
    two-phase handover with `--context` in place of a point, and the board card

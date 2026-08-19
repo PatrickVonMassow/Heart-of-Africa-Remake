@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { CONTEXT_TRIGGER_TOKENS } from './context-watermark-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SID = 'context-fence-test'
@@ -73,7 +74,7 @@ afterAll(() => {
 
 beforeEach(() => {
   writeJson(lockPath(), { v: 2, sessionId: SID, claimedAt: Date.now(), pid: process.pid })
-  writeTranscript(434_440) // past the 150k mark
+  writeTranscript(434_440) // past the trigger
 })
 
 describe('context-fence-guard (spawned)', () => {
@@ -134,7 +135,7 @@ describe('context-fence-guard (spawned)', () => {
   })
 
   it('allows everything below the mark', () => {
-    writeTranscript(90_000)
+    writeTranscript(CONTEXT_TRIGGER_TOKENS - 1)
     expect(callGuard('Agent', {}).stdout.trim()).toBe('')
     expect(callGuard('Bash', { command: 'npm test' }).stdout.trim()).toBe('')
   })

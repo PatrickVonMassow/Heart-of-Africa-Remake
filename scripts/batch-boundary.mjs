@@ -57,13 +57,19 @@ import {
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
-import { gatherWatermark, watermarkTokens } from './context-watermark.mjs'
-import { contextDistanceNote } from './context-watermark-core.mjs'
+import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
+import { CONTEXT_CEILING_TOKENS, contextDistanceNote } from './context-watermark-core.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
+
+/** The boundary's overshoot consumer is deliberately fixed to the cost
+ * ceiling. Admission uses the lower trigger through gatherWatermark. */
+export function boundaryContextDistanceNote(tokens) {
+  return contextDistanceNote({ tokens, ceiling: CONTEXT_CEILING_TOKENS })
+}
 
 const readText = (p) => {
   try {
@@ -305,9 +311,9 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
 export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } = {}) {
   const marker = readBoundary(path)
   const closure = marker ? closureOf(marker.point) : 'unknown'
-  // The CURRENT configured watermark rides along (Sol final round, finding 1):
+  // The CURRENT configured trigger rides along (Sol final round, finding 1):
   // a context claim must clear it as well as its own recorded mark.
-  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: watermarkTokens() })
+  const boundary = assessBoundary({ marker, sid, now, closure, watermarkNow: triggerTokens() })
   // Probe the OS only when a boundary is actually claimed — this runs at every
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
@@ -725,9 +731,10 @@ if (isMain) {
             : ''),
       )
       // The distance is a NUMBER somebody reads, not a claim (point 700): a
-      // commit further past the mark than the stated margin owes the closing
-      // report a sentence.
-      const distance = contextDistanceNote({ tokens: wm.tokens, watermark: wm.watermark })
+      // commit further past the ceiling than the stated margin owes the
+      // closing report a sentence. Admission above used the trigger; overshoot
+      // deliberately measures the separate cost ceiling.
+      const distance = boundaryContextDistanceNote(wm.tokens)
       if (distance) console.log(`\n${distance}`)
       process.exit(0)
     }
@@ -907,9 +914,10 @@ if (isMain) {
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
-    // Point 700: a boundary further past the mark than the stated margin — or
-    // one whose context could not be measured — owes the closing report a line.
-    const distance = contextDistanceNote({ tokens: contextTokens, watermark: wmPoint.watermark })
+    // Point 700: a boundary further past the ceiling than the stated margin —
+    // or one whose context could not be measured — owes the closing report a
+    // line. The trigger in wmPoint is for admission, not this overshoot record.
+    const distance = boundaryContextDistanceNote(contextTokens)
     if (distance) console.log(`\n${distance}`)
   }
 }

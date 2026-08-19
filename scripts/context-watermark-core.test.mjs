@@ -3,12 +3,17 @@
 // forbidden outcomes are firing on an ASSUMPTION and silently never firing.
 import { describe, it, expect } from 'vitest'
 import {
+  CONTEXT_CEILING_TOKENS,
   CONTEXT_MARGIN_TOKENS,
-  CONTEXT_WATERMARK_TOKENS,
+  CONTEXT_TRIGGER_TOKENS,
   contextDistanceNote,
   parseContextTokens,
   watermarkDecision,
 } from './context-watermark-core.mjs'
+import { triggerTokens } from './context-watermark.mjs'
+
+const LARGEST_OBSERVED_SINGLE_RESPONSE_TOKENS = 40_000
+const MEASURED_BOUNDARY_COST_TOKENS = 27_336
 
 const usageLine = (over = {}, top = {}) =>
   JSON.stringify({
@@ -74,14 +79,23 @@ describe('parseContextTokens — the reading is the NEWEST real usage record', (
 })
 
 describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
-  it('the watermark itself is the measured 150k cost cliff, in one named place', () => {
-    expect(CONTEXT_WATERMARK_TOKENS).toBe(150_000)
+  it('pins the ceiling, trigger, and the observed arithmetic the trigger must satisfy', () => {
+    expect(CONTEXT_CEILING_TOKENS).toBe(150_000)
+    expect(CONTEXT_TRIGGER_TOKENS).toBe(82_000)
+    expect(
+      CONTEXT_TRIGGER_TOKENS +
+        LARGEST_OBSERVED_SINGLE_RESPONSE_TOKENS +
+        MEASURED_BOUNDARY_COST_TOKENS,
+    ).toBeLessThanOrEqual(CONTEXT_CEILING_TOKENS)
   })
 
-  it('at or over the mark fires; under it does not', () => {
-    expect(watermarkDecision({ reading: { tokens: 150_000 } }).state).toBe('past')
-    expect(watermarkDecision({ reading: { tokens: 200_000 } }).state).toBe('past')
-    expect(watermarkDecision({ reading: { tokens: 149_999 } }).state).toBe('below')
+  it('the admission consumer fires on the trigger, not the ceiling', () => {
+    expect(watermarkDecision({ reading: { tokens: CONTEXT_TRIGGER_TOKENS } }).state).toBe('past')
+    expect(watermarkDecision({ reading: { tokens: CONTEXT_CEILING_TOKENS } }).state).toBe('past')
+    expect(watermarkDecision({ reading: { tokens: CONTEXT_TRIGGER_TOKENS - 1 } }).state).toBe('below')
+    expect(triggerTokens({})).toBe(CONTEXT_TRIGGER_TOKENS)
+    expect(triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '90_000' })).toBe(CONTEXT_TRIGGER_TOKENS)
+    expect(triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '90000' })).toBe(90_000)
   })
 
   it('NO reading is "unreadable" WITH an alert — never a silent "below"', () => {
@@ -96,32 +110,33 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
   it('a calibrated watermark is honoured; a broken one falls back to the named default', () => {
     expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: 50_000 }).state).toBe('past')
     expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: 0 }).state).toBe('below')
-    expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: NaN }).watermark).toBe(150_000)
+    expect(watermarkDecision({ reading: { tokens: 60_000 }, watermark: NaN }).watermark).toBe(82_000)
   })
 
   it('a real reading carries its tokens through to the verdict', () => {
-    const d = watermarkDecision({ reading: { tokens: 151_000 } })
-    expect(d).toEqual({ state: 'past', tokens: 151_000, watermark: 150_000, alert: false })
+    const d = watermarkDecision({ reading: { tokens: 83_000 } })
+    expect(d).toEqual({ state: 'past', tokens: 83_000, watermark: 82_000, alert: false })
   })
 })
 
-describe('contextDistanceNote — the distance between mark and handover is a number, not a claim (point 700)', () => {
-  it('stays silent within the stated margin, below the mark included', () => {
-    expect(contextDistanceNote({ tokens: 120_000, watermark: 150_000 })).toBeNull()
-    expect(contextDistanceNote({ tokens: 150_000 + CONTEXT_MARGIN_TOKENS, watermark: 150_000 })).toBeNull()
+describe('contextDistanceNote — the distance between ceiling and handover is a number, not a claim (point 700)', () => {
+  it('stays silent within the stated margin, below the ceiling included', () => {
+    expect(contextDistanceNote({ tokens: 120_000, ceiling: 150_000 })).toBeNull()
+    expect(contextDistanceNote({ tokens: 150_000 + CONTEXT_MARGIN_TOKENS, ceiling: 150_000 })).toBeNull()
   })
 
-  it('demands the closing report name a boundary taken further past the mark than the margin', () => {
-    const note = contextDistanceNote({ tokens: 434_440, watermark: 150_000 })
+  it('demands the closing report name a boundary taken further past the ceiling than the margin', () => {
+    const note = contextDistanceNote({ tokens: 434_440, ceiling: 150_000 })
     expect(note).toContain('284440')
+    expect(note).toContain('150000 CEILING')
     expect(note).toContain('closing report')
   })
 
   it('an UNMEASURED boundary is named too — no reading must never read as a small distance', () => {
-    expect(contextDistanceNote({ tokens: null, watermark: 150_000 })).toContain('NO CONTEXT READING')
+    expect(contextDistanceNote({ tokens: null, ceiling: 150_000 })).toContain('NO CONTEXT READING')
   })
 
-  it('a broken watermark falls back to the named default', () => {
-    expect(contextDistanceNote({ tokens: 500_000, watermark: 0 })).toContain('150000')
+  it('a broken ceiling falls back to the named ceiling, not the trigger', () => {
+    expect(contextDistanceNote({ tokens: 500_000, ceiling: 0 })).toContain('150000 CEILING')
   })
 })

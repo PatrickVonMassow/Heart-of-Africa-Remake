@@ -12,16 +12,27 @@
 // `alert: true`) instead of silently never firing.
 
 /**
- * THE WATERMARK, in tokens of context. One named place, calibratable via
- * HOA_CONTEXT_WATERMARK_TOKENS (read by the IO wrapper so this stays pure).
- *
- * WHY 150 000: it is the measured cost cliff the whole boundary rule exists for
- * — 87–94 % of the batch's token spend sat ABOVE 150k context, one session
- * carrying point after point (CLAUDE.md §6, users 27./28.07.2026). A session at
- * the mark has already consumed the cheap region; everything further multiplies
- * every subsequent turn's cost, so the handover pays for itself immediately.
+ * THE CEILING, in tokens of context. This is the cost cliff against which an
+ * incident overshoot is measured; it is NOT the point at which new work may be
+ * admitted, because a handover begun here would finish beyond the ceiling.
  */
-export const CONTEXT_WATERMARK_TOKENS = 150_000
+export const CONTEXT_CEILING_TOKENS = 150_000
+
+/**
+ * THE TRIGGER, in tokens of context. Admission decisions use this lower number
+ * so the observed work still paid after a trigger can fit below the ceiling.
+ *
+ * Arithmetic (19.08.2026): ceiling 150,000 - largest observed single response
+ * 40,000 - measured cost of leaving 27,336 = 82,664; round down to 82,000.
+ * The rejected 100,000 draft did not hold even its own stated worst case:
+ * 100,000 + 40,000 + 15,000 already exceeds the ceiling.
+ * Both premises are observations, not bounds: the response jump is one reading,
+ * and the leaving cost is contaminated by contradictory gates. That
+ * contamination biases the leaving cost high, so subtracting it is the safer
+ * immediate margin until clean measurement and prospective admission replace
+ * this written trigger.
+ */
+export const CONTEXT_TRIGGER_TOKENS = 82_000
 
 /**
  * The CURRENT CONTEXT SIZE from a transcript tail. PURE.
@@ -72,11 +83,10 @@ export function parseContextTokens(text) {
  *                  (a watermark that silently never fires is defeat 3 intact).
  */
 /**
- * THE STATED MARGIN (point 700): how far past the mark a boundary may honestly
- * land — the mark fires mid-step and finishing that step costs context. A
- * boundary taken FURTHER past it than this says so in the session's closing
- * report, so the distance between the mark and the real handover stays a
- * number somebody reads rather than a claim. Calibratable like the mark.
+ * THE STATED MARGIN (point 700): how far past the ceiling a boundary may
+ * honestly land. A boundary taken FURTHER past it than this says so in the
+ * session's closing report, so the distance between the ceiling and the real
+ * handover stays a number somebody reads rather than a claim.
  */
 export const CONTEXT_MARGIN_TOKENS = 25_000
 
@@ -87,24 +97,24 @@ export const CONTEXT_MARGIN_TOKENS = 25_000
  * rode on the boundary at all, since an unmeasured distance must not read as a
  * small one.
  */
-export function contextDistanceNote({ tokens, watermark, margin = CONTEXT_MARGIN_TOKENS } = {}) {
+export function contextDistanceNote({ tokens, ceiling, margin = CONTEXT_MARGIN_TOKENS } = {}) {
   if (typeof tokens !== 'number' || !(tokens > 0)) {
     return (
-      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the watermark cannot be judged. ' +
+      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the ceiling cannot be judged. ' +
       'Say so in the closing report.'
     )
   }
-  const mark = typeof watermark === 'number' && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
-  const over = tokens - mark
+  const limit = typeof ceiling === 'number' && ceiling > 0 ? ceiling : CONTEXT_CEILING_TOKENS
+  const over = tokens - limit
   if (over <= margin) return null
   return (
-    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${mark} WATERMARK (measured ${tokens}, stated margin ` +
-    `${margin}) — say so in the closing report, naming what kept the session working past the mark.`
+    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${limit} CEILING (measured ${tokens}, stated margin ` +
+    `${margin}) — say so in the closing report, naming what kept the session working past the ceiling.`
   )
 }
 
-export function watermarkDecision({ reading, watermark = CONTEXT_WATERMARK_TOKENS } = {}) {
-  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_WATERMARK_TOKENS
+export function watermarkDecision({ reading, watermark = CONTEXT_TRIGGER_TOKENS } = {}) {
+  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : CONTEXT_TRIGGER_TOKENS
   if (!reading || typeof reading.tokens !== 'number' || !(reading.tokens > 0)) {
     return { state: 'unreadable', tokens: null, watermark: mark, alert: true }
   }
