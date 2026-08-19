@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@05eaa324
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@19ee578a
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -19,10 +19,10 @@
 //          the main session's job, so authoring it elsewhere buys nothing) —
 //          and only while nothing marks that point hard, because the user's
 //          18.08. ruling outranks this lane, not the other way round.
-//   fable  Fable 5 takes ONE case (user 17.08.2026): work whose re-work the
-//          review still finds problems in. Its weekly pool is the scarcest of
-//          the three, so the CUT sends nothing else there — a point's own lane
-//          tag and the caller's override still can, and both are deliberate.
+//   fable  Fable 5 is the escalation described by CLAUDE.md §6. Its weekly
+//          pool is the scarcest of the three, so the CUT sends nothing else
+//          there — a point's own Fable tag and the caller's override still can,
+//          and both are deliberate.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -43,6 +43,26 @@ export const LANE_MODEL = Object.freeze({
   fable: 'Fable 5',
   opus: 'Opus 5',
 })
+
+/** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
+export const FABLE_ESCALATION_ROUNDS = 5
+
+/**
+ * An unsuccessful round is a completed review whose verdict was not a pass.
+ * A run that aborted, did not run or had a material shortfall is not completed
+ * and does not count; the ordinary record path writes no row for those cases,
+ * and the defensive checks here also reject such a hand-authored row.
+ */
+export function unsuccessfulReviewRounds(records = [], point = '') {
+  const wanted = Number(point)
+  if (!Number.isInteger(wanted) || wanted < 0) return 0
+  return (Array.isArray(records) ? records : []).filter((record) => {
+    if (Number(record?.point) !== wanted) return false
+    if (record?.mode && record.mode !== 'review') return false
+    if (record?.aborted || record?.shortfall || record?.completed === false) return false
+    return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
+  }).length
+}
 
 /**
  * The words CLAUDE.md §6 itself uses for the hard cases, plus the classic
@@ -196,32 +216,35 @@ function hits(markers, text) {
  * Inputs — all optional, because a caller rarely has all of them:
  *   body         the point's text out of the work order
  *   criticality  its tag, as `criticalityOf` reads it ('low' | 'med' | 'high')
- *   reworked     did the review still find problems in a re-work of this point?
- *                (CLAUDE.md §6: such work MOVES to Fable)
+ *   reworkRounds completed reviews of this point whose verdict was not a pass
  *   override     a lane the caller insists on, beating even the tag
  *
  * Returns { lane, model, why, signals } — `why` is the ordered list of reasons,
  * first the deciding one. It NEVER throws and never answers nothing: an empty
  * input is a point with no signal against it, which is the mechanical case.
  */
-export function authorLaneFor({ body = '', criticality = null, reworked = false, override = '' } = {}) {
+export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0, override = '' } = {}) {
   const text = String(body ?? '')
   const tag = laneTagIn(text)
   const hard = hits(HARD_MARKERS, text)
   const verification = hits(VERIFICATION_MARKERS, text)
-  const signals = { tag, criticality: criticality ?? null, reworked: Boolean(reworked), hard, verification }
+  const rounds = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : 0
+  const signals = { tag, criticality: criticality ?? null, reworkRounds: rounds, hard, verification }
   const decide = (lane, reason) => ({ lane, model: LANE_MODEL[lane], why: [reason], signals })
 
   if (LANES.includes(String(override).toLowerCase())) {
     return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
   }
-  // A RE-WORK THE REVIEW STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
-  // (CLAUDE.md §6). Whatever the text looks like — and whatever lane it was
-  // TAGGED for — the evidence says the lane it was on could not finish it. It
-  // stood BELOW the tag until the cross-vendor review of point 667 (P1) read the
-  // order against the sentence claiming it, and `Author lane: sol` plus a failed
-  // re-work therefore stayed with Sol.
-  if (reworked) return decide('fable', 'the review still found problems after a re-work — §6 moves such work to Fable')
+  // A FABLE TAG IS AN OPERATOR DECISION, not an automatic signal. It therefore
+  // remains immediate while tags naming the ordinary lanes yield once the
+  // recorded escalation boundary has actually been reached.
+  if (tag === 'fable') return decide(tag, 'the point itself carries `Author lane: fable`')
+  if (rounds >= FABLE_ESCALATION_ROUNDS) {
+    return decide(
+      'fable',
+      `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
+    )
+  }
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
   // A HARD OR CRITICAL POINT GOES STRAIGHT TO SOL (user 18.08.2026). It used to
   // be held back for Opus — and before that routed to Fable — and it now takes

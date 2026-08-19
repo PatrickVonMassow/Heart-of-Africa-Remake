@@ -23,9 +23,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { authorLaneFor, formatLaneReport, LANE_MODEL } from './author-routing-core.mjs'
+import {
+  authorLaneFor,
+  formatLaneReport,
+  LANE_MODEL,
+  unsuccessfulReviewRounds,
+} from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
+import { readRecords } from './mechanism-review.mjs'
 import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -64,10 +70,17 @@ export function pointBody(number, text = readTasksOpen()) {
   return block ? block.body : ''
 }
 
+/** The ledger-derived escalation signal. No record is the ordinary zero case. */
+export function recordedReworkRounds(number, { records } = {}) {
+  const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+  return unsuccessfulReviewRounds(rows, number)
+}
+
 /** The lane a point belongs to, with the reasons that decided it. */
-export function laneFor(number, { override = '', reworked = false } = {}) {
+export function laneFor(number, { override = '', reworkRounds, records } = {}) {
   const body = pointBody(number)
-  return { body, ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworked }) }
+  const rounds = reworkRounds ?? recordedReworkRounds(number, { records })
+  return { body, ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds }) }
 }
 
 /** The brief, cut by the project's own command — never a reading assignment. */
@@ -244,9 +257,9 @@ export async function runAuthoringCodex({
 
 export const usage = () =>
   [
-    'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--reworked] [--timeout <ms>]',
+    'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
     '           [--anyway] [--dry-run]',
-    '       node scripts/author-sol.mjs --routing (--point <N> | --all)',
+    '       node scripts/author-sol.mjs --routing (--point <N> [--rounds <n>] | --all)',
     '',
     `${SOL_MODEL_NAME} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
     'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
@@ -261,6 +274,18 @@ export const usage = () =>
 
 if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
+  const knownFlags = new Set([
+    '--point',
+    '--findings',
+    '--rounds',
+    '--timeout',
+    '--anyway',
+    '--dry-run',
+    '--routing',
+    '--all',
+    '--help',
+    '-h',
+  ])
   const flag = (name) => {
     const i = argv.indexOf(name)
     return i >= 0 && i + 1 < argv.length && !argv[i + 1].startsWith('--') ? argv[i + 1] : ''
@@ -270,13 +295,39 @@ if (isMainModule(import.meta.url)) {
       console.log(usage())
       process.exit(0)
     }
+    const unknown = argv.find((arg) => arg.startsWith('-') && !knownFlags.has(arg))
+    if (unknown) {
+      console.error(`author-sol: unknown option ${unknown}.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+    const roundsText = flag('--rounds')
+    if (argv.includes('--rounds') && !/^\d+$/.test(roundsText)) {
+      console.error('author-sol: --rounds needs a non-negative integer.\n')
+      console.error(usage())
+      process.exit(2)
+    }
+    const roundsOverride = argv.includes('--rounds') ? Number(roundsText) : undefined
 
     // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
     if (argv.includes('--routing')) {
       if (argv.includes('--all')) {
+        if (roundsOverride !== undefined) {
+          console.error('author-sol: --rounds applies to one --point, not --all.')
+          process.exit(2)
+        }
+        const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
         const rows = parsePointBlocks(readTasksOpen())
           .filter((b) => !b.done)
-          .map((b) => ({ number: b.n, ...authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level }) }))
+          .map((b) => {
+            const reworkRounds = unsuccessfulReviewRounds(records, b.n)
+            const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds })
+            return {
+              number: b.n,
+              ...decided,
+              why: [`${decided.why[0]} (${reworkRounds} unsuccessful review round(s) recorded)`],
+            }
+          })
         console.log(formatLaneReport(rows))
         process.exit(0)
       }
@@ -286,9 +337,10 @@ if (isMainModule(import.meta.url)) {
         console.error(usage())
         process.exit(2)
       }
-      const decided = laneFor(number, { reworked: argv.includes('--reworked') })
+      const decided = laneFor(number, { reworkRounds: roundsOverride })
       if (!decided.body) console.error(`author-sol: point ${number} is not in the OPEN work order — routing what is known.`)
       console.log(`author-sol: point ${number} → ${decided.lane} (${LANE_MODEL[decided.lane]})`)
+      console.log(`  review record: ${decided.signals.reworkRounds} unsuccessful round(s)`)
       for (const why of decided.why) console.log(`  because ${why}`)
       process.exit(0)
     }
@@ -326,10 +378,13 @@ if (isMainModule(import.meta.url)) {
     }
 
     // THE LANE IS THE POINT'S OWN ANSWER, not the dispatcher's mood (point 667).
-    // `--reworked` is how the caller says Sol has already been round this point
-    // and the review still found problems: CLAUDE.md §6 moves such work to Fable,
-    // and the routing could not know it from the text (cross-vendor review, P1).
-    const decided = laneFor(point, { reworked: argv.includes('--reworked') })
+    // Its automatic escalation signal comes from the review ledger. `--rounds`
+    // is the deliberate override for a history that the ledger cannot know.
+    const decided = laneFor(point, { reworkRounds: roundsOverride })
+    console.error(
+      `author-sol: lane verdict for point ${point}: ${decided.lane} (${LANE_MODEL[decided.lane]}); ` +
+        `${decided.signals.reworkRounds} unsuccessful review round(s) recorded.`,
+    )
     if (decided.lane !== 'sol' && !argv.includes('--anyway')) {
       console.error(
         `author-sol: point ${point} routes to the ${decided.lane} lane (${LANE_MODEL[decided.lane]}), not to ${SOL_MODEL_NAME}:\n` +

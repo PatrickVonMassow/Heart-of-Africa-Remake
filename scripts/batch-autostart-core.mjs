@@ -40,14 +40,12 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-/** Model policy (CLAUDE.md §6, 25.07./18.08.2026). rule:model-policy@05eaa324
+/** Model policy (CLAUDE.md §6). rule:model-policy@19ee578a
  *  The fallback CHAIN is
  *  Opus 5 → Fable 5 → Opus 4.8, so the SESSION this launcher spawns is Opus 5.
- *  That is the spawn, not the whole policy: the hard and critical points are
- *  AUTHORED by GPT-5.6 Sol (user 18.08.2026) and Fable 5 is the ESCALATION a
- *  session delegates to once a re-work still comes back with problems — choices
- *  no `--model` flag here can make, since they concern the DELEGATED author
- *  rather than the session this launcher spawns. The CLI
+ *  That is the spawn, not the whole policy: authoring and escalation are the
+ *  decisions named in §6 and applied by scripts/author-routing-core.mjs, not by
+ *  any `--model` flag here. The CLI
  *  takes a single --fallback-model, so Fable is wired as the first fallback; the
  *  model-guard Stop hook enforces the allowlist from inside either way. */
 export const SPAWN_MODEL = 'claude-opus-5[1m]'
