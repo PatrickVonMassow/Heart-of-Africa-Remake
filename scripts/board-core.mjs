@@ -400,15 +400,16 @@ const SECT_OPEN = '<details class="sect">'
  * could project into and the comparison would bless. An occurrence not
  * directly preceded by the wrapper is no heading; none left, or more than one
  * left, refuses by name — the fail-closed callers propagate, the fail-open
- * ones already catch.
+ * ones already catch. Only WHITESPACE may stand between the wrapper and its
+ * heading, in ANY amount (eighth cross-review): a 32-character lookback cap
+ * rejected a legitimately deep indent, and formatting depth is not damage.
  */
 function sectionBounds(html, key) {
   const head = HEAD[key]
   const text = String(html ?? '')
   const hits = []
   for (let at = text.indexOf(head); at >= 0; at = text.indexOf(head, at + head.length)) {
-    const before = text.slice(Math.max(0, at - SECT_OPEN.length - 32), at)
-    if (before.trimEnd().endsWith(SECT_OPEN)) hits.push(at)
+    if (text.slice(0, at).trimEnd().endsWith(SECT_OPEN)) hits.push(at)
   }
   if (hits.length === 0) {
     throw new Error(

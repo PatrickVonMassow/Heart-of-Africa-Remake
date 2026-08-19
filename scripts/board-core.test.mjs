@@ -328,6 +328,29 @@ describe('derived now-section membership', () => {
     expect(compareNowProjection(intact, [700]).ok).toBe(true)
   })
 
+  it('accepts a heading behind ANY amount of whitespace inside its wrapper — depth of indent is not damage', () => {
+    // Eighth cross-review: the orphan check capped its lookback at 32
+    // characters, so a legitimately deep indent between `<details
+    // class="sect">` and its heading was refused as structural damage. Only
+    // the CONTENT between wrapper and heading decides: whitespace of any
+    // length is formatting, one non-whitespace character is an orphan.
+    const heading = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
+    const rest = `${sect('Von dir zu klären', '')}${sect('Warteschlange', '')}${sect('Erledigt', '')}`
+    const withGap = (gap) =>
+      `<main>\n<details class="sect">${gap}${heading}\n${nowEntry(700, 'Echt', '20:07')}</details>\n${rest}</main>\n`
+    // The everyday pretty-print form: newline plus a small indent.
+    expect(compareNowProjection(withGap('\n  '), [700]).ok).toBe(true)
+    // The reviewer's exact failing layout: more than 32 whitespace characters.
+    expect(compareNowProjection(withGap(`\n${' '.repeat(48)}`), [700]).ok).toBe(true)
+    expect(() => reconcileNowProjection(withGap(`\n${' '.repeat(48)}`), [700])).not.toThrow()
+    // Mixed whitespace far beyond the old cap stays formatting too.
+    expect(compareNowProjection(withGap(`\n\t${'  \t'.repeat(20)}\n`), [700]).ok).toBe(true)
+    // The other direction holds: ONE non-whitespace character between wrapper
+    // and heading is still an orphaned heading, however far back the wrapper.
+    expect(compareNowProjection(withGap(`\n<p>x</p>\n${' '.repeat(48)}`), [700]))
+      .toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
+  })
+
   it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
     const authored = nowEntry(700, 'Die Übergabe', '20:07', 'Umlaute, <a href="/x">Link</a> und Text.')
     const before = fullBoard({
