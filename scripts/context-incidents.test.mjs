@@ -313,7 +313,8 @@ describe('the reading command', () => {
         JSON.stringify(rec('2026-08-19T10:00:00.000Z', 311_039, 742)),
       ].join('\n')}\n`,
     )
-    const run = (args) => spawnSync(process.execPath, [CLI, '--file', path, ...args], { encoding: 'utf8' })
+    const run = (args) =>
+      spawnSync(process.execPath, [CLI, '--file', path, ...args], { encoding: 'utf8', windowsHide: true })
 
     const all = run([])
     expect(all.status).toBe(0)
