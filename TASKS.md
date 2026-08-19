@@ -9588,3 +9588,69 @@ to land than a mechanism that needs a review.
   Criticality: low — nothing is lost, but the cost is silent and one-sided: work is deferred that
   nothing was stopping.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 754. The rule corpus carries twenty-three measured defects, four of them in code that
+  cannot do what its own text promises (cross-vendor review by GPT-5.6 Sol, 19.08.2026, over
+  the corpus injected into every prompt, every session start and every blocked turn end:
+  `CLAUDE.md`, `MEMORY.md`, `scripts/dashboard-reminder-hook.mjs`,
+  `scripts/batch-resume-hook.mjs`; each entry judged on the six axes of
+  `scripts/rule-review.mjs`). The corpus ages like code but without a compiler — a stale rule
+  says nothing and is obeyed anyway. FINAL STATE, in four groups; each fix is verified against
+  the CODE, never against the neighbouring prose:
+  A. THE FOUR THAT ARE INEFFECTIVE IN CODE, and therefore first.
+     `batch-resume-hook.mjs` prints "a missing id errs toward NOT resuming", but after
+     `randomUUID()` it still runs `noteTopLevelSession()` and, on a free lock, `acquire()` — the
+     hook must abort before both when no session id was asserted. Its "pid-bound, one-shot
+     authorization" is neither: `autostartAuthorization()` checks only the marker's AGE,
+     `convertPendingSpawn()` receives a bare `!!auth`, and `clearAuthorized()` consumes a fresh
+     marker even after a failed or foreign takeover — the marker is bound to session, pid and
+     lock generation and cleared only after a matching successful conversion. The printed rule
+     "if the serving model is not one of those three, do NOT work" cannot fire at all: the hook
+     reads only session id and source from the payload, never the model, so it hands the batch
+     lock to a forbidden model — the serving model is checked machine-side before `acquire()`
+     or proven by a bound launcher marker. And `dashboard-reminder-hook.mjs` updates
+     `turnStartedAtBySession` through an unguarded read-spread-merge, so parallel prompt hooks
+     can drop each other's session keys — the write becomes atomic (a lock or one file per
+     session), which is what "It binds EVERY session" claims.
+  B. THE INJECTED RESUME TEXT CONTRADICTS THE RULES IT QUOTES. It demands "each point on its
+     OWN branch" and later "tightly-coupled same-file points TOGETHER on ONE branch"; it says
+     "cross-cutting changes go directly to main" where CLAUDE.md §6 allows that only while they
+     stay SMALL and delegates the rest; it says every reported defect is APPENDED as its own
+     point where the standing rule is that a finding JOINS an existing bundle first; and it
+     echoes "every GUI/render fix verified on WebGPU AND WebGL2" where CLAUDE.md §6 exempts
+     backend-insensitive paths by `isBackendSensitivePath`. Each is brought to the binding
+     wording, with the exception stated where one exists.
+  C. CLAUDE.md CONTRADICTS ITSELF IN SIX PLACES. §3 says the TTS worker means synthesis "never
+     blocks the game loop" and then records ~15 s without frames at WebGPU init (the true claim
+     is that no synthesis JS runs on the main thread). §7.1 no. 18 demands "zero
+     vulnerabilities" while naming a tolerated high advisory (the condition is zero
+     UNALLOWLISTED ones). "both checks after every change" contradicts §7.2, which asks
+     `audit-check.mjs` only when the lockfile moved. "LARGE regression on BOTH backends" and
+     "backend coverage is UNIVERSAL" contradict the LARGE lane defined below them (all suites on
+     WebGL 2, render suites on WebGPU). "design.md is the sole source of the target state"
+     contradicts §7.1, where `docs/acceptance-criteria-detail.md` holds the COMPLETE wording and
+     "is what governs" — the rank between the two is stated. And criteria 1, 10 and 11 lack the
+     "two pointers" the same section demands of every criterion, while no. 32 states a
+     retrospective status ("SSR removed", "true refraction stays OPEN") where an acceptance
+     criterion must state a checkable target.
+  D. THE MEMORY INDEX CARRIES RULES THAT SAY THE OPPOSITE OF THEIR OWN TEXT. `Serving-model
+     watch` lists GPT-5.6 Sol among the models that may RUN the batch, where it is an AUTHOR
+     lane only; `Saves are irrelevant in the PoC` contradicts acceptance criterion 28;
+     `Schlafende Guards` still names the context fence as unwired, though point 700 armed it;
+     `New TASKS points: one point → one commit` contradicts the push-after-every-commit and
+     rescue-commit rules (the surviving rule is one point per branch, atomic thematic commits);
+     `Sol authors by default` and `WebGPU untestable headless` have titles that assert what
+     their bodies deny; `TASKS time tracking` is dead in practice but stands as an active rule.
+     Each is either corrected or marked `WITHDRAWN — <surviving insight>`; the index's own claim
+     that retired entries were DELETED is dropped, because a deleted rule cannot be recognised
+     as withdrawn by anyone reading the corpus.
+  VERIFIABLE: Vitest for group A — a resume-hook run without an asserted session id acquires no
+  lock, a stale or foreign authorization marker is not consumed, a payload naming a forbidden
+  serving model is refused before the lock, and two concurrent reminder-hook writes preserve
+  both session keys. Groups B–D are text: the check is that each named contradiction resolves to
+  ONE wording, asserted where a guard already reads that text (`rule-echo`, the resume body, the
+  doc budget), and `rule-review.mjs --status` shows the corpus reviewed at the resulting count.
+  Criticality: high for group A — one of its four defects hands the batch lock to a model the
+  policy forbids, which is the breach `model-guard` exists to catch after the fact; medium for
+  the rest.
+  Bundle: Session- & Repo-Hygiene.
