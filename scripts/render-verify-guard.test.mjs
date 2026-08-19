@@ -11,7 +11,12 @@
 // state untouched, gate still pending on the next turn.
 import { describe, it, expect } from 'vitest'
 import { execSync } from 'node:child_process'
-import { BaselineDiffError, commitMissing, gatherRenderVerifyInputs } from './render-verify-guard.mjs'
+import {
+  BaselineDiffError,
+  commitMissing,
+  gatherRenderVerifyInputs,
+  openIncompleteRuns,
+} from './render-verify-guard.mjs'
 
 const boom = (what) => () => {
   throw new Error(`${what} exploded`)
@@ -146,6 +151,39 @@ describe('the Stop hook re-baselines on that error and only that one', () => {
     expect(wouldRebaseline(new TypeError('probe blew up'))).toBe(false)
     // A message that merely LOOKS like the diff failure must not count either.
     expect(wouldRebaseline(new Error('diff vs abc123 failed'))).toBe(false)
+  })
+})
+
+// Point 734: which runs the `--incomplete` sign-off may see. It works on the
+// state the guard reads, so a closure can only ever name a run that is really
+// recorded and not already signed off.
+describe('openIncompleteRuns — what the sign-off may close', () => {
+  const truncated = (at) => ({
+    backend: 'webgpu',
+    suite: 'settings',
+    at,
+    exit: 1,
+    reds: [{ name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'truncated', point: null }],
+  })
+  const ordinary = (at) => ({ backend: 'webgpu', suite: 'polish', at, exit: 1, reds: [{ name: 'a real red', kind: 'check', point: null }] })
+
+  it('lists the truncated runs and nothing else', () => {
+    const open = openIncompleteRuns({ runs: [truncated(1500), ordinary(1600), { backend: 'webgl', suite: 'x', at: 1700, exit: 0 }] })
+    expect(open.map((r) => r.at)).toEqual([1500])
+  })
+
+  it('drops a run that is already signed off, and keeps the next one', () => {
+    const state = {
+      runs: [truncated(1500), truncated(2500)],
+      incompleteClosures: [{ backend: 'webgpu', suite: 'settings', at: 1500, evidence: 'no browser on this host' }],
+    }
+    expect(openIncompleteRuns(state).map((r) => r.at)).toEqual([2500])
+  })
+
+  it('is total on a missing or malformed state', () => {
+    expect(openIncompleteRuns(null)).toEqual([])
+    expect(openIncompleteRuns({ runs: 'nope' })).toEqual([])
+    expect(() => openIncompleteRuns({ runs: [null, 7], incompleteClosures: 'nope' })).not.toThrow()
   })
 })
 

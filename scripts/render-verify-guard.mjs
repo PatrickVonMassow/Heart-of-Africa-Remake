@@ -23,10 +23,16 @@
 // recorded as `clearedVia: 'accounted-for'` with the charges, and said out loud
 // — a suite that cannot exit 0 for another point's reasons must not force a
 // hand-written --defer on every change, and it must not read as a pass either.
+// A run whose result lines the capture cap TRUNCATED is not a red at all but an
+// INCOMPLETE RECORDING (point 734): its red list is a fragment, so none of point
+// 640's three closings can reach it, and before this it could only be waived by
+// hand. It is now named as its own class and signed off per run, with evidence —
+// a closure that discards the record and clears no backend.
 // CLI:
 //   node scripts/render-verify-guard.mjs status            # inspect the gate
 //   node scripts/render-verify-guard.mjs --defer "<why>"   # loud escape valve
 //   node scripts/render-verify-guard.mjs --clear "<why>"   # manual baseline advance
+//   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"
 import { readFileSync, statSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -45,6 +51,9 @@ import {
   chargeablePoints,
   runVerdict,
   latestRun,
+  isIncompleteRecording,
+  incompleteClosureFor,
+  droppedLinesOf,
 } from './render-verify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
@@ -251,8 +260,21 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
       runs: state.runs,
       deferral: state.deferral,
       openPoints,
+      // The signed-off broken RECORDINGS (point 734) — not waivers: each names
+      // one run by identity and clears no backend.
+      incompleteClosures: state.incompleteClosures,
     },
   }
+}
+
+/** How many signed incomplete-recording closures the state keeps. The run window
+ *  itself holds 40, so a closure older than that names a run nobody can see. */
+const MAX_INCOMPLETE_CLOSURES = 40
+
+/** The recorded runs whose recording is incomplete and NOT yet signed off. */
+export function openIncompleteRuns(state) {
+  const runs = Array.isArray(state?.runs) ? state.runs : []
+  return runs.filter((r) => isIncompleteRecording(r) && !incompleteClosureFor(r, state?.incompleteClosures))
 }
 
 const arg = isMainModule(import.meta.url) ? process.argv[2] : '__imported__'
@@ -277,6 +299,78 @@ if (arg === '--defer') {
     process.exit(0)
   } catch (e) {
     console.error(`render-verify-guard --defer failed: ${e && e.message}`)
+    process.exit(1)
+  }
+}
+
+// --incomplete "<backend>/<suite>" --evidence "<why>" (or --incomplete --all
+// --evidence "<why>"): THE NAMED WAY OUT OF A BROKEN RECORDING (point 734).
+//
+// A run whose result lines the capture cap truncated cannot be closed by any of
+// point 640's three ways — they all need to know WHAT the red was, and such a
+// run never recorded it. Before this, its only exit was a hand-written --defer,
+// i.e. the waiver the charge ledger exists to abolish. This signs the RECORDING
+// off as broken instead: one run at a time, by identity, with written evidence,
+// and it clears NO backend — the run stays `incomplete` in every verdict, so it
+// is never mistaken for a green.
+if (arg === '--incomplete') {
+  try {
+    const rest = process.argv.slice(3)
+    const all = rest.includes('--all')
+    const evidenceAt = rest.indexOf('--evidence')
+    const evidence = evidenceAt === -1 ? '' : String(rest[evidenceAt + 1] ?? '').trim()
+    // Positional selector = the first argument that is neither a flag nor the
+    // value consumed by --evidence, found by INDEX: a comparison by value would
+    // drop the selector whenever the evidence text happened to read the same.
+    const selector =
+      rest.find((a, i) => i !== evidenceAt && i !== evidenceAt + 1 && !a.startsWith('--')) ?? ''
+    if (!evidence) {
+      console.error(
+        'render-verify-guard --incomplete: --evidence "<why this recording cannot be redone>" is required. ' +
+          'The evidence is the whole difference between this and a silent waiver.',
+      )
+      process.exit(1)
+    }
+    if (!all && !selector) {
+      console.error(
+        'render-verify-guard --incomplete: name the run as "<backend>/<suite>", or pass --all to sign off ' +
+          'every open incomplete recording. A closure is per RUN — it can never pre-clear a future one.',
+      )
+      process.exit(1)
+    }
+    const state = readRenderState() ?? {}
+    const open = openIncompleteRuns(state).filter(
+      (r) => all || `${r.backend}/${r.suite}` === selector,
+    )
+    if (open.length === 0) {
+      console.error(
+        `render-verify-guard --incomplete: no OPEN incomplete recording matches ${all ? '--all' : `"${selector}"`}. ` +
+          'Run `node scripts/render-verify-guard.mjs status` to see which runs are truncated.',
+      )
+      process.exit(1)
+    }
+    const closures = (Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []).concat(
+      open.map((r) => ({
+        backend: r.backend,
+        suite: r.suite,
+        at: Number(r.at),
+        droppedLines: droppedLinesOf(r),
+        evidence,
+        closedAt: Date.now(),
+      })),
+    )
+    while (closures.length > MAX_INCOMPLETE_CLOSURES) closures.shift()
+    mergeRenderState({ incompleteClosures: closures })
+    for (const r of open) {
+      console.log(
+        `⚠ INCOMPLETE RECORDING SIGNED OFF: ${r.backend}/${r.suite} @${new Date(Number(r.at)).toISOString()} ` +
+          `(${droppedLinesOf(r)} result line(s) dropped) — "${evidence}". This closes the RECORD, not the ` +
+          'picture: the run still covers no backend and is never a pass. Re-run the suite at the first chance.',
+      )
+    }
+    process.exit(0)
+  } catch (e) {
+    console.error(`render-verify-guard --incomplete failed: ${e && e.message}`)
     process.exit(1)
   }
 }
@@ -345,6 +439,22 @@ if (arg === 'status') {
             (u.point === null ? ' (charged to nothing)' : ` (point ${u.point} is not open)`),
         )
       }
+    }
+    // Broken RECORDINGS, listed apart from the reds (point 734): they are not
+    // defects to hunt, they are runs whose evidence was truncated away.
+    const openIncomplete = openIncompleteRuns(state)
+    for (const r of openIncomplete) {
+      console.log(
+        `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
+          `@${new Date(Number(r.at)).toISOString()} — ${droppedLinesOf(r)} result line(s) dropped by the ` +
+          'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
+          `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
+      )
+    }
+    for (const c of Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []) {
+      console.log(
+        `(signed-off incomplete recording: ${c.backend}/${c.suite} @${new Date(Number(c.at)).toISOString()} — "${c.evidence}")`,
+      )
     }
     if (state.deferral) console.log(`⚠ active deferral @${String(state.deferral.head).slice(0, 7)}: "${state.deferral.reason}"`)
     if (state.lastDeferral) console.log(`(last consumed deferral: "${state.lastDeferral.reason}")`)
