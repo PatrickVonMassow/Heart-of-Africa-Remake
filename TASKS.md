@@ -1961,7 +1961,10 @@ put it is the mistake this line exists to stop.
   state nothing can rescue — blocked the supervising session's turn end three times in a row,
   each time for a commit in the middle of an unfinished point. Two consequences, both real:
   `ci-status-guard` can never find a concluded green run on that branch while the author works,
-  and Actions minutes are spent on runs nobody reads.
+  and Actions minutes are spent on runs nobody reads. Measured again 19.08.2026 with TWO author
+  lanes in flight at once: three consecutive runs ended `cancelled` because the next checkpoint
+  overtook them, and while two lanes push in turn SOME run is always unconcluded — so the block
+  is not repeated but CONTINUOUS, and it grows with the agent pool rather than with the point.
   FINAL STATE, and it has two halves because the two lanes fail for different reasons:
   (1) THE TIMER LANE. `author-sol.mjs`'s interim pushes are what CLAUDE.md §6 already calls a
   RESCUE commit — work committed because the run may die, no claim of completeness — so they are
