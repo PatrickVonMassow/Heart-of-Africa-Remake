@@ -3,6 +3,7 @@
 // an absent record (verified zero is possible) from a present unreadable one
 // (unknown, so Stop allows but publication refuses).
 import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { IN_FLIGHT_PATH } from './batch-singleton.mjs'
 import { FOCUS_PATH } from './dashboard-state.mjs'
 import { normalizeActiveWork } from './batch-in-flight-core.mjs'
@@ -28,12 +29,27 @@ const readJsonStrict = (path, { exists = existsSync, read = readFileSync } = {})
   }
 }
 
+/** Resolve the branch a legacy worktree evidence item already names. */
+const worktreeRefFromGit = (path) => {
+  try {
+    return execFileSync('git', ['-C', String(path), 'symbolic-ref', '--quiet', 'HEAD'], {
+      windowsHide: true,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim() || null
+  } catch {
+    return null
+  }
+}
+
 export function gatherActiveWorkSource({
   tasksText,
   declarationPath = IN_FLIGHT_PATH,
   focusPath = FOCUS_PATH,
   exists = existsSync,
   read = readFileSync,
+  worktreeRef = worktreeRefFromGit,
 } = {}) {
   try {
     if (typeof tasksText !== 'string') {
@@ -50,6 +66,7 @@ export function gatherActiveWorkSource({
       declaration: declaration.value,
       focusPoint: Number.isInteger(focus.value?.point) ? focus.value.point : null,
       openPoints: openPointNumbers(tasksText),
+      worktreeRef,
       checkpointContradicted: declaration.value?.transfer?.checkpoints?.some((checkpoint) => checkpoint?.contradicted === true),
     })
   } catch (error) {

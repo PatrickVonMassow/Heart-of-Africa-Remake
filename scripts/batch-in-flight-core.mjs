@@ -1226,10 +1226,11 @@ export const TERMINAL_WORK_PHASES = Object.freeze([
 
 /**
  * Normalize the ONE structured active-work source into the ordered point set
- * projected by the board. Evidence must carry its point explicitly; inferring
- * from every open `feat/*` branch would recreate the stale-branch ambiguity
- * this record exists to remove. The owner focus is part of the same source
- * snapshot and leads the order, so a render can put the focused strand first.
+ * projected by the board. New evidence carries its point explicitly; legacy
+ * branch/worktree evidence derives the point from the declared strand itself.
+ * No undeclared `feat/*` branch is consulted, so stale branches cannot become
+ * active work. The owner focus is part of the same source snapshot and leads
+ * the order, so a render can put the focused strand first.
  *
  * Returns `{ ok, points, focusPoint, errors }` and never throws. An unreadable,
  * malformed, untagged, closed or checkpoint-contradictory source is UNKNOWN,
@@ -1241,6 +1242,7 @@ export function normalizeActiveWork({
   declaration = null,
   focusPoint = null,
   openPoints = [],
+  worktreeRef = () => null,
   checkpointContradicted = false,
 } = {}) {
   try {
@@ -1286,7 +1288,16 @@ export function normalizeActiveWork({
             errors.push(`evidence item ${index + 1} has unknown phase "${phase || '<blank>'}"`)
             return
           }
-          add(item.point, `evidence item ${index + 1}`)
+          if (Object.hasOwn(item, 'point')) {
+            add(item.point, `evidence item ${index + 1}`)
+            return
+          }
+          const legacyRef = item.kind === 'branch'
+            ? item.ref
+            : item.kind === 'worktree'
+              ? worktreeRef(item.path)
+              : null
+          add(pointOfBranch(legacyRef), `evidence item ${index + 1}`)
         })
       }
     }

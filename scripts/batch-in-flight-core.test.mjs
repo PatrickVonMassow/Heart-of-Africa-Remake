@@ -177,6 +177,21 @@ describe('normalizeActiveWork — the board\'s structured point source', () => {
     ] })).toMatchObject({ ok: true, points: [] })
   })
 
+  it('derives legacy branch and worktree strands without consulting undeclared branches', () => {
+    const result = normalizeActiveWork({
+      focusPoint: 713,
+      openPoints: new Set([713]),
+      declaration: {
+        evidence: [
+          { kind: 'branch', ref: 'refs/heads/feat/713-now-section-derived' },
+          { kind: 'worktree', path: '/workspace/hoa/.claude/worktrees/point-713' },
+        ],
+      },
+      worktreeRef: (path) => path.endsWith('/point-713') ? 'refs/heads/feat/713-now-section-derived' : null,
+    })
+    expect(result).toMatchObject({ ok: true, points: [713], focusPoint: 713, errors: [] })
+  })
+
   it('stamps branch/worktree evidence from its own strand and pid/log evidence from the declared focus', () => {
     expect(tagEvidencePoint({ kind: 'branch', ref: 'feat/697-a' }, { currentPoint: 700 })).toMatchObject({
       point: 697,
@@ -192,7 +207,7 @@ describe('normalizeActiveWork — the board\'s structured point source', () => {
 
   it.each([
     ['unreadable source', { readable: false }],
-    ['untagged legacy evidence', { declaration: { evidence: [{ kind: 'branch', ref: 'feat/697-x' }] } }],
+    ['untagged evidence with no derivable point', { declaration: { evidence: [{ kind: 'branch', ref: 'main' }] } }],
     ['malformed point', { declaration: { evidence: [{ point: 'x' }] } }],
     ['closed point', { declaration: { evidence: [{ point: 699 }] } }],
     ['unknown phase', { declaration: { evidence: [{ point: 697, phase: 'maybe' }] } }],
