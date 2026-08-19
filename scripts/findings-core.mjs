@@ -53,7 +53,7 @@ const READ_TOOLS = new Set(['Read', 'Grep', 'Glob', 'NotebookRead', 'WebFetch', 
 /** Tools that run a shell — investigation only when the command merely LOOKS. */
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 /** Tools that write files — a record only for the paths below. */
-const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
+const WRITE_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
 /**
  * Split a shell command into its segments.

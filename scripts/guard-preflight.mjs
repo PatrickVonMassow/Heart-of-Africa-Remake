@@ -50,6 +50,8 @@ import { gatherTasksSpecInputs } from './tasks-spec-guard.mjs'
 import { gatherTasksArchiveInputs } from './tasks-archive-guard.mjs'
 import { gatherQueueOrderInputs } from './queue-order-guard.mjs'
 import { gatherDocBudgetInputs } from './doc-budget-guard.mjs'
+import { gatherBundleFirstInputs } from './bundle-first-guard.mjs'
+import { evaluate as evaluateBundleFirst } from './bundle-first-core.mjs'
 import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
@@ -231,6 +233,14 @@ export const GUARDS = [
     decide: ({ docs }) => {
       const verdict = evaluateDocBudgets(docs)
       return { block: verdict.block, reason: formatDocBudgetVerdict(verdict) }
+    },
+  },
+  {
+    id: 'bundle-first-guard',
+    gather: gatherBundleFirstInputs,
+    decide: (inputs) => {
+      const verdict = evaluateBundleFirst(inputs)
+      return { block: verdict.block, reason: verdict.reason }
     },
   },
   {

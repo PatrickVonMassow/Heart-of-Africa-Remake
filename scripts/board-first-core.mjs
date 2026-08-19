@@ -72,8 +72,11 @@ export function isWorktreeCheckout(path) {
   return /[/\\]\.claude[/\\]worktrees[/\\]/.test(String(path ?? ''))
 }
 
-/** Tools that change state by their nature — no command inspection needed. */
-export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
+/** Tools that change state by their nature — no command inspection needed.
+ *  `MultiEdit` is named although this harness does not offer it, for the same
+ *  reason as in path-scope-guard and the context fence: a write tool a set
+ *  forgets is a hole that opens silently the day the harness gains it. */
+export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Agent'])
 
 /** Tools whose payload is a shell command; mutation depends on the command. */
 export const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
@@ -131,7 +134,8 @@ export function classifyCall({ toolName, command, filePath, boardPaths = [] } = 
   const tool = String(toolName ?? '')
   if (MUTATING_TOOLS.has(tool)) {
     // An edit of the board itself is how the gate gets satisfied.
-    if ((tool === 'Edit' || tool === 'Write') && isBoardFile(filePath, boardPaths)) return { kind: 'escape', segment: '' }
+    if ((tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit') && isBoardFile(filePath, boardPaths))
+      return { kind: 'escape', segment: '' }
     return { kind: 'mutating', segment: '' }
   }
   if (!SHELL_TOOLS.has(tool)) return { kind: 'read-only', segment: '' }

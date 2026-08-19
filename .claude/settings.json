@@ -150,7 +150,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",

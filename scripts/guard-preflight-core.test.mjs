@@ -571,6 +571,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
       [
         'batch-progress-guard',
         'branch-hygiene-guard',
+        'bundle-first-guard',
         'commission-guard',
         'ci-status-guard',
         'container-ask-guard',
