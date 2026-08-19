@@ -76,6 +76,162 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 757. Cut the per-turn document floor: CLAUDE.md, MEMORY.md and the global CLAUDE.md
+  (user 20.08.2026, queue FIRST). MEASURED 20.08.2026 from a session's own transcript: the
+  FIRST response of a freshly cleared session already stood at 61,372 tokens, before a single
+  tool call. Of that, ~19k are our own documents — CLAUDE.md 46,796 B (~12k tokens), MEMORY.md
+  16,801 B (~4.3k), the global CLAUDE.md 5,093 B (~1.3k), the SessionStart hook ~1.4k — while
+  the remaining ~42k are the harness system prompt and the tool schemas, which we do not
+  control. That floor is what strands the batch: four sessions in a row stood at 85,225 /
+  83,079 / 86,416 tokens before their first own work, against a trigger of 82,000, and had to
+  hand over without beginning a point. Raising the trigger to 110,000 treats one end of that
+  arithmetic; this point treats the other, and only this one gives the working window back
+  rather than moving it. It is also the cheapest recurring saving in the project: the floor is
+  paid by EVERY turn of EVERY session AND by every delegated subagent, which inherits the same
+  documents. Realistic yield 4-6k of the ~19k, so a floor near 55-57k. That does not change the
+  order of magnitude — the ~42k harness share dominates — and the point must not claim
+  otherwise.
+  FINAL STATE:
+  - THE ANALYSIS RUNS BLIND PARALLEL, THE MERGE GOES TO THE THIRD MODEL (user 20.08.2026).
+    Opus 5 and GPT-5.6 Sol each produce a COMPLETE cut list from the same inputs, neither
+    seeing the other's until both are done; FABLE 5, which wrote neither, merges them, COUNTED
+    through `scripts/blind-merge.mjs` — every entry carries an id and the union accounts for
+    each as `only A`, `only B` or `merged with <id>` — and `mechanism-review.mjs --merged-by`
+    records the merger. This deliberately spends the scarcest pool: with three models available
+    the merge rule demands one that authored neither list, and Fable is the only legal merger.
+    Naming that here is the justification the Fable lane requires.
+  - THE EXECUTION IS PART OF THIS POINT, not a successor (the lesson of point 614). The point
+    is not done when the verdict exists; it is done when the documents HOLD the cut and the
+    measured floor has fallen.
+  - THREE CUTTING AXES, each stated as the criterion the cut is judged by:
+    a. A RULE WITH A GUARD GETS A POINTER, NOT A PARAGRAPH. 39 guards are wired in
+       `.claude/settings.json` (28 Stop, 11 PreToolUse; measured 20.08.2026), and nearly
+       everything §6 and §7.2 explain in prose is enforced by one of them — the board (5
+       guards), the TASKS split, spec form, queue order, bundles, model policy, picture
+       verification, mechanism review, CI, the doc ceilings, the context fence, findings, the
+       closing, timestamps, branch hygiene. The guard is the authority; the prose is a second
+       copy paid for every turn. STAGGERED BY FIRING TIME, never flat: a PreToolUse guard
+       refuses BEFORE the action, so its rule is safe as a pointer; a Stop-chain rule fires at
+       the turn END, and a session can violate it for a whole turn first — that costs the turn,
+       so those keep the text that prevents the violation, and each such decision names the
+       guard that covers it.
+    b. ROLE-SPECIFIC CONTENT LEAVES THE ALWAYS-LOADED FILE. The batch-operation machinery —
+       boundary, lease, claim, launcher, chat-watcher, in-flight adoption — binds ONLY the
+       batch owner, yet is inherited in full by every delegated subagent that never touches it.
+       It moves into a document the SessionStart hook serves to the OWNER, the way
+       `point-brief.mjs` already serves TASKS.md and design.md instead of shipping them whole.
+    c. THE WHY-HISTORY MOVES, THE RULE STAYS — the grip point 555 used on §7.1. Measurements,
+       dates and incident narratives ("42 of 60 first-parent commits", "31 of 36 remote
+       branches", "87-94 % of the spend") are needed when a rule is DISPUTED, not on every
+       turn; they go to a read-on-demand document and the binding sentence stays.
+  - NOTHING LEAVES WITHOUT AN ACCOUNT. Every rule cut from CLAUDE.md is accounted for the way
+    blind-merge accounts for findings: MOVED to a named destination, COVERED by a named guard,
+    or DROPPED on the user's explicit ruling. The account is written down and is what the
+    cross-vendor review reads — a rule that vanishes silently is a rule nobody enforces.
+  - MEMORY.md RETURNS TO ITS OWN RULE, "one line per entry: the hook only". Measured
+    20.08.2026: 88 entries in 16,801 B, ~191 B per entry, longest 854 B. Entries marked DEAD /
+    ENDED / CORRECTED / DEAD IN PRACTICE are deleted, and entries that only restate a rule
+    CLAUDE.md already binds are dropped rather than paid for twice on every turn.
+  - THE GLOBAL CLAUDE.md IS CUT LIKE THE REST (user 20.08.2026: »Ich habe keine anderen
+    Projekte. Mache alles so, wie es für dieses am besten passt«). The cross-project caveat is
+    void — this repository is its only reader — so it is optimised for THIS project without a
+    second ruling. Its content is triaged once: what the project's own CLAUDE.md already says
+    more precisely (test layers, commit hygiene, model diversity, the progress board) is
+    DELETED rather than paid for twice on every turn; what is genuinely user-level and not in
+    the project file MOVES INTO the project file at its right section; what neither binds nor
+    informs goes. The account above covers these rules too. SAME FOR MEMORY.md, which lives at
+    the same user level: it is optimised for this project alone, since no other reader exists.
+  - THE CEILINGS FALL WITH THE CUT. `scripts/doc-budget-core.mjs` lowers `maxLines`/`maxWords`
+    for every cut file to what the cut achieved, with the reason written there. Left at the old
+    figures the cut simply refills — that file's own history records exactly this happening
+    after point 555.
+  VERIFIABLE: the floor is MEASURED, not counted in lines. The FIRST response of a freshly
+  cleared session is read from its transcript before and after the cut (`input_tokens +
+  cache_read + cache_creation`), and both figures are recorded beside the target.
+  `doc-budget-guard` is green at the lowered ceilings, and a Vitest case fails when a rule
+  named in the account has no destination.
+  CONSTRAINTS: no new runtime dependency — this is documents, budgets and one hook path; the
+  cut must not touch design.md's content authority (§1: design.md is the sole source of the
+  target state); the model policy of §6 governs the authoring lane, and the roles named above
+  (Opus 5 and Sol blind, Fable merging) are the user's explicit instruction of 20.08.2026,
+  which overrides the ordinary Fable-is-the-escalation rule for the MERGE role only.
+  Criticality: high — binding documents are being cut, which is why the analysis is
+  blind-parallel, the merge goes to a third model and the review is cross-vendor.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 614. Re-run the four-eyes work-order cleanup FROM SCRATCH, and execute it in the same
+  point (user 19.08.2026: »Dann schmeiße die Ergebnisse von 614 weg und fange nochmal komplett
+  neu mit der Analyse mit Vier Augen an. Setze die dieses Mal auch direkt vollständig um.«).
+  WHY FROM SCRATCH RATHER THAN EXECUTING WHAT WAS FOUND: the 10.08.2026 verdict was never
+  executed, and a stocktaking spoils while the stock moves. MEASURED 19.08.2026: of its 42
+  named points 35 are still open, but two of its seven merges are dead (569+606 → 573 and
+  608 → 590 all landed), one contradiction may have been decided one-sidedly when 612 landed,
+  and 77 of today's 208 open points — 37 % — were appended after it and were never analysed.
+  The cost driver is READING the work order (690 KB), which a delta run over the 77 new points
+  pays almost in full, so a fresh run costs little more and leaves no item needing a
+  "does this still hold?" pass. The old verdict is NOT deleted from history — it stands in
+  this file's git history — but it is NOT an input: a model handed a finished list checks that
+  list instead of seeing afresh (CLAUDE.md §6, the anchoring reason blind-parallel exists).
+  FINAL STATE:
+  - THE ANALYSIS IS RUN BLIND PARALLEL over the CURRENT open set, by two models that do not
+    see each other's result and do not see the 10.08. verdict. Same input, each a complete
+    result of its own: duplicates to merge, specs no longer valid as written, contradictions
+    between points, and points whose work is already delivered.
+  - THE MERGE GOES TO A THIRD MODEL that wrote neither list and is COUNTED through
+    `scripts/blind-merge.mjs`: every entry carries an id and the union accounts for each as
+    `only A`, `only B` or `merged with <id>`. `mechanism-review.mjs --merged-by` records who
+    merged and refuses either author.
+  - THE OLD VERDICT IS RECONCILED AFTERWARDS, NEVER BEFORE. Once the new union stands, the
+    10.08. verdict is compared against it and every item the new run did NOT find is listed
+    with a verdict: still true (then it is a MISS of the new run and is carried), or overtaken.
+    The miss count is reported — it measures the analysis itself.
+  - THE EXECUTION IS PART OF THIS POINT, not a successor. The point is not done when the
+    verdict exists; it is done when `TASKS.md` and `docs/work-packages.md` HOLD it: every merge
+    performed with the survivor carrying the merged point's unique clauses, every invalid spec
+    re-cut to what remains, every contradiction resolved by one owner, every delivered point
+    ticked and archived. Nothing is deleted without its content landing somewhere.
+  - `docs/work-packages.md` IS RECONCILED IN THE SAME PASS. Measured 19.08.2026:
+    `bundle-first-guard --status` reports 108 open points in no bundle, against the 52 the
+    10.08. reading found and the 29 the document's own text claims, and its newest bundle rows
+    stop around 726. Back-fill the missing points AND either restore the "every open point
+    appears exactly once" rule or withdraw it in CLAUDE.md, so the paragraph and the table
+    agree.
+  - THE RUN NAMES ITS OWN WINDOW so the next reader knows what it covered: the open-point count
+    and the HEAD it was cut from, recorded with the verdict.
+  VERIFIABLE: the counted union exists with a named merger who authored neither list; the
+  reconciliation against the 10.08. verdict is recorded with its miss count; after the pass
+  every merged point is gone from `TASKS.md` with its unique clauses present in the survivor;
+  `tasks-archive-guard`, `queue-order-guard` and `bundle-first-guard --status` are clean; and
+  the open count drops by the number of merges and ticks made.
+  A FOLD ALSO NEEDS A WAY ONTO THE BOARD (measured 13.08.2026): a point filed and folded within
+  the hour can be ticked and archived, but NO board command can give it the Erledigt card the
+  dashboard audit then demands — `done` needs a now-card, `promote` needs a queue card, and the
+  queue is derived from the OPEN work order the point has just left. The only way out was
+  `--waive-audit`, which bypasses the audit rather than satisfying it. This point is where the
+  folds happen, so it carries the fold's own board path: one command that ticks, archives and
+  writes the Erledigt card naming the point the content went to.
+  A CAP PER POINT FALLS OUT OF THIS CUT. Measured 20.08.2026: TASKS.md holds 223 open points
+  in 745,837 B, ~3,340 B per point on average, while the largest stand far above it — 184 with
+  22,754 B, 203 with 15,811, 692 with 15,379, 687 with 13,165, 200 with 12,420. `point-brief.mjs`
+  pays that spec IN FULL at EVERY delegation; 22,754 B are ~5,800 tokens for a single point.
+  `scripts/doc-budget-core.mjs` so far budgets TASKS.md deliberately in the PREAMBLE only,
+  because a line limit on the whole file would punish appending — a cap per POINT does not have
+  that side effect and hits exactly the swollen umbrella points. The cap is MEASURED FROM THE
+  RESULT of this cut and not set beforehand, the same mechanism with which doc-budget-core
+  lowered the CLAUDE.md ceiling to the size reached after point 555; a point that genuinely
+  needs more raises it with a written reason, a longer retelling of the same does not. NOT TO
+  BE CHANGED: the archive `docs/tasks-archive.md` stays unbudgeted — reference, read only on
+  demand, costing nothing per turn. VERIFIABLE: `doc-budget-guard` green at the measured cap,
+  plus a Vitest case that goes red on a point above it.
+  QUEUE RANK 2, directly behind point 757 (user 20.08.2026): 223 open points with duplicates
+  make every brief generation and every queue reading more expensive, and 614 is the only point
+  that cuts that set.
+  Criticality: high — it rewrites the work order itself, several points at once, and a merge
+  that drops a clause loses work no test would miss. The blind-parallel find, the third-model
+  merge and the counted union are the assurance; the execution is checked point by point
+  against the union before anything is deleted.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 744. Leaving is the most expensive step of a session, and nobody has measured it
   (19.08.2026). Every token spent on the handover is a token subtracted from the working
   window: the trigger of point 743 is literally the ceiling minus the cost of leaving, so this
@@ -603,62 +759,6 @@ put it is the mistake this line exists to stop.
   proposal for lack of exactly this evidence, so it belongs in that series).
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 614. Re-run the four-eyes work-order cleanup FROM SCRATCH, and execute it in the same
-  point (user 19.08.2026: »Dann schmeiße die Ergebnisse von 614 weg und fange nochmal komplett
-  neu mit der Analyse mit Vier Augen an. Setze die dieses Mal auch direkt vollständig um.«).
-  WHY FROM SCRATCH RATHER THAN EXECUTING WHAT WAS FOUND: the 10.08.2026 verdict was never
-  executed, and a stocktaking spoils while the stock moves. MEASURED 19.08.2026: of its 42
-  named points 35 are still open, but two of its seven merges are dead (569+606 → 573 and
-  608 → 590 all landed), one contradiction may have been decided one-sidedly when 612 landed,
-  and 77 of today's 208 open points — 37 % — were appended after it and were never analysed.
-  The cost driver is READING the work order (690 KB), which a delta run over the 77 new points
-  pays almost in full, so a fresh run costs little more and leaves no item needing a
-  "does this still hold?" pass. The old verdict is NOT deleted from history — it stands in
-  this file's git history — but it is NOT an input: a model handed a finished list checks that
-  list instead of seeing afresh (CLAUDE.md §6, the anchoring reason blind-parallel exists).
-  FINAL STATE:
-  - THE ANALYSIS IS RUN BLIND PARALLEL over the CURRENT open set, by two models that do not
-    see each other's result and do not see the 10.08. verdict. Same input, each a complete
-    result of its own: duplicates to merge, specs no longer valid as written, contradictions
-    between points, and points whose work is already delivered.
-  - THE MERGE GOES TO A THIRD MODEL that wrote neither list and is COUNTED through
-    `scripts/blind-merge.mjs`: every entry carries an id and the union accounts for each as
-    `only A`, `only B` or `merged with <id>`. `mechanism-review.mjs --merged-by` records who
-    merged and refuses either author.
-  - THE OLD VERDICT IS RECONCILED AFTERWARDS, NEVER BEFORE. Once the new union stands, the
-    10.08. verdict is compared against it and every item the new run did NOT find is listed
-    with a verdict: still true (then it is a MISS of the new run and is carried), or overtaken.
-    The miss count is reported — it measures the analysis itself.
-  - THE EXECUTION IS PART OF THIS POINT, not a successor. The point is not done when the
-    verdict exists; it is done when `TASKS.md` and `docs/work-packages.md` HOLD it: every merge
-    performed with the survivor carrying the merged point's unique clauses, every invalid spec
-    re-cut to what remains, every contradiction resolved by one owner, every delivered point
-    ticked and archived. Nothing is deleted without its content landing somewhere.
-  - `docs/work-packages.md` IS RECONCILED IN THE SAME PASS. Measured 19.08.2026:
-    `bundle-first-guard --status` reports 108 open points in no bundle, against the 52 the
-    10.08. reading found and the 29 the document's own text claims, and its newest bundle rows
-    stop around 726. Back-fill the missing points AND either restore the "every open point
-    appears exactly once" rule or withdraw it in CLAUDE.md, so the paragraph and the table
-    agree.
-  - THE RUN NAMES ITS OWN WINDOW so the next reader knows what it covered: the open-point count
-    and the HEAD it was cut from, recorded with the verdict.
-  VERIFIABLE: the counted union exists with a named merger who authored neither list; the
-  reconciliation against the 10.08. verdict is recorded with its miss count; after the pass
-  every merged point is gone from `TASKS.md` with its unique clauses present in the survivor;
-  `tasks-archive-guard`, `queue-order-guard` and `bundle-first-guard --status` are clean; and
-  the open count drops by the number of merges and ticks made.
-  A FOLD ALSO NEEDS A WAY ONTO THE BOARD (measured 13.08.2026): a point filed and folded within
-  the hour can be ticked and archived, but NO board command can give it the Erledigt card the
-  dashboard audit then demands — `done` needs a now-card, `promote` needs a queue card, and the
-  queue is derived from the OPEN work order the point has just left. The only way out was
-  `--waive-audit`, which bypasses the audit rather than satisfying it. This point is where the
-  folds happen, so it carries the fold's own board path: one command that ticks, archives and
-  writes the Erledigt card naming the point the content went to.
-  Criticality: high — it rewrites the work order itself, several points at once, and a merge
-  that drops a clause loses work no test would miss. The blind-parallel find, the third-model
-  merge and the counted union are the assurance; the execution is checked point by point
-  against the union before anything is deleted.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 736. The escalation lane has no way back DOWN, so one point sits on the scarcest model
   for good (measured 19.08.2026 from the harness transcripts under
   `/home/node/.claude/projects/-workspace-hoa`, window since 18.08. 19:00). Fable ran 1137 turns
