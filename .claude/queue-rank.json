@@ -147,10 +147,14 @@
     "731": {
       "at": "2026-08-19T10:19:49.258Z",
       "why": "Low-criticality one-line inconsistency; it costs a hand-rewrite per boundary and nothing is lost, so it waits behind the queue's settled order."
+    },
+    "733": {
+      "at": "2026-08-19T11:53:10.666Z",
+      "why": "Direkt hinter 732, das den Befund erst sichtbar gemacht hat: Solange startup rot ist, ist die Suite rot, an der jeder andere Lauf gemessen wird."
     }
   },
   "settled": {
-    "at": "2026-08-19T10:19:49.258Z",
+    "at": "2026-08-19T11:53:10.666Z",
     "points": [
       174,
       184,
@@ -355,7 +359,9 @@
       728,
       729,
       730,
-      731
+      731,
+      732,
+      733
     ]
   }
 }
