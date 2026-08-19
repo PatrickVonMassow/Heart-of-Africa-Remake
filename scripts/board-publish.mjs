@@ -41,7 +41,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
-import { normaliseLineEndings, refreshFooter, upgradeNowCards } from './board-core.mjs'
+import { normaliseLineEndings, projectNowForPublish, refreshFooter, upgradeNowCards } from './board-core.mjs'
+import { gatherActiveWorkSource, openPointNumbers } from './active-work-source.mjs'
+import { withBoardEditLock } from './board-edit-lock.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { applyFooterNote } from './sol-share-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
@@ -91,6 +93,7 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
 }
 
 const args = process.argv.slice(2)
+const lockedByCaller = args.length === 1 && args[0] === '--locked'
 const git = (a, opts = {}) =>
   execFileSync('git', a, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
 
@@ -151,11 +154,30 @@ if (args.includes('--check')) {
   // unref'd, so the process ends by itself once the loop drains.
   process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' ? 1 : 0
 } else {
-  if (args.length > 0) {
+  if (args.length > 0 && !lockedByCaller) {
     console.error('usage: node scripts/board-publish.mjs [--check | --url]')
     process.exit(1)
   }
-  publish()
+  if (lockedByCaller) publish()
+  else {
+    try {
+      // The lock-owning parent stays alive while the publishing child runs.
+      // `publish()` has deliberate `process.exit(1)` failure paths; running it
+      // in the owner process would skip the lock's finally/release and leave a
+      // live-pid lock wedged for the rest of this process.
+      withBoardEditLock(() => execFileSync(process.execPath, [process.argv[1], '--locked'], {
+        windowsHide: true,
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+      }))
+    } catch (error) {
+      if (Number.isInteger(error?.status)) process.exitCode = error.status || 1
+      else {
+        console.error(`board-publish FAILED — serialized publish could not run: ${error?.message ?? error}`)
+        process.exitCode = 1
+      }
+    }
+  }
 }
 
 // ---- publish --------------------------------------------------------------
@@ -179,7 +201,10 @@ const fail = (reason) => {
 // the audit, so the two cannot disagree.
 try {
   const html = readFileSync(boardFile, 'utf8')
-  const { open } = parseTasks(readFileSync(tasksPath, 'utf8'))
+  const tasksText = readFileSync(tasksPath, 'utf8')
+  const { open } = parseTasks(tasksText)
+  const activeWork = gatherActiveWorkSource({ tasksText })
+  const projected = projectNowForPublish(html, activeWork, { knownPoints: openPointNumbers(tasksText) }).html
   // LF-NORMALISED HERE TOO (point 439). This is the last write before the bytes
   // go out, so whatever wrote the file before — a hand edit in Windows text mode
   // included — the published board and the local one agree on their newlines,
@@ -196,7 +221,7 @@ try {
   // too means a board that was last written by an older version can still be
   // published — a strict gate must never be reachable without a way out.
   const refreshed = normaliseLineEndings(
-    upgradeNowCards(applyFooterNote(refreshFooter(html, { openCount: open.length }), share)),
+    upgradeNowCards(applyFooterNote(refreshFooter(projected, { openCount: open.length }), share)),
   )
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the

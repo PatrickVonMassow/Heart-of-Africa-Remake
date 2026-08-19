@@ -598,6 +598,32 @@ export function reconcileNowProjection(
   return stripProjectedQueueCards(projected, expected)
 }
 
+/** Fail-closed publish preflight: source, render and exact check are one pure step. */
+export function projectNowForPublish(html, activeWork, { knownPoints = null, stamp = berlinStamp() } = {}) {
+  if (!activeWork || activeWork.ok !== true || !Array.isArray(activeWork.points)) {
+    const why = activeWork?.errors?.join('; ') || 'the active-work source is unreadable'
+    throw new Error(`active-work source unresolved: ${why}`)
+  }
+  const projected = reconcileNowProjection(html, activeWork.points, {
+    focusPoint: activeWork.focusPoint,
+    stamp,
+  })
+  const comparison = compareNowProjection(projected, activeWork.points, { knownPoints })
+  if (!comparison.ok) {
+    const facts = [
+      comparison.missing?.length ? `missing ${comparison.missing.join(', ')}` : '',
+      comparison.extra?.length ? `extra ${comparison.extra.join(', ')}` : '',
+      comparison.duplicates?.length ? `duplicate ${comparison.duplicates.join(', ')}` : '',
+      comparison.unknown?.length ? `unknown ${comparison.unknown.join(', ')}` : '',
+      comparison.crossSection?.length
+        ? `cross-section ${comparison.crossSection.map((item) => item.point).join(', ')}`
+        : '',
+    ].filter(Boolean)
+    throw new Error(`now-section exact-set preflight failed: ${facts.join('; ') || comparison.error || 'state mismatch'}`)
+  }
+  return { html: projected, comparison }
+}
+
 /** "~2,5 h · Feature" → 2.5; anything without an hour figure → null. */
 export function estimateHours(meta) {
   const m = String(meta ?? '').match(/~\s*(\d+(?:[.,]\d+)?)\s*h/)

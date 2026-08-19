@@ -67,6 +67,7 @@ import {
   reconcileNowProjection,
   NOW_EMPTY_STATE_MARKUP,
   NOW_EMPTY_STATE_TEXT,
+  projectNowForPublish,
 } from './board-core.mjs'
 
 const board = (point = 361) =>
@@ -248,6 +249,13 @@ describe('derived now-section membership', () => {
       ok: false,
       crossSection: [{ point: 700, sections: ['Erledigt'] }],
     })
+  })
+
+  it('fails publish closed on an unreadable source without mutating the input', () => {
+    const before = fullBoard({ now: nowEntry(700, 'A', '20:07') })
+    expect(() => projectNowForPublish(before, { ok: false, points: [], errors: ['broken JSON'] }))
+      .toThrow(/source unresolved.*broken JSON/)
+    expect(before).toContain('700 — A')
   })
 })
 

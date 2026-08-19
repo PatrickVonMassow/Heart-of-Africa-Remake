@@ -43,6 +43,7 @@ import { createHash } from 'node:crypto'
 import {
   parseTasks,
   parseNowCardPoint,
+  parseNowCardPoints,
   auditDashboard,
   etaRevisionPatch,
   parseCards,
@@ -308,14 +309,17 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   // now-card matches the declared focus it doubles as the focus confirmation.
   try {
     const focus = readJson(FOCUS_PATH)
-    const nowPoint = parseNowCardPoint(readFileSync(p, 'utf8'))
-    if (focus && (focus.point == null || focus.point === nowPoint)) {
+    const reviewedHtml = readFileSync(p, 'utf8')
+    const nowPoints = parseNowCardPoints(reviewedHtml)
+    const nowPoint = parseNowCardPoint(reviewedHtml)
+    if (focus && (focus.point == null || nowPoints.has(focus.point))) {
       writeJsonAtomic(FOCUS_PATH, { ...focus, confirmedAt: Date.now() })
       removeFile(PENDING_PATH)
       console.log(`focus confirmed by the review (point ${focus.point ?? '-'}: ${focus.note ?? ''})`)
     } else if (focus) {
       console.log(
-        `WARNING: now-card point ${nowPoint ?? '<none>'} != declared focus ${focus.point} — ` +
+        `WARNING: now-card point(s) ${nowPoints.size ? [...nowPoints].join(', ') : nowPoint ?? '<none>'} ` +
+          `do not include declared focus ${focus.point} — ` +
           'fix the stale side (card edit + republish, or node scripts/focus.mjs set).',
       )
     } else {

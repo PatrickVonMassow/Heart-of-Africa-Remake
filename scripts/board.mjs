@@ -151,7 +151,7 @@ function applyEdit(fn, done) {
     done,
     write: (html) => writeTextAtomic(BOARD, html),
     rotate: () => run(['scripts/board-archive-rotate.mjs']),
-    publish: () => run([PUBLISH_SCRIPT]),
+    publish: () => run([PUBLISH_SCRIPT, '--locked']),
     stdout: (line) => console.log(line),
     stderr: (line) => console.error(line),
   })
@@ -326,7 +326,10 @@ try {
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
     if (!point) throw new Error('usage: board.mjs focus <point> "<note>"|--text-stdin')
-    console.log(run(['scripts/focus.mjs', 'set', point, textOf(words)]).trim())
+    withBoardEditLock(() => {
+      console.log(run(['scripts/focus.mjs', 'set', point, textOf(words)]).trim())
+      console.log(run([PUBLISH_SCRIPT, '--locked']).trim().split('\n')[0])
+    })
   } else if (cmd === 'attest') {
     // Rotation first: a tick that pushed the Erledigt section past its cap would
     // otherwise fail the audit two steps later, after the publish.
