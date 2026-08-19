@@ -398,6 +398,22 @@ How it works:
    margin (`CONTEXT_MARGIN_TOKENS`, context-watermark-core.mjs) prints the
    distance and demands it in the closing report — so how far past the mark a
    session really left stays a number somebody reads, not a claim.
+   THAT DISTANCE IS ALSO KEPT (point 742): the same condition appends an INCIDENT
+   RECORD to `.claude/context-incidents.jsonl` — the measurement, the session, the
+   point in flight, the head, the session's per-turn context GROWTH and that growth
+   per KIND of call with its input size, so the largest single step is visible
+   wherever it BEGAN (a call that starts below the mark and whose response crosses
+   it appears in no "calls past the mark" list). The startup cost rides along
+   MEASURED, from the first complete api usage event, never estimated from the
+   preamble. `node scripts/context-incidents.mjs [--since <date>|--since-commit
+   <sha>]` reads the series back — count, size distribution, per-incident context,
+   growth per kind at an upper quantile — and the two measured startup overshoots of
+   19./20.08.2026 sit in the tracked seed beside it. NOTHING is filed or ranked from
+   it: the record is evidence for the deferred question of whether arming the fence
+   ended the overshoots. It can never fail the boundary — a write error degrades to a
+   printed warning, because the handover matters more than the bookkeeping. RESIDUAL,
+   with its direction: a session that dies without taking a boundary writes no
+   record, so the series UNDER-counts and never over-counts.
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
    `TASKS.md` + `docs/tasks-archive.md` (or the marker records a real watermark
