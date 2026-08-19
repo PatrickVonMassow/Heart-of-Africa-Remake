@@ -128,10 +128,6 @@
       "at": "2026-08-18T13:41:45.936Z",
       "why": "Batch autonomy defect with a known workaround (the successor adopts the strand); it waits behind the token and communication blocks the user ordered first."
     },
-    "717": {
-      "at": "2026-08-18T13:41:45.977Z",
-      "why": "The review-material tail was deliberately deferred at 714's cut-off; nothing depends on it until the review tooling is worked again."
-    },
     "718": {
       "at": "2026-08-18T13:41:46.018Z",
       "why": "The lane ruling it records is already in force since 714 landed; what remains is the tag plus its unit case, which nothing blocks."
@@ -146,7 +142,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-19T01:04:46.783Z",
+    "at": "2026-08-19T01:36:42.709Z",
     "points": [
       174,
       184,
@@ -346,7 +342,6 @@
       713,
       715,
       716,
-      717,
       718,
       719,
       720,
