@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   AUTHORING_FRAMINGS,
+  AUTHORING_COMMISSION_KIND,
   authorRoundHistory,
   authorLaneFor,
   FABLE_ESCALATION_ROUNDS,
@@ -241,6 +242,12 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
     evidence: 'the reviewer found a concrete remaining defect',
     ...extra,
   })
+  const commissioned = (round, authorFraming = '') => ({
+    point: 727,
+    kind: AUTHORING_COMMISSION_KIND,
+    round,
+    authorFraming,
+  })
 
   it('commissions a point with no record as round zero, and round one without a framing', () => {
     const initial = nextAuthoringStep({ records: [], point: 727 })
@@ -282,6 +289,33 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
       '',
       'the author framing repeats the preceding fresh round',
     ])
+  })
+
+  it('counts every pre-mechanism review as a fresh attempt', () => {
+    const records = Array.from({ length: 11 }, () => failed())
+    const history = authorRoundHistory(records, 727)
+    expect(history.unsuccessfulRounds).toBe(11)
+    expect(history.freshRounds).toBe(11)
+    expect(history.rounds.every((round) => !round.repeat)).toBe(true)
+  })
+
+  it('uses the durable commission when the later review omits its confirmation flag', () => {
+    const history = authorRoundHistory(
+      [failed(), failed(), commissioned(2, AUTHORING_FRAMINGS[0]), failed()],
+      727,
+    )
+    expect(history.freshRounds).toBe(3)
+    expect(history.rounds.at(-1)).toMatchObject({
+      commissioned: true,
+      framing: AUTHORING_FRAMINGS[0],
+      repeat: '',
+    })
+  })
+
+  it('still reports a governed later round whose commission carried no framing', () => {
+    const history = authorRoundHistory([failed(), failed(), commissioned(2), failed()], 727)
+    expect(history.freshRounds).toBe(2)
+    expect(history.rounds.at(-1).repeat).toBe('no author framing was recorded')
   })
 
   it('counts only the known hostile-tester framings as fresh later attempts', () => {
@@ -343,6 +377,7 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
         failed(),
         failed(),
         failed({ authorFraming: AUTHORING_FRAMINGS[0] }),
+        commissioned(3),
         failed(),
         {
           point: 727,

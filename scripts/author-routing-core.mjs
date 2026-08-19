@@ -64,6 +64,9 @@ export const AUTHORING_FRAMINGS = Object.freeze([
 /** The two outcomes a completed examination may record. */
 export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
 
+/** A pre-dispatch receipt written by author-sol for a round governed by this mechanism. */
+export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+
 const isUnsuccessfulReview = (record, wanted) => {
   if (Number(record?.point) !== wanted) return false
   if (record?.mode && record.mode !== 'review') return false
@@ -122,29 +125,51 @@ export function authorRoundHistory(records = [], point = '') {
   // the outcome of round zero, the second the outcome of round one, and so on.
   let freshRounds = 0
   let previousFraming = ''
-  const rounds = rows.filter((record) => isUnsuccessfulReview(record, wanted)).map((record, index) => {
-    const framing = String(record?.authorFraming ?? '').trim()
+  const rounds = []
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const record = rows[rowIndex]
+    if (!isUnsuccessfulReview(record, wanted)) continue
+    const index = rounds.length
+    const reviewFraming = String(record?.authorFraming ?? '').trim()
+    const commission = [...rows.slice(0, rowIndex)].reverse().find(
+      (candidate) =>
+        candidate?.kind === AUTHORING_COMMISSION_KIND &&
+        Number(candidate?.point) === wanted &&
+        Number(candidate?.round) === index,
+    )
+    const commissionedFraming = String(commission?.authorFraming ?? '').trim()
+    const framing = commissionedFraming || reviewFraming
+    // No old ledger row could carry a commission receipt or the confirmation
+    // flag: those rows are real pre-mechanism attempts, not malformed uses of
+    // a rule that did not exist. Once either marker exists, enforce the rule.
+    const governed = Boolean(commission || reviewFraming)
     const reviewedRound = freshRounds
     let repeat = ''
-    if (reviewedRound <= 1 && framing) repeat = 'rounds zero and one must carry no author framing'
-    if (reviewedRound > 1 && !framing) repeat = 'no author framing was recorded'
-    if (framing && !AUTHORING_FRAMINGS.includes(framing)) repeat = 'the record names no recognized hostile-tester framing'
-    if (framing && previousFraming && framing === previousFraming) {
+    if (commission && reviewFraming && reviewFraming !== commissionedFraming) {
+      repeat = 'the review framing does not match the recorded commission'
+    }
+    if (governed && reviewedRound <= 1 && framing) repeat = 'rounds zero and one must carry no author framing'
+    if (governed && reviewedRound > 1 && !framing) repeat = 'no author framing was recorded'
+    if (governed && framing && !AUTHORING_FRAMINGS.includes(framing)) {
+      repeat = 'the record names no recognized hostile-tester framing'
+    }
+    if (governed && framing && previousFraming && framing === previousFraming) {
       repeat = 'the author framing repeats the preceding fresh round'
     }
     if (!repeat) {
       freshRounds += 1
       previousFraming = framing
     }
-    return {
+    rounds.push({
       ledgerRound: index + 1,
       freshRound: repeat ? null : reviewedRound,
       framing,
+      commissioned: Boolean(commission),
       repeat,
       evidence: String(record?.evidence ?? '').trim(),
       authoredBy: String(record?.authoredBy ?? '').trim(),
-    }
-  })
+    })
+  }
   const expectedExaminer = specExaminerFor({ rounds })
   const examination =
     [...rows]

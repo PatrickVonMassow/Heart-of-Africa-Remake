@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { AUTHORING_COMMISSION_KIND, recordAuthoringCommission } from './author-sol.mjs'
+import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
+import { recordAuthoringCommission } from './author-sol.mjs'
 
 const root = resolve(process.cwd())
 const script = resolve(root, 'scripts', 'author-sol.mjs')
@@ -114,16 +114,30 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
   })
 
   it('reports an unframed later review as a repeat and does not advance the lane', () => {
-    const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, () => ({
+    const rows = []
+    for (let round = 0; round < FABLE_ESCALATION_ROUNDS; round += 1) {
+      if (round > 1) {
+        rows.push({ point: Number(point), kind: AUTHORING_COMMISSION_KIND, round, authorFraming: '' })
+      }
+      rows.push({ point: Number(point), mode: 'review', verdict: 'do-not-merge' })
+    }
+    const result = route(ledger(rows))
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain(`${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
+    expect(result.stdout).toContain('REPEAT — no author framing was recorded')
+  })
+
+  it('keeps all reviews from before commission receipts in the escalation count', () => {
+    const rows = Array.from({ length: 11 }, () => ({
       point: Number(point),
       mode: 'review',
       verdict: 'do-not-merge',
     }))
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → sol`)
-    expect(result.stdout).toContain(`${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); 2 fresh attempt(s)`)
-    expect(result.stdout).toContain('REPEAT — no author framing was recorded')
+    expect(result.stdout).toContain(`point ${point} → fable`)
+    expect(result.stdout).toContain('11 unsuccessful round(s); 11 fresh attempt(s)')
   })
 
   it('accepts an explicit numeric override for history outside the ledger', () => {

@@ -25,6 +25,7 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   authorRoundHistory,
+  AUTHORING_COMMISSION_KIND,
   authorLaneFor,
   formatAuthorRoundHistory,
   formatLaneReport,
@@ -80,8 +81,8 @@ export function recordedReworkRounds(number, { records } = {}) {
   return authorRoundHistory(rows, number).freshRounds
 }
 
-/** The durable evidence written before a commissioned model sees its prompt. */
-export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+// Re-exported beside the writer for callers that inspect its record shape.
+export { AUTHORING_COMMISSION_KIND }
 
 /**
  * Append one commission to the shared ledger and make that append durable.
