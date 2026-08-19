@@ -340,7 +340,7 @@ export function pointFromEvidence({ branch = '', cwd = '', text = '' } = {}, can
       [new RegExp(`--point\\s+${n}\\b`, 'gi'), 9],
       [new RegExp(`WORK-ORDER POINT(?: NUMBER)?[: ]+${n}\\b`, 'gi'), 9],
       [new RegExp(`point-brief\\.mjs\\s+${n}\\b`, 'gi'), 8],
-      [new RegExp(`(?:point|Punkt)\s+${n}\\b`, 'gi'), 2],
+      [new RegExp(`(?:point|Punkt)\\s+${n}\\b`, 'gi'), 2],
     ]
     for (const [re, weight] of rules) score += [...haystack.matchAll(re)].length * weight
     if (score) scores.push({ point, score })
@@ -350,15 +350,36 @@ export function pointFromEvidence({ branch = '', cwd = '', text = '' } = {}, can
   return scores[0].point
 }
 
+/** A session's own strong declaration wins even when that point is OUTSIDE the report.
+ * Otherwise an in-progress point 727 that merely discusses landed point 712 is charged
+ * to 712 because 727 was absent from the candidate set. */
+export function declaredPointFromEvidence({ branch = '', cwd = '', text = '' } = {}) {
+  const scores = new Map()
+  const add = (point, weight) => {
+    const n = Number(point)
+    if (Number.isInteger(n)) scores.set(n, (scores.get(n) ?? 0) + weight)
+  }
+  for (const match of String(branch).matchAll(/feat\/(\d+)(?:[-/]|\b)/gi)) add(match[1], 20)
+  for (const match of String(cwd).replace(/\\/g, '/').matchAll(/worktrees\/(?:point-)?(\d+)(?:[-/]|\b)/gi)) add(match[1], 20)
+  for (const match of String(text).matchAll(/WORK-ORDER POINT(?: NUMBER)?[: ]+(\d+)\b/gi)) add(match[1], 12)
+  for (const match of String(text).matchAll(/(?:YOUR BRANCH:\s*)?feat\/(\d+)(?:[-/]|\b)/gi)) add(match[1], 10)
+  for (const match of String(text).matchAll(/point-brief\.mjs\s+(\d+)\b/gi)) add(match[1], 8)
+  const ranked = [...scores].sort((a, b) => b[1] - a[1] || a[0] - b[0])
+  if (!ranked.length || ranked[0][1] === ranked[1]?.[1]) return null
+  return ranked[0][0]
+}
+
+function evidenceOf(turn) {
+  return {
+    branch: turn.branch,
+    cwd: turn.cwd,
+    text: `${turn.evidenceText ?? ''}\n${turn.scope === 'subagent' ? (turn.prompt ?? '') : ''}\n${(turn.tools ?? []).map(toolText).join('\n')}`,
+  }
+}
+
 function directPoint(turn, candidates) {
-  return pointFromEvidence(
-    {
-      branch: turn.branch,
-      cwd: turn.cwd,
-      text: `${turn.evidenceText ?? ''}\n${turn.scope === 'subagent' ? (turn.prompt ?? '') : ''}\n${(turn.tools ?? []).map(toolText).join('\n')}`,
-    },
-    candidates,
-  )
+  const evidence = evidenceOf(turn)
+  return declaredPointFromEvidence(evidence) ?? pointFromEvidence(evidence, candidates)
 }
 
 /** Assign each response to one point, then carry evidence only within the same session
@@ -379,6 +400,19 @@ export function assignPoints(turns = [], candidates = [], { idleGapMs = IDLE_GAP
     // A delegated transcript / Codex rollout is one assignment by construction.
     // Its dominant direct point rescues setup turns recorded before the branch existed.
     if (list[0]?.scope === 'subagent') {
+      const declarations = new Map()
+      for (const row of list) {
+        const declared = declaredPointFromEvidence(evidenceOf(row))
+        if (declared != null) declarations.set(declared, (declarations.get(declared) ?? 0) + 1)
+      }
+      const ownPoint = [...declarations].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0]
+      if (ownPoint != null) {
+        for (const row of list) {
+          const declared = declaredPointFromEvidence(evidenceOf(row))
+          row.point = ownPoint
+          row.pointSource = declared === ownPoint ? 'evidence' : 'session'
+        }
+      }
       const counts = new Map()
       for (const row of list) if (row.point != null) counts.set(row.point, (counts.get(row.point) ?? 0) + 1)
       const dominant = [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0]

@@ -8,6 +8,7 @@ import {
   associateBoundaryEvents,
   claudeTokens,
   codexTokens,
+  declaredPointFromEvidence,
   leverEffect,
   parseBoundaryLog,
   parseClaudeTranscript,
@@ -71,7 +72,20 @@ describe('point attribution is candidate-bounded and evidence-led', () => {
         [900, 901],
       ),
     ).toBe(900)
+    expect(pointFromEvidence({ text: 'please finish point 900' }, [900, 901])).toBe(900)
     expect(pointFromEvidence({ text: 'numbers 900 and 901 only' }, [900, 901])).toBeNull()
+  })
+
+  it('retains a strong OUTSIDE declaration so current work cannot leak into landed candidates', () => {
+    expect(declaredPointFromEvidence({ text: 'WORK-ORDER POINT 727; this fixes point 712' })).toBe(727)
+    const assigned = assignPoints(
+      [
+        { at: 0, session: 'current', scope: 'subagent', prompt: 'AUTHORING WORK-ORDER POINT 727', branch: 'feat/727-new', tools: [] },
+        { at: 1, session: 'current', scope: 'subagent', prompt: '', branch: '', tools: [{ name: 'Bash', input: { command: 'inspect point 712' } }] },
+      ],
+      [712],
+    )
+    expect(assigned.map((turn) => turn.point)).toEqual([727, 727])
   })
 
   it('fills setup and prose within one agent session, never across an idle episode', () => {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-19T08:49:21.285Z",
+  "generatedAt": "2026-08-19T08:52:03.643Z",
   "accounting": {
     "unit": "provider-reported billed tokens",
     "note": "Claude cache counters are disjoint; Codex cached_input_tokens is a subset of input_tokens. No provider price or quota conversion is applied.",
@@ -18,36 +18,36 @@
     "oldestLanding": "2026-08-18T13:09:01.000Z"
   },
   "providerTokens": {
-    "anthropic": 1527819474,
-    "openai": 131643094
+    "anthropic": 1379630652,
+    "openai": 102787117
   },
   "assignedBy": {
-    "evidence": 444241658,
-    "session": 521398807,
-    "neighbour": 693822103
+    "evidence": 474572881,
+    "session": 499541643,
+    "neighbour": 508303245
   },
-  "totalTokens": 1659462568,
+  "totalTokens": 1482417769,
   "ledger": [
     {
       "point": 726,
       "merge": "1d192899faa724a7a4a8c857a173aaceb390e00a",
       "landedAt": 1787125062000,
-      "tokens": 94227009,
-      "turns": 657,
+      "tokens": 79633038,
+      "turns": 524,
       "sessions": 6,
       "origins": {
-        "mainSession": 71124680,
-        "crossVendorReviews": 6284628,
+        "mainSession": 62815337,
+        "crossVendorReviews": 0,
         "agents": {
           "codex:01a018ca-b93b": 16817701
         }
       },
       "items": {
         "pictureReads": 0,
-        "agentReports": 6110345,
-        "reviewRounds": 6284628,
+        "agentReports": 3916883,
+        "reviewRounds": 0,
         "suiteDigests": 81769,
-        "rawSuiteLogs": 59844
+        "rawSuiteLogs": 0
       },
       "levers": {
         "pointBoundary": true,
@@ -60,27 +60,27 @@
       "leverEvents": {
         "pointBoundary": 2,
         "contextWatermark": 1,
-        "delegationBrief": 16,
+        "delegationBrief": 8,
         "boundedVerifyDigest": 1,
-        "openArchiveSplit": 20,
+        "openArchiveSplit": 11,
         "docBudgets": 3
       },
       "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 27655589,
-        "session": 5965727,
-        "neighbour": 60605693
+        "evidence": 33806109,
+        "session": 0,
+        "neighbour": 45826929
       }
     },
     {
       "point": 707,
       "merge": "66e3dcaebe83ae99a312d25728e3dd73a296a2b2",
       "landedAt": 1787106840000,
-      "tokens": 35706138,
-      "turns": 244,
+      "tokens": 50799204,
+      "turns": 289,
       "sessions": 7,
       "origins": {
-        "mainSession": 19342200,
+        "mainSession": 34435266,
         "crossVendorReviews": 0,
         "agents": {
           "codex:01a017b0-4d3d": 16363938
@@ -88,7 +88,7 @@
       },
       "items": {
         "pictureReads": 0,
-        "agentReports": 3947812,
+        "agentReports": 4311867,
         "reviewRounds": 0,
         "suiteDigests": 0,
         "rawSuiteLogs": 244694
@@ -104,36 +104,36 @@
       "leverEvents": {
         "pointBoundary": 1,
         "contextWatermark": 0,
-        "delegationBrief": 4,
+        "delegationBrief": 3,
         "boundedVerifyDigest": 0,
-        "openArchiveSplit": 4,
+        "openArchiveSplit": 3,
         "docBudgets": 2
       },
       "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 20972754,
+        "evidence": 23426212,
         "session": 0,
-        "neighbour": 14733384
+        "neighbour": 27372992
       }
     },
     {
       "point": 684,
       "merge": "f259a2460d1f9a05f3c572e376f6149423751885",
       "landedAt": 1787104766000,
-      "tokens": 17990775,
-      "turns": 144,
+      "tokens": 12296589,
+      "turns": 101,
       "sessions": 5,
       "origins": {
-        "mainSession": 13974553,
-        "crossVendorReviews": 123692,
+        "mainSession": 8345049,
+        "crossVendorReviews": 59010,
         "agents": {
           "codex:01a017b0-3b4a": 3892530
         }
       },
       "items": {
         "pictureReads": 0,
-        "agentReports": 2177773,
-        "reviewRounds": 123692,
+        "agentReports": 828847,
+        "reviewRounds": 59010,
         "suiteDigests": 0,
         "rawSuiteLogs": 0
       },
@@ -153,22 +153,22 @@
         "openArchiveSplit": 8,
         "docBudgets": 0
       },
-      "wholeDocumentReads": 2,
+      "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 8324374,
+        "evidence": 8615087,
         "session": 0,
-        "neighbour": 9666401
+        "neighbour": 3681502
       }
     },
     {
       "point": 717,
       "merge": "790e4b3cae706ad66c484e8a0eae28be5ab08a29",
       "landedAt": 1787102787000,
-      "tokens": 29673562,
-      "turns": 241,
-      "sessions": 5,
+      "tokens": 38595561,
+      "turns": 277,
+      "sessions": 10,
       "origins": {
-        "mainSession": 11588092,
+        "mainSession": 20510091,
         "crossVendorReviews": 0,
         "agents": {
           "codex:01a01786-9b18": 11926534,
@@ -177,10 +177,10 @@
       },
       "items": {
         "pictureReads": 0,
-        "agentReports": 1752219,
+        "agentReports": 2713764,
         "reviewRounds": 0,
         "suiteDigests": 0,
-        "rawSuiteLogs": 79855
+        "rawSuiteLogs": 219430
       },
       "levers": {
         "pointBoundary": true,
@@ -193,54 +193,46 @@
       "leverEvents": {
         "pointBoundary": 1,
         "contextWatermark": 0,
-        "delegationBrief": 9,
+        "delegationBrief": 10,
         "boundedVerifyDigest": 0,
         "openArchiveSplit": 12,
         "docBudgets": 0
       },
       "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 22699727,
-        "session": 581120,
-        "neighbour": 6392715
+        "evidence": 27251182,
+        "session": 719325,
+        "neighbour": 10625054
       }
     },
     {
       "point": 697,
       "merge": "6efe25b9ffe7d5b4f1afeb56e24f21415ebc818a",
       "landedAt": 1787093046000,
-      "tokens": 335151175,
-      "turns": 1946,
-      "sessions": 52,
+      "tokens": 137377489,
+      "turns": 791,
+      "sessions": 25,
       "origins": {
-        "mainSession": 232107395,
-        "crossVendorReviews": 25173460,
+        "mainSession": 106445027,
+        "crossVendorReviews": 18836621,
         "agents": {
-          "codex:01a017b0-42df": 22988191,
-          "claude:a6311615378ed0155": 15306506,
-          "claude:a5b67602762d1b3c4": 12628838,
-          "claude:ae036abccef6afc4c": 7343010,
-          "claude:ab75379c972024a7c": 4589554,
           "claude:af5d7240a7edc19b2": 4059062,
-          "claude:a86fdf80e25c31f8b": 2628733,
+          "claude:a86fdf80e25c31f8b": 3192588,
           "codex:01a010bd-1c31": 2456840,
           "codex:01a010c8-4c89": 2342291,
-          "codex:01a017d5-80a7": 2249515,
-          "claude:afdf484135d8d26a9": 1028545,
-          "codex:01a0165f-0725": 204175,
           "codex:01a0110d-71eb": 45060
         }
       },
       "items": {
         "pictureReads": 125704,
-        "agentReports": 17040390,
-        "reviewRounds": 25173460,
-        "suiteDigests": 1432291,
-        "rawSuiteLogs": 9032142
+        "agentReports": 6702530,
+        "reviewRounds": 18836621,
+        "suiteDigests": 398026,
+        "rawSuiteLogs": 7037067
       },
       "levers": {
         "pointBoundary": true,
-        "contextWatermark": true,
+        "contextWatermark": false,
         "delegationBrief": true,
         "boundedVerifyDigest": true,
         "openArchiveSplit": true,
@@ -248,41 +240,178 @@
       },
       "leverEvents": {
         "pointBoundary": 1,
-        "contextWatermark": 1,
-        "delegationBrief": 60,
-        "boundedVerifyDigest": 13,
-        "openArchiveSplit": 79,
-        "docBudgets": 4
+        "contextWatermark": 0,
+        "delegationBrief": 19,
+        "boundedVerifyDigest": 5,
+        "openArchiveSplit": 26,
+        "docBudgets": 3
       },
       "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 46824216,
-        "session": 82124033,
-        "neighbour": 206202926
+        "evidence": 40653816,
+        "session": 19012748,
+        "neighbour": 77710925
       }
     },
     {
       "point": 703,
       "merge": "52d5c001c77068018f8dd63abfdf7ab8ca43732e",
       "landedAt": 1787088033000,
-      "tokens": 108537277,
-      "turns": 790,
-      "sessions": 17,
+      "tokens": 40400209,
+      "turns": 311,
+      "sessions": 8,
       "origins": {
-        "mainSession": 104639922,
-        "crossVendorReviews": 590121,
+        "mainSession": 37355492,
+        "crossVendorReviews": 0,
         "agents": {
-          "codex:01a00fe7-75ba": 3044717,
-          "claude:a5b67602762d1b3c4": 143398,
-          "claude:a86fdf80e25c31f8b": 119119
+          "codex:01a00fe7-75ba": 3044717
         }
       },
       "items": {
         "pictureReads": 0,
-        "agentReports": 5526896,
-        "reviewRounds": 590121,
-        "suiteDigests": 249479,
-        "rawSuiteLogs": 2389700
+        "agentReports": 1926696,
+        "reviewRounds": 0,
+        "suiteDigests": 0,
+        "rawSuiteLogs": 112860
+      },
+      "levers": {
+        "pointBoundary": true,
+        "contextWatermark": false,
+        "delegationBrief": true,
+        "boundedVerifyDigest": false,
+        "openArchiveSplit": true,
+        "docBudgets": true
+      },
+      "leverEvents": {
+        "pointBoundary": 1,
+        "contextWatermark": 0,
+        "delegationBrief": 4,
+        "boundedVerifyDigest": 0,
+        "openArchiveSplit": 6,
+        "docBudgets": 6
+      },
+      "wholeDocumentReads": 0,
+      "assignedBy": {
+        "evidence": 15326771,
+        "session": 0,
+        "neighbour": 25073438
+      }
+    },
+    {
+      "point": 712,
+      "merge": "f8869a5c7b33c14c89c75e3926b42e2e055265d9",
+      "landedAt": 1787084468000,
+      "tokens": 175228132,
+      "turns": 1031,
+      "sessions": 31,
+      "origins": {
+        "mainSession": 98543845,
+        "crossVendorReviews": 47922210,
+        "agents": {
+          "claude:afdf484135d8d26a9": 18628761,
+          "codex:01a0165f-0725": 9592404,
+          "codex:01a0167c-5297": 540912
+        }
+      },
+      "items": {
+        "pictureReads": 0,
+        "agentReports": 11795967,
+        "reviewRounds": 47922210,
+        "suiteDigests": 0,
+        "rawSuiteLogs": 0
+      },
+      "levers": {
+        "pointBoundary": true,
+        "contextWatermark": true,
+        "delegationBrief": true,
+        "boundedVerifyDigest": false,
+        "openArchiveSplit": true,
+        "docBudgets": false
+      },
+      "leverEvents": {
+        "pointBoundary": 2,
+        "contextWatermark": 4,
+        "delegationBrief": 38,
+        "boundedVerifyDigest": 0,
+        "openArchiveSplit": 54,
+        "docBudgets": 0
+      },
+      "wholeDocumentReads": 0,
+      "assignedBy": {
+        "evidence": 55966985,
+        "session": 56869407,
+        "neighbour": 62391740
+      }
+    },
+    {
+      "point": 623,
+      "merge": "10500fa702469d17ea6012a4a940c517b7a141f2",
+      "landedAt": 1787077400000,
+      "tokens": 64566054,
+      "turns": 486,
+      "sessions": 15,
+      "origins": {
+        "mainSession": 53191604,
+        "crossVendorReviews": 0,
+        "agents": {
+          "codex:01a01548-1e08": 5454923,
+          "codex:01a0155d-6d99": 3101071,
+          "codex:01a01600-235d": 2299405,
+          "codex:01a01610-3243": 519051
+        }
+      },
+      "items": {
+        "pictureReads": 0,
+        "agentReports": 4800995,
+        "reviewRounds": 0,
+        "suiteDigests": 0,
+        "rawSuiteLogs": 0
+      },
+      "levers": {
+        "pointBoundary": true,
+        "contextWatermark": true,
+        "delegationBrief": true,
+        "boundedVerifyDigest": false,
+        "openArchiveSplit": true,
+        "docBudgets": true
+      },
+      "leverEvents": {
+        "pointBoundary": 2,
+        "contextWatermark": 1,
+        "delegationBrief": 13,
+        "boundedVerifyDigest": 0,
+        "openArchiveSplit": 14,
+        "docBudgets": 2
+      },
+      "wholeDocumentReads": 0,
+      "assignedBy": {
+        "evidence": 31440273,
+        "session": 0,
+        "neighbour": 33125781
+      }
+    },
+    {
+      "point": 721,
+      "merge": "6ce172717475828faa3c3b84f065a15bbad47f98",
+      "landedAt": 1787069591000,
+      "tokens": 103099983,
+      "turns": 570,
+      "sessions": 25,
+      "origins": {
+        "mainSession": 87266767,
+        "crossVendorReviews": 400114,
+        "agents": {
+          "codex:01a01558-fe42": 8914975,
+          "codex:01a01547-f68c": 6476412,
+          "codex:01a015d6-5226": 41715
+        }
+      },
+      "items": {
+        "pictureReads": 0,
+        "agentReports": 12745481,
+        "reviewRounds": 400114,
+        "suiteDigests": 261215,
+        "rawSuiteLogs": 341163
       },
       "levers": {
         "pointBoundary": true,
@@ -295,172 +424,28 @@
       "leverEvents": {
         "pointBoundary": 1,
         "contextWatermark": 3,
-        "delegationBrief": 15,
-        "boundedVerifyDigest": 3,
-        "openArchiveSplit": 25,
-        "docBudgets": 6
+        "delegationBrief": 9,
+        "boundedVerifyDigest": 1,
+        "openArchiveSplit": 10,
+        "docBudgets": 1
       },
       "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 14283154,
+        "evidence": 65020472,
         "session": 0,
-        "neighbour": 94254123
-      }
-    },
-    {
-      "point": 712,
-      "merge": "f8869a5c7b33c14c89c75e3926b42e2e055265d9",
-      "landedAt": 1787084468000,
-      "tokens": 163892952,
-      "turns": 1093,
-      "sessions": 57,
-      "origins": {
-        "mainSession": 106703171,
-        "crossVendorReviews": 27872391,
-        "agents": {
-          "claude:afdf484135d8d26a9": 17600216,
-          "codex:01a0165f-0725": 9388229,
-          "claude:a5b67602762d1b3c4": 1047419,
-          "codex:01a0167c-5297": 540912,
-          "claude:a86fdf80e25c31f8b": 444736,
-          "claude:a6311615378ed0155": 189091,
-          "claude:ae036abccef6afc4c": 106787
-        }
-      },
-      "items": {
-        "pictureReads": 0,
-        "agentReports": 14611584,
-        "reviewRounds": 27872391,
-        "suiteDigests": 0,
-        "rawSuiteLogs": 0
-      },
-      "levers": {
-        "pointBoundary": true,
-        "contextWatermark": true,
-        "delegationBrief": true,
-        "boundedVerifyDigest": false,
-        "openArchiveSplit": true,
-        "docBudgets": true
-      },
-      "leverEvents": {
-        "pointBoundary": 2,
-        "contextWatermark": 7,
-        "delegationBrief": 36,
-        "boundedVerifyDigest": 0,
-        "openArchiveSplit": 49,
-        "docBudgets": 2
-      },
-      "wholeDocumentReads": 0,
-      "assignedBy": {
-        "evidence": 48864216,
-        "session": 32798081,
-        "neighbour": 82230655
-      }
-    },
-    {
-      "point": 623,
-      "merge": "10500fa702469d17ea6012a4a940c517b7a141f2",
-      "landedAt": 1787077400000,
-      "tokens": 44559335,
-      "turns": 405,
-      "sessions": 11,
-      "origins": {
-        "mainSession": 33184885,
-        "crossVendorReviews": 0,
-        "agents": {
-          "codex:01a01548-1e08": 5454923,
-          "codex:01a0155d-6d99": 3101071,
-          "codex:01a01600-235d": 2299405,
-          "codex:01a01610-3243": 519051
-        }
-      },
-      "items": {
-        "pictureReads": 0,
-        "agentReports": 4107679,
-        "reviewRounds": 0,
-        "suiteDigests": 0,
-        "rawSuiteLogs": 0
-      },
-      "levers": {
-        "pointBoundary": true,
-        "contextWatermark": true,
-        "delegationBrief": true,
-        "boundedVerifyDigest": false,
-        "openArchiveSplit": true,
-        "docBudgets": false
-      },
-      "leverEvents": {
-        "pointBoundary": 2,
-        "contextWatermark": 2,
-        "delegationBrief": 14,
-        "boundedVerifyDigest": 0,
-        "openArchiveSplit": 15,
-        "docBudgets": 0
-      },
-      "wholeDocumentReads": 0,
-      "assignedBy": {
-        "evidence": 22827551,
-        "session": 0,
-        "neighbour": 21731784
-      }
-    },
-    {
-      "point": 721,
-      "merge": "6ce172717475828faa3c3b84f065a15bbad47f98",
-      "landedAt": 1787069591000,
-      "tokens": 110293174,
-      "turns": 607,
-      "sessions": 24,
-      "origins": {
-        "mainSession": 93473674,
-        "crossVendorReviews": 483973,
-        "agents": {
-          "codex:01a01558-fe42": 8914975,
-          "codex:01a01547-f68c": 6476412,
-          "claude:aa92e3b89ff284a69": 902425,
-          "codex:01a015d6-5226": 41715
-        }
-      },
-      "items": {
-        "pictureReads": 0,
-        "agentReports": 16051984,
-        "reviewRounds": 483973,
-        "suiteDigests": 0,
-        "rawSuiteLogs": 341163
-      },
-      "levers": {
-        "pointBoundary": true,
-        "contextWatermark": true,
-        "delegationBrief": true,
-        "boundedVerifyDigest": false,
-        "openArchiveSplit": true,
-        "docBudgets": false
-      },
-      "leverEvents": {
-        "pointBoundary": 1,
-        "contextWatermark": 2,
-        "delegationBrief": 12,
-        "boundedVerifyDigest": 0,
-        "openArchiveSplit": 13,
-        "docBudgets": 0
-      },
-      "wholeDocumentReads": 0,
-      "assignedBy": {
-        "evidence": 55212461,
-        "session": 798613,
-        "neighbour": 54282100
+        "neighbour": 38079511
       }
     },
     {
       "point": 714,
       "merge": "e3fd3ba109a594b09428b4d4c77b48ee7fef3aa4",
       "landedAt": 1787058541000,
-      "tokens": 719431171,
-      "turns": 3136,
-      "sessions": 123,
+      "tokens": 780421510,
+      "turns": 3259,
+      "sessions": 108,
       "origins": {
-        "mainSession": 213460845,
-        "crossVendorReviews": 477061606,
+        "mainSession": 292410036,
+        "crossVendorReviews": 459102754,
         "agents": {
           "claude:a5903341fccc6ef7d": 24500795,
           "codex:01a014ee-e793": 4407925
@@ -468,10 +453,10 @@
       },
       "items": {
         "pictureReads": 0,
-        "agentReports": 38107918,
-        "reviewRounds": 477061606,
-        "suiteDigests": 698624,
-        "rawSuiteLogs": 832409
+        "agentReports": 42962520,
+        "reviewRounds": 459102754,
+        "suiteDigests": 210225,
+        "rawSuiteLogs": 540436
       },
       "levers": {
         "pointBoundary": true,
@@ -483,17 +468,17 @@
       },
       "leverEvents": {
         "pointBoundary": 1,
-        "contextWatermark": 8,
-        "delegationBrief": 85,
-        "boundedVerifyDigest": 5,
-        "openArchiveSplit": 88,
-        "docBudgets": 6
+        "contextWatermark": 9,
+        "delegationBrief": 78,
+        "boundedVerifyDigest": 3,
+        "openArchiveSplit": 81,
+        "docBudgets": 4
       },
-      "wholeDocumentReads": 1,
+      "wholeDocumentReads": 0,
       "assignedBy": {
-        "evidence": 176577616,
-        "session": 399131233,
-        "neighbour": 143722322
+        "evidence": 173065974,
+        "session": 422940163,
+        "neighbour": 184415373
       }
     }
   ],
@@ -502,60 +487,60 @@
       "events": 13,
       "fired": 10,
       "absent": 0,
-      "firedMean": 165946257,
+      "firedMean": 148241777,
       "absentMean": null,
       "difference": null,
       "differencePct": null,
       "verdict": "cannot be shown to move per-point cost: no comparison group"
     },
     "contextWatermark": {
-      "events": 24,
-      "fired": 7,
-      "absent": 3,
-      "firedMean": 225156013,
-      "absentMean": 27790158,
-      "difference": 197365855,
-      "differencePct": 7.102,
+      "events": 18,
+      "fired": 5,
+      "absent": 5,
+      "firedMean": 240589743,
+      "absentMean": 55893810,
+      "difference": 184695933,
+      "differencePct": 3.3044,
       "verdict": "not shown to lower per-point cost"
     },
     "delegationBrief": {
-      "events": 254,
+      "events": 185,
       "fired": 10,
       "absent": 0,
-      "firedMean": 165946257,
+      "firedMean": 148241777,
       "absentMean": null,
       "difference": null,
       "differencePct": null,
       "verdict": "cannot be shown to move per-point cost: no comparison group"
     },
     "boundedVerifyDigest": {
-      "events": 22,
+      "events": 10,
       "fired": 4,
       "absent": 6,
-      "firedMean": 314336658,
-      "absentMean": 67019323,
-      "difference": 247317335,
-      "differencePct": 3.6902,
+      "firedMean": 275133005,
+      "absentMean": 63647625,
+      "difference": 211485380,
+      "differencePct": 3.3228,
       "verdict": "not shown to lower per-point cost"
     },
     "openArchiveSplit": {
-      "events": 313,
+      "events": 225,
       "fired": 10,
       "absent": 0,
-      "firedMean": 165946257,
+      "firedMean": 148241777,
       "absentMean": null,
       "difference": null,
       "differencePct": null,
       "verdict": "cannot be shown to move per-point cost: no comparison group"
     },
     "docBudgets": {
-      "events": 23,
-      "fired": 6,
-      "absent": 4,
-      "firedMean": 242824287,
-      "absentMean": 50629212,
-      "difference": 192195075,
-      "differencePct": 3.7961,
+      "events": 21,
+      "fired": 7,
+      "absent": 3,
+      "firedMean": 179471070,
+      "absentMean": 75373427,
+      "difference": 104097643,
+      "differencePct": 1.3811,
       "verdict": "not shown to lower per-point cost"
     }
   },
@@ -565,40 +550,40 @@
       "share": 0.0001
     },
     "agentReports": {
-      "tokens": 109434600,
-      "share": 0.0659
+      "tokens": 92705550,
+      "share": 0.0625
     },
     "reviewRounds": {
-      "tokens": 537589871,
-      "share": 0.324
+      "tokens": 526320709,
+      "share": 0.355
     },
     "suiteDigests": {
-      "tokens": 2462163,
-      "share": 0.0015
+      "tokens": 951235,
+      "share": 0.0006
     },
     "rawSuiteLogs": {
-      "tokens": 12979807,
-      "share": 0.0078
+      "tokens": 8495650,
+      "share": 0.0057
     }
   },
   "largestItems": [
     {
       "item": "reviewRounds",
       "label": "cross-vendor review rounds",
-      "tokens": 537589871,
-      "share": 0.324
+      "tokens": 526320709,
+      "share": 0.355
     },
     {
       "item": "agentReports",
       "label": "agent reports",
-      "tokens": 109434600,
-      "share": 0.0659
+      "tokens": 92705550,
+      "share": 0.0625
     },
     {
       "item": "rawSuiteLogs",
       "label": "raw suite/log reads",
-      "tokens": 12979807,
-      "share": 0.0078
+      "tokens": 8495650,
+      "share": 0.0057
     }
   ]
 }
