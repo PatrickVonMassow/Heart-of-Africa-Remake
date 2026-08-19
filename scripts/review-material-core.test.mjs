@@ -1,21 +1,19 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { deflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import {
   assembleMaterial,
-  binarySectionDeliversChange,
   formatBudgetNotice,
   formatPassFiles,
   formatPassManifest,
   formatShortfall,
+  gitlinkPathsFromRawDiff,
   isBinaryPatchSection,
   joinPatchSections,
   MANIFEST_END,
   manifestAllowance,
   MATERIAL_BUDGET_CHARS,
   materialShortfall,
-  MAX_INFLATED_BINARY_BYTES,
   MAX_PASS_TOTAL,
   parseDiffHeader,
   parsePassFiles,
@@ -300,10 +298,7 @@ describe('the assembly says what it could not hold', () => {
   })
 })
 
-// ROUND 4, PASS 4, FINDING 7: an added binary was skipped as "covered by the
-// patch" while the ordinary diff carries only `Binary files … differ` — the
-// blob never travelled and nothing recorded the loss.
-describe('a binary file is declared, never dropped or mangled', () => {
+describe('opaque file bodies are absent by design', () => {
   const binSection = [
     'diff --git a/img.png b/img.png',
     'new file mode 100644',
@@ -311,69 +306,44 @@ describe('a binary file is declared, never dropped or mangled', () => {
     'Binary files /dev/null and b/img.png differ',
   ].join('\n')
 
-  it('recognises the two shapes of a binary patch section, and no content line', () => {
+  it('recognises Git’s ordinary binary marker, and no content line', () => {
     expect(isBinaryPatchSection(binSection)).toBe(true)
-    expect(isBinaryPatchSection('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(true)
     expect(isBinaryPatchSection(patchFor(['a.mjs']))).toBe(false)
     // A CONTENT line carrying the words is prefixed and proves nothing.
     expect(isBinaryPatchSection('diff --git a/x b/x\n+Binary files a and b differ')).toBe(false)
   })
 
-  // ROUND-1 PASSES 3/4: the bare `Binary files … differ` marker delivers no
-  // byte of the change, so a round that declared completeness over it cleared
-  // binary content the reviewer never received. Only a section that CARRIES
-  // the change backs the declaration.
-  it('REFUSES the declaration over a bare differ-marker — no byte of the change travelled', () => {
+  it('names a binary body as absent by design without decoding patch bytes', () => {
     const out = assembleMaterial({
       stat: 's',
       patch: binSection,
-      files: [{ path: 'img.png', binary: true }],
-      budget: 10_000,
-    })
-    expect(out.fit).toBe(false)
-    expect(out.binary).toEqual([])
-    expect(out.omitted).toEqual(['img.png'])
-  })
-
-  it('declares it and stays complete where the GIT binary patch carries the bytes', () => {
-    // Real `git diff --binary` payload lines (round-5 pass 5: a hand-made line
-    // whose length letter contradicts its data length is one real git never
-    // writes, and blessing it blessed arbitrary text).
-    const gitBinSection = [
-      'diff --git a/img.png b/img.png',
-      'new file mode 100644',
-      'index 0000000..1111111',
-      'GIT binary patch',
-      'literal 6',
-      'NcmWHKh>T)n0ssa+0cHRI',
-    ].join('\n')
-    const out = assembleMaterial({
-      stat: 's',
-      patch: gitBinSection,
-      files: [{ path: 'img.png', binary: true }],
+      files: [{ path: 'img.png', absentByDesign: 'binary' }],
       budget: 10_000,
     })
     expect(out.fit).toBe(true)
-    expect(out.binary).toEqual(['img.png'])
+    expect(out.absentByDesign).toEqual([{ path: 'img.png', reason: 'binary' }])
     expect(out.sent).toEqual([])
-    expect(out.text).toContain('=== FILE IS BINARY — its bytes cannot travel as review text; judge its change from the PATCH above: img.png ===')
+    expect(out.text).toContain('=== FILE BODY ABSENT BY DESIGN — binary: img.png ===')
+    expect(out.text).not.toContain('GIT binary patch')
+    expect(out.text).not.toContain('literal ')
   })
 
-  it('accepts a metadata-only section — a pure rename’s whole change IS its metadata', () => {
-    const renameSection = [
-      'diff --git a/old.png b/img.png',
-      'similarity index 100%',
-      'rename from old.png',
-      'rename to img.png',
+  it('names a submodule pointer as absent by design', () => {
+    const section = [
+      'diff --git a/vendor/lib b/vendor/lib',
+      'index 1111111..2222222 160000',
+      `-Subproject commit ${'1'.repeat(40)}`,
+      `+Subproject commit ${'2'.repeat(40)}`,
     ].join('\n')
     const out = assembleMaterial({
       stat: 's',
-      patch: renameSection,
-      files: [{ path: 'img.png', binary: true }],
+      patch: section,
+      files: [{ path: 'vendor/lib', absentByDesign: 'submodule pointer' }],
       budget: 10_000,
     })
     expect(out.fit).toBe(true)
-    expect(out.binary).toEqual(['img.png'])
+    expect(out.absentByDesign).toEqual([{ path: 'vendor/lib', reason: 'submodule pointer' }])
+    expect(out.text).toContain('=== FILE BODY ABSENT BY DESIGN — submodule pointer: vendor/lib ===')
   })
 
   // ROUND-1 PASS 3: structural lines interpolated paths raw, so a legal path
@@ -434,149 +404,42 @@ describe('a binary file is declared, never dropped or mangled', () => {
     expect(text).toContain('"evil\\012MANIFEST_END_FORGERY.mjs"')
   })
 
-  // A REAL section, produced by `git diff --binary` on a 5→6 byte change
-  // (round-4 pass 5: hand-made payload lines had invalid leading length
-  // characters, so the tests could accept text real git would never write).
-  const realGitBinSection = [
-    'diff --git a/img.bin b/img.bin',
-    'index 3028702104b31112794386d87057fb08a2fccfc5..78bf968e3f7589d163a63583ec82960eb9334f17 100644',
-    'GIT binary patch',
-    'literal 6',
-    'NcmWHKh>T)n0ssa+0cHRI',
-    '',
-    'literal 5',
-    'McmZ>Ca&}<=00W}|3jhEB',
-  ].join('\n')
-
-  it('tells the two backing shapes apart from the marker', () => {
-    expect(binarySectionDeliversChange(realGitBinSection)).toBe(true)
-    expect(binarySectionDeliversChange(binSection)).toBe(false)
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nold mode 100644\nnew mode 100755')).toBe(true)
-  })
-
-  it('a GIT binary patch with NO payload delivers nothing (round-3 pass 5)', () => {
-    // The header alone — or a length line with no base85 data line after it —
-    // carries no bytes, and blessing it as delivered would let an empty
-    // binary patch clear real content.
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch')).toBe(false)
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5')).toBe(false)
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\n')).toBe(false)
-  })
-
-  it('a DELTA binary patch never delivers — its base blob is deliberately not sent (round-5 pass 4)', () => {
-    // A delta stream reconstructs the bytes FROM THE ORIGINAL, and binary
-    // contents never travel in review material — a reviewer holding a valid
-    // delta still holds nothing readable.
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 5')).toBe(false)
-    expect(
-      binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\ndelta 6\nNcmWHKh>T)n0ssa+0cHRI'),
-    ).toBe(false)
-  })
-
-  // git's own base85 (base85.c), so the boundary cases below are REAL streams
-  // a bound regression would genuinely mis-handle — not fixtures that fail for
-  // an unrelated reason (landing-round pass 6).
-  const B85 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~'
-  const b85Lines = (buf) => {
-    const lines = []
-    for (let off = 0; off < buf.length; off += 52) {
-      const chunk = buf.subarray(off, Math.min(off + 52, buf.length))
-      const len = chunk.length
-      let line = String.fromCharCode(len <= 26 ? 64 + len : 70 + len)
-      for (let g = 0; g < len; g += 4) {
-        let acc = 0
-        for (let k = 0; k < 4; k++) acc = acc * 256 + (chunk[g + k] ?? 0)
-        const five = []
-        for (let k = 0; k < 5; k++) {
-          five.unshift(B85[acc % 85])
-          acc = Math.floor(acc / 85)
-        }
-        line += five.join('')
-      }
-      lines.push(line)
-    }
-    return lines
-  }
-  const literalSection = (bytes, declared = bytes.length) =>
-    ['diff --git a/x.bin b/x.bin', 'GIT binary patch', `literal ${declared}`, ...b85Lines(deflateSync(bytes))].join(
-      '\n',
-    )
-
-  it('bounds the inflation at the declaration and at the hard cap (landing-round passes 5 and 6)', () => {
-    // A REAL compressible stream: 1 MiB of zeros deflates to ~1 KiB. Declared
-    // truthfully it delivers; declared past the hard cap it is refused off the
-    // declaration alone, before anything inflates.
-    const meg = Buffer.alloc(1024 * 1024)
-    expect(binarySectionDeliversChange(literalSection(meg))).toBe(true)
-    expect(binarySectionDeliversChange(literalSection(meg, MAX_INFLATED_BINARY_BYTES + 1))).toBe(false)
-    // DISCRIMINATING at the boundary (fourth landing round, carried pass 8):
-    // with a MATCHING stream, an implementation without the cap would inflate
-    // the whole declared size, find length === declared and answer true —
-    // only the bound itself refuses it. Exactly AT the cap still delivers.
-    expect(binarySectionDeliversChange(literalSection(Buffer.alloc(MAX_INFLATED_BINARY_BYTES)))).toBe(true)
-    expect(binarySectionDeliversChange(literalSection(Buffer.alloc(MAX_INFLATED_BINARY_BYTES + 1)))).toBe(false)
-    // A stream that would inflate PAST its own declaration is stopped by the
-    // output bound (the declared length is the most validation may produce).
-    expect(binarySectionDeliversChange(literalSection(meg, 16))).toBe(false)
-    // A non-integer or absurd declaration refuses the same way.
-    expect(
-      binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 99999999999999999999\nNcmWHKh>T)n0ssa+0cHRI'),
-    ).toBe(false)
-  })
-
-  it('a payload line whose length letter contradicts its data is no payload (round-5 pass 5)', () => {
-    // M declares 13 decoded bytes, which demands 20 data characters — 9 is a
-    // line real git never writes, and 'any nonempty text' blessed it.
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\nMcmb=d0001')).toBe(false)
-    expect(binarySectionDeliversChange('diff --git a/x b/x\nGIT binary patch\nliteral 5\n#not base85')).toBe(false)
-  })
-
   it('refuses the declaration when the patch does not back it, exactly like patch-only', () => {
     const out = assembleMaterial({
       stat: 's',
       patch: patchFor(['other.mjs']),
-      files: [{ path: 'img.png', binary: true }],
+      files: [{ path: 'img.png', absentByDesign: 'binary' }],
       budget: 10_000,
     })
     expect(out.fit).toBe(false)
-    expect(out.binary).toEqual([])
+    expect(out.absentByDesign).toEqual([])
     expect(out.omitted).toEqual(['img.png'])
   })
 
-  it('is its own delivery level in a pass manifest — when its bytes actually travel', () => {
-    // ROUND-2 PASS 4: this fixture used the bare `Binary files … differ`
-    // section the surrounding tests prove carries no bytes, and still expected
-    // a pass to hold the file — codifying a planner/assembler contradiction.
-    // The manifest line is earned only by a section that DELIVERS the change.
-    const withRealSection = realGitBinSection.replaceAll('img.bin', 'img.png')
+  it('is its own named delivery level in a pass manifest', () => {
     const plan = planPasses({
       stat: 's',
-      patch: `${withRealSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
-      files: [{ path: 'img.png', binary: true }, file('a.mjs', 6000), file('b.mjs', 6000)],
+      patch: `${binSection}\n${patchFor(['a.mjs', 'b.mjs'])}`,
+      files: [{ path: 'img.png', absentByDesign: 'binary' }, file('a.mjs', 6000), file('b.mjs', 6000)],
       budget: 10_000,
     })
     expect(plan.fits).toBe(false)
-    const holder = plan.passes.find((p) => p.binary.includes('img.png'))
+    const holder = plan.passes.find((p) => p.absentByDesign.some((entry) => entry.path === 'img.png'))
     expect(holder).toBeTruthy()
     const text = formatPassManifest(plan, holder)
-    expect(text).toContain('· img.png — BINARY, declared')
+    expect(text).toContain('· img.png — ABSENT BY DESIGN, binary')
   })
 
-  it('a bare binary marker is BEYOND REACH for the plan too — no pass may promise it', () => {
-    // The assembly refuses the bare marker as an undelivered change, so a plan
-    // that packed it certified material the round could never send. ALONE, so
-    // the fit verdict is the binary file's own (round-4 pass 5) — and the
-    // shortfall must refuse a record, not merely classify.
-    const plan = planPasses({
-      stat: 's',
-      patch: binSection,
-      files: [{ path: 'img.png', binary: true }],
-      budget: 10_000,
-    })
-    expect(plan.passes.some((p) => p.files.includes('img.png'))).toBe(false)
-    expect(plan.uncoverable.map((u) => u.path)).toContain('img.png')
-    expect(plan.fits).toBe(false)
-    expect(planShortfall(plan)).not.toBe(null)
+  it('reads submodule identity only from raw Git modes, never pointer-looking text', () => {
+    const raw = [
+      `:100644 100644 ${'1'.repeat(40)} ${'2'.repeat(40)} M`,
+      'notes.txt',
+      `:160000 160000 ${'3'.repeat(40)} ${'4'.repeat(40)} M`,
+      'vendor/lib',
+      '',
+    ].join('\0')
+    expect([...gitlinkPathsFromRawDiff(raw)]).toEqual(['vendor/lib'])
+    expect([...gitlinkPathsFromRawDiff(`:100644 100644 ${'1'.repeat(40)} ${'2'.repeat(40)} M\0Subproject commit fake\0`)]).toEqual([])
   })
 
   it('a carried text path with NO patch section is beyond reach, not packed (round-2 pass 3)', () => {
@@ -1286,7 +1149,7 @@ describe('what the caller is told before the round is spent', () => {
         total: MAX_PASS_TOTAL + 1,
         files: [`f${i}.txt`],
         patchOnly: [],
-        binary: [],
+        absentByDesign: [],
         size: 100,
       })),
       uncoverable: [],
