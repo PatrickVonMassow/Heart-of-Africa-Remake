@@ -180,6 +180,31 @@ describe('condition 2 — the carrier must not rest', () => {
     const v = auditFindings({ tally: tallyTurn(reads(20)), ownsBatch: true, carrierPending: 1 })
     expect(kinds(v).sort()).toEqual(['carrier-not-drained', 'unrecorded-investigation'])
   })
+
+  it('hands pending carrier entries to the successor once the context fence is closed', () => {
+    const v = auditFindings({
+      tally: tallyTurn([]),
+      ownsBatch: true,
+      sessionId: 'closing-owner',
+      carrierPending: 3,
+      fence: { closed: true, successor: 'the successor session' },
+    })
+    expect(kinds(v)).not.toContain('carrier-not-drained')
+    expect(v.deferred.map((d) => d.kind)).toEqual(['carrier-not-drained'])
+    expect(v.deferred[0].detail).toContain('successor session')
+  })
+
+  it('demands the same carrier debt on the successor\'s first turn', () => {
+    const v = auditFindings({
+      tally: tallyTurn([]),
+      ownsBatch: true,
+      sessionId: 'successor-1',
+      carrierPending: 3,
+      fence: { closed: false },
+    })
+    expect(kinds(v)).toEqual(['carrier-not-drained'])
+    expect(v.violations[0].detail).toContain('successor-1')
+  })
 })
 
 describe('the carrier round-trips', () => {

@@ -52,6 +52,29 @@ describe('evaluateRuleReview', () => {
     expect(evaluateRuleReview({ ...fresh, lastReviewedAt: null, paused: true })).toBeNull()
   })
 
+  it('defers an owed review after the context fence closes', () => {
+    const v = evaluateRuleReview({
+      ...fresh,
+      lastReviewedAt: null,
+      sessionId: 'closing-owner',
+      fence: { closed: true, successor: 'the successor session' },
+    })
+    expect(v).toMatchObject({ decision: 'defer', deferred: true })
+    expect(v.reason).toContain('successor session')
+    expect(v.reason).toContain('batch-boundary.mjs --clear')
+  })
+
+  it('demands that same review from the successor\'s first turn', () => {
+    const v = evaluateRuleReview({
+      ...fresh,
+      lastReviewedAt: null,
+      sessionId: 'successor-1',
+      fence: { closed: false },
+    })
+    expect(v?.decision).toBe('block')
+    expect(v.reason).toContain('successor-1')
+  })
+
   it('errs toward allowing on unusable input rather than trapping the session', () => {
     expect(evaluateRuleReview(null)).toBeNull()
     expect(evaluateRuleReview({})).toBeNull()

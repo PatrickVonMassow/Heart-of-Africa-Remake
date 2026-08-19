@@ -48,11 +48,12 @@ import {
   knownPoints,
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
-import { progressGuardDecision } from './batch-singleton.mjs'
+import { markHandover, progressGuardDecision, readOwnerLock } from './batch-singleton.mjs'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
+import { evaluateRuleReview } from './rule-review-core.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -895,6 +896,24 @@ describe('commitSealedBoundary — the marker and ownership handover are one com
     expect(marker).toEqual({ v: 2, cause: 'context' })
     expect(caught?.stage).toBe('handover')
     expect(caught?.message).toBe('lock busy')
+  })
+
+  it('leaves the lock handed over even when an unrelated Stop duty blocks afterwards', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'boundary-handover-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    writeFileSync(lockPath, JSON.stringify({ sessionId: SID, claimedAt: NOW - 10_000, pid: process.pid }))
+    try {
+      commitSealedBoundary({
+        marker: marker({ cause: 'context', point: null }),
+        write: () => {},
+        handover: () => markHandover(SID, { lockPath, point: null, now: NOW }),
+      })
+      const unrelated = evaluateRuleReview({ now: NOW, lastReviewedAt: null, sessionId: SID })
+      expect(unrelated?.decision).toBe('block')
+      expect(readOwnerLock(lockPath)).toMatchObject({ handedOver: true, handedOverAt: NOW, handoverPoint: null })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

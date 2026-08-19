@@ -317,7 +317,7 @@ export const GUARDS = [
     gather: gatherRuleReviewInputs,
     decide: (inputs) => {
       const verdict = evaluateRuleReview(inputs)
-      return { block: Boolean(verdict), reason: verdict ? verdict.reason : '' }
+      return { block: verdict?.decision === 'block', reason: verdict ? verdict.reason : '' }
     },
   },
   {

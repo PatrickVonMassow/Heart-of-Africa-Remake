@@ -18,6 +18,7 @@
 //
 // Side-effect free. The wrapper (rule-review-guard.mjs) gathers the corpus and
 // is fail-open.
+import { scopeMandatoryDuty } from './guard-duty-core.mjs'
 
 /** A review is owed at the latest this many days after the previous one. */
 export const REVIEW_INTERVAL_DAYS = 14
@@ -71,30 +72,40 @@ export function evaluateRuleReview(input) {
     entryCount = null,
     reviewedCount = null,
     paused = false,
+    fence = null,
+    sessionId = '',
   } = input ?? {}
   if (paused) return null
   if (!Number.isFinite(now)) return null
 
-  if (!Number.isFinite(lastReviewedAt)) {
-    return owed('Für den Regelbestand ist noch NIE eine Durchsicht verzeichnet worden.')
+  let why = null
+  if (!Number.isFinite(lastReviewedAt)) why = 'Für den Regelbestand ist noch NIE eine Durchsicht verzeichnet worden.'
+
+  const days = Number.isFinite(lastReviewedAt) ? Math.floor((now - lastReviewedAt) / DAY_MS) : 0
+  if (!why && days >= REVIEW_INTERVAL_DAYS) {
+    why = `Die letzte Durchsicht des Regelbestands liegt ${days} Tage zurück (Intervall: ${REVIEW_INTERVAL_DAYS}).`
   }
 
-  const days = Math.floor((now - lastReviewedAt) / DAY_MS)
-  if (days >= REVIEW_INTERVAL_DAYS) {
-    return owed(`Die letzte Durchsicht des Regelbestands liegt ${days} Tage zurück (Intervall: ${REVIEW_INTERVAL_DAYS}).`)
-  }
-
-  if (Number.isFinite(entryCount) && Number.isFinite(reviewedCount)) {
+  if (!why && Number.isFinite(entryCount) && Number.isFinite(reviewedCount)) {
     const grown = entryCount - reviewedCount
     if (grown >= GROWTH_BUDGET) {
-      return owed(
+      why =
         `Der Regelbestand ist seit der letzten Durchsicht um ${grown} Einträge gewachsen ` +
-          `(Budget: ${GROWTH_BUDGET}) — von ${reviewedCount} auf ${entryCount}.`,
-      )
+        `(Budget: ${GROWTH_BUDGET}) — von ${reviewedCount} auf ${entryCount}.`
     }
   }
 
-  return null
+  if (!why) return null
+  const scoped = scopeMandatoryDuty({
+    owed: true,
+    fence,
+    guardId: 'rule-review-guard',
+    sessionId,
+    duty: 'the due rule-corpus review',
+  })
+  return scoped.deferred
+    ? { decision: 'defer', deferred: true, reason: scoped.message }
+    : owed(`${why} Diese Pflicht schuldet Sitzung ${sessionId || '<unknown owner>'}.`)
 }
 
 function owed(why) {
