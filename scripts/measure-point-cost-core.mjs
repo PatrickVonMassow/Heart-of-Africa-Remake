@@ -51,7 +51,7 @@ export const ITEM_LABELS = {
 }
 
 const IMAGE_PATH = /\.(?:png|jpe?g|webp|gif|avif|bmp|tiff?)\b/i
-const WHOLE_SPEC_PATH = /(?:^|[\\/])(?:TASKS\.md|design\.md|docs[\\/]tasks-archive\.md)\b/i
+const WHOLE_SPEC_PATH = /(?:^|[\\/\s"'=:])(?:TASKS\.md|design\.md|docs[\\/]tasks-archive\.md)\b/i
 // `review-sol.mjs` is the only mechanism that creates a cross-vendor review in
 // this corpus. Match its commission, not incidental prose such as "a reviewer will
 // read every line" in an authoring brief. `ask-sol.mjs` has a different opening and

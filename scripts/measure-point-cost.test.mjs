@@ -61,6 +61,8 @@ describe('point-cost IO over recorded trees', () => {
     expect(markdown).toContain('Named Codex residual')
     expect(markdown).toContain('reverse causality')
     expect(snapshot.residualTokens.openai).toMatchObject({ tokens: 200, outsideWindowTokens: 200 })
+    expect(snapshot.wholeDocumentReads).toEqual({ attributed: 0, sourceWindow: 1 })
+    expect(markdown).toContain('not observed within the attributed set (1 in the source window overall)')
     expect(snapshot.reviewProviderTokens).toEqual({ anthropic: 0, openai: 800 })
     expect(snapshot.ledger[0].origins.crossVendorReviews).toBe(snapshot.reviewProviderTokens.openai)
   })

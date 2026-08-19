@@ -118,6 +118,11 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
   const result = aggregatePointLedger({ landed, turns: assigned, boundaryEvents })
   const assignedTurns = assigned.filter((turn) => points.includes(turn.point) && turn.tokens > 0)
   const residualTurns = assigned.filter((turn) => !points.includes(turn.point) && turn.tokens > 0)
+  const sourceSince = dateMs(source.since)
+  const sourceUntil = dateMs(generatedAt)
+  const sourceWindowTurns = assigned.filter(
+    (turn) => (sourceSince == null || turn.at >= sourceSince) && (sourceUntil == null || turn.at <= sourceUntil),
+  )
   const providerTokens = {
     anthropic: assignedTurns.filter((turn) => turn.provider === 'anthropic').reduce((sum, turn) => sum + turn.tokens, 0),
     openai: assignedTurns.filter((turn) => turn.provider === 'openai').reduce((sum, turn) => sum + turn.tokens, 0),
@@ -167,6 +172,10 @@ export function buildSnapshot({ landed, turns, boundaryText = '', source = {}, g
     residualTokens: {
       anthropic: residualFor('anthropic'),
       openai: residualFor('openai'),
+    },
+    wholeDocumentReads: {
+      attributed: result.ledger.reduce((sum, row) => sum + row.wholeDocumentReads, 0),
+      sourceWindow: sourceWindowTurns.filter((turn) => turn.signals?.wholeDocumentRead).length,
     },
     assignedBy,
     ...result,
@@ -225,7 +234,7 @@ export function formatConsole(snapshot) {
         `fired ${k(effect.firedMean).padStart(7)} absent ${k(effect.absentMean).padStart(7)} difference ${k(effect.difference).padStart(8)} (${pct(effect.differencePct)}) — ${effect.verdict}`,
     )
   }
-  lines.push(`  whole-document reads observed beside the brief: ${snapshot.ledger.reduce((sum, row) => sum + row.wholeDocumentReads, 0)}`)
+  lines.push(`  whole-document reads: ${snapshot.wholeDocumentReads.attributed} within the attributed set (${snapshot.wholeDocumentReads.sourceWindow} in the source window overall)`)
   lines.push('')
   lines.push('LARGE ITEMS — inclusive shares; overlaps are possible when a review consumes another item')
   for (const [item, value] of Object.entries(snapshot.items).sort((a, b) => b[1].tokens - a[1].tokens)) {
@@ -280,7 +289,13 @@ export function formatMarkdown(snapshot) {
     const effect = snapshot.effectiveness[lever]
     lines.push(`| ${LEVER_LABELS[lever]} | ${effect.fired} | ${effect.events} | ${effect.absent} | ${effect.firedMean ?? 'n/a'} | ${effect.absentMean ?? 'n/a'} | ${effect.difference ?? 'n/a'} | ${effect.verdict} |`)
   }
-  lines.push('', `Whole-document reads observed beside the brief: ${snapshot.ledger.reduce((sum, row) => sum + row.wholeDocumentReads, 0)}. This is the operational check behind the brief/open-archive readings.`)
+  const attributedWholeReads = snapshot.wholeDocumentReads.attributed
+  lines.push(
+    '',
+    attributedWholeReads === 0
+      ? `Whole-document reads were not observed within the attributed set (${snapshot.wholeDocumentReads.sourceWindow} in the source window overall). This detector coverage does not show that the brief eliminated whole-document reads.`
+      : `Whole-document reads observed within the attributed set: ${attributedWholeReads} (${snapshot.wholeDocumentReads.sourceWindow} in the source window overall).`,
+  )
   lines.push('', '## Largest measured items', '')
   for (const item of snapshot.largestItems) lines.push(`- ${item.label}: ${item.tokens} tokens (${pct(item.share)}).`)
   lines.push('', 'The three named suspects, whether or not they made the top three:', '')
@@ -328,6 +343,7 @@ if (isMainModule(import.meta.url)) {
       codexFiles: providers.codexFiles,
       codexCandidates: providers.codexCandidates,
       boundaryLog: existsSync(boundaryPath),
+      since: iso(since),
     },
   })
   const empty = snapshot.ledger.filter((row) => row.tokens === 0).map((row) => row.point)
