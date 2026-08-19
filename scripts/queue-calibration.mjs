@@ -206,6 +206,7 @@ try {
     noBranch: rows.filter((r) => r.spanBasis === SPAN_NO_BRANCH).length,
     unknown: rows.filter((r) => r.spanBasis === SPAN_UNKNOWN).length,
     inferred: rows.filter((r) => r.attribution === 'inferred').length,
+    inferredMeasured: rows.filter((r) => r.attribution === 'inferred' && r.spanBasis === SPAN_MEASURED).length,
   }
   console.log('')
   console.log(
@@ -213,13 +214,14 @@ try {
       `NOT compared · ${provenance.none} unestimated`,
   )
   console.log(
-    `  LIMIT: ${QUEUE_DATA_PATH} and the board HTML are both untracked, so estimates older than this ledger are unrecoverable; ` +
+    `  LIMIT: ${QUEUE_DATA_PATH} and .batch-dashboard.html are both untracked, so estimates older than this ledger are unrecoverable; ` +
       'the ledger begins with this command’s first run.',
   )
   if (provenance.snapshot === 0) console.log('  NO FACTOR CAN BE MEASURED YET: this window contains zero landing-time snapshots.')
   console.log(
-    `SPAN PROVENANCE         ${spans.measured} measured (${spans.inferred} via a merge inferred from the landing sequence) · ` +
-      `${spans.noBranch} explicitly no-branch · ${spans.unknown} without a readable attributed span`,
+    `SPAN PROVENANCE         ${spans.measured} measured (${spans.inferredMeasured} via a merge inferred from the landing sequence) · ` +
+      `${spans.inferred} inferred attribution(s) total · ${spans.noBranch} explicitly no-branch · ` +
+      `${spans.unknown} without a readable attributed span`,
   )
   console.log('CLASSIFICATION LIMIT — LANE: only a merge subject naming the point’s branch establishes delegated; every other row is lane-unestablished.')
   console.log('CLASSIFICATION LIMIT — PICTURE: render-verify-state.json is git-ignored, bounded to 40 runs and clearedHeads is pruned at branch end; only a retained branch entry establishes picture verification.')
