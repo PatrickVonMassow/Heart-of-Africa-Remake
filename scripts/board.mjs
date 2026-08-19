@@ -183,13 +183,34 @@ function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, not
         focusPoint: focusPoint === undefined ? declaration.focusPoint ?? null : focusPoint,
       }))
     }
-    if (focusPoint !== undefined) {
-      console.log(run(['scripts/focus.mjs', 'set', focusPoint == null ? '-' : String(focusPoint), note]).trim())
-    } else if (exitPoint != null) {
-      const focus = readJson(FOCUS_PATH)
-      if (Number(focus?.point) === Number(exitPoint)) {
-        console.log(run(['scripts/focus.mjs', 'set', '-', note]).trim())
+    try {
+      if (focusPoint !== undefined) {
+        console.log(run(['scripts/focus.mjs', 'set', focusPoint == null ? '-' : String(focusPoint), note]).trim())
+      } else if (exitPoint != null) {
+        const focus = readJson(FOCUS_PATH)
+        if (Number(focus?.point) === Number(exitPoint)) {
+          console.log(run(['scripts/focus.mjs', 'set', '-', note]).trim())
+        }
       }
+    } catch (error) {
+      // ROLLBACK (eighth cross-review): the declaration is written FIRST, so a
+      // focus step that fails here would leave the two stores contradicting
+      // each other — the very split-brain this shared transition exists to
+      // close, with the edit lock offering no rollback of its own. The
+      // declaration write is in-process and restorable; the focus subprocess
+      // failed and wrote nothing. Restore, then fail the command loudly.
+      if (declaration) {
+        try {
+          writeDeclaration(declaration)
+        } catch (rollbackError) {
+          throw new Error(
+            `${error.message} — AND rolling the active-work declaration back failed too ` +
+              `(${rollbackError.message}): the two active-work stores may now disagree; ` +
+              're-run this command once the cause is fixed.',
+          )
+        }
+      }
+      throw error
     }
   }
 }

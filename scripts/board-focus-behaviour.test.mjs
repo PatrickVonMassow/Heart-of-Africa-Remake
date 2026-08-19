@@ -89,6 +89,28 @@ describe('board.mjs focus (spawned)', () => {
     expect(confirm.stdout).toContain('focus confirmed: 700')
   })
 
+  it('rolls the declaration back when the focus step fails AFTER the declaration write', () => {
+    // Eighth cross-review: the transition writes declaration.focusPoint FIRST
+    // and runs `focus.mjs set` second. A second step that fails must not leave
+    // the stores contradicting each other in the other direction — the
+    // declaration write is rolled back and the command fails loudly.
+    const focusScript = resolve(repo, 'scripts', 'focus.mjs')
+    const original = readFileSync(focusScript, 'utf8')
+    writeFileSync(focusScript, 'process.stderr.write("focus stub: refusing\\n")\nprocess.exit(1)\n')
+    try {
+      const r = runCli('board.mjs', 'focus', '700', 'wechsle auf den zweiten Strang')
+      expect(r.status).toBe(1)
+      // Neither store moved: the focus file was never written, the
+      // declaration write was rolled back.
+      expect(readJson(focusPath()).point).toBe(697)
+      const declaration = readJson(declarationPath())
+      expect(declaration.focusPoint).toBe(697)
+      expect(declaration.evidence.map((item) => item.point)).toEqual([697, 700])
+    } finally {
+      writeFileSync(focusScript, original)
+    }
+  })
+
   it('clears both stores with "-" and refuses a non-point before touching either', () => {
     const cleared = runCli('board.mjs', 'focus', '-', 'kein Punkt gerade')
     expect(cleared.stdout + cleared.stderr).toContain('focus declared: -')
