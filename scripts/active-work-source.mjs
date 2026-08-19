@@ -77,13 +77,16 @@ export function gatherActiveWorkSource({
 /**
  * Lifecycle edit applied by board commands before their locked publish. The
  * assignment evidence→point is RECORDED, never guessed (fifth cross-vendor
- * round — every probe heuristic here produced the next finding): each item is
- * first migrated to carry its `point` (`withRecordedEvidencePoint` persists
- * what the read side resolves anyway, so a legacy declaration is migrated by
- * its next write), and the exit then filters purely on that recorded field.
- * An item that cannot be attributed keeps standing UNCHANGED — no probe
- * retires it; the read side reports it loudly and names the explicit human
- * command (`batch-in-flight.mjs --clear`) as the only way out.
+ * round — every probe heuristic here produced the next finding): EVERY write
+ * through here first migrates each item to carry its `point`
+ * (`withRecordedEvidencePoint` persists what the read side resolves anyway,
+ * so a legacy declaration is migrated by its next write — an exit AND a
+ * plain focus write alike; the sixth round found the migration skipped on
+ * the non-exit path, which left the once-only migration never happening
+ * there). The exit then filters purely on that recorded field. An item that
+ * cannot be attributed keeps standing UNCHANGED — no probe retires it; the
+ * read side reports it loudly and names the explicit human command
+ * (`batch-in-flight.mjs --clear`) as the only way out.
  */
 export function transitionActiveDeclaration(
   declaration,
@@ -91,9 +94,10 @@ export function transitionActiveDeclaration(
 ) {
   if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) return declaration
   const next = { ...declaration, ...(focusPoint === undefined ? {} : { focusPoint }) }
-  if (!Array.isArray(declaration.evidence) || exitPoint == null) return next
-  const evidence = declaration.evidence
-    .map((item) => withRecordedEvidencePoint(item, { worktreeRef }))
-    .filter((item) => !(item && typeof item === 'object' && Number(item.point) === Number(exitPoint)))
+  if (!Array.isArray(declaration.evidence)) return next
+  const migrated = declaration.evidence.map((item) => withRecordedEvidencePoint(item, { worktreeRef }))
+  const evidence = exitPoint == null
+    ? migrated
+    : migrated.filter((item) => !(item && typeof item === 'object' && Number(item.point) === Number(exitPoint)))
   return { ...next, evidence }
 }

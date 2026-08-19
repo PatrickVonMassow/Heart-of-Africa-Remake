@@ -104,6 +104,29 @@ describe('active-work source I/O boundary', () => {
     expect(transitionActiveDeclaration(recorded, { exitPoint: 713, worktreeRef: () => null }).evidence).toEqual([])
   })
 
+  it('migrates a legacy declaration on a write that exits nothing — the focus path is a write too', () => {
+    // Sixth cross-review: the early return on `exitPoint == null` skipped the
+    // migration on focus writes, so a legacy declaration never gained its
+    // recorded mapping until something exited. Every write migrates.
+    const worktree = '/workspace/hoa/.claude/worktrees/point-713'
+    const worktreeRef = (path) => (path === worktree ? 'refs/heads/feat/713-now-section-derived' : null)
+    const declaration = {
+      evidence: [
+        { kind: 'branch', ref: 'refs/heads/feat/697-goat-foot-planting' },
+        { kind: 'worktree', path: worktree },
+      ],
+    }
+    expect(transitionActiveDeclaration(declaration, { focusPoint: 700, worktreeRef })).toEqual({
+      focusPoint: 700,
+      evidence: [
+        { kind: 'branch', ref: 'refs/heads/feat/697-goat-foot-planting', point: 697 },
+        { kind: 'worktree', path: worktree, point: 713 },
+      ],
+    })
+    // The input declaration is never mutated in place.
+    expect(declaration.evidence[0]).toEqual({ kind: 'branch', ref: 'refs/heads/feat/697-goat-foot-planting' })
+  })
+
   it('keeps an unattributable item unchanged and has the read side name the human way out', () => {
     // No recorded point, no resolvable ref: the item is neither guessed at nor
     // dropped — it survives every exit, and the gather side blocks loudly with

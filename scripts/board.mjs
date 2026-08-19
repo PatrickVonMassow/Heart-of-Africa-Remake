@@ -170,11 +170,14 @@ function applyEdit(fn, done, preparePublish = () => {}) {
 function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, note = 'board lifecycle transition' } = {}) {
   return () => {
     const declaration = readDeclaration()
-    if (declaration && exitPoint != null) {
-      // The exit filters on the RECORDED point alone (and migrates a legacy
-      // item to carry it): nothing is probed, guessed or retired here — an
-      // unattributable item survives and the read side names the human way
-      // out (fifth cross-vendor round).
+    if (declaration) {
+      // EVERY transition is a write, so every transition migrates: a legacy
+      // item gets its resolved point RECORDED (fifth cross-vendor round), on
+      // the focus path as much as on an exit — the sixth round found the
+      // migration skipped when nothing exited. The exit then filters on the
+      // RECORDED point alone: nothing is probed, guessed or retired here —
+      // an unattributable item survives and the read side names the human
+      // way out.
       writeDeclaration(transitionActiveDeclaration(declaration, {
         exitPoint,
         focusPoint: focusPoint === undefined ? declaration.focusPoint ?? null : focusPoint,
