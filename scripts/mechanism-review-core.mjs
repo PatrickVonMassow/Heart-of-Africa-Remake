@@ -1144,7 +1144,14 @@ export function evaluateMechanismReview({
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
     const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
-    const sound = wellFormed.filter((r) => !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit))
+    // A SPEC EXAMINATION READS TEXT, NOT CODE. It deliberately shares the
+    // append-only ledger with reviews, but it cannot satisfy this gate: in
+    // particular, its merge verdict at a descendant sha must never discharge
+    // a do-not-merge that demanded a code fix. Keep it out of `sound` so it can
+    // neither clear an otherwise unreviewed commit nor answer a refusal.
+    const sound = wellFormed.filter(
+      (r) => !r?.specExamination && !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit),
+    )
 
     // AUTHORSHIP-SCOPED PASSES ADVANCE PER CONTRIBUTION. Unlike the legacy
     // size-only split below, these rows name the commits whose changes were in
