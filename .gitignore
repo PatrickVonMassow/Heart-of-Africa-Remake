@@ -126,6 +126,13 @@ scripts/.tile-cache
 .claude/batch-boundary.json.tmp-*
 .claude/batch-boundary-prepared.json
 .claude/batch-boundary-prepared.json.tmp-*
+# The LIVE context-overshoot series the boundary appends to (point 742). Runtime
+# state like the fence beside it: these are THIS machine's session readings, and a
+# committed one would hand a clone somebody else's history — while a boundary, the
+# session's LAST repository action, could never commit what it writes anyway. The
+# readings that must outlive the machine sit in the TRACKED
+# .claude/context-incidents-seed.jsonl.
+.claude/context-incidents.jsonl
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
 # The commissioning record (point 712): the overrides taken against the queue's
