@@ -241,6 +241,7 @@ describe('the mode round-trips into the ledger', () => {
       files: ['scripts/shared-guard.mjs'],
       commits: [a, b],
     })
+    expect(built.record.partialReview).toBe(true)
   })
 
   it('stores a contribution boundary WHOLE, so the gate can match it at all', () => {
@@ -526,6 +527,7 @@ describe('the mode round-trips into the ledger', () => {
         mode: 'review',
         carried: { from: S },
         pass: { index: 1, total: 2, files: ['fileA.mjs', 'fileB.mjs'] },
+        partialReview: true,
       })
       expect(carried.evidence).toMatch(/^CARRIED from [0-9a-f]{7} \(blobs verified identical\): read both files whole/)
       // A fresh verdict beside a carry is refused — a carry is provenance.
@@ -741,7 +743,7 @@ describe('the mode round-trips into the ledger', () => {
       // normal-looking pass line.
       expect(r.stdout).toContain('"files":"x"')
       // …while the well-formed row keeps the ordinary rendering.
-      expect(r.stdout).toContain('pass 1/2 over: b.mjs')
+      expect(r.stdout).toContain('PARTIAL REVIEW — pass 1/2 over: b.mjs')
       // The forged text never renders as a LINE of its own — flattened, it may
       // survive only inline where nothing reads it as structure — and the
       // unparseable pass claim is named for the hand-edit it is.

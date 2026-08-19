@@ -24,6 +24,7 @@ import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, V
 import {
   assembleMaterial,
   formatPassFiles,
+  formatReviewCoverage,
   formatShortfall,
   MATERIAL_BUDGET_CHARS,
   parseDiffHeader,
@@ -912,6 +913,7 @@ export function formatReviewReport({
     return [
       `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
       `  ${decision.evidence}`,
+      ...(plan ? ['', formatReviewCoverage(plan, pass)] : []),
       '',
       'Record it (the model named is the one that actually ran):',
       `  ${cmd}`,

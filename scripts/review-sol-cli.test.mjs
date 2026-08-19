@@ -895,6 +895,9 @@ describe('a range too large for one round', () => {
     expect(printed).toMatch(/--pass 1\/2/)
     expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
     expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
+    expect(r.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of file contributions (1/2); block 1/2.')
+    expect(r.stdout).toContain('assigned to other blocks, not dropped:')
+    expect(r.stdout).toContain('dropped: none')
     // What actually went to the reviewer stayed inside the budget.
     const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
     expect(sent.length).toBeLessThanOrEqual(200_000)
@@ -933,6 +936,7 @@ describe('a range too large for one round', () => {
     const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
     expect(JSON.parse(ledger.at(-1))).toMatchObject({
       sha: bulkSha,
+      partialReview: true,
       pass: { index: 1, total: 2, files: [expect.stringMatching(/^bulk-[ab]\.txt$/)] },
     })
   })
@@ -1050,6 +1054,8 @@ describe('a range too large for one round', () => {
     const r = run(['--sha', headSha, '--brief', 'judge the ordinary range'])
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).toContain('Coverage plan: 100% planned coverage')
+    expect(r.stdout).toContain('Coverage: FULL REVIEW — 100% of file contributions')
   })
 
   it('retires carry planning because recorded contribution coverage now persists directly', () => {
