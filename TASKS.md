@@ -7990,9 +7990,12 @@ to land than a mechanism that needs a review.
   setting said so, not because a fallback fired. Part (3) below is exactly that fix. Measured in the
   same reading, on what the lane is actually spent on: of 461 review records Fable is the MERGER in 3
   and the REVIEWER in 190, but every one of those falls on or before 13.08., when the cross-vendor
-  rule moved reviewing to Sol; the recent spend is AUTHORING (Fable-trailer commits 17.08. 67,
-  18.08. 94), which is the escalation the routing point governs. The merger role consults no lane
-  function and is untouched by either point — it must stay that way.
+  rule moved reviewing to Sol. Classifying all 235 Fable commits since 01.08. by where they sit
+  REVERSES the 17.08. weighting this point opens with: 179 of them (76 %) are on merged FEATURE
+  branches, only 43 direct on `main`, and two points ate more than half — 714 with 87 and 700 with
+  39. Under the current policy the serving share is the MINORITY and the escalation lane is the
+  consumer, so the load-bearing fixes are the threshold and its round-level twin, not a reordered
+  chain. The merger role consults no lane function and is untouched by either — it must stay that way.
   FINAL STATE, three halves from two incidents:
   (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
   already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
