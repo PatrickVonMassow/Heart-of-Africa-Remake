@@ -7,11 +7,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   authorLaneFor,
+  FABLE_ESCALATION_ROUNDS,
   formatLaneReport,
   HARD_MARKERS,
   LANE_MODEL,
   LANES,
   laneTagIn,
+  unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
 
@@ -84,18 +86,28 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('Claude judges the picture. The picture shows a black horizon on WebGL.')).toBe('opus')
   })
 
-  it('moves work whose re-work the review still finds problems in to Fable, above every other signal', () => {
-    expect(lane('A screenshot point.', { reworked: true })).toBe('fable')
-    expect(lane('Something mechanical.', { reworked: true })).toBe('fable')
-    expect(authorLaneFor({ body: 'x', reworked: true }).why[0]).toMatch(/after a re-work/)
-    // ABOVE THE TAG TOO (cross-vendor review of point 667, P1): the order used to
-    // return the tag first, so `Author lane: sol` plus a failed re-work stayed
-    // with Sol while the comment claimed rework outranked everything.
-    expect(lane('Something mechanical.\nAuthor lane: sol', { reworked: true })).toBe('fable')
-    expect(lane('A picture point.\nAuthor lane: opus', { reworked: true })).toBe('fable')
-    // The caller's explicit override is the ONE thing above it: a human saying
-    // "this one, in that lane" is not a signal to be outvoted.
-    expect(lane('x', { reworked: true, override: 'sol' })).toBe('sol')
+  it('keeps every pre-boundary rework in the lane its other signals demand', () => {
+    for (let reworkRounds = 0; reworkRounds < FABLE_ESCALATION_ROUNDS; reworkRounds += 1) {
+      expect(lane('Something mechanical.', { reworkRounds }), `ordinary round ${reworkRounds}`).toBe('sol')
+      expect(
+        lane('A complex screenshot problem.', { criticality: 'high', reworkRounds }),
+        `hard/HIGH round ${reworkRounds}`,
+      ).toBe('sol')
+      expect(lane('A screenshot point.', { reworkRounds }), `verification round ${reworkRounds}`).toBe('opus')
+    }
+  })
+
+  it('escalates at the exported boundary, above ordinary lane tags but below operator decisions', () => {
+    const reworkRounds = FABLE_ESCALATION_ROUNDS
+    expect(lane('Something mechanical.', { reworkRounds })).toBe('fable')
+    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('fable')
+    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('fable')
+    expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('fable')
+    expect(lane('x', { reworkRounds, override: 'sol' })).toBe('sol')
+    expect(lane('x\nAuthor lane: fable', { reworkRounds: 0 })).toBe('fable')
+    expect(authorLaneFor({ body: 'x', reworkRounds }).why[0]).toBe(
+      `${FABLE_ESCALATION_ROUNDS} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
+    )
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
@@ -165,7 +177,7 @@ describe('authorLaneFor — which lane authors a point', () => {
 
   it('reports every signal it saw, not only the deciding one', () => {
     const d = authorLaneFor({ body: 'A complex screenshot problem.', criticality: 'med' })
-    expect(d.signals).toMatchObject({ criticality: 'med', reworked: false })
+    expect(d.signals).toMatchObject({ criticality: 'med', reworkRounds: 0 })
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
     // The two signals now answer DIFFERENTLY, and the order decides: hard wins,
@@ -180,6 +192,38 @@ describe('authorLaneFor — which lane authors a point', () => {
     }
     expect(HARD_MARKERS.length).toBeGreaterThan(0)
     expect(VERIFICATION_MARKERS.length).toBeGreaterThan(0)
+  })
+})
+
+describe('unsuccessfulReviewRounds — completed ledger evidence only', () => {
+  it('returns zero without records and counts only non-passing reviews for this point', () => {
+    expect(unsuccessfulReviewRounds([], 726)).toBe(0)
+    expect(
+      unsuccessfulReviewRounds(
+        [
+          { point: 726, mode: 'review', verdict: 'merge' },
+          { point: 726, mode: 'review', verdict: 'merge-with-fixes' },
+          { point: 726, mode: 'review', verdict: 'do-not-merge' },
+          { point: 725, mode: 'review', verdict: 'do-not-merge' },
+          { point: 726, mode: 'blind-parallel', verdict: 'do-not-merge' },
+        ],
+        726,
+      ),
+    ).toBe(2)
+  })
+
+  it('does not turn aborted or short material into an unsuccessful round', () => {
+    expect(
+      unsuccessfulReviewRounds(
+        [
+          { point: 726, mode: 'review', verdict: 'do-not-merge', aborted: true },
+          { point: 726, mode: 'review', verdict: 'do-not-merge', shortfall: { missing: ['x'] } },
+          { point: 726, mode: 'review', verdict: 'do-not-merge', completed: false },
+          { point: 726, mode: 'review', kind: 'shortfall' },
+        ],
+        726,
+      ),
+    ).toBe(0)
   })
 })
 

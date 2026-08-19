@@ -497,7 +497,7 @@ describe('the real placement of a stamp (review round 8)', () => {
 
   it('accepts a quote from the policy text it marks', () => {
     expect(
-      quoteIsInFile(hookText, 'HARD and CRITICAL ones go STRAIGHT to it', { id: 'model-policy' }).ok,
+      quoteIsInFile(hookText, 'makes that cut from point text and recorded review history', { id: 'model-policy' }).ok,
     ).toBe(true)
   })
 

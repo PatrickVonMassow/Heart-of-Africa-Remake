@@ -111,21 +111,19 @@ node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, no
 node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-<!-- rule:model-policy@05eaa324 -->
-**The cut is a function, not a taste.** `scripts/author-routing-core.mjs` reads
-the point's own text: the hard cases (difficult, complex, error-prone, or tagged
-HIGH criticality) go **straight to Sol** (user 18.08.2026 — they used to be held
-back for Opus 5, and before that routed to Fable), and so does everything
-mechanical and mid-difficulty. What stays with the main session is a point whose
-VERIFICATION is the work and that nothing marks hard — the picture is judged
-here whoever authored the code, so a hard picture point is Sol's too. The CUT
-reaches Fable by ONE route only, `--reworked`; a lane tag or an explicit
-override is the operator's own decision, below. Measured over the whole open queue on
-18.08.2026, before and after the change: **203 points → 120 Sol / 0 Fable / 83
-main session**, against 65 / 0 / 138 the day before. A point may
-override the function with `Author lane: sol|fable|opus` **on a line of its
-own** in its spec; `--reworked` says Sol has already been round this point and
-the review still found problems, which sends it to Fable whatever the text says.
+<!-- rule:model-policy@19ee578a -->
+**The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
+for the authoring and escalation policy. `scripts/author-routing-core.mjs`
+applies it from the point text and recorded review history. A point may override
+the function with `Author lane: sol|fable|opus` **on a line of its own** in its
+spec, and `--rounds <n>` is the deliberate override for history the ledger
+cannot know.
+
+**What the cut actually moved**, measured over the whole open queue on
+18.08.2026, before and after the day's ruling: **203 points → 120 Sol / 0 Fable
+/ 83 main session**, against 65 / 0 / 138 the day before. This is a MEASUREMENT,
+not a restatement of the policy — it stands here because nothing else records it,
+and it is the reading against which a later re-measurement is judged.
 
 **The lane runs like any delegated agent**: an isolated worktree, its own
 `feat/` branch, the point handed over as a BRIEF rather than a reading

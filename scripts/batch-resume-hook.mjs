@@ -236,15 +236,11 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@05eaa324
-      'MODEL POLICY (25.07.-18.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
-      'GPT-5.6 Sol authors the points via scripts/author-sol.mjs, and since 18.08.2026 the ' +
-      'HARD and CRITICAL ones go STRAIGHT to it — difficult, complex, error-prone or tagged ' +
-      'HIGH criticality is a reason FOR Sol, not against it; OPUS 5 authors what is left, a ' +
-      'point whose VERIFICATION is the work and that nothing marks hard; FABLE 5 is the ' +
-      'ESCALATION the CUT reaches only once a re-work still comes back with problems, though ' +
-      'a point\'s own `Author lane:` tag may name any lane (its weekly pool is the scarcest). ' +
-      'scripts/author-routing-core.mjs makes the cut, and ' +
+      // rule:model-policy@19ee578a
+      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
+      'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
+      'makes that cut from point text and recorded review history, while a point\'s own ' +
+      '`Author lane:` tag remains an operator decision. ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +
