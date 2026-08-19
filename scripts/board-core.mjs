@@ -373,10 +373,9 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
  * the next render decides anyway.
  */
 function insertAsFirstNowCard(html, card) {
-  const head = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
-  const at = html.indexOf(head)
-  if (at < 0) throw new Error('board: current-work section not found')
-  const from = at + head.length
+  // The same structural rule as every read (seventh cross-review): the writer
+  // must not insert after a heading that only LOOKS like the section.
+  const { from } = sectionBounds(html, 'now')
   return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
 }
 
@@ -388,15 +387,44 @@ const HEAD = {
   done: '<summary><h2>Erledigt</h2></summary>',
 }
 
-/** Where a section's content begins and ends. Throws rather than guessing. */
+/** The wrapper every section heading lives directly inside. */
+const SECT_OPEN = '<details class="sect">'
+
+/**
+ * Where a section's content begins and ends. Throws rather than guessing.
+ *
+ * The heading counts ONLY inside its own `<details class="sect">` wrapper
+ * (seventh cross-review): a bare `indexOf(head)` accepted a heading orphaned
+ * by damage, or one standing unescaped inside a card's prose — and the slice
+ * then treated the FOREIGN region after it as the section, which the render
+ * could project into and the comparison would bless. An occurrence not
+ * directly preceded by the wrapper is no heading; none left, or more than one
+ * left, refuses by name — the fail-closed callers propagate, the fail-open
+ * ones already catch.
+ */
 function sectionBounds(html, key) {
   const head = HEAD[key]
-  const at = String(html ?? '').indexOf(head)
-  if (at < 0) throw new Error(`board: section not found: ${key}`)
-  const from = at + head.length
-  const nextSect = html.indexOf('<details class="sect">', from)
-  const end = nextSect < 0 ? html.length : html.lastIndexOf('\n</details>', nextSect)
-  return { from, end: end < from ? html.length : end }
+  const text = String(html ?? '')
+  const hits = []
+  for (let at = text.indexOf(head); at >= 0; at = text.indexOf(head, at + head.length)) {
+    const before = text.slice(Math.max(0, at - SECT_OPEN.length - 32), at)
+    if (before.trimEnd().endsWith(SECT_OPEN)) hits.push(at)
+  }
+  if (hits.length === 0) {
+    throw new Error(
+      text.includes(head)
+        ? `board: the ${key} section heading stands outside its <details class="sect"> wrapper — ` +
+          'structural damage, refusing to guess the section'
+        : `board: section not found: ${key}`,
+    )
+  }
+  if (hits.length > 1) {
+    throw new Error(`board: the ${key} section heading appears ${hits.length} times — refusing to guess the section`)
+  }
+  const from = hits[0] + head.length
+  const nextSect = text.indexOf(SECT_OPEN, from)
+  const end = nextSect < 0 ? text.length : text.lastIndexOf('\n</details>', nextSect)
+  return { from, end: end < from ? text.length : end }
 }
 
 /**

@@ -296,6 +296,38 @@ describe('derived now-section membership', () => {
       .toThrow(/section heading is missing/)
   })
 
+  it('a findable heading OUTSIDE its sect wrapper is no section — the foreign region after it is never sliced', () => {
+    // Seventh cross-review: the fail-closed path checked only indexOf(HEAD.now),
+    // so a heading orphaned by damage — or standing unescaped inside a card's
+    // prose — made the FOREIGN region after it the "now-section": the render
+    // could project there and the comparison confirmed it.
+    const heading = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
+    // (1) Orphaned: the heading stands bare, its wrapper gone; the queue
+    // section follows it.
+    const orphaned =
+      `<main>\n${heading}\n${sect('Von dir zu klären', '')}` +
+      `${sect('Warteschlange', queueEntry(700, 'Wartend', '~2 h'))}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(orphaned, [700])).toThrow(/section heading is missing/)
+    const compared = compareNowProjection(orphaned, [700])
+    expect(compared).toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
+    // (2) Inside card prose: the real section is gone, a card in another
+    // section QUOTES the heading unescaped — still no section.
+    const quoted = fullBoard({
+      vdzk: `<details>\n  <summary><span class="t">Zitat</span></summary>\n` +
+        `  <div class="body">\n    <p>${heading}</p>\n  </div>\n</details>\n`,
+    }).replace(sect('Woran ich gerade arbeite', ''), '')
+    expect(() => reconcileNowProjection(quoted, [700])).toThrow(/section heading is missing/)
+    expect(compareNowProjection(quoted, [700]).ok).toBe(false)
+    // (3) Beside the intact section, a quoted duplicate changes nothing: the
+    // wrapper decides, so the real section still renders and compares.
+    const intact = fullBoard({
+      now: nowEntry(700, 'Echt', '20:07'),
+      vdzk: `<details>\n  <summary><span class="t">Zitat</span></summary>\n` +
+        `  <div class="body">\n    <p>${heading}</p>\n  </div>\n</details>\n`,
+    })
+    expect(compareNowProjection(intact, [700]).ok).toBe(true)
+  })
+
   it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
     const authored = nowEntry(700, 'Die Übergabe', '20:07', 'Umlaute, <a href="/x">Link</a> und Text.')
     const before = fullBoard({
