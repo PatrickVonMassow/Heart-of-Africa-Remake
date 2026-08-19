@@ -8605,3 +8605,34 @@ to land than a mechanism that needs a review.
   a re-baseline that unblocked the batch is honest only while this reading is owed and scheduled.
   Author lane: Sol.
   Bundle: unbundled (review tooling).
+
+- [ ] 724. A feature branch fully contained in a SIBLING branch keeps eating a pool slot
+  (measured 19.08.2026 while commissioning point 717; bundle Session- & Repo-Hygiene). The
+  commission guard refused the slot because SIX open `feat/*` branches stood against a pool cap of
+  three. Two of them carried nothing of their own: `feat/687-bank-game` had ZERO commits that
+  `feat/687-roam-bound-fixes` did not already contain, and `feat/686-five-word-lexicon`'s only
+  unique commit was a merge of `main` into itself. ONE line of development was therefore occupying
+  THREE of three slots, and the cap — which exists to bound parallel work — was being spent on
+  debris instead. `branch-hygiene-guard` does not see it: it tests containment in `main`, and these
+  were contained in a SIBLING that had not landed either. The remaining stale branches were 2040,
+  430 and 424 commits behind `main`, so their landing cost grows daily — which is the case for
+  naming a dead branch early rather than at the block two weeks later.
+  FINAL STATE:
+  - `branch-hygiene-guard` also tests PAIRWISE containment across the open `feat/*` set: a branch
+    whose tip is an ancestor of another open branch's tip (`git rev-list --count <newer>..<older>`
+    is 0) is named as debris, with the branch that contains it named beside it, so the reader can
+    see at a glance that deleting it loses nothing. A branch whose only unique commits are merges
+    OF `main` INTO ITSELF is reported the same way and for the same reason — it carries no
+    authored work either.
+  - The report is a NAMING, not a deletion: an unmerged branch is never removed by a guard. It is
+    listed with the one command that retires it, and the `commission-guard` slot count reports it
+    as debris where it appears, so a blocked commissioning says WHICH of the counted branches are
+    duplicates rather than only that the count is too high.
+  - The pairwise test runs on the branch tips only, never on their full histories, so the cost
+    stays linear in the number of open branches.
+  VERIFIABLE: Vitest on the pure core — two branch tips where one is an ancestor of the other yield
+  a debris finding naming the container; a branch whose unique commits are merges of `main` into
+  itself yields one too; two genuinely divergent branches yield none; and the slot count reports
+  the debris subset. No guard deletes a branch in any case.
+  Criticality: medium — it wastes the pool cap and hides real parallelism, but it destroys nothing.
+  Bundle: Session- & Repo-Hygiene.
