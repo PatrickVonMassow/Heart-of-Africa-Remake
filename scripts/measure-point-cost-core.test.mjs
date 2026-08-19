@@ -171,6 +171,25 @@ describe('boundary events and the landed-point ledger', () => {
     expect(row.leverEvents.pointBoundary).toBe(1)
     expect(row.leverEvents.contextWatermark).toBe(1)
   })
+
+  it('charges a consumed item the whole response and permits inclusive overlap', () => {
+    const result = aggregatePointLedger({
+      landed: [{ point: 900 }],
+      turns: [
+        {
+          point: 900,
+          tokens: 100,
+          role: 'agent',
+          provider: 'openai',
+          session: 'one',
+          sessionBase: 'one',
+          items: ['agentReports', 'rawSuiteLogs'],
+        },
+      ],
+    })
+    expect(result.items.agentReports).toEqual({ tokens: 100, share: 1 })
+    expect(result.items.rawSuiteLogs).toEqual({ tokens: 100, share: 1 })
+  })
 })
 
 describe('effectiveness verdicts say when the data cannot support a lever', () => {

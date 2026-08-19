@@ -186,18 +186,18 @@ function proposals(snapshot) {
   const items = snapshot.items
   return [
     items.pictureReads.tokens > 0 && items.pictureReads.share >= 0.01
-      ? `Picture reads are ${pct(items.pictureReads.share)}: crop to the decision region before model judgment and preserve a full-frame fallback only when composition is the question.`
+      ? `Turns consuming picture reads are ${pct(items.pictureReads.share)} of ledger tokens inclusively: crop to the decision region before model judgment and preserve a full-frame fallback only when composition is the question.`
       : items.pictureReads.tokens > 0
-        ? `Picture reads are only ${pct(items.pictureReads.share)}: cropping can reduce an individual read, but it is not a cost-per-point priority in this window.`
-      : 'No picture-read charge was observed: do not claim crop savings from this window; first retain explicit image-read evidence.',
+        ? `Turns consuming picture reads are only ${pct(items.pictureReads.share)} of ledger tokens inclusively: cropping can reduce an individual read, but it is not a cost-per-point priority in this window.`
+        : 'No picture-read charge was observed: do not claim crop savings from this window; first retain explicit image-read evidence.',
     items.agentReports.tokens > 0
-      ? `Agent reports are ${pct(items.agentReports.share)}: cap handoffs to a structured verdict/findings/gates payload and keep full logs addressable rather than injected.`
+      ? `Turns consuming agent reports are ${pct(items.agentReports.share)} of ledger tokens inclusively: cap handoffs to a structured verdict/findings/gates payload and keep full logs addressable rather than injected.`
       : 'No agent-report charge was observed: the report-length proposal has no measured support in this window.',
     items.reviewRounds.tokens > 0
-      ? `Cross-vendor reviews are ${pct(items.reviewRounds.share)}: keep the review, but measure and eliminate repeated rounds caused by incomplete material or unbatched findings.`
+      ? `Cross-vendor review turns are ${pct(items.reviewRounds.share)} of ledger tokens: keep the review, but measure and eliminate repeated rounds caused by incomplete material or unbatched findings.`
       : 'No cross-vendor-review charge was observed: a review-round proposal has no measured support in this window.',
     items.rawSuiteLogs.tokens > 0
-      ? `Raw suite/log reads are ${pct(items.rawSuiteLogs.share)}: use the bounded digest where it preserves the failure surface; this is the measured third-largest item, but far behind reviews and reports.`
+      ? `Turns consuming raw suite/log reads are ${pct(items.rawSuiteLogs.share)} of ledger tokens inclusively: use the bounded digest where it preserves the failure surface when this remains a leading charged-turn category.`
       : 'No raw-suite/log-read charge was observed: broader digest adoption has no measured support in this window.',
   ]
 }
@@ -236,7 +236,7 @@ export function formatConsole(snapshot) {
   }
   lines.push(`  whole-document reads: ${snapshot.wholeDocumentReads.attributed} within the attributed set (${snapshot.wholeDocumentReads.sourceWindow} in the source window overall)`)
   lines.push('')
-  lines.push('LARGE ITEMS — inclusive shares; overlaps are possible when a review consumes another item')
+  lines.push('LARGE ITEMS — whole response tokens charged to every consumed item; inclusive shares overlap; item size itself is unmeasured')
   for (const [item, value] of Object.entries(snapshot.items).sort((a, b) => b[1].tokens - a[1].tokens)) {
     lines.push(`  ${ITEM_LABELS[item].padEnd(28)} ${k(value.tokens).padStart(8)}  ${pct(value.share).padStart(6)}`)
   }
@@ -297,10 +297,11 @@ export function formatMarkdown(snapshot) {
       : `Whole-document reads observed within the attributed set: ${attributedWholeReads} (${snapshot.wholeDocumentReads.sourceWindow} in the source window overall).`,
   )
   lines.push('', '## Largest measured items', '')
-  for (const item of snapshot.largestItems) lines.push(`- ${item.label}: ${item.tokens} tokens (${pct(item.share)}).`)
+  lines.push('Charging rule: when a model response consumes an item, the item receives that response\'s whole provider-reported token count. These are inclusive charged-turn upper bounds and can overlap when one response consumes several items. The records do not expose each item\'s own token size, so own item size is unmeasured.', '')
+  for (const item of snapshot.largestItems) lines.push(`- ${item.label}: ${item.tokens} charged-turn tokens (${pct(item.share)} inclusive share); own item size unmeasured.`)
   lines.push('', 'The three named suspects, whether or not they made the top three:', '')
   for (const item of ['pictureReads', 'agentReports', 'reviewRounds']) {
-    lines.push(`- ${ITEM_LABELS[item]}: ${snapshot.items[item].tokens} tokens (${pct(snapshot.items[item].share)}).`)
+    lines.push(`- ${ITEM_LABELS[item]}: ${snapshot.items[item].tokens} charged-turn tokens (${pct(snapshot.items[item].share)} inclusive share); own item size unmeasured.`)
   }
   lines.push('', '## Proposals', '')
   for (const proposal of proposals(snapshot)) lines.push(`- ${proposal}`)
