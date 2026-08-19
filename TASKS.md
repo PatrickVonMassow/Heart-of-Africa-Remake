@@ -9582,3 +9582,35 @@ to land than a mechanism that needs a review.
   sessions that are already over their ceiling, which is where a trapped turn is most expensive.
   A guard change is a mechanism, so it needs the other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 756. The context fence reads the BODY of a heredoc as a command and denies the board card
+  that describes the successor's next step (measured 19.08.2026, 23:04, on the session handing
+  over at the fence). A `board.mjs … --text-stdin` call fed from a heredoc was refused with
+  "this call would START new work (delegating a new authoring run …)": the signature it matched
+  stood ONLY inside the card text in the heredoc body, never on the command line, and the card
+  merely described what the successor should do. The fence documents the opposite rule itself —
+  "a call is judged SEGMENT BY SEGMENT on the command itself, never on what stands inside its
+  quotes" — and a heredoc body is that same case, unhandled: `scripts/command-classify-core.mjs`
+  contains no heredoc handling at all, so the body's lines reach `segmentStart` as though they
+  were segments of the command. The consequence lands exactly where it hurts most: at the fence,
+  where the handover card is worth the most, that card cannot name the successor's way. The
+  workaround was a rewording that avoids command text, which loses the one thing the card is for.
+  FINAL STATE: the segmenter strips heredoc bodies before any classification. A redirection of
+  the form `<<WORD`, `<<-WORD`, `<<'WORD'` or `<<"WORD"` consumes every following line up to its
+  terminator (a tab-indented terminator for the `<<-` form), and those lines are removed from the
+  segment stream; the redirection operator itself stays part of the segment it belongs to, so the
+  command that OWNS the heredoc is still classified normally. A heredoc left unterminated
+  consumes to end of input rather than falling back to line-by-line classification, because
+  reading a body as commands is the defect. `<<<` (here-string) keeps its current handling as an
+  ordinary word.
+  VERIFIABLE: Vitest over the pure segmenter and through the fence core — the real 23:04 call
+  (a `board.mjs --text-stdin` whose heredoc body NAMES an authoring run) is admitted; the same
+  body's text placed on the command line is still denied; a heredoc-fed command that itself
+  starts work is still denied on its own invocation; the `<<-` tab-indented terminator, a quoted
+  terminator, an unterminated body and a here-string each hold their stated behaviour; and a
+  case pinning that a segment following the heredoc's closing terminator is classified again.
+  Criticality: medium — it cannot corrupt the repository, but it silently mis-reads quoted text
+  as intent in the guard that governs what a session may still do, and its failure mode is a
+  refusal nobody can distinguish from a real one. A guard change is a mechanism, so it needs the
+  other model's recorded review before it lands.
+  Bundle: Session- & Repo-Hygiene.
