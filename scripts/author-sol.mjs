@@ -302,12 +302,13 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     const roundsText = flag('--rounds')
-    if (argv.includes('--rounds') && !/^\d+$/.test(roundsText)) {
+    const roundsValue = Number(roundsText)
+    if (argv.includes('--rounds') && (!/^\d+$/.test(roundsText) || !Number.isSafeInteger(roundsValue))) {
       console.error('author-sol: --rounds needs a non-negative integer.\n')
       console.error(usage())
       process.exit(2)
     }
-    const roundsOverride = argv.includes('--rounds') ? Number(roundsText) : undefined
+    const roundsOverride = argv.includes('--rounds') ? roundsValue : undefined
 
     // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
     if (argv.includes('--routing')) {

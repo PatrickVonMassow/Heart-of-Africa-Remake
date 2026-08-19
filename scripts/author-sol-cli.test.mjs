@@ -57,4 +57,10 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`point ${point} → fable`)
   })
+
+  it('rejects a numeric spelling that cannot be represented as an integer', () => {
+    const result = route(ledger([]), ['--rounds', '9'.repeat(400)])
+    expect(result.status).toBe(2)
+    expect(result.stderr).toContain('--rounds needs a non-negative integer')
+  })
 })

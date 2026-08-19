@@ -13,9 +13,12 @@ const EXCLUDED = new Set([
   'src/config/fableEscalationDoc.test.ts',
 ])
 
+const routeTerms = String.raw`\b(?:fable|escalat\w*)\b`
+const roundTerms =
+  String.raw`\b(?:five|${FABLE_ESCALATION_ROUNDS})\b[\s\S]{0,120}` +
+  String.raw`\b(?:unsuccessful|non-passing|failed)\b[\s\S]{0,80}\breview\s+rounds?\b`
 const claim = new RegExp(
-  String.raw`\b(?:fable|escalat\w*)\b[\s\S]{0,240}\b(?:five|${FABLE_ESCALATION_ROUNDS})\b` +
-    String.raw`[\s\S]{0,120}\b(?:unsuccessful|non-passing|failed)\b[\s\S]{0,80}\breview\s+rounds?\b`,
+  `${routeTerms}[\\s\\S]{0,240}${roundTerms}|${roundTerms}[\\s\\S]{0,240}${routeTerms}`,
   'i',
 )
 
@@ -38,8 +41,13 @@ describe('the Fable escalation boundary has one prose statement', () => {
   })
 
   it('would fail the consistency check if a second statement appeared', () => {
-    const files = trackedProseAndSource()
-    files.set('docs/duplicate.md', 'Fable escalates after five unsuccessful review rounds.')
-    expect(thresholdClaims(files)).toEqual(['CLAUDE.md', 'docs/duplicate.md'])
+    for (const duplicate of [
+      'Fable escalates after five unsuccessful review rounds.',
+      'After five unsuccessful review rounds, escalate the point to Fable.',
+    ]) {
+      const files = trackedProseAndSource()
+      files.set('docs/duplicate.md', duplicate)
+      expect(thresholdClaims(files)).toEqual(['CLAUDE.md', 'docs/duplicate.md'])
+    }
   })
 })
