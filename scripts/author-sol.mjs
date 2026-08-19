@@ -427,6 +427,60 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
+    // THE EXAMINATION IS READ-ONLY. Decide it before asking whether this is a
+    // writable feature worktree: the examiner changes no code, starts no author
+    // and needs neither the point's branch nor a clean checkout.
+    const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
+    const decided = laneFor(point, { reworkRounds: roundsOverride, records })
+    const authoringStep = nextAuthoringStep({ records, point, reworkRounds: roundsOverride })
+    const readFindings = () => {
+      const findingsFile = flag('--findings')
+      if (!findingsFile) return ''
+      let findings = ''
+      try {
+        findings = readFileSync(findingsFile, 'utf8')
+      } catch (e) {
+        console.error(`author-sol: --findings ${findingsFile}: ${e.message}`)
+        process.exit(2)
+      }
+      if (!findings.trim()) {
+        console.error(`author-sol: --findings ${findingsFile} is empty — there is nothing to answer.`)
+        process.exit(2)
+      }
+      return findings
+    }
+    if (authoringStep.kind === 'spec-examination') {
+      const findings = readFindings()
+      const brief = briefFor(point)
+      if (!brief) {
+        console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
+        process.exit(2)
+      }
+      const examinationRoute = specExaminerFor(decided.roundHistory, SOL_MODEL_NAME)
+      const route = examinationRoute.route === 'claude-read'
+        ? 'Claude reads this packet directly because Sol authored the round.'
+        : 'Run `node scripts/ask-sol.mjs --kind audit` with this packet because Claude authored the round.'
+      const packet = buildSpecExaminationPrompt({
+        point,
+        pointText: decided.body,
+        brief,
+        history: decided.roundHistory,
+        currentFindings: findings,
+      })
+      const head = git(['rev-parse', 'HEAD'], { cwd: process.cwd() }) ?? '<reviewed-sha>'
+      console.log(
+        `author-sol: SPEC EXAMINATION REQUIRED before another authoring commission.\n` +
+          `  ${authoringStep.reason}\n` +
+          `  cross-vendor route: ${route}\n\n` +
+          `${packet}\n\n` +
+          `Record the result once it has been read (use amended only after the point text is amended):\n` +
+          `  node scripts/mechanism-review.mjs --record ${head} --model "${examinationRoute.model}" --verdict merge ` +
+          `--evidence "<what the examination established>" --mode review --point ${point} ` +
+          `--spec-examination <sound|amended>`,
+      )
+      process.exit(4)
+    }
+
     // WHERE THIS RUN WOULD WRITE, asked before anything is spent.
     const cwd = process.cwd()
     const worktree = git(['rev-parse', '--show-toplevel'], { cwd }) ?? ''
@@ -455,9 +509,6 @@ if (isMainModule(import.meta.url)) {
     // THE LANE IS THE POINT'S OWN ANSWER, not the dispatcher's mood (point 667).
     // Its automatic escalation signal comes from the review ledger. `--rounds`
     // is the deliberate override for a history that the ledger cannot know.
-    const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-    const decided = laneFor(point, { reworkRounds: roundsOverride, records })
-    const authoringStep = nextAuthoringStep({ records, point, reworkRounds: roundsOverride })
     console.error(
       `author-sol: lane verdict for point ${point}: ${decided.lane} (${LANE_MODEL[decided.lane]}); ` +
         `${decided.roundHistory.unsuccessfulRounds} unsuccessful review round(s), ` +
@@ -485,59 +536,13 @@ if (isMainModule(import.meta.url)) {
       process.exit(3)
     }
 
-    const findingsFile = flag('--findings')
-    let findings = ''
-    if (findingsFile) {
-      try {
-        findings = readFileSync(findingsFile, 'utf8')
-      } catch (e) {
-        console.error(`author-sol: --findings ${findingsFile}: ${e.message}`)
-        process.exit(2)
-      }
-      if (!findings.trim()) {
-        console.error(`author-sol: --findings ${findingsFile} is empty — there is nothing to answer.`)
-        process.exit(2)
-      }
-    }
+    const findings = readFindings()
 
     // The brief is cut fresh: a stale one describes a work order that has moved.
-    // The examination reads BOTH the point and this generated view even when a
-    // findings file was supplied, so it is the one later-round path that still
-    // asks for the brief.
-    const brief = !findings || authoringStep.kind === 'spec-examination' ? briefFor(point) : ''
+    const brief = !findings ? briefFor(point) : ''
     if (!findings && !brief) {
       console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — refusing to author from nothing.`)
       process.exit(2)
-    }
-
-    if (authoringStep.kind === 'spec-examination') {
-      if (!brief) {
-        console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
-        process.exit(2)
-      }
-      const examinationRoute = specExaminerFor(decided.roundHistory, SOL_MODEL_NAME)
-      const route = examinationRoute.route === 'claude-read'
-        ? 'Claude reads this packet directly because Sol authored the round.'
-        : 'Run `node scripts/ask-sol.mjs --kind audit` with this packet because Claude authored the round.'
-      const packet = buildSpecExaminationPrompt({
-        point,
-        pointText: decided.body,
-        brief,
-        history: decided.roundHistory,
-        currentFindings: findings,
-      })
-      const head = git(['rev-parse', 'HEAD'], { cwd, required: true })
-      console.log(
-        `author-sol: SPEC EXAMINATION REQUIRED before another authoring commission.\n` +
-          `  ${authoringStep.reason}\n` +
-          `  cross-vendor route: ${route}\n\n` +
-          `${packet}\n\n` +
-          `Record the result once it has been read (use amended only after the point text is amended):\n` +
-          `  node scripts/mechanism-review.mjs --record ${head} --model "${examinationRoute.model}" --verdict merge ` +
-          `--evidence "<what the examination established>" --mode review --point ${point} ` +
-          `--spec-examination <sound|amended>`,
-      )
-      process.exit(4)
     }
 
     const prompt = buildAuthoringPrompt({ point, brief, branch, findings, framing: authoringStep.framing })

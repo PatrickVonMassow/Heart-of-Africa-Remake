@@ -28,6 +28,17 @@ function route(records, extra = []) {
   })
 }
 
+function examine(records) {
+  const cwd = mkdtempSync(join(tmpdir(), 'hoa-author-examination-'))
+  dirs.push(cwd)
+  return spawnSync(process.execPath, [script, '--point', '727'], {
+    cwd,
+    encoding: 'utf8',
+    windowsHide: true,
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records },
+  })
+}
+
 afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
 })
@@ -157,5 +168,22 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     const result = route(ledger([]), ['--rounds', '9'.repeat(400)])
     expect(result.status).toBe(2)
     expect(result.stderr).toContain('--rounds needs a non-negative integer')
+  })
+})
+
+describe('author-sol examination does not require an authoring worktree', () => {
+  it('prints the read-only examination packet before branch and worktree readiness', () => {
+    const records = ledger(
+      Array.from({ length: FABLE_ESCALATION_ROUNDS - 1 }, () => ({
+        point: 727,
+        mode: 'review',
+        verdict: 'do-not-merge',
+      })),
+    )
+    const result = examine(records)
+    expect(result.status, result.stderr).toBe(4)
+    expect(result.stdout).toContain('SPEC EXAMINATION REQUIRED')
+    expect(result.stdout).toContain('SPEC EXAMINATION FOR WORK-ORDER POINT 727')
+    expect(result.stderr).not.toContain('refusing to start')
   })
 })
