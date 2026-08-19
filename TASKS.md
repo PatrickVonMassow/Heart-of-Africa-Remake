@@ -76,6 +76,39 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
+  set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
+  12 unexplained red runs, the oldest from 17.08.2026 — `webgpu/enrichments` from 08:25 on, and
+  two `webgpu/settings` runs carrying 10 and 11 unaccounted reds. Those two say verbatim:
+  `115 further result line(s) exceeded the capture cap — this run's reds were NOT all read`.
+  THAT IS THE TRAP. Point 640 gives a red exactly three ways to close: name and fix its CAUSE,
+  CHARGE it to the open point that owns it, or make it an open point. All three require knowing
+  WHAT the red was — and a run that never recorded its reds cannot supply that, by construction.
+  Such a run is therefore unclosable, and because the guard's window is "since the last render
+  edit", it blocks EVERY later change to the render set indefinitely. The only way past it is the
+  hand-written `--defer`, which is precisely the "gate routinely overridden by hand" that the
+  charge ledger (point 550) was built to abolish. It was deferred on 19.08.2026 with that reason
+  named, so point 732 could land; the defer is a logged exception, not a pass.
+  FINAL STATE:
+  - THE CAP CANNOT PRODUCE AN UNCLOSABLE RUN. Either a run that would truncate its result lines
+    FAILS LOUDLY as an incomplete recording rather than half-recording itself, or the cap stops
+    applying to RED lines — they are the few lines whose loss costs everything, and a run's reds
+    are bounded by its checks, not by its chatter. Which of the two is chosen is decided by
+    measurement of how large a real red set actually gets, not by taste.
+  - AN ALREADY-BROKEN RUN HAS A NAMED WAY OUT that is not a silent waiver: a run whose reds are
+    provably unrecorded is closable AS THAT — recorded as an incomplete recording, with the
+    evidence, so it stops blocking without ever being mistaken for a green.
+  - THE GUARD SAYS WHICH IT IS. Today it reports "unexplained red" for a run that has no
+    explanation to give, which sends the reader hunting for a defect that was never captured. An
+    incomplete recording must be named as one, distinct from a red nobody has explained yet.
+  VERIFIABLE: Vitest over the pure decision — a run whose result lines hit the cap is classified
+  as an incomplete recording and not as an unexplained red; a genuinely unexplained red still
+  blocks; a closed incomplete recording no longer blocks a later render edit. Plus the real proof:
+  the 17.08. runs stop blocking without a `--defer`.
+  Criticality: medium — it blocks no player-visible behaviour, but it disarms the gate that keeps
+  the picture honest, and a gate whose only exit is a hand waiver decays into a formality.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
   19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
   MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
