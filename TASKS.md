@@ -76,28 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 740. Every chat answer carries the session's CONTEXT LEVEL beside the timestamp (user
-  19.08.2026, 18:36: he wants to see where we stand and whether the new mechanisms bite, without
-  asking). Measured the same evening: `scripts/context-watermark.mjs --status --transcript <path>`
-  answers in 0.063 s with the token count of the newest non-sidechain usage entry, and the
-  project's own `scripts/dashboard-reminder-hook.mjs` ALREADY reads `transcript_path` and is ESM,
-  so it can import `context-watermark-core.mjs` directly — no second copy of the counting rule,
-  and no edit to the user-global CJS timestamp hook, which reads no stdin. `TIMESTAMP_RE` in
-  `scripts/timestamp-guard-core.mjs` is anchored at the line start and has no `$`, so a suffix
-  behind the bold stamp does not trip that guard; it needs no change.
-  FINAL STATE: the header line the session writes carries the context reading beside the German
-  timestamp, fed by the hook rather than by a tool call the model must remember to make. It
-  appears in BOTH branches of the hook — the stand-down branch too, or it is missing in exactly
-  the sessions that most need it — and an unreadable measurement is reported honestly as "--",
-  never as 0. `MEMORY.md`'s chat-timestamp entry describes the full header afterwards.
-  VERIFIABLE: Vitest over the hook's text for both branches, with a readable and an unreadable
-  transcript, and a case pinning that the produced header still satisfies the timestamp guard's
-  own predicate.
-  Criticality: low — it is a display, and it costs ~15 tokens a turn through the hook against
-  300-500 for a tool call. A hook is a mechanism, so the change needs the other model's recorded
-  review before it lands.
-  Bundle: Chat & Tafel.
-
 - [ ] 743. The watermark is set where its own arithmetic holds (user 19.08.2026, on being
   shown that a handover AT the mark means the damage is already done: "Wenn bei 150.000
   abgegeben wird, ist das Kind ja schon in den Brunnen gefallen"). `CONTEXT_WATERMARK_TOKENS`
