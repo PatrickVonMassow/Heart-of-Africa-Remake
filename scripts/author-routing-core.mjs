@@ -143,7 +143,10 @@ export function authorRoundHistory(records = [], point = '') {
     // flag: those rows are real pre-mechanism attempts, not malformed uses of
     // a rule that did not exist. Once either marker exists, enforce the rule.
     const governed = Boolean(commission || reviewFraming)
-    const reviewedRound = freshRounds
+    // Every ledger outcome consumes its own attempt number, including a
+    // repeat. Freshness controls escalation credit; it must not also control
+    // the ordinal, or one bad row makes every later row retry the same rules.
+    const reviewedRound = index
     let repeat = ''
     if (commission && reviewFraming && reviewFraming !== commissionedFraming) {
       repeat = 'the review framing does not match the recorded commission'
@@ -204,15 +207,17 @@ export function nextAuthoringStep({
 } = {}) {
   const history = authorRoundHistory(records, point)
   const examinationRound = escalationRounds - 1
-  const round = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : history.freshRounds
-  if (round === examinationRound && !history.examination) {
+  const overridden = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : null
+  const freshRounds = overridden ?? history.freshRounds
+  const round = overridden ?? history.unsuccessfulRounds
+  if (freshRounds === examinationRound && !history.examination) {
     return {
       kind: 'spec-examination',
       round,
       framing: '',
       history,
       reason:
-        `round ${round} is the one before the Fable escalation threshold of ${escalationRounds}; ` +
+        `${freshRounds} fresh attempts have reached the step before the Fable escalation threshold of ${escalationRounds}; ` +
         'the point text and generated brief must be examined against every finding before another commission',
     }
   }

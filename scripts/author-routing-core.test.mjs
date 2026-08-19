@@ -289,6 +289,17 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
       '',
       'the author framing repeats the preceding fresh round',
     ])
+    const next = nextAuthoringStep({
+      records: [
+        failed(),
+        failed(),
+        failed({ authorFraming: firstFraming }),
+        failed({ authorFraming: firstFraming }),
+      ],
+      point: 727,
+    })
+    expect(next).toMatchObject({ kind: 'commission', round: 4 })
+    expect(next.framing).not.toBe(firstFraming)
   })
 
   it('counts every pre-mechanism review as a fresh attempt', () => {
@@ -313,9 +324,27 @@ describe('re-authoring rounds — decorrelated before Fable', () => {
   })
 
   it('still reports a governed later round whose commission carried no framing', () => {
-    const history = authorRoundHistory([failed(), failed(), commissioned(2), failed()], 727)
-    expect(history.freshRounds).toBe(2)
+    const records = [failed(), failed(), commissioned(2, AUTHORING_FRAMINGS[0]), failed(), commissioned(3), failed()]
+    const history = authorRoundHistory(records, 727)
+    expect(history.unsuccessfulRounds).toBe(4)
+    expect(history.freshRounds).toBe(3)
     expect(history.rounds.at(-1).repeat).toBe('no author framing was recorded')
+
+    const next = nextAuthoringStep({ records, point: 727 })
+    expect(next).toMatchObject({ kind: 'commission', round: 4 })
+    expect(next.framing).toBe(AUTHORING_FRAMINGS[1])
+    records.push(commissioned(4, next.framing), failed())
+    expect(authorRoundHistory(records, 727)).toMatchObject({ unsuccessfulRounds: 5, freshRounds: 4 })
+    expect(nextAuthoringStep({ records, point: 727 })).toMatchObject({ kind: 'spec-examination', round: 5 })
+  })
+
+  it('moves past an over-framed baseline round on the following ledger row', () => {
+    const records = [commissioned(0, AUTHORING_FRAMINGS[0]), failed(), commissioned(1), failed()]
+    const history = authorRoundHistory(records, 727)
+    expect(history.freshRounds).toBe(1)
+    expect(history.rounds[0].repeat).toBe('rounds zero and one must carry no author framing')
+    expect(history.rounds[1]).toMatchObject({ freshRound: 1, repeat: '' })
+    expect(nextAuthoringStep({ records, point: 727 })).toMatchObject({ kind: 'commission', round: 2 })
   })
 
   it('counts only the known hostile-tester framings as fresh later attempts', () => {
