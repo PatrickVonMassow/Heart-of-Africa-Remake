@@ -34,7 +34,7 @@ describe('provider token counters', () => {
 })
 
 describe('recorded Claude fixture', () => {
-  it('folds streamed response lines and charges tool results to the response that reads them', () => {
+  it('keeps a real hand-over commission in the author bucket despite its review vocabulary', () => {
     const agent = parseClaudeTranscript(fixture('claude-agent.jsonl'), { file: 's/subagents/agent-a900.jsonl', scope: 'subagent' })
     expect(agent).toHaveLength(1)
     expect(agent[0].usage.output_tokens).toBe(120)
@@ -59,7 +59,7 @@ describe('recorded Codex fixtures', () => {
     expect(turns[0]).toMatchObject({ role: 'agent', agent: 'codex:codex-author' })
   })
 
-  it('classifies a second-pair-of-eyes rollout as review cost', () => {
+  it('classifies the real review-sol commission as review cost', () => {
     expect(parseCodexTranscript(fixture('codex-review.jsonl'))[0]).toMatchObject({ role: 'review', tokens: 800 })
   })
 })
@@ -132,6 +132,15 @@ describe('boundary events and the landed-point ledger', () => {
     expect(row.items.agentReports).toBeGreaterThan(0)
     expect(row.items.pictureReads).toBeGreaterThan(0)
     expect(row.items.reviewRounds).toBe(800)
+  })
+
+  it('never puts Anthropic traffic in the cross-vendor review bucket', () => {
+    const result = aggregatePointLedger({
+      landed: [{ point: 900 }],
+      turns: [{ point: 900, tokens: 50, role: 'review', provider: 'anthropic', session: 'claude-review', sessionBase: 'claude-review' }],
+    })
+    expect(result.ledger[0].origins.crossVendorReviews).toBe(0)
+    expect(result.ledger[0].origins.agents).toEqual({ 'anthropic:claude-review': 50 })
   })
 
   it('records all six built levers and the exact observed event counts', () => {

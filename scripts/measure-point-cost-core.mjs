@@ -43,7 +43,11 @@ export const ITEM_LABELS = {
 
 const IMAGE_PATH = /\.(?:png|jpe?g|webp|gif|avif|bmp|tiff?)\b/i
 const WHOLE_SPEC_PATH = /(?:^|[\\/])(?:TASKS\.md|design\.md|docs[\\/]tasks-archive\.md)\b/i
-const REVIEW_PROMPT = /SECOND pair of eyes|cross[- ]vendor review|Gegenpr(?:ü|u)fung|\breviewer\b|\breview round\b/i
+// `review-sol.mjs` is the only mechanism that creates a cross-vendor review in
+// this corpus. Match its commission, not incidental prose such as "a reviewer will
+// read every line" in an authoring brief. `ask-sol.mjs` has a different opening and
+// deliberately remains delegated agent work.
+const REVIEW_COMMISSION = /^You are the SECOND pair of eyes on a change in this repository, working under the\n(?:four-eyes rule|four[- ]eyes rule)/i
 const REPORT_PATH = /(?:author|agent|sol|fable|opus|review)[^\s/\\]*\.log\b/i
 
 const positive = (value) => (Number.isFinite(value) && value > 0 ? value : 0)
@@ -133,13 +137,15 @@ function signalsForTools(tools = [], extraText = '') {
   }
 }
 
-function classifyRole({ scope = 'top-level', prompt = '' } = {}) {
+function classifyRole({ scope = 'top-level', prompt = '', provider = 'anthropic' } = {}) {
   if (scope === 'top-level') return 'main'
   const opening = String(prompt).slice(0, 6000)
-  // Authoring briefs themselves say that a reviewer will later read every line. The
-  // exact role declaration must win before those later words are considered.
-  if (/AUTHORING work-order point|Du arbeitest an Arbeitsauftrags-Punkt|DEIN AUFTRAG IST EINE NACHARBEIT/i.test(opening)) return 'agent'
-  return REVIEW_PROMPT.test(opening) ? 'review' : 'agent'
+  // Claude subagents are authoring/delegation traffic. Their real hand-over and
+  // escalation prompts contain review vocabulary as process guidance, which is not
+  // evidence that the transcript itself is a review. Positive review attribution is
+  // restricted to the OpenAI commission emitted by review-sol.mjs.
+  if (provider === 'openai' && REVIEW_COMMISSION.test(opening)) return 'review'
+  return 'agent'
 }
 
 /**
@@ -154,7 +160,7 @@ export function parseClaudeTranscript(text = '', { file = 'session.jsonl', scope
     .filter((row) => row?.type === 'user')
     .map((row) => contentText(row?.message?.content))
     .join('\n')
-  const role = classifyRole({ scope, prompt })
+  const role = classifyRole({ scope, prompt, provider: 'anthropic' })
   const toolById = new Map()
   const pendingItems = new Set()
   let pendingText = ''
@@ -258,7 +264,7 @@ export function parseCodexTranscript(text = '', { file = 'rollout.jsonl' } = {})
     .map((row) => row.payload.message ?? '')
     .join('\n')
   const sessionId = meta.session_id ?? meta.id ?? file
-  const role = classifyRole({ scope: 'subagent', prompt })
+  const role = classifyRole({ scope: 'subagent', prompt, provider: 'openai' })
   const toolById = new Map()
   let currentTools = []
   let consumed = new Set()
@@ -533,7 +539,7 @@ export function aggregatePointLedger({ landed = [], turns = [], boundaryEvents =
     row.sessions.add(turn.session)
     if (turn.pointSource) row.assignedBy[turn.pointSource] += turn.tokens
     if (turn.role === 'main') row.origins.mainSession += turn.tokens
-    else if (turn.role === 'review') {
+    else if (turn.role === 'review' && turn.provider === 'openai') {
       row.origins.crossVendorReviews += turn.tokens
       row.items.reviewRounds += turn.tokens
     } else {
