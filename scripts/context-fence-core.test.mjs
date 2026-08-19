@@ -572,6 +572,45 @@ describe('the refusal text', () => {
     const authored = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'authoring a memory', authoring: true })
     expect(authored).toContain('finding.mjs --record')
   })
+
+  it('names /clear only where the call has that cheaper way out', () => {
+    const plain = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'starting a browser verify run' })
+    expect(plain).not.toContain('/clear')
+    const claim = fenceRefusal({ tokens: 200_000, watermark: 150_000, what: 'taking the batch', clearFirst: true })
+    expect(claim).toContain('/clear')
+    // The boundary stays named beside it: unattended there is no one to clear.
+    expect(claim).toContain(FENCE_END_COMMAND)
+  })
+})
+
+describe('TAKING THE BATCH IS STARTING WORK (point 542)', () => {
+  const claim = 'node scripts/batch-claim.mjs --session 4e67c9a0-d702-4cf2-a0d6-db243bc1971a'
+
+  it('is denied past the mark, and the refusal names /clear', () => {
+    const v = decide({ toolName: 'Bash', command: claim })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('/clear')
+    expect(v.reason).toContain(FENCE_END_COMMAND)
+  })
+
+  it('is allowed below the mark, like every other start', () => {
+    const v = decide({ toolName: 'Bash', command: claim }, { state: 'below', tokens: 40_000, watermark: 150_000 })
+    expect(v.block).toBe(false)
+  })
+
+  it('READING the claim state is not taking it', () => {
+    expect(decide({ toolName: 'Bash', command: 'node scripts/batch-claim.mjs --status' }).block).toBe(false)
+  })
+
+  it('WITHDRAWING the claim stays allowed — it lets go, and the fence may not trap that', () => {
+    const v = decide({ toolName: 'Bash', command: 'node scripts/batch-claim.mjs --withdraw --session abc' })
+    expect(v.block).toBe(false)
+  })
+
+  it('a claim riding beside a read is still a claim', () => {
+    const v = decide({ toolName: 'Bash', command: `node scripts/batch-claim.mjs --status && ${claim}` })
+    expect(v.block).toBe(true)
+  })
 })
 
 describe('resolveThroughAncestors — the symlinked directory is seen even for an unborn leaf (Sol round 5)', () => {

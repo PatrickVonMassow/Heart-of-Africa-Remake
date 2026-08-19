@@ -66,6 +66,10 @@ export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
  *   reaches), delegating an author (`author-sol.mjs`), starting a
  *   cross-vendor review (`review-sol.mjs`) and a delegated ask
  *   (`ask-sol.mjs`) — each begins an expensive new unit of work.
+ *   AND TAKING THE BATCH (`batch-claim.mjs`, point 542): a claim is not
+ *   bookkeeping, it is the moment a session starts working, and one was
+ *   measured at ~250,000 tokens of context. Its refusal names `/clear`
+ *   as well as the boundary — see CLEAR_FIRST_SCRIPTS.
  *   ALSO COVERED: any DIRECT `node scripts/verify/<x>.mjs` call, judged on
  *   the PATH PREFIX rather than a suite list (Sol review of 534c2ba,
  *   finding 4b) — it starts exactly the browser work the fence exists to
@@ -85,6 +89,37 @@ const START_SCRIPTS = {
   'author-sol.mjs': 'delegating a new authoring run',
   'review-sol.mjs': 'starting a cross-vendor review run',
   'ask-sol.mjs': 'starting a delegated ask run',
+  'batch-claim.mjs': 'taking the batch, which is where a session begins its work',
+}
+
+/**
+ * The starting scripts whose refusal must ALSO name `/clear`, because the
+ * session can obey it without ending anything (user 19.08.2026: "Bevor die
+ * Batch geholt wird, den Benutzer zu clear auffordern und danach zu weiter
+ * oder so.").
+ *
+ * Taking the batch is the one start that is normally made by an ATTENDED
+ * window, and an attended window has a cheaper exit than the boundary: clear
+ * the context and claim again. Measured at ~250,000 tokens, a claim made
+ * unchanged only carries the overrun into the next point. Unattended the
+ * ordinary handover applies, so naming both costs nothing.
+ */
+const CLEAR_FIRST_SCRIPTS = new Set(['batch-claim.mjs'])
+
+/**
+ * Where ONE script both starts work and ends it, the ARGUMENTS decide.
+ *
+ * `batch-claim.mjs` is the case that forced this: `--session <id>` TAKES the
+ * batch and is the start of a session's work, while `--status` merely reads
+ * and `--withdraw` LETS GO — and a fence that denied the withdrawal would trap
+ * the session in the state the withdrawal exists to leave (a pending claim
+ * makes the launcher skip its spawn and stalls the batch). The fence's own
+ * rule already says it: reads and everything that finishes stay allowed.
+ *
+ * A script with no entry here starts on every spelling, as before.
+ */
+const START_SCRIPT_ARG_GATES = {
+  'batch-claim.mjs': (argTexts) => !argTexts.some((a) => a === '--status' || a === '--withdraw'),
 }
 
 /** The carrier SCRIPT and file stay usable past the mark — they are the
@@ -704,7 +739,10 @@ function segmentStart(seg, resolvePath, isDirectory) {
     return { what: `starting a browser verify run (\`${seg.raw}\`)`, authoring: false }
   }
   for (const [script, what] of Object.entries(START_SCRIPTS)) {
-    if (segmentInvokesScript(seg, [script])) return { what: `${what} (\`${seg.raw}\`)`, authoring: false }
+    if (!segmentInvokesScript(seg, [script])) continue
+    const gate = START_SCRIPT_ARG_GATES[script]
+    if (gate && !gate(args.map((a) => a.text))) return null
+    return { what: `${what} (\`${seg.raw}\`)`, authoring: false, clearFirst: CLEAR_FIRST_SCRIPTS.has(script) }
   }
   // A DIRECT call into scripts/verify/ starts the same browser work the
   // sanctioned launchers do — judged on the path prefix (symlink spellings
@@ -835,13 +873,18 @@ export function classifyFenceCall({ toolName, command, filePath, resolvePath, is
 /** The refusal, pinned by tests rather than improvised at the one moment it
  *  matters. Names the mark, the measurement, the carrier (for authoring) and
  *  the one command that ends the session. */
-export function fenceRefusal({ tokens, watermark, what, authoring = false } = {}) {
+export function fenceRefusal({ tokens, watermark, what, authoring = false, clearFirst = false } = {}) {
   return (
     `PAST THE CONTEXT WATERMARK, NEW WORK IS DENIED (point 700): this session's context measures ` +
     `${tokens} tokens against the ${watermark}-token mark, and this call would START new work (${what}). ` +
     (authoring
       ? `A finding does not need this expensive context — keep it on the CARRIER instead: ` +
         `\`${FENCE_CARRIER_COMMAND}\`; the successor writes the point or section in a cheap context. `
+      : '') +
+    (clearFirst
+      ? `THIS ONE HAS A CHEAPER WAY OUT THAN THE BOUNDARY: ask the user for \`/clear\` and take the batch ` +
+        'again in the fresh context — claiming it at this size only carries the overrun into the next ' +
+        'point. Unattended, the ordinary handover below applies. '
       : '') +
     `Finish the step in flight — commits, pushes, the landing, the board and the boundary bookkeeping all ` +
     `stay allowed — then END THIS SESSION: \`${FENCE_END_COMMAND}\`, its bookkeeping, then ` +
@@ -871,5 +914,14 @@ export function contextFenceDecision({
   if (state !== 'past') return { block: false, reason: null }
   const call = classifyFenceCall({ toolName, command, filePath, resolvePath, isDirectory })
   if (!call.starts) return { block: false, reason: null }
-  return { block: true, reason: fenceRefusal({ tokens, watermark, what: call.what, authoring: call.authoring }) }
+  return {
+    block: true,
+    reason: fenceRefusal({
+      tokens,
+      watermark,
+      what: call.what,
+      authoring: call.authoring,
+      clearFirst: call.clearFirst,
+    }),
+  }
 }
