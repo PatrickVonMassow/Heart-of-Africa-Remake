@@ -1214,18 +1214,30 @@ So the cap stays, and hitting it FAILS LOUDLY instead. The record says
 `truncated: true` whatever the exit code (a pass whose result lines were thrown
 away is a pass nobody read), `runVerdict` answers `incomplete` — a class of its
 own, covering nothing — and the guard names it apart from an unexplained red, so
-nobody hunts a defect that was never captured. Its way out is not the ledger but
-a signed closure:
+nobody hunts a defect that was never captured.
 
-```
-node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why it cannot be re-recorded>"
-```
+Two things lift it, and neither is the ledger (a charge needs the red's
+identity, and the lost part has none):
 
-It signs off ONE run by identity (backend, suite, exact timestamp), so the next
-truncated run of that pair blocks again; it demands written evidence; and it
-clears no backend — the run stays `incomplete`, never a green. The first answer
-is always to RE-RUN the suite; the closure is for a recording that genuinely
-cannot be redone.
+1. **A real re-recording** — a COVERING run of the same suite on the same
+   backend, later than the broken one and on code since the last render edit.
+   This is not the fourth closing point 640 forbids: a red is an observation no
+   later green un-observes, while a truncation is a MEASUREMENT THAT WAS LOST,
+   and a lost measurement is answered by taking it again. This is the first
+   answer, always.
+2. **A signed closure**, for a recording that genuinely cannot be redone:
+
+   ```
+   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" [--at <iso|ms>] --evidence "<why>"
+   ```
+
+   It names ONE run by identity (backend, suite, exact timestamp) and refuses an
+   ambiguous selector rather than resolving it; it demands written evidence, and
+   a closure carrying none closes nothing; it clears no backend — the run stays
+   `incomplete`, never a green; and it closes **only the part nobody can know**.
+   Every red the run DID record was really observed, so it keeps blocking and
+   closes the three ordinary ways. That last limit is what keeps this from being
+   the waiver it replaces: flooding a suite's output on purpose buries nothing.
 
 **Why the cap was not simply lifted for red lines** (measured 19.08.2026, and the
 measurement is what decided it): the only overflow on record — two

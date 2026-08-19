@@ -1046,11 +1046,12 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
       droppedLines: 115,
       ...overrides,
     })
-  const truncatedLegacy = (backend, at) =>
-    redRun(backend, at, [
-      { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null },
-      red('console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError', null, 'console'),
-    ])
+  const truncationEntry = { name: "115 further result line(s) exceeded the capture cap — this run's reds were NOT all read", key: 'capture-truncated', kind: 'check', point: null }
+  /** A record from before the field existed, carrying ONLY the truncation. */
+  const truncatedLegacy = (backend, at) => redRun(backend, at, [truncationEntry])
+  /** The same, but it also recorded a red it really did observe. */
+  const truncatedWithRed = (backend, at, name = 'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError') =>
+    redRun(backend, at, [truncationEntry, red(name, null, 'console')])
   const closure = (backend, suite, at) => ({ backend, suite, at, evidence: 'the host cannot run a browser suite (point 732)' })
 
   it('recognises both record shapes, and reads how much was lost', () => {
@@ -1126,6 +1127,38 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(result.decision).toBe('allow')
   })
 
+  // THE LINE BETWEEN THIS AND A WAIVER (review finding, 19.08.2026). The
+  // signature closes what nobody could record; it must not touch what the run
+  // DID record, or a suite could be flooded on purpose to bury a real red.
+  it('signs off only the LOST part — a red the run really recorded keeps blocking', () => {
+    const broken = truncatedWithRed('webgpu', 1500)
+    const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
+    const closures = [closure('webgpu', 'polish', 1500)]
+    const result = evaluate(renderChange({ runs, openPoints, incompleteClosures: closures }))
+    expect(result.decision).toBe('block')
+    // And it is now reported as the RED it is, not as an incomplete recording.
+    const still = unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })
+    expect(still).toHaveLength(1)
+    expect(still[0].status).toBe('red')
+    expect(still[0].reds[0]).toMatch(/GPUValidationError/)
+  })
+
+  it('...and stops blocking once that observed red is CHARGED to an open point', () => {
+    const broken = truncatedWithRed('webgpu', 1500)
+    const ledger = [{ point: 506, kind: 'console', match: /GPUValidationError/, why: 'the compat lane cannot multisample' }]
+    const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
+    const closures = [closure('webgpu', 'polish', 1500)]
+    expect(evaluate(renderChange({ runs, openPoints, incompleteClosures: closures })).decision).toBe('block')
+    expect(evaluate(renderChange({ runs, openPoints, incompleteClosures: closures, ledger })).decision).toBe('allow')
+  })
+
+  it('a closure carrying no EVIDENCE closes nothing — that is the whole difference', () => {
+    const broken = truncatedLegacy('webgpu', 1500)
+    const blank = [{ backend: 'webgpu', suite: 'polish', at: 1500, evidence: '   ' }]
+    expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: blank })).toHaveLength(1)
+    expect(unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [{ backend: 'webgpu', suite: 'polish', at: 1500 }] })).toHaveLength(1)
+  })
+
   it('signs off ONE run, never a suite/backend pair — the NEXT truncated run blocks again', () => {
     const first = truncatedLegacy('webgpu', 1500)
     const second = truncatedLegacy('webgpu', 2500)
@@ -1134,6 +1167,35 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const still = unexplainedRuns([first, second], 1000, { openPoints, incompleteClosures: closures })
     expect(still.map((u) => u.at)).toEqual([2500])
     expect(still[0].status).toBe('incomplete')
+  })
+
+  // The advertised first remedy has to WORK, or the signature is the only exit
+  // and the mechanism is a waiver after all (review finding, 19.08.2026).
+  it('a real RE-RECORDING closes it — a covering run of the same suite and backend, later, on this code', () => {
+    const broken = { ...truncatedWithRed('webgpu', 1500), suite: 'polish' }
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    expect(unexplainedRuns([broken], 1000, { openPoints })).toHaveLength(1)
+    expect(unexplainedRuns([broken, again], 1000, { openPoints })).toEqual([])
+  })
+
+  it('but only that pair: another suite, another backend, or an older run proves nothing', () => {
+    const broken = { ...truncatedLegacy('webgpu', 1500), suite: 'polish' }
+    const otherSuite = { ...run('webgpu', 2000), suite: 'settings' }
+    const otherBackend = { ...run('webgl', 2000), suite: 'polish' }
+    const earlier = { ...run('webgpu', 1200), suite: 'polish' }
+    const alsoTruncated = { ...run('webgpu', 2000), suite: 'polish', truncated: true, droppedLines: 3 }
+    for (const other of [otherSuite, otherBackend, earlier, alsoTruncated]) {
+      // The broken run is STILL listed. (`alsoTruncated` brings its own entry —
+      // a run that truncated cannot re-record anything for anybody.)
+      expect(unexplainedRuns([broken, other], 1000, { openPoints }).some((u) => u.at === 1500)).toBe(true)
+    }
+  })
+
+  // And the fourth closing stays shut where it belongs: a RED is an observation,
+  // and no later green un-observes it (point 640).
+  it('does NOT extend the re-run route to an ordinary red', () => {
+    const unfiled = redRun('webgpu', 1500, [red('a NEW check nobody filed')])
+    expect(unexplainedRuns([unfiled, { ...run('webgpu', 2000), suite: 'polish' }], 1000, { openPoints })).toHaveLength(1)
   })
 
   // The closure discards a RECORD; it never says the picture was fine. A backend
@@ -1154,6 +1216,24 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(isIncompleteRecording(null)).toBe(false)
     expect(incompleteClosureFor(null, null)).toBeNull()
     expect(droppedLinesOf({ droppedLines: 'many' })).toBe(0)
+    // `Number(Symbol())` THROWS, and these records come off disk (review
+    // finding, 19.08.2026) — total means total.
+    expect(() => droppedLinesOf({ droppedLines: Symbol('x') })).not.toThrow()
+    expect(() => incompleteClosureFor({ backend: 'webgpu', suite: 'polish', at: Symbol('x') }, [{ backend: 'webgpu', suite: 'polish', at: 1, evidence: 'e' }])).not.toThrow()
+  })
+
+  // A finite but out-of-range timestamp makes `toISOString()` throw — and that
+  // call sits inside the BLOCK MESSAGE, where a throw costs the gate its verdict
+  // and the wrapper allows the very turn it meant to stop.
+  it('builds its block message on an out-of-range timestamp rather than throwing', () => {
+    const broken = { ...truncatedLegacy('webgpu', 1e18), startedAt: 1e18 }
+    const runs = [broken, run('webgpu', 2000), run('webgl', 2100)]
+    let result
+    expect(() => {
+      result = evaluate(renderChange({ runs, openPoints }))
+    }).not.toThrow()
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/INCOMPLETE RECORDING/)
   })
 })
 

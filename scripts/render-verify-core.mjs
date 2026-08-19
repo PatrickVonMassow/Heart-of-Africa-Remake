@@ -259,6 +259,30 @@ function text(value) {
   }
 }
 
+/** A value as a finite number, or 0 — `Number(x)` itself THROWS on a symbol, and
+ *  every record here is read off disk. Total. */
+function number(value) {
+  try {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+/** A timestamp as an ISO string, or a plain readable fallback: `toISOString()`
+ *  THROWS on a finite but out-of-range number, and it is called while BUILDING A
+ *  BLOCK MESSAGE — a throw there costs the gate its verdict (the wrapper would
+ *  fail open and allow the very turn it meant to stop). Total. */
+function isoOf(at) {
+  try {
+    const iso = new Date(number(at)).toISOString()
+    return iso
+  } catch {
+    return `t=${text(at)}`
+  }
+}
+
 /**
  * Format the first attempt's reds for the env var: one per line, each written
  * `<kind>\t<name>`.
@@ -346,18 +370,26 @@ export function isIncompleteRecording(run) {
   if (!run || typeof run !== 'object') return false
   if (run.truncated === true) return true
   const reds = Array.isArray(run.reds) ? run.reds : []
-  return reds.some((red) => red?.key === 'capture-truncated' || red?.kind === TRUNCATED_KIND)
+  return reds.some(isTruncationEntry)
+}
+
+/** The synthetic entry that STANDS FOR the lines the cap ate — not a red anybody
+ *  observed, and the one entry a sign-off closes. */
+function isTruncationEntry(red) {
+  return red?.key === 'capture-truncated' || red?.kind === TRUNCATED_KIND
 }
 
 /** How many result lines the cap swallowed, as the record knows it — the number
  *  the new field carries, or the one the old synthetic red states in its text.
  *  0 when the run is not truncated or the count cannot be read. */
 export function droppedLinesOf(run) {
-  const n = Number(run?.droppedLines)
-  if (Number.isFinite(n) && n > 0) return Math.trunc(n)
+  // `Number(x)` THROWS on a symbol, and these records come off disk and out of a
+  // suite's exit handler — total means total (review finding, 19.08.2026).
+  const n = number(run?.droppedLines)
+  if (n > 0) return Math.trunc(n)
   const reds = Array.isArray(run?.reds) ? run.reds : []
   for (const red of reds) {
-    if (red?.key !== 'capture-truncated' && red?.kind !== TRUNCATED_KIND) continue
+    if (!isTruncationEntry(red)) continue
     const m = /^(\d+)\s+further result line/.exec(text(red?.name))
     if (m) return Number(m[1])
   }
@@ -372,25 +404,28 @@ export function droppedLinesOf(run) {
  * was the hand-written `--defer`: the very waiver the charge ledger exists to
  * abolish.
  *
- * So the incompleteness gets its own closure, which is not a waiver: it is
- * signed for one RUN by identity (backend, suite and the exact `at`), it carries
- * written evidence, and it NEVER makes the run cover a backend — runVerdict
- * still answers `incomplete`. Closing it says "this record is not evidence",
- * never "the picture was fine"; the backend still needs a covering run.
- *
- * RESIDUAL, named rather than hidden: a run can be pushed into this state on
- * purpose by flooding a suite's output, and its recorded reds then go with it.
- * That buys nothing — the closure clears no backend and the suite must still be
- * re-run — but it is the side this mechanism can be abused from, and the reason
- * a closure is per-run and never per suite/backend pair.
+ * So the incompleteness gets its own closure, which is not a waiver, and the
+ * limits are what make that true:
+ *   - it is signed for ONE RUN by identity — backend, suite and the exact `at`;
+ *   - it carries WRITTEN EVIDENCE, and a closure without any closes nothing;
+ *   - it NEVER makes the run cover a backend: runVerdict still answers
+ *     `incomplete`, so the backend still needs a real covering run;
+ *   - and it closes ONLY THE PART NOBODY CAN KNOW. The reds the run DID record
+ *     were really observed, so they keep blocking exactly as any other red and
+ *     close by the three ways of point 640. That is the difference between this
+ *     and the waiver it replaces (review finding, 19.08.2026): flooding a suite's
+ *     output on purpose hides nothing, because every red that reached the record
+ *     still stands.
  */
 export function incompleteClosureFor(run, closures) {
   if (!run || typeof run !== 'object') return null
-  const at = Number(run.at)
   for (const c of Array.isArray(closures) ? closures : []) {
     try {
       if (!c || c.backend !== run.backend || c.suite !== run.suite) continue
-      if (Number(c.at) !== at) continue
+      if (number(c.at) !== number(run.at)) continue
+      // The evidence IS the mechanism: an entry that carries none is a silent
+      // waiver wearing a closure's shape, so it closes nothing.
+      if (!text(c.evidence).trim()) continue
       return c
     } catch {
       /* a malformed closure closes nothing — the run keeps blocking */
@@ -678,6 +713,25 @@ export function unexplainedRuns(runs, since, options) {
         runVerdict(later, { openPoints, ledger }).covers,
     )
   }
+  /**
+   * WAS THE LOST MEASUREMENT TAKEN AGAIN (point 734)? A covering run of the SAME
+   * suite on the SAME backend, later than this one and on code since the last
+   * render edit. Deliberately NOT the rule for a red — a red is an observation
+   * and no later green un-observes it — but a truncated recording observed
+   * nothing to keep: it is a reading that was lost, and a reading is redone.
+   */
+  const reRecorded = (r) =>
+    all.some(
+      (later) =>
+        later &&
+        later !== r &&
+        later.partial !== true &&
+        later.backend === r.backend &&
+        later.suite === r.suite &&
+        number(later.at) > number(r.at) &&
+        sawCodeSince(later, from) &&
+        runVerdict(later, { openPoints, ledger }).covers,
+    )
   const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
@@ -702,20 +756,52 @@ export function unexplainedRuns(runs, since, options) {
     if (verdict.status !== 'red' && verdict.status !== 'suspect' && verdict.status !== 'incomplete') continue
     const suite = typeof r.suite === 'string' && r.suite ? r.suite : 'unknown'
     const backend = typeof r.backend === 'string' ? r.backend : 'unknown'
-    // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), and its own closure
-    // is the only thing that lifts it: the ledger cannot, because a charge needs
-    // the red's identity and this record has none to give. Reported apart from
-    // the reds so the guard can name it as what it is.
+    // AN INCOMPLETE RECORDING IS ITS OWN CLASS (point 734), reported apart from
+    // the reds so the guard can name it as what it is. Two things lift it, and
+    // NEITHER is the ledger — a charge needs the red's identity, and the lost
+    // part has none to give:
     if (verdict.status === 'incomplete') {
-      if (incompleteClosureFor(r, incompleteClosures)) continue
+      // (1) A REAL RE-RECORDING. This is not the fourth closing point 640
+      // forbids, and the difference is the whole reason the class exists: a RED
+      // is an observation that a later green cannot un-observe, while a
+      // truncation is a MEASUREMENT THAT WAS LOST — and a lost measurement is
+      // answered by taking it again. The bar is the strongest one available: a
+      // COVERING run of the same suite on the same backend, later than this one
+      // and on code since the last render edit. Without it the advertised
+      // "re-run the suite" remedy did nothing inside the current window, which
+      // left the sign-off as the only exit (review finding, 19.08.2026).
+      if (reRecorded(r)) continue
+      const closure = incompleteClosureFor(r, incompleteClosures)
+      if (!closure) {
+        out.push({
+          backend,
+          suite,
+          at,
+          status: 'incomplete',
+          droppedLines: droppedLinesOf(r),
+          unaccounted: verdict.unaccounted,
+          reds: verdict.unaccounted.map((u) => u.name),
+        })
+        continue
+      }
+      // (2) THE SIGNED CLOSURE — and it closes ONLY the unknowable part. What
+      // the run DID record was really observed, so it is judged here exactly
+      // like any other red: charged reds are accounted for, an unowned one keeps
+      // blocking and closes the three ordinary ways. This is what stops the
+      // closure being a waiver: a flood cannot bury a red that reached the file.
+      const observed = (Array.isArray(r.reds) ? r.reds : []).filter((red) => !isTruncationEntry(red))
+      const unowned = observed.filter((red) => !owned(red, suite, backend))
+      if (unowned.length === 0) continue
       out.push({
         backend,
         suite,
         at,
-        status: 'incomplete',
-        droppedLines: droppedLinesOf(r),
-        unaccounted: verdict.unaccounted,
-        reds: verdict.unaccounted.map((u) => u.name),
+        status: 'red',
+        unaccounted: unowned.map((red) => ({
+          name: text(red?.name) || '(unnamed red)',
+          point: Number.isInteger(red?.point) ? red.point : null,
+        })),
+        reds: unowned.map((red) => text(red?.name)).filter(Boolean),
       })
       continue
     }
@@ -977,7 +1063,7 @@ export function evaluate(input) {
         .slice(0, 3)
         .map(
           (u) =>
-            `${u.backend}/${u.suite} @${new Date(u.at).toISOString()}` +
+            `${u.backend}/${u.suite} @${isoOf(u.at)}` +
             (u.droppedLines > 0 ? ` (${u.droppedLines} line(s) dropped)` : ''),
         )
         .join(' | ')

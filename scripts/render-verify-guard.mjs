@@ -271,6 +271,16 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
  *  itself holds 40, so a closure older than that names a run nobody can see. */
 const MAX_INCOMPLETE_CLOSURES = 40
 
+/** A run's timestamp for a human, never throwing: `toISOString()` dies on a
+ *  finite but out-of-range number, and these come off disk. */
+export function isoText(at) {
+  try {
+    return new Date(Number(at)).toISOString()
+  } catch {
+    return `t=${String(at)}`
+  }
+}
+
 /** The recorded runs whose recording is incomplete and NOT yet signed off. */
 export function openIncompleteRuns(state) {
   const runs = Array.isArray(state?.runs) ? state.runs : []
@@ -303,27 +313,36 @@ if (arg === '--defer') {
   }
 }
 
-// --incomplete "<backend>/<suite>" --evidence "<why>" (or --incomplete --all
-// --evidence "<why>"): THE NAMED WAY OUT OF A BROKEN RECORDING (point 734).
+// --incomplete "<backend>/<suite>" [--at <iso|ms>] --evidence "<why>":
+// THE NAMED WAY OUT OF A BROKEN RECORDING (point 734).
 //
 // A run whose result lines the capture cap truncated cannot be closed by any of
 // point 640's three ways — they all need to know WHAT the red was, and such a
 // run never recorded it. Before this, its only exit was a hand-written --defer,
 // i.e. the waiver the charge ledger exists to abolish. This signs the RECORDING
-// off as broken instead: one run at a time, by identity, with written evidence,
-// and it clears NO backend — the run stays `incomplete` in every verdict, so it
-// is never mistaken for a green.
+// off as broken instead — and only that: the reds the run DID record keep
+// blocking and close the ordinary ways, it clears NO backend, and it names
+// exactly ONE run, so two truncated runs need two signatures with two reasons.
+// Ambiguity is REFUSED rather than resolved (review finding, 19.08.2026): a
+// selector matching several open runs prints each with its own --at.
 if (arg === '--incomplete') {
   try {
     const rest = process.argv.slice(3)
-    const all = rest.includes('--all')
-    const evidenceAt = rest.indexOf('--evidence')
-    const evidence = evidenceAt === -1 ? '' : String(rest[evidenceAt + 1] ?? '').trim()
-    // Positional selector = the first argument that is neither a flag nor the
-    // value consumed by --evidence, found by INDEX: a comparison by value would
-    // drop the selector whenever the evidence text happened to read the same.
-    const selector =
-      rest.find((a, i) => i !== evidenceAt && i !== evidenceAt + 1 && !a.startsWith('--')) ?? ''
+    const valueOf = (flag) => {
+      const i = rest.indexOf(flag)
+      return i === -1 ? '' : String(rest[i + 1] ?? '').trim()
+    }
+    const consumed = new Set()
+    for (const flag of ['--evidence', '--at']) {
+      const i = rest.indexOf(flag)
+      if (i !== -1) consumed.add(i).add(i + 1)
+    }
+    const evidence = valueOf('--evidence')
+    const at = valueOf('--at')
+    // Positional selector = the first argument that is neither a flag nor a
+    // value another flag consumed, found by INDEX: comparing by value would drop
+    // the selector whenever an evidence text happened to read the same.
+    const selector = rest.find((a, i) => !consumed.has(i) && !a.startsWith('--')) ?? ''
     if (!evidence) {
       console.error(
         'render-verify-guard --incomplete: --evidence "<why this recording cannot be redone>" is required. ' +
@@ -331,43 +350,57 @@ if (arg === '--incomplete') {
       )
       process.exit(1)
     }
-    if (!all && !selector) {
+    if (!selector) {
       console.error(
-        'render-verify-guard --incomplete: name the run as "<backend>/<suite>", or pass --all to sign off ' +
-          'every open incomplete recording. A closure is per RUN — it can never pre-clear a future one.',
+        'render-verify-guard --incomplete: name the run as "<backend>/<suite>" (add --at <iso|ms> when more ' +
+          'than one is open). A closure names ONE run and can never pre-clear a future one.',
       )
       process.exit(1)
     }
     const state = readRenderState() ?? {}
+    const wanted = at ? new Date(/^\d+$/.test(at) ? Number(at) : at).getTime() : null
+    if (at && !Number.isFinite(wanted)) {
+      console.error(`render-verify-guard --incomplete: --at "${at}" is not a timestamp (ISO or epoch ms).`)
+      process.exit(1)
+    }
     const open = openIncompleteRuns(state).filter(
-      (r) => all || `${r.backend}/${r.suite}` === selector,
+      (r) => `${r.backend}/${r.suite}` === selector && (wanted === null || Number(r.at) === wanted),
     )
     if (open.length === 0) {
       console.error(
-        `render-verify-guard --incomplete: no OPEN incomplete recording matches ${all ? '--all' : `"${selector}"`}. ` +
-          'Run `node scripts/render-verify-guard.mjs status` to see which runs are truncated.',
+        `render-verify-guard --incomplete: no OPEN incomplete recording matches "${selector}"` +
+          `${at ? ` at ${at}` : ''}. Run \`node scripts/render-verify-guard.mjs status\` to see which runs ` +
+          'are truncated.',
       )
       process.exit(1)
     }
-    const closures = (Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []).concat(
-      open.map((r) => ({
-        backend: r.backend,
-        suite: r.suite,
-        at: Number(r.at),
-        droppedLines: droppedLinesOf(r),
+    if (open.length > 1) {
+      console.error(
+        `render-verify-guard --incomplete: "${selector}" matches ${open.length} open incomplete recordings. ` +
+          'A closure signs for ONE run, so name it — each is its own judgment and its own reason:',
+      )
+      for (const r of open) console.error(`  --at ${isoText(r.at)}   (${droppedLinesOf(r)} line(s) dropped)`)
+      process.exit(1)
+    }
+    const [run_] = open
+    const closures = (Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []).concat([
+      {
+        backend: run_.backend,
+        suite: run_.suite,
+        at: Number(run_.at),
+        droppedLines: droppedLinesOf(run_),
         evidence,
         closedAt: Date.now(),
-      })),
-    )
+      },
+    ])
     while (closures.length > MAX_INCOMPLETE_CLOSURES) closures.shift()
     mergeRenderState({ incompleteClosures: closures })
-    for (const r of open) {
-      console.log(
-        `⚠ INCOMPLETE RECORDING SIGNED OFF: ${r.backend}/${r.suite} @${new Date(Number(r.at)).toISOString()} ` +
-          `(${droppedLinesOf(r)} result line(s) dropped) — "${evidence}". This closes the RECORD, not the ` +
-          'picture: the run still covers no backend and is never a pass. Re-run the suite at the first chance.',
-      )
-    }
+    console.log(
+      `⚠ INCOMPLETE RECORDING SIGNED OFF: ${run_.backend}/${run_.suite} @${isoText(run_.at)} ` +
+        `(${droppedLinesOf(run_)} result line(s) dropped) — "${evidence}". This closes the RECORD, not the ` +
+        'picture: the run still covers no backend and is never a pass, and every red it DID record still ' +
+        'blocks until it is fixed, charged or filed. Re-run the suite at the first chance.',
+    )
     process.exit(0)
   } catch (e) {
     console.error(`render-verify-guard --incomplete failed: ${e && e.message}`)
@@ -446,14 +479,14 @@ if (arg === 'status') {
     for (const r of openIncomplete) {
       console.log(
         `⚠ INCOMPLETE RECORDING (not an unexplained red): ${r.backend}/${r.suite} ` +
-          `@${new Date(Number(r.at)).toISOString()} — ${droppedLinesOf(r)} result line(s) dropped by the ` +
+          `@${isoText(r.at)} — ${droppedLinesOf(r)} result line(s) dropped by the ` +
           'capture cap. Re-run the suite, or sign it off: node scripts/render-verify-guard.mjs ' +
           `--incomplete "${r.backend}/${r.suite}" --evidence "<why>"`,
       )
     }
     for (const c of Array.isArray(state.incompleteClosures) ? state.incompleteClosures : []) {
       console.log(
-        `(signed-off incomplete recording: ${c.backend}/${c.suite} @${new Date(Number(c.at)).toISOString()} — "${c.evidence}")`,
+        `(signed-off incomplete recording: ${c.backend}/${c.suite} @${isoText(c.at)} — "${c.evidence}")`,
       )
     }
     if (state.deferral) console.log(`⚠ active deferral @${String(state.deferral.head).slice(0, 7)}: "${state.deferral.reason}"`)
