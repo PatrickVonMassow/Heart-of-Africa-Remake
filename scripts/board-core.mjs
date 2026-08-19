@@ -493,11 +493,14 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
     // authored idle card carrying the written handover reason, or — when nobody
     // wrote one — exactly the one parser-distinct empty element. Never both,
     // never a stack, and never a non-idle card standing in for either.
+    // …and beside expected active work, NEITHER zero-claim form may stand: an
+    // idle card or the empty element next to numbered cards is the board
+    // saying two things at once (second cross-vendor round).
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
           ? emptyStateCount !== 0 || unnumberedCards !== 1
           : emptyStateCount !== 1 || unnumberedCards > 0)
-      : emptyStateCount > 0
+      : emptyStateCount > 0 || idleCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length && !emptyStateWrong,
       missing,
@@ -566,6 +569,18 @@ export function reconcileNowProjection(
   const unnumbered = cards.filter((card) => card.point == null)
   if (expected.length === 0 && unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle'))) {
     throw new Error('board: refusing to replace an authored unnumbered non-idle card with the empty-state element')
+  }
+  // The idle card claims "nothing is running"; rendering numbered work beside
+  // it would publish a board saying two things at once, and dropping the card
+  // here would blank its written reason. Refused (second cross-vendor round) —
+  // the sanctioned promotions (`board.mjs now` / `done --next`) strip the
+  // state card as they write the work, which is the way out this error names.
+  if (expected.length > 0 && unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))) {
+    throw new Error(
+      `board: refusing to render active point(s) ${expected.join(', ')} beside the standing ` +
+        '"nothing is running" card — the board would contradict itself in one screen. Promote the ' +
+        'work through board.mjs (now/done --next), which replaces the state card.',
+    )
   }
 
   const byPoint = new Map(numbered.map((card) => [card.point, card.html]))

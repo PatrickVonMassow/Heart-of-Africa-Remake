@@ -217,8 +217,14 @@ describe('derived now-section membership', () => {
     // and a stacked pair is the point-470 defect — both stay unpublishable.
     expect(compareNowProjection(fullBoard({ now: idleReason + NOW_EMPTY_STATE_MARKUP }), []).ok).toBe(false)
     expect(compareNowProjection(fullBoard({ now: idleReason + idleReason }), []).ok).toBe(false)
-    // An idle card claims a stop; beside expected active work it is wrong.
+    // An idle card claims a stop; beside expected active work it is wrong —
+    // even when the numbered set is exactly right, the board would say two
+    // things at once, so the pair is unpublishable (second cross-vendor round).
     expect(compareNowProjection(fullBoard({ now: idleReason }), [700])).toMatchObject({ ok: false, missing: [700] })
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'Kontext', '20:07') + idleReason }), [700]))
+      .toMatchObject({ ok: false, idleCards: 1 })
+    expect(() => reconcileNowProjection(fullBoard({ now: nowEntry(700, 'Kontext', '20:07') + idleReason }), [700]))
+      .toThrow(/beside the standing[\s\S]*nothing is running/)
   })
 
   it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
