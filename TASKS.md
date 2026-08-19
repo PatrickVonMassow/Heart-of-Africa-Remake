@@ -157,46 +157,6 @@ put it is the mistake this line exists to stop.
   merge (`mechanism-review-guard`).
   Bundle: Chat & Tafel.
 
-- [ ] 701. What a task costs, and whether the built levers actually move it (user 17.08.2026:
-  »Ich verstehe nicht, warum der Verbrauch trotz aller bisheriger Maßnahmen so extrem hoch ist«
-  and »Es geht nicht darum, weniger Token pro Zeit zu verbrauchen, sondern darum, dass es weniger
-  pro Task wird«). The binding target is the cost per finished point. Throughput is not a lever:
-  slowing the batch, shrinking the agent pool or deferring work is explicitly excluded — a
-  measure that lowers the hourly rate while leaving the per-point cost untouched has failed.
-  Why this point exists: a row of levers is built (the point boundary, the context watermark, the
-  bounded verify digest, the delegation brief, the open/archive split of the work order, the doc
-  budgets) and the spend is still dominated by large contexts — 81 % of a week's usage above the
-  150k mark, by the user's own panel. Nobody knows which of those levers is used, how often, and
-  what it saves, because none of them is measured in operation. Four more measures are filed and
-  unbuilt (553 budget per point, 596 the running tail, 597 large tool output, 662 the boundary
-  without a tick) — that alone may be the answer, and it must be established rather than assumed.
-  FINAL STATE:
-  - A ledger per point, written where a later session can read it: for every landed point, the
-    tokens it cost, split by origin — the main session, each delegated agent, the cross-vendor
-    reviews, and the big single items (picture reads, suite digests, agent reports). It is
-    derived from what the harness already records (the session transcripts, the agent logs), not
-    from a new accounting layer nobody maintains.
-  - An effectiveness reading per lever, from that same data: how often each built lever actually
-    fired (boundaries taken, watermark crossings, briefs used instead of whole-document reads,
-    digests instead of raw logs), and the measured difference between the points where it fired
-    and the ones where it did not. A lever that cannot be shown to move the per-point cost is
-    named as such — that verdict is the point's product, and a lever that fails is a candidate
-    for removal, because an unused mechanism still costs to carry.
-  - The three largest items named with numbers, since the fix follows the measurement: today's
-    suspects are the picture judgment (a full 1440x900 frame read whole where a crop answers the
-    question), the agent reports (multi-thousand-token prose per round), and the review rounds
-    (a diff plus files per round, three rounds on one small bar today). Each gets a measured
-    share, and only then a proposal.
-  - The reading is repeatable, not a one-off study: one command prints it for the last N points,
-    so the next session can ask "did it get cheaper" and get an answer rather than an opinion.
-  VERIFIABLE: the command runs on the real transcripts of the last ten landed points and prints
-  the per-point split; the per-lever reading names, for each built lever, its firing count and
-  the measured difference; and the closing report of this point states the three largest items
-  with their shares. Vitest over the pure parsing/aggregation with recorded fixtures.
-  Criticality: high — it is the measurement every other cost point is currently guessing at, and
-  the user has asked for the cause twice.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 705. The board is republished once per guard correction, instead of once at the end
   (measured 17.08.2026). One session published the whole board about a dozen times in fifty
   minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card
