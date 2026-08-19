@@ -171,10 +171,14 @@
     "754": {
       "at": "2026-08-19T19:59:31.708Z",
       "why": "Rangfolge bleibt hinter der Deckenprogramm-Kette; Gruppe A ist zwar hoch kritisch, aber der Modell-Verstoss wird von model-guard nachtraeglich gefangen — die Sitzung ist am Kontext-Zaun und darf den Work Order nicht mehr umschichten (Punkt 751), deshalb ordnet der Nachfolger die Gruppe A gegebenenfalls vor"
+    },
+    "755": {
+      "at": "2026-08-19T20:42:12.049Z",
+      "why": "Es ist der Nachfolger von 751 in derselben Kontext-Programm-Reihe; die vorderen Punkte 743/742/744 stehen davor, und 755 blockiert nichts, was vor ihm liegt"
     }
   },
   "settled": {
-    "at": "2026-08-19T19:59:31.708Z",
+    "at": "2026-08-19T20:42:12.049Z",
     "points": [
       174,
       184,
@@ -386,7 +390,6 @@
       737,
       738,
       739,
-      740,
       741,
       742,
       743,
@@ -399,7 +402,8 @@
       750,
       752,
       753,
-      754
+      754,
+      755
     ]
   }
 }
