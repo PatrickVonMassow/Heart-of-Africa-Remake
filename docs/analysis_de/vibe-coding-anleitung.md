@@ -201,6 +201,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
+- **Die Regel greift — an einem von zwei Eingängen.** Der Schutz ist gebaut, geprüft und
+  beweisbar wirksam; ein später hinzugekommener zweiter Weg fragt ihn schlicht nicht. Wer
+  prüft, ob die Regel wirkt, findet sie wirken.
+  → *Prompt:* „Setz eine Zutrittsbedingung **dort durch, wo zugetreten wird**, nicht bei jedem
+  Aufrufer. Und der Test dazu heißt nicht ‚greift sie?', sondern ‚**gibt es einen Weg an ihr
+  vorbei?**' — er muss fehlschlagen, sobald ein Pfad sie überspringt."
+
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
   oder er ist nur dort grün, wo er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
@@ -411,4 +418,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0f29ac9a6c99b803a450e2eb3afd29ce4aea322171a766e72975f6e4f1c3df88 -->
+<!-- GUIDE-FINGERPRINT: 0a70b40a74b6bb639bd9377417fe675d8e28698c0fc709737c8b9a2675c70cec -->

@@ -135,10 +135,14 @@
     "725": {
       "at": "2026-08-19T02:12:32.321Z",
       "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright."
+    },
+    "728": {
+      "at": "2026-08-19T09:07:16.285Z",
+      "why": "Neu angelegter Fehlerbefund vom 19.08.2026 (dreifache Chat-Antwort neben lebendem Besitzer). Er bleibt hinten: der Fehler kostet den Nutzer Lesezeit, korrumpiert aber nichts, und die vorderen Punkte sind entweder vom Nutzer vorgezogen oder bereits im Bau. Vor die grossen Finder-Punkte gehoert er trotzdem, was die Anhaengeposition ohnehin leistet."
     }
   },
   "settled": {
-    "at": "2026-08-19T08:26:52.058Z",
+    "at": "2026-08-19T09:07:16.286Z",
     "points": [
       174,
       184,
@@ -342,7 +346,8 @@
       722,
       724,
       725,
-      727
+      727,
+      728
     ]
   }
 }
