@@ -486,9 +486,17 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
     }
     const crossSection = [...elsewhere].map(([point, sections]) => ({ point, sections }))
     const emptyStateCount = (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length
-    const unnumberedCards = cards.filter((card) => card.point == null).length
+    const unnumbered = cards.filter((card) => card.point == null)
+    const unnumberedCards = unnumbered.length
+    const idleCards = unnumbered.filter((card) => isTrulyStateCard(card.html, 'idle')).length
+    // Verified zero has TWO honest forms (second cross-vendor review): the one
+    // authored idle card carrying the written handover reason, or — when nobody
+    // wrote one — exactly the one parser-distinct empty element. Never both,
+    // never a stack, and never a non-idle card standing in for either.
     const emptyStateWrong = expected.length === 0
-      ? emptyStateCount !== 1 || unnumberedCards > 0
+      ? (idleCards === 1
+          ? emptyStateCount !== 0 || unnumberedCards !== 1
+          : emptyStateCount !== 1 || unnumberedCards > 0)
       : emptyStateCount > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length && !emptyStateWrong,
@@ -499,6 +507,7 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
       crossSection,
       emptyStateCount,
       unnumberedCards,
+      idleCards,
     }
   } catch (error) {
     return { ok: false, error: error?.message ?? String(error), missing: [], extra: [], duplicates: [] }
@@ -593,7 +602,11 @@ export function reconcileNowProjection(
     })
     .replace(emptyStatePattern(), '')
     .trim()
-  if (expected.length === 0) remainder = NOW_EMPTY_STATE_MARKUP
+  // Verified zero NEVER blanks what a session wrote (second cross-vendor
+  // review): the idle card `done --none` puts up carries the handover reason
+  // the reader opens the board for, so it survives the render byte for byte.
+  // The generic empty element is only the fallback when nobody wrote anything.
+  if (expected.length === 0) remainder = remainder || NOW_EMPTY_STATE_MARKUP
   else remainder = `${ordered.map((card) => card.html).join('')}${remainder ? `\n${remainder}` : ''}`.trimEnd()
   const projected = source.slice(0, now.from) + `\n${remainder}\n` + source.slice(now.end).replace(/^\n/, '')
   return stripProjectedQueueCards(projected, expected)

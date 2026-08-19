@@ -205,6 +205,22 @@ describe('derived now-section membership', () => {
     expect(compareNowProjection(fullBoard({ now: handover }), []).ok).toBe(false)
   })
 
+  it('accepts verified zero through the one authored idle card, never a mixed or stacked form', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">16:45</span></span></summary>\n' +
+      '  <div class="body">\n<p><span class="stamp">Stand 16:45</span> Sitzungsgrenze; der Nachfolger nimmt ' +
+      'Punkt 707.</p>\n  </div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: idleReason }), []))
+      .toMatchObject({ ok: true, idleCards: 1, emptyStateCount: 0 })
+    // The written card and the generic element side by side contradict each other,
+    // and a stacked pair is the point-470 defect — both stay unpublishable.
+    expect(compareNowProjection(fullBoard({ now: idleReason + NOW_EMPTY_STATE_MARKUP }), []).ok).toBe(false)
+    expect(compareNowProjection(fullBoard({ now: idleReason + idleReason }), []).ok).toBe(false)
+    // An idle card claims a stop; beside expected active work it is wrong.
+    expect(compareNowProjection(fullBoard({ now: idleReason }), [700])).toMatchObject({ ok: false, missing: [700] })
+  })
+
   it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
     const authored = nowEntry(700, 'Die Übergabe', '20:07', 'Umlaute, <a href="/x">Link</a> und Text.')
     const before = fullBoard({
@@ -273,7 +289,7 @@ describe('derived now-section membership', () => {
       .toThrow(/refusing to replace an authored unnumbered non-idle card/)
   })
 
-  it('publishes the honest zero state written by done --none as the distinct empty element', () => {
+  it('publishes the handover reason written by done --none instead of blanking it', () => {
     const before = fullBoard({ now: nowEntry(713, 'Abgeleitete Jetzt-Sektion', '10:07 · ~14:30') })
     const edited = closeCard(before, 713, {
       text: 'Fertig.',
@@ -283,9 +299,13 @@ describe('derived now-section membership', () => {
 
     expect(claimsNoCurrentWork(edited)).toBe(true)
     const { html, comparison } = projectNowForPublish(edited, { ok: true, points: [], focusPoint: null })
-    expect(html).toContain(NOW_EMPTY_STATE_MARKUP)
-    expect(html).not.toContain(NO_CURRENT_WORK_TITLE)
-    expect(comparison).toMatchObject({ ok: true, emptyStateCount: 1, unnumberedCards: 0 })
+    // The render never blanks text a session wrote: the authored idle card
+    // survives with its reason, and the generic element stays the fallback
+    // for a section where nobody wrote anything.
+    expect(html).toContain(NO_CURRENT_WORK_TITLE)
+    expect(html).toContain('Sitzungsgrenze; der Nachfolger nimmt Punkt 707.')
+    expect(html).not.toContain(NOW_EMPTY_STATE_MARKUP)
+    expect(comparison).toMatchObject({ ok: true, emptyStateCount: 0, unnumberedCards: 1, idleCards: 1 })
   })
 })
 
