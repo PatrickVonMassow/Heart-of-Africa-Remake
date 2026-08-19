@@ -157,6 +157,51 @@ put it is the mistake this line exists to stop.
   merge (`mechanism-review-guard`).
   Bundle: Chat & Tafel.
 
+- [ ] 730. The board's queue estimates are calibrated for a slower batch than the one running
+  (user 19.08.2026, reading the live board: »Seit den Umstellungen gestern scheint die
+  Abarbeitung der Punkte schneller zu laufen als bisher. Die Schätzungen der zukünftigen Tasks
+  sind daher vermutlich übertrieben lange. Prüfe das und überarbeite sie wo notwendig.«).
+  MEASURED 19.08.2026 from the first-parent merges: the eleven points landed between 623
+  (18.08., 20:23) and 701 (19.08., 11:55) took 15.5 h of wall clock — one landing every ~1.4 h —
+  against 32.1 h for the eight before them (628 → 623), one every ~4.0 h. The 316 cards in
+  `.claude/board-queue.json` carry a median estimate of 3 h and a mean of 3.0 h, 952 h in total,
+  and not one of them was derived from a measurement. An estimate is DEFINED in
+  `scripts/dashboard-guard-core.mjs` as the time by which the work is VISIBLY DONE — merged,
+  verified, board updated — so it is a falsifiable promise to the reader, and it is currently
+  wrong in one direction for the whole queue.
+  FINAL STATE:
+  - THE CALIBRATION IS MEASURED, NOT GUESSED. One command reads the landed points out of git and
+    reports, as a DISTRIBUTION rather than an average, the actual elapsed time per point (the
+    branch's first commit to its merge) beside the estimate that point's card carried, plus the
+    queue-drain cadence (merge to merge), which is the smaller number whenever the pool ran
+    several points at once. The two are reported separately and never averaged into one figure.
+  - THE READING IS SPLIT BY WHAT ACTUALLY DISTINGUISHES A POINT — its criticality tag, whether it
+    was delegated or authored in the main session, and whether a picture verification was part of
+    it. A single global correction factor is adopted ONLY if the measurement shows the classes do
+    not differ; otherwise each class carries its own.
+  - THE STORED ESTIMATES ARE REWRITTEN FROM THAT READING for every open point, as a machine step
+    over `.claude/board-queue.json` through the existing `board-queue.mjs set <N> --estimate`
+    path, never a hand pass over 200 cards. What it wrote is printed per card, so the change is
+    reviewable in one screen, and a card whose class has NO landed comparable keeps its estimate
+    with that reason named rather than being moved on a guess.
+  - A NEW CARD INHERITS THE MEASURED DEFAULT: filing a point without an estimate takes the
+    measured median of its class, and the existing "no estimate yet" marker stays for the case
+    where no class fits.
+  - THE READING STAYS REPEATABLE. Re-run later, the same command says whether the estimates still
+    match the batch's speed, so the NEXT shift is noticed rather than assumed; every run names
+    the measurement window it used.
+  VERIFIABLE: the command runs on the real merge history and prints the per-point
+  estimate-versus-actual distribution and the cadence beside it; after the rewrite no estimate in
+  `.claude/board-queue.json` contradicts the measurement by more than the reported spread; Vitest
+  over the pure comparison, the class split and the rewrite plan with recorded fixtures —
+  including a case where the classes differ enough that a single global factor is REFUSED, and a
+  case where a class has no landed comparable and its cards keep their estimate with a named
+  reason.
+  Criticality: medium — nothing in the code depends on an estimate, but the board is what the
+  user plans by, and a queue that promises 952 h for work running at three times that speed
+  misinforms every reading of it.
+  Bundle: Chat & Tafel.
+
 - [ ] 705. The board is republished once per guard correction, instead of once at the end
   (measured 17.08.2026). One session published the whole board about a dozen times in fifty
   minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card
@@ -8577,47 +8622,27 @@ to land than a mechanism that needs a review.
   passes a red one as green.
   Bundle: Modell & Wächter.
 
-- [ ] 730. The board's queue estimates are calibrated for a slower batch than the one running
-  (user 19.08.2026, reading the live board: »Seit den Umstellungen gestern scheint die
-  Abarbeitung der Punkte schneller zu laufen als bisher. Die Schätzungen der zukünftigen Tasks
-  sind daher vermutlich übertrieben lange. Prüfe das und überarbeite sie wo notwendig.«).
-  MEASURED 19.08.2026 from the first-parent merges: the eleven points landed between 623
-  (18.08., 20:23) and 701 (19.08., 11:55) took 15.5 h of wall clock — one landing every ~1.4 h —
-  against 32.1 h for the eight before them (628 → 623), one every ~4.0 h. The 316 cards in
-  `.claude/board-queue.json` carry a median estimate of 3 h and a mean of 3.0 h, 952 h in total,
-  and not one of them was derived from a measurement. An estimate is DEFINED in
-  `scripts/dashboard-guard-core.mjs` as the time by which the work is VISIBLY DONE — merged,
-  verified, board updated — so it is a falsifiable promise to the reader, and it is currently
-  wrong in one direction for the whole queue.
+
+- [ ] 731. The boundary prints a handover text the board gate refuses (measured 19.08.2026 at the
+  point 701 boundary). `scripts/batch-boundary.mjs --prepare` prints the handover card verbatim
+  with the instruction to "take this text verbatim rather than writing it again" — the reason it
+  exists is that a rewritten card drifts. That text names NO point number, and `board.mjs none`
+  plus the publish gate REFUSE a handover card whose reason does not name the point the batch
+  picks up next. So the verbatim paste is rejected and every boundary rewrites it by hand, which
+  is exactly the drift the verbatim rule prevents; two mechanisms built for the same card
+  disagree about what it must contain.
   FINAL STATE:
-  - THE CALIBRATION IS MEASURED, NOT GUESSED. One command reads the landed points out of git and
-    reports, as a DISTRIBUTION rather than an average, the actual elapsed time per point (the
-    branch's first commit to its merge) beside the estimate that point's card carried, plus the
-    queue-drain cadence (merge to merge), which is the smaller number whenever the pool ran
-    several points at once. The two are reported separately and never averaged into one figure.
-  - THE READING IS SPLIT BY WHAT ACTUALLY DISTINGUISHES A POINT — its criticality tag, whether it
-    was delegated or authored in the main session, and whether a picture verification was part of
-    it. A single global correction factor is adopted ONLY if the measurement shows the classes do
-    not differ; otherwise each class carries its own.
-  - THE STORED ESTIMATES ARE REWRITTEN FROM THAT READING for every open point, as a machine step
-    over `.claude/board-queue.json` through the existing `board-queue.mjs set <N> --estimate`
-    path, never a hand pass over 200 cards. What it wrote is printed per card, so the change is
-    reviewable in one screen, and a card whose class has NO landed comparable keeps its estimate
-    with that reason named rather than being moved on a guess.
-  - A NEW CARD INHERITS THE MEASURED DEFAULT: filing a point without an estimate takes the
-    measured median of its class, and the existing "no estimate yet" marker stays for the case
-    where no class fits.
-  - THE READING STAYS REPEATABLE. Re-run later, the same command says whether the estimates still
-    match the batch's speed, so the NEXT shift is noticed rather than assumed; every run names
-    the measurement window it used.
-  VERIFIABLE: the command runs on the real merge history and prints the per-point
-  estimate-versus-actual distribution and the cadence beside it; after the rewrite no estimate in
-  `.claude/board-queue.json` contradicts the measurement by more than the reported spread; Vitest
-  over the pure comparison, the class split and the rewrite plan with recorded fixtures —
-  including a case where the classes differ enough that a single global factor is REFUSED, and a
-  case where a class has no landed comparable and its cards keep their estimate with a named
-  reason.
-  Criticality: medium — nothing in the code depends on an estimate, but the board is what the
-  user plans by, and a queue that promises 952 h for work running at three times that speed
-  misinforms every reading of it.
+  - THE PRINTED TEXT SATISFIES THE GATE IT IS PRINTED FOR. `batch-boundary.mjs --prepare` reads
+    the head of the open work order the same way the board's queue does and names that point in
+    the handover text it prints, so the paste passes the publish gate unedited. Where no open
+    point remains, it prints the wording the gate accepts for that case rather than a number that
+    does not exist.
+  - THE AGREEMENT IS PINNED, NOT COINCIDENTAL. The gate's requirement and the boundary's text are
+    checked against each other, so a later change to either side fails a test instead of
+    surfacing at the next handover.
+  VERIFIABLE: Vitest over the pure text builder — the produced handover reason satisfies the same
+  predicate the publish gate applies, with a case for an empty queue and a case that FAILS if the
+  point number is dropped from the text.
+  Criticality: low — it costs one hand-rewrite per session boundary and risks the drift the
+  verbatim rule was built to stop, but nothing is lost.
   Bundle: Chat & Tafel.

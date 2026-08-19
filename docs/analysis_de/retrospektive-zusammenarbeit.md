@@ -207,7 +207,9 @@ Ein Kohärenz-Audit fand acht Stellen, an denen die Dokumente etwas anderes beha
 
 Dieselbe Wette schließt, wer eine Beschriftung im **Testcode** wörtlich erwartet, statt sie aus der Sprachdatei zu lesen: Eine live laufende Prüfung suchte den deutschen Platzhalter, während ihre Suite auf Englisch lief — sie schlug bei völlig korrektem Verhalten fehl. Eine Prüfzusicherung ist eine Kopie wie jede andere.
 
-**Lehre:** Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man. Ein verbindlicher Ort je Faktum, alle anderen verweisen; für Tests heißt das, gegen die Quelle der Wahrheit zu prüfen statt gegen eine abgeschriebene Zeichenkette.
+Die Variante ohne menschlichen Schreiber ist am zähesten: Am 19.08.2026 druckte die Sitzungsgrenze den Text der Übergabekarte mit der Anweisung, ihn WÖRTLICH zu übernehmen — und die Veröffentlichungsprüfung der Tafel wies genau diesen Text ab, weil er den nächsten Punkt nicht benennt. Zwei Mechanismen, gebaut für dieselbe Karte, waren sich über deren Inhalt uneins; keiner von beiden konnte das bemerken, und der Ausweg war jedes Mal die Handschrift, die der Wörtlich-Vorschrift zuvorkommen sollte.
+
+**Lehre:** Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man. Ein verbindlicher Ort je Faktum, alle anderen verweisen; für Tests heißt das, gegen die Quelle der Wahrheit zu prüfen statt gegen eine abgeschriebene Zeichenkette. Wo zwei Mechanismen dasselbe Artefakt erzeugen und prüfen, gilt dasselbe: Die Anforderung gehört an EINE Stelle, gegen die beide laufen.
 
 ### 3.22 Der rote Test, der den Unschuldigen anklagt
 
@@ -253,6 +255,8 @@ Ich hatte erklärt, parallele Stränge vervielfachten den Token-Verbrauch, weil 
 Zäh war die Fehlannahme, weil die Erfahrung sie zu bestätigen schien: Das Wochenkontingent war tatsächlich vorzeitig erschöpft — aber das belegte die Rate, nicht die Kosten. Der echte Aufschlag ist kleiner und liegt woanders: Nacharbeit, wenn zwei Stränge denselben Code berühren, plus die Aufsicht. Die eigentliche Grenze ist ohnehin keine Kostenfrage, sondern der **Haupt-Agent**: Bei ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
 
 **Lehre:** Bevor man etwas beziffert, muss der Nenner feststehen — pro Arbeit oder pro Zeit. Beides „Kosten" zu nennen führt zu falschen Entscheidungen; hier zu einer Drosselung, die nichts sparte und nur langsamer machte.
+
+Dieselbe Prüfung schuldet jede Zahl, die der Nutzer liest: Die Zeitschätzungen der Warteschlange waren durchweg von Hand gesetzt. Als der Nutzer am 19.08.2026 auffiel, die Punkte liefen schneller durch als angekündigt, ergab die Messung elf Landungen in 15,5 Stunden gegen rund vier Stunden je Punkt davor — die Tafel versprach für 316 Karten zusammen 952 Stunden, ohne dass je eine dieser Zahlen aus einer Messung stammte. Eine geschätzte Zahl, die wie eine gemessene aussieht, ist keine Information, sondern eine Behauptung.
 
 ### 3.28 Die teuerste Prüfung war die unschärfste
 
@@ -1309,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 19.08.2026, 11:07 · Quellen-Fingerprint: `0a70b40a74b6…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 12:20 · Quellen-Fingerprint: `bde94d1f61f4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1400,10 +1404,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 59 Prozess-/Meta-TASKS-Punkte (davon 25 offen).
+Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 60 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
 
-<!-- RETRO-FINGERPRINT: 0a70b40a74b6bb639bd9377417fe675d8e28698c0fc709737c8b9a2675c70cec -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T09:07:58.183Z -->
+<!-- RETRO-FINGERPRINT: bde94d1f61f4caa8b7f69032f4eff9e5e9295eedec829ebeaf01f79ebb450531 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T10:20:13.107Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

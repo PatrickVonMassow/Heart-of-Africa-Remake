@@ -139,10 +139,14 @@
     "729": {
       "at": "2026-08-19T09:26:29.525Z",
       "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf."
+    },
+    "731": {
+      "at": "2026-08-19T10:19:49.258Z",
+      "why": "Low-criticality one-line inconsistency; it costs a hand-rewrite per boundary and nothing is lost, so it waits behind the queue's settled order."
     }
   },
   "settled": {
-    "at": "2026-08-19T09:26:29.525Z",
+    "at": "2026-08-19T10:19:49.258Z",
     "points": [
       174,
       184,
@@ -330,7 +334,6 @@
       696,
       698,
       699,
-      701,
       704,
       705,
       706,
@@ -345,9 +348,10 @@
       722,
       724,
       725,
-      727,
       728,
-      729
+      729,
+      730,
+      731
     ]
   }
 }
