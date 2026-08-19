@@ -270,7 +270,22 @@ describe('derived now-section membership', () => {
 
   it('refuses verified zero when only an authored handover card stands there', () => {
     expect(() => projectNowForPublish(fullBoard({ now: handover }), { ok: true, points: [], focusPoint: null }))
-      .toThrow(/refusing to replace an authored unnumbered handover card/)
+      .toThrow(/refusing to replace an authored unnumbered non-idle card/)
+  })
+
+  it('publishes the honest zero state written by done --none as the distinct empty element', () => {
+    const before = fullBoard({ now: nowEntry(713, 'Abgeleitete Jetzt-Sektion', '10:07 · ~14:30') })
+    const edited = closeCard(before, 713, {
+      text: 'Fertig.',
+      end: '16:45',
+      none: 'Sitzungsgrenze; der Nachfolger nimmt Punkt 707.',
+    })
+
+    expect(claimsNoCurrentWork(edited)).toBe(true)
+    const { html, comparison } = projectNowForPublish(edited, { ok: true, points: [], focusPoint: null })
+    expect(html).toContain(NOW_EMPTY_STATE_MARKUP)
+    expect(html).not.toContain(NO_CURRENT_WORK_TITLE)
+    expect(comparison).toMatchObject({ ok: true, emptyStateCount: 1, unnumberedCards: 0 })
   })
 })
 

@@ -554,8 +554,9 @@ export function reconcileNowProjection(
   for (const card of numbered) counts.set(card.point, (counts.get(card.point) ?? 0) + 1)
   const conflicts = [...counts].filter(([, count]) => count > 1).map(([point]) => point)
   if (conflicts.length) throw new Error(`board: conflicting current-work copies for point(s) ${conflicts.join(', ')}`)
-  if (expected.length === 0 && cards.some((card) => card.point == null)) {
-    throw new Error('board: refusing to replace an authored unnumbered handover card with the empty-state element')
+  const unnumbered = cards.filter((card) => card.point == null)
+  if (expected.length === 0 && unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle'))) {
+    throw new Error('board: refusing to replace an authored unnumbered non-idle card with the empty-state element')
   }
 
   const byPoint = new Map(numbered.map((card) => [card.point, card.html]))
