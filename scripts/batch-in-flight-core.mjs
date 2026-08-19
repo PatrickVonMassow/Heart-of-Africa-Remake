@@ -1190,12 +1190,24 @@ export const UNATTRIBUTABLE_EVIDENCE_REMEDY =
  * point-less pid/log items made `normalizeActiveWork` refuse the whole source
  * one read later — a success message followed by a silently empty result. One
  * alert line per such item, each naming the human way out. PURE.
+ *
+ * It judges by the SAME phase resolution as the read side (seventh
+ * cross-review): `normalizeActiveWork` skips a TERMINAL item before it ever
+ * resolves the point, so a point-less terminal item never refuses the record —
+ * alerting on it claimed a refusal that would not happen and recommended the
+ * destructive whole clear for a record the read side accepts. `declarationPhase`
+ * is the same fallback the read side applies to an item without its own phase.
  */
-export function unattributableEvidenceAlerts(evidence = [], { worktreeRef = () => null } = {}) {
+export function unattributableEvidenceAlerts(
+  evidence = [],
+  { worktreeRef = () => null, declarationPhase = null } = {},
+) {
   const out = []
   const list = Array.isArray(evidence) ? evidence : []
   list.forEach((item, index) => {
     if (!item || typeof item !== 'object') return
+    const phase = String(item.phase ?? declarationPhase ?? 'authoring').trim().toLowerCase()
+    if (TERMINAL_WORK_PHASES.includes(phase)) return
     if (evidencePoint(item, { worktreeRef }) != null) return
     const name = `${item.kind ?? '?'} ${item.ref ?? item.path ?? item.pid ?? ''}`.trim()
     out.push(

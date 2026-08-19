@@ -254,8 +254,33 @@ describe('unattributableEvidenceAlerts — an adoption never succeeds silently i
 
   it('stays silent when every item is attributed, and never throws on junk', () => {
     expect(unattributableEvidenceAlerts([{ kind: 'branch', ref: 'feat/700-x', point: 700 }])).toEqual([])
+    // Point-carrying pid/log evidence is attributed by the SAME field (seventh
+    // cross-review): an implementation that complained about pid/log by KIND,
+    // regardless of the recorded point, would block every valid adoption.
+    expect(unattributableEvidenceAlerts([
+      { kind: 'pid', pid: 77, point: 700 },
+      { kind: 'log', path: '/l', point: 697 },
+    ])).toEqual([])
     expect(unattributableEvidenceAlerts()).toEqual([])
     expect(unattributableEvidenceAlerts([null, 'x'])).toEqual([])
+  })
+
+  it('skips a point-less TERMINAL item, exactly as the read side does', () => {
+    // Seventh cross-review: `normalizeActiveWork` returns on a terminal phase
+    // BEFORE resolving the point, so this item never refuses the record — an
+    // alert here falsely claimed a refusal and recommended the whole clear.
+    expect(unattributableEvidenceAlerts([{ kind: 'log', path: '/l', phase: 'landed' }])).toEqual([])
+    // The declaration-level phase is the same fallback the read side applies…
+    expect(unattributableEvidenceAlerts([{ kind: 'pid', pid: 77 }], { declarationPhase: 'completed' })).toEqual([])
+    // …and an item's own phase wins over it, in both directions.
+    expect(
+      unattributableEvidenceAlerts([{ kind: 'pid', pid: 77, phase: 'verification' }], { declarationPhase: 'landed' }),
+    ).toHaveLength(1)
+    expect(
+      unattributableEvidenceAlerts([{ kind: 'pid', pid: 77, phase: 'returned' }], { declarationPhase: 'authoring' }),
+    ).toEqual([])
+    // A point-less ACTIVE item still alerts — that one the read side refuses.
+    expect(unattributableEvidenceAlerts([{ kind: 'log', path: '/l', phase: 'authoring' }])).toHaveLength(1)
   })
 })
 
