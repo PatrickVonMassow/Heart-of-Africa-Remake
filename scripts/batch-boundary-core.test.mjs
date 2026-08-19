@@ -49,9 +49,9 @@ import {
   topicViolations,
 } from './dashboard-card-topic-guard-core.mjs'
 import { markHandover, progressGuardDecision, readOwnerLock } from './batch-singleton.mjs'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
 
@@ -731,6 +731,37 @@ describe('the marker survives everything --prepare prescribes (point 675)', () =
       'node scripts/context-watermark.mjs --status',
     ]) {
       expect(handoverSurvivesCall({ toolName: 'Bash', command }).survives, command).toBe(true)
+    }
+  })
+})
+
+describe('every Stop-guard remedy stays inside the closing set', () => {
+  it('derives remedy scripts from the authoritative hook chain, not a copied guard list', () => {
+    const root = process.cwd()
+    const settings = JSON.parse(readFileSync(resolve(root, '.claude/settings.json'), 'utf8'))
+    const guards = (settings.hooks?.Stop ?? [])
+      .flatMap((entry) => entry.hooks ?? [])
+      .map((hook) => /scripts[\\/]([\w.-]+\.mjs)/.exec(hook.command ?? '')?.[1])
+      .filter(Boolean)
+    expect(guards.length).toBeGreaterThan(5)
+
+    const remedies = []
+    for (const guard of guards) {
+      const source = readFileSync(resolve(root, 'scripts', guard), 'utf8')
+      for (const match of source.matchAll(/node\s+scripts[\\/]([\w-]+\.mjs)/g)) {
+        remedies.push({ guard, command: `node scripts/${match[1]}` })
+      }
+    }
+    // These messages live in imported pure cores rather than their wrappers.
+    remedies.push(
+      { guard: 'findings-guard.mjs', command: 'node scripts/finding.mjs --drain' },
+      { guard: 'findings-guard.mjs', command: 'node scripts/board-queue.mjs' },
+      { guard: 'rule-review-guard.mjs', command: 'node scripts/rule-review.mjs --reviewed' },
+    )
+
+    expect(remedies.length).toBeGreaterThan(20)
+    for (const { guard, command } of remedies) {
+      expect(isClosingSetCommand(command), `${guard} demands ${command}`).toBe(true)
     }
   })
 })
