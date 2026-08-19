@@ -119,23 +119,24 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
   })
 })
 
-describe('contextDistanceNote — the distance between mark and handover is a number, not a claim (point 700)', () => {
-  it('stays silent within the stated margin, below the mark included', () => {
-    expect(contextDistanceNote({ tokens: 120_000, watermark: 150_000 })).toBeNull()
-    expect(contextDistanceNote({ tokens: 150_000 + CONTEXT_MARGIN_TOKENS, watermark: 150_000 })).toBeNull()
+describe('contextDistanceNote — the distance between ceiling and handover is a number, not a claim (point 700)', () => {
+  it('stays silent within the stated margin, below the ceiling included', () => {
+    expect(contextDistanceNote({ tokens: 120_000, ceiling: 150_000 })).toBeNull()
+    expect(contextDistanceNote({ tokens: 150_000 + CONTEXT_MARGIN_TOKENS, ceiling: 150_000 })).toBeNull()
   })
 
-  it('demands the closing report name a boundary taken further past the mark than the margin', () => {
-    const note = contextDistanceNote({ tokens: 434_440, watermark: 150_000 })
+  it('demands the closing report name a boundary taken further past the ceiling than the margin', () => {
+    const note = contextDistanceNote({ tokens: 434_440, ceiling: 150_000 })
     expect(note).toContain('284440')
+    expect(note).toContain('150000 CEILING')
     expect(note).toContain('closing report')
   })
 
   it('an UNMEASURED boundary is named too — no reading must never read as a small distance', () => {
-    expect(contextDistanceNote({ tokens: null, watermark: 150_000 })).toContain('NO CONTEXT READING')
+    expect(contextDistanceNote({ tokens: null, ceiling: 150_000 })).toContain('NO CONTEXT READING')
   })
 
-  it('a broken watermark falls back to the named trigger, not the ceiling', () => {
-    expect(contextDistanceNote({ tokens: 500_000, watermark: 0 })).toContain('82000')
+  it('a broken ceiling falls back to the named ceiling, not the trigger', () => {
+    expect(contextDistanceNote({ tokens: 500_000, ceiling: 0 })).toContain('150000 CEILING')
   })
 })

@@ -58,7 +58,7 @@ import { launcherRemedy } from './batch-launcher-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { gatherHandoverTransfer as gatherTransfer } from './batch-in-flight.mjs'
 import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
-import { contextDistanceNote } from './context-watermark-core.mjs'
+import { CONTEXT_CEILING_TOKENS, contextDistanceNote } from './context-watermark-core.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
@@ -725,9 +725,10 @@ if (isMain) {
             : ''),
       )
       // The distance is a NUMBER somebody reads, not a claim (point 700): a
-      // commit further past the mark than the stated margin owes the closing
-      // report a sentence.
-      const distance = contextDistanceNote({ tokens: wm.tokens, watermark: wm.watermark })
+      // commit further past the ceiling than the stated margin owes the
+      // closing report a sentence. Admission above used the trigger; overshoot
+      // deliberately measures the separate cost ceiling.
+      const distance = contextDistanceNote({ tokens: wm.tokens, ceiling: CONTEXT_CEILING_TOKENS })
       if (distance) console.log(`\n${distance}`)
       process.exit(0)
     }
@@ -907,9 +908,10 @@ if (isMain) {
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
-    // Point 700: a boundary further past the mark than the stated margin — or
-    // one whose context could not be measured — owes the closing report a line.
-    const distance = contextDistanceNote({ tokens: contextTokens, watermark: wmPoint.watermark })
+    // Point 700: a boundary further past the ceiling than the stated margin —
+    // or one whose context could not be measured — owes the closing report a
+    // line. The trigger in wmPoint is for admission, not this overshoot record.
+    const distance = contextDistanceNote({ tokens: contextTokens, ceiling: CONTEXT_CEILING_TOKENS })
     if (distance) console.log(`\n${distance}`)
   }
 }

@@ -83,11 +83,10 @@ export function parseContextTokens(text) {
  *                  (a watermark that silently never fires is defeat 3 intact).
  */
 /**
- * THE STATED MARGIN (point 700): how far past the mark a boundary may honestly
- * land — the mark fires mid-step and finishing that step costs context. A
- * boundary taken FURTHER past it than this says so in the session's closing
- * report, so the distance between the mark and the real handover stays a
- * number somebody reads rather than a claim. Calibratable like the mark.
+ * THE STATED MARGIN (point 700): how far past the ceiling a boundary may
+ * honestly land. A boundary taken FURTHER past it than this says so in the
+ * session's closing report, so the distance between the ceiling and the real
+ * handover stays a number somebody reads rather than a claim.
  */
 export const CONTEXT_MARGIN_TOKENS = 25_000
 
@@ -98,19 +97,19 @@ export const CONTEXT_MARGIN_TOKENS = 25_000
  * rode on the boundary at all, since an unmeasured distance must not read as a
  * small one.
  */
-export function contextDistanceNote({ tokens, watermark, margin = CONTEXT_MARGIN_TOKENS } = {}) {
+export function contextDistanceNote({ tokens, ceiling, margin = CONTEXT_MARGIN_TOKENS } = {}) {
   if (typeof tokens !== 'number' || !(tokens > 0)) {
     return (
-      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the watermark cannot be judged. ' +
+      'NO CONTEXT READING RODE ON THIS BOUNDARY — the distance to the ceiling cannot be judged. ' +
       'Say so in the closing report.'
     )
   }
-  const mark = typeof watermark === 'number' && watermark > 0 ? watermark : CONTEXT_TRIGGER_TOKENS
-  const over = tokens - mark
+  const limit = typeof ceiling === 'number' && ceiling > 0 ? ceiling : CONTEXT_CEILING_TOKENS
+  const over = tokens - limit
   if (over <= margin) return null
   return (
-    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${mark} WATERMARK (measured ${tokens}, stated margin ` +
-    `${margin}) — say so in the closing report, naming what kept the session working past the mark.`
+    `THIS BOUNDARY WAS TAKEN ${over} TOKENS PAST THE ${limit} CEILING (measured ${tokens}, stated margin ` +
+    `${margin}) — say so in the closing report, naming what kept the session working past the ceiling.`
   )
 }
 
