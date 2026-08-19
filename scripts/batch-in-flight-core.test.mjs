@@ -54,6 +54,7 @@ import {
   COMMISSION_RECORD_PATH,
   pointOfBranch,
   normalizeActiveWork,
+  unattributableEvidenceAlerts,
   describeBranchAge,
   parseCommissionRecord,
   commissionOverrideFor,
@@ -216,6 +217,45 @@ describe('normalizeActiveWork — the board\'s structured point source', () => {
     expect(result.ok).toBe(false)
     expect(result.points).toEqual([])
     expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  it('an EMPTY open-point set is a verified "nothing is open", never a free pass', () => {
+    // Sixth cross-review: the old `open.size > 0` guard skipped the membership
+    // check entirely when nothing was open, so any declared strand sailed
+    // through on the fail-closed publish side.
+    const declared = { declaration: { evidence: [{ point: 697 }] } }
+    const result = normalizeActiveWork({ openPoints: new Set(), ...declared })
+    expect(result).toMatchObject({ ok: false, points: [] })
+    expect(result.errors.join(' ')).toContain('not open')
+    // …and a numbered focus against the empty set refuses the same way.
+    expect(normalizeActiveWork({ openPoints: [], focusPoint: 700 }).ok).toBe(false)
+    // The genuinely idle record stays a valid zero.
+    expect(normalizeActiveWork({ openPoints: new Set(), declaration: null, focusPoint: null }))
+      .toMatchObject({ ok: true, points: [] })
+  })
+})
+
+describe('unattributableEvidenceAlerts — an adoption never succeeds silently into an empty board', () => {
+  it('names every kept item that stays point-less after the migration, with the human way out', () => {
+    const alerts = unattributableEvidenceAlerts(
+      [
+        { kind: 'branch', ref: 'feat/700-x', point: 700 },
+        { kind: 'pid', pid: 77 },
+        { kind: 'log', path: '/l' },
+        { kind: 'worktree', path: '/w/point-713' },
+      ],
+      { worktreeRef: (p) => (p === '/w/point-713' ? 'refs/heads/feat/713-x' : null) },
+    )
+    expect(alerts).toHaveLength(2)
+    expect(alerts[0]).toContain('pid 77')
+    expect(alerts[1]).toContain('log /l')
+    for (const alert of alerts) expect(alert).toContain('batch-in-flight.mjs --clear')
+  })
+
+  it('stays silent when every item is attributed, and never throws on junk', () => {
+    expect(unattributableEvidenceAlerts([{ kind: 'branch', ref: 'feat/700-x', point: 700 }])).toEqual([])
+    expect(unattributableEvidenceAlerts()).toEqual([])
+    expect(unattributableEvidenceAlerts([null, 'x'])).toEqual([])
   })
 })
 
@@ -2349,6 +2389,36 @@ describe('markTransferred — the adoption record stays probeable (M4/M7)', () =
     const t = markTransferred({ declaration, bySid: 's1', now: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
     expect(t.evidence).toEqual(declaration.evidence)
     expect(t.transfer).toEqual({ v: 1, by: 's1', at: 99, checkpoints: [{ ref: 'b', sha: 'x' }] })
+  })
+
+  it('the transfer is a write, so it migrates: legacy evidence leaves with its point recorded', () => {
+    // Sixth cross-review: writing the legacy evidence back unchanged handed
+    // the successor a declaration without its once-only migration.
+    const declaration = {
+      v: 1,
+      sessionId: 's1',
+      at: 1,
+      waitingOn: 'agent',
+      evidence: [
+        { kind: 'branch', ref: 'feat/700-context-fence' },
+        { kind: 'worktree', path: '/w/point-713' },
+        { kind: 'log', path: '/l' },
+      ],
+    }
+    const t = markTransferred({
+      declaration,
+      bySid: 's1',
+      now: 9,
+      checkpoints: [],
+      worktreeRef: (p) => (p === '/w/point-713' ? 'refs/heads/feat/713-now-section-derived' : null),
+    })
+    expect(t.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/700-context-fence', point: 700 },
+      { kind: 'worktree', path: '/w/point-713', point: 713 },
+      // What resolves to nothing stays byte-identical: nothing is invented.
+      { kind: 'log', path: '/l' },
+    ])
+    expect(declaration.evidence[0]).toEqual({ kind: 'branch', ref: 'feat/700-context-fence' })
   })
 
   it('a RE-TRANSFER supersedes the old adoption, so the record stays protected (Sol re-review, finding 1)', () => {

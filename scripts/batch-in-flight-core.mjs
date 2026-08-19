@@ -699,11 +699,20 @@ export function transferBlockMessage({ blockers = [] } = {}) {
  * transfer supersedes it, and a record still stamped `adopted` would lose the
  * mutation protection the moment it crossed a SECOND boundary — the very
  * record a chain of handovers depends on most.
+ *
+ * THE TRANSFER IS A WRITE, SO IT MIGRATES (sixth cross-review): writing the
+ * legacy evidence back unchanged handed the successor a declaration that had
+ * lost its once-only migration, so each item leaves here with its resolved
+ * point RECORDED (`withRecordedEvidencePoint`; an unresolvable item stays
+ * byte-identical — never guessed at, never dropped).
  */
-export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [] } = {}) {
+export function markTransferred({ declaration, bySid, now, checkpoints = [], runs = [], worktreeRef = () => null } = {}) {
   const { adopted: _superseded, ...rest } = declaration ?? {}
   return {
     ...rest,
+    ...(Array.isArray(rest.evidence)
+      ? { evidence: rest.evidence.map((item) => withRecordedEvidencePoint(item, { worktreeRef })) }
+      : {}),
     transfer: {
       v: 1,
       by: String(bySid ?? ''),
@@ -1175,6 +1184,28 @@ export function withRecordedEvidencePoint(item, { worktreeRef = () => null } = {
 export const UNATTRIBUTABLE_EVIDENCE_REMEDY =
   'inspect the declaration and clear it explicitly: node scripts/batch-in-flight.mjs --clear'
 
+/**
+ * The LOUD report for evidence that stays unattributable after a migrating
+ * write (sixth cross-review): `--adopt` answered plain success while retained
+ * point-less pid/log items made `normalizeActiveWork` refuse the whole source
+ * one read later — a success message followed by a silently empty result. One
+ * alert line per such item, each naming the human way out. PURE.
+ */
+export function unattributableEvidenceAlerts(evidence = [], { worktreeRef = () => null } = {}) {
+  const out = []
+  const list = Array.isArray(evidence) ? evidence : []
+  list.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return
+    if (evidencePoint(item, { worktreeRef }) != null) return
+    const name = `${item.kind ?? '?'} ${item.ref ?? item.path ?? item.pid ?? ''}`.trim()
+    out.push(
+      `evidence item ${index + 1} (${name}) carries no point and resolves to none — the active-work read ` +
+        `side will refuse the whole record until it is attributed or cleared; ${UNATTRIBUTABLE_EVIDENCE_REMEDY}`,
+    )
+  })
+  return out
+}
+
 /** Phases that keep a declared strand on the board until an explicit exit. */
 export const ACTIVE_WORK_PHASES = Object.freeze([
   'authoring',
@@ -1209,7 +1240,10 @@ export const TERMINAL_WORK_PHASES = Object.freeze([
  * Returns `{ ok, points, focusPoint, errors }` and never throws. An unreadable,
  * malformed, unresolvable, closed or checkpoint-contradictory source is UNKNOWN,
  * never the empty set. A missing declaration is a valid zero-strand record when
- * no numbered focus stands.
+ * no numbered focus stands. `openPoints` is always the KNOWN open set — an
+ * empty one means "nothing is open", so any declared strand against it is
+ * UNKNOWN too (sixth cross-review: the old size guard made the empty set a
+ * free pass on the fail-closed publish side).
  */
 export function normalizeActiveWork({
   readable = true,
@@ -1235,7 +1269,13 @@ export function normalizeActiveWork({
         errors.push(`${where} has no valid point number`)
         return
       }
-      if (open.size > 0 && !open.has(point)) {
+      // The membership check has no size guard (sixth cross-review): an EMPTY
+      // open-point set is a verified "nothing is open", and a declared strand
+      // against it is exactly as wrong as one naming a closed point. Skipping
+      // the check there made the empty set a free pass on the publish side,
+      // which fails CLOSED — the Stop side's fail-open lives in its consumer,
+      // never here.
+      if (!open.has(point)) {
         errors.push(`${where} names point ${point}, which is not open`)
         return
       }

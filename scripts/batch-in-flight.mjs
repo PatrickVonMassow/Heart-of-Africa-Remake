@@ -65,6 +65,7 @@ import {
   openBranchSlots,
   pointOfBranch,
   withRecordedEvidencePoint,
+  unattributableEvidenceAlerts,
   parseCommissionRecord,
   COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
@@ -971,7 +972,16 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
     note: `the declared in-flight work is transferable (${summary})`,
     commit: () => {
       writeDeclaration(
-        markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints, runs: assessment.runs }),
+        markTransferred({
+          declaration,
+          bySid: sid,
+          now,
+          checkpoints: assessment.checkpoints,
+          runs: assessment.runs,
+          // The transfer is a write, so it migrates (sixth cross-review): a
+          // legacy item leaves with its resolved point RECORDED.
+          worktreeRef: (p) => worktreeBranch(p, { cwd }),
+        }),
         path,
       )
       return summary
@@ -1071,6 +1081,14 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const assessment = adoptionAssessment({ items, checkpointStates })
   if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
   const lock = readOwnerLock(lockPath)
+  // Adoption is a WRITE, so it migrates: a legacy item that still resolves
+  // gets its point RECORDED here, and the legacy form does not survive the
+  // handover (fifth cross-vendor round — the assignment is written down,
+  // never re-guessed at the exit).
+  const worktreeRef = (p) => worktreeBranch(p, { cwd })
+  const keptEvidence = evidence
+    .filter((_, i) => items[i]?.ok === true)
+    .map((e) => withRecordedEvidencePoint(e, { worktreeRef }))
   writeDeclaration(
     {
       ...declaration,
@@ -1078,13 +1096,7 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
       pid: typeof lock?.pid === 'number' ? lock.pid : null,
       pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
       at: now,
-      // Adoption is a WRITE, so it migrates: a legacy item that still resolves
-      // gets its point RECORDED here, and the legacy form does not survive the
-      // handover (fifth cross-vendor round — the assignment is written down,
-      // never re-guessed at the exit).
-      evidence: evidence
-        .filter((_, i) => items[i]?.ok === true)
-        .map((e) => withRecordedEvidencePoint(e, { worktreeRef: (p) => worktreeBranch(p, { cwd }) })),
+      evidence: keptEvidence,
       adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
     },
     path,
@@ -1092,7 +1104,11 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   return {
     adopted: true,
     reason: 'adopted',
-    alerts: assessment.alerts,
+    // A kept item that stays unattributable after the migration is said OUT
+    // LOUD with the adoption (sixth cross-review): the read side will refuse
+    // the whole record on the next look, and a plain success followed by a
+    // silently empty result is the failure this alert names.
+    alerts: [...assessment.alerts, ...unattributableEvidenceAlerts(keptEvidence, { worktreeRef })],
     kept: assessment.kept.length,
     dropped: assessment.dropped.length,
   }
