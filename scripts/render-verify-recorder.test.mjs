@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { tapOutput } from './render-verify-recorder.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
-import { RETRY_ENV, TRUNCATED_KIND, chargeReds, formatSuspectEnv, runVerdict } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, formatSuspectEnv, runVerdict } from './render-verify-core.mjs'
 
 // The record is stubbed, not written: these cases exercise the REAL arming and
 // the REAL exit handler, and a test must never append to the checkout's own
@@ -92,6 +92,16 @@ describe('tapOutput — observe-only', () => {
     expect(state.lines).toEqual([
       'FAIL  the goat stance — worst travel 0.967',
       'ERR: [ASSERT] render-resource-leak — renderTargets grew back',
+    ])
+  })
+
+  it('keeps a repeated line ONCE — repetition is chatter, identity is the red (point 734)', () => {
+    const { state, out } = tapped()
+    for (let i = 0; i < 1000; i++) out.write('ERR: the same per-frame validation error\n')
+    out.write('FAIL  the one check that failed — 3 of 4\n')
+    expect(state.lines).toEqual([
+      'ERR: the same per-frame validation error',
+      'FAIL  the one check that failed — 3 of 4',
     ])
   })
 
@@ -220,9 +230,12 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     expect(runVerdict(record, { openPoints }).status).toBe('red')
   })
 
-  it('turns a capture that hit its cap into an INCOMPLETE RECORDING, not a red (F3, point 734)', async () => {
+  // Point 734, the chosen half: red lines are NEVER dropped. A per-frame flood
+  // of one identical error used to overflow the 400-line buffer and turn the run
+  // into a half-recorded fragment; now repetition collapses at the capture and
+  // every observed red keeps its identity, so no record is ever "incomplete".
+  it('keeps every observed red under a per-frame flood — no truncation, no marker (point 734)', async () => {
     const run = await armed('polish')
-    // A per-frame assert flood, then the one new red that must not vanish.
     for (let i = 0; i < 420; i++) {
       process.stdout.write(
         'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: 19 -> 22\n',
@@ -230,45 +243,61 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     }
     process.stdout.write('FAIL  a brand-new check nobody has filed — 3 of 4\n')
     const record = run.exit(1)
-    expect(record.reds[0].point).toBeNull()
-    expect(record.reds[0].name).toMatch(/exceeded the capture cap/)
-    // The truncation is said as a FIELD, not only as a red's wording, and its
-    // kind is one no charge may name.
-    expect(record.truncated).toBe(true)
-    expect(record.droppedLines).toBeGreaterThan(0)
-    expect(record.reds[0].kind).toBe(TRUNCATED_KIND)
-    // NOT an unexplained red: there is nothing in it to explain.
-    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
+    expect(record.truncated).toBeUndefined()
+    expect(record.droppedLines).toBeUndefined()
+    // BOTH reds, each with its identity: the flooded assert and the new check.
+    expect(record.reds.map((r) => r.name)).toEqual([
+      'a brand-new check nobody has filed',
+      'console error: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: 19 -> 22',
+    ])
+    // An ordinary red, closable the three ordinary ways — never 'incomplete'.
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
     expect(runVerdict(record, { openPoints }).covers).toBe(false)
   })
 
-  // A truncated run that still exited 0 is the case the old accounting could not
-  // see at all: `dropped` was only consulted on a red exit, so a "pass" whose
-  // result lines were thrown away covered a backend. It must not.
-  it('records the truncation even when the run exited 0, and that run covers nothing', async () => {
+  // The finding the old cap could not survive (round 5, finding 4): hundreds of
+  // DISTINCT reds. 60 were stored and the rest silently discarded — observed
+  // reds losing their identity, i.e. the half-recording the spec forbids. Now
+  // the record carries the whole set. (Distinct in LETTERS, because checkKey
+  // folds digits.)
+  it('stores hundreds of DISTINCT observed reds whole — no cap discards one', async () => {
+    const run = await armed('polish')
+    const name = (i) => `check ${String(i).replace(/\d/g, (d) => 'abcdefghij'[Number(d)])} broke`
+    for (let i = 0; i < 401; i++) process.stdout.write(`FAIL  ${name(i)} — detail\n`)
+    const record = run.exit(1)
+    expect(record.truncated).toBeUndefined()
+    expect(record.reds.length).toBe(401)
+    expect(record.reds[0].name).toBe(name(0))
+    expect(record.reds.at(-1).name).toBe(name(400))
+    const verdict = runVerdict(record, { openPoints })
+    expect(verdict.status).toBe('red')
+    // Every one of them still actionable: all 401 are reported unaccounted.
+    expect(verdict.unaccounted.length).toBe(401)
+  })
+
+  // A flood the suite itself tolerated: exit 0 means every check passed, and
+  // with nothing dropped there is nothing unread — the run is a clean pass, as
+  // it always was for a tolerated error below the old cap.
+  it('leaves an exit-0 run clean under the same flood — nothing was dropped, nothing is unread', async () => {
     const run = await armed('polish')
     for (let i = 0; i < 420; i++) process.stdout.write('ERR: something the suite decided to tolerate\n')
     const record = run.exit(0)
-    expect(record.truncated).toBe(true)
+    expect(record.truncated).toBeUndefined()
     expect(record.reds).toBeUndefined()
-    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
-    expect(runVerdict(record, { openPoints }).covers).toBe(false)
+    expect(runVerdict(record, { openPoints }).status).toBe('clean')
   })
 
-  // The same bypass through the other door (review, 19.08.2026): the flush that
-  // reads a stream's unterminated last line sat inside the red branch, so a run
-  // that filled the buffer with whole lines and printed ONE more without a
-  // newline recorded `dropped: 0` on exit 0 — no `truncated` field, clean
-  // verdict, backend covered. Exactly 400 + 1 lines, because 400 is the cap.
-  it('sees the line the cap ate even when it never got its newline and the run exited 0', async () => {
+  // The tail line is read whatever the exit code (review, 19.08.2026): a red
+  // printed as the process dies carries no newline, and it must reach the record
+  // like any other — there is no cap left for it to overflow.
+  it('records a red whose line never got its newline, beyond where the old cap ended', async () => {
     const run = await armed('polish')
     for (let i = 0; i < 400; i++) process.stdout.write(`ERR: a tolerated console error #${i}\n`)
-    process.stdout.write('FAIL  the one line that overflowed the buffer — and it never got its newline')
-    const record = run.exit(0)
-    expect(record.truncated).toBe(true)
-    expect(record.droppedLines).toBe(1)
-    expect(runVerdict(record, { openPoints }).status).toBe('incomplete')
-    expect(runVerdict(record, { openPoints }).covers).toBe(false)
+    process.stdout.write('FAIL  the line the old cap would have eaten — and it never got its newline')
+    const record = run.exit(1)
+    expect(record.truncated).toBeUndefined()
+    expect(record.reds.map((r) => r.name)).toContain('the line the old cap would have eaten')
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
   })
 
   it('leaves a green run with no accounting at all', async () => {

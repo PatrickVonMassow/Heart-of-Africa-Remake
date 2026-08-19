@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
-import { RETRY_ENV, TRUNCATED_KIND, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
+import { RETRY_ENV, chargeReds, parseSuspectReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
 // working-directory fallback: under the test runner `import.meta.url` is not
@@ -59,26 +59,25 @@ const SCREENSHOT_DIR = (() => {
 const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
 
 /**
- * A cap, because the buffer lives for the whole run and the lines it holds are
- * NOT bounded by the suite's checks: every suite prints one `ERR:` line per
- * console-error OCCURRENCE (`for (const e of errors) console.log('ERR:', …)`),
- * and a page error that repeats per frame multiplies one red without bound. So
- * the cap stays — and a run that hits it is recorded INCOMPLETE (point 734)
- * rather than half-recorded, because a fragment of a red set explains nothing.
+ * NO CAP ON RED LINES, BY MEASUREMENT (point 734). The old 400-line cap existed
+ * because a page error that repeats per frame prints one `ERR:` line per
+ * OCCURRENCE — but a run that hit it was HALF-RECORDED: a fragment of its red
+ * set plus a truncation marker, which no closing of point 640 can reach (all
+ * three need the red's identity), so the run was unclosable by construction and
+ * blocked the render set until a hand-written --defer.
  *
- * MEASURED 19.08.2026 (the numbers that chose "fail loudly" over "no cap on red
- * lines"): the only overflow on record, two webgpu/settings runs of 13.08.2026,
- * dropped 115 and 116 lines beyond this cap — 515/516 result lines — and yielded
- * 18/19 DISTINCT reds, i.e. a WebGPU validation cascade repeating a handful of
- * errors, not a large red set. Across the 47 stored suite logs in local/ that
- * carry result lines at all, the maximum is 12 kept lines and 7 distinct reds.
- * The distinct set is small and bounded; the LINES are what runs away.
+ * MEASURED 19.08.2026 (re-taken for this fix; scripts/verify/README.md carries
+ * the full numbers): the red SET is small — the worst run on record printed 521
+ * result lines but only 33 DISTINCT ones, every recorded run holds at most 19
+ * parsed reds, and every non-cascade log carries ≤ 12 result lines. What runs
+ * away is REPETITION of identical lines, never the set. So the buffer keeps
+ * each DISTINCT line ONCE (first occurrence, which keeps its detail): identity
+ * is never dropped, and memory is bounded by the distinct set — a subset of
+ * output the suite already printed. The parser (failedChecks) de-duplicates by
+ * key anyway, so collapsing repeats changes no verdict. A recorded run can
+ * therefore never be an INCOMPLETE RECORDING again; that class remains only for
+ * the records written before this fix (render-verify-core.mjs reads them).
  */
-const MAX_KEPT_LINES = 400
-
-/** How many charged reds one record keeps — a bound on the state file, which
- *  holds 40 runs. See the sort below: only a CHARGED red is ever dropped. */
-const MAX_RECORDED_REDS = 60
 
 /** Stderr that says the process did not end on its own terms — a stack frame or
  *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
@@ -102,14 +101,20 @@ let armed = null
  */
 export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]]) {
   const pending = new Map()
+  // Each DISTINCT result line is kept ONCE, in first-seen order (the first
+  // occurrence carries the detail a charge may match on). Repetition is what a
+  // per-frame error flood multiplies, and it is chatter: the parser already
+  // de-duplicates by key, so dropping repeats loses no red's identity — while
+  // the old line cap did, which made a flooded run unclosable (point 734).
+  const seenLines = new Set()
   const take = (stream, isErr, text) => {
     const lines = ((pending.get(stream) ?? '') + text).split('\n')
     pending.set(stream, lines.pop() ?? '')
     for (const line of lines) {
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
-      if (!KEPT_LINE.test(line)) continue
-      if (state.lines.length < MAX_KEPT_LINES) state.lines.push(line)
-      else state.dropped = (state.dropped ?? 0) + 1
+      if (!KEPT_LINE.test(line) || seenLines.has(line)) continue
+      seenLines.add(line)
+      state.lines.push(line)
     }
   }
   const isErrOf = new Map(streams)
@@ -180,11 +185,6 @@ export function armRunRecorder(backend) {
       // (point 550) — the raw material of the red accounting below.
       lines: [],
       crashed: false,
-      // Result lines the capture cap refused. They become one synthetic
-      // UNACCOUNTED red below: a dropped line may have been the one red nobody
-      // has filed, and a cap that can silently delete it turns the flood into a
-      // way to clear the gate.
-      dropped: 0,
     }
     const flush = tapOutput(armed)
     // THE REAL CRASH PATH (four-eyes finding F1). Node prints an uncaught
@@ -215,12 +215,9 @@ export function armRunRecorder(backend) {
         }
         // THE TAIL LINE IS READ WHATEVER THE EXIT CODE (review, 19.08.2026).
         // A stream's last line carries no newline when the process dies
-        // mid-write, and flushing only on a red left the cap open from the
-        // other side: 400 newline-terminated result lines plus an unterminated
-        // 401st never reached the counter, so `dropped` stayed 0, the record
-        // omitted `truncated`, and a run whose reds nobody read COVERED the
-        // backend. Flushed here, before anything is judged, so the truncation
-        // field and the red accounting below read the same capture.
+        // mid-write; flushed here, before anything is judged, so the red
+        // accounting below reads the complete capture — an unterminated last
+        // `FAIL` is a red like any other.
         try {
           flush()
         } catch {
@@ -241,25 +238,8 @@ export function armRunRecorder(backend) {
               // adapter the player runs (point 505 + review, 19.08.2026).
               featureLevel: armed.featureLevel,
             })
-            // UNACCOUNTED reds first, so the cap below can only ever drop a
-            // charged one. Truncation must never be able to turn a red run into
-            // an accounted-for one; losing a charge only costs detail in the
-            // report (a stable sort keeps each group's own order).
-            reds.sort((a, b) => (a.point === null ? 0 : 1) - (b.point === null ? 0 : 1))
           } catch {
             /* unparseable output — no red is charged, so the run stays red */
-          }
-          // A capture that lost lines cannot claim to have read the run's reds:
-          // one synthetic UNACCOUNTED red, first in the list so no truncation
-          // can drop it either. Its KIND is `truncated`, which no charge may
-          // name — what was never captured cannot be owned by anybody.
-          if (armed.dropped > 0) {
-            reds.unshift({
-              name: `${armed.dropped} further result line(s) exceeded the capture cap — this run's reds were NOT all read`,
-              key: 'capture-truncated',
-              kind: TRUNCATED_KIND,
-              point: null,
-            })
           }
         }
         recordRun({
@@ -274,14 +254,13 @@ export function armRunRecorder(backend) {
           screenshots: shots.slice(0, 12),
           ...(armed.section ? { partial: true, section: armed.section } : {}),
           ...(armed.suspectOf.length ? { suspect: true, suspectOf: armed.suspectOf } : {}),
-          // THE RECORDING IS INCOMPLETE, SAID AS A FIELD (point 734). Written
-          // whatever the exit code: a run that printed more result lines than
-          // the cap holds and still exited 0 is precisely a "pass" nobody read,
-          // and runVerdict must be able to refuse it as coverage too. Stated
-          // once, at the top level, so no consumer has to recognise the
-          // synthetic red by its wording.
-          ...(armed.dropped > 0 ? { truncated: true, droppedLines: armed.dropped } : {}),
-          ...(exit !== 0 ? { reds: reds.slice(0, MAX_RECORDED_REDS), crashed: armed.crashed } : {}),
+          // EVERY red, uncapped (point 734): the capture keeps one entry per
+          // DISTINCT line and the parser de-duplicates by key, so this list is
+          // the run's red SET — bounded by its checks and distinct console
+          // errors (measured maximum on record: 19), never by its chatter. A
+          // cap here silently discarded observed reds, which is the
+          // half-recording the point forbids.
+          ...(exit !== 0 ? { reds, crashed: armed.crashed } : {}),
         })
       } catch {
         /* never fail a suite over the bookkeeping */
