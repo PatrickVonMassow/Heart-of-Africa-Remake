@@ -416,7 +416,7 @@ if (isMainModule(import.meta.url)) {
       process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
       process.exit(0)
     }
-    if (result.deferred) {
+    if (result.decision === 'defer') {
       // No baseline advance: the pending diff is the successor's durable inbox.
       process.stdout.write(JSON.stringify({ systemMessage: result.reason }))
       process.exit(0)
