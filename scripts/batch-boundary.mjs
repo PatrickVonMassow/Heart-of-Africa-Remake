@@ -65,6 +65,12 @@ import { nowCard } from './board-core.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
+/** The boundary's overshoot consumer is deliberately fixed to the cost
+ * ceiling. Admission uses the lower trigger through gatherWatermark. */
+export function boundaryContextDistanceNote(tokens) {
+  return contextDistanceNote({ tokens, ceiling: CONTEXT_CEILING_TOKENS })
+}
+
 const readText = (p) => {
   try {
     return readFileSync(p, 'utf8')
@@ -728,7 +734,7 @@ if (isMain) {
       // commit further past the ceiling than the stated margin owes the
       // closing report a sentence. Admission above used the trigger; overshoot
       // deliberately measures the separate cost ceiling.
-      const distance = contextDistanceNote({ tokens: wm.tokens, ceiling: CONTEXT_CEILING_TOKENS })
+      const distance = boundaryContextDistanceNote(wm.tokens)
       if (distance) console.log(`\n${distance}`)
       process.exit(0)
     }
@@ -911,7 +917,7 @@ if (isMain) {
     // Point 700: a boundary further past the ceiling than the stated margin —
     // or one whose context could not be measured — owes the closing report a
     // line. The trigger in wmPoint is for admission, not this overshoot record.
-    const distance = contextDistanceNote({ tokens: contextTokens, ceiling: CONTEXT_CEILING_TOKENS })
+    const distance = boundaryContextDistanceNote(contextTokens)
     if (distance) console.log(`\n${distance}`)
   }
 }
