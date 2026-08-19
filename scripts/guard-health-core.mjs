@@ -46,12 +46,6 @@ export const INTENTIONALLY_DORMANT = {
     'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
     'the drift it exists to catch, and a worktree agent may not edit that file either. Reconcile the scheme ' +
     '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
-  'context-fence-guard.mjs':
-    'Built 17.08.2026 by a worktree agent (point 700), which may not touch .claude/settings.json — the ' +
-    'PreToolUse line ("Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell" → node scripts/context-fence-guard.mjs) ' +
-    'is a protected-path edit and needs an attended session. Its core and its spawned wrapper are fully ' +
-    'tested, so it is correct the moment it is armed. REMOVE THIS ENTRY IN THE SAME COMMIT THAT ADDS THE ' +
-    'HOOK LINE.',
   // commission-guard.mjs left this map on 18.08.2026, in the commit that added
   // its PreToolUse line ("Agent|Task|Bash|PowerShell") — the rule above, kept.
 }

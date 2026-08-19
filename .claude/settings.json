@@ -191,6 +191,15 @@
         ]
       },
       {
+        "matcher": "Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/context-fence-guard.mjs\""
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
