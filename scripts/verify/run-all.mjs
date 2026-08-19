@@ -21,7 +21,12 @@ import {
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
 import { RETRY_ENV, formatSuspectEnv } from '../render-verify-core.mjs'
-import { DEV_SUITES, laneFor, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
+import { backendProbeDetail, gpuBackendVerdict } from './gpu-backend-probe-core.mjs'
+import { probeGpuBackends } from './gpu-backend-probe.mjs'
+import {
+  DEV_SUITES, laneFor, needsDevServer, needsGpuBackendProbe, parseArgs, planBackends,
+  selectBackend, skippedSuites, suitesFor,
+} from './tiers.mjs'
 import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
 
@@ -401,6 +406,31 @@ if (!skipPreflight && (fullRun || filter.includes('unit'))) {
   results.push(unitOk)
 }
 
+// Resolve the browser work once. The GPU probe below and the suite loop MUST read the
+// same selection: probing an empty or different lane set would recreate the false-ready
+// report this guard exists to end.
+const devPick = suitesFor({ tier, filter, backend: VERIFY_GL, webglOnlyCovered: WEBGL_ONLY_COVERED })
+const wantPreview = !skipPreflight && ((fullRun && tier !== 'small') || filter.includes('preview'))
+
+// Host/browser preflight (point 732): a browser executable is not a GPU backend. Before
+// Vite starts — and before any suite can wait 180 seconds for window.__renderer — open a
+// bare canvas in both exact verification browsers and query Chrome's Graphics Feature
+// Status through CDP. A red here is explicitly pre-app; a green hands later startup
+// failures back to the app. Pure Node/docs-only selections never need a GPU.
+if (needsGpuBackendProbe(devPick, { preview: wantPreview })) {
+  console.log('# GPU backend preflight (bare canvas, no app)…')
+  const probe = gpuBackendVerdict(await probeGpuBackends())
+  console.log(`${probe.ok ? 'PASS' : 'FAIL'}  gpu-backends  ${probe.summary}`)
+  for (const result of probe.results) {
+    console.log(`      ${result.lane}: ${backendProbeDetail(result)}`)
+  }
+  if (!probe.ok) {
+    console.log('\n1 SUITE(S) FAILED — host/browser GPU preflight failed, skipping the browser suites')
+    process.exit(1)
+  }
+  results.push(true)
+}
+
 let dev
 try {
   // The suites this pass runs, and the lane each one opens. A WebGL2-only suite is
@@ -408,7 +438,6 @@ try {
   // `voice` now that it runs on WebGPU; it is dropped only where the companion
   // WebGL 2 pass of the same command already ran it — logged either way, never a
   // silent gap.
-  const devPick = suitesFor({ tier, filter, backend: VERIFY_GL, webglOnlyCovered: WEBGL_ONLY_COVERED })
   for (const s of skippedSuites({ tier, filter, backend: VERIFY_GL, webglOnlyCovered: WEBGL_ONLY_COVERED })) {
     console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — already run by this command's WebGL 2 pass, point 184/571)`)
   }
@@ -443,7 +472,7 @@ try {
 // The prod-preview smoke test runs in the LARGE/default regression, not the SMALL
 // gate (the `build` step already type-checks and builds; SMALL trades the extra
 // prod-runtime smoke for speed).
-if (!skipPreflight && ((fullRun && tier !== 'small') || filter.includes('preview'))) {
+if (wantPreview) {
   console.log('# building for the production-preview smoke test…')
   const build = spawnSync('npm run build', { windowsHide: true, cwd: join(HERE, '..', '..'), shell: true, stdio: 'inherit' })
   if (build.status !== 0) {

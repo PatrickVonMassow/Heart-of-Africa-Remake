@@ -206,7 +206,9 @@ verdicts: PRESENT (both APIs on a named hardware renderer), DEGRADED (one missin
 software, or unnamed), or ABSENT (neither exists). ABSENT explicitly names the
 host/browser GPU layer, before app startup; PRESENT says a later `window.__renderer`
 timeout belongs to app startup instead. It fails in seconds, before the 180-second
-suite wait.
+suite wait. `run-all.mjs` executes the same probe automatically before any Chromium
+suite or production preview and exits before starting Vite on a red verdict; pure
+Node selections such as `docs`, `build`, `lint`, and `unit` stay GPU-independent.
 
 The **graphics stack is chosen by platform** (`launch-args-core.mjs`, swept by
 `launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it always
