@@ -4960,13 +4960,19 @@ Build order, chosen so no two parallel agents own the same file:
   repetition IS the finding, not the answer. The entry is owed in FOUR lines: written out
   once, it cost 5 lines and 79 words over the budget and was taken back out because
   `guide-brevity-core.test.mjs` was the unit layer's only red and blocked every push — which
-  is this point's forcing function doing its job, not a reason to skip the lesson.
+  is this point's forcing function doing its job, not a reason to skip the lesson. The
+  reverted wording stands verbatim in commit 9b484e41 and is the draft to fold in, not to
+  invent a second time.
   DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
   now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
-  displacing one, not by widening the frame; (2) if genuinely nothing is weaker, raise both
-  budgets deliberately in `guide-brevity-core.mjs` with the justification in the same
-  commit, the way the doc-budget ceilings are raised; (3) either way the new pitfall goes
-  in with its prompt, in the guide's established form.
+  displacing one, not by widening the frame; (2) for (C) the cheapest displacement is
+  already identified: MERGE it into the existing »Die Grenze spricht erst beim Aufhören«
+  bullet, which is the same subject seen from the other side, and pay for the merged entry
+  by tightening ~40 words of the neighbouring bullets; (3) only if genuinely nothing is
+  weaker and nothing merges, raise both budgets deliberately in `guide-brevity-core.mjs`
+  with the justification in the same commit, the way the doc-budget ceilings are raised —
+  this is the LAST resort, not the first; (4) either way the new pitfall goes in with its
+  prompt, in the guide's established form.
   VERIFIABLE: `scripts/guide-brevity-core.test.mjs` stays green (the real guide inside its
   budget), the guide contains the new pitfall, and `node scripts/retro-refresh.mjs
   --guide-reviewed` is re-attested afterwards.
