@@ -76,54 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 717. The review-material chain's remaining sharpenings, named by the reviewer while point 714
-  was built and deliberately deferred so the mechanism could land (18.08.2026). None of them lets a
-  record cover unread material — that hole is closed — but each leaves a smaller edge unswept.
-  FINAL STATE:
-  - BINARY FILES AND SUBMODULE POINTERS ARE DELIVERED AS ABSENT-BY-DESIGN, with the reason named,
-    and the machinery that tried to carry their content is DELETED — the base85 literal delivery,
-    the inflate path with its bounds, and the gitlink content classification with its
-    false-positive surface. The decision (18.08.2026) is deliberate and it is a CUT, not an
-    omission: the spec requires only that every file's delivery mode be NAMED, which
-    "absent-by-design, binary" satisfies, while carrying that content cost a whole class of
-    review findings — memory-exhaustion bounds, delta patches that silently delivered nothing, a
-    text file containing `+Subproject commit` losing its body. Deleting a capability deletes its
-    finding class; bounding it does not. The cut was held back from point 714 only because
-    executing it there would have perturbed the files whose stability let the review passes carry
-    forward.
-  - The pass-warning and ledger-pointer rulings are pinned where the reviewer looks for them: they
-    currently live in `review-sol-cli.test.mjs` and `review-sol-core.test.mjs` while the material
-    suite carries no pin, so a reader of that suite cannot see the rule is held. Either duplicate the
-    pin there or name its location in the suite.
-  - The Windows shell-expansion lane is proven, not merely argued: the args-array no-shell path
-    closes `%VAR%` expansion by construction, and this environment cannot execute it. An integration
-    test on a Windows runner is what turns that argument into evidence; until one exists the residual
-    is stated as untested rather than closed.
-  - The review tail the twelve rounds of point 714 confirmed but did not chase, each named on the
-    record there: the tests that assert a guarantee more weakly than they claim it, the diagnostics
-    whose wording does not say which side refused, the carry-forward's usability edges, and the
-    set-key that a newline can make non-injective. None of them can clear a range nobody read —
-    that is why they were deferred rather than fixed — but each is a place where the mechanism
-    reads as stronger than it is.
-  - Two residuals stand ACCEPTED and stay stated rather than closed, because both fail in the safe
-    direction: an empty `authoredBy` cannot be told apart from a hand-typed empty one, and the
-    hairline band between the under-estimated rendered floor and the real rendered size keeps
-    blocking where it could in principle waive.
-  - THE REVIEW LOOP CONVERGES ONLY ON A CLEAN PASS (measured on point 721, 18.08.2026): every fix
-    commit ADDS a pass to the range plan, so working off a review debt GREW it from 13 to 21 passes
-    while eight passes ran — every finding real, three blockers, so the reviewer was right, but a
-    commit whose whole content ANSWERS a recorded pass still opens a new contribution instead of
-    joining the pass that demanded it. Decide and build the cheaper shape: an answer commit joins
-    its demanding pass's contribution (reviewed in the confirming re-round anyway), or the cost is
-    accepted and stated here as intended.
-  VERIFIABLE: Vitest for the first two — a binary or a submodule pointer yields an absent-by-design
-  entry naming the reason, never silence and never a decode path, and the deleted machinery has no
-  caller left; and the material suite holds the pass-warning and ledger-pointer rulings. Each tail
-  item is verified where it lives. The Windows case is verified by a runner or recorded as an open
-  residual with its reason.
-  Criticality: medium — the clearance-covering hole is closed; these are edges around it.
-  Bundle: unbundled (review tooling).
-
 - [ ] 684. A whole-branch cross-review falls into the material limit and judges a cropped
   PICTURE (measured 13.08.2026 over TWELVE review rounds on point 675). Every whole-branch
   round hit the ~200k-character material limit of `scripts/review-sol.mjs`, and Sol said so in
