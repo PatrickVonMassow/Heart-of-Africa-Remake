@@ -3,6 +3,10 @@
 // and resumes blocking the moment it can. Every branch of the pure ruling is
 // pinned here; the live trap this closes held every turn on main hostage to a
 // review no caller could produce (measured 18.08.2026).
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   criticalityGapPlan,
@@ -16,6 +20,44 @@ import {
 } from './mechanism-review-guard-gap-core.mjs'
 
 const material = await import('./review-material-core.mjs').catch(() => null)
+
+it('keeps the shell-expansion proof on a Windows CI runner', () => {
+  const workflow = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8')
+  expect(workflow).toContain('windows-argv-proof:')
+  expect(workflow).toContain('runs-on: windows-latest')
+  expect(workflow).toContain('scripts/mechanism-review-guard-gap-core.test.mjs')
+})
+
+// OPEN RESIDUAL UNTIL THE WINDOWS JOB PASSES: Linux can prove the argument
+// array but cannot execute cmd.exe's `%VAR%` expansion rules. This integration
+// is skipped here and run by CI's windows-argv-proof job on windows-latest.
+it.skipIf(process.platform !== 'win32')('the production Git runner keeps a literal %VAR% ref on Windows', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-review-argv-'))
+  const git = (...args) => execFileSync('git', args, { cwd: dir, windowsHide: true, encoding: 'utf8' }).trim()
+  try {
+    git('init', '-q', '-b', 'main')
+    git('config', 'user.email', 'test@example.invalid')
+    git('config', 'user.name', 'Test')
+    writeFileSync(join(dir, 'proof.txt'), 'literal branch\n')
+    git('add', 'proof.txt')
+    git('commit', '-q', '-m', 'Create literal ref target')
+    const literal = git('rev-parse', 'HEAD')
+    git('branch', '%HOA_REVIEW_REF%')
+    writeFileSync(join(dir, 'proof.txt'), 'environment branch\n')
+    git('commit', '-q', '-am', 'Move main elsewhere')
+    const expanded = git('rev-parse', 'main')
+    expect(expanded).not.toBe(literal)
+
+    const { runGitArgs } = await import('./mechanism-review-guard-gap.mjs')
+    const resolved = runGitArgs(['rev-parse', '%HOA_REVIEW_REF%'], {
+      cwd: dir,
+      env: { ...process.env, HOA_REVIEW_REF: 'main' },
+    }).trim()
+    expect(resolved).toBe(literal)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 describe('reviewGapRange — one range for detection, coverage and gap ruling', () => {
   it('uses the computed merge-base as the assessment baseline', () => {

@@ -49,10 +49,11 @@ const provesStdoutOverflow = (e) =>
 // `git show` on a file this measurement does read cannot overflow.
 const CONTENT_READ_LIMIT_BYTES = 8 * 1024 * 1024
 
-const git = (args) => {
+export const runGitArgs = (args, { cwd = REPO_ROOT, env = process.env } = {}) => {
   try {
     return execFileSync('git', args, {
-      cwd: REPO_ROOT,
+      cwd,
+      env,
       windowsHide: true,
       encoding: 'utf8',
       maxBuffer: MAX_BUFFER,
@@ -75,7 +76,7 @@ const git = (args) => {
  * path's content at `head` (a path absent there — deleted — still counts its
  * patch, which the patch total already carries).
  */
-export function measureReviewMaterial({ baseline, head, run = git }) {
+export function measureReviewMaterial({ baseline, head, run = runGitArgs }) {
   const range = `${baseline}..${head}`
   // AN OVERFLOW ON THE PATCH SIDE IS A PROVEN FLOOR, NOT A FAILURE (landing-
   // round pass 3): the stat, the patch and the path list describe the range
@@ -157,7 +158,7 @@ export async function assessReviewGap({
   head,
   standingRecords = 0,
   // Injectable for the unit layer only — production callers pass neither.
-  run = git,
+  run = runGitArgs,
   loadTool = () => import('./review-material-core.mjs'),
 }) {
   let measured = null

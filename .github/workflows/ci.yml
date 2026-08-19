@@ -51,6 +51,26 @@ permissions:
   statuses: write
 
 jobs:
+  # Windows evidence for the review-material residual (18.08.2026). The
+  # production helper uses an argv array with no shell; this runner proves a
+  # literal `%VAR%` Git ref reaches Git unchanged under Windows rather than
+  # relying on the construction argument from Linux. The test is skipped on
+  # every non-Windows unit run, so this job is the only lane that can close it.
+  windows-argv-proof:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: install
+        run: npm ci
+      - name: prove literal Windows argv transport
+        run: npm run test:unit -- --run scripts/mechanism-review-guard-gap-core.test.mjs
+
   fast:
     runs-on: ubuntu-latest
     timeout-minutes: 15
