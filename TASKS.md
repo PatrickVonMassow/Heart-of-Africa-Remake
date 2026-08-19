@@ -296,7 +296,15 @@ put it is the mistake this line exists to stop.
   (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
   via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
   nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
-  point, card byte-identical inside the same minute) plus a correction for card brevity.
+  point, card byte-identical inside the same minute) plus a correction for card brevity. THE TWO
+  SIDES ALSO CONTRADICT EACH OTHER, measured 19.08.2026 at the boundary of point 726: `--prepare`
+  prints its card text as "take this text verbatim" and states that it names NO point number ON
+  PURPOSE, while `board.mjs none` REFUSES exactly that text ("its reason must NAME the point the
+  batch picks up next"). A session that follows the printed instruction verbatim is blocked, and
+  the only reason this one was not is that `board.mjs done <N> --none` had already put a
+  point-naming card up a step earlier. So the command that owns the card must own its WORDING too:
+  one text, satisfying the gate that judges it, rather than two mechanisms disagreeing about what
+  the handover card must say.
   (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
   `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
   estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
