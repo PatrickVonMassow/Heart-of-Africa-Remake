@@ -7925,7 +7925,13 @@ to land than a mechanism that needs a review.
   outage at spawn puts a multi-hour session on the scarcest pool. The evidence gap is the load-bearing
   part: neither `.claude/autostart.log` nor `.claude/batch-launcher.log` records WHICH model a session
   runs on or whether the fallback fired — the commit trailers are the only trace, and they appear
-  hours in.
+  hours in. MEASURED AGAIN 19.08.2026, and the cause candidate holds: `SPAWN_FALLBACK_MODEL`
+  (`scripts/batch-autostart-core.mjs`) is still `claude-fable-5`, so an Opus 5 outage at spawn puts a
+  whole session — bookkeeping, board publishes, guard loops, the reviews of Sol's work — and every
+  subagent it spawns on the scarcest pool. Commit-trailer proxy since 01.08.: 208 Fable against 1701
+  Opus 5 and 112 Sol, and the session taking that reading was itself serving on Fable. The proxy spans
+  the pre-18.08 policy, so it bounds the SERVING share rather than proving it — but it is the larger
+  consumer either way, and the authoring escalation the routing point governs is the smaller half.
   FINAL STATE, three halves from two incidents:
   (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
   already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
