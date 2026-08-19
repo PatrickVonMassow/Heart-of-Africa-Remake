@@ -65,6 +65,7 @@ import {
   branchSlotDecision,
   branchSlotRefusal,
   commissionTarget,
+  activeNowPoints,
   normaliseTip,
 } from './batch-in-flight-core.mjs'
 import {
@@ -3480,5 +3481,71 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     expect(() => commissionTarget({ toolName: null, command: null, prompt: null, description: null })).not.toThrow()
     expect(commissionTarget({ toolName: 'Bash', command: 'git checkout -b feat/0-nope' }).point).toBeNull()
     expect(commissionTarget({ toolName: 'Agent', prompt: 'feat/'.repeat(500) }).point).toBeNull()
+  })
+})
+
+describe('activeNowPoints — the structured active-point set behind the now-section', () => {
+  const declaration = (evidence) => ({ v: 1, evidence })
+
+  it('combines the owner focus with branch/worktree strands and deduplicates repeated evidence', () => {
+    const out = activeNowPoints({
+      focusPoint: 700,
+      declaration: declaration([
+        { kind: 'branch', ref: 'feat/697-goat-foot-planting' },
+        { kind: 'worktree', path: '/tmp/wt-711' },
+        { kind: 'branch', ref: 'feat/697-goat-foot-planting' },
+      ]),
+      worktreeRef: (path) => (path === '/tmp/wt-711' ? 'feat/711-deploy-retry' : null),
+    })
+    expect(out).toEqual({ readable: true, points: [700, 697, 711], problems: [] })
+  })
+
+  it('treats open feat branches absent from the declaration as adding nothing', () => {
+    const out = activeNowPoints({
+      focusPoint: 700,
+      declaration: declaration([{ kind: 'branch', ref: 'feat/697-goat-foot-planting' }]),
+      worktreeRef: () => null,
+    })
+    expect(out.points).toEqual([700, 697])
+  })
+
+  it('allows the focus point to stand on its own when no declaration exists', () => {
+    expect(activeNowPoints({ focusPoint: 700 })).toEqual({ readable: true, points: [700], problems: [] })
+    expect(activeNowPoints()).toEqual({ readable: true, points: [], problems: [] })
+  })
+
+  it('is unreadable rather than empty when a branch/worktree strand names no point', () => {
+    const badBranch = activeNowPoints({
+      declaration: declaration([{ kind: 'branch', ref: 'main' }]),
+    })
+    expect(badBranch.readable).toBe(false)
+    expect(badBranch.points).toEqual([])
+    expect(badBranch.problems.join(' ')).toMatch(/names no feat\/<N> point/)
+
+    const badWorktree = activeNowPoints({
+      declaration: declaration([{ kind: 'worktree', path: '/tmp/agent' }]),
+      worktreeRef: () => 'main',
+    })
+    expect(badWorktree.readable).toBe(false)
+    expect(badWorktree.problems.join(' ')).toMatch(/worktree evidence/)
+  })
+
+  it('accepts non-point pid/log evidence as not naming extra strands', () => {
+    expect(
+      activeNowPoints({
+        focusPoint: 700,
+        declaration: declaration([
+          { kind: 'pid', pid: 1234, startedAt: 1 },
+          { kind: 'log', path: '/tmp/run.log' },
+        ]),
+      }),
+    ).toEqual({ readable: true, points: [700], problems: [] })
+  })
+
+  it('is unreadable on malformed declaration shapes and invalid explicit points', () => {
+    expect(activeNowPoints({ declaration: { evidence: 'garbage' } }).readable).toBe(false)
+    const invalid = activeNowPoints({ declaration: declaration([{ kind: 'branch', point: 'x', ref: 'feat/700-x' }]) })
+    expect(invalid.readable).toBe(false)
+    expect(invalid.problems.join(' ')).toMatch(/invalid point/)
   })
 })

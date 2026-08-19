@@ -1126,6 +1126,81 @@ export function pointOfBranch(ref) {
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
+/**
+ * The ACTIVE point set the board now-section derives from: the owner's current
+ * focus plus every point a structured in-flight strand names. PURE.
+ *
+ * The declaration is the source for handed-over parallel strands, but it is not
+ * the whole source: the owner may be actively working the focused point without
+ * any `batch-in-flight` declaration at all. That focused point is therefore one
+ * active point in its own right, and the declaration only adds further strands.
+ *
+ * Only structured point identities count. A `feat/<N>-…` branch or a worktree on
+ * one names point N; an explicit integer `point` field may name one too. Open
+ * branches absent from the declaration add nothing, and a malformed
+ * branch/worktree claim makes the result unreadable rather than quietly empty.
+ */
+export function activeNowPoints({ declaration = null, focusPoint = null, worktreeRef = () => null } = {}) {
+  const points = []
+  const problems = []
+  const add = (value) => {
+    const n = Number(value)
+    if (Number.isInteger(n) && n > 0 && !points.includes(n)) points.push(n)
+  }
+
+  add(focusPoint)
+  if (declaration == null) return { readable: true, points, problems }
+  if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) {
+    return { readable: false, points: [], problems: ['in-flight declaration is not a readable object'] }
+  }
+  if (declaration.evidence != null && !Array.isArray(declaration.evidence)) {
+    return { readable: false, points: [], problems: ['in-flight declaration carries no readable evidence list'] }
+  }
+
+  for (const item of declaration.evidence ?? []) {
+    if (!item || typeof item !== 'object') {
+      problems.push('an in-flight evidence item is not a readable object')
+      continue
+    }
+    const explicit = Number(item.point)
+    const hasExplicit = Object.hasOwn(item, 'point')
+    if (hasExplicit && !Number.isInteger(explicit)) {
+      problems.push(`evidence ${item.kind ?? '?'} names an invalid point "${item.point}"`)
+      continue
+    }
+    if (hasExplicit && explicit <= 0) {
+      problems.push(`evidence ${item.kind ?? '?'} names a non-positive point "${item.point}"`)
+      continue
+    }
+    if (hasExplicit) {
+      add(explicit)
+      continue
+    }
+    if (item.kind === 'branch') {
+      const ref = String(item.ref ?? '').trim()
+      const point = pointOfBranch(ref)
+      if (point == null) {
+        problems.push(`branch evidence "${ref || '<empty>'}" names no feat/<N> point`)
+        continue
+      }
+      add(point)
+      continue
+    }
+    if (item.kind === 'worktree') {
+      const path = String(item.path ?? '').trim()
+      const ref = path ? worktreeRef(path) : null
+      const point = pointOfBranch(ref)
+      if (point == null) {
+        problems.push(`worktree evidence "${path || '<empty>'}" names no feat/<N> point branch`)
+        continue
+      }
+      add(point)
+    }
+  }
+
+  return { readable: problems.length === 0, points, problems }
+}
+
 /** Phases that keep a declared strand on the board until an explicit exit. */
 export const ACTIVE_WORK_PHASES = Object.freeze([
   'authoring',
