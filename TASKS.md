@@ -8852,3 +8852,129 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs one hand-rewrite per session boundary and risks the drift the
   verbatim rule was built to stop, but nothing is lost.
   Bundle: Chat & Tafel.
+
+- [ ] 738. The lease fence does not know the fold command, so a dispossessed session can still
+  rewrite the work order (measured 19.08.2026 while building `scripts/fold-point.mjs`).
+  `fenceGuardedAction` in `scripts/batch-lease-core.mjs` names only `land-point.mjs` in
+  `LANDING_SCRIPTS`. A session whose batch lease has run out is therefore refused a bare `git
+  push`, a `TASKS.md` edit, the tick and every `board.mjs` call — but NOT `node
+  scripts/fold-point.mjs <N> --into <M>`, which ticks a point, moves it into the archive,
+  publishes the board and commits. That is exactly the hole the fence exists to close, and it
+  opened the moment a second command learned to land work.
+  FINAL STATE: the fence names EVERY command that lands work, not one of them, and the list is
+  derived from or pinned against what the repository actually has — a third landing command may
+  not silently reopen the hole. A dispossessed session running the fold command is refused with
+  the same message the tick already gives it.
+  VERIFIABLE: a Vitest case per landing command proving the fence refuses it without the lease
+  and allows it with one, plus a check that fails when a command that mutates the work order is
+  missing from the list.
+  Criticality: medium — nothing is lost while one session owns the batch, but two owners writing
+  the work order is the state the lease was built to make impossible.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 739. Taking the batch is fenced by the HANDOVER mark, so a window can take it with a third
+  of its context already spent (measured 19.08.2026, 18:39). `batch-claim.mjs` is in the context
+  fence's `START_SCRIPTS` and `CLEAR_FIRST_SCRIPTS` (`scripts/context-fence-core.mjs`), so the
+  fence does refuse a claim past the mark and names `/clear` — that part works. But the mark it
+  refuses against is the 150000-token HANDOVER watermark, and a window that claims the batch at
+  101487 tokens is below it and passes. The user caught that one by hand ("Damit hättest du
+  direkt einen schlechten Start"); the mechanism did not.
+  WHY TWO NUMBERS, NOT ONE. The 150000 mark answers "when must a RUNNING session hand over?" — a
+  session with work in flight. Taking the batch asks the opposite question: "how fresh must a
+  worker be to START one?", and a fresh worker should begin near zero. One number cannot serve
+  both without being wrong at one end.
+  FINAL STATE: the claim path is fenced against its OWN threshold, separate from the handover
+  watermark, and the refusal names the remedy (`/clear`, then claim). THE NUMBER IS MEASURED
+  BEFORE IT IS SET: what starting context did the sessions that actually LANDED points run with?
+  A number picked from taste would be the same guess this point exists to replace.
+  VERIFIABLE: Vitest over the pure decision — a claim below the claim threshold passes, one above
+  it is refused with the remedy named, and the handover watermark keeps its own behaviour
+  unchanged; plus the measurement recorded with the chosen number.
+  Criticality: medium — it costs a whole session's quality when it fires, and this incident is the
+  FIRST recorded recurrence after the fence was armed (Sol's audit of 19.08. refused the larger
+  proposal for lack of exactly this evidence, so it belongs in that series).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 740. Every chat answer carries the session's CONTEXT LEVEL beside the timestamp (user
+  19.08.2026, 18:36: he wants to see where we stand and whether the new mechanisms bite, without
+  asking). Measured the same evening: `scripts/context-watermark.mjs --status --transcript <path>`
+  answers in 0.063 s with the token count of the newest non-sidechain usage entry, and the
+  project's own `scripts/dashboard-reminder-hook.mjs` ALREADY reads `transcript_path` and is ESM,
+  so it can import `context-watermark-core.mjs` directly — no second copy of the counting rule,
+  and no edit to the user-global CJS timestamp hook, which reads no stdin. `TIMESTAMP_RE` in
+  `scripts/timestamp-guard-core.mjs` is anchored at the line start and has no `$`, so a suffix
+  behind the bold stamp does not trip that guard; it needs no change.
+  FINAL STATE: the header line the session writes carries the context reading beside the German
+  timestamp, fed by the hook rather than by a tool call the model must remember to make. It
+  appears in BOTH branches of the hook — the stand-down branch too, or it is missing in exactly
+  the sessions that most need it — and an unreadable measurement is reported honestly as "--",
+  never as 0. `MEMORY.md`'s chat-timestamp entry describes the full header afterwards.
+  VERIFIABLE: Vitest over the hook's text for both branches, with a readable and an unreadable
+  transcript, and a case pinning that the produced header still satisfies the timestamp guard's
+  own predicate.
+  Criticality: low — it is a display, and it costs ~15 tokens a turn through the hook against
+  300-500 for a tool call. A hook is a mechanism, so the change needs the other model's recorded
+  review before it lands.
+  Bundle: Chat & Tafel.
+
+- [ ] 741. A carrier entry carries its writer's situation as though it were the finding's own
+  (measured 19.08.2026, 18:47). The entry of 16:38 closed with "blocked until the batch is taken
+  over (a claim stands, fb439a94 holds the lock)". Re-measured, that is not true any more and was
+  never true of the WORK: the change touches `scripts/dashboard-reminder-hook.mjs` alone, that
+  hook is already wired in `.claude/settings.json`, so there is no settings edit, no permission
+  dialog and no reason for an attended session — and the named claim is gone (`batch-claim.mjs
+  --status`: no-claim). The entry was not blocked; its WRITER was, because it did not hold the
+  lock. The class is general: a carrier entry outlives the situation it was written in, and a
+  statement about that situation is read as fact when the entry is finally drained — here it
+  would have deferred a five-line hook change to an attended session for nothing.
+  FINAL STATE: a blocking note on a carrier entry names WHOSE block it is and what it can be
+  re-checked against (the lock holder, the file, the guard), or it is not written at all. The
+  drain reads such a note as a HINT to verify, never as a precondition, and says so where it
+  shows the entry.
+  VERIFIABLE: Vitest over the record and the drain — an entry whose note names its holder and
+  check re-reads as a hint; an entry with a bare "blocked" claim is refused at recording time
+  with the missing part named.
+  Criticality: low — nothing is lost, but the cost is silent and one-sided: work is deferred that
+  nothing was stopping.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 742. The context overshoot is measured once and then forgotten, so nobody can tell whether
+  arming the fence fixed it (19.08.2026; the reduced form of a larger proposal, cut down by
+  GPT-5.6 Sol's audit). A session took its handover at 311039 tokens against the 150000
+  watermark — 161039 past it, with a stated margin of 25000. `batch-boundary.mjs --commit
+  --context` measures that overshoot and PRINTS it, and `.claude/boundary.log` records the
+  handover, but the number is kept nowhere: the next reading starts from zero.
+  WHAT THIS POINT DELIBERATELY DOES NOT DO. The original proposal had the boundary trigger an
+  automatic post-mortem that files a top-of-queue point for a new mechanism. Sol's audit refused
+  it on the evidence, and the refusal is adopted: the ONE measured overshoot already has a known
+  prevention in point 542 (the context fence is built and tested but wired into no hook chain),
+  and there is NO post-arming recurrence evidence that would justify a second, probably HIGH
+  mechanism beside the sleeping one — which is exactly how four dormant guards came about.
+  Automatic triage and automatic ranking are therefore NOT built here; this point only makes the
+  recurrence MEASURABLE, so the later decision rests on readings instead of guesses.
+  FINAL STATE:
+  - THE BOUNDARY WRITES AN INCIDENT RECORD whenever the measured context exceeds the watermark
+    by more than the stated margin. It records the measurement (tokens, watermark, margin), the
+    session, the point in flight, and the repository head — appended, never rewritten, so the
+    series survives every handover.
+  - THE RECORD CARRIES THE GROWTH, NOT ONLY THE ENDPOINT. Sol's audit named the gap: a call that
+    STARTS below the mark and whose RESPONSE crosses it appears in no "calls past the mark" list,
+    and reads the fence deliberately allows are a normal way for context to grow. The record
+    therefore holds the per-turn context growth of the session, so the largest single step is
+    visible wherever it began.
+  - ONE COMMAND READS THE SERIES: how many overshoots since a given date or commit, their size
+    distribution, and what each session was doing. It is the reading the deferred decision needs
+    — after the fence is armed, it answers whether overshoots still happen at all.
+  - NOTHING IS FILED OR RANKED AUTOMATICALLY. The record is evidence, not a queue action.
+  - THE RESIDUAL IS NAMED WITH ITS DIRECTION: a session that dies without taking a boundary
+    writes no record, so the series UNDER-counts and never over-counts. Closing that would mean
+    deriving the reading at session start from the predecessor's transcript, which is a separate
+    point and is not claimed here.
+  VERIFIABLE: Vitest over the pure record shape and the growth extraction, with recorded
+  fixtures — an overshoot inside the margin (no record), one beyond it (a record), and one whose
+  largest growth step BEGAN below the watermark and is still reported; the reading command runs
+  over a fixture series and prints the count, the distribution and the per-incident context.
+  Criticality: low — it only writes and reads a record and changes no control flow; the care it
+  needs is that the boundary must not fail when the record cannot be written, since the handover
+  matters more than the bookkeeping.
+  Bundle: Session- & Repo-Hygiene.
