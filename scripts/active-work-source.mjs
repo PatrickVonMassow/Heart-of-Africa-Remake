@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { IN_FLIGHT_PATH } from './batch-singleton.mjs'
 import { FOCUS_PATH } from './dashboard-state.mjs'
-import { evidencePoint, normalizeActiveWork } from './batch-in-flight-core.mjs'
+import { normalizeActiveWork, partitionEvidenceOnExit } from './batch-in-flight-core.mjs'
 
 export function openPointNumbers(tasksText) {
   const points = new Set()
@@ -75,24 +75,40 @@ export function gatherActiveWorkSource({
 }
 
 /**
+ * A worktree item whose PATH no longer exists is provably beyond resolution:
+ * no retry of the git probe can ever answer for it again. Anything still on
+ * disk — a detached worktree, a transient git failure — is NOT gone; it may
+ * testify to real work and stays, reported loudly by the read side.
+ */
+const worktreeEvidenceGone = (item) =>
+  item?.kind === 'worktree' && typeof item.path === 'string' && item.path !== '' && !existsSync(item.path)
+
+/**
  * Lifecycle edit applied by board commands before their locked publish. The
  * exit filter resolves each evidence item through the SAME `evidencePoint`
  * the read side uses — a `point`-less legacy branch/worktree item must leave
  * with its point exactly as it was counted for it, or the strand stays
  * readable-but-unretractable and blocks the very publish that exits it
- * (second cross-vendor review of this point). `worktreeRef` is injectable for
- * tests; the default is the same git probe the gather side binds.
+ * (second cross-vendor review of this point). An item that can never resolve
+ * again because its artefact is provably gone is RETIRED via `onRetire`, so
+ * a vanished worktree cannot wedge the exit permanently — and nothing leaves
+ * unsaid. `worktreeRef`/`evidenceGone` are injectable for tests; the defaults
+ * are the same git and fs probes the gather side binds.
  */
 export function transitionActiveDeclaration(
   declaration,
-  { exitPoint = null, focusPoint = undefined, worktreeRef = worktreeRefFromGit } = {},
+  {
+    exitPoint = null,
+    focusPoint = undefined,
+    worktreeRef = worktreeRefFromGit,
+    evidenceGone = worktreeEvidenceGone,
+    onRetire = null,
+  } = {},
 ) {
   if (!declaration || typeof declaration !== 'object' || Array.isArray(declaration)) return declaration
-  return {
-    ...declaration,
-    ...(focusPoint === undefined ? {} : { focusPoint }),
-    evidence: Array.isArray(declaration.evidence) && exitPoint != null
-      ? declaration.evidence.filter((item) => evidencePoint(item, { worktreeRef }) !== Number(exitPoint))
-      : declaration.evidence,
-  }
+  const next = { ...declaration, ...(focusPoint === undefined ? {} : { focusPoint }) }
+  if (!Array.isArray(declaration.evidence) || exitPoint == null) return next
+  const { kept, retired } = partitionEvidenceOnExit(declaration.evidence, exitPoint, { worktreeRef, evidenceGone })
+  for (const item of retired) onRetire?.(item)
+  return { ...next, evidence: kept }
 }

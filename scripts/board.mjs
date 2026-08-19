@@ -174,6 +174,13 @@ function prepareActiveTransition({ focusPoint = undefined, exitPoint = null, not
       writeDeclaration(transitionActiveDeclaration(declaration, {
         exitPoint,
         focusPoint: focusPoint === undefined ? declaration.focusPoint ?? null : focusPoint,
+        // Retirement is never silent: an item whose artefact is provably gone
+        // leaves the declaration SAID, so a vanished worktree cannot wedge the
+        // exit and nobody wonders later where its evidence went.
+        onRetire: (item) => console.error(
+          `active-work evidence retired on exit of ${exitPoint}: ${JSON.stringify(item)} — ` +
+            'its artefact no longer exists, so it can testify to no point',
+        ),
       }))
     }
     if (focusPoint !== undefined) {

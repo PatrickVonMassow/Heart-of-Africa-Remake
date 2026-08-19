@@ -1150,6 +1150,35 @@ export function evidencePoint(item, { worktreeRef = () => null } = {}) {
   return pointOfBranch(legacyRef)
 }
 
+/**
+ * Partition a declaration's evidence at the exit of one point, per item and by
+ * the SAME resolution the read side uses. Three verdicts:
+ * - resolves to the exited point → exited (dropped with its point);
+ * - resolves to another point, or to none while its artefact may still exist
+ *   → kept: it may testify to real work, and the read side reports an
+ *   unresolvable survivor loudly rather than this filter dropping it silently;
+ * - resolves to none AND its artefact is provably gone (`evidenceGone`) →
+ *   retired. Evidence that no longer exists testifies to nothing, and keeping
+ *   it would wedge every later exit and publish on a probe that can never
+ *   succeed again (second cross-vendor round: a worktree removed between read
+ *   and exit left a permanently unretractable strand). Retired items are
+ *   RETURNED so the caller says so out loud — never a silent disappearance.
+ */
+export function partitionEvidenceOnExit(evidence, exitPoint, { worktreeRef = () => null, evidenceGone = () => false } = {}) {
+  const kept = []
+  const retired = []
+  for (const item of Array.isArray(evidence) ? evidence : []) {
+    const point = evidencePoint(item, { worktreeRef })
+    if (point === Number(exitPoint)) continue
+    if (point == null && evidenceGone(item) === true) {
+      retired.push(item)
+      continue
+    }
+    kept.push(item)
+  }
+  return { kept, retired }
+}
+
 /** Phases that keep a declared strand on the board until an explicit exit. */
 export const ACTIVE_WORK_PHASES = Object.freeze([
   'authoring',
