@@ -197,8 +197,14 @@ export const RED_CHARGES = [
       'generic WebGPU cascade wording, so unscoped they would excuse a real defect on the CORE ' +
       'adapter the player runs). On core each of these stays a real red, and the charge dies with ' +
       'point 514.',
+    // The RGBA16Float alternative names the ONE evidenced validation error —
+    // "The texture format (TextureFormat::RGBA16Float) does not sup[port
+    // multisampling]", as the recorded names carry it (cut by the 120-char
+    // normalisation) — never the bare format name: a different RGBA16Float
+    // fault on this lane is NOT the measured cascade and must stay red
+    // (round-5 review, 19.08.2026).
     match:
-      /(RGBA16Float|Invalid Texture "(output|normal)-msaa"|Invalid TextureView|Invalid CommandBuffer from CommandEncoder|Async render pipeline creation failed)/i,
+      /(GPUValidationError: The texture format \(TextureFormat::RGBA16Float\) does not sup|Invalid Texture "(output|normal)-msaa"|Invalid TextureView|Invalid CommandBuffer from CommandEncoder|Async render pipeline creation failed)/i,
   },
   {
     point: 568,

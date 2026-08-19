@@ -659,6 +659,24 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
     expect(chargeFor(console_, { ledger }).point).toBe(546)
   })
 
+  it('refuses a kind-scoped charge on a red that carries NO kind — no evidence of the kind, no match', () => {
+    // `charge.kind && red.kind && …` let a kindless (older/misclassified) red
+    // slip through a console charge and then be owned() away (round 5, F1).
+    const kindless = { name: 'console error: render-resource-leak — renderTargets grew', key: 'k', point: null }
+    expect(chargeFor(kindless, { ledger })).toBeNull()
+  })
+
+  it('never charges a truncation entry, in EITHER record shape', () => {
+    // What was never captured can be owned by nothing — not even by a ledger
+    // entry broad enough to match the marker's own wording. The legacy shape
+    // carries kind 'check' under the stable key, so the kind alone cannot say it.
+    const catchAll = [{ point: 546, match: /further result line/i, why: 'a hostile catch-all' }]
+    const modern = { name: '115 further result line(s) exceeded the capture cap', key: 'capture-truncated', kind: TRUNCATED_KIND, point: null }
+    const legacy = { name: '115 further result line(s) exceeded the capture cap — this run\'s reds were NOT all read', key: 'capture-truncated', kind: 'check', point: null }
+    expect(chargeFor(modern, { ledger: catchAll })).toBeNull()
+    expect(chargeFor(legacy, { ledger: catchAll })).toBeNull()
+  })
+
   it('survives a broken ledger entry rather than throwing', () => {
     const broken = [{ point: 1, match: null }, { point: 2, match: /x/ }, null]
     expect(() => chargeFor(red('x'), { ledger: broken })).not.toThrow()
@@ -1651,6 +1669,21 @@ describe('the shipped charge ledger', () => {
     // And still not another suite, backend or kind.
     expect(chargeFor(cascade, { suite: 'polish', backend: 'webgpu', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
     expect(chargeFor(cascade, { suite: 'settings', backend: 'webgl', kind: 'console', featureLevel: 'compatibility' })).toBeNull()
+  })
+
+  it('charges the RGBA16Float family only through the EVIDENCED validation error, never the bare format name', () => {
+    const scoped = { suite: 'settings', backend: 'webgpu', featureLevel: 'compatibility' }
+    // The recorded wording — cut at "sup" by the 120-char name normalisation.
+    const evidenced = red(
+      'console error: THREE.WebGPURenderer: Uncaptured WebGPU GPUValidationError: The texture format (TextureFormat::RGBA16Float) does not sup',
+      null,
+      'console',
+    )
+    expect(chargeFor(evidenced, scoped).point).toBe(514)
+    // A DIFFERENT RGBA16Float fault on the same lane is not the measured
+    // cascade and must stay a real red (round-5 review, 19.08.2026).
+    const other = red('console error: RGBA16Float storage binding is not allowed in this bind group', null, 'console')
+    expect(chargeFor(other, scoped)).toBeNull()
   })
 
   // THE SAME LANE FAULT FROM THE CHECK SIDE. The console half was scoped to the

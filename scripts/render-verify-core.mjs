@@ -194,6 +194,11 @@ export function chargeFor(red, options) {
   const name = text(red?.name)
   const detail = text(red?.detail)
   if (!name) return null
+  // A truncation entry stands for lines NOBODY captured, in either record shape
+  // — the `truncated` kind, or the legacy marker whose kind is 'check' under the
+  // stable key. What was never read can be owned by nothing, however broad a
+  // ledger regex is (round-5 hardening, 19.08.2026).
+  if (isTruncationEntry(red)) return null
   for (const charge of Array.isArray(ledger) ? ledger : []) {
     try {
       if (!charge || !Number.isInteger(charge.point)) continue
@@ -205,7 +210,12 @@ export function chargeFor(red, options) {
       // names a level and a run that never recorded one do not match — an
       // unrecorded level is not evidence of the lane (review, 19.08.2026).
       if (charge.featureLevel && charge.featureLevel !== featureLevel) continue
-      if (charge.kind && red?.kind && charge.kind !== red.kind) continue
+      // A kind-scoped charge matches ONLY a red that CARRIES that kind. Every
+      // red written since point 550 does; one that carries none is not evidence
+      // of the kind the charge was scoped to, so it stays unmatched — the
+      // strict direction. (`red?.kind && …` here let a kindless record slip
+      // through a console charge — round-5 review, 19.08.2026.)
+      if (charge.kind && red?.kind !== charge.kind) continue
       if (!charge.match?.test?.(name)) continue
       // Some checks have more than one red cause behind the same stable label.
       // Such a charge must name the measured signature in the detail instead
@@ -830,8 +840,9 @@ export function unexplainedRuns(runs, since, options) {
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
   const owned = (red, suite, backend, featureLevel) => {
-    // Reds that never reached the record cannot be owned by anything.
-    if (red?.kind === TRUNCATED_KIND) return false
+    // Reds that never reached the record cannot be owned by anything — in
+    // either shape a record may carry the marker (kind, or the legacy key).
+    if (isTruncationEntry(red)) return false
     const recorded = Number.isInteger(red?.point) ? red.point : null
     if (recorded !== null && open.has(recorded)) return true
     const now = chargeFor(red, { suite, backend, featureLevel, ledger })
