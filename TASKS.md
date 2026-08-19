@@ -85,7 +85,13 @@ put it is the mistake this line exists to stop.
   19.08.2026: the fence first fired at 167,277 tokens — the mark had been crossed with
   nothing firing, because no STARTING call lay on the way up — and the boundary was committed
   at 194,613, i.e. 44,613 past it, of which 27,336 were spent purely on leaving.
-  FINAL STATE: the trigger is 82,000 tokens, and the commit that sets it CARRIES ITS
+  FINAL STATE: the two numbers become two NAMED constants, because one name for both is how
+  the confusion got in — `CONTEXT_CEILING_TOKENS = 150000` and `CONTEXT_TRIGGER_TOKENS =
+  82000`, and every consumer names the one it means: point 742's incident record and point
+  747's rollback measure against the CEILING, the fence's admission decision against the
+  TRIGGER (GPT-5.6 Sol, review of 19.08.2026 — while `CONTEXT_WATERMARK_TOKENS` carries both
+  meanings, an incident threshold and a ceiling overshoot are silently the same number and
+  neither is right). The commit that sets them CARRIES ITS
   ARITHMETIC in a comment beside the constant: ceiling 150,000 − largest observed single
   response 40,000 − measured cost of leaving 27,336 = 82,664. This is deliberately the
   CONSERVATIVE cut and not the 100,000 a first draft proposed: 100,000 + 40,000 + 15,000
@@ -93,12 +99,22 @@ put it is the mistake this line exists to stop.
   audit of 19.08.2026). The resulting working window of roughly 52,000 tokens after startup
   is the honest price of an uncapped output channel; points 744 and 597 buy it back, and
   point 747 raises the trigger again once they have.
+  BOTH PREMISES ARE OBSERVATIONS, NOT BOUNDS, and the point says so rather than pretending
+  otherwise (GPT-5.6 Sol, review 19.08.2026): the 40,000 jump is one reading and point 742
+  itself calls it neither a maximum nor an expected value, and the 27,336 leaving cost is the
+  contaminated measurement point 744 replaces. This point is therefore not the guarantee — it
+  is the cheap, immediate margin, and points 597, 745 and 744 are what turn the margin into a
+  bound. IT IS RANKED AHEAD OF 744 DELIBERATELY, and the contamination is why that is safe:
+  the two gates that contradicted each other made leaving MORE expensive than a clean handover
+  will be, so 27,336 is biased HIGH and subtracting it errs toward a lower, safer trigger.
+  When 744 lands its clean measurement, this constant is recomputed from it.
   NOT IN THIS POINT: deriving the trigger automatically. That is point 745, which replaces
   this constant with a computed remaining-budget function; until then the number stands as a
   written, justified value rather than a formula.
-  VERIFIABLE: a Vitest case pinning the constant AND the inequality it must satisfy —
+  VERIFIABLE: a Vitest case pinning both constants AND the inequality they must satisfy —
   trigger + largest-observed-jump + measured-boundary-cost <= ceiling — so a later change to
-  any of the three fails the gate rather than silently breaking the ceiling; plus the existing
+  any of the three fails the gate rather than silently breaking the ceiling; a case asserting
+  no consumer reads the ceiling where it means the trigger or the reverse; plus the existing
   watermark tests re-run green against the new value.
   Criticality: low — one constant, immediately reversible, and it only makes an existing
   mechanism fire earlier.
@@ -113,9 +129,11 @@ put it is the mistake this line exists to stop.
   WHAT THIS POINT DELIBERATELY DOES NOT DO. The original proposal had the boundary trigger an
   automatic post-mortem that files a top-of-queue point for a new mechanism. Sol's audit refused
   it on the evidence, and the refusal is adopted: the ONE measured overshoot already has a known
-  prevention in point 542 (the context fence is built and tested but wired into no hook chain),
-  and there is NO post-arming recurrence evidence that would justify a second, probably HIGH
-  mechanism beside the sleeping one — which is exactly how four dormant guards came about.
+  prevention in point 542, which ARMED the context fence on 19.08.2026 —
+  `context-fence-guard.mjs` now hangs in the PreToolUse chain of `.claude/settings.json`
+  (measured 19.08.2026, 19:11) — and there is NO post-arming recurrence evidence that would
+  justify a second, probably HIGH mechanism beside it, which is exactly how four dormant
+  guards came about.
   Automatic triage and automatic ranking are therefore NOT built here; this point only makes the
   recurrence MEASURABLE, so the later decision rests on readings instead of guesses.
   FINAL STATE:
@@ -174,10 +192,18 @@ put it is the mistake this line exists to stop.
   THIS IS A FUNCTIONAL CHANGE, not bookkeeping (GPT-5.6 Sol, audit 19.08.2026): it must not be
   filed under "measurement only", and the measurement is worthless until it lands, because the
   contradiction is inside every reading taken before it.
+  THE HANDOVER GETS A MECHANICAL CAP, not only a measurement (GPT-5.6 Sol, review 19.08.2026:
+  three readings and their spread still establish no maximum, and point 745 reserves a number
+  it can only trust if something enforces it). The boundary path's own inputs and outputs pass
+  point 597's budget like everything else, and the cap is the constant point 745 reserves from
+  the session's first call onward. An overrun is not silently swallowed: the boundary still
+  COMPLETES — the handover is the one path that must never fail — but records that it exceeded
+  its cap, so the reserve is corrected from evidence rather than from hope.
   VERIFIABLE: a Vitest case driving the printed template through the board gate's own
   validator and asserting it is accepted unchanged; a case asserting the template names both
-  the point and the queue-return step; and the three recorded handover measurements with their
-  spread, not only their mean.
+  the point and the queue-return step; a case proving the boundary completes even when it
+  overruns its cap AND that the overrun is recorded; and the three recorded handover
+  measurements with their spread, not only their mean.
   Criticality: medium — it touches the handover path, which is the one path that must never
   fail; every change here is fail-open or it is wrong.
   Bundle: Session- & Repo-Hygiene.
@@ -191,6 +217,13 @@ put it is the mistake this line exists to stop.
   the same 40,000-token jump the ceiling must survive comes back the moment one call is made
   the way it always was. So every tool output passes a BUDGET with spill-to-log, and what
   stands in the context is what fits, never what the producer chose to print.
+  THE INTERCEPTION POINT IS NAMED, or this stays a rule wearing a mechanism's clothes
+  (GPT-5.6 Sol, review 19.08.2026: naming `run-logged.mjs` leaves a direct `git diff`, `grep`,
+  file read, `npm ls` or `gh run view` entirely unbudgeted, and those are exactly the calls
+  the point lists). The budget therefore sits in the PreToolUse chain, where every tool call
+  passes whether or not it went through a project script, and the point names that hook and
+  its file. A producer that bypasses it is a defect the tests must catch, not a caller's
+  discipline.
   THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
   <log>` already hands back the run when the digest is not enough, but it is narrowed to
   SELECTIVE, line-bounded or paginated queries — a full `--show` reloads the very 40,000
@@ -212,15 +245,25 @@ put it is the mistake this line exists to stop.
      retry printing everything three times. Collapsing by SIGNATURE removes most of the volume
      and loses no distinguishable cause. This cut runs FIRST, and often it is the only one
      needed.
-  3. THE FIRST DISTINCT CAUSE IS NEVER CUT. It enters the context whole. Further occurrences
-     of the same signature collapse to a count; further DISTINCT causes get a bounded excerpt
-     with a pointer to the full text.
+  3. THE FIRST DISTINCT CAUSE IS NEVER CUT SHORT OF ITS OWN HARD MAXIMUM. It enters the
+     context whole up to a cap that is generous by the p95 measurement above and far larger
+     than any real assertion-plus-stack, and beyond that cap it spills to log with condition 4's
+     notice. "Never cut" without a maximum is the one hole through which a single output can
+     still exceed the ceiling (GPT-5.6 Sol, review 19.08.2026), and the maximum is what makes
+     the channel bounded while still fitting every cause anyone has actually needed to read.
+     Further occurrences of the same signature collapse to a count; further DISTINCT causes get
+     a bounded excerpt with a pointer to the full text.
   4. CUT FROM THE MIDDLE, NEVER THE HEAD OR THE TAIL, and never silently. The assertion and
      the stack top are at the head, the summary at the tail — a naive head bound loses the
      summary and a tail bound loses the assertion. Every cut states in the context how much
      was omitted and how to fetch it.
   So the rule is: error output is never cut SILENTLY, never cut BEFORE its first distinct
   cause, and never cut at HEAD or TAIL — and every failing test keeps its name.
+  THE POINT SPLITS AT ITS DEPENDENCY, and the ceiling-relevant half is what stands at the front
+  of the queue (GPT-5.6 Sol, review 19.08.2026). The OUTPUT BUDGET and the error channel above
+  depend on nothing and are what points 743 and 745 consume, so they are built first. The
+  standing-load paragraph below is CONDITIONAL on point 599's cache reading, and 599 stands far
+  back in the work order — that half waits for it and does not hold up the budget.
   MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
   its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
   to a follow-up-query rate of ~85 %.
@@ -232,9 +275,14 @@ put it is the mistake this line exists to stop.
   remembered.
   VERIFIABLE (the error channel): a Vitest case per condition — a twenty-fold repeated stack
   collapsing to one cause plus a count; a first distinct cause surviving whole against a budget
-  far below its size; a second distinct cause surviving as a bounded excerpt WITH its pointer;
+  far below its size; a first distinct cause LARGER than its own hard maximum, spilling to log
+  with its notice; a second distinct cause surviving as a bounded excerpt WITH its pointer;
   a middle cut that keeps both the head assertion and the tail summary; and a case asserting no
   cut is ever written without its omission notice.
+  VERIFIABLE (the interception): a case per named producer — a direct `git diff`, `grep`, file
+  read, `npm ls` and `gh run view` — proving each is budgeted without having been routed
+  through a project script, and one asserting that NO admitted output, error output included,
+  can exceed the per-call maximum. That is the case which proves a bound rather than a habit.
   Criticality: medium — the real risk is cutting an error message, which the four conditions
   bound rather than exclude, and the budget now denies output instead of advising against it.
   NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
@@ -269,11 +317,57 @@ put it is the mistake this line exists to stop.
   refused; and only a call ALREADY classified as a start, whose type cost is unknown, is
   treated conservatively. That conservative branch COUNTS how often it fires, because a
   silent brake that defers work nobody sees is worse than the overshoot it prevents.
+  EVERY CONTEXT-GROWING CALL IS ADMITTED AGAINST THE SAME BUDGET, not only the ones today's
+  fence classifies as a START (GPT-5.6 Sol, review 19.08.2026: a session that never issues a
+  `START_SCRIPTS` command, or that grows purely through reads, crosses the ceiling with the
+  whole programme built). The exemption is therefore not "everything except starts" but
+  "control operations whose output is BOUNDED BY CONSTRUCTION" — a commit, a push, a board
+  call, a focus stamp, the boundary — and each of those is exempt because point 597's budget
+  caps what it can return, not because of what it is called. A large READ is not a control
+  operation and is admitted like any other growth.
+  THE LAG IS A LEDGER, NOT A RESERVE (GPT-5.6 Sol, review 19.08.2026). Subtracting a
+  statistical reserve cannot bound anything, and it is spent TWICE when one assistant turn
+  makes several tool calls against the same stale reading. So the function keeps a per-turn
+  PENDING DEBIT: every admitted call books its projected cost immediately, the remainder is
+  computed as reading minus outstanding debits, and the debits are reconciled against the
+  actual growth when the next complete reading arrives. A reading that has not moved is
+  therefore not free budget.
+  THE HANDOVER IS RESERVED BEFORE ANY WORK, not admitted at zero (GPT-5.6 Sol, review
+  19.08.2026): point 744's mechanically capped handover cost is subtracted from the remainder
+  from the session's first call onward, so the exit is always affordable and never has to be
+  waved through. "Exit-path calls are always allowed" then stops being a hole and becomes a
+  consequence — the budget for them was never lent out.
+  THE EMERGENCY LEVER LIVES HERE, because this point owns the admission decision (user
+  19.08.2026: prevention by default, "mit einem Notfall-Hebel, der das erlaubt, wenn es gar
+  nicht anders geht"). It is a PERMIT, not a switch: `context-fence-override.mjs --session
+  <id> --point <N> --reason "<why>" --max-tokens <n>` writes a short-lived, session-bound,
+  point-bound, SINGLE-USE permit that the fence consumes atomically for exactly one otherwise
+  refused operation. An append-only record stores timestamp, session, point, repository head,
+  the reading, the projected cost, the reason, the caller and the ACTUAL result, so a lever
+  pulled often is visible as a pattern rather than as a habit. An environment variable or a
+  persistent "off" state is explicitly NOT this lever: it would not be deliberate and it would
+  not be once. The same permit is what points 748 and 746 honour, so there is one lever and
+  not three.
   VERIFIABLE: Vitest over the pure function — a call that fits, one that does not, one whose
   type cost is unknown, an unreadable reading (allowed), an exit-path call at zero remaining
-  budget (allowed), and a case proving the lag reserve is subtracted; plus a replay against
+  budget (allowed), and a case proving the lag reserve is subtracted; a case where three calls
+  in one turn against an unmoved reading are each debited rather than each granted the same
+  remainder; a case proving the handover reserve is subtracted from the first call onward; and
+  over the permit — consumed exactly once, refused for another session, another point or after
+  expiry, and every use recorded. AND AN END-TO-END CASE THROUGH THE REAL HOOK, not only the
+  pure function: `context-fence-guard.mjs` is armed in `.claude/settings.json` (measured
+  19.08.2026), so a fixture command must be shown actually intercepted — a decision function
+  nobody calls prevents nothing. Plus a replay against
   the transcript of the 19.08.2026 session showing at which call it would have refused, and
   that none of the refusals is an exit path.
+  THE RESIDUAL IS NAMED WITH ITS SIDE, because "never" is a claim this point cannot honestly
+  make (GPT-5.6 Sol, review 19.08.2026, and it is right): while an UNREADABLE measurement fails
+  open, a session whose transcript cannot be parsed is ungoverned, and that branch stays open
+  deliberately — denying on an assumption breaks the measurement rule and would be the worse
+  failure. So the claim is: with the budget enforced, the ledger booking every admitted call,
+  the output cap in place and the handover reserved, the only remaining path across the ceiling
+  is an unreadable reading — and THAT is what the incident record of point 742 exists to count.
+  If it turns out to fire, closing it is a point of its own, not a silent tightening here.
   Criticality: high — it decides what may run at all, and its failure mode is a session that
   locks itself out of its own exit.
   Bundle: Session- & Repo-Hygiene.
@@ -290,11 +384,19 @@ put it is the mistake this line exists to stop.
   BILLED tokens per landed point, which is a different quantity from context growth and must
   not be substituted for it. The estimate comes from point 742's series, aggregated per POINT
   CLASS, and a class with too few readings counts as unknown.
+  WHAT "UNKNOWN" DECIDES IS SPELLED OUT, because an expectation that decides nothing is not a
+  safety mechanism (GPT-5.6 Sol, review 19.08.2026): an unknown class is commissioned only
+  against a FULL remaining budget — the guard treats it as the most expensive class it has
+  ever measured — and a point whose class stays unknown after enough attempts is flagged for
+  classification rather than admitted by default.
   A POINT TOO LARGE FOR ANY SESSION MUST NOT BE DEFERRED FOREVER (GPT-5.6 Sol, audit
   19.08.2026): where the expected cost exceeds a FULL fresh session's window, the guard does
   not refuse indefinitely but demands the point be CUT — and that demand is recorded on the
   point, so a systematically oversized point becomes visible instead of quietly sinking down
-  the queue.
+  the queue. THAT DEMAND IS A PREREQUISITE, not a note: while it stands unanswered the point
+  cannot be commissioned, and it is answered by the point actually being split — otherwise a
+  recorded demand is exactly the "we wrote it down" that changes nothing. The emergency permit
+  of point 745 is the one way past it, and it is recorded like every other use of the lever.
   VERIFIABLE: Vitest over the decision — a point that fits, one that does not, one of unknown
   class, and one larger than a whole fresh window (decomposition demanded, not refusal); and a
   replay over the last twenty landed points showing which would have been deferred and which
@@ -314,6 +416,13 @@ put it is the mistake this line exists to stop.
   on an upper QUANTILE of the per-kind growth rather than a mean; a stated safety margin on
   top; a cap on how far one step may move the value; and an AUTOMATIC ROLLBACK to the previous
   value on any recorded overshoot of the ceiling.
+  THE ROLLBACK IS A SECOND LINE, NOT THE PREVENTION, and this point says so rather than
+  letting the word "automatic" imply otherwise (GPT-5.6 Sol, review 19.08.2026). It reacts
+  only to overshoots that were RECORDED, and point 742 names its own blind spots — a session
+  that dies without a boundary writes nothing, and a crossing under the stated margin writes
+  nothing either. So the rollback fires after the ceiling has already been broken, and it
+  exists to stop a bad raise from standing, not to keep the ceiling. What keeps the ceiling is
+  points 745 and 597.
   WHY THE SAMPLE IS NOT ENOUGH BY ITSELF (GPT-5.6 Sol, audit 19.08.2026): handovers taken
   under the new, lower trigger are CENSORED — they cannot show a jump the trigger already
   prevented — so a quiet series is evidence about the trigger, not about the jump. The
@@ -336,23 +445,36 @@ put it is the mistake this line exists to stop.
   an hour earlier, and nothing refused it a single call. Points 742 to 747 govern the batch and
   would leave this untouched, so the "share of usage above 150k" they are meant to remove would
   keep being fed from here.
-  FINAL STATE: the stand-down distinguishes THREE cases instead of two. A SUBAGENT stays
-  exempt, unchanged. The BATCH OWNER is governed as points 745 and 743 describe. An ATTENDED
-  MAIN WINDOW that owns no lock is governed too, but by the remedy that fits it: it cannot take
-  a boundary, because a person is talking to it, so past the mark it is DENIED the expensive
-  starts (agent, browser suite, delegated ask, authoring) and its refusal names `/clear` and
-  nothing else. That is the same remedy point 542 already wired for `batch-claim.mjs`, applied
+  FINAL STATE: NO SESSION CLASS IS EXEMPT FROM THE CEILING; what differs between the three is
+  the REMEDY, not whether the budget applies (GPT-5.6 Sol, review 19.08.2026 — an exempt
+  subagent is a whole class of sessions with no ceiling at all, and a subagent is exactly what
+  the expensive work runs in). All three are admitted through point 745's prospective budget,
+  so the decision is "does this call still fit", not "are we already past the mark" — denial
+  after the mark detects the condition one call too late. The remedies:
+  a SUBAGENT past its budget is refused the call and told to return what it has, because it has
+  a caller who can carry on; the BATCH OWNER is taken over the boundary as points 745 and 743
+  describe; an ATTENDED MAIN WINDOW cannot take a boundary, because a person is talking to it,
+  so its refusal names `/clear` and nothing else. That is the same remedy point 542 already
+  wired for `batch-claim.mjs`, applied
   to the window rather than to one command, and it rests on the same user decision (19.08.2026:
   "Bevor die Batch geholt wird, den Benutzer zu clear auffordern und danach zu weiter oder so").
+  In all three, point 745's emergency permit is the one deliberate way through.
   THE FENCE MUST NOT SILENCE THE CONVERSATION: reads, answers, commits and pushes stay allowed
   in every case — a window that cannot answer the person in front of it is worse than an
-  expensive one.
+  expensive one. A large READ is admitted against the budget like any other growth; what is
+  never refused is the ANSWER.
   HOW THE THREE ARE TOLD APART is the real work of this point and must not be guessed: the
   subagent case is what today's `heldByOtherLiveOwner` conflates with the attended one, and
-  getting it wrong either fences every subagent or fences nothing.
-  VERIFIABLE: Vitest over the three-way decision with a fixture per case — subagent past the
-  mark (allowed), batch owner past the mark (denied, boundary named), attended window past the
-  mark (denied, `/clear` named), and each of them below the mark (allowed); plus a replay
+  getting it wrong either fences every subagent or fences nothing. The point NAMES the identity
+  signal it uses — what a subagent process carries that a main window does not — rather than
+  leaving it to the implementation, because fixtures for a pure three-way decision prove the
+  decision and not the classification (GPT-5.6 Sol, review 19.08.2026).
+  VERIFIABLE: Vitest over the three-way decision with a fixture per case — subagent past its
+  budget (refused, return-what-you-have named), batch owner past it (refused, boundary named),
+  attended window past it (refused, `/clear` named), and each of them within budget (allowed);
+  a case per class proving an ANSWER is never refused; a case proving the permit lets exactly
+  one refused call through in each class; a classification case per real session shape, driven
+  from the signal the point names rather than from a hand-built fixture; plus a replay
   against this session's own transcript showing the calls it would have refused and confirming
   no answer, read, commit or push is among them.
   Criticality: high — it extends a denying mechanism to a session a human is using, so a false
@@ -389,6 +511,31 @@ put it is the mistake this line exists to stop.
   `.claude/batch-paused` is gone.
   Criticality: medium — it touches the alert path, which must keep reaching the user; the
   change removes a board card, never a notification.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 750. A session that dies without a boundary leaves no reading, so the overshoot series
+  under-counts exactly where it matters most (GPT-5.6 Sol, review of the context-ceiling
+  programme, 19.08.2026; point 742 names this residual and expressly does not claim it). The
+  incident record of point 742 is written by `batch-boundary.mjs --commit --context`. A session
+  that crashes, is killed with the container, or simply stops answering never reaches that call
+  — and a session that died is more likely to have been an expensive one, so the missing
+  readings are biased toward the large end. Point 747's rollback then reacts only to what was
+  recorded, and reads a quiet series as evidence of safety.
+  FINAL STATE: the reading is derived at SESSION START from the PREDECESSOR's transcript, not
+  only at the predecessor's exit. A session that comes up finds the last complete api usage
+  event of the session before it, and if that reading crossed the ceiling with no incident
+  record for it, writes the record then — same shape, same series, marked as reconstructed
+  rather than self-reported, so the two are never confused when the series is read.
+  IT MUST NOT DELAY THE START. The reconstruction is bounded work over one file and fails
+  SILENTLY into "no reading" rather than holding up a session that has work to do; a startup
+  path that can block on bookkeeping is a worse defect than the under-count it closes.
+  VERIFIABLE: Vitest over the reconstruction — a predecessor that exited cleanly (nothing
+  written, the boundary already recorded it), one that died above the ceiling (a reconstructed
+  record), one that died below it (nothing), one whose transcript is unreadable (no reading, no
+  throw), and a case proving a reconstructed record is distinguishable from a self-reported one
+  in the series the reading command prints.
+  Criticality: low — it only writes a record, and it sits on the startup path, where its one
+  real risk is delaying a session rather than corrupting anything.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 738. The lease fence does not know the fold command, so a dispossessed session can still
