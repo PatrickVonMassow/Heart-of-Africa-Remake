@@ -1202,67 +1202,75 @@ than reported — `uncaughtExceptionMonitor` catches that, because node prints a
 uncaught exception straight to fd 2 where no tapped stream write can see it.
 `--defer` stays for what genuinely cannot be judged headless.
 
-### A flooded run is an INCOMPLETE RECORDING, not a red (point 734)
+### Red lines are NEVER dropped — the cap is gone (point 734)
 
-A run whose output floods past the capture cap records a FRAGMENT of its red
-set. That used to be judged an unaccounted red — and it was unclosable by
-construction, because all three closings of point 640 need the red's identity:
-it blocked every later render change until somebody hand-wrote a `--defer`, i.e.
-exactly the waiver the charge ledger exists to abolish.
+The recorder used to cap its capture at 400 result lines and its record at 60
+reds. A run past either cap was HALF-RECORDED — a fragment of its red set plus
+a truncation marker — and unclosable by construction: all three closings of
+point 640 need the red's identity, and the lost part had none. It blocked every
+later render change until somebody hand-wrote a `--defer`, i.e. exactly the
+waiver the charge ledger exists to abolish; the sign-off machinery built to
+patch that kept minting new laundering paths through five review rounds.
 
-So the cap stays, and hitting it FAILS LOUDLY instead. The record says
-`truncated: true` whatever the exit code (a pass whose result lines were thrown
-away is a pass nobody read), `runVerdict` answers `incomplete` — a class of its
-own, covering nothing — and the guard names it apart from an unexplained red, so
-nobody hunts a defect that was never captured.
+**The measurement that decided it** (re-taken 19.08.2026 from every stored
+artefact — 94 of 178 suite logs in `local/` carrying result lines, plus the
+full 40-run state window): a real red SET is small. The worst run on record, a
+WebGPU validation cascade in `webgpu/settings`, printed **521 result lines but
+only 33 distinct ones** and parsed to **18/19 recorded reds**; no record has
+ever held more than 19 reds, and every non-cascade log carries **≤ 12 result
+lines**. What is unbounded is REPETITION — one page error printed once per
+frame — never the set: reds are bounded by the suite's checks and its distinct
+console errors. (The earlier reading, "red lines are exactly the unbounded
+ones, so they cannot go uncapped", conflated occurrences with identities.)
 
-Two things lift it, and neither is the ledger (a charge needs the red's
-identity, and the lost part has none):
+So the spec's option "the cap stops applying to RED lines" was chosen, and the
+other one deleted. The tap keeps each DISTINCT result line ONCE, in first-seen
+order (the first occurrence keeps the detail a `detailMatch` charge reads);
+the parser de-duplicates by key anyway, so collapsing repeats changes no
+verdict, and memory is bounded by the distinct set — a subset of output the
+suite already printed. The record then stores the whole red set, uncapped. A
+new record can therefore never truncate: every observed red keeps its identity
+and stays closable the three ordinary ways of point 640, whatever the flood
+around it.
+
+### The records written before that fix (the legacy `incomplete` class)
+
+Records already on file (the two truncated `webgpu/settings` runs of
+13.08.2026) still carry the truncation marker, and for THEM the incomplete-
+recording class remains: `runVerdict` answers `incomplete` — a class of its
+own, covering nothing — and the guard names it apart from an unexplained red
+in EVERY branch of its block message, so nobody hunts a defect that was never
+captured. Two things lift it, and neither is the ledger (a charge needs the
+red's identity, and the lost part has none):
 
 1. **A real re-recording** — a COVERING run of the same suite on the same
    backend, later than the broken one and on code since the last render edit.
-   This is not the fourth closing point 640 forbids: a red is an observation no
-   later green un-observes, while a truncation is a MEASUREMENT THAT WAS LOST,
-   and a lost measurement is answered by taking it again. This is the first
-   answer, always.
+   A red is an observation no later green un-observes; a truncation is a
+   MEASUREMENT THAT WAS LOST, and a lost measurement is answered by taking it
+   again. This is the first answer, always.
 2. **A signed closure**, for a recording that genuinely cannot be redone:
 
    ```
-   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" [--at <iso|ms>] --evidence "<why>"
+   node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" [--at <iso|ms>] [--run <id>] --evidence "<why>"
    ```
 
-   It names ONE run by identity (backend, suite, exact timestamp — `at`, or the
-   start time where that cannot be read, the same reading the re-recording route
-   uses) and refuses an ambiguous selector rather than resolving it; a record
-   with NO readable stamp at all is refused too, because a signature that names
-   no run closes none (stated residual: such a record has no per-run way out —
-   the loud `--defer`, which signs for a judgment rather than for a run, is what
-   is left). It demands written evidence, and
-   a closure carrying none closes nothing; it clears no backend — the run stays
-   `incomplete`, never a green; and it closes **only the part nobody can know**.
-   Every red the run DID record was really observed, so it keeps blocking and
-   closes the three ordinary ways — and for a run that also passed on the RETRY
-   those reds are the FIRST attempt's, which it never carries in `reds` of its
-   own. That last limit is what keeps this far
-   narrower than the waiver it replaces — but not airtight, and the residual is
-   stated rather than glossed (review, 19.08.2026): what the closure signs away
-   is exactly the part nobody can read, so it cannot tell an unavoidable
-   overflow from output flooded on purpose. A suite made to overflow deliberately
-   could bury a red among the dropped lines and then sign the recording off. What
-   it can NEVER do is bury a red that reached the record, and the signature is
-   named, dated and evidenced, so the deliberate case is visible to a reader even
-   where the mechanism cannot refuse it.
+   It binds ONE record by its CONTENT identity (`runIdentity`, a hash of the
+   record's whole canonical content — a stamp was not an identity: it fell
+   back `at` → `startedAt`, so one signature could close a second run sharing
+   a millisecond, and a record with no readable stamp was closable by nothing
+   at all). `--at` and `--run` only narrow the selection; ambiguity is refused
+   with each candidate's `--run` id rather than resolved. It demands written
+   evidence, and a closure carrying none closes nothing; it is only OFFERED
+   where it would lift something — a truncated run that CRASHED stays red and
+   a truncated `--section` probe stays partial; it clears no backend — the run
+   stays `incomplete`, never a green; and it closes **only the part nobody can
+   know**: every red the run DID record keeps blocking and closes the three
+   ordinary ways, and for a run that also passed on the RETRY those reds are
+   the FIRST attempt's, held in `suspectOf`. Stated residual, unchanged: the
+   closure cannot tell an unavoidable overflow from output flooded on purpose
+   — but it can never bury a red that reached the record, and for every run
+   recorded since the fix, ALL of them did.
 
-**Why the cap was not simply lifted for red lines** (measured 19.08.2026, and the
-measurement is what decided it): the only overflow on record — two
-`webgpu/settings` runs of 13.08.2026 — dropped 115 and 116 lines beyond the
-400-line cap, i.e. 515/516 result lines, and yielded 18/19 DISTINCT reds, a
-WebGPU validation cascade repeating a handful of errors. Across the 47 stored
-suite logs carrying result lines at all, the maximum is 12 kept lines and 7
-distinct reds. The distinct red set is small and bounded by the suite's checks;
-the LINES are not — every suite prints one `ERR:` line per console-error
-OCCURRENCE, and a page error that repeats per frame multiplies one red without
-bound. Red lines are exactly the unbounded ones, so they cannot go uncapped.
 
 ## The world seed is pinned AT THE LAUNCHER (points 549/557)
 
