@@ -76,51 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 735. The mechanism gate fires on a TOUCH, where it was built for a CHANGE (user
-  19.08.2026, reading the board: the user saw four-eyes on over half the cards and asked whether
-  so many points are judged critical). They are not. MEASURED 19.08.2026 over the 71 points
-  landed since 01.08.: 56 carry a review record (79 %), but only 16 of those reviews come
-  from a criticality decision — 38 were demanded by `mechanism-review-guard`, which is
-  NAME-based (`scripts/*-guard*.mjs`, `*-gate*.mjs`, anything beside one by stem,
-  `scripts/git-hooks/*`, plus the named exceptions in MECHANISM_EXTRA) and asks nothing about
-  what the diff does. 40 of the 71 points (56 %) touch such a path, while the criticality tags
-  across all 156 tagged points read 41 high (26 %), 86 medium, 29 low. The gate was written
-  when a guard change was the exception; the queue is now mostly guard work, so the exception
-  became the rule and a comment line in a guard file costs a full cross-model round.
-  FINAL STATE:
-  - THE GATE ASKS WHETHER THE DIFF CAN CHANGE BEHAVIOUR, not only which file it sits in. The
-    path rule stays the entry condition and is not widened or narrowed; a NEW, pure classifier
-    beside it decides whether the changed HUNKS in a mechanism file are review-worthy. Only
-    changes that provably cannot alter what the mechanism decides are exempt: comment- and
-    JSDoc-only hunks, pure whitespace/formatting, and a test file that only ADDS cases. Any
-    deletion or weakening in a test file, any change to an assertion, and every hunk of
-    executable code stay review-worthy — a weakened test is exactly the failure the gate exists
-    to catch, so a test file is never exempt as a class.
-  - A MIXED DIFF IS REVIEW-WORTHY. One executable hunk anywhere in the point's mechanism files
-    puts the whole point back under the full gate; the exemption is all-or-nothing per point,
-    never per file, so nothing lands by being bundled with a comment fix.
-  - THE EXEMPTION IS RECORDED, NOT SILENT. A point cleared this way writes a record naming
-    every mechanism file it touched and why each was exempt, through the existing
-    `mechanism-review.mjs --record` path with its own verdict value, so the ledger keeps
-    answering "was this mechanism reviewed" and a later reader sees the gate was asked and
-    answered rather than absent.
-  - THE RULE IS PROVEN AGAINST HISTORY BEFORE IT IS ARMED. One command replays the classifier
-    over every commit the ledger already judged and reports how many recorded do-not-merge
-    verdicts sat on a diff the new rule would have exempted. That number must be ZERO; a single
-    real finding on an exempt diff refutes the rule, and the point then narrows the exemption
-    rather than accepting the loss. The replay's output is committed as the evidence.
-  VERIFIABLE: Vitest over the pure classifier with recorded fixtures — a comment-only hunk in a
-  guard core (exempt), an added test case (exempt), a deleted assertion (review-worthy), a
-  one-character change inside an executable line (review-worthy), a diff mixing a comment fix
-  with an executable hunk (review-worthy as a whole), and a rename that moves executable code
-  between mechanism files (review-worthy); the history replay reports zero missed findings; and
-  the guard's own change carries the cross-model review it demands of everything else.
-  Criticality: high — this loosens a safety gate that exists because the pre-push gate once
-  went live unreviewed. The saving is real but bounded and must not be overstated: cross-vendor
-  review rounds measured 0.5 % of the tokens in the ten-point cost ledger, so the gain is fewer
-  Sol rounds and shorter wall clock per point, NOT a large token saving, and it does not touch
-  the Fable pool at all (Fable ran 0 reviews this week; its volume is authoring).
-  Bundle: Modell & Wächter.
 - [ ] 736. The escalation lane has no way back DOWN, so one point sits on the scarcest model
   for good (measured 19.08.2026 from the harness transcripts under
   `/home/node/.claude/projects/-workspace-hoa`, window since 18.08. 19:00). Fable ran 1137 turns
@@ -193,6 +148,51 @@ put it is the mistake this line exists to stop.
   a moment, "plain Opus 5 first, then Fable" would hold the user's same-house rule and spare the
   Fable pool — a hypothesis from one observation, and the CLI takes only one `--fallback-model`,
   so it would need a mechanism rather than the flag.
+  Bundle: Modell & Wächter.
+- [ ] 735. The mechanism gate fires on a TOUCH, where it was built for a CHANGE (user
+  19.08.2026, reading the board: the user saw four-eyes on over half the cards and asked whether
+  so many points are judged critical). They are not. MEASURED 19.08.2026 over the 71 points
+  landed since 01.08.: 56 carry a review record (79 %), but only 16 of those reviews come
+  from a criticality decision — 38 were demanded by `mechanism-review-guard`, which is
+  NAME-based (`scripts/*-guard*.mjs`, `*-gate*.mjs`, anything beside one by stem,
+  `scripts/git-hooks/*`, plus the named exceptions in MECHANISM_EXTRA) and asks nothing about
+  what the diff does. 40 of the 71 points (56 %) touch such a path, while the criticality tags
+  across all 156 tagged points read 41 high (26 %), 86 medium, 29 low. The gate was written
+  when a guard change was the exception; the queue is now mostly guard work, so the exception
+  became the rule and a comment line in a guard file costs a full cross-model round.
+  FINAL STATE:
+  - THE GATE ASKS WHETHER THE DIFF CAN CHANGE BEHAVIOUR, not only which file it sits in. The
+    path rule stays the entry condition and is not widened or narrowed; a NEW, pure classifier
+    beside it decides whether the changed HUNKS in a mechanism file are review-worthy. Only
+    changes that provably cannot alter what the mechanism decides are exempt: comment- and
+    JSDoc-only hunks, pure whitespace/formatting, and a test file that only ADDS cases. Any
+    deletion or weakening in a test file, any change to an assertion, and every hunk of
+    executable code stay review-worthy — a weakened test is exactly the failure the gate exists
+    to catch, so a test file is never exempt as a class.
+  - A MIXED DIFF IS REVIEW-WORTHY. One executable hunk anywhere in the point's mechanism files
+    puts the whole point back under the full gate; the exemption is all-or-nothing per point,
+    never per file, so nothing lands by being bundled with a comment fix.
+  - THE EXEMPTION IS RECORDED, NOT SILENT. A point cleared this way writes a record naming
+    every mechanism file it touched and why each was exempt, through the existing
+    `mechanism-review.mjs --record` path with its own verdict value, so the ledger keeps
+    answering "was this mechanism reviewed" and a later reader sees the gate was asked and
+    answered rather than absent.
+  - THE RULE IS PROVEN AGAINST HISTORY BEFORE IT IS ARMED. One command replays the classifier
+    over every commit the ledger already judged and reports how many recorded do-not-merge
+    verdicts sat on a diff the new rule would have exempted. That number must be ZERO; a single
+    real finding on an exempt diff refutes the rule, and the point then narrows the exemption
+    rather than accepting the loss. The replay's output is committed as the evidence.
+  VERIFIABLE: Vitest over the pure classifier with recorded fixtures — a comment-only hunk in a
+  guard core (exempt), an added test case (exempt), a deleted assertion (review-worthy), a
+  one-character change inside an executable line (review-worthy), a diff mixing a comment fix
+  with an executable hunk (review-worthy as a whole), and a rename that moves executable code
+  between mechanism files (review-worthy); the history replay reports zero missed findings; and
+  the guard's own change carries the cross-model review it demands of everything else.
+  Criticality: high — this loosens a safety gate that exists because the pre-push gate once
+  went live unreviewed. The saving is real but bounded and must not be overstated: cross-vendor
+  review rounds measured 0.5 % of the tokens in the ten-point cost ledger, so the gain is fewer
+  Sol rounds and shorter wall clock per point, NOT a large token saving, and it does not touch
+  the Fable pool at all (Fable ran 0 reviews this week; its volume is authoring).
   Bundle: Modell & Wächter.
 - [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
   set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
