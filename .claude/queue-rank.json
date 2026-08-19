@@ -140,6 +140,10 @@
       "at": "2026-08-19T09:26:29.525Z",
       "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf."
     },
+    "730": {
+      "at": "2026-08-19T10:37:26.991Z",
+      "why": "Der Nutzer hat 730 ausdrücklich vorgezogen (Tafel-Chat 19.08.2026, 12:36: »Ziehe 730 vor.«) — die Schätzungen sind das, wonach er die Tafel liest, und 713 läuft bereits auf seinem Zweig."
+    },
     "731": {
       "at": "2026-08-19T10:19:49.258Z",
       "why": "Low-criticality one-line inconsistency; it costs a hand-rewrite per boundary and nothing is lost, so it waits behind the queue's settled order."
