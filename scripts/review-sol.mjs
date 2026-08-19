@@ -77,6 +77,7 @@ import {
 } from './review-sol-core.mjs'
 import {
   assembleMaterial,
+  formatCoveragePlan,
   formatPassManifest,
   formatShortfall,
   gitlinkPathsFromRawDiff,
@@ -405,6 +406,7 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   for (const group of plan.unreviewable ?? []) {
     lines.push(`  CANNOT ASSIGN: ${group.files.map(quotePassFile).join(', ')} — every candidate authored this group`)
   }
+  lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
 }
 

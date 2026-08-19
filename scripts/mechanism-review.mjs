@@ -341,6 +341,12 @@ export function buildRecord({
       // clears it only once every pass of the same total is on record, so this
       // field is what turns several partial verdicts into one coverage.
       ...(passField ? { pass: passField } : {}),
+      // MACHINE-READABLE SCOPE BESIDE THE VERDICT (point 684). A pass is a
+      // partial review of the range even when its own material fitted perfectly;
+      // storing the mark prevents a later ledger reader from mistaking that
+      // verdict for the whole branch. The gate still composes the pass metadata
+      // itself — this label explains scope, it never grants coverage.
+      ...(passField ? { partialReview: true } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -471,6 +477,7 @@ export function buildCarriedRecord({
       evidence: copiedEvidence,
       mode: String(src.mode).trim(),
       pass: passCheck.pass,
+      partialReview: true,
       carried: { from: source.sha },
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
@@ -701,7 +708,7 @@ if (isMainModule(import.meta.url)) {
           Array.isArray(p?.files)
         const commits = Array.isArray(p?.commits) ? p.commits.map((sha) => oneLine(sha)).join(', ') : ''
         return shaped
-          ? `\n      pass ${index}/${total} over: ${files}${commits ? `\n      contribution commits: ${commits}` : ''}`
+          ? `\n      PARTIAL REVIEW — pass ${index}/${total} over: ${files}${commits ? `\n      contribution commits: ${commits}` : ''}`
           : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total, files: Array.isArray(p?.files) ? undefined : p?.files })).slice(0, 100)}) over: ${files}`
       }
       for (const r of records) {

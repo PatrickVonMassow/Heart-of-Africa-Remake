@@ -76,28 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 684. A whole-branch cross-review falls into the material limit and judges a cropped
-  PICTURE (measured 13.08.2026 over TWELVE review rounds on point 675). Every whole-branch
-  round hit the ~200k-character material limit of `scripts/review-sol.mjs`, and Sol said so in
-  every verdict ("patch truncated, full file bodies omitted"). Not one round could read the
-  whole branch: the findings are line-local on whatever happened to be visible, while the
-  verdict READS as a judgment on the branch — the confusion point 650 names (coverage is read
-  off the verdict) and retrospective 3.x records ("the measurement saw less than it claimed").
-  FINAL STATE: `review-sol.mjs` does not crop oversized material silently. It SPLITS the
-  material into covering blocks, reviews each, and REPORTS the coverage beside the verdict —
-  which files were read whole, which were split, and that nothing was dropped. A verdict
-  reached over incomplete material is marked a PARTIAL REVIEW and, on its own, cannot satisfy
-  a review CLAUDE.md §7.2 demands; the recorded ledger entry carries that mark, so a later
-  reader cannot mistake it for a full one.
-  VERIFIABLE: Vitest over the split (every file appears exactly once, coverage reported as
-  100 %, an oversized SINGLE file is reported as such rather than silently truncated, and a
-  material under the limit takes the unchanged single-block path); plus one real run against a
-  branch over the limit whose verdict names its coverage.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the review path every mechanism
-  review runs through.
-  Criticality: high — it decides what our four-eyes principle actually covers, and it has been
-  overstating that coverage on every large branch.
-
 - [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
   in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
   leer. Soll das so sein?«; and at 20:07: »Lege einen neuen Punkt an, um das Problem mit dem
@@ -8588,3 +8566,34 @@ to land than a mechanism that needs a review.
   the debris subset. No guard deletes a branch in any case.
   Criticality: medium — it wastes the pool cap and hides real parallelism, but it destroys nothing.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 725. The goat's release frame may still teleport the foot, and the test measures around it
+  (GPT-5.6 Sol, 19.08.2026, in a review round spent as point 684's demanded real over-limit run —
+  so this is a REVIEW VERDICT on landed code, not a play-session observation, and it is UNVERIFIED:
+  nobody has reproduced it). The verdict on commit 9c9425a, the goat foot-planting work of point
+  697, reads: `src/render/fauna.ts` clears `contact` on release but returns only a clamped release
+  pose, so on the next still-in-stance frame `previous === null` recaptures the procedural endpoint
+  and reproduces the same ~0.46-leg one-frame jump the change set out to remove — one frame later.
+  It names the test as measuring around it: the case in `src/render/fauna.test.ts` asserts that the
+  fresh pose reaches its new contact but never compares it against the PRECEDING release-frame
+  position, and `stance: pose.contact !== null` keeps that very frame out of `judgeStanceSlip`, so
+  the suite goes green over the jump rather than over its absence. That is the "looks-wrong-but-
+  passes" shape our own rules warn about, which is why it is filed rather than dropped.
+  FINAL STATE:
+  - THE MEASUREMENT DECIDES THE POINT, and it comes first: the foot position is sampled across the
+    release frame and the two frames around it, on a real animation, and the frame-to-frame
+    distance is compared against the same threshold `judgeStanceSlip` uses. The number is recorded
+    in the point's closing note whichever way it falls — a point closed by "no jump was measured"
+    is a legitimate close, and the recorded number is what makes it one.
+  - IF THE JUMP IS REAL, the release frame carries the foot from its held contact to the
+    procedural endpoint over the frames the gait allows, so no single frame moves it further than
+    the walk itself does.
+  - THE MEASUREMENT WINDOW COVERS THE RELEASE FRAME EITHER WAY. Whatever the first step measures,
+    a frame excluded from `judgeStanceSlip` is a frame no invariant watches: the release frame
+    enters the judged set, so a future regression there fails a suite instead of passing one.
+  VERIFIABLE: Vitest over the pure pose logic — a sampled sequence across a release frame whose
+  per-frame displacement stays within the gait's own step, and a synthetic sequence carrying an
+  injected jump on exactly the release frame that FAILS, proving the window now covers it.
+  Criticality: medium — it is one frame of one animal, but a test that measures around the very
+  frame it was written for hides the next regression as reliably as this one.
+  Bundle: Tierverhalten.

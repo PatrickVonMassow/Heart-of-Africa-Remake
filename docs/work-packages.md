@@ -84,7 +84,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Siedlungsgeometrie** | C | Settlement geometry | 299, 349, 352, 380, 415, 428, 581, 583, 604 |
 | **Sonne & Himmel** | D | Sun and sky | 343, 344, 345, 346 |
 | **Monumente** | E | Monument sites | 315, 379, 391 |
-| **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575 |
+| **Tierverhalten** | F | Animal behaviour | 265, 269, 312, 362, 363, 364, 414, 565, 575, 725 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
 | **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
 | **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553, 554, 556, 629, 646, 649 (646 is the doctor-side twin of 629 — the same deletion reached by a different route; 649 holds the holes the fifth review found in 629's own lock protocol; 553 is 373's measured successor lever; 556 is the lease half of the same singleton family) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
