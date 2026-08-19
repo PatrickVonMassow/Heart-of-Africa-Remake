@@ -427,6 +427,177 @@ function nowSectionSlice(html) {
   }
 }
 
+/** Every complete current-work card in section order, with its exact bytes. */
+function projectedNowCards(html) {
+  const section = nowSectionSlice(html).text
+  return [...section.matchAll(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g)].map((match) => {
+    const summary = (match[0].match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    const { chip, legacy } = summaryPoint(summary)
+    const rawPoint = chip ?? legacy
+    return { point: rawPoint == null ? null : Number(rawPoint), html: match[0], at: match.index }
+  })
+}
+
+const pointsInSection = (html, key) => {
+  try {
+    const { from, end } = sectionBounds(html, key)
+    const section = String(html).slice(from, end)
+    return [...section.matchAll(/class="(?:num|t)">\s*(\d+)/g)].map((m) => Number(m[1]))
+  } catch {
+    return []
+  }
+}
+
+/** The parser-distinct honest zero state — deliberately not a `.now` card. */
+export const NOW_EMPTY_STATE_TEXT = 'Gerade ist kein Punkt nachweisbar in Arbeit.'
+export const NOW_EMPTY_STATE_MARKUP =
+  `<p class="now-empty" data-state="idle">${NOW_EMPTY_STATE_TEXT}</p>`
+
+const emptyStatePattern = () => /<p class="now-empty" data-state="idle">[\s\S]*?<\/p>\s*/g
+
+/**
+ * Compare the rendered numbered membership with the normalized active record.
+ * This is shared by the fail-open Stop hook and fail-closed publish preflight.
+ */
+export function compareNowProjection(html, expectedPoints, { knownPoints = null } = {}) {
+  try {
+    const expected = Array.isArray(expectedPoints) ? expectedPoints.map(Number) : []
+    if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
+      return { ok: false, error: 'the expected active-point set is malformed', missing: [], extra: [], duplicates: [] }
+    }
+    const cards = projectedNowCards(html)
+    const actual = cards.filter((card) => card.point != null).map((card) => card.point)
+    const counts = new Map()
+    for (const point of actual) counts.set(point, (counts.get(point) ?? 0) + 1)
+    const expectedSet = new Set(expected)
+    const actualSet = new Set(actual)
+    const missing = expected.filter((point) => !actualSet.has(point))
+    const extra = [...actualSet].filter((point) => !expectedSet.has(point)).sort((a, b) => a - b)
+    const duplicates = [...counts].filter(([, count]) => count > 1).map(([point]) => point).sort((a, b) => a - b)
+    const known = knownPoints instanceof Set ? knownPoints : null
+    const unknown = known ? [...actualSet].filter((point) => !known.has(point)).sort((a, b) => a - b) : []
+    const elsewhere = new Map()
+    for (const [key, label] of [['vdzk', 'Von dir zu klären'], ['queue', 'Warteschlange'], ['done', 'Erledigt']]) {
+      for (const point of pointsInSection(html, key)) {
+        if (!expectedSet.has(point)) continue
+        if (!elsewhere.has(point)) elsewhere.set(point, [])
+        if (!elsewhere.get(point).includes(label)) elsewhere.get(point).push(label)
+      }
+    }
+    const crossSection = [...elsewhere].map(([point, sections]) => ({ point, sections }))
+    const emptyStateCount = (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length
+    const unnumberedCards = cards.filter((card) => card.point == null).length
+    const emptyStateWrong = expected.length === 0
+      ? emptyStateCount !== 1 || unnumberedCards > 0
+      : emptyStateCount > 0
+    return {
+      ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length && !emptyStateWrong,
+      missing,
+      extra,
+      duplicates,
+      unknown,
+      crossSection,
+      emptyStateCount,
+      unnumberedCards,
+    }
+  } catch (error) {
+    return { ok: false, error: error?.message ?? String(error), missing: [], extra: [], duplicates: [] }
+  }
+}
+
+/** A visible placeholder; its copy is explicitly not mistaken for authored prose. */
+export function renderNowStub(point, { stamp = berlinStamp() } = {}) {
+  return (
+    `<details class="now" data-state="stub">\n  <summary>${numberChip(point)}` +
+    `<span class="t">Text für diesen Punkt fehlt noch</span>` +
+    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardBody('Diese Karte braucht noch ihren handgeschriebenen Text.', { stamp })}\n` +
+    '  </div>\n</details>\n'
+  )
+}
+
+/** Remove queue copies for points whose membership is now derived as active. */
+function stripProjectedQueueCards(html, points) {
+  const wanted = new Set(points)
+  if (!wanted.size) return String(html ?? '')
+  try {
+    const source = String(html ?? '')
+    const { from, end } = sectionBounds(source, 'queue')
+    const section = source.slice(from, end).replace(/<details>\s*<summary>[\s\S]*?<\/details>\s*/g, (card) => {
+      const point = Number((card.match(/class="num">\s*(\d+)/) ?? [])[1])
+      return wanted.has(point) ? '' : card
+    })
+    return source.slice(0, from) + section + source.slice(end)
+  } catch {
+    return String(html ?? '')
+  }
+}
+
+/**
+ * Project the numbered now-card set while retaining every surviving card byte
+ * for byte. `transformExisting` exists only to make the loss-prevention
+ * invariant directly testable; production uses the identity transform.
+ */
+export function reconcileNowProjection(
+  html,
+  expectedPoints,
+  { focusPoint = null, stamp = berlinStamp(), transformExisting = (card) => card } = {},
+) {
+  const source = String(html ?? '')
+  const expected = Array.isArray(expectedPoints) ? expectedPoints.map(Number) : []
+  if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
+    throw new Error('board: active-point projection is malformed')
+  }
+  const cards = projectedNowCards(source)
+  const numbered = cards.filter((card) => card.point != null)
+  const counts = new Map()
+  for (const card of numbered) counts.set(card.point, (counts.get(card.point) ?? 0) + 1)
+  const conflicts = [...counts].filter(([, count]) => count > 1).map(([point]) => point)
+  if (conflicts.length) throw new Error(`board: conflicting current-work copies for point(s) ${conflicts.join(', ')}`)
+  if (expected.length === 0 && cards.some((card) => card.point == null)) {
+    throw new Error('board: refusing to replace an authored unnumbered handover card with the empty-state element')
+  }
+
+  const byPoint = new Map(numbered.map((card) => [card.point, card.html]))
+  const kept = []
+  for (const point of expected) {
+    const original = byPoint.get(point)
+    if (!original) continue
+    const transformed = String(transformExisting(original, point) ?? '')
+    if (transformed !== original) {
+      throw new Error(`board: reconciliation would rewrite or blank authored prose for point ${point}`)
+    }
+    kept.push({ point, html: original })
+  }
+
+  // Focus is the only permitted reorder of surviving cards; every other
+  // survivor keeps its previous relative order, independent of insertion time.
+  const previous = numbered.map((card) => card.point).filter((point) => new Set(expected).has(point))
+  const survivorOrder = Number.isInteger(Number(focusPoint)) && previous.includes(Number(focusPoint))
+    ? [Number(focusPoint), ...previous.filter((point) => point !== Number(focusPoint))]
+    : previous
+  const survivorMap = new Map(kept.map((card) => [card.point, card.html]))
+  const newPoints = expected.filter((point) => !survivorMap.has(point))
+  const ordered = [
+    ...survivorOrder.map((point) => ({ point, html: survivorMap.get(point) })),
+    ...newPoints.map((point) => ({ point, html: renderNowStub(point, { stamp }) })),
+  ]
+
+  const now = nowSectionSlice(source)
+  let remainder = now.text
+    .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
+      const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+      const { chip, legacy } = summaryPoint(summary)
+      return chip != null || legacy != null ? '' : card
+    })
+    .replace(emptyStatePattern(), '')
+    .trim()
+  if (expected.length === 0) remainder = NOW_EMPTY_STATE_MARKUP
+  else remainder = `${ordered.map((card) => card.html).join('')}${remainder ? `\n${remainder}` : ''}`.trimEnd()
+  const projected = source.slice(0, now.from) + `\n${remainder}\n` + source.slice(now.end).replace(/^\n/, '')
+  return stripProjectedQueueCards(projected, expected)
+}
+
 /** "~2,5 h · Feature" → 2.5; anything without an hour figure → null. */
 export function estimateHours(meta) {
   const m = String(meta ?? '').match(/~\s*(\d+(?:[.,]\d+)?)\s*h/)
@@ -960,7 +1131,9 @@ export function closingWorkCards(html) {
  */
 export function stripNoCurrentWork(html) {
   return withinNowSection(html, (scope) =>
-    scope.replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card)),
+    scope
+      .replace(noWorkCardPattern(), (card) => (isTrulyStateCard(card, 'idle') ? '' : card))
+      .replace(emptyStatePattern(), ''),
   )
 }
 
@@ -1041,7 +1214,7 @@ function standingPointCards(html) {
  * predicate can quietly take the other card with it.
  */
 export function claimsNoCurrentWork(html) {
-  return sectionStateCards(html, 'idle').length > 0
+  return sectionStateCards(html, 'idle').length > 0 || (nowSectionSlice(html).text.match(emptyStatePattern()) ?? []).length > 0
 }
 
 /** Does the current-work section say that only closing duties are left? */

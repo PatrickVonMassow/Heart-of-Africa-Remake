@@ -1269,7 +1269,8 @@ export function normalizeActiveWork({
       }
     }
 
-    if (focusPoint != null) add(focusPoint, 'the owner focus')
+    const declaredFocus = focusPoint ?? declaration?.focusPoint ?? null
+    if (declaredFocus != null) add(declaredFocus, 'the owner focus')
     if (declaration != null) {
       if (!declaration || typeof declaration !== 'object' || !Array.isArray(declaration.evidence)) {
         errors.push('the active-work declaration is malformed')
@@ -1290,7 +1291,7 @@ export function normalizeActiveWork({
       }
     }
 
-    return { ok: errors.length === 0, points: errors.length ? [] : ordered, focusPoint: Number(focusPoint) || null, errors }
+    return { ok: errors.length === 0, points: errors.length ? [] : ordered, focusPoint: Number(declaredFocus) || null, errors }
   } catch (error) {
     return { ok: false, points: [], focusPoint: null, errors: [`active-work normalization failed: ${error?.message ?? error}`] }
   }

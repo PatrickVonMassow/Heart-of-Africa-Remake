@@ -1262,7 +1262,8 @@ if (isMain) {
     const evidence = []
     let slotsFreeReason = ''
     const focus = readJson(FOCUS_PATH)
-    let currentPoint = Number.isInteger(focus?.point) && focus.point > 0 ? focus.point : null
+    const ownerFocusPoint = Number.isInteger(focus?.point) && focus.point > 0 ? focus.point : null
+    let currentPoint = ownerFocusPoint
     for (let i = 2; i < argv.length; i += 2) {
       const flag = argv[i]
       const value = argv[i + 1]
@@ -1371,6 +1372,7 @@ if (isMain) {
       pidStartedAt: typeof lock.pidStartedAt === 'number' ? lock.pidStartedAt : null,
       at: now,
       waitingOn,
+      focusPoint: ownerFocusPoint,
       evidence,
       // Empty string when not given, so the decision sees "no reason" rather than
       // an absent field it has to interpret (point 427).

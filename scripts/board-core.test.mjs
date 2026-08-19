@@ -63,6 +63,10 @@ import {
   mergeDoneDuplicates,
   toNow,
   toQueue,
+  compareNowProjection,
+  reconcileNowProjection,
+  NOW_EMPTY_STATE_MARKUP,
+  NOW_EMPTY_STATE_TEXT,
 } from './board-core.mjs'
 
 const board = (point = 361) =>
@@ -166,6 +170,86 @@ const nowEntry = (n, title, times, status = 'läuft') =>
 const vdzkEntry = (title) =>
   `<details>\n  <summary><span class="t">${title}</span></summary>\n` +
   `  <div class="body">\n    <p>Die Frage.</p>\n  </div>\n</details>\n`
+
+describe('derived now-section membership', () => {
+  const handover =
+    '<details class="now" data-state="handover">\n  <summary><span class="t">Sitzungsübergabe</span></summary>\n' +
+    '  <div class="body"><p>Die Arbeit wird übergeben.</p></div>\n</details>\n'
+
+  it('reports the measured partial and empty boards with the missing point numbers', () => {
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'Kontext', '20:07') }), [700, 697, 711]))
+      .toMatchObject({ ok: false, missing: [697, 711], extra: [] })
+    expect(compareNowProjection(fullBoard(), [700, 697, 711]))
+      .toMatchObject({ ok: false, missing: [700, 697, 711] })
+  })
+
+  it('reports stale and duplicate numbered cards even when set equality would hide them', () => {
+    const duplicate = fullBoard({ now: nowEntry(700, 'A', '20:07') + nowEntry(700, 'B', '20:08') })
+    expect(compareNowProjection(duplicate, [700])).toMatchObject({ ok: false, duplicates: [700] })
+    const stale = fullBoard({ now: nowEntry(700, 'A', '20:07') + nowEntry(699, 'Alt', '19:00') })
+    expect(compareNowProjection(stale, [700])).toMatchObject({ ok: false, extra: [699] })
+  })
+
+  it('allows an unnumbered handover beside numbered work but never instead of it', () => {
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + handover }), [700]).ok).toBe(true)
+    expect(compareNowProjection(fullBoard({ now: handover }), [700])).toMatchObject({ ok: false, missing: [700] })
+  })
+
+  it('accepts verified zero only through the parser-distinct non-card state', () => {
+    const idle = fullBoard({ now: NOW_EMPTY_STATE_MARKUP })
+    expect(compareNowProjection(idle, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    expect(claimsNoCurrentWork(idle)).toBe(true)
+    expect(idle).toContain(NOW_EMPTY_STATE_TEXT)
+    expect(compareNowProjection(fullBoard(), []).ok).toBe(false)
+    expect(compareNowProjection(fullBoard({ now: handover }), []).ok).toBe(false)
+  })
+
+  it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {
+    const authored = nowEntry(700, 'Die Übergabe', '20:07', 'Umlaute, <a href="/x">Link</a> und Text.')
+    const before = fullBoard({
+      now: authored + nowEntry(699, 'Alt', '19:00'),
+      queue: queueEntry(697, 'Wartend', '~2 h') + queueEntry(711, 'Wartend', '~1 h'),
+    })
+    const out = reconcileNowProjection(before, [700, 697, 711], { focusPoint: 700, stamp: '20:10' })
+    expect(out).toContain(authored)
+    expect(out).not.toContain('699 — Alt')
+    expect(out.match(/Text für diesen Punkt fehlt noch/g)).toHaveLength(2)
+    expect(parseQueuePoints(out)).toEqual(new Set())
+    expect(compareNowProjection(out, [700, 697, 711]).ok).toBe(true)
+  })
+
+  it('refuses any reconciliation path that would rewrite or blank authored prose', () => {
+    const before = fullBoard({ now: nowEntry(700, 'Text', '20:07', 'Bleibt erhalten.') })
+    expect(() => reconcileNowProjection(before, [700], {
+      transformExisting: (card) => card.replace('Bleibt erhalten.', ''),
+    })).toThrow(/rewrite or blank authored prose.*700/)
+  })
+
+  it('puts focus first, keeps other survivors stable and is byte-idempotent', () => {
+    const before = fullBoard({
+      now: nowEntry(700, 'A', '20:07') + nowEntry(697, 'B', '20:08'),
+      queue: queueEntry(711, 'C', '~1 h'),
+    })
+    const once = reconcileNowProjection(before, [700, 697, 711], { focusPoint: 697, stamp: '20:10' })
+    expect([...parseNowCardPoints(once)]).toEqual([697, 700, 711])
+    expect(reconcileNowProjection(once, [700, 697, 711], { focusPoint: 697, stamp: '20:10' })).toBe(once)
+  })
+
+  it('renders verified zero by removing stale numbered cards', () => {
+    const out = reconcileNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') }), [])
+    expect(out).not.toContain('700 — A')
+    expect(out).toContain(NOW_EMPTY_STATE_MARKUP)
+    expect(compareNowProjection(out, []).ok).toBe(true)
+  })
+
+  it('reports an active point duplicated into another section', () => {
+    const doubled = fullBoard({ now: nowEntry(700, 'A', '20:07'), done: queueEntry(700, 'A', '20:09') })
+    expect(compareNowProjection(doubled, [700])).toMatchObject({
+      ok: false,
+      crossSection: [{ point: 700, sections: ['Erledigt'] }],
+    })
+  })
+})
 
 // Point 410: the shell is what broke the umlauts, so the text must be able to
 // skip it. These cases pin the seam between the argv and the stdin path.
