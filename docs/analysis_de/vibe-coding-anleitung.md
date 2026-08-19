@@ -169,16 +169,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
-  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte. Ein
-  Fehlalarm meldet sich, ein ausgefallener nie.
+  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
   echte Treffer noch da. Die Fälle erfindet das **andere Modell**, an der Mechanik gemessen statt
   an Testnamen." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; oder die Verbesserung ist fertig, nur führt nichts jemanden dorthin.
-  → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest,
-  eine Fähigkeit dort, wo jemand nach ihr greift. Und wenn etwas ‚wartet': **worauf genau**?"
+  die das Werkzeug liest; zur fertigen Verbesserung führt nichts; oder der Schutz wirkt — nur
+  fragt ihn ein zweiter Weg nie.
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, eine
+  Fähigkeit, wo jemand greift, eine Zutrittsbedingung **dort, wo zugetreten wird**. Der Test heißt
+  ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -201,13 +202,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Die Regel greift — an einem von zwei Eingängen.** Der Schutz ist gebaut, geprüft und
-  beweisbar wirksam; ein später hinzugekommener zweiter Weg fragt ihn schlicht nicht. Wer
-  prüft, ob die Regel wirkt, findet sie wirken.
-  → *Prompt:* „Setz eine Zutrittsbedingung **dort durch, wo zugetreten wird**, nicht bei jedem
-  Aufrufer. Und der Test dazu heißt nicht ‚greift sie?', sondern ‚**gibt es einen Weg an ihr
-  vorbei?**' — er muss fehlschlagen, sobald ein Pfad sie überspringt."
-
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
   oder er ist nur dort grün, wo er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
@@ -219,8 +213,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   miss auf einer ruhigen Maschine."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert; eine Warnung in einer **geglückten** Aktion ist unsichtbar — und ein
-  Tor, das den Push zu Recht verweigert, meldet nichts — es wächst nur ein Stapel.
+  trotzdem nicht passiert; eine Warnung in einer **geglückten** Aktion ist unsichtbar, und ein
+  Tor, das den Push zu Recht verweigert, lässt nur einen Stapel wachsen.
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der
   Erfolgsmeldung, und melde beim Start, was **lokal fertig, aber nirgends angekommen** ist."
 
@@ -231,8 +225,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den
   Satz**." *(einmalig hoch)*
 
-- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht
-  gefährlicher als ein Grün.
+- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet —
   nie eine Uhr. Schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
