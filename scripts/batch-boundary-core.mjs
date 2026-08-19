@@ -750,10 +750,14 @@ const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
  * A SEPARATOR ENDS THE MERGE AS SURELY AS A SPACE (Claude review of a6bcd9a5):
  * `--clear 2>&1|tail -3` is the same harmless decoration as the spaced form, and
  * demanding the space would leave the very shape this point exists to unblock
- * denied for a typing habit.
+ * denied for a typing habit. A LONE TRAILING `&` IS NOT SUCH A SEPARATOR (Sol
+ * re-review of c5a97818): stripping the merge in `--clear 2>&1&` would leave
+ * `--clear &`, whose empty trailing segment disappears in the split, and the call
+ * would pass as closing work while actually running detached. Only `&&`, which
+ * sequences, qualifies.
  */
 export function withoutOutputDescriptorMerges(command) {
-  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|&]|$)/g, '$1')
+  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|]|&&|$)/g, '$1')
 }
 
 /**

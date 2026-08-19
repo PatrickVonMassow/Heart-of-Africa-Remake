@@ -391,8 +391,18 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     expect(withoutOutputDescriptorMerges('x 2>&1|y')).toBe('x |y')
     expect(withoutOutputDescriptorMerges('x 2>&1;y')).toBe('x ;y')
     expect(withoutOutputDescriptorMerges('x 2>&1&& y')).toBe('x && y')
+    // A LONE trailing & backgrounds the call — it is not output handling and the
+    // merge stays in place, so the segment reads as the redirection it is.
+    expect(withoutOutputDescriptorMerges('x 2>&1&')).toBe('x 2>&1&')
     // A digit that keeps running is not a file descriptor merge we understand.
     expect(withoutOutputDescriptorMerges('x 2>&1a')).toBe('x 2>&1a')
+  })
+
+  it('a merge followed by a lone & stays the redirection it is', () => {
+    // MEASURED 19.08.2026: a BARE trailing `&` already passes on main, which is a
+    // separate pre-existing hole and a finding of its own. What must not happen is
+    // this point widening it, so the decorated form is pinned here.
+    expect(call({ command: 'node scripts/batch-boundary.mjs --clear 2>&1&' }).survives).toBe(false)
   })
 
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
