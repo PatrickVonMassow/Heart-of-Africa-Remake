@@ -18,7 +18,9 @@ import {
   driftedCards,
   evaluate,
   duplicateDonePoints,
+  nowProjectionStopDecision,
 } from './dashboard-integrity-guard-core.mjs'
+import { NOW_EMPTY_STATE_MARKUP } from './board-core.mjs'
 
 /** Minimal dashboard in the real board's markup (mirrors the queue-order tests).
  *  `nowTitles` renders SEVERAL now-cards (parallel feature-branch work) and
@@ -68,6 +70,74 @@ const SPECS = tasksMd([
   { n: 223, spec: 'Weather x terrain audit across src/systems/season.ts.' },
   { n: 209, open: false, spec: 'Closed point.' },
 ])
+
+describe('nowProjectionStopDecision — exact declared active set', () => {
+  const active = { ok: true, points: [700, 697, 711], focusPoint: 700 }
+  const knownPoints = new Set([697, 700, 711, 712])
+
+  it('names 697 and 711 on the measured board that showed only 700', () => {
+    const result = nowProjectionStopDecision({
+      dashboardHtml: boardHtml({ nowTitles: ['700 — Kontext'] }),
+      activeWork: active,
+      knownPoints,
+    })
+    expect(result).toMatchObject({ block: true, comparison: { missing: [697, 711] } })
+    expect(result.reason).toMatch(/missing 697, 711/)
+  })
+
+  it('blocks an empty section with all three named and allows exact equality', () => {
+    expect(nowProjectionStopDecision({
+      dashboardHtml: boardHtml({ nowTitles: [] }),
+      activeWork: active,
+      knownPoints,
+    })).toMatchObject({ block: true, comparison: { missing: [700, 697, 711] } })
+    expect(nowProjectionStopDecision({
+      dashboardHtml: boardHtml({ nowTitles: ['700 — A', '697 — B', '711 — C'] }),
+      activeWork: active,
+      knownPoints,
+    }).block).toBe(false)
+  })
+
+  it('reports extra and duplicate cards instead of hiding them behind set equality', () => {
+    expect(nowProjectionStopDecision({
+      dashboardHtml: boardHtml({ nowTitles: ['700 — A', '697 — B', '711 — C', '712 — Alt'] }),
+      activeWork: active,
+      knownPoints,
+    })).toMatchObject({ block: true, comparison: { extra: [712] } })
+    expect(nowProjectionStopDecision({
+      dashboardHtml: boardHtml({ nowTitles: ['700 — A', '700 — A2', '697 — B', '711 — C'] }),
+      activeWork: active,
+      knownPoints,
+    })).toMatchObject({ block: true, comparison: { duplicates: [700] } })
+  })
+
+  it('accepts verified zero only with the dedicated non-card state', () => {
+    const zero = { ok: true, points: [], focusPoint: null }
+    expect(nowProjectionStopDecision({
+      dashboardHtml: boardHtml({ nowTitles: [] }).replace('<h2>Von dir zu klären</h2>', `${NOW_EMPTY_STATE_MARKUP}\n<h2>Von dir zu klären</h2>`),
+      activeWork: zero,
+      knownPoints,
+    }).block).toBe(false)
+    expect(nowProjectionStopDecision({ dashboardHtml: boardHtml({ nowTitles: [] }), activeWork: zero }).block).toBe(true)
+  })
+
+  it('fails open for source errors, another owner and a paused batch', () => {
+    const mismatch = { dashboardHtml: boardHtml({ nowTitles: [] }), activeWork: active, knownPoints }
+    expect(nowProjectionStopDecision({ ...mismatch, activeWork: { ok: false, points: [] } }).block).toBe(false)
+    expect(nowProjectionStopDecision({ ...mismatch, heldByOther: true }).block).toBe(false)
+    expect(nowProjectionStopDecision({ ...mismatch, paused: true }).block).toBe(false)
+  })
+
+  it('does not let the old no-board escape suppress a known nonempty declaration', () => {
+    const result = evaluate({
+      dashboardHtml: '<p>no sections</p>',
+      tasksMd: tasksMd([{ n: 697 }, { n: 700 }, { n: 711 }]),
+      activeWork: active,
+    })
+    expect(result.block).toBe(true)
+    expect(result.reason).toMatch(/NOW-SECTION DOES NOT MATCH.*missing 700, 697, 711/)
+  })
+})
 
 describe('constants', () => {
   it('pin the calibratable thresholds', () => {

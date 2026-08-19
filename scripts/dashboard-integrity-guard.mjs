@@ -23,6 +23,7 @@ import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { gatherActiveWorkSource } from './active-work-source.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const DASHBOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -82,11 +83,13 @@ export function gatherDashboardIntegrityInputs({ sessionId = '' } = {}) {
     ? git(`log -n ${RECENT_COMMIT_COUNT} --format=%s ${reviewedHead}..HEAD`).split('\n').filter(Boolean)
     : []
 
+  const tasksMd = readTasksAll(TASKS)
   return {
     applicable: true,
     inputs: {
       dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
-      tasksMd: readTasksAll(TASKS),
+      tasksMd,
+      activeWork: gatherActiveWorkSource({ tasksText: tasksMd }),
       focusPoint: focus && Number.isInteger(focus.point) ? focus.point : null,
       commitSubjects,
       touchedFiles: touchedFiles(),
