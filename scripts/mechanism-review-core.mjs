@@ -25,7 +25,7 @@ import { modelNamesIn } from './model-guard-core.mjs'
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
 import { parsePassFiles, parsePassSpec, passComposition, worstVerdict } from './review-material-core.mjs'
-import { scopeMandatoryDuty } from './guard-duty-core.mjs'
+import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])

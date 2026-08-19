@@ -19,7 +19,7 @@
 // point. The two are never conflated — see runVerdict.
 
 import { RED_CHARGES } from './render-verify-charges.mjs'
-import { scopeMandatoryDuty } from './guard-duty-core.mjs'
+import { scopeMandatoryDuty } from './mandatory-duty-core.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
 export const BACKENDS = ['webgpu', 'webgl']
