@@ -11,11 +11,17 @@
 // file read lives in `queue-calibration.mjs`, so each rule below is testable
 // against a recorded fixture instead of against a repository.
 //
-// TWO NUMBERS, NEVER ONE. A point's ELAPSED time (its branch's first commit to
-// its merge) and the queue's CADENCE (landing to landing) answer different
+// TWO NUMBERS, NEVER ONE. A point's ELAPSED time (its first commit to its
+// LANDING) and the queue's CADENCE (landing to landing) answer different
 // questions, and the pool runs three points at once, so the cadence is the
 // smaller of the two whenever it does. Averaging them would produce a figure
 // that is true of neither. They are computed apart and reported apart.
+//
+// THE SPAN ENDS AT THE LANDING, NOT AT THE MERGE. The estimate this measures is
+// defined as the time by which the work is VISIBLY DONE — merged, gated, ticked,
+// board updated. A span that stopped at the merge left the gate, the picture
+// check and the board update outside the very duration the promise is calibrated
+// against, and every one of those happens after it.
 //
 // A DISTRIBUTION, NEVER A MEAN. The elapsed times are heavy-tailed — a branch cut
 // early and merged days later sits in the same sample as one built and landed in
@@ -172,6 +178,18 @@ export function mergedBranchPoint(subject) {
 export const MERGE_LOOKBACK = 3
 
 /**
+ * …and how long before the tick it may sit, in hours.
+ *
+ * MEASURED, not guessed: over the 73 landings whose merge NAMES its branch, the
+ * gap from merge to tick runs 0.03 h (median) to 1.55 h (max), p99 0.34 h —
+ * `land-point.mjs` merges, gates and ticks in one command. Three hours is twice
+ * the widest one ever recorded, so it excludes nothing real while it cuts the
+ * case this bound exists for: a main-session tick that happens to follow
+ * somebody else's merge from hours or days earlier.
+ */
+export const MERGE_MAX_LAG_HOURS = 3
+
+/**
  * `main`'s first-parent chain out of `git log --pretty=%H %ct %p<TAB>%s`,
  * newest first — sha, time, parent count and subject, nothing else.
  */
@@ -198,35 +216,66 @@ export function parseFirstParentChain(log) {
  *
  * The second attribution uses the landing SEQUENCE `land-point.mjs` enforces:
  * merge, gate, then the tick commit. So the merge within `MERGE_LOOKBACK`
- * first-parent commits BEFORE a tick is that point's merge. That is a heuristic,
- * and it was CHECKED against the merges that name themselves: it agrees on 70 of
- * 73 (96 %). A merge is claimed by ONE point only, so a second tick behind the
- * same merge is left unmeasured rather than counted twice.
+ * first-parent commits AND `MERGE_MAX_LAG_HOURS` before a tick is that point's
+ * merge. It is a heuristic, so it is fenced on three sides, because a point done
+ * in the MAIN SESSION has no merge at all and must not inherit somebody else's:
+ *
+ *   1. EVERY named merge is claimed FIRST, in a pass of its own. Before, a merge
+ *      was claimed only when its own point's tick came up, so a main-session tick
+ *      that happened to be processed earlier could take it.
+ *   2. A merge whose subject names ANOTHER point's branch is never taken, even
+ *      unclaimed — it says whose it is.
+ *   3. The merge must sit BEFORE the tick and no further back than the measured
+ *      lag bound above. A tick hours or days after the last merge gets none.
+ *
+ * A merge is claimed by ONE point only, so a second tick behind the same merge is
+ * left unmeasured rather than counted twice — without fence 1 that held for the
+ * guessed merges but not for the named ones, and one merge on this repository was
+ * in fact attributed to two points.
+ *
+ * CROSS-VALIDATED by blinding each self-naming merge in turn and asking the rule
+ * to find it: 67 of 73 recovered exactly, 4 left unattributed, 2 wrong. Without
+ * the three fences the same check reads 68 / 2 / 3 — the fences trade one
+ * recovery for one fewer WRONG attribution, which is the trade this measurement
+ * wants: a wrong merge invents a lane and a duration, an abstention only leaves
+ * one point unmeasured.
  */
-export function attributeMerges(chain, ticks, { lookback = MERGE_LOOKBACK } = {}) {
+export function attributeMerges(chain, ticks, { lookback = MERGE_LOOKBACK, maxLagHours = MERGE_MAX_LAG_HOURS } = {}) {
   const rows = Array.isArray(chain) ? chain : []
   const index = new Map(rows.map((c, i) => [c.sha, i]))
   const named = new Map()
+  const owner = new Map()
   for (const c of rows) {
     const point = mergedBranchPoint(c.subject)
-    if (point !== null && !named.has(point)) named.set(point, c)
+    if (point === null) continue
+    owner.set(c.sha, point)
+    if (!named.has(point)) named.set(point, c)
   }
   const claimed = new Set()
   const out = new Map()
   const events = [...(Array.isArray(ticks) ? ticks : [])].sort((a, b) => a.at - b.at)
+  // PASS 1 — every merge that names its own branch, before any guess is made.
   for (const tick of events) {
     const byName = named.get(tick.point)
-    if (byName) {
-      claimed.add(byName.sha)
-      out.set(tick.point, { merge: byName, attribution: 'branch-name' })
-      continue
-    }
+    if (!byName || claimed.has(byName.sha)) continue
+    claimed.add(byName.sha)
+    out.set(tick.point, { merge: byName, attribution: 'branch-name' })
+  }
+  // PASS 2 — the landing sequence, for the ticks that pass 1 left over.
+  const maxLag = Math.max(0, Number(maxLagHours) || 0) * 3600
+  for (const tick of events) {
+    if (out.has(tick.point)) continue
     const start = index.get(tick.sha)
     if (start === undefined) continue
     // The chain is newest-first, so walking towards OLDER means walking forward.
     for (let i = start; i < rows.length && i < start + 1 + lookback; i++) {
       const c = rows[i]
       if (c.parents.length < 2 || claimed.has(c.sha)) continue
+      const belongsTo = owner.get(c.sha)
+      if (belongsTo !== undefined && belongsTo !== tick.point) continue
+      if (!(c.at <= tick.at)) continue
+      // Older still means further away, so nothing behind this one can qualify.
+      if (tick.at - c.at > maxLag) break
       claimed.add(c.sha)
       out.set(tick.point, { merge: c, attribution: 'nearest-merge' })
       break
@@ -251,12 +300,42 @@ export function summarise(values) {
   }
 }
 
-/** Which class a landing falls into on each axis. */
+/**
+ * WHY a landing has, or has not, a measurable span — the difference between
+ * "nobody has measured this yet" and "this can never be measured".
+ *
+ * `no-branch` is STRUCTURAL: a point done in the main session leaves no branch,
+ * so no amount of further landings will ever give its class a span. `unknown` is
+ * incidental — a merge exists but its second parent is gone after a history
+ * rewrite — and more landings WILL fill that class in.
+ */
+export const SPAN_MEASURED = 'branch-to-landing'
+export const SPAN_NO_BRANCH = 'no-branch'
+export const SPAN_UNKNOWN = 'unknown'
+
+/** The bases that no further landing of the same kind can ever turn into a span. */
+const STRUCTURAL_SPAN_BASES = new Set([SPAN_NO_BRANCH])
+
+/** A landing's span basis — inferred for a row that does not carry one. */
+export function spanBasisOf(landing) {
+  const stated = landing?.spanBasis
+  if (stated === SPAN_MEASURED || stated === SPAN_NO_BRANCH || stated === SPAN_UNKNOWN) return stated
+  return asNumber(landing?.elapsedHours) !== null ? SPAN_MEASURED : SPAN_UNKNOWN
+}
+
+/**
+ * Which class a landing falls into on each axis.
+ *
+ * A landing whose merge was never found has no file list either, so whether a
+ * picture check was part of it is UNKNOWN — not "no picture". Saying "no" there
+ * would be the same silent guess the lane axis was making.
+ */
 export function classesOf(landing) {
+  const picture = landing?.picture
   return {
     criticality: landing?.criticality ?? UNTAGGED,
     lane: landing?.delegated ? 'delegated' : 'main-session',
-    picture: landing?.picture ? 'picture' : 'no-picture',
+    picture: picture === null || picture === undefined ? 'picture-unknown' : picture ? 'picture' : 'no-picture',
   }
 }
 
@@ -264,8 +343,12 @@ export function classesOf(landing) {
  * One axis's classes, each with its elapsed and ratio distributions.
  *
  * A landing with no MEASURABLE elapsed time still counts towards the class's
- * size — a main-session point has no branch, so it has no first-commit-to-merge
+ * size — a main-session point has no branch, so it has no first-commit-to-landing
  * span at all, and reporting the class as empty would hide that it exists.
+ *
+ * A class where EVERY member is unmeasurable for a structural reason is marked
+ * `structural`, and that mark is what keeps the decision below honest: such a
+ * class is not thin, it is unknowable, and the two must not be reported alike.
  */
 export function classSummaries(landings, axis) {
   const groups = new Map()
@@ -284,16 +367,29 @@ export function classSummaries(landings, axis) {
       elapsed: summarise(members.map((m) => m.elapsedHours)),
       ratio: summarise(rated.map((m) => m.elapsedHours / m.estimateHours)),
       comparable: rated.length >= MIN_CLASS_SAMPLES,
+      structural: members.length > 0 && members.every((m) => STRUCTURAL_SPAN_BASES.has(spanBasisOf(m))),
     })
   }
   return out.sort((a, b) => b.ratio.n - a.ratio.n || String(a.name).localeCompare(String(b.name)))
 }
 
-/** How far apart an axis's trustworthy classes sit — max factor over min. */
+/**
+ * How far apart an axis's trustworthy classes sit — max factor over min — plus
+ * WHY it could not be measured when it could not.
+ *
+ * `structural` names the classes that can never carry a span; `pending` counts
+ * the ones that merely have too few measured landings so far. An axis with a
+ * null spread means something different in each case, and the decision below
+ * treats them differently.
+ */
 export function axisSpread(summaries) {
-  const factors = summaries.filter((s) => s.comparable).map((s) => s.ratio.median).filter((f) => asNumber(f) && f > 0)
-  if (factors.length < 2) return { classes: factors.length, spread: null }
-  return { classes: factors.length, spread: Math.max(...factors) / Math.min(...factors) }
+  const rows = Array.isArray(summaries) ? summaries : []
+  const factors = rows.filter((s) => s.comparable).map((s) => s.ratio.median).filter((f) => asNumber(f) && f > 0)
+  const structural = rows.filter((s) => s.structural).map((s) => s.name)
+  const pending = rows.filter((s) => !s.comparable && !s.structural && (s.points ?? 0) > 0).length
+  const base = { classes: factors.length, structural, pending }
+  if (factors.length < 2) return { ...base, spread: null }
+  return { ...base, spread: Math.max(...factors) / Math.min(...factors) }
 }
 
 /**
@@ -309,24 +405,46 @@ export function axisSpread(summaries) {
  * comparable class shows nothing either way. Treating silence as agreement is how
  * the first run of this command adopted a global factor while the picture axis —
  * under-sampled, and therefore mute — sat at 7.5× against 0.28×.
+ *
+ * BUT AN AXIS THAT CAN NEVER BE COMPARED IS NOT A VOTE AGAINST. The lane axis is
+ * exactly that: main-session work leaves no branch, so its class carries no span
+ * and never will. Counting it as "too few measured" made the refusal permanent
+ * and the adopt path unreachable — a decision that always says the same thing
+ * decides nothing. Such an axis is reported as NOT DECIDABLE, by name and with
+ * its classes, and is left out of the vote; the residual it leaves is stated
+ * rather than dressed up as evidence. An axis whose classes are merely THIN still
+ * refuses, because more landings would settle it.
  */
 export function globalFactorDecision(byAxis, { tolerance = GLOBAL_FACTOR_TOLERANCE } = {}) {
   const spreads = AXES.map((axis) => ({ axis, ...axisSpread(byAxis[axis] ?? []) }))
-  const offenders = spreads.filter((s) => asNumber(s.spread) !== null && s.spread > tolerance)
-  const mute = spreads.filter((s) => asNumber(s.spread) === null)
-  if (offenders.length || mute.length) {
+  const compared = spreads.filter((s) => asNumber(s.spread) !== null)
+  const offenders = compared.filter((s) => s.spread > tolerance)
+  const undecidable = spreads.filter((s) => asNumber(s.spread) === null && s.pending === 0 && s.structural.length > 0)
+  const mute = spreads.filter((s) => asNumber(s.spread) === null && !undecidable.includes(s))
+  const residual = undecidable.map((u) => `${u.axis} not decidable — ${u.structural.join(', ')} can carry no measured span`)
+  if (offenders.length || mute.length || !compared.length) {
     const said = [
       ...offenders.map((o) => `${o.axis} classes differ by ${o.spread.toFixed(2)}×`),
       ...mute.map((m) => `${m.axis} has ${m.classes} comparable class(es), too few to compare`),
+      ...(compared.length ? [] : ['no axis was compared at all']),
     ]
     return {
       adopted: false,
       factor: null,
       spreads,
-      reason: `refused — ${said.join('; ')} (tolerance ${tolerance.toFixed(2)}×)`,
+      undecidable: residual,
+      reason: `refused — ${[...said, ...residual].join('; ')} (tolerance ${tolerance.toFixed(2)}×)`,
     }
   }
-  return { adopted: true, factor: null, spreads, reason: `adopted — every axis was compared and stays within ${tolerance.toFixed(2)}×` }
+  return {
+    adopted: true,
+    factor: null,
+    spreads,
+    undecidable: residual,
+    reason:
+      `adopted — ${compared.map((s) => s.axis).join(', ')} compared and within ${tolerance.toFixed(2)}×` +
+      (residual.length ? `; ${residual.join('; ')}` : ''),
+  }
 }
 
 /**
@@ -378,49 +496,134 @@ export function factorForCard(reading, criticality) {
 }
 
 /**
+ * THE BASELINE LEDGER — what each card promised BEFORE any correction touched it.
+ *
+ * Two defects made this necessary, and one fact made it the only possible shape:
+ * `.claude/board-queue.json` is GIT-IGNORED, so there is no commit to read a past
+ * estimate out of. Provenance can only be BUILT FORWARD, by recording what the
+ * file said each time the command looked at it.
+ *
+ *   · A ratio measured against today's mutable card is not the promise that stood
+ *     at the landing. Once a point has landed, its ledger entry is FROZEN — the
+ *     last thing the card said while the point was still open is the promise the
+ *     reader was given, and nothing later can edit it.
+ *   · A correction applied to an already-corrected card multiplies the same
+ *     factor in again. So the target is always BASELINE × factor, never
+ *     CURRENT × factor: re-running the same reading writes the same value, and a
+ *     reading that has moved is recomputed from the baseline instead of stacked
+ *     on top of the last one.
+ *
+ * A card the user rewrites by hand becomes its own new baseline — a number a
+ * human just chose is a fresh promise, not a corrected one.
+ */
+export function ledgerEntry(ledger, point) {
+  const l = ledger && typeof ledger === 'object' ? ledger : {}
+  return l[String(point)] ?? l[Number(point)] ?? null
+}
+
+/**
+ * The ledger after this run looked at the file. Only OPEN points are touched:
+ * a landed point's entry is the promise that stood at its landing and is frozen.
+ */
+export function updateEstimateLedger(ledger, { cards = {}, open = [], now = Math.floor(Date.now() / 1000) } = {}) {
+  const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
+  for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0)) {
+    const current = cards?.[point]?.estimate ?? null
+    if (!current) continue
+    const prev = ledgerEntry(out, point)
+    // Our own last write, or the untouched baseline: the baseline stands.
+    if (prev && (prev.applied?.estimate === current || prev.baseline === current)) continue
+    out[String(point)] = { baseline: current, baselineAt: Math.floor(now) }
+  }
+  return out
+}
+
+/**
+ * The estimate a landing is judged against, and where it came from.
+ *
+ * `snapshot` is the frozen promise; `current` is the live card, used only where
+ * no snapshot exists yet — every landing from before this ledger was introduced.
+ * The difference is REPORTED rather than smoothed over.
+ */
+export function estimateForLanding(ledger, point, currentEstimate) {
+  const entry = ledgerEntry(ledger, point)
+  if (entry?.baseline) return { estimate: entry.baseline, source: 'snapshot' }
+  if (currentEstimate) return { estimate: currentEstimate, source: 'current' }
+  return { estimate: null, source: null }
+}
+
+/**
  * WHAT THE REWRITE WOULD WRITE, per card — pure, so it is reviewable before it runs.
  *
  * A card is only moved when its class HAS a landed comparable and its stored
  * estimate parses. Otherwise it keeps exactly what it had, and the plan carries
  * the reason in words: a guessed correction on a class nobody measured would put
  * back the very thing this point removes.
+ *
+ * IDEMPOTENT BY CONSTRUCTION: the factor is applied to the card's BASELINE, so a
+ * second run of the same reading computes the same target and changes nothing.
  */
-export function rewritePlan(reading, { cards = {}, open = [], criticality = new Map() } = {}) {
+export function rewritePlan(reading, { cards = {}, open = [], criticality = new Map(), ledger = {} } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
   const plan = []
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b)) {
     const from = cards?.[point]?.estimate ?? null
-    const hours = parseEstimateHours(from)
+    const entry = ledgerEntry(ledger, point)
+    const baseline = entry?.baseline ?? from
+    const hours = parseEstimateHours(baseline)
     const { factor, basis, label } = factorForCard(reading, crit.get(point))
     if (!hours) {
-      plan.push({ point, from, to: from, changed: false, reason: 'no stored estimate to correct — the card keeps its "no estimate yet" marker' })
+      plan.push({ point, from, baseline, to: from, changed: false, reason: 'no stored estimate to correct — the card keeps its "no estimate yet" marker' })
       continue
     }
     if (!factor) {
       plan.push({
         point,
         from,
+        baseline,
         to: from,
         changed: false,
         reason: `class "${label}" has no landed comparable (fewer than ${MIN_CLASS_SAMPLES} measured landings) — estimate kept`,
       })
       continue
     }
-    const to = formatEstimate(hours * factor, from)
+    const to = formatEstimate(hours * factor, baseline)
     const changed = to !== from
+    const corrected = baseline !== from
     plan.push({
       point,
       from,
+      baseline,
       to,
       changed,
       factor,
       basis,
       reason: changed
-        ? `${basis} factor ${factor.toFixed(2)}×`
-        : `${basis} factor ${factor.toFixed(2)}× leaves it where it is (half-hour steps, floor ${ESTIMATE_FLOOR_HOURS} h)`,
+        ? `${basis} factor ${factor.toFixed(2)}×` + (corrected ? ` on the uncorrected ${baseline}` : '')
+        : corrected
+          ? `${basis} factor ${factor.toFixed(2)}× — the card already carries this correction of ${baseline}`
+          : `${basis} factor ${factor.toFixed(2)}× leaves it where it is (half-hour steps, floor ${ESTIMATE_FLOOR_HOURS} h)`,
     })
   }
   return plan
+}
+
+/**
+ * The ledger after a rewrite was APPLIED — each corrected card remembers the
+ * baseline it came from and the factor that was used, which is what makes the
+ * next run recognise its own writing instead of correcting it a second time.
+ */
+export function ledgerAfterApply(ledger, plan, { now = Math.floor(Date.now() / 1000) } = {}) {
+  const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
+  for (const p of Array.isArray(plan) ? plan : []) {
+    if (!p || !asNumber(p.factor) || !p.baseline || !p.to) continue
+    out[String(p.point)] = {
+      ...(ledgerEntry(out, p.point) ?? {}),
+      baseline: p.baseline,
+      applied: { estimate: p.to, factor: p.factor, basis: p.basis ?? null, at: Math.floor(now) },
+    }
+  }
+  return out
 }
 
 /**
