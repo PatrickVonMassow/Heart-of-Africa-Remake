@@ -1309,7 +1309,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 18.08.2026, 22:33 · Quellen-Fingerprint: `b7e491ceaf55…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 09:57 · Quellen-Fingerprint: `0f29ac9a6c99…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1342,10 +1342,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, Fable stays the escalation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, Fable stays the escalation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1402,8 +1402,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 58 Prozess-/Meta-TASKS-Punkte (davon 24 offen).
 
-<!-- RETRO-FINGERPRINT: b7e491ceaf552bab2b48162930e381292e6243d334cdea2661dcbd2dfe5fbdc0 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-18T20:33:38.650Z -->
+<!-- RETRO-FINGERPRINT: 0f29ac9a6c99b803a450e2eb3afd29ce4aea322171a766e72975f6e4f1c3df88 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T07:57:29.279Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1684,3 +1684,23 @@ Uhr, die abläuft. Die Reparatur — eine einzige Graph-Abfrage statt der Paarsc
 wurde nicht nur als „schneller" abgenommen, sondern als GLEICHLAUTEND belegt: 9901 Paare
 gegen die alte Antwort geprüft, null Abweichung. Ein Umbau an einem Tor darf sein Urteil
 nicht ändern, und das ist messbar, statt behauptet.
+
+### 3.123 Zwei Mechanismen, die sich über dasselbe Artefakt widersprechen
+
+Beim Abschluss von Punkt 726 druckte die Sitzungsgrenze ihren Übergabetext mit der
+Anweisung, ihn WÖRTLICH zu übernehmen — und hielt ausdrücklich fest, dass er mit Absicht
+keine Punktnummer nennt. Der Tafel-Befehl, der genau diesen Text entgegennimmt, wies ihn
+ab: Eine Übergabekarte ohne genannten Folgepunkt lässt das Veröffentlichungs-Tor nicht
+durch. Wer der gedruckten Anweisung wörtlich folgt, steht also.
+
+Auffällig ist, warum es nicht auffiel. Beide Seiten sind für sich richtig und beide sind
+getestet — nur testet jede ihre eigene Hälfte. Der Widerspruch lebt im Zwischenraum, den
+kein Test besitzt, und er wurde hier nur deshalb nicht zum Blocker, weil ein früherer
+Schritt zufällig schon eine nummernnennende Karte gesetzt hatte. Ein Zufall ist keine
+Absicherung: Ohne ihn hätte die Grenze eine Sitzung am Aufhören gehindert.
+
+**Lehre:** Wo ein Mechanismus den Inhalt eines Artefakts VORGIBT und ein anderer ihn
+PRÜFT, gehören Vorgabe und Prüfung in eine Hand — oder die Vorgabe muss durch die Prüfung
+gelaufen sein, bevor sie gedruckt wird. Ein wörtlich gemeinter Text, den das eigene Tor
+zurückweist, ist ein Defekt, keine Ungenauigkeit. Verwandt mit 3.21: Dort veraltet ein
+Fakt an vier von fünf Stellen; hier sind beide Stellen aktuell und trotzdem unvereinbar.
