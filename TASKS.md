@@ -76,41 +76,75 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 732. No browser suite can run on this host, so every picture check and the closing are
-  blocked (measured 19.08.2026, 13:1x, and independently by the delegated author of point 581
-  before it). MEASURED TWICE, on `main` in the MAIN tree and on a detached `origin/main` checkout
-  in a worktree: `node scripts/verify/run-logged.mjs --suites startup` fails with
-  `page.waitForFunction: Timeout 180000ms exceeded` at startup.mjs:76 — the wait for
-  `window.__renderer` — on BOTH backends, and writes 0 of 1 frames. The browser console shows
-  `Failed to create WebGPU Context Provider` and then the WebGL 2 fallback dying on
-  `canvas.getContext('webgl2') === null`. So it is not one backend degrading to the other: the
-  verify browser gets NO GPU backend at all. It reproduces on unmodified `main`, so it is the HOST
-  or the browser launch, never a product change.
-  WHY THIS IS AHEAD OF THE QUEUE: it is not one red suite, it is the whole verification lane.
-  CLAUDE.md §7.2 makes the picture the judge of every render/GUI change and `render-verify-guard`
-  blocks such a landing without it; the closing cycle (§9) demands a LARGE regression on BOTH
-  backends. While this holds, point 581 cannot be verified, no render point can land, and no
-  version can be tagged. Every hour it stands, render work piles up unverifiable.
+- [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
+  set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
+  12 unexplained red runs, the oldest from 17.08.2026 — `webgpu/enrichments` from 08:25 on, and
+  two `webgpu/settings` runs carrying 10 and 11 unaccounted reds. Those two say verbatim:
+  `115 further result line(s) exceeded the capture cap — this run's reds were NOT all read`.
+  THAT IS THE TRAP. Point 640 gives a red exactly three ways to close: name and fix its CAUSE,
+  CHARGE it to the open point that owns it, or make it an open point. All three require knowing
+  WHAT the red was — and a run that never recorded its reds cannot supply that, by construction.
+  Such a run is therefore unclosable, and because the guard's window is "since the last render
+  edit", it blocks EVERY later change to the render set indefinitely. The only way past it is the
+  hand-written `--defer`, which is precisely the "gate routinely overridden by hand" that the
+  charge ledger (point 550) was built to abolish. It was deferred on 19.08.2026 with that reason
+  named, so point 732 could land; the defer is a logged exception, not a pass.
   FINAL STATE:
-  - THE CAUSE IS NAMED, not worked around. Which layer lost the GPU — the container's device
-    passthrough, the browser binary the launcher picks, its flags, or a driver the image carries —
-    is established by MEASUREMENT, and the finding says which, with the command that shows it.
-  - THE LANE RUNS AGAIN on both backends: `startup` green on WebGPU and on WebGL 2 from the main
-    tree AND from a fresh worktree, since a worktree is where delegated authors verify.
-  - THE OUTAGE CANNOT RECUR SILENTLY. Today it surfaced as a 180 s timeout inside one suite, which
-    reads like a slow machine or a product hang — the two things it is not. A bring-up probe
-    decides BEFORE the suites whether a GPU backend exists at all and says so in one line, so the
-    next occurrence costs one command instead of a delegated round; `scripts/verify-bringup.mjs`
-    is where that belongs if it fits.
-  - AND IT IS DISTINGUISHED FROM A PRODUCT HANG: the probe's verdict names the layer, so a future
-    red says "no backend on this host" or "the app did not come up", never one dressed as the
-    other.
-  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on both backends from the
-  main tree and from a fresh worktree; the bring-up probe reports the backend it found and fails
-  LOUD and FAST (seconds, not the 180 s wait) on a host without one; a Vitest case over the probe's
-  pure verdict for present, absent and degraded.
-  Criticality: HIGH — nothing renders unverifiable for long without something shipping unseen, and
-  this blocks 581, every later render point and the release.
+  - THE CAP CANNOT PRODUCE AN UNCLOSABLE RUN. Either a run that would truncate its result lines
+    FAILS LOUDLY as an incomplete recording rather than half-recording itself, or the cap stops
+    applying to RED lines — they are the few lines whose loss costs everything, and a run's reds
+    are bounded by its checks, not by its chatter. Which of the two is chosen is decided by
+    measurement of how large a real red set actually gets, not by taste.
+  - AN ALREADY-BROKEN RUN HAS A NAMED WAY OUT that is not a silent waiver: a run whose reds are
+    provably unrecorded is closable AS THAT — recorded as an incomplete recording, with the
+    evidence, so it stops blocking without ever being mistaken for a green.
+  - THE GUARD SAYS WHICH IT IS. Today it reports "unexplained red" for a run that has no
+    explanation to give, which sends the reader hunting for a defect that was never captured. An
+    incomplete recording must be named as one, distinct from a red nobody has explained yet.
+  VERIFIABLE: Vitest over the pure decision — a run whose result lines hit the cap is classified
+  as an incomplete recording and not as an unexplained red; a genuinely unexplained red still
+  blocks; a closed incomplete recording no longer blocks a later render edit. Plus the real proof:
+  the 17.08. runs stop blocking without a `--defer`.
+  Criticality: medium — it blocks no player-visible behaviour, but it disarms the gate that keeps
+  the picture honest, and a gate whose only exit is a hand waiver decays into a formality.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
+  19.08.2026, 13:50 and 13:51, the first two runs after point 732 brought the picture lane back).
+  MEASURED, twice, on `feat/732-verify-gpu-backend` at b2f6f5f5, backend WebGPU, frame written
+  1/1: the `startup` suite's assertion "the loading picture never freezes longer than the balance
+  budget (4000 ms, design.md §21.2)" fails with a worst standstill of 7632 / 8167 / 7833 / 7801 ms
+  across the two runs' two sections — roughly 2x the budget. The breakdown is the same every time:
+  blocked thread ~3.3 s, inside ONE animation frame ~2.3 s, unpainted ~7.8 s.
+  IT IS NOT LOAD, and that was checked rather than assumed: the four readings sit within 7 % of
+  each other across two runs at load average 3.1–4.7, where a load artefact scatters. It is also
+  not new breakage — it is newly VISIBLE: the lane could not run on this host at all until 732, so
+  this assertion had never been evaluated here.
+  WHAT IS NOT YET KNOWN, and is the first half of the work: whether the freeze belongs to the APP
+  (startup work on the main thread) or to the BACKEND the lane now uses. Point 732 restored the
+  picture through ANGLE's surfaceless EGL route, and the WebGPU lane rides a COMPATIBILITY adapter
+  there; a compat adapter's shader compilation could plausibly own the 2.3 s inside one frame. The
+  two are distinguished by MEASUREMENT before anything is changed — the same run on the WebGL 2
+  lane, and against the deployed build the user actually plays, decides which it is. Naming the
+  wrong half here would rebuild the wrong thing.
+  FINAL STATE:
+  - THE CAUSE IS NAMED with a measurement that separates app from backend, and the answer is
+    written down where the next reader finds it — including the case "the budget is right and the
+    app is too slow" and the case "this backend cannot meet a budget written for another one",
+    which have different remedies.
+  - THE STANDSTILL COMES UNDER THE §21.2 BUDGET on the lane the player uses, or the budget is
+    re-derived FROM A MEASUREMENT on the backends we actually ship and design.md §21.2 moves with
+    it in the same commit. The budget is not simply raised to whatever the current number is: it
+    is a promise to the player about the loading picture, so a raise needs the reason a player
+    would accept.
+  - THE 2.3 s INSIDE ONE ANIMATION FRAME is accounted for by name. A single frame holding the main
+    thread that long is the sharpest clue in the reading and the most likely single cause.
+  VERIFIABLE: `node scripts/verify/run-logged.mjs --suites startup` green on BOTH backends, and
+  the measurement that separated app from backend recorded with its numbers, so a later regression
+  can be compared against it rather than re-argued.
+  Criticality: medium — it fails no player-visible correctness rule and the game does start, but
+  it is a §21.2 promise the build currently breaks by 2x, and it keeps the `startup` suite red,
+  which is the suite every other run is judged beside.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 730. The board's queue estimates are calibrated for a slower batch than the one running
@@ -153,6 +187,20 @@ put it is the mistake this line exists to stop.
   including a case where the classes differ enough that a single global factor is REFUSED, and a
   case where a class has no landed comparable and its cards keep their estimate with a named
   reason.
+  A MEASUREMENT OF THE SPEED-UP ITSELF ALREADY EXISTS — take it as the starting point rather
+  than raising it again (measured 19.08.2026 from the merge history and
+  `.claude/mechanism-reviews.jsonl`). Not only the cadence moved: the per-point branch runtime
+  collapsed, 6.4/12.9/17.3/29.4/31.9 h on 17.–18.08. against 0.2–1.3 h on 19.08. Parallelism is
+  NOT the cause — the 19.08. points ran with FEWER concurrent branches. The cause is the review
+  loop: 86 do-not-merge against 26 merge on 18.08., while every point landed on 19.08. cleared in
+  ONE round, and those 18.08. rejections were MECHANICAL rather than substantive (the ledger
+  quotes "files listed in the diffstat were not included"). The break sits exactly at 19.08.
+  03:26, where points 714 → 717 → 684 fixed the review material.
+  TWO CONFOUNDERS THAT BIND THIS POINT: the window is n=8, all process/infrastructure points of
+  middling size with NO render point carrying a picture check in it — the picture lane was broken
+  and unnoticed until 19.08. (points 732/733) — so the factor must NOT be carried over to render
+  points; and point 713 still stands at 14 do-not-merge, so the loop is not universally healed.
+  Both belong in the reading as named limits, not as a footnote.
   Criticality: medium — nothing in the code depends on an estimate, but the board is what the
   user plans by, and a queue that promises 952 h for work running at three times that speed
   misinforms every reading of it.

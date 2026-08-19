@@ -1313,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 19.08.2026, 12:42 · Quellen-Fingerprint: `bde94d1f61f4…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 14:09 · Quellen-Fingerprint: `52b460ae5069…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1404,10 +1404,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 60 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
+Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 61 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
 
-<!-- RETRO-FINGERPRINT: bde94d1f61f4caa8b7f69032f4eff9e5e9295eedec829ebeaf01f79ebb450531 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T10:42:47.723Z -->
+<!-- RETRO-FINGERPRINT: 52b460ae5069ab7ade76a784e9699e7cc0b726625fbf1d0c8efa8c4a0caabeff -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T12:09:34.520Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1748,3 +1748,34 @@ einem Strang keine Schätzung für zwei. Die Frage lautet nicht »wie oft passie
 sondern »wovon hängt die Häufigkeit ab?« — hängt sie an der Anzahl gleichzeitiger Stränge,
 kippt das Ärgernis bei der nächsten Pool-Erhöhung in einen Stillstand. Wir haben den Pool
 auf drei gehoben, ohne diese Frage zu stellen.
+
+### 3.126 Die Bereitschaftsprüfung fragte, ob das Werkzeug da ist — nicht, ob es funktioniert
+
+Am 19.08.2026 stand die gesamte Bildprüfung still, und niemand hatte es bemerkt. Der
+Prüf-Browser bekam überhaupt kein Grafik-Backend: `webgl2` und `webgpu` lieferten in beiden
+Browsern und unter jeder Flag-Kombination `false`. Sichtbar wurde das erst als
+Zeitüberschreitung von 180 Sekunden mitten in einer Suite, beim Warten auf den Renderer —
+und das liest sich wie eine langsame Maschine oder ein hängendes Spiel, also wie die zwei
+Dinge, die es gerade nicht war. Ein delegierter Autor verlor eine ganze Runde daran, bevor
+der Befund als solcher dastand.
+
+Die Ursache war zäh, aber nicht das Lehrreiche daran. Das Lehrreiche ist, was die
+Bereitschaftsprüfung sagte, während das galt: `verify-bringup` meldete beide Browser
+»present«, mit Pfad, und verließ sich mit Code 0. Sie prüfte die Existenz der Binärdateien.
+Ob aus ihnen ein Grafikkontext herauskommt — das, wofür sie überhaupt da sind — hat sie nie
+gefragt. Die Prüfung war grün, weil sie das Falsche maß, und ihr Grün war teurer als gar
+keine Prüfung: Es hat den Ausfall gedeckt.
+
+Dazu kommt die Form des Ausfalls. Alle Schichten darunter waren intakt — die
+Gerätedurchreichung, die Bibliotheken, der Treiber, beide Browser. Kaputt war nur die
+Verbindung ganz oben, und weil jede einzelne Schicht für sich »da« meldete, ergab die Summe
+der Ja-Antworten ein Nein, das niemand aussprach.
+
+**Lehre:** Eine Bereitschaftsprüfung muss die FÄHIGKEIT messen, nicht ihre Voraussetzungen.
+»Installiert«, »vorhanden«, »Pfad existiert« sind Vorbedingungen und nie die Sache selbst;
+gefragt gehört, was der Aufrufer tatsächlich braucht — hier: ein echter Kontext aus einem
+echten Fenster. Die Prüffrage bei jeder Vorab-Prüfung lautet deshalb: *Könnte sie grün sein,
+während das, wofür sie bürgt, vollständig ausgefallen ist?* Und die zweite Hälfte gehört
+dazu: Der Ausfall muss sich vom Produktfehler UNTERSCHEIDEN. Solange »kein Backend auf
+diesem Rechner« und »die Anwendung kam nicht hoch« dasselbe Rot erzeugen, wird jedes Mal
+neu diagnostiziert, was einmal benannt gehört.

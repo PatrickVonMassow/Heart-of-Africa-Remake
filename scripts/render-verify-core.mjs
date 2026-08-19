@@ -76,6 +76,7 @@ export const NON_RENDER_VERIFY = new Set([
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; polish.mjs hands it the samples
   'frameSubject-core.mjs',
+  'gpu-backend-probe-core.mjs', // the host GPU verdict over a CDP/canvas reading; gpu-backend-probe.mjs does the driving
   'frameSubject.mjs', // the frame shutter's decision layer; the suites hand it their page
   'labelFusion.mjs', // the no-fusion bar over a sampled rect series; enrichments.mjs and polish.mjs sample it
   'launch-args-core.mjs', // the launcher's PLATFORM policy; _browser.mjs opens the browser
