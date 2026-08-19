@@ -62,6 +62,7 @@ describe('point-cost IO over recorded trees', () => {
     expect(markdown).toContain('reverse causality')
     expect(markdown).toContain('inclusive charged-turn upper bounds')
     expect(markdown).toContain('own item size is unmeasured')
+    expect(markdown).toContain('not the weighted proxy from measure-context-cost-core.mjs')
     expect(snapshot.residualTokens.openai).toMatchObject({ tokens: 200, outsideWindowTokens: 200 })
     expect(snapshot.wholeDocumentReads).toEqual({ attributed: 0, sourceWindow: 1 })
     expect(markdown).toContain('not observed within the attributed set (1 in the source window overall)')
