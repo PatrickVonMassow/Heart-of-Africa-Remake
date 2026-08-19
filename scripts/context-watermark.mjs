@@ -15,10 +15,10 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { CONTEXT_TRIGGER_TOKENS, parseContextTokens, watermarkDecision } from './context-watermark-core.mjs'
 
-/** The calibratable mark, HOA_CONTEXT_WATERMARK_TOKENS. Read here (not in the
+/** The calibratable trigger, HOA_CONTEXT_TRIGGER_TOKENS. Read here (not in the
  *  core) so the decision function stays pure. */
 export function triggerTokens(env = process.env) {
-  const raw = Number(env.HOA_CONTEXT_WATERMARK_TOKENS)
+  const raw = Number(env.HOA_CONTEXT_TRIGGER_TOKENS)
   return Number.isFinite(raw) && raw > 0 ? raw : CONTEXT_TRIGGER_TOKENS
 }
 

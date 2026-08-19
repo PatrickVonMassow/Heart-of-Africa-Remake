@@ -94,8 +94,8 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
     expect(watermarkDecision({ reading: { tokens: CONTEXT_CEILING_TOKENS } }).state).toBe('past')
     expect(watermarkDecision({ reading: { tokens: CONTEXT_TRIGGER_TOKENS - 1 } }).state).toBe('below')
     expect(triggerTokens({})).toBe(CONTEXT_TRIGGER_TOKENS)
-    expect(triggerTokens({ HOA_CONTEXT_WATERMARK_TOKENS: '90_000' })).toBe(CONTEXT_TRIGGER_TOKENS)
-    expect(triggerTokens({ HOA_CONTEXT_WATERMARK_TOKENS: '90000' })).toBe(90_000)
+    expect(triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '90_000' })).toBe(CONTEXT_TRIGGER_TOKENS)
+    expect(triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '90000' })).toBe(90_000)
   })
 
   it('NO reading is "unreadable" WITH an alert — never a silent "below"', () => {
