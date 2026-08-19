@@ -41,13 +41,12 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // without a written reason is refused, so "park it" is not available as an escape,
 // and the entry must be removed in the same commit that adds the hook line.
 export const INTENTIONALLY_DORMANT = {
-  'bundle-first-guard.mjs':
-    'Built 07.08.2026 by a worktree agent — same protected-path reason as above. It ALSO needs its finding ' +
-    'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
-    'the drift it exists to catch, and a worktree agent may not edit that file either. Reconcile the scheme ' +
-    '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
   // commission-guard.mjs left this map on 18.08.2026, in the commit that added
   // its PreToolUse line ("Agent|Task|Bash|PowerShell") — the rule above, kept.
+  // bundle-first-guard.mjs left it on 19.08.2026, the last of point 542's four:
+  // its precondition was the real work — every open point in a bundle of
+  // docs/work-packages.md — and the Stop line was added in the same commit that
+  // deleted this entry. The map is EMPTY again, which is the state it wants.
 }
 
 /**
