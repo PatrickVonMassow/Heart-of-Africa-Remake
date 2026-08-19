@@ -56,7 +56,7 @@ export const AGENT_TOOLS = new Set(['Agent', 'Task'])
 
 /** Tools that WRITE the file they name. Only these can author; a Read on
  *  TASKS.md is a read, and every read stays allowed whatever the mark says. */
-export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
+export const FILE_WRITING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
 /**
  * WHAT COUNTS AS STARTING A NEW UNIT, BY THE SCRIPT IT RUNS — widened

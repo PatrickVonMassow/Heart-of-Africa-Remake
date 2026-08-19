@@ -177,7 +177,7 @@
         ]
       },
       {
-        "matcher": "Bash|PowerShell|Read|Edit|Write|NotebookEdit|Glob|Grep",
+        "matcher": "Bash|PowerShell|Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep",
         "hooks": [
           {
             "type": "command",
@@ -195,7 +195,7 @@
         ]
       },
       {
-        "matcher": "Edit|Write|NotebookEdit|Agent|Task|Bash|PowerShell",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Agent|Task|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",

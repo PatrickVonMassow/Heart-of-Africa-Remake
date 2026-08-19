@@ -116,6 +116,10 @@ describe('over the mark, AUTHORING is denied — and the refusal names the carri
     ['a memory', { toolName: 'Write', filePath: '/home/node/.claude/projects/-workspace-hoa/memory/new-rule.md' }],
     ['the memory index', { toolName: 'Edit', filePath: 'MEMORY.md' }],
     ['CLAUDE.md itself', { toolName: 'Edit', filePath: 'CLAUDE.md' }],
+    // MultiEdit is not offered by this harness today. It is pinned anyway: the
+    // settings file guards it wherever a write is guarded, and a write tool the
+    // set forgets opens silently the day the harness gains it (Sol, c38d8e9).
+    ['a work-order point via MultiEdit', { toolName: 'MultiEdit', filePath: 'TASKS.md' }],
     ['a redirect into the work order', { toolName: 'Bash', command: 'echo "- [ ] 999. x" >> TASKS.md' }],
     ['a redirect into a doc', { toolName: 'Bash', command: 'cat notes >> docs/new-section.md' }],
   ]
