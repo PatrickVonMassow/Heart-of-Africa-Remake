@@ -936,6 +936,7 @@ describe('a range too large for one round', () => {
     const ledger = readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')
     expect(JSON.parse(ledger.at(-1))).toMatchObject({
       sha: bulkSha,
+      partialReview: true,
       pass: { index: 1, total: 2, files: [expect.stringMatching(/^bulk-[ab]\.txt$/)] },
     })
   })
