@@ -27,35 +27,30 @@ meint den Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
 
 ### Primäres und sekundäres Modell
 
-Lege **zwei** Modelle fest und gib ihnen klare Rollen:
+Lege **zwei** Modelle fest, mit klaren Rollen:
 
 - Ein **primäres Modell** macht die gewöhnliche Arbeit. Nimm die jeweils stärkste
   verfügbare Version.
 - Ein **sekundäres, anderes Modell** übernimmt das **Vier-Augen-Prinzip**, die
   **Ausweichstufe** — und die **harten Fälle**: als schwierig/fehleranfällig
-  Eingeschätztes.
-- Hat ein Modell ein **knappes** Kontingent, ist es die **Eskalationsstufe**, und die
-  greift erst nach **mehreren** erfolglosen Prüfrunden, nicht nach der ersten. Eine
-  Schwelle von eins verbrennt die knappste Spur an Arbeit, die eine weitere gewöhnliche
-  Runde erledigt hätte. Die Zahl steht an **genau einer** Stelle im Code; steht sie in
-  fünf Formulierungen, veraltet sie in vieren.
+  Eingeschätztes. Ist seine Spur **knapp**, eskaliere erst nach **mehreren** erfolglosen
+  Runden.
 
 > *Prompt:* „Gewöhnliche Arbeit macht **\<primäres Modell\>**. **\<sekundäres Modell\>**
 > übernimmt Vier-Augen, Ausweichstufe und als schwierig/fehleranfällig eingeschätzte
-> Aufgaben. Ist eine Spur knapp, gehe erst nach **\<n\>** erfolglosen Prüfrunden dorthin,
-> zähle die Runden aus dem Prüfprotokoll statt aus einem Schalter, und halte die Zahl als
-> eine einzige Konstante. Etabliere einen Mechanismus, der ein Arbeitsergebnis eines
-> **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
-> übernehmen."
+> Aufgaben; zur knappen Spur eskalierst du erst nach **\<n\>** erfolglosen Runden;
+> **\<n\>** ist eine Konstante. Etabliere einen Mechanismus, der ein
+> Arbeitsergebnis eines **anderen** Modells erkennt und die Arbeit stoppt, statt sie
+> stillschweigend zu übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
-steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller Test
-sofort zeigt, nie.
+steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test
+zeigt, nie.
 
-**Kontingent ist nicht austauschbar.** Ist ein Modell knapp, gib das Schreiben von Code — den
-größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann. Ein
-Verteiler, der den Füllstand nicht liest, empfiehlt ein längst leeres Modell.
+**Kontingent ist nicht austauschbar.** Ist ein Modell knapp, behalte ihm vor, was **nur** es
+kann; das Schreiben von Code, der größte Verbraucher, geht ans andere. Ein Verteiler, der den
+Füllstand nicht liest, empfiehlt ein leeres Modell.
 
 > *Prompt:* „Sag mir vor Ende eines Kontingents, welche Arbeit an das Modell mit Restvolumen
 > geht; eine leere Spur empfiehlst du nie. Ist das zweite Modell nicht erreichbar, melde die
