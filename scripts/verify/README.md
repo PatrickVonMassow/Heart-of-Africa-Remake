@@ -168,7 +168,7 @@ when the result becomes the session's next action. The decision is pure in
 never fires for a non-owner or a paused batch, and refuses a run whose log has
 gone quiet (that is a wedge, not a wait).
 
-### Host bring-up — once per machine (point 475)
+### Host bring-up and fast GPU preflight (points 475/732)
 
 The browser suites need a browser, and `npm install` does not put one there. One
 documented command does, on every platform:
@@ -180,7 +180,8 @@ npm run verify:bringup -- --check   # report only, install nothing
 
 **No suite ever installs implicitly** — a regression that quietly downloads
 ~180 MB mid-run is a surprise, not a convenience — so a fresh machine runs this
-once and never again.
+once to install. The command's probe is also safe to repeat: it opens a bare
+localhost canvas in each exact verification browser, without starting the app.
 
 | Lane | Needs | Where it comes from |
 |---|---|---|
@@ -194,14 +195,24 @@ the path over is what makes the report honest: the `chrome` CHANNEL resolves, in
 playwright-core's registry, to `/opt/google/chrome/chrome` and its beta/dev/canary
 siblings and **nothing else**, so a chromium-only host used to be reported "present"
 and then die on Playwright's generic channel error. Windows and macOS are not probed
-at all and keep the historical `channel:'chrome'` launch byte for byte. Whether a
-particular build really brings up a headless WebGPU adapter is not a probe's question:
-`assertBackend` answers it on the running renderer, and a lane that came up on WebGL 2
-fails loud.
+for a path and keep the historical `channel:'chrome'` launch byte for byte.
+
+**A binary is not a backend.** The 19.08.2026 outage had both browsers installed,
+so the old bring-up exited 0, but Chrome's own Graphics Feature Status said
+`(gl=none,angle=none)`, `webgl=disabled_off`, `webgpu=disabled_off`; bare canvases
+returned neither a WebGL 2 context nor a WebGPU adapter. `verify:bringup` now queries
+that status through CDP `SystemInfo.getInfo` and makes one of three pure-tested
+verdicts: PRESENT (both APIs on a named hardware renderer), DEGRADED (one missing,
+software, or unnamed), or ABSENT (neither exists). ABSENT explicitly names the
+host/browser GPU layer, before app startup; PRESENT says a later `window.__renderer`
+timeout belongs to app startup instead. It fails in seconds, before the 180-second
+suite wait. `run-all.mjs` executes the same probe automatically before any Chromium
+suite or production preview and exits before starting Vite on a red verdict; pure
+Node selections such as `docs`, `build`, `lint`, and `unit` stay GPU-independent.
 
 The **graphics stack is chosen by platform** (`launch-args-core.mjs`, swept by
 `launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it always
-had it, macOS `metal`, and Linux gets `--use-angle=gl` with `GALLIUM_DRIVER=d3d12`
+had it, macOS `metal`, and Linux gets `--use-angle=gl-egl` with `GALLIUM_DRIVER=d3d12`
 in the browser's environment. That pair is what reaches the GPU behind `/dev/dxg`
 in the WSL container — `ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX
 4070 Ti), OpenGL 4.6)` — measured at 170 renderer calls per second against the 22.7
@@ -215,7 +226,7 @@ sets nothing at all). Linux additionally launches with `--no-sandbox`,
 Windows and macOS keep their argument list unchanged.
 
 The **WebGPU lane rides the same GL chain** on Linux, through Dawn's OpenGLES
-backend: `--use-gl=angle --use-angle=gl --use-webgpu-adapter=opengles
+backend: `--use-gl=angle --use-angle=gl-egl --use-webgpu-adapter=opengles
 --force-webgpu-compat` (point 505). Vulkan is a dead end here — the only Vulkan
 device is Dozen, whose `fullDrawIndexUint32 = false` Dawn's Vulkan backend
 refuses, so it falls back to its bundled SwiftShader and no flag reaches into

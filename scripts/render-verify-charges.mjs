@@ -46,6 +46,22 @@
 /** @type {RedCharge[]} */
 export const RED_CHARGES = [
   {
+    point: 733,
+    suite: 'startup',
+    kind: 'check',
+    match: /loading picture never freezes longer than the balance budget/i,
+    why:
+      'FILED AS 733 ON 19.08.2026, THE DAY THE LANE CAME BACK. The startup freeze assertion had ' +
+      'never been evaluated on this host: no browser suite could run here at all until point 732 ' +
+      'restored the GPU backend, so this red is newly VISIBLE, not newly broken, and it says ' +
+      'nothing about a change under scripts/verify/. MEASURED four times across two runs at ' +
+      'b2f6f5f5 (worst standstill 7632 / 8167 / 7833 / 7801 ms against the 4000 ms budget, ' +
+      'blocked thread ~3.3 s, ~2.3 s inside one animation frame): the readings sit within 7 % of ' +
+      'each other at load average 3.1-4.7, where a load artefact scatters, so it is reproducible ' +
+      'and not the machine. 733 owns naming whether the freeze belongs to the app or to the ' +
+      'compatibility adapter the restored lane rides, and the charge dies with that point.',
+  },
+  {
     point: 694,
     suite: 'polish',
     backend: 'webgl',
