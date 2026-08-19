@@ -1,0 +1,135 @@
+{
+  "mergedBy": "GPT-5.4",
+  "entries": [
+    {
+      "id": "U1",
+      "from": ["A1", "B1"],
+      "defect": "The published now-section can be empty or incomplete while `batch-in-flight --status` proves several active points; no current guard compares the full active-point set to the numbered now-cards, and open `feat/*` branches alone are not evidence of active work."
+    },
+    {
+      "id": "U2",
+      "from": ["A2", "B2", "B4"],
+      "defect": "The numbered membership of “Woran ich gerade arbeite” is projected from the authoritative structured in-flight declaration alone while title/body prose remains human-authored; undeclared `feat/*` branches add nothing, and unreadable or contradictory source data is unresolved rather than interpreted as zero active work."
+    },
+    {
+      "id": "U3",
+      "from": ["A3", "A5", "B5"],
+      "defect": "Board reconciliation keeps exactly one numbered now-card per active point, removes numbered cards for points that left active work, and creates a visible stub for an active point that has no card yet so unwritten prose is explicit rather than silently absent."
+    },
+    {
+      "id": "U4",
+      "from": ["A4", "B17"],
+      "defect": "Reconciliation preserves existing authored now-card prose and markup byte-for-byte for unchanged fields, refuses any mutation that would blank or conflict with existing prose, and changes authored text only through explicit operator input."
+    },
+    {
+      "id": "U5",
+      "from": ["A6", "B13"],
+      "defect": "While any active points exist, the now-section must match that exact numbered set; an empty section or a partial one blocks with named `missing` points, and an extra stale card blocks with named `extra` points."
+    },
+    {
+      "id": "U6",
+      "from": ["A7", "B9"],
+      "defect": "A verified zero-point active record renders a parser-distinct non-card empty-state element meaning that no point is demonstrably active; malformed, unreadable or unverifiable source data never renders that empty state and never clears the last authored board."
+    },
+    {
+      "id": "U7",
+      "from": ["A8", "B12"],
+      "defect": "Point 700’s open clause is resolved by never substituting an unnumbered handover card for active work: transfer, adoption and handover continuity keep numbered now-cards for their points, and only the verified-zero state is unnumbered via the dedicated empty-state element."
+    },
+    {
+      "id": "U8",
+      "from": ["A9"],
+      "defect": "The Stop-hook wrapper for the now-section completeness check stands down for `heldByOtherLiveOwner` and `.claude/batch-paused`, keeps the decision logic pure, and fails open on its own error path."
+    },
+    {
+      "id": "U9",
+      "from": ["A10"],
+      "defect": "Guard-core tests must pin the measured `[700,697,711]` cases where a sole 700 card and an empty now-section both block and report the missing active points."
+    },
+    {
+      "id": "U10",
+      "from": ["A11"],
+      "defect": "Board-core tests must pin that reconciliation creates missing stubs without touching surviving prose, refuses blanking existing prose, and removes cards for points no longer in flight."
+    },
+    {
+      "id": "U11",
+      "from": ["A12"],
+      "defect": "Tests must keep the ownership and pause stand-downs, plus the now-section edge cases, covered at the board-core layer."
+    },
+    {
+      "id": "U12",
+      "from": ["A13"],
+      "defect": "This point is critical because the user-facing board section that answers whether the batch is running omitted two of three active strands and therefore communicated the opposite of the truth."
+    },
+    {
+      "id": "U13",
+      "from": ["A14"],
+      "defect": "The change lands as a combined board/render/guard mechanism change and therefore requires the other model’s recorded review before merge."
+    },
+    {
+      "id": "U14",
+      "from": ["B3"],
+      "defect": "The in-flight core must normalize active work as numbered strands from the owner’s structured declaration, deduplicating repeated evidence for one point and treating explicit continuation phases as still active."
+    },
+    {
+      "id": "U15",
+      "from": ["B6"],
+      "defect": "Transfer, adoption, session compaction, counter-review and handover are continuity states rather than exits, so their numbered cards remain in the now-section until an explicit lifecycle transition moves them elsewhere."
+    },
+    {
+      "id": "U16",
+      "from": ["B7"],
+      "defect": "Reconciliation operates by moving existing numbered card markup between sections and refuses missing-copy or conflicting-copy situations rather than synthesizing new authored prose."
+    },
+    {
+      "id": "U17",
+      "from": ["B8"],
+      "defect": "The derived now-section order is deterministic and idempotent: surviving cards keep their relative order, newly inserted cards follow a structured active-work order with point number as tie-break, and repeated reconciliation produces byte-identical output."
+    },
+    {
+      "id": "U18",
+      "from": ["B10"],
+      "defect": "Publication performs the exact-set check against the normalized active record and refuses missing, extra, duplicate, unknown or cross-section numbered points; reconcile-and-publish runs as one serialized board operation and a failed publish remains a named non-zero obligation."
+    },
+    {
+      "id": "U19",
+      "from": ["B11"],
+      "defect": "The owner’s Stop-hook mismatch check uses the same pure active-set comparison and reports missing/extra numbered points, while publish preflight is intentionally fail-closed because no publication is safer than publishing a knowingly false board."
+    },
+    {
+      "id": "U20",
+      "from": ["B14"],
+      "defect": "Guard-core tests must cover duplicate now-cards for one point, cross-section duplication, a nonempty active record against an otherwise empty board, and the removal of the old ‘no board means skip’ escape for a known active-set mismatch."
+    },
+    {
+      "id": "U21",
+      "from": ["B15"],
+      "defect": "Batch-in-flight-core tests must cover normalization of repeated evidence to one active point, focus-plus-strand aggregation, exclusion of undeclared open branches, and fail-open handling of malformed or contradictory active-work source data."
+    },
+    {
+      "id": "U22",
+      "from": ["B16"],
+      "defect": "Board-core tests must cover lifecycle moves across sections, retention of numbered cards through transfer/adoption continuity, and the verified zero-active-points empty-state element."
+    },
+    {
+      "id": "U23",
+      "from": ["B18"],
+      "defect": "The composed tests must prove total fail-open Stop behavior on unreadable source data, fail-closed publish preflight, preserved stand-downs for paused/non-owner states, and continued compatibility with existing topic, done-claim, queue-order and ETA rules."
+    },
+    {
+      "id": "U24",
+      "from": ["B19"],
+      "defect": "Point-700 regression coverage must start continuity and handover cases from a numbered active card and separately prove that the verified-zero empty state is parser-distinct and needs no fictitious card to move."
+    },
+    {
+      "id": "U25",
+      "from": ["B20"],
+      "defect": "The active-set omission is CRITICAL because it affected a published control surface the user relies on to judge whether autonomous work is running at all."
+    },
+    {
+      "id": "U26",
+      "from": ["B21"],
+      "defect": "The point bundles the board-core lifecycle change, dashboard-integrity exact-set enforcement and batch-in-flight active-point normalization because splitting them would preserve either the duplicate-card failure or the incomplete active-work source."
+    }
+  ]
+}
