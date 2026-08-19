@@ -5129,10 +5129,31 @@ Build order, chosen so no two parallel agents own the same file:
   `docs/work-packages.md` — the drift it exists to catch. Reconcile the scheme
   against the full open set (`node scripts/bundle-first-guard.mjs --status`) BEFORE
   wiring it, or its first turn blocks on a backlog it did not cause.
+  THE DAMAGE IS NOW MEASURED, not merely argued (19.08.2026). One session ran to 311,039
+  tokens — 161,039 BEYOND the watermark, the band where 87 to 94 % of the batch spend
+  sits — while `context-fence-guard` sat unwired: `grep -c context-fence
+  .claude/settings.json .claude/settings.local.json` answers 0 and 0, and the wired
+  PreToolUse guards are board-first, worktree-reminder, commission, closing and firewall.
+  The guard itself is FINISHED and CORRECT — `node scripts/context-fence-guard.mjs
+  --status --transcript <that session>` answers `state: past, tokens 320507` and `verdict
+  for a STARTING call: DENY` — and it would have fired at least three times in that one
+  session (the edit to `docs/analysis_de/vibe-coding-anleitung.md`, the `fs.writeFileSync`
+  to TASKS.md over the Bash path, and the memory write). Only the wiring is missing. That
+  makes this point a lever on the batch's dominant cost rather than hygiene.
+  ONE GAP INSIDE THE FENCE BELONGS TO THIS POINT: `START_SCRIPTS` in
+  `scripts/context-fence-core.mjs` knows `run-all.mjs`, `run-logged.mjs`, `author-sol.mjs`,
+  `review-sol.mjs` and `ask-sol.mjs`, but NOT `batch-claim.mjs` — and CLAIMING the batch
+  IS the start of new work (measured: a claim at ~250,000 tokens of context). User
+  19.08.2026, verbatim: »Bevor die Batch geholt wird, den Benutzer zu clear auffordern und
+  danach zu weiter oder so.« That falls out of listing `batch-claim.mjs` in `START_SCRIPTS`
+  with `/clear` named in the refusal text: attended, the fence refuses the claim and says
+  the way out; unattended, the handover applies anyway. Changing the fence is a mechanism
+  path and carries the other model's review.
   VERIFIABLE: after each arming, a fresh session's `node scripts/guard-preflight.mjs
   --for answer --session <id>` lists the guard rather than passing over it, and
   `node scripts/guard-health-guard.mjs` reports no dormant record for a wired
-  enforcer (that IS the CLI — there is no `scripts/guard-health.mjs`).
+  enforcer (that IS the CLI — there is no `scripts/guard-health.mjs`); plus a Vitest case
+  proving `batch-claim.mjs` is refused past the watermark and named with `/clear`.
   Criticality: medium — the guards themselves are reviewed and tested; what is at
   stake is that a wrongly placed hook line disables a chain silently.
 

@@ -1313,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 19.08.2026, 15:33 · Quellen-Fingerprint: `f58d1255cbdb…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 16:42 · Quellen-Fingerprint: `33d159513dc0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1321,6 +1321,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 1 | niedrig | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
+| OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
@@ -1405,10 +1406,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 84 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 61 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 61 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
 
-<!-- RETRO-FINGERPRINT: f58d1255cbdb02bb9a58010abc53dd86ac18a1c9a343b88f918842b247e4063a -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T13:33:33.710Z -->
+<!-- RETRO-FINGERPRINT: 33d159513dc07812fdf5ebe7ded5370c9c30edc4f0c0392f25a9ce8369127e64 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T14:42:25.510Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1811,3 +1812,30 @@ und »der Mechanismus ist repariert« immer eine Strecke liegt, die jemand über
 ohne ihn kostet jeder Fehlgriff genau so lange, wie das Bauen des nächsten Mechanismus
 dauert. Und die Prüffrage dazu lautet nicht »ist die Bedingung richtig«, sondern: *Wie komme
 ich hier wieder heraus, wenn sie es nicht ist?*
+
+### 3.128 Fünf Runden am selben Defekt, weil die Entscheidung nie getroffen wurde
+
+Am 19.08.2026 kam die fünfte Gegenlesung eines Punktes zurück, und zum fünften Mal lautete
+das Urteil »nicht mergen«. Die Befunde waren jedes Mal echt, jedes Mal andere Zeilen — und
+jedes Mal dieselbe Krankheit: Ein tatsächlich beobachteter Fehler verlor seine Kennung und
+galt danach als erklärt. Der Punkt selbst hatte die Wahl klar gestellt: ENTWEDER scheitert
+ein Lauf, dessen Ergebniszeilen die Aufzeichnungsgrenze sprengen, laut als unvollständige
+Aufzeichnung, ODER die Grenze gilt für rote Zeilen nicht mehr — und *welcher* der beiden
+Wege es wird, entscheidet eine Messung, nicht der Geschmack. Die Umsetzung hat beide Wege
+halb gemacht: Sie schrieb die Trunkierungsmarke UND behielt die Obergrenze von sechzig
+gespeicherten Roten. Bei vierhundert echten Fehlerzeilen bleiben davon neunundfünfzig
+übrig; die übrigen dreihunderteinundvierzig verschwinden, obwohl sie beobachtet wurden.
+
+Jede der vier Nachbesserungsrunden hat einen Symptomweg dieses ungetroffenen Beschlusses
+zugemauert, und die nächste Runde fand den nächsten. Das ist kein Versagen der Gegenlesung
+— sie hat jedes Mal richtig gelegen — sondern eine Eigenschaft der Aufgabe: Solange die
+Entscheidung offen ist, erzeugt sie beliebig viele Symptome, und jede Runde bekommt eines
+davon zu sehen. Die vom Punkt VERLANGTE Messung, wie groß ein echter Fehlersatz in der
+Praxis wird, war in fünf Runden nie durchgeführt worden.
+
+**Lehre:** Wenn ein Punkt zwei Wege anbietet und die Wahl an eine Messung bindet, ist die
+MESSUNG der erste Arbeitsschritt und nicht der letzte. Und wenn eine Gegenlesung dreimal
+denselben Krankheitstyp an verschiedenen Stellen findet, ist der Befund nicht die Stelle,
+sondern die Form der Lösung — dann hört das Nachbessern auf und die Entscheidung wird
+getroffen, samt Löschen des Weges, den man nicht genommen hat. Die Prüffrage lautet: *Sind
+das n Fehler, oder ist es einer, den ich an n Stellen sehe?*
