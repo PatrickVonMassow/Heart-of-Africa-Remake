@@ -308,13 +308,35 @@ put it is the mistake this line exists to stop.
   the session's first call onward. An overrun is not silently swallowed: the boundary still
   COMPLETES — the handover is the one path that must never fail — but records that it exceeded
   its cap, so the reserve is corrected from evidence rather than from hope.
+  THE GAP CARD MAY NAME THE BATCH'S NEXT POINT, and that is the FIRST part of this point, not
+  a detail of it (GPT-5.6 Sol, audit 19.08.2026, finding A10; verified against the source in
+  the same session). The two sanctioned mechanisms are made consistent in ONE change, and the
+  GUARD is the side that gives: `dashboard-card-topic-guard` learns exactly one exception —
+  the boundary gap card written by `board.mjs done <n> --none` and `board.mjs none` MAY name
+  the point the batch takes up next, because that point is the batch's own DESTINATION, not a
+  foreign reference. The comment at `scripts/batch-boundary-core.mjs:874-882` ("IT NAMES NO
+  POINT NUMBER (point 439)") is rewritten in the SAME commit to carry the new rule and why
+  439's reason no longer holds, so the next reader is not sent back into the resolved
+  contradiction.
+  THE EXCEPTION IS NARROW, or it becomes the hole the topic guard was built against: it holds
+  for the gap card alone, and inside it for the ONE number that is the batch's next point. A
+  second point number in that card, and any foreign point number in any other card, still
+  block as before.
+  THE ALTERNATIVE IS NAMED AND REJECTED so it is not re-litigated: leaving the card numberless
+  and letting the successor derive its point from the queue keeps the guard untouched but
+  defeats this point's purpose — the printed sequence would again need interpretation at the
+  most expensive moment of the session, which is the cost this point was written to remove.
   VERIFIABLE: a Vitest case driving the printed template through the board gate's own
   validator and asserting it is accepted unchanged; a case asserting the template names both
-  the point and the queue-return step; a case proving the boundary completes even when it
+  the point and the queue-return step; a case where the same gap card names a SECOND point
+  number and is still refused; a case where a normal (non-gap) card naming a foreign point
+  still blocks; a case that the rewritten source comment and the guard agree, so the two
+  cannot drift apart again; a case proving the boundary completes even when it
   overruns its cap AND that the overrun is recorded; and the three recorded handover
   measurements with their spread, not only their mean.
-  Criticality: medium — it touches the handover path, which is the one path that must never
-  fail; every change here is fail-open or it is wrong.
+  Criticality: high — it sits on the handover path, the one path that must never fail, and its
+  failure mode is the measured one: a session that can neither hand over nor stop; every
+  change here is fail-open or it is wrong.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 597. Large tool output never enters the context whole (point 572's measure 7). The
@@ -543,6 +565,102 @@ put it is the mistake this line exists to stop.
   would propose and the value it refuses.
   Criticality: low — it only moves a number, and its dangerous direction (raising too far) is
   the one the rollback covers.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
+  (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
+  HANDOVER markers, `.claude/autostart.log` spawns, commit timestamps, deduplicated by session
+  id within 60 min). Marker → launcher spawns successor: median 0.0 min, p90 0.1, max 65.
+  Spawn → successor's first commit: median 6.3, p90 14.9, max 91. Last commit old → first
+  commit new: median 12.7, p90 47.8, max 100; of that the outgoing session's tail median 6.1,
+  p90 11.8. The mechanism is not the delay — the spawn follows the marker in under a second.
+  What costs is the sequence of model turns on both sides: the exit (now-card back to the
+  queue, board publish, handover card, carrier drain, `--prepare`, `--commit`) and the ramp
+  (board-first duties, adopting in-flight work, reading the queue, cutting and reading the
+  brief). WHAT THAT MEASUREMENT CANNOT DO, and why this point starts with attribution (GPT-5.6
+  Sol, audit 19.08.2026, findings A7/A14/A17/A18/A19): it reports elapsed MINUTES and therefore
+  cannot price tokens, cannot show that the six exit steps dominate, and uses "first commit" as
+  a proxy for productive work, which reading, analysis and uncommitted implementation all
+  precede. The 60-minute deduplication also suppressed the very retry burst under study, and of
+  the 29- and 65-minute outliers roughly 25 and 35 minutes stay undecomposed. So the numbers
+  establish that a gap EXISTS and roughly how large it is, not what it is made of. Handover
+  cost and context ceiling multiply: a lower trigger means more handovers, and each pays the
+  startup load of a fresh session before its first useful turn.
+  FINAL STATE, in two stages, because building the levers before the attribution would spend
+  the session's scarcest budget on a guess:
+  1. THE BOUNDARY PATH IS ATTRIBUTED IN TOKENS, PER STEP, not in minutes. Point 744 already
+     measures the exit as one number; this splits that number: every stage of
+     `--prepare`/`--commit` and the successor's first turn up to its first work-bearing call
+     carries its own reading, so "which step dominates" is settled by evidence. Elapsed time is
+     recorded BESIDE it, never instead of it: idle stretches (the claiming reservation, the
+     launcher's tick cadence) are real throughput loss that no token count shows, and they are
+     reported separately so neither hides the other.
+  2. ONLY WHAT THE ATTRIBUTION SHOWS DOMINANT IS THEN BUILT. The candidates, each with the
+     bound that makes it safe:
+     a. ONE EXIT COMMAND (`batch-boundary.mjs --leave`) driving the bookkeeping the way
+        `land-point.mjs` drives the landing — one verdict per step, stopping at the first red.
+        It is IDEMPOTENT AND RESUMABLE: each step records its own completion, a re-run
+        continues where it stopped, and no board edit or carrier drain is ever performed twice.
+        It PRESERVES THE TWO-PHASE INVARIANT rather than collapsing it: `--prepare` still
+        proves fresh bookkeeping, `--commit` remains the LAST repository action, and a guard
+        that demands remedial work between them still gets its chance. Fail-open like the rest
+        of the boundary: it COMPLETES even when it overruns its cap, and records the overrun.
+     b. THE LAUNCHER DOES MECHANICAL RAMP WORK ONLY WHERE THE DESTINATION IS ALREADY DECIDED.
+        An honoured claim redirects a handover to a claiming window
+        (`resolveBoundaryDestination`), so nothing — focus, board card, adoption — is
+        pre-assigned while that redirect is still possible; where it is not, the launcher
+        discharges the board-first duties before the model's first turn.
+     c. THE BRIEF TRAVELS IN THE SPAWN PROMPT ONLY WITH A FRESHNESS CHECK. It names the
+        revision it was cut from, and the successor REGENERATES instead of trusting it when
+        head, queue rank or claim moved in between. This shifts the brief's token cost rather
+        than removing it, which is the honest claim.
+     d. RETRY IS BOUNDED WITH A DEFINED TERMINAL BEHAVIOUR. After the second failed boundary
+        attempt the session stops retrying: it completes the handover fail-open, records the
+        overrun and alerts. It never loops (the 18 markers in four minutes) and never strands
+        the batch. Where point 751 already removes a cause of that loop, this is folded into
+        751 rather than duplicated.
+  3. SCOPE, STATED SO IT IS NOT MISCOUNTED: these are THROUGHPUT measures, not ceiling safety.
+     The ceiling is held by point 597 (capped tool inputs and outputs) and point 745 (the
+     prospective budget asked before the call). Nothing here may be subtracted from the trigger
+     arithmetic of 743, and no turn-count saving may be treated as a token bound — one uncapped
+     40,000-token response crosses the ceiling however few turns it took.
+  VERIFIABLE: Vitest over the per-step attribution record (a fixture boundary run yields one
+  reading per stage, and a missing reading is reported rather than silently absent); a case that
+  `--leave` re-run after an interrupted step completes without repeating the finished ones; a
+  case that it still completes when a step overruns, WITH the overrun recorded; a case that no
+  pre-assignment happens while a claim can still be honoured; a case that a stale brief is
+  regenerated; and a case that the retry bound terminates in a completed handover rather than a
+  loop.
+  Criticality: medium — every change touches the handover path, where fail-open is the rule;
+  the attribution stage itself is low risk and is what the rest is decided from.
+  RANK: after the ceiling programme (743, 742, 744, 597, 745, 746, 747), i.e. directly
+  following 747. The ceiling mechanisms bound the damage, this one buys throughput, and its own
+  first stage depends on 744's corrected exit path.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 753. The authoring routing counts almost no unsuccessful review rounds, so the Fable
+  escalation never fires (measured 19.08.2026, 21:06 and again 21:33 on point 751). The first
+  reading printed "0 unsuccessful review round(s), 0 fresh attempt(s)" and "round history: no
+  unsuccessful reviews recorded" while point 751 stood in its THIRD do-not-merge round; the
+  second, one round later, printed 1 — against four recorded do-not-merge reviews. CLAUDE.md §6
+  makes Fable 5 the escalation "REACHED ONLY AFTER FIVE UNSUCCESSFUL REVIEW ROUNDS", and
+  `scripts/author-routing-core.mjs` makes that cut from the recorded review history. A count
+  that lags the real rounds can never reach five, so a point loops on one author indefinitely —
+  which is the cost the memory `commit-proxy-misses-unlanded-work` names as the most expensive
+  thing there is: a grinding, never-landing point has no commits and shows up in no proxy.
+  FINAL STATE: the round count `author-routing-core.mjs` reads is the number of do-not-merge
+  reviews recorded for that point, whatever wrote them. Where `review-sol.mjs` writes a verdict
+  and where the routing reads it are the SAME record, keyed on something every recorded round
+  carries — a review handed to a fallback model, a review recorded from a worktree and a review
+  of a range rather than a single sha all count, because each of them is a round the point did
+  not pass. A verdict the routing cannot key is reported as unkeyable at recording time, not
+  dropped silently.
+  VERIFIABLE: Vitest over the routing's counter — a fixture history of four recorded
+  do-not-merge verdicts yields four, a fifth crosses into the Fable lane, a clean verdict does
+  not count, and a verdict missing the key is refused at recording time with the missing part
+  named; plus a case over the real 751 history asserting the count equals the recorded rounds.
+  Criticality: medium — nothing breaks visibly; the failure is a point that never escalates and
+  keeps consuming rounds on one author.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 748. The attended window is fenced by nothing, and it is the largest remaining source
