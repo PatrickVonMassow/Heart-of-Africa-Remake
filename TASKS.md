@@ -154,6 +154,20 @@ put it is the mistake this line exists to stop.
   including a case where the classes differ enough that a single global factor is REFUSED, and a
   case where a class has no landed comparable and its cards keep their estimate with a named
   reason.
+  A MEASUREMENT OF THE SPEED-UP ITSELF ALREADY EXISTS — take it as the starting point rather
+  than raising it again (measured 19.08.2026 from the merge history and
+  `.claude/mechanism-reviews.jsonl`). Not only the cadence moved: the per-point branch runtime
+  collapsed, 6.4/12.9/17.3/29.4/31.9 h on 17.–18.08. against 0.2–1.3 h on 19.08. Parallelism is
+  NOT the cause — the 19.08. points ran with FEWER concurrent branches. The cause is the review
+  loop: 86 do-not-merge against 26 merge on 18.08., while every point landed on 19.08. cleared in
+  ONE round, and those 18.08. rejections were MECHANICAL rather than substantive (the ledger
+  quotes "files listed in the diffstat were not included"). The break sits exactly at 19.08.
+  03:26, where points 714 → 717 → 684 fixed the review material.
+  TWO CONFOUNDERS THAT BIND THIS POINT: the window is n=8, all process/infrastructure points of
+  middling size with NO render point carrying a picture check in it — the picture lane was broken
+  and unnoticed until 19.08. (points 732/733) — so the factor must NOT be carried over to render
+  points; and point 713 still stands at 14 do-not-merge, so the loop is not universally healed.
+  Both belong in the reading as named limits, not as a footnote.
   Criticality: medium — nothing in the code depends on an estimate, but the board is what the
   user plans by, and a queue that promises 952 h for work running at three times that speed
   misinforms every reading of it.
