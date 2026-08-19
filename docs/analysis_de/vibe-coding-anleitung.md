@@ -17,13 +17,13 @@ war es weg. Verlange deshalb bei allem, was dir wichtig ist, im Prompt einen
 > unmöglich macht, und zeig mir, wo er blockiert."
 
 Der Aufwand richtet sich nach der Wichtigkeit — ein leichter Check für eine leichte
-Regel —, und zwar ab der ersten Formulierung, nicht erst beim zweiten Schaden.
+Regel —, ab der ersten Formulierung, nicht erst beim zweiten Schaden.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze; wo einer
-prinzipiell **nicht** möglich ist, steht das dabei. Eine **Schätzung** wie *(Kosten ≈ 2x)*
-meint den Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
+**nicht** möglich ist, steht das dabei. Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den
+Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
 
 ### Primäres und sekundäres Modell
 
@@ -43,13 +43,13 @@ Lege **zwei** Modelle fest, mit klaren Rollen:
 > Arbeitsergebnis eines **anderen** Modells erkennt und die Arbeit stoppt, statt sie
 > stillschweigend zu übernehmen."
 
-Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
+Ein zweites Modell nützt nicht, weil es *besser* ist, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
 steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test
 zeigt, nie.
 
 **Kontingent ist nicht austauschbar.** Ist ein Modell knapp, behalte ihm vor, was **nur** es
-kann; das Schreiben von Code, der größte Verbraucher, geht ans andere. Ein Verteiler, der den
+kann; Code zu schreiben, der größte Verbraucher, geht ans andere. Ein Verteiler, der den
 Füllstand nicht liest, empfiehlt ein leeres Modell.
 
 > *Prompt:* „Sag mir vor Ende eines Kontingents, welche Arbeit an das Modell mit Restvolumen
@@ -151,8 +151,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis falsch — er prüfte einen
-  Hilfswert, einen unerreichbaren Zustand. Oder das Beweisbild entstand vor der fertigen Szene.
+- **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
+  das Bild entstand vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
   Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
   die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
@@ -162,8 +162,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
   Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
-- **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt;
-  „das Feld wird bereits gesetzt" steht so im Code nicht.
+- **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** behoben ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
   nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
@@ -175,8 +174,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   an Testnamen." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; zur fertigen Verbesserung führt nichts; oder der Schutz wirkt — nur
-  fragt ihn ein zweiter Weg nie.
+  die das Werkzeug liest; oder der Schutz wirkt — nur fragt ihn ein zweiter Weg nie.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, eine
   Fähigkeit, wo jemand greift, eine Zutrittsbedingung **dort, wo zugetreten wird**. Der Test heißt
   ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
@@ -192,8 +190,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Nenne mir die **gemessenen** Treiber, schick jedem Helfer seinen Auftrag als
   fertigen Kurzbrief mit und fang je Aufgabe einen **frischen Kontext** an."
 
-- **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt
-  oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
+- **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe, und bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
   festhalten, was mich braucht, weitergehen. Jedes Warten bricht auch beim **Fehler** ab."
@@ -244,8 +241,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
   anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
   Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die Begründung**.
-  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb."
-  *(≈ 2x für den Fundschritt)*
+  **Vereinigt** wird nach Bedeutung, vom Modell, das an **keiner** Liste mitschrieb." *(≈ 2x)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft, nicht
@@ -277,8 +273,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
-  Einträge, ein Teil der Tests lud nicht, dem Prüfer wurde die Hälfte nie gereicht. Nicht
-  geliefert ist nicht rot, sondern abwesend — und liest sich *grüner* als ein Fehlschlag.
+  Einträge, dem Prüfer wurde die Hälfte nie gereicht. Nicht geliefert ist abwesend, nicht rot —
+  und liest sich *grüner* als ein Fehlschlag.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist **Teilprüfung**."
 
@@ -373,6 +369,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Vor jedem **neuen** Punkt: nenn ihn, den vordersten offenen und jeden älteren
   angefangenen Zweig. Weichst du ab, **begründe es**; leere Angefangenes zuerst."
 
+- **Die Grenze spricht erst beim Aufhören.** Eine Obergrenze im Schlusscheck lässt jeden Anfang
+  durch; und was festhält, gilt als „nicht übergebbar".
+  → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
+  letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -411,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0a70b40a74b6bb639bd9377417fe675d8e28698c0fc709737c8b9a2675c70cec -->
+<!-- GUIDE-FINGERPRINT: bde94d1f61f4caa8b7f69032f4eff9e5e9295eedec829ebeaf01f79ebb450531 -->
