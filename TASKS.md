@@ -160,6 +160,18 @@ put it is the mistake this line exists to stop.
     reads the transcripts, because an unlanded point produces no commit and the commit proxy
     reports zero for the most expensive case. Where the transcripts are unavailable that is
     reported as unmeasured, never as zero.
+  - AN OPERATOR CAN OVERRIDE THE LANE ABOVE THE THRESHOLD, and today nobody can. MEASURED
+    19.08.2026: `node scripts/author-sol.mjs --routing --point 713` answers `point 713 → fable`
+    at 18 unsuccessful rounds, and there is NO hand route around it. `authorLaneFor` tests
+    `tag === fable` first, then `rounds >= FABLE_ESCALATION_ROUNDS → fable`, and only THEN
+    `if (tag)` for the ordinary lanes — so an `Author lane: opus` in the point's own spec does
+    not bite once the boundary is passed, and the comment there says so outright. The only
+    parameter that wins is `authorLaneFor`'s `override` argument, which no CLI sets:
+    `--anyway` in `author-sol.mjs` only bypasses the refusal to write a point assigned to
+    someone else, not the lane decision. An explicit tag or an explicit switch must therefore
+    beat the escalation boundary, so the next case does not wait for a mechanism to be built.
+    This is its own gap beside the monotone counter, and it is why nothing can take 713 off the
+    scarcest model until this point ships.
   VERIFIABLE: Vitest over the pure routing decision — a point with a flat do-not-merge trend
   stays escalated, a point whose recorded verdicts improve falls back to the cheaper lane, a
   point at the threshold returns the decision with all three answers and never an abort, a
