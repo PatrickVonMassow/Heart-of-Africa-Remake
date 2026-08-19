@@ -57,7 +57,7 @@ const stateDir = resolve(flag('--state-dir', resolve(REPO_ROOT, '.claude')))
 const dataFile = resolve(stateDir, 'board-queue.json')
 const storeFile = resolve(stateDir, 'queue-calibration.json')
 
-const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 256e6 })
+const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 256e6, windowsHide: true })
 
 /** Seconds back from now for `14d` / `36h` / an ISO date. */
 function sinceSeconds(spec) {
