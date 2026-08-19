@@ -271,8 +271,15 @@ function text(value) {
  *  read as the same run (review finding, 19.08.2026). */
 function finite(value) {
   try {
-    const n = Number(value)
-    return Number.isFinite(n) ? n : null
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null
+    // A NUMERIC STRING is readable; nothing else is. `Number()` turns null, ''
+    // and false into 0, which made two records with NO timestamp read as the
+    // same run and an `exit: null` read as a clean pass (review, 19.08.2026).
+    if (typeof value === 'string' && value.trim() !== '') {
+      const n = Number(value)
+      return Number.isFinite(n) ? n : null
+    }
+    return null
   } catch {
     return null
   }
@@ -532,10 +539,23 @@ export function runVerdict(run, options) {
       unaccounted: [{ name: `the run covered only section ${which} of the suite (--section)`, point: null }],
     }
   }
+  // A CRASH OUTRANKS EVERY OTHER READING. A run that died rather than reported
+  // judged no picture, and nothing may explain it away — not a charge, not a
+  // later green, and not the incomplete-recording sign-off either: judged BELOW
+  // truncation, a crashed run that also flooded its output could be lifted by one
+  // signature (review, 19.08.2026). Only `partial` still comes first, because a
+  // --section probe is nobody's evidence in either direction.
+  if (run.crashed === true) {
+    return {
+      status: 'red',
+      covers: false,
+      charges: [],
+      unaccounted: [{ name: 'the run ended in a crash, not in its own report', point: null }],
+    }
+  }
   // Judged before the exit code and before the reds, because BOTH are unreadable
   // here: the red list is a fragment of the run's red set, and an exit 0 that
-  // dropped result lines is a pass nobody read. Behind `partial`, so a
-  // one-section probe stays the harmless instrument it is.
+  // dropped result lines is a pass nobody read.
   if (isIncompleteRecording(run)) {
     const dropped = droppedLinesOf(run)
     return {
@@ -568,14 +588,6 @@ export function runVerdict(run, options) {
     }
   }
   if (exitOf(run) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
-  if (run.crashed === true) {
-    return {
-      status: 'red',
-      covers: false,
-      charges: [],
-      unaccounted: [{ name: 'the run ended in a crash, not in its own report', point: null }],
-    }
-  }
   const reds = Array.isArray(run.reds) ? run.reds : []
   if (reds.length === 0) {
     return {
@@ -758,18 +770,20 @@ export function unexplainedRuns(runs, since, options) {
    * and no later green un-observes it — but a truncated recording observed
    * nothing to keep: it is a reading that was lost, and a reading is redone.
    */
-  const reRecorded = (r) =>
-    all.some(
-      (later) =>
-        later &&
-        later !== r &&
-        later.partial !== true &&
-        later.backend === r.backend &&
-        later.suite === r.suite &&
-        number(later.at) > number(r.at) &&
-        sawCodeSince(later, from) &&
-        runVerdict(later, { openPoints, ledger }).covers,
-    )
+  const reRecorded = (r) => {
+    // WITHOUT A READABLE TIMESTAMP, NOTHING CAN BE SHOWN TO BE LATER. Folding an
+    // unreadable `at` to 0 let any dated covering run "re-record" an undated
+    // truncation (review, 19.08.2026).
+    const when = finite(r?.at) ?? finite(r?.startedAt)
+    if (when === null) return false
+    return all.some((later) => {
+      if (!later || later === r || later.partial === true) return false
+      if (later.backend !== r.backend || later.suite !== r.suite) return false
+      const laterAt = finite(later.at) ?? finite(later.startedAt)
+      if (laterAt === null || laterAt <= when) return false
+      return sawCodeSince(later, from) && runVerdict(later, { openPoints, ledger }).covers
+    })
+  }
   const open = pointSet(openPoints)
   /** Is this red owned by an OPEN point — by the charge it was recorded with, or
    *  by one the ledger carries today? */
@@ -1154,25 +1168,42 @@ export function evaluate(input) {
     if (!run) continue
     const verdict = runVerdict(run, opts)
     if (verdict.unaccounted.length === 0) continue
+    // WHAT IS REALLY STILL BLOCKING THIS RUN — the entry unexplainedRuns wrote,
+    // not the raw verdict. A truncated run whose truncation has been lifted can
+    // still be blocked by a red it DID record, and quoting the verdict there
+    // named the truncation and advised a second signature, which resolves
+    // nothing (review, 19.08.2026).
+    const suiteName = run.suite ?? 'unknown'
+    const reported = unexplained.find(
+      (u) => u.backend === b && u.suite === suiteName && u.at === (finite(run.at) ?? 0),
+    )
     // Same distinction as above: an incomplete recording is not a red anybody
     // can chase, so the reader is sent to a re-run rather than to the ledger.
-    if (verdict.status === 'incomplete') {
+    if (verdict.status === 'incomplete' && (!reported || reported.status === 'incomplete')) {
       const dropped = droppedLinesOf(run)
       whyNot.push(
-        `${b}: the last run (${run.suite ?? 'unknown'}) recorded INCOMPLETELY — the capture cap dropped ` +
+        `${b}: the last run (${suiteName}) recorded INCOMPLETELY — the capture cap dropped ` +
           `${dropped > 0 ? `${dropped} ` : ''}result line(s), so it lists a FRAGMENT of its reds and explains ` +
-          'nothing. Re-run it; where that is impossible, sign the recording off with ' +
-          'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"',
+          'nothing' +
+          (reported
+            ? '. Re-run it; where that is impossible, sign the recording off with ' +
+              'node scripts/render-verify-guard.mjs --incomplete "<backend>/<suite>" --evidence "<why>"'
+            : ' — and its truncation is already answered, so it neither blocks nor proves anything. ' +
+              'This backend simply has no covering run yet.'),
       )
       continue
     }
-    const named = verdict.unaccounted
+    // ONLY the incomplete fall-through reads the reported entry: every other
+    // family's verdict sentence is the one to print (a suspect run's entry
+    // carries the first attempt's raw check names, not the sentence about them).
+    const open_ = verdict.status === 'incomplete' && reported ? reported.unaccounted : verdict.unaccounted
+    const named = open_
       .slice(0, 3)
       .map((u) => (u.point === null ? `"${u.name}" (charged to nothing)` : `"${u.name}" (point ${u.point} is not open)`))
       .join('; ')
     whyNot.push(
-      `${b}: the last run (${run.suite ?? 'unknown'}) failed with ${verdict.unaccounted.length} ` +
-        `UNACCOUNTED red(s) — ${named}${verdict.unaccounted.length > 3 ? ', …' : ''}`,
+      `${b}: the last run (${suiteName}) failed with ${open_.length} ` +
+        `UNACCOUNTED red(s) — ${named}${open_.length > 3 ? ', …' : ''}`,
     )
   }
 

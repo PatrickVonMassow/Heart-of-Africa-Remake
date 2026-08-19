@@ -1166,6 +1166,16 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     const closure_ = [{ backend: 'webgpu', suite: 'polish', at: undefined, evidence: 'signed' }]
     expect(incompleteClosureFor(undated, closure_)).toBeNull()
     expect(incompleteClosureFor(undated, [{ backend: 'webgpu', suite: 'polish', at: 'soon', evidence: 'signed' }])).toBeNull()
+    // `Number()` turns each of these into 0, which made them all the same run.
+    for (const [runAt, closureAt] of [[null, ''], ['', false], [false, null]]) {
+      expect(incompleteClosureFor({ ...undated, at: runAt }, [{ backend: 'webgpu', suite: 'polish', at: closureAt, evidence: 'signed' }])).toBeNull()
+    }
+  })
+
+  it('cannot be RE-RECORDED either without a readable timestamp of its own', () => {
+    const undated = { ...truncatedLegacy('webgpu', 1500), at: null, startedAt: null }
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    expect(unexplainedRuns([undated, again], 1000, { openPoints })).toHaveLength(1)
   })
 
   it('signs off ONE run, never a suite/backend pair — the NEXT truncated run blocks again', () => {
@@ -1230,6 +1240,36 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
     expect(result.reason).toMatch(/RENDER CHANGE NOT VERIFIED ON WEBGPU/)
   })
 
+  // A CRASH OUTRANKS THE TRUNCATION. A run that died judged no picture, and a
+  // crashed run that also flooded its output must not be liftable by one
+  // signature (review, 19.08.2026).
+  it('never lifts a run that CRASHED, whatever its recording lost', () => {
+    const crashedToo = { ...truncatedLegacy('webgpu', 1500), crashed: true }
+    expect(runVerdict(crashedToo, { openPoints }).status).toBe('red')
+    expect(runVerdict(crashedToo, { openPoints }).unaccounted[0].name).toMatch(/crash/)
+    const closures = [closure('webgpu', 'polish', 1500)]
+    const again = { ...run('webgpu', 2000), suite: 'polish' }
+    for (const runs of [[crashedToo], [crashedToo, again]]) {
+      expect(unexplainedRuns(runs, 1000, { openPoints, incompleteClosures: closures })).toHaveLength(1)
+    }
+  })
+
+  // The remedy printed on a missing backend has to name what is REALLY blocking:
+  // advising a second signature for a red resolves nothing (review, 19.08.2026).
+  it('names the surviving RED, not the signed-off truncation, on a missing backend', () => {
+    const broken = truncatedWithRed('webgpu', 1500)
+    const result = evaluate(
+      renderChange({
+        runs: [broken, run('webgl', 2100)],
+        openPoints,
+        incompleteClosures: [closure('webgpu', 'polish', 1500)],
+      }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNACCOUNTED red\(s\) — "console error: THREE\.WebGPURenderer/)
+    expect(result.reason).not.toMatch(/sign the recording off/)
+  })
+
   it('is total on malformed closures and records', () => {
     const broken = truncatedLegacy('webgpu', 1500)
     expect(() => unexplainedRuns([broken], 1000, { openPoints, incompleteClosures: [null, 7, {}] })).not.toThrow()
@@ -1255,8 +1295,11 @@ describe('an INCOMPLETE RECORDING is its own class, and has its own way out (poi
       expect(() => runVerdict(redRun('webgpu', 1500, [red('x', 506)]), { openPoints: bad })).not.toThrow()
       expect(() => unexplainedRuns([redRun('webgpu', 1500, [red('x')])], 1000, { openPoints: bad })).not.toThrow()
     }
-    // An unreadable exit code is a FAILED run, never a clean pass.
-    expect(runVerdict({ backend: 'webgpu', suite: 'polish', at: 1500, exit: Symbol('e') }, { openPoints }).status).toBe('red')
+    // An unreadable exit code is a FAILED run, never a clean pass — and `null`,
+    // `''` and `false` are unreadable, though Number() calls each of them 0.
+    for (const exit of [Symbol('e'), null, '', false, 'nope', undefined]) {
+      expect(runVerdict({ backend: 'webgpu', suite: 'polish', at: 1500, exit }, { openPoints }).status).toBe('red')
+    }
   })
 
   // A finite but out-of-range timestamp makes `toISOString()` throw — and that
