@@ -163,10 +163,14 @@
     "736": {
       "at": "2026-08-19T13:52:29.970Z",
       "why": "Nutzerentscheidung 19.08.2026: 736 vor 735 — gemessen adressiert 736 79 Prozent des Fable-Wochenverbrauchs, 735 rund 0,5 Prozent der Tokens."
+    },
+    "741": {
+      "at": "2026-08-19T17:02:06.150Z",
+      "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately."
     }
   },
   "settled": {
-    "at": "2026-08-19T16:24:57.076Z",
+    "at": "2026-08-19T17:02:06.151Z",
     "points": [
       174,
       184,
@@ -375,7 +379,19 @@
       734,
       735,
       736,
-      737
+      737,
+      738,
+      739,
+      740,
+      741,
+      742,
+      743,
+      744,
+      745,
+      746,
+      747,
+      748,
+      749
     ]
   }
 }

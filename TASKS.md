@@ -76,6 +76,385 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 743. The watermark is set where its own arithmetic holds (user 19.08.2026, on being
+  shown that a handover AT the mark means the damage is already done: "Wenn bei 150.000
+  abgegeben wird, ist das Kind ja schon in den Brunnen gefallen"). `CONTEXT_WATERMARK_TOKENS`
+  (`scripts/context-watermark-core.mjs`) is 150,000 and is used as the TRIGGER while being
+  spoken of as the CEILING. One number cannot be both: the trigger must sit far enough below
+  the ceiling that everything which still happens after it fits underneath. Measured
+  19.08.2026: the fence first fired at 167,277 tokens — the mark had been crossed with
+  nothing firing, because no STARTING call lay on the way up — and the boundary was committed
+  at 194,613, i.e. 44,613 past it, of which 27,336 were spent purely on leaving.
+  FINAL STATE: the trigger is 82,000 tokens, and the commit that sets it CARRIES ITS
+  ARITHMETIC in a comment beside the constant: ceiling 150,000 − largest observed single
+  response 40,000 − measured cost of leaving 27,336 = 82,664. This is deliberately the
+  CONSERVATIVE cut and not the 100,000 a first draft proposed: 100,000 + 40,000 + 15,000
+  already exceeds the ceiling, so that value never held its own worst case (GPT-5.6 Sol,
+  audit of 19.08.2026). The resulting working window of roughly 52,000 tokens after startup
+  is the honest price of an uncapped output channel; points 744 and 597 buy it back, and
+  point 747 raises the trigger again once they have.
+  NOT IN THIS POINT: deriving the trigger automatically. That is point 745, which replaces
+  this constant with a computed remaining-budget function; until then the number stands as a
+  written, justified value rather than a formula.
+  VERIFIABLE: a Vitest case pinning the constant AND the inequality it must satisfy —
+  trigger + largest-observed-jump + measured-boundary-cost <= ceiling — so a later change to
+  any of the three fails the gate rather than silently breaking the ceiling; plus the existing
+  watermark tests re-run green against the new value.
+  Criticality: low — one constant, immediately reversible, and it only makes an existing
+  mechanism fire earlier.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 742. The context overshoot is measured once and then forgotten, so nobody can tell whether
+  arming the fence fixed it (19.08.2026; the reduced form of a larger proposal, cut down by
+  GPT-5.6 Sol's audit). A session took its handover at 311039 tokens against the 150000
+  watermark — 161039 past it, with a stated margin of 25000. `batch-boundary.mjs --commit
+  --context` measures that overshoot and PRINTS it, and `.claude/boundary.log` records the
+  handover, but the number is kept nowhere: the next reading starts from zero.
+  WHAT THIS POINT DELIBERATELY DOES NOT DO. The original proposal had the boundary trigger an
+  automatic post-mortem that files a top-of-queue point for a new mechanism. Sol's audit refused
+  it on the evidence, and the refusal is adopted: the ONE measured overshoot already has a known
+  prevention in point 542 (the context fence is built and tested but wired into no hook chain),
+  and there is NO post-arming recurrence evidence that would justify a second, probably HIGH
+  mechanism beside the sleeping one — which is exactly how four dormant guards came about.
+  Automatic triage and automatic ranking are therefore NOT built here; this point only makes the
+  recurrence MEASURABLE, so the later decision rests on readings instead of guesses.
+  FINAL STATE:
+  - THE BOUNDARY WRITES AN INCIDENT RECORD whenever the measured context exceeds the watermark
+    by more than the stated margin. It records the measurement (tokens, watermark, margin), the
+    session, the point in flight, and the repository head — appended, never rewritten, so the
+    series survives every handover.
+  - THE RECORD CARRIES THE GROWTH, NOT ONLY THE ENDPOINT. Sol's audit named the gap: a call that
+    STARTS below the mark and whose RESPONSE crosses it appears in no "calls past the mark" list,
+    and reads the fence deliberately allows are a normal way for context to grow. The record
+    therefore holds the per-turn context growth of the session, so the largest single step is
+    visible wherever it began.
+  - ONE COMMAND READS THE SERIES: how many overshoots since a given date or commit, their size
+    distribution, and what each session was doing. It is the reading the deferred decision needs
+    — after the fence is armed, it answers whether overshoots still happen at all.
+  - NOTHING IS FILED OR RANKED AUTOMATICALLY. The record is evidence, not a queue action.
+  - THE RESIDUAL IS NAMED WITH ITS DIRECTION: a session that dies without taking a boundary
+    writes no record, so the series UNDER-counts and never over-counts. Closing that would mean
+    deriving the reading at session start from the predecessor's transcript, which is a separate
+    point and is not claimed here.
+  - THE GROWTH IS RECORDED BY CALL TYPE AND INPUT SIZE, not only as a per-turn total (added
+    19.08.2026 from GPT-5.6 Sol's audit of the context-ceiling programme). The forward-looking
+    check of point 745 needs a cost per KIND of call (agent spawn, browser suite, delegated ask
+    with N characters of material, large read), and a bare per-turn series cannot yield one. A
+    single observed 40,000-token jump is neither a maximum nor an expected value, so the reading
+    command reports an upper QUANTILE per kind, not a mean.
+  - THE STARTUP COST IS MEASURED, NOT ESTIMATED: at the first COMPLETE api usage event of a
+    session, not from the character count of the preamble. `parseContextTokens` returns nothing
+    at all immediately after SessionStart, so a reading taken there would be silently absent
+    rather than wrong.
+  VERIFIABLE: Vitest over the pure record shape and the growth extraction, with recorded
+  fixtures — an overshoot inside the margin (no record), one beyond it (a record), and one whose
+  largest growth step BEGAN below the watermark and is still reported; the reading command runs
+  over a fixture series and prints the count, the distribution and the per-incident context.
+  Criticality: low — it only writes and reads a record and changes no control flow; the care it
+  needs is that the boundary must not fail when the record cannot be written, since the handover
+  matters more than the bookkeeping.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 744. Leaving is the most expensive step of a session, and nobody has measured it
+  (19.08.2026). Every token spent on the handover is a token subtracted from the working
+  window: the trigger of point 743 is literally the ceiling minus the cost of leaving, so this
+  cost sets how much work a session can do at all. Measured once, badly: 27,336 tokens between
+  the fence's first refusal and the committed boundary — and that measurement is CONTAMINATED,
+  because two gates contradicted each other inside it. `batch-boundary.mjs --prepare --context`
+  prints the handover card and demands it VERBATIM ("… und sie nimmt den nächsten Punkt der
+  Warteschlange auf"), while `board.mjs none` refuses exactly that text because the unnumbered
+  card must NAME the point the batch picks up next; on top of that, `none` refuses while any
+  now-card still stands, so the point must be sent back to the queue first — three steps the
+  template does not name, at the most expensive moment of the session.
+  FINAL STATE: the template produces a text that ALREADY names the point the successor picks
+  up and ALREADY names sending the now-card back as its first step, so the printed sequence
+  passes both gates as printed; and the boundary is then measured across three clean
+  handovers, the result recorded beside `CONTEXT_WATERMARK_TOKENS` as the named constant point
+  743's arithmetic consumes.
+  THIS IS A FUNCTIONAL CHANGE, not bookkeeping (GPT-5.6 Sol, audit 19.08.2026): it must not be
+  filed under "measurement only", and the measurement is worthless until it lands, because the
+  contradiction is inside every reading taken before it.
+  VERIFIABLE: a Vitest case driving the printed template through the board gate's own
+  validator and asserting it is accepted unchanged; a case asserting the template names both
+  the point and the queue-return step; and the three recorded handover measurements with their
+  spread, not only their mean.
+  Criticality: medium — it touches the handover path, which is the one path that must never
+  fail; every change here is fail-open or it is wrong.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 597. Large tool output never enters the context whole (point 572's measure 7). The
+  bound `scripts/verify/run-logged.mjs` already applies to verify runs extends to the other
+  big producers: `git diff` (`--stat` first), `grep` (`-c` or a head bound), file reads
+  (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
+  IT IS ENFORCED, NOT PRACTISED (user 19.08.2026, on GPT-5.6 Sol's audit of the
+  context-ceiling programme). A rule that is followed cannot bound an input-dependent output:
+  the same 40,000-token jump the ceiling must survive comes back the moment one call is made
+  the way it always was. So every tool output passes a BUDGET with spill-to-log, and what
+  stands in the context is what fits, never what the producer chose to print.
+  THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
+  <log>` already hands back the run when the digest is not enough, but it is narrowed to
+  SELECTIVE, line-bounded or paginated queries — a full `--show` reloads the very 40,000
+  tokens the budget just prevented and would make the overview call a net loss. What must
+  NOT be adopted is the tempting inverse either: a runner that returns only the names of
+  failing suites by default.
+  THE ERROR CHANNEL IS BOUNDED TOO, AND THESE FOUR CONDITIONS ARE HOW. An unbounded channel
+  defeats any ceiling, but a truncated cause forces a re-run, and one browser-suite re-run
+  costs a multiple of what the cut saved — the house rule "a red closes by a CAUSE, never by
+  a later green" exists because that already hurt. Each condition is binding:
+  1. ERRORS HAVE THEIR OWN, GENEROUS BUDGET, separate from the ordinary output budget and a
+     multiple of it. It exists to catch the outlier, not to discipline the normal case.
+     MEASURED 19.08.2026 over the 124 log files under `local/`: median 3,197 characters,
+     p95 36,118, max 158,017 — the typical output is tiny and the top 5 % is the whole
+     problem, so a generous budget almost never binds. The number itself is set from the same
+     measurement taken over ERROR outputs specifically, not over all logs.
+  2. REPETITION IS CUT, CONTENT IS NOT. A large error output is almost never one long cause;
+     it is one cause repeated — identical stacks across twenty cases, a diff per assertion, a
+     retry printing everything three times. Collapsing by SIGNATURE removes most of the volume
+     and loses no distinguishable cause. This cut runs FIRST, and often it is the only one
+     needed.
+  3. THE FIRST DISTINCT CAUSE IS NEVER CUT. It enters the context whole. Further occurrences
+     of the same signature collapse to a count; further DISTINCT causes get a bounded excerpt
+     with a pointer to the full text.
+  4. CUT FROM THE MIDDLE, NEVER THE HEAD OR THE TAIL, and never silently. The assertion and
+     the stack top are at the head, the summary at the tail — a naive head bound loses the
+     summary and a tail bound loses the assertion. Every cut states in the context how much
+     was omitted and how to fetch it.
+  So the rule is: error output is never cut SILENTLY, never cut BEFORE its first distinct
+  cause, and never cut at HEAD or TAIL — and every failing test keeps its name.
+  MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
+  its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
+  to a follow-up-query rate of ~85 %.
+  THE STANDING LOAD IS THE SAME ARITHMETIC ON A LARGER SCALE: 1k of permanently carried
+  text costs 3.27 M per window, so CLAUDE.md alone (~11.4k tokens) is ~4.2 % of it, and
+  per-turn injected text that CHANGES additionally breaks the cache prefix. So: a hook that
+  succeeded says nothing, and the per-turn injections are audited. CONDITIONAL on point
+  599's cache reading, and it cuts TEXT only — never a duty that is enforced rather than
+  remembered.
+  VERIFIABLE (the error channel): a Vitest case per condition — a twenty-fold repeated stack
+  collapsing to one cause plus a count; a first distinct cause surviving whole against a budget
+  far below its size; a second distinct cause surviving as a bounded excerpt WITH its pointer;
+  a middle cut that keeps both the head assertion and the tail summary; and a case asserting no
+  cut is ever written without its omission notice.
+  Criticality: medium — the real risk is cutting an error message, which the four conditions
+  bound rather than exclude, and the budget now denies output instead of advising against it.
+  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
+  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
+  on its own branch; the shared branch lands 595 and 598 alone.
+
+- [ ] 745. One remaining-budget function, asked before the call rather than after it (user
+  19.08.2026: "'Passt das, was ich jetzt anfange, überhaupt noch unter die Decke' klingt nach
+  der richtigen Frage, anstatt an einem willkürlichen Punkt zuzumachen"). The fence
+  (`scripts/context-fence-core.mjs`) asks BACKWARDS — "is the measurement already past the
+  mark?" — so the growth that pushed it there has already been paid when it answers. It
+  already classifies exactly the expensive kinds of call (agent spawn, browser suite,
+  delegated ask, authoring, a direct verify call); what it does not do is ask whether THIS
+  call still fits.
+  FINAL STATE: one function answers every admission question from the same numbers — ceiling,
+  current reading, the type cost of this call from point 742's series, the cost of leaving
+  from point 744 — and the fence refuses when the remainder cannot hold the call plus the
+  handover. The separately derived global trigger of point 743 is SUBSUMED by it and removed
+  in the same commit rather than kept beside it: two estimates of the same quantity can
+  disagree, and then the stricter one is doing nothing while the looser one decides
+  (GPT-5.6 Sol, audit 19.08.2026). What remains beside the function is the ceiling and one
+  conservative emergency brake.
+  THE READING LAGS BY ONE TURN, and the function must carry that: `parseContextTokens` sums
+  the input and cache tokens of the LAST api event, so it contains neither the current
+  assistant output and its tool arguments nor the tool result about to arrive (verified in the
+  code 19.08.2026). The remainder is therefore reduced by a reserve for all three before the
+  comparison; a check that trusts the raw reading is systematically too permissive.
+  THE FAIL DIRECTIONS ARE THREE, NOT ONE, and mixing them is the way this point does damage:
+  an UNREADABLE measurement keeps failing OPEN and loudly, exactly as today — a guard that
+  denied on an assumption would break the measurement rule; a call that is not classified as a
+  START stays allowed, so no exit path, commit, push, board or boundary call can ever be
+  refused; and only a call ALREADY classified as a start, whose type cost is unknown, is
+  treated conservatively. That conservative branch COUNTS how often it fires, because a
+  silent brake that defers work nobody sees is worse than the overshoot it prevents.
+  VERIFIABLE: Vitest over the pure function — a call that fits, one that does not, one whose
+  type cost is unknown, an unreadable reading (allowed), an exit-path call at zero remaining
+  budget (allowed), and a case proving the lag reserve is subtracted; plus a replay against
+  the transcript of the 19.08.2026 session showing at which call it would have refused, and
+  that none of the refusals is an exit path.
+  Criticality: high — it decides what may run at all, and its failure mode is a session that
+  locks itself out of its own exit.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 746. A point is not begun that cannot finish under the ceiling (19.08.2026, the same
+  user decision as 745, applied one level up). `commission-guard` already answers whether a
+  point may be opened — the pool cap and the queue order — and it is the natural place for the
+  second question: does the expected context cost of THIS point still fit in what is left? A
+  point begun at the end of a session is cut in half mid-work, and the halves cost more than a
+  fresh session would have.
+  FINAL STATE: the guard refuses to commission a point whose expected context cost exceeds the
+  remaining budget of point 745's function, and names the fresh session as the remedy.
+  THE ESTIMATOR IS THE HARD PART AND IS NAMED, not assumed: `measure-point-cost.mjs` reports
+  BILLED tokens per landed point, which is a different quantity from context growth and must
+  not be substituted for it. The estimate comes from point 742's series, aggregated per POINT
+  CLASS, and a class with too few readings counts as unknown.
+  A POINT TOO LARGE FOR ANY SESSION MUST NOT BE DEFERRED FOREVER (GPT-5.6 Sol, audit
+  19.08.2026): where the expected cost exceeds a FULL fresh session's window, the guard does
+  not refuse indefinitely but demands the point be CUT — and that demand is recorded on the
+  point, so a systematically oversized point becomes visible instead of quietly sinking down
+  the queue.
+  VERIFIABLE: Vitest over the decision — a point that fits, one that does not, one of unknown
+  class, and one larger than a whole fresh window (decomposition demanded, not refusal); and a
+  replay over the last twenty landed points showing which would have been deferred and which
+  cut.
+  Criticality: medium — it delays work rather than corrupting it, but a wrong estimator
+  delays it invisibly.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 747. The ceiling is recalibrated from a series, and gives ground back only against
+  evidence (19.08.2026). Point 743 buys safety with a small working window, and that price is
+  meant to be temporary: once the output budget of 597 caps the largest single jump and point
+  744 has made leaving cheap, the same ceiling tolerates a HIGHER trigger — roughly 125,000 on
+  today's numbers — and the working window nearly doubles at unchanged safety. The temptation
+  is to raise it after a quiet stretch, which is exactly when the evidence is weakest.
+  FINAL STATE: a raise is admissible only when all of these hold, and the commit that raises
+  it records each: a MINIMUM SAMPLE of handovers measured AFTER 597 landed; the decision taken
+  on an upper QUANTILE of the per-kind growth rather than a mean; a stated safety margin on
+  top; a cap on how far one step may move the value; and an AUTOMATIC ROLLBACK to the previous
+  value on any recorded overshoot of the ceiling.
+  WHY THE SAMPLE IS NOT ENOUGH BY ITSELF (GPT-5.6 Sol, audit 19.08.2026): handovers taken
+  under the new, lower trigger are CENSORED — they cannot show a jump the trigger already
+  prevented — so a quiet series is evidence about the trigger, not about the jump. The
+  quantile is therefore read per call KIND from point 742's series, which is not censored,
+  rather than from the handover totals.
+  VERIFIABLE: Vitest over the raise decision — too small a sample, a mean that would pass
+  where the quantile fails, a step larger than the cap, and a recorded overshoot triggering
+  the rollback; plus a dry run over whatever series exists at the time, printing the value it
+  would propose and the value it refuses.
+  Criticality: low — it only moves a number, and its dangerous direction (raising too far) is
+  the one the rollback covers.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 748. The attended window is fenced by nothing, and it is the largest remaining source
+  (measured 19.08.2026 ON THE SESSION THAT WROTE THIS PROGRAMME). Every guard in this project,
+  the context fence included, STANDS DOWN for a session that does not own the batch lock —
+  correctly, because a subagent must not be judged by the batch's rules. But an attended chat
+  window is not a subagent, and it is not the batch worker either: it falls through the same
+  hole. This session sat at 265,517 tokens, 115,517 past the mark, having handed the batch over
+  an hour earlier, and nothing refused it a single call. Points 742 to 747 govern the batch and
+  would leave this untouched, so the "share of usage above 150k" they are meant to remove would
+  keep being fed from here.
+  FINAL STATE: the stand-down distinguishes THREE cases instead of two. A SUBAGENT stays
+  exempt, unchanged. The BATCH OWNER is governed as points 745 and 743 describe. An ATTENDED
+  MAIN WINDOW that owns no lock is governed too, but by the remedy that fits it: it cannot take
+  a boundary, because a person is talking to it, so past the mark it is DENIED the expensive
+  starts (agent, browser suite, delegated ask, authoring) and its refusal names `/clear` and
+  nothing else. That is the same remedy point 542 already wired for `batch-claim.mjs`, applied
+  to the window rather than to one command, and it rests on the same user decision (19.08.2026:
+  "Bevor die Batch geholt wird, den Benutzer zu clear auffordern und danach zu weiter oder so").
+  THE FENCE MUST NOT SILENCE THE CONVERSATION: reads, answers, commits and pushes stay allowed
+  in every case — a window that cannot answer the person in front of it is worse than an
+  expensive one.
+  HOW THE THREE ARE TOLD APART is the real work of this point and must not be guessed: the
+  subagent case is what today's `heldByOtherLiveOwner` conflates with the attended one, and
+  getting it wrong either fences every subagent or fences nothing.
+  VERIFIABLE: Vitest over the three-way decision with a fixture per case — subagent past the
+  mark (allowed), batch owner past the mark (denied, boundary named), attended window past the
+  mark (denied, `/clear` named), and each of them below the mark (allowed); plus a replay
+  against this session's own transcript showing the calls it would have refused and confirming
+  no answer, read, commit or push is among them.
+  Criticality: high — it extends a denying mechanism to a session a human is using, so a false
+  deny is felt immediately by the user rather than by a batch nobody watches.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 749. The machine files its own status reports as user decisions, and the user keeps
+  having to clear them out (user 19.08.2026, 18:59, on the card "Batch pausiert: Alarm blieb
+  unbeantwortet": "Ich habe schon wieder so eine pathologische Karte unter 'Von dir zu klären'
+  … Das ist nicht meine Zuständigkeit. Da kann ich nichts machen. Löse das selbst."). The rule
+  is settled and enforced elsewhere: "Von dir zu klären" holds ONLY genuine user decisions.
+  Two scripts break it from the machine side — `scripts/alert-escalation.mjs:166` posts
+  "Batch pausiert: Alarm blieb unbeantwortet" and `scripts/child-retry.mjs:284` posts "Batch
+  pausiert: Umgebungsausfall", both through `board.mjs vdzk-add`. Neither asks the user to
+  DECIDE anything: the first reports that an ntfy alert went unanswered and the batch paused
+  itself, the second that the environment failed. Both close with an instruction the user
+  cannot carry out ("prüfen, was die Meldung ausgelöst hat"), and both resolve by themselves
+  when the restart clock expires — so the card outlives the condition it describes.
+  FINAL STATE:
+  - Neither script writes to the decision section. A paused batch and an environment outage
+    are STATE, and they are shown where the board already shows state; the ntfy alert stays
+    as it is, since that is the channel built for reaching the user.
+  - A decision card is admissible from an automated path only when it names a choice the user
+    alone can make, and it names the options. Where a script has no such choice to offer, the
+    board API refuses the card rather than accepting it — the same shape as the existing card
+    gates, so the rule is enforced instead of remembered.
+  - A card whose condition has resolved does not have to be removed by hand: a status the
+    board derives is re-derived, and the pause state disappears from the board when the pause
+    file does.
+  VERIFIABLE: Vitest over the refusal — an automated card without a named choice is rejected
+  and the message names the state section as the right place; a genuine decision card with
+  options is accepted; and a case over each of the two call sites asserting they no longer
+  reach `vdzk-add`. Plus a case that the board's rendered pause state disappears once
+  `.claude/batch-paused` is gone.
+  Criticality: medium — it touches the alert path, which must keep reaching the user; the
+  change removes a board card, never a notification.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 738. The lease fence does not know the fold command, so a dispossessed session can still
+  rewrite the work order (measured 19.08.2026 while building `scripts/fold-point.mjs`).
+  `fenceGuardedAction` in `scripts/batch-lease-core.mjs` names only `land-point.mjs` in
+  `LANDING_SCRIPTS`. A session whose batch lease has run out is therefore refused a bare `git
+  push`, a `TASKS.md` edit, the tick and every `board.mjs` call — but NOT `node
+  scripts/fold-point.mjs <N> --into <M>`, which ticks a point, moves it into the archive,
+  publishes the board and commits. That is exactly the hole the fence exists to close, and it
+  opened the moment a second command learned to land work.
+  FINAL STATE: the fence names EVERY command that lands work, not one of them, and the list is
+  derived from or pinned against what the repository actually has — a third landing command may
+  not silently reopen the hole. A dispossessed session running the fold command is refused with
+  the same message the tick already gives it.
+  VERIFIABLE: a Vitest case per landing command proving the fence refuses it without the lease
+  and allows it with one, plus a check that fails when a command that mutates the work order is
+  missing from the list.
+  Criticality: medium — nothing is lost while one session owns the batch, but two owners writing
+  the work order is the state the lease was built to make impossible.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 739. Taking the batch is fenced by the HANDOVER mark, so a window can take it with a third
+  of its context already spent (measured 19.08.2026, 18:39). `batch-claim.mjs` is in the context
+  fence's `START_SCRIPTS` and `CLEAR_FIRST_SCRIPTS` (`scripts/context-fence-core.mjs`), so the
+  fence does refuse a claim past the mark and names `/clear` — that part works. But the mark it
+  refuses against is the 150000-token HANDOVER watermark, and a window that claims the batch at
+  101487 tokens is below it and passes. The user caught that one by hand ("Damit hättest du
+  direkt einen schlechten Start"); the mechanism did not.
+  WHY TWO NUMBERS, NOT ONE. The 150000 mark answers "when must a RUNNING session hand over?" — a
+  session with work in flight. Taking the batch asks the opposite question: "how fresh must a
+  worker be to START one?", and a fresh worker should begin near zero. One number cannot serve
+  both without being wrong at one end.
+  FINAL STATE: the claim path is fenced against its OWN threshold, separate from the handover
+  watermark, and the refusal names the remedy (`/clear`, then claim). THE NUMBER IS MEASURED
+  BEFORE IT IS SET: what starting context did the sessions that actually LANDED points run with?
+  A number picked from taste would be the same guess this point exists to replace.
+  VERIFIABLE: Vitest over the pure decision — a claim below the claim threshold passes, one above
+  it is refused with the remedy named, and the handover watermark keeps its own behaviour
+  unchanged; plus the measurement recorded with the chosen number.
+  Criticality: medium — it costs a whole session's quality when it fires, and this incident is the
+  FIRST recorded recurrence after the fence was armed (Sol's audit of 19.08. refused the larger
+  proposal for lack of exactly this evidence, so it belongs in that series).
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 740. Every chat answer carries the session's CONTEXT LEVEL beside the timestamp (user
+  19.08.2026, 18:36: he wants to see where we stand and whether the new mechanisms bite, without
+  asking). Measured the same evening: `scripts/context-watermark.mjs --status --transcript <path>`
+  answers in 0.063 s with the token count of the newest non-sidechain usage entry, and the
+  project's own `scripts/dashboard-reminder-hook.mjs` ALREADY reads `transcript_path` and is ESM,
+  so it can import `context-watermark-core.mjs` directly — no second copy of the counting rule,
+  and no edit to the user-global CJS timestamp hook, which reads no stdin. `TIMESTAMP_RE` in
+  `scripts/timestamp-guard-core.mjs` is anchored at the line start and has no `$`, so a suffix
+  behind the bold stamp does not trip that guard; it needs no change.
+  FINAL STATE: the header line the session writes carries the context reading beside the German
+  timestamp, fed by the hook rather than by a tool call the model must remember to make. It
+  appears in BOTH branches of the hook — the stand-down branch too, or it is missing in exactly
+  the sessions that most need it — and an unreadable measurement is reported honestly as "--",
+  never as 0. `MEMORY.md`'s chat-timestamp entry describes the full header afterwards.
+  VERIFIABLE: Vitest over the hook's text for both branches, with a readable and an unreadable
+  transcript, and a case pinning that the produced header still satisfies the timestamp guard's
+  own predicate.
+  Criticality: low — it is a display, and it costs ~15 tokens a turn through the hook against
+  300-500 for a tool call. A hook is a mechanism, so the change needs the other model's recorded
+  review before it lands.
+  Bundle: Chat & Tafel.
+
 - [ ] 614. Re-run the four-eyes work-order cleanup FROM SCRATCH, and execute it in the same
   point (user 19.08.2026: »Dann schmeiße die Ergebnisse von 614 weg und fange nochmal komplett
   neu mit der Analyse mit Vier Augen an. Setze die dieses Mal auch direkt vollständig um.«).
@@ -729,30 +1108,6 @@ put it is the mistake this line exists to stop.
   Point 567 (remains of killed runs) owns the reaping; this point owns the report.
   Criticality: medium — a cap that let a red state pass as green would be worse than the
   cost it saves, so the escalation path is the mechanism and the abort is not.
-  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
-  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
-  on its own branch; the shared branch lands 595 and 598 alone.
-
-- [ ] 597. Large tool output never enters the context whole (point 572's measure 7). The
-  bounded-output discipline `scripts/verify/run-logged.mjs` already applies to verify runs
-  extends to the other big producers: `git diff` (`--stat` first), `grep` (`-c` or a head
-  bound), file reads (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
-  ERROR OUTPUT STAYS UNCUT — every failing test keeps its name.
-  THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
-  <log>` already hands back the whole run when the digest is not enough. What must NOT be
-  adopted is the tempting inverse — a runner that returns only the names of failing suites
-  by default; error output stays uncut.
-  MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
-  its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
-  to a follow-up-query rate of ~85 %.
-  THE STANDING LOAD IS THE SAME ARITHMETIC ON A LARGER SCALE: 1k of permanently carried
-  text costs 3.27 M per window, so CLAUDE.md alone (~11.4k tokens) is ~4.2 % of it, and
-  per-turn injected text that CHANGES additionally breaks the cache prefix. So: a hook that
-  succeeded says nothing, and the per-turn injections are audited. CONDITIONAL on point
-  599's cache reading, and it cuts TEXT only — never a duty that is enforced rather than
-  remembered.
-  Criticality: low — the one real risk is cutting an error message, which the rule
-  excludes.
   NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
   but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
   on its own branch; the shared branch lands 595 and 598 alone.
@@ -8853,70 +9208,6 @@ to land than a mechanism that needs a review.
   verbatim rule was built to stop, but nothing is lost.
   Bundle: Chat & Tafel.
 
-- [ ] 738. The lease fence does not know the fold command, so a dispossessed session can still
-  rewrite the work order (measured 19.08.2026 while building `scripts/fold-point.mjs`).
-  `fenceGuardedAction` in `scripts/batch-lease-core.mjs` names only `land-point.mjs` in
-  `LANDING_SCRIPTS`. A session whose batch lease has run out is therefore refused a bare `git
-  push`, a `TASKS.md` edit, the tick and every `board.mjs` call — but NOT `node
-  scripts/fold-point.mjs <N> --into <M>`, which ticks a point, moves it into the archive,
-  publishes the board and commits. That is exactly the hole the fence exists to close, and it
-  opened the moment a second command learned to land work.
-  FINAL STATE: the fence names EVERY command that lands work, not one of them, and the list is
-  derived from or pinned against what the repository actually has — a third landing command may
-  not silently reopen the hole. A dispossessed session running the fold command is refused with
-  the same message the tick already gives it.
-  VERIFIABLE: a Vitest case per landing command proving the fence refuses it without the lease
-  and allows it with one, plus a check that fails when a command that mutates the work order is
-  missing from the list.
-  Criticality: medium — nothing is lost while one session owns the batch, but two owners writing
-  the work order is the state the lease was built to make impossible.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 739. Taking the batch is fenced by the HANDOVER mark, so a window can take it with a third
-  of its context already spent (measured 19.08.2026, 18:39). `batch-claim.mjs` is in the context
-  fence's `START_SCRIPTS` and `CLEAR_FIRST_SCRIPTS` (`scripts/context-fence-core.mjs`), so the
-  fence does refuse a claim past the mark and names `/clear` — that part works. But the mark it
-  refuses against is the 150000-token HANDOVER watermark, and a window that claims the batch at
-  101487 tokens is below it and passes. The user caught that one by hand ("Damit hättest du
-  direkt einen schlechten Start"); the mechanism did not.
-  WHY TWO NUMBERS, NOT ONE. The 150000 mark answers "when must a RUNNING session hand over?" — a
-  session with work in flight. Taking the batch asks the opposite question: "how fresh must a
-  worker be to START one?", and a fresh worker should begin near zero. One number cannot serve
-  both without being wrong at one end.
-  FINAL STATE: the claim path is fenced against its OWN threshold, separate from the handover
-  watermark, and the refusal names the remedy (`/clear`, then claim). THE NUMBER IS MEASURED
-  BEFORE IT IS SET: what starting context did the sessions that actually LANDED points run with?
-  A number picked from taste would be the same guess this point exists to replace.
-  VERIFIABLE: Vitest over the pure decision — a claim below the claim threshold passes, one above
-  it is refused with the remedy named, and the handover watermark keeps its own behaviour
-  unchanged; plus the measurement recorded with the chosen number.
-  Criticality: medium — it costs a whole session's quality when it fires, and this incident is the
-  FIRST recorded recurrence after the fence was armed (Sol's audit of 19.08. refused the larger
-  proposal for lack of exactly this evidence, so it belongs in that series).
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 740. Every chat answer carries the session's CONTEXT LEVEL beside the timestamp (user
-  19.08.2026, 18:36: he wants to see where we stand and whether the new mechanisms bite, without
-  asking). Measured the same evening: `scripts/context-watermark.mjs --status --transcript <path>`
-  answers in 0.063 s with the token count of the newest non-sidechain usage entry, and the
-  project's own `scripts/dashboard-reminder-hook.mjs` ALREADY reads `transcript_path` and is ESM,
-  so it can import `context-watermark-core.mjs` directly — no second copy of the counting rule,
-  and no edit to the user-global CJS timestamp hook, which reads no stdin. `TIMESTAMP_RE` in
-  `scripts/timestamp-guard-core.mjs` is anchored at the line start and has no `$`, so a suffix
-  behind the bold stamp does not trip that guard; it needs no change.
-  FINAL STATE: the header line the session writes carries the context reading beside the German
-  timestamp, fed by the hook rather than by a tool call the model must remember to make. It
-  appears in BOTH branches of the hook — the stand-down branch too, or it is missing in exactly
-  the sessions that most need it — and an unreadable measurement is reported honestly as "--",
-  never as 0. `MEMORY.md`'s chat-timestamp entry describes the full header afterwards.
-  VERIFIABLE: Vitest over the hook's text for both branches, with a readable and an unreadable
-  transcript, and a case pinning that the produced header still satisfies the timestamp guard's
-  own predicate.
-  Criticality: low — it is a display, and it costs ~15 tokens a turn through the hook against
-  300-500 for a tool call. A hook is a mechanism, so the change needs the other model's recorded
-  review before it lands.
-  Bundle: Chat & Tafel.
-
 - [ ] 741. A carrier entry carries its writer's situation as though it were the finding's own
   (measured 19.08.2026, 18:47). The entry of 16:38 closed with "blocked until the batch is taken
   over (a claim stands, fb439a94 holds the lock)". Re-measured, that is not true any more and was
@@ -8936,45 +9227,4 @@ to land than a mechanism that needs a review.
   with the missing part named.
   Criticality: low — nothing is lost, but the cost is silent and one-sided: work is deferred that
   nothing was stopping.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 742. The context overshoot is measured once and then forgotten, so nobody can tell whether
-  arming the fence fixed it (19.08.2026; the reduced form of a larger proposal, cut down by
-  GPT-5.6 Sol's audit). A session took its handover at 311039 tokens against the 150000
-  watermark — 161039 past it, with a stated margin of 25000. `batch-boundary.mjs --commit
-  --context` measures that overshoot and PRINTS it, and `.claude/boundary.log` records the
-  handover, but the number is kept nowhere: the next reading starts from zero.
-  WHAT THIS POINT DELIBERATELY DOES NOT DO. The original proposal had the boundary trigger an
-  automatic post-mortem that files a top-of-queue point for a new mechanism. Sol's audit refused
-  it on the evidence, and the refusal is adopted: the ONE measured overshoot already has a known
-  prevention in point 542 (the context fence is built and tested but wired into no hook chain),
-  and there is NO post-arming recurrence evidence that would justify a second, probably HIGH
-  mechanism beside the sleeping one — which is exactly how four dormant guards came about.
-  Automatic triage and automatic ranking are therefore NOT built here; this point only makes the
-  recurrence MEASURABLE, so the later decision rests on readings instead of guesses.
-  FINAL STATE:
-  - THE BOUNDARY WRITES AN INCIDENT RECORD whenever the measured context exceeds the watermark
-    by more than the stated margin. It records the measurement (tokens, watermark, margin), the
-    session, the point in flight, and the repository head — appended, never rewritten, so the
-    series survives every handover.
-  - THE RECORD CARRIES THE GROWTH, NOT ONLY THE ENDPOINT. Sol's audit named the gap: a call that
-    STARTS below the mark and whose RESPONSE crosses it appears in no "calls past the mark" list,
-    and reads the fence deliberately allows are a normal way for context to grow. The record
-    therefore holds the per-turn context growth of the session, so the largest single step is
-    visible wherever it began.
-  - ONE COMMAND READS THE SERIES: how many overshoots since a given date or commit, their size
-    distribution, and what each session was doing. It is the reading the deferred decision needs
-    — after the fence is armed, it answers whether overshoots still happen at all.
-  - NOTHING IS FILED OR RANKED AUTOMATICALLY. The record is evidence, not a queue action.
-  - THE RESIDUAL IS NAMED WITH ITS DIRECTION: a session that dies without taking a boundary
-    writes no record, so the series UNDER-counts and never over-counts. Closing that would mean
-    deriving the reading at session start from the predecessor's transcript, which is a separate
-    point and is not claimed here.
-  VERIFIABLE: Vitest over the pure record shape and the growth extraction, with recorded
-  fixtures — an overshoot inside the margin (no record), one beyond it (a record), and one whose
-  largest growth step BEGAN below the watermark and is still reported; the reading command runs
-  over a fixture series and prints the count, the distribution and the per-incident context.
-  Criticality: low — it only writes and reads a record and changes no control flow; the care it
-  needs is that the boundary must not fail when the record cannot be written, since the handover
-  matters more than the bookkeeping.
   Bundle: Session- & Repo-Hygiene.
