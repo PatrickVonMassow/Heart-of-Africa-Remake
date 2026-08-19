@@ -251,6 +251,27 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(ok({ toolName: 'Write', filePath: '.claude/dashboard-state.json' }).block).toBe(false)
   })
 
+  it('§8 chokepoint: a MultiEdit of the guarded files is the write it is, not a read', () => {
+    // Point 542, four-eyes round 3 (Sol): `MultiEdit` was added to the write-tool
+    // set here without a case of its own, which is the same hole the round found
+    // twice already — a write tool a set forgets passes silently the day the
+    // harness gains it. The asymmetry the whole chokepoint keeps still holds:
+    // the ACTION is refused, never the READ that would tell the session why.
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: 'TASKS.md' })).toMatchObject({ kind: 'tasks' })
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: 'docs/tasks-archive.md' })).toMatchObject({
+      kind: 'tasks',
+    })
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: '.claude/dashboard-state.json' })).toMatchObject({
+      kind: 'dashboard-state',
+    })
+    expect(call({ toolName: 'MultiEdit', filePath: 'TASKS.md' })).toMatchObject({ block: true, kind: 'tasks' })
+    // and the current-fence owner keeps doing all of it
+    expect(fenceDecision({ fenceState: stale, sessionId: 's-new', toolName: 'MultiEdit', filePath: 'TASKS.md' }).block).toBe(false)
+    // a path alone is still not an action
+    expect(fenceGuardedAction({ toolName: 'Read', filePath: 'TASKS.md' })).toBe(null)
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: 'src/world/world.ts' })).toBe(null)
+  })
+
   it('leaves everything OUTSIDE the four families alone, even for a fenced-out session', () => {
     // A gate that can trap the session is worse than the staleness it fixes: a
     // dispossessed session must still be able to read, commit locally and finish
