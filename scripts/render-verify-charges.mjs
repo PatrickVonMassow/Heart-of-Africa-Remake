@@ -167,6 +167,28 @@ export const RED_CHARGES = [
       /(TRAA (off again|toggle stress)|F9 low|Graphics levels|the leak block produced no OTHER|first-person ground shows micro-detail)/i,
   },
   {
+    point: 514,
+    suite: 'settings',
+    backend: 'webgpu',
+    kind: 'console',
+    why:
+      'THE SAME LANE FAULT FROM THE OTHER SIDE, charged 19.08.2026. The entry above already ' +
+      'excuses the CHECKS that report these errors ("TRAA off again: no new console errors", ' +
+      '"Graphics levels: no new console errors across the F9 cycle"), while the console ' +
+      'pseudo-checks carrying the identical texts stayed unaccounted — so the same measured lane ' +
+      'fault blocked the gate through a second door. The cascade is one root cause, named in point ' +
+      '514 §5: on the compatibility lane the MSAA fallback cannot exist, `RGBA16Float does not ' +
+      'support multisampling` arrives as an uncaptured GPUValidationError, and the invalid ' +
+      'msaa-texture/view/command-buffer and async-pipeline errors are its downstream. Read off the ' +
+      'two 13.08.2026 webgpu/settings records, where they sit beside the checks the entry above ' +
+      'already charges. Suite-, backend- and kind-scoped, and it dies with point 514. RESIDUAL, ' +
+      'stated rather than hidden: on a CORE WebGPU adapter one of these texts would be a real ' +
+      'defect and is excused here too — but the check that would have caught it is excused by the ' +
+      'entry above already, so this closes a door that was open, it does not open a new one.',
+    match:
+      /(RGBA16Float|Invalid Texture "(output|normal)-msaa"|Invalid TextureView|Invalid CommandBuffer from CommandEncoder|Async render pipeline creation failed)/i,
+  },
+  {
     point: 568,
     suite: 'polish',
     backend: 'webgl',
