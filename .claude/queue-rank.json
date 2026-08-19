@@ -1,5 +1,9 @@
 {
   "ranked": {
+    "614": {
+      "at": "2026-08-19T14:05:26.684Z",
+      "why": "Nutzerentscheidung 19.08.2026: die Analyse wird komplett neu erhoben und in DEMSELBEN Punkt umgesetzt; sie steht als naechster Task vor 736."
+    },
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."

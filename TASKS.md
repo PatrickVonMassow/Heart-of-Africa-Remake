@@ -76,6 +76,62 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 614. Re-run the four-eyes work-order cleanup FROM SCRATCH, and execute it in the same
+  point (user 19.08.2026: »Dann schmeiße die Ergebnisse von 614 weg und fange nochmal komplett
+  neu mit der Analyse mit Vier Augen an. Setze die dieses Mal auch direkt vollständig um.«).
+  WHY FROM SCRATCH RATHER THAN EXECUTING WHAT WAS FOUND: the 10.08.2026 verdict was never
+  executed, and a stocktaking spoils while the stock moves. MEASURED 19.08.2026: of its 42
+  named points 35 are still open, but two of its seven merges are dead (569+606 → 573 and
+  608 → 590 all landed), one contradiction may have been decided one-sidedly when 612 landed,
+  and 77 of today's 208 open points — 37 % — were appended after it and were never analysed.
+  The cost driver is READING the work order (690 KB), which a delta run over the 77 new points
+  pays almost in full, so a fresh run costs little more and leaves no item needing a
+  "does this still hold?" pass. The old verdict is NOT deleted from history — it stands in
+  this file's git history — but it is NOT an input: a model handed a finished list checks that
+  list instead of seeing afresh (CLAUDE.md §6, the anchoring reason blind-parallel exists).
+  FINAL STATE:
+  - THE ANALYSIS IS RUN BLIND PARALLEL over the CURRENT open set, by two models that do not
+    see each other's result and do not see the 10.08. verdict. Same input, each a complete
+    result of its own: duplicates to merge, specs no longer valid as written, contradictions
+    between points, and points whose work is already delivered.
+  - THE MERGE GOES TO A THIRD MODEL that wrote neither list and is COUNTED through
+    `scripts/blind-merge.mjs`: every entry carries an id and the union accounts for each as
+    `only A`, `only B` or `merged with <id>`. `mechanism-review.mjs --merged-by` records who
+    merged and refuses either author.
+  - THE OLD VERDICT IS RECONCILED AFTERWARDS, NEVER BEFORE. Once the new union stands, the
+    10.08. verdict is compared against it and every item the new run did NOT find is listed
+    with a verdict: still true (then it is a MISS of the new run and is carried), or overtaken.
+    The miss count is reported — it measures the analysis itself.
+  - THE EXECUTION IS PART OF THIS POINT, not a successor. The point is not done when the
+    verdict exists; it is done when `TASKS.md` and `docs/work-packages.md` HOLD it: every merge
+    performed with the survivor carrying the merged point's unique clauses, every invalid spec
+    re-cut to what remains, every contradiction resolved by one owner, every delivered point
+    ticked and archived. Nothing is deleted without its content landing somewhere.
+  - `docs/work-packages.md` IS RECONCILED IN THE SAME PASS. Measured 19.08.2026:
+    `bundle-first-guard --status` reports 108 open points in no bundle, against the 52 the
+    10.08. reading found and the 29 the document's own text claims, and its newest bundle rows
+    stop around 726. Back-fill the missing points AND either restore the "every open point
+    appears exactly once" rule or withdraw it in CLAUDE.md, so the paragraph and the table
+    agree.
+  - THE RUN NAMES ITS OWN WINDOW so the next reader knows what it covered: the open-point count
+    and the HEAD it was cut from, recorded with the verdict.
+  VERIFIABLE: the counted union exists with a named merger who authored neither list; the
+  reconciliation against the 10.08. verdict is recorded with its miss count; after the pass
+  every merged point is gone from `TASKS.md` with its unique clauses present in the survivor;
+  `tasks-archive-guard`, `queue-order-guard` and `bundle-first-guard --status` are clean; and
+  the open count drops by the number of merges and ticks made.
+  A FOLD ALSO NEEDS A WAY ONTO THE BOARD (measured 13.08.2026): a point filed and folded within
+  the hour can be ticked and archived, but NO board command can give it the Erledigt card the
+  dashboard audit then demands — `done` needs a now-card, `promote` needs a queue card, and the
+  queue is derived from the OPEN work order the point has just left. The only way out was
+  `--waive-audit`, which bypasses the audit rather than satisfying it. This point is where the
+  folds happen, so it carries the fold's own board path: one command that ticks, archives and
+  writes the Erledigt card naming the point the content went to.
+  Criticality: high — it rewrites the work order itself, several points at once, and a merge
+  that drops a clause loses work no test would miss. The blind-parallel find, the third-model
+  merge and the counted union are the assurance; the execution is checked point by point
+  against the union before anything is deleted.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 736. The escalation lane has no way back DOWN, so one point sits on the scarcest model
   for good (measured 19.08.2026 from the harness transcripts under
   `/home/node/.claude/projects/-workspace-hoa`, window since 18.08. 19:00). Fable ran 1137 turns
@@ -2411,89 +2467,6 @@ put it is the mistake this line exists to stop.
   report with the right age; plus the report's own output asserted on a fixture directory.
   Criticality: high — it decides whether our whole apparatus of lessons takes effect or
   merely records.
-
-- [ ] 614. Execute the four-eyes work-order cleanup (10.08.2026; the verdict of a
-  BLIND-PARALLEL analysis by two models on the 148 open points — CLAUDE.md §6, divergent
-  stage). Both runs were merged by MEANING; where only one model found an item it is
-  MARKED as such and kept. This point EXECUTES the verdict on `TASKS.md` and
-  `docs/work-packages.md`; it is main-only work, so it does not go to a feature branch.
-  MERGES — both models independently found these (each is ONE defect reported several
-  times, and every extra copy costs its own verification round):
-  · 569 + 606 → 573. All three are `scripts/verify/scope.test.mjs` resolving
-    `node_modules/.bin/oxlint` under `process.cwd()`, red in every agent worktree.
-    Keep 573's false-green clause (a spawn that never ran also exits non-zero) and its
-    spawn-assertion gate, plus 569's dependency bootstrap and 606's sweep of the other
-    local-binary resolutions.
-  · 608 → 590. Same file, same guard, same final state; 590 additionally ranks a newly
-    appended point. Fold in 471's two paragraphs on the stored-versus-documented order
-    and leave 471 its picker/slot-feeding half.
-  · 609 → 542. 542 already arms `point-proof-guard` as one of its three dormant guards,
-    and both are attended-only. Keep 609's "is this guard reachable from the settings
-    chain at all" inventory check as a 542 deliverable.
-  · 500 + 501 → 523. One empty leave-capture (opaque 0.000, 0 px west, 0 px east)
-    reported three times; keep 500's drawable-versus-committed and 501's cached-capture
-    as the two candidate causes inside 523.
-  · 336 + 570 (+ 568, ONE model) → 200. Both say so in their own text; one owner for the
-    rotating-staging flake family, one verification round.
-  · 522 → 321 (ONE model). 321 rebuilds the whole grass-fire depiction; 522 adds a single
-    clause about measuring drawn fire pixels.
-  · 463 part A → 504 (ONE model); part B stays with the guard sweep.
-  CONTRADICTION TO RESOLVE, not merge: 612 item 2 (an idle owner loses the lock after a
-  short window) and 517 item 5 (the launcher EXTENDS the lease while evidence advances)
-  pull the same `leaseUntil` arithmetic in opposite directions. ONE function must own
-  the decision, or whichever lands second silently undoes the first.
-  NO LONGER VALID AS WRITTEN — with the evidence each model recorded:
-  · 466 — its work exists already. `node scripts/verify/docs.mjs` exits green at HEAD, including
-    the detail-pointer checks this point asks to ADD. Tick and archive.
-  · 184 / 203 / 207 / 309 / 330 — each carries internal DONE records and archived
-    successors, so each reads as an unstarted 60-line block in every context that loads
-    the work order. Re-cut to what actually REMAINS (184: pillars 1+2, its execution
-    clause contradicts the §6 model policy and the no-ultracode rule; 203: the inspection
-    passes, B/D/E; 207: ii–vii, and (ii)'s golden-image gate is REJECTED by point 361 —
-    strike or condition it; 309: the LARGE proof only; 330: fold the residual into 303,
-    591 and the closing cycle).
-  · 265 and 269 — the RESEARCH half is delivered in `docs/fauna-behaviour-1890.md`;
-    strike the research clause, keep the build.
-  · 531 — its VERIFIABLE greps for a phrase `design.md` no longer contains, so the test
-    would pass without the fix. The defect stands; re-word the acceptance.
-  · 537 — `prep-guard` already left `KNOWN_UNTESTED`; the list is 6 names, not 7.
-  · 512 — its arithmetic quotes a 61.6 KB CLAUDE.md; the file is 45.5 KB since the
-    evidence and detail moved out. Re-derive the lever's size before selling it.
-  · 607 — the drifted count drifted again (162 in the test, 132 in the evidence), which
-    is that point's own thesis.
-  · 451 — half delivered (stdin works); what remains is the explicit flag and the loud
-    refusal of an unknown one.
-  · 379 and 380 — their blocking clauses name points that are archived done; strike them.
-  · 357 — its wordless-voices clause rests on §13.4 being undecided, which the delivered
-    communication PoC settled; the gap it describes is real, the clause is not.
-  PREMISE TO RE-MEASURE BEFORE ANY WORK: 506 argues from a SOFTWARE WebGPU lane at
-  ~1 fps, while archived point 505 put the lane on the card and open point 498 states the
-  factor is history — the work order contradicts itself, and 506/507/514/498 all hang off
-  the answer. One run of `scripts/verify/backend-lane-check.mjs` plus one timed
-  `VERIFY_GL=webgpu` suite settles it.
-  ALSO: `docs/work-packages.md` is measurably behind — it ranks archived points at the
-  head and `bundle-first-guard --status` reports 52 unbundled open points against the 29
-  its own text claims. It has also STOPPED RECEIVING NEW POINTS (measured 17.08.2026 while
-  filing 711): the newest numbers in its bundle rows stop around 649, and 700, 703, 704 and
-  709 appear nowhere in it, while the "Work packages (bundles)" paragraph of this file states
-  "Every open point appears there exactly once; a new point joins a bundle when appended".
-  So the stated rule is broken for at least ten points, and a session that follows it for its
-  own point writes into a table the others are missing from. Reconcile it in the same pass —
-  back-fill the missing points AND either restore the rule or withdraw it in this file, so the
-  paragraph and the table say the same thing; it is the precondition 542 names.
-  VERIFIABLE: after the pass, every merged point is gone from `TASKS.md` with its unique
-  clauses present in the survivor; `tasks-archive-guard`, `queue-order-guard` and
-  `bundle-first-guard --status` are clean; and the open count drops by the number of
-  merges and ticks made. No point is deleted without its content landing somewhere.
-  A FOLD ALSO NEEDS A WAY ONTO THE BOARD (measured 13.08.2026): a point filed and folded
-  within the hour can be ticked and archived, but NO board command can give it the Erledigt
-  card the dashboard audit then demands — `done` needs a now-card, `promote` needs a queue
-  card, and the queue is derived from the OPEN work order the point has just left. The only
-  way out was `--waive-audit`, which bypasses the audit rather than satisfying it. This point
-  is where seven duplicates get folded, so it carries the fold's own board path: one command
-  that ticks, archives and writes the Erledigt card naming the point the content went to.
-  Criticality: medium — it removes verification rounds that would otherwise be paid
-  several times for one defect, and it stops five blocks from reading as unstarted work.
 
 - [ ] 639. The assurance regime for the release machinery (user 11.08.2026: "Das Ganze ist
   ein kritischer neuer Mechanismus … Überlege, ob du die drei verfügbaren Modelle hier noch
