@@ -398,11 +398,18 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     expect(withoutOutputDescriptorMerges('x 2>&1a')).toBe('x 2>&1a')
   })
 
-  it('a merge followed by a lone & stays the redirection it is', () => {
-    // MEASURED 19.08.2026: a BARE trailing `&` already passes on main, which is a
-    // separate pre-existing hole and a finding of its own. What must not happen is
-    // this point widening it, so the decorated form is pinned here.
-    expect(call({ command: 'node scripts/batch-boundary.mjs --clear 2>&1&' }).survives).toBe(false)
+  it('a DETACHED closing command is not closing work, however it is spelled', () => {
+    for (const command of [
+      'node scripts/batch-boundary.mjs --clear &',
+      'node scripts/batch-boundary.mjs --clear 2>&1&',
+      'node scripts/batch-boundary.mjs --clear 2>&1 &',
+    ]) {
+      expect(call({ command }).survives, command).toBe(false)
+    }
+    // An & BETWEEN two closing commands is a chain, not a detachment: both run and
+    // both are judged, which the set has always accepted.
+    expect(call({ command: 'node scripts/board.mjs attest & node scripts/board-publish.mjs' }).survives).toBe(true)
+    expect(call({ command: 'node scripts/board.mjs attest && node scripts/board-publish.mjs' }).survives).toBe(true)
   })
 
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {

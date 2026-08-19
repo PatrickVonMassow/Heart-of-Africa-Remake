@@ -754,11 +754,23 @@ const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
  * re-review of c5a97818): stripping the merge in `--clear 2>&1&` would leave
  * `--clear &`, whose empty trailing segment disappears in the split, and the call
  * would pass as closing work while actually running detached. Only `&&`, which
- * sequences, qualifies.
+ * sequences, qualifies — and the detachment itself is refused separately below,
+ * so no spelling of it reaches the segment split.
  */
 export function withoutOutputDescriptorMerges(command) {
   return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|]|&&|$)/g, '$1')
 }
+
+/**
+ * A TRAILING `&` DETACHES THE WHOLE LINE, and a detached call is not the closing
+ * work it names (Sol re-review of 0de0a948). `--clear &` and `--clear 2>&1 &`
+ * both end in an empty segment the split silently drops, so the line read as
+ * closing while the shell backgrounded it and moved on — the boundary was never
+ * withdrawn by the time the next call was judged. An `&` BETWEEN two segments is
+ * different and stays allowed: both commands run, and each is judged on its own,
+ * which is the chain the set has always accepted.
+ */
+const TRAILING_DETACH_RE = /(^|[^&])&\s*$/
 
 /**
  * A PURE OUTPUT PAGER — a segment that only looks at what the segment before it
@@ -783,7 +795,9 @@ export function isOutputPagerSegment(segment) {
 
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
-  const segments = withoutOutputDescriptorMerges(command)
+  const stripped = withoutOutputDescriptorMerges(command)
+  if (TRAILING_DETACH_RE.test(stripped)) return false
+  const segments = stripped
     .split(/&&|\|\||[;|&\n\r]+/)
     .map((s) => s.trim())
     .filter(Boolean)
