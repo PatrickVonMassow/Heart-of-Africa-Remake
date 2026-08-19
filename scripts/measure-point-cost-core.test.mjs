@@ -96,13 +96,13 @@ describe('boundary events and the landed-point ledger', () => {
       ...parseCodexTranscript(fixture('codex-review.jsonl')),
     ]
     const turns = assignPoints(raw, [900])
-    const events = associateBoundaryEvents(parseBoundaryLog(fixture('boundary.log')), turns)
+    const events = associateBoundaryEvents(parseBoundaryLog(fixture('boundary.txt')), turns)
     return aggregatePointLedger({ landed: [{ point: 900, sha: 'abc', landedAt: '2026-08-18T10:20:00Z' }], turns, boundaryEvents: events })
   }
 
   it('associates a watermark session with the point active in that session', () => {
     const turns = assignPoints(parseClaudeTranscript(fixture('claude-main.jsonl'), { file: 'main.jsonl' }), [900])
-    const events = associateBoundaryEvents(parseBoundaryLog(fixture('boundary.log')), turns)
+    const events = associateBoundaryEvents(parseBoundaryLog(fixture('boundary.txt')), turns)
     expect(events.map((event) => [event.kind, event.point])).toEqual([
       ['pointBoundary', 900],
       ['contextWatermark', 900],
