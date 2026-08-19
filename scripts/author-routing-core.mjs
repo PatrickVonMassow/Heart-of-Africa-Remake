@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@05eaa324
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@19ee578a
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -19,10 +19,10 @@
 //          the main session's job, so authoring it elsewhere buys nothing) —
 //          and only while nothing marks that point hard, because the user's
 //          18.08. ruling outranks this lane, not the other way round.
-//   fable  Fable 5 takes ONE case (user 17.08.2026): work whose re-work the
-//          review still finds problems in. Its weekly pool is the scarcest of
-//          the three, so the CUT sends nothing else there — a point's own lane
-//          tag and the caller's override still can, and both are deliberate.
+//   fable  Fable 5 is the escalation described by CLAUDE.md §6. Its weekly
+//          pool is the scarcest of the three, so the CUT sends nothing else
+//          there — a point's own Fable tag and the caller's override still can,
+//          and both are deliberate.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -43,6 +43,229 @@ export const LANE_MODEL = Object.freeze({
   fable: 'Fable 5',
   opus: 'Opus 5',
 })
+
+/** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
+export const FABLE_ESCALATION_ROUNDS = 5
+
+/** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
+export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
+
+/**
+ * The hostile-tester stances used to make successive re-authoring commissions
+ * ask materially different questions of the same lane. These are instructions,
+ * not labels: the prompt can hand either one to an author without another
+ * judgment call in the dispatcher.
+ */
+export const AUTHORING_FRAMINGS = Object.freeze([
+  'Act as a hostile tester: assume the previous fix is confidently wrong, reproduce every finding from first principles, and search the adjacent state transitions for the same failure.',
+  'Act as a hostile contract tester: treat every sentence of the point as an adversarial boundary, construct the smallest counterexample to the current implementation, and repair the invariant rather than the example.',
+])
+
+/** The two outcomes a completed examination may record. */
+export const SPEC_EXAMINATION_VERDICTS = Object.freeze(['sound', 'amended'])
+
+/** A pre-dispatch receipt written by author-sol for a round governed by this mechanism. */
+export const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+
+const isUnsuccessfulReview = (record, wanted) => {
+  if (Number(record?.point) !== wanted) return false
+  if (record?.mode && record.mode !== 'review') return false
+  if (record?.specExamination) return false
+  if (record?.aborted || record?.shortfall || record?.completed === false) return false
+  return record?.verdict === 'merge-with-fixes' || record?.verdict === 'do-not-merge'
+}
+
+const isExaminationRecord = (record, wanted) =>
+  Number(record?.point) === wanted &&
+  record?.mode === 'review' &&
+  record?.verdict === 'merge' &&
+  SPEC_EXAMINATION_VERDICTS.includes(String(record?.specExamination)) &&
+  !record?.aborted &&
+  !record?.shortfall &&
+  record?.completed !== false &&
+  String(record?.evidence ?? '').trim().length >= 10
+
+/** The examiner is always the other vendor and never the scarce Fable pool. */
+export function specExaminerFor(history = {}, fallbackAuthor = '') {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const author = [...rounds].reverse().find((round) => round.authoredBy)?.authoredBy || String(fallbackAuthor)
+  if (/\bsol\b/i.test(author)) {
+    return { vendor: 'claude', model: 'Opus 5', route: 'claude-read', author }
+  }
+  return { vendor: 'sol', model: 'GPT-5.6 Sol', route: 'ask-sol', author }
+}
+
+/**
+ * An unsuccessful round is a completed review whose verdict was not a pass.
+ * A run that aborted, did not run or had a material shortfall is not completed
+ * and does not count; the ordinary record path writes no row for those cases,
+ * and the defensive checks here also reject such a hand-authored row.
+ */
+export function unsuccessfulReviewRounds(records = [], point = '') {
+  const wanted = Number(point)
+  if (!Number.isInteger(wanted) || wanted < 0) return 0
+  return (Array.isArray(records) ? records : []).filter((record) => isUnsuccessfulReview(record, wanted)).length
+}
+
+/**
+ * Read the re-authoring history once, in ledger order.
+ *
+ * Outcomes of authoring rounds zero and one carry no framing. Every later fresh
+ * attempt must name one and must differ from the preceding fresh attempt. A
+ * missing or repeated framing remains visible as a repeat, but does not buy
+ * progress toward the scarce Fable lane.
+ */
+export function authorRoundHistory(records = [], point = '') {
+  const wanted = Number(point)
+  if (!Number.isInteger(wanted) || wanted < 0) {
+    return { unsuccessfulRounds: 0, freshRounds: 0, rounds: [], examination: null }
+  }
+  const rows = Array.isArray(records) ? records : []
+  // This is also the number of the NEXT commission: the first review row is
+  // the outcome of round zero, the second the outcome of round one, and so on.
+  let freshRounds = 0
+  let previousFraming = ''
+  const rounds = []
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const record = rows[rowIndex]
+    if (!isUnsuccessfulReview(record, wanted)) continue
+    const index = rounds.length
+    const reviewFraming = String(record?.authorFraming ?? '').trim()
+    const commission = [...rows.slice(0, rowIndex)].reverse().find(
+      (candidate) =>
+        candidate?.kind === AUTHORING_COMMISSION_KIND &&
+        Number(candidate?.point) === wanted &&
+        Number(candidate?.round) === index,
+    )
+    const commissionedFraming = String(commission?.authorFraming ?? '').trim()
+    const framing = commissionedFraming || reviewFraming
+    // No old ledger row could carry a commission receipt or the confirmation
+    // flag: those rows are real pre-mechanism attempts, not malformed uses of
+    // a rule that did not exist. Once either marker exists, enforce the rule.
+    const governed = Boolean(commission || reviewFraming)
+    // Every ledger outcome consumes its own attempt number, including a
+    // repeat. Freshness controls escalation credit; it must not also control
+    // the ordinal, or one bad row makes every later row retry the same rules.
+    const reviewedRound = index
+    let repeat = ''
+    if (commission && reviewFraming && reviewFraming !== commissionedFraming) {
+      repeat = 'the review framing does not match the recorded commission'
+    }
+    if (governed && reviewedRound <= 1 && framing) repeat = 'rounds zero and one must carry no author framing'
+    if (governed && reviewedRound > 1 && !framing) repeat = 'no author framing was recorded'
+    if (governed && framing && !AUTHORING_FRAMINGS.includes(framing)) {
+      repeat = 'the record names no recognized hostile-tester framing'
+    }
+    if (governed && framing && previousFraming && framing === previousFraming) {
+      repeat = 'the author framing repeats the preceding fresh round'
+    }
+    if (!repeat) {
+      freshRounds += 1
+      previousFraming = framing
+    }
+    rounds.push({
+      ledgerRound: index + 1,
+      freshRound: repeat ? null : reviewedRound,
+      framing,
+      commissioned: Boolean(commission),
+      repeat,
+      evidence: String(record?.evidence ?? '').trim(),
+      authoredBy: String(record?.authoredBy ?? '').trim(),
+    })
+  }
+  const expectedExaminer = specExaminerFor({ rounds })
+  const examination =
+    [...rows]
+      .reverse()
+      .find((record) => {
+        if (!isExaminationRecord(record, wanted)) return false
+        if (!expectedExaminer.author) return true
+        return expectedExaminer.route === 'claude-read'
+          ? /\bopus\b/i.test(String(record?.model))
+          : /\bsol\b/i.test(String(record?.model))
+      }) ?? null
+  return { unsuccessfulRounds: rounds.length, freshRounds, rounds, examination }
+}
+
+/** Pick a known hostile-tester stance that is not the preceding one. */
+export function nextAuthoringFraming(previous = '') {
+  const before = String(previous ?? '').trim()
+  return AUTHORING_FRAMINGS.find((framing) => framing !== before) ?? AUTHORING_FRAMINGS[0]
+}
+
+/**
+ * What happens after the history just read: an authoring commission or the one
+ * spec examination immediately before the automatic Fable threshold.
+ * `escalationRounds` is injectable only so the test can prove every boundary
+ * moves with the exported constant instead of hiding a round-number literal.
+ */
+export function nextAuthoringStep({
+  records = [],
+  point = '',
+  reworkRounds,
+  escalationRounds = FABLE_ESCALATION_ROUNDS,
+} = {}) {
+  const history = authorRoundHistory(records, point)
+  const examinationRound =
+    escalationRounds === FABLE_ESCALATION_ROUNDS ? SPEC_EXAMINATION_ROUND : escalationRounds - 1
+  const overridden = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : null
+  const freshRounds = overridden ?? history.freshRounds
+  const round = overridden ?? history.unsuccessfulRounds
+  if (freshRounds === examinationRound && !history.examination) {
+    return {
+      kind: 'spec-examination',
+      round,
+      framing: '',
+      history,
+      reason:
+        `${freshRounds} fresh attempts have reached the step before the Fable escalation threshold of ${escalationRounds}; ` +
+        'the point text and generated brief must be examined against every finding before another commission',
+    }
+  }
+  const previous = [...history.rounds].reverse().find((round) => round.freshRound !== null)?.framing ?? ''
+  const framing = round > 1 ? nextAuthoringFraming(previous) : ''
+  return {
+    kind: 'commission',
+    round,
+    framing,
+    history,
+    reason: framing
+      ? `re-authoring round ${round} is decorrelated with a hostile-tester framing`
+      : `authoring round ${round} is the unframed baseline`,
+  }
+}
+
+/** The whole ledger-derived history as a compact dispatcher-facing reading. */
+export function formatAuthorRoundHistory(history = {}) {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const oneLine = (value) =>
+    String(value ?? '')
+      .replace(/\s+/g, ' ')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+      .trim()
+  const lines = [
+    `  review record: ${Number(history?.unsuccessfulRounds) || 0} unsuccessful round(s); ` +
+      `${Number(history?.freshRounds) || 0} fresh attempt(s)`,
+  ]
+  if (!rounds.length) lines.push('  round history: no unsuccessful reviews recorded')
+  for (const round of rounds) {
+    if (round.repeat) {
+      lines.push(`  ledger review ${round.ledgerRound}: REPEAT — ${round.repeat}`)
+      continue
+    }
+    lines.push(
+      `  round ${round.freshRound}: ${round.framing ? `framing — ${oneLine(round.framing)}` : 'unframed baseline'}`,
+    )
+  }
+  const examination = history?.examination
+  lines.push(
+    examination
+      ? `  spec examination: ${oneLine(examination.specExamination)} — ${oneLine(examination.evidence)}`
+      : '  spec examination: not recorded',
+  )
+  return lines.join('\n')
+}
 
 /**
  * The words CLAUDE.md §6 itself uses for the hard cases, plus the classic
@@ -196,32 +419,35 @@ function hits(markers, text) {
  * Inputs — all optional, because a caller rarely has all of them:
  *   body         the point's text out of the work order
  *   criticality  its tag, as `criticalityOf` reads it ('low' | 'med' | 'high')
- *   reworked     did the review still find problems in a re-work of this point?
- *                (CLAUDE.md §6: such work MOVES to Fable)
+ *   reworkRounds completed reviews of this point whose verdict was not a pass
  *   override     a lane the caller insists on, beating even the tag
  *
  * Returns { lane, model, why, signals } — `why` is the ordered list of reasons,
  * first the deciding one. It NEVER throws and never answers nothing: an empty
  * input is a point with no signal against it, which is the mechanical case.
  */
-export function authorLaneFor({ body = '', criticality = null, reworked = false, override = '' } = {}) {
+export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0, override = '' } = {}) {
   const text = String(body ?? '')
   const tag = laneTagIn(text)
   const hard = hits(HARD_MARKERS, text)
   const verification = hits(VERIFICATION_MARKERS, text)
-  const signals = { tag, criticality: criticality ?? null, reworked: Boolean(reworked), hard, verification }
+  const rounds = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : 0
+  const signals = { tag, criticality: criticality ?? null, reworkRounds: rounds, hard, verification }
   const decide = (lane, reason) => ({ lane, model: LANE_MODEL[lane], why: [reason], signals })
 
   if (LANES.includes(String(override).toLowerCase())) {
     return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
   }
-  // A RE-WORK THE REVIEW STILL FINDS PROBLEMS IN OUTRANKS EVERY OTHER SIGNAL
-  // (CLAUDE.md §6). Whatever the text looks like — and whatever lane it was
-  // TAGGED for — the evidence says the lane it was on could not finish it. It
-  // stood BELOW the tag until the cross-vendor review of point 667 (P1) read the
-  // order against the sentence claiming it, and `Author lane: sol` plus a failed
-  // re-work therefore stayed with Sol.
-  if (reworked) return decide('fable', 'the review still found problems after a re-work — §6 moves such work to Fable')
+  // A FABLE TAG IS AN OPERATOR DECISION, not an automatic signal. It therefore
+  // remains immediate while tags naming the ordinary lanes yield once the
+  // recorded escalation boundary has actually been reached.
+  if (tag === 'fable') return decide(tag, 'the point itself carries `Author lane: fable`')
+  if (rounds >= FABLE_ESCALATION_ROUNDS) {
+    return decide(
+      'fable',
+      `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
+    )
+  }
   if (tag) return decide(tag, `the point itself carries \`Author lane: ${tag}\``)
   // A HARD OR CRITICAL POINT GOES STRAIGHT TO SOL (user 18.08.2026). It used to
   // be held back for Opus — and before that routed to Fable — and it now takes

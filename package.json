@@ -10,6 +10,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test:unit": "vitest run",
+    "measure:points": "node scripts/measure-point-cost.mjs",
     "test:watch": "vitest",
     "typecheck:test": "tsc -p tsconfig.vitest.json --noEmit",
     "verify:bringup": "node scripts/verify-bringup.mjs",

@@ -619,6 +619,37 @@ describe('evaluateMechanismReview', () => {
     expect(v.block).toBe(false)
   })
 
+  it('never lets a spec examination answer a do-not-merge, even at a descendant sha', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40), 'd'.repeat(40)] })],
+      records: [
+        record({ verdict: 'do-not-merge', at: 1_787_000_001_000 }),
+        record({
+          sha: 'd'.repeat(40),
+          verdict: 'merge',
+          at: 1_787_000_005_000,
+          containedShas: new Set(['d'.repeat(40), 'c'.repeat(40)]),
+          specExamination: 'sound',
+        }),
+      ],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('do-not-merge')
+  })
+
+  it('does not accept a spec examination as the missing code review', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [record({ verdict: 'merge', specExamination: 'sound' })],
+    })
+    expect(v.block).toBe(true)
+    expect(v.findings[0].kind).toBe('no-review')
+  })
+
   it('a later clearing that does NOT descend from the refusal answers nothing (second landing round)', () => {
     // Timestamp-only supersession let a merge review of an ancestor — or of
     // an unrelated sibling — clear a do-not-merge on newer work: a verdict on

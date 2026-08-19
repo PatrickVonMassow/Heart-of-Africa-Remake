@@ -19048,3 +19048,181 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   where the CI verdict is red surfacing as a block rather than as `not judged`.
   Criticality: medium — it is the tool that exists to save turns, and it costs them where it is blind.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 726. Fable is escalated to only after FIVE unsuccessful review rounds, and that number
+  lives in ONE place (user 19.08.2026, board chat: escalate to Fable only after 5 unsuccessful
+  review rounds, and record the rule consistently and without redundancies). Today the cut
+  escalates on the FIRST unsuccessful round: `authorLaneFor` in `scripts/author-routing-core.mjs`
+  takes a BOOLEAN `reworked` and returns `fable` the moment it is set (`if (reworked) return
+  decide('fable', …)`), and `scripts/author-sol.mjs` sets it from the manual `--reworked` flag.
+  Fable's weekly pool is the scarcest of the three, so a threshold of one spends it on work a
+  further Sol or Opus round would have finished. The threshold is also WRITTEN in several places
+  at once — `CLAUDE.md` §6, `docs/sol-routing.md` ("the CUT reaches Fable by ONE route only,
+  `--reworked`"), the lane comment at the head of `author-routing-core.mjs`, the SessionStart text
+  in `scripts/batch-resume-hook.mjs`, `scripts/batch-autostart-core.mjs`, whatever
+  `scripts/rule-echo-core.mjs` echoes, and the memories `fable-sparingly` /
+  `hard-cases-go-to-sol` — which is the redundancy half of the same instruction: a number stated
+  in six wordings drifts the moment one of them is edited alone.
+  FINAL STATE:
+  - THE THRESHOLD IS A SINGLE EXPORTED CONSTANT. `scripts/author-routing-core.mjs` exports
+    `FABLE_ESCALATION_ROUNDS = 5` with a one-line comment naming the user decision and its date;
+    the cut, the CLIs, the reason string and every test read it from there. No second numeric
+    literal of this threshold exists in the mechanism, and changing 5 to another number is a
+    one-line edit in one file.
+  - THE SIGNAL IS A COUNT, NOT A BOOLEAN. `authorLaneFor` takes the number of unsuccessful review
+    rounds (`reworkRounds: number`) instead of `reworked` and returns `fable` only once the count
+    REACHES the constant. Below it the point keeps the lane its other signals give it — a
+    re-worked hard or HIGH-criticality point stays with Sol per the 18.08.2026 ruling, an ordinary
+    one stays where it was — so a fourth round re-authors in the SAME lane rather than falling
+    through to a default. The boolean is REPLACED, not kept beside the count: two spellings of one
+    fact is what this point removes.
+  - AN UNSUCCESSFUL ROUND IS DEFINED where the constant is: a completed review whose verdict was
+    not a pass. A round that never ran, aborted, or came back short of material (the `shortfall`
+    case in `scripts/review-sol-core.mjs`) does NOT count — otherwise a tooling failure escalates
+    a point nobody re-authored.
+  - THE COUNT COMES FROM THE RECORD, not from a hand-typed flag. `scripts/review-sol.mjs` already
+    records each review it runs; the count for a point is read from that record, and
+    `scripts/author-sol.mjs` reports it in its lane verdict so the reader sees WHY the lane fell
+    as it did. A point with no recorded review is zero rounds, never an error. The old
+    `--reworked` flag is REMOVED rather than aliased; an explicit numeric `--rounds <n>` remains
+    as the deliberate override for what the ledger cannot know.
+  - THE OPERATOR OVERRIDE IS UNTOUCHED. An explicit `override` and an `Author lane: fable` line in
+    a point's spec still send that point to Fable immediately; the threshold governs the automatic
+    CUT, not the operator's own decision.
+  - THE PROSE SAYS IT ONCE. `CLAUDE.md` §6 is the single prose statement of the rule ("Fable is
+    the escalation, reached only after five unsuccessful review rounds"); `docs/sol-routing.md`,
+    the resume-hook text, `scripts/batch-autostart-core.mjs`, `scripts/rule-echo-core.mjs` and the
+    memories `fable-sparingly` / `hard-cases-go-to-sol` POINT AT §6 instead of restating the
+    number, and any site that merely repeats what §6 says is DELETED rather than reworded. All of
+    it lands in the SAME commit as the code, per the docs-in-lockstep rule, and the commit names
+    every place that was checked — including the ones found to need no change — so the audit is on
+    the record and not repeated later.
+  VERIFIABLE: Vitest over the pure core in `scripts/author-routing-core.test.mjs` — round counts
+  0..`FABLE_ESCALATION_ROUNDS - 1` return the lane the point's text demands (including a hard/HIGH
+  point, which must stay with Sol) and the count AT the constant returns `fable`, with the
+  boundary DERIVED from the exported constant so raising or lowering it moves the test with it; an
+  explicit `Author lane: fable` still routes to Fable at round 0 while a lane tag loses at five;
+  an aborted or short round does not increment; the reason string is pinned to the constant; the
+  ledger-derived count is proven (no reviews → 0, N non-passing records → N) at CLI level; and a
+  consistency case FAILS when a second statement of the threshold appears outside the constant and
+  CLAUDE.md §6 (the shape of `src/config/qualityDoc.test.ts`). Because this changes the routing
+  mechanism, it needs the other vendor's recorded review (`scripts/mechanism-review.mjs --record`)
+  before the turn ends.
+  Criticality: high — this cut decides which model authors every point and spends the scarcest
+  weekly pool; a wrong count either burns that pool or strands work in a lane that already failed
+  it, and the redundancy is what makes such a drift invisible.
+  Bundle: Modell & Wächter.
+
+- [x] 685. The board's tab icon stands on a transparent ground, not on a beige plate (user
+  13.08.2026, 23:00, on the deployed icon: »Das Afrika-Symbol für den Browser-Tab finde ich gut.
+  Eine kleine Änderung: Der Hintergrund sollte nicht beige sondern transparent sein.«). The
+  silhouette is right, but its beige plate reads as a card wedged between the other tabs, whose
+  favicons all stand free.
+  FINAL STATE:
+  - `public/board/favicon.svg` drops the `<rect width="64" height="64" fill="#f0e8d2"/>` behind
+    the silhouette. Nothing else about the drawing changes — same viewBox, same path, same size.
+  - Because the plate went, the silhouette now sits on whatever the browser paints behind the
+    tab. It therefore carries its own theme rule: the path is filled `#3a2e1c` by default and
+    `#e9dfc2` under `@media (prefers-color-scheme: dark)`, written as an internal `<style>` in
+    the SVG. A browser that ignores it keeps the dark silhouette, which is today's picture — so
+    the fallback is never worse than what ships now.
+  VERIFIABLE: the existing favicon test in the Vitest layer additionally asserts that the file
+  contains no opaque full-size background rect and that both fills are present; plus the
+  PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
+  Criticality: low — it is a one-element correction to the icon point 679 delivered.
+
+- [x] 727. A repeated review round is re-framed, and the spec is examined before the lane escalates
+  (user 19.08.2026, chat: "4. klingt gut. Mach das so und reihe das hinter 726 ein"). Point 726
+  raises the Fable escalation to five unsuccessful review rounds; this point is what happens
+  DURING those five, and it depends on 726 for the count and the constant. Today a round that
+  returns problems is answered by repeating the same commission — same lane, same framing, same
+  spec — and only the counter moves. Measured 18./19.08.2026: point 713 reached its SIXTH review
+  round with rounds 3–5 driven by Fable, so the scarcest pool paid for a point that was not
+  converging, and nothing in its record says whether five rounds meant a hard problem or an
+  ambiguous spec. Point 712 shows the other shape — a Fable round (7 commits) followed by a Sol
+  AUTHORING round (12 commits), an interlude rather than a handover. CLAUDE.md §6 already names
+  the remedy for the correlated case (a re-run of one model varies least where it is confidently
+  blind, so the weaker fallback is DECORRELATED BY FRAMING); nothing applies it to a re-authoring
+  round.
+  FINAL STATE:
+  - A RE-AUTHORING ROUND IS DECORRELATED, NEVER REPEATED. Every round after the first carries,
+    beside the review's findings, an explicit decorrelating FRAMING — the hostile-tester framing
+    of §6 — and `scripts/author-sol.mjs` composes it into the commission and RECORDS which framing
+    that round ran under. Two consecutive rounds of one point never carry the same framing; a
+    round whose record names no framing is reported as a repeat rather than counted as a fresh
+    attempt.
+  - THE SPEC IS EXAMINED BEFORE THE LANE ESCALATES. On reaching the round DERIVED from
+    `FABLE_ESCALATION_ROUNDS` (the round before the threshold — no second literal), the next
+    commission is not an authoring round at all: the point's own text and its
+    `scripts/point-brief.mjs` brief are read against the findings of the rounds so far, and the
+    result is either an amendment of the point in the work order or a recorded verdict that the
+    spec is sound and the difficulty is real. Only then does the count advance to Fable. A point
+    whose examination is recorded is never examined twice.
+  - THE EXAMINATION IS CROSS-VENDOR AND COSTS THE SCARCE POOL NOTHING. It reads text, runs no
+    suite, and goes to the vendor that did NOT author the rounds — `node scripts/ask-sol.mjs
+    --kind audit` where Claude authored, a Claude read where Sol authored — per §6's cross-vendor
+    rule. It is a read-only ask: it writes no commit.
+  - THE ROUND HISTORY IS ONE READING. `scripts/author-sol.mjs` reports in its lane verdict the
+    number of unsuccessful rounds (726's ledger-derived count), the framing each ran under, and
+    whether the spec examination has happened — so a dispatcher sees WHY the point stands where it
+    does instead of reconstructing it from commit trailers, which is how the 713 history had to be
+    read.
+  - THE OPERATOR OVERRIDE AND THE MERGER ROLE ARE UNTOUCHED. An explicit `override` or an
+    `Author lane: fable` line still sends a point to Fable at once. The blind-merge MERGER — the
+    model that authored neither list (§6) — is decided by `scripts/blind-merge.mjs` /
+    `mechanism-review.mjs --merged-by`, which consult no lane function (measured 19.08.2026); this
+    point introduces no route that would make an authoring lane decide a merge.
+  VERIFIABLE: Vitest over the pure core — round 1 commissions without a framing; rounds 2 to
+  `FABLE_ESCALATION_ROUNDS - 2` each carry a framing, and a different one from the round before;
+  the round derived from the constant returns the spec-examination step instead of an authoring
+  commission, and returns the ordinary commission once an examination is recorded for that point;
+  a point with no record is round 0 and commissions normally; every reason string and every
+  boundary is pinned to the constant, so changing 5 moves the tests with it; and a case FAILS on a
+  round-number literal introduced outside the constant. Plus one observed run of
+  `scripts/author-sol.mjs --routing` on a real point that has turned at least two rounds, whose
+  report names its rounds, their framings and the examination state.
+  Criticality: medium — nothing renders wrong and no state is corrupted, but this mechanism decides
+  where the scarcest model pool is spent, and a wrong answer is silent.
+  DEPENDS ON 726: the round count and the exported constant come from there, so this point is
+  not started before 726 has landed.
+  Bundle: Modell & Wächter.
+
+- [x] 701. What a task costs, and whether the built levers actually move it (user 17.08.2026:
+  »Ich verstehe nicht, warum der Verbrauch trotz aller bisheriger Maßnahmen so extrem hoch ist«
+  and »Es geht nicht darum, weniger Token pro Zeit zu verbrauchen, sondern darum, dass es weniger
+  pro Task wird«). The binding target is the cost per finished point. Throughput is not a lever:
+  slowing the batch, shrinking the agent pool or deferring work is explicitly excluded — a
+  measure that lowers the hourly rate while leaving the per-point cost untouched has failed.
+  Why this point exists: a row of levers is built (the point boundary, the context watermark, the
+  bounded verify digest, the delegation brief, the open/archive split of the work order, the doc
+  budgets) and the spend is still dominated by large contexts — 81 % of a week's usage above the
+  150k mark, by the user's own panel. Nobody knows which of those levers is used, how often, and
+  what it saves, because none of them is measured in operation. Four more measures are filed and
+  unbuilt (553 budget per point, 596 the running tail, 597 large tool output, 662 the boundary
+  without a tick) — that alone may be the answer, and it must be established rather than assumed.
+  FINAL STATE:
+  - A ledger per point, written where a later session can read it: for every landed point, the
+    tokens it cost, split by origin — the main session, each delegated agent, the cross-vendor
+    reviews, and the big single items (picture reads, suite digests, agent reports). It is
+    derived from what the harness already records (the session transcripts, the agent logs), not
+    from a new accounting layer nobody maintains.
+  - An effectiveness reading per lever, from that same data: how often each built lever actually
+    fired (boundaries taken, watermark crossings, briefs used instead of whole-document reads,
+    digests instead of raw logs), and the measured difference between the points where it fired
+    and the ones where it did not. A lever that cannot be shown to move the per-point cost is
+    named as such — that verdict is the point's product, and a lever that fails is a candidate
+    for removal, because an unused mechanism still costs to carry.
+  - The three largest items named with numbers, since the fix follows the measurement: today's
+    suspects are the picture judgment (a full 1440x900 frame read whole where a crop answers the
+    question), the agent reports (multi-thousand-token prose per round), and the review rounds
+    (a diff plus files per round, three rounds on one small bar today). Each gets a measured
+    share, and only then a proposal.
+  - The reading is repeatable, not a one-off study: one command prints it for the last N points,
+    so the next session can ask "did it get cheaper" and get an answer rather than an opinion.
+  VERIFIABLE: the command runs on the real transcripts of the last ten landed points and prints
+  the per-point split; the per-lever reading names, for each built lever, its firing count and
+  the measured difference; and the closing report of this point states the three largest items
+  with their shares. Vitest over the pure parsing/aggregation with recorded fixtures.
+  Criticality: high — it is the measurement every other cost point is currently guessing at, and
+  the user has asked for the cause twice.
+  Bundle: Session- & Repo-Hygiene.

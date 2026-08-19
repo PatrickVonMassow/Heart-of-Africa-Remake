@@ -157,45 +157,50 @@ put it is the mistake this line exists to stop.
   merge (`mechanism-review-guard`).
   Bundle: Chat & Tafel.
 
-- [ ] 701. What a task costs, and whether the built levers actually move it (user 17.08.2026:
-  »Ich verstehe nicht, warum der Verbrauch trotz aller bisheriger Maßnahmen so extrem hoch ist«
-  and »Es geht nicht darum, weniger Token pro Zeit zu verbrauchen, sondern darum, dass es weniger
-  pro Task wird«). The binding target is the cost per finished point. Throughput is not a lever:
-  slowing the batch, shrinking the agent pool or deferring work is explicitly excluded — a
-  measure that lowers the hourly rate while leaving the per-point cost untouched has failed.
-  Why this point exists: a row of levers is built (the point boundary, the context watermark, the
-  bounded verify digest, the delegation brief, the open/archive split of the work order, the doc
-  budgets) and the spend is still dominated by large contexts — 81 % of a week's usage above the
-  150k mark, by the user's own panel. Nobody knows which of those levers is used, how often, and
-  what it saves, because none of them is measured in operation. Four more measures are filed and
-  unbuilt (553 budget per point, 596 the running tail, 597 large tool output, 662 the boundary
-  without a tick) — that alone may be the answer, and it must be established rather than assumed.
+- [ ] 730. The board's queue estimates are calibrated for a slower batch than the one running
+  (user 19.08.2026, reading the live board: »Seit den Umstellungen gestern scheint die
+  Abarbeitung der Punkte schneller zu laufen als bisher. Die Schätzungen der zukünftigen Tasks
+  sind daher vermutlich übertrieben lange. Prüfe das und überarbeite sie wo notwendig.«).
+  MEASURED 19.08.2026 from the first-parent merges: the eleven points landed between 623
+  (18.08., 20:23) and 701 (19.08., 11:55) took 15.5 h of wall clock — one landing every ~1.4 h —
+  against 32.1 h for the eight before them (628 → 623), one every ~4.0 h. The 316 cards in
+  `.claude/board-queue.json` carry a median estimate of 3 h and a mean of 3.0 h, 952 h in total,
+  and not one of them was derived from a measurement. An estimate is DEFINED in
+  `scripts/dashboard-guard-core.mjs` as the time by which the work is VISIBLY DONE — merged,
+  verified, board updated — so it is a falsifiable promise to the reader, and it is currently
+  wrong in one direction for the whole queue.
   FINAL STATE:
-  - A ledger per point, written where a later session can read it: for every landed point, the
-    tokens it cost, split by origin — the main session, each delegated agent, the cross-vendor
-    reviews, and the big single items (picture reads, suite digests, agent reports). It is
-    derived from what the harness already records (the session transcripts, the agent logs), not
-    from a new accounting layer nobody maintains.
-  - An effectiveness reading per lever, from that same data: how often each built lever actually
-    fired (boundaries taken, watermark crossings, briefs used instead of whole-document reads,
-    digests instead of raw logs), and the measured difference between the points where it fired
-    and the ones where it did not. A lever that cannot be shown to move the per-point cost is
-    named as such — that verdict is the point's product, and a lever that fails is a candidate
-    for removal, because an unused mechanism still costs to carry.
-  - The three largest items named with numbers, since the fix follows the measurement: today's
-    suspects are the picture judgment (a full 1440x900 frame read whole where a crop answers the
-    question), the agent reports (multi-thousand-token prose per round), and the review rounds
-    (a diff plus files per round, three rounds on one small bar today). Each gets a measured
-    share, and only then a proposal.
-  - The reading is repeatable, not a one-off study: one command prints it for the last N points,
-    so the next session can ask "did it get cheaper" and get an answer rather than an opinion.
-  VERIFIABLE: the command runs on the real transcripts of the last ten landed points and prints
-  the per-point split; the per-lever reading names, for each built lever, its firing count and
-  the measured difference; and the closing report of this point states the three largest items
-  with their shares. Vitest over the pure parsing/aggregation with recorded fixtures.
-  Criticality: high — it is the measurement every other cost point is currently guessing at, and
-  the user has asked for the cause twice.
-  Bundle: Session- & Repo-Hygiene.
+  - THE CALIBRATION IS MEASURED, NOT GUESSED. One command reads the landed points out of git and
+    reports, as a DISTRIBUTION rather than an average, the actual elapsed time per point (the
+    branch's first commit to its merge) beside the estimate that point's card carried, plus the
+    queue-drain cadence (merge to merge), which is the smaller number whenever the pool ran
+    several points at once. The two are reported separately and never averaged into one figure.
+  - THE READING IS SPLIT BY WHAT ACTUALLY DISTINGUISHES A POINT — its criticality tag, whether it
+    was delegated or authored in the main session, and whether a picture verification was part of
+    it. A single global correction factor is adopted ONLY if the measurement shows the classes do
+    not differ; otherwise each class carries its own.
+  - THE STORED ESTIMATES ARE REWRITTEN FROM THAT READING for every open point, as a machine step
+    over `.claude/board-queue.json` through the existing `board-queue.mjs set <N> --estimate`
+    path, never a hand pass over 200 cards. What it wrote is printed per card, so the change is
+    reviewable in one screen, and a card whose class has NO landed comparable keeps its estimate
+    with that reason named rather than being moved on a guess.
+  - A NEW CARD INHERITS THE MEASURED DEFAULT: filing a point without an estimate takes the
+    measured median of its class, and the existing "no estimate yet" marker stays for the case
+    where no class fits.
+  - THE READING STAYS REPEATABLE. Re-run later, the same command says whether the estimates still
+    match the batch's speed, so the NEXT shift is noticed rather than assumed; every run names
+    the measurement window it used.
+  VERIFIABLE: the command runs on the real merge history and prints the per-point
+  estimate-versus-actual distribution and the cadence beside it; after the rewrite no estimate in
+  `.claude/board-queue.json` contradicts the measurement by more than the reported spread; Vitest
+  over the pure comparison, the class split and the rewrite plan with recorded fixtures —
+  including a case where the classes differ enough that a single global factor is REFUSED, and a
+  case where a class has no landed comparable and its cards keep their estimate with a named
+  reason.
+  Criticality: medium — nothing in the code depends on an estimate, but the board is what the
+  user plans by, and a queue that promises 952 h for work running at three times that speed
+  misinforms every reading of it.
+  Bundle: Chat & Tafel.
 
 - [ ] 705. The board is republished once per guard correction, instead of once at the end
   (measured 17.08.2026). One session published the whole board about a dozen times in fifty
@@ -240,7 +245,15 @@ put it is the mistake this line exists to stop.
   (1) THE SESSION BOUNDARY prints a card it could set itself — `batch-boundary.mjs` composes the text
   via `boundaryCardText`, imports `PUBLISH_CMD` and has `execFileSync`, but neither puts the card up
   nor publishes; that cost three refused `--commit` runs in one day (card missing, card naming no
-  point, card byte-identical inside the same minute) plus a correction for card brevity.
+  point, card byte-identical inside the same minute) plus a correction for card brevity. THE TWO
+  SIDES ALSO CONTRADICT EACH OTHER, measured 19.08.2026 at the boundary of point 726: `--prepare`
+  prints its card text as "take this text verbatim" and states that it names NO point number ON
+  PURPOSE, while `board.mjs none` REFUSES exactly that text ("its reason must NAME the point the
+  batch picks up next"). A session that follows the printed instruction verbatim is blocked, and
+  the only reason this one was not is that `board.mjs done <N> --none` had already put a
+  point-naming card up a step earlier. So the command that owns the card must own its WORDING too:
+  one text, satisfying the gate that judges it, rather than two mechanisms disagreeing about what
+  the handover card must say.
   (2) FILING A POINT is about ten calls with no helper at all: append to TASKS.md, `tasks-spec-guard`,
   `tasks-archive-guard`, `doc-budget-guard`, commit, push, `board-queue set` for title, body and
   estimate, render the queue, publish the board, `queue-rank --ranked`. No script in the tree appends
@@ -303,17 +316,25 @@ put it is the mistake this line exists to stop.
   closed point with an armed launcher; a spent budget with a written handoff and an armed
   launcher joins it. Every other stop stays illegal, so the guard can never be talked into
   an idle stop by writing a handoff for work that was never started.
-  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE (found 11.08.2026). The handoff
-  covers the session that hands over deliberately; it does nothing for the agent that dies
-  without one, and that is the case that actually cost work. Two feature branches sat in
-  the tree unreported — one carrying ~2000 lines for points that still read as untouched,
-  one fully superseded — and the only thing that found them was a resuming session running
-  `git worktree list` on a hunch. So the resume path REPORTS every branch that has commits
-  `main` does not contain and no live agent behind it, with its point, its last commit and
-  its age, exactly as it reports the work order; and a branch whose work has landed under
-  another number is ENDED at that landing rather than left to be re-triaged. VERIFIABLE by
-  Vitest on the pure core — an orphan is listed, a branch with a live agent is not, a
-  contained branch is not — plus the resume hook printing it.
+  (e) AN ORPHANED BRANCH IS SURFACED, NOT LEFT TO CHANCE. The handoff covers the session
+  that hands over deliberately; it does nothing for the agent that dies without one, and
+  that is the case that actually cost work. MEASURED 19.08.2026 09:20 on `main`, by a
+  resuming session that ran `git worktree list` on a hunch — the same hunch that first
+  found the problem on 11.08.: SEVEN feature branches carry commits `main` does not
+  contain, with no process behind any of them — `feat/687-roam-bound-fixes` (45),
+  `feat/687-bank-game` (35), `feat/713-now-section-derived` (25), `feat/686-five-word-lexicon`
+  (14), `feat/595-598-verification-ladder-brief` (6), `feat/336-croc-staging` (5),
+  `feat/581-settlement-boundary-contrast` (3). Nothing reports them, so the work reads as
+  untouched from the work order while it sits built in the tree. THE SECOND COST IS THE
+  DELEGATION: every point disjoint enough to fill a free pool slot is one of these
+  branches, so a free slot cannot be filled by a fresh agent at all — it needs a careful
+  REVIVAL (merge `main` in, verify on the synced state, land) that nobody is prompted to
+  do. So the resume path REPORTS every branch that has commits `main` does not contain and
+  no live agent behind it, with its point, its last commit and its age, exactly as it
+  reports the work order, and names the revival as the action; and a branch whose work has
+  landed under another number is ENDED at that landing rather than left to be re-triaged.
+  VERIFIABLE by Vitest on the pure core — an orphan is listed, a branch with a live agent
+  is not, a contained branch is not — plus the resume hook printing it.
   MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
   for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
   starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
@@ -1889,7 +1910,10 @@ put it is the mistake this line exists to stop.
   state nothing can rescue — blocked the supervising session's turn end three times in a row,
   each time for a commit in the middle of an unfinished point. Two consequences, both real:
   `ci-status-guard` can never find a concluded green run on that branch while the author works,
-  and Actions minutes are spent on runs nobody reads.
+  and Actions minutes are spent on runs nobody reads. Measured again 19.08.2026 with TWO author
+  lanes in flight at once: three consecutive runs ended `cancelled` because the next checkpoint
+  overtook them, and while two lanes push in turn SOME run is always unconcluded — so the block
+  is not repeated but CONTINUOUS, and it grows with the agent pool rather than with the point.
   FINAL STATE, and it has two halves because the two lanes fail for different reasons:
   (1) THE TIMER LANE. `author-sol.mjs`'s interim pushes are what CLAUDE.md §6 already calls a
   RESCUE commit — work committed because the run may die, no claim of completeness — so they are
@@ -7861,7 +7885,21 @@ to land than a mechanism that needs a review.
   outage at spawn puts a multi-hour session on the scarcest pool. The evidence gap is the load-bearing
   part: neither `.claude/autostart.log` nor `.claude/batch-launcher.log` records WHICH model a session
   runs on or whether the fallback fired — the commit trailers are the only trace, and they appear
-  hours in.
+  hours in. NARROWED 19.08.2026 by the user's ruling, which strikes the quota reading this point
+  once carried: an exhausted Opus pool cannot leave a Fable pool standing, so QUOTA IS NOT A ROUTE
+  to the fallback — `SPAWN_FALLBACK_MODEL` exists for UNREACHABILITY alone, and reordering the chain
+  to save quota is ruled out. What survives is the OBSERVABILITY half, and it survives intact: no log
+  records which model a session came up on, so the Fable block of 17.08. (10:00–14:36) still cannot
+  be told apart from a hand-set model — the window that read it was on Fable because a VS Code
+  setting said so, not because a fallback fired. Part (3) below is exactly that fix. Measured in the
+  same reading, on what the lane is actually spent on: of 461 review records Fable is the MERGER in 3
+  and the REVIEWER in 190, but every one of those falls on or before 13.08., when the cross-vendor
+  rule moved reviewing to Sol. Classifying all 235 Fable commits since 01.08. by where they sit
+  REVERSES the 17.08. weighting this point opens with: 179 of them (76 %) are on merged FEATURE
+  branches, only 43 direct on `main`, and two points ate more than half — 714 with 87 and 700 with
+  39. Under the current policy the serving share is the MINORITY and the escalation lane is the
+  consumer, so the load-bearing fixes are the threshold and its round-level twin, not a reordered
+  chain. The merger role consults no lane function and is untouched by either — it must stay that way.
   FINAL STATE, three halves from two incidents:
   (1) A LANE HAS AN AVAILABILITY SWITCH and the routing consults it, the way `scripts/sol-share.mjs`
   already gates the Sol lane. A lane marked unavailable does not receive work: the routing falls
@@ -8113,24 +8151,6 @@ to land than a mechanism that needs a review.
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes the boundary seal.
   Criticality: medium — the seal holds against every other mutation, so this is the last gap
   in it rather than an open door.
-
-- [ ] 685. The board's tab icon stands on a transparent ground, not on a beige plate (user
-  13.08.2026, 23:00, on the deployed icon: »Das Afrika-Symbol für den Browser-Tab finde ich gut.
-  Eine kleine Änderung: Der Hintergrund sollte nicht beige sondern transparent sein.«). The
-  silhouette is right, but its beige plate reads as a card wedged between the other tabs, whose
-  favicons all stand free.
-  FINAL STATE:
-  - `public/board/favicon.svg` drops the `<rect width="64" height="64" fill="#f0e8d2"/>` behind
-    the silhouette. Nothing else about the drawing changes — same viewBox, same path, same size.
-  - Because the plate went, the silhouette now sits on whatever the browser paints behind the
-    tab. It therefore carries its own theme rule: the path is filled `#3a2e1c` by default and
-    `#e9dfc2` under `@media (prefers-color-scheme: dark)`, written as an internal `<style>` in
-    the SVG. A browser that ignores it keeps the dark silhouette, which is today's picture — so
-    the fallback is never worse than what ships now.
-  VERIFIABLE: the existing favicon test in the Vitest layer additionally asserts that the file
-  contains no opaque full-size background rect and that both fills are present; plus the
-  PICTURE — the icon rasterised and looked at against a light and a dark tab strip.
-  Criticality: low — it is a one-element correction to the icon point 679 delivered.
 
 - [ ] 693. The author routing recommends a lane whose pool is empty (measured 14.08.2026,
   01:33–01:40, at the start of an autonomous batch session). `scripts/author-routing-core.mjs`
@@ -8550,3 +8570,79 @@ to land than a mechanism that needs a review.
   Criticality: medium — it is one frame of one animal, but a test that measures around the very
   frame it was written for hides the next regression as reliably as this one.
   Bundle: Tierverhalten.
+
+
+- [ ] 728. The chat responder answers while a session owns the batch, and answers one message
+  three times (user 19.08.2026, 09:00, in the board chat: »Du hast bzg. 685 jetzt dreimal
+  geantwortet.«). `scripts/chat-watcher.mjs` may spawn a light responder from the chat inbox
+  ONLY when no session owns the batch and no claim is honoured (CLAUDE.md §6). Measured on this
+  run: the ordinary delivery path applied that rule correctly — three later polls logged
+  `{"decision":"skip","reason":"owner-live"}` — but the `defer-sweep` path did not consult it at
+  all and logged `{"decision":"spawn","reason":"defer-expired"}` at 08:58:04Z while this session
+  held `.claude/batch-lock.json` and was working. The spawned responder (pid 2957441, one
+  message) then wrote THREE replies into the board chat within 90 s, each one a complete answer
+  to the same message, with four `Execution error` lines between them in
+  `.claude/chat-responder-run.log`.
+  FINAL STATE:
+  - THE OWNER CHECK IS ONE FUNCTION, ASKED BY EVERY SPAWN PATH. The condition "no live owner and
+    no honoured claim" is applied where the responder is SPAWNED, not per call site, so a path
+    added later inherits it. `defer-sweep` decides `skip` with the same reason string the polling
+    path already logs.
+  - A DEFERRED MESSAGE IS NOT LOST WHEN THE SPAWN IS SKIPPED. It stays pending for the owning
+    session, which is the session that can act on it — the message that triggered this had to be
+    carried into the work order by the owner anyway.
+  - ONE MESSAGE, ONE REPLY. A responder run sends AT MOST ONE reply per message; a retry after an
+    execution error resumes the run without re-sending what already went out, and a second send
+    for a message already answered is refused at the reply layer rather than left to the run's
+    own discipline. The receipt in `.claude/chat-reply-receipt.json` is what decides it.
+  VERIFIABLE: Vitest over the pure spawn decision — every spawn path (poll, defer-sweep, and a
+  synthetic third) returns `skip`/`owner-live` against a live lock, returns `spawn` without one,
+  and a case FAILS if a path reaches the spawn without consulting the function; plus Vitest over
+  the reply layer — a second send for an already-receipted message is refused, and a run
+  interrupted by an execution error re-sends nothing.
+  Criticality: medium — nothing is corrupted, but the user reads the duplicates, and a responder
+  running beside a live owner writes to the same chat and carrier from two processes at once.
+  Bundle: Chat & Tafel.
+
+- [ ] 729. A truthful "5 skipped" reads as a failed gate (found by the point 727 run,
+  19.08.2026, and older than it). `gatesProblem` in `scripts/author-sol-core.mjs` matches the
+  word `skipped` with its NOT_GREEN pattern, so a Vitest summary that honestly reports skipped
+  cases — which this suite always does — is classified as a non-green gate. Both of today's
+  authoring runs tripped it while their gates were green, and the supervising session then looks
+  for a cause that does not exist.
+  FINAL STATE:
+  - THE PATTERN MATCHES FAILURE, NOT ABSENCE. `gatesProblem` reads a gate as not green on the
+    words that mean a failure; a summary line reporting skipped cases beside passing ones is
+    green, and a gate that genuinely did not run stays reported as not run — the two are distinct
+    verdicts and neither is folded into the other.
+  VERIFIABLE: Vitest over `gatesProblem` with REAL summary text — a green run naming `5 skipped`
+  is green, a run with a failed file is not green, and a gate that was never executed reports as
+  not run; plus a case that FAILS if the pattern is widened back to any word containing "skip".
+  Criticality: low — it misreports a green run as red, which costs a diagnosis, but it never
+  passes a red one as green.
+  Bundle: Modell & Wächter.
+
+
+- [ ] 731. The boundary prints a handover text the board gate refuses (measured 19.08.2026 at the
+  point 701 boundary). `scripts/batch-boundary.mjs --prepare` prints the handover card verbatim
+  with the instruction to "take this text verbatim rather than writing it again" — the reason it
+  exists is that a rewritten card drifts. That text names NO point number, and `board.mjs none`
+  plus the publish gate REFUSE a handover card whose reason does not name the point the batch
+  picks up next. So the verbatim paste is rejected and every boundary rewrites it by hand, which
+  is exactly the drift the verbatim rule prevents; two mechanisms built for the same card
+  disagree about what it must contain.
+  FINAL STATE:
+  - THE PRINTED TEXT SATISFIES THE GATE IT IS PRINTED FOR. `batch-boundary.mjs --prepare` reads
+    the head of the open work order the same way the board's queue does and names that point in
+    the handover text it prints, so the paste passes the publish gate unedited. Where no open
+    point remains, it prints the wording the gate accepts for that case rather than a number that
+    does not exist.
+  - THE AGREEMENT IS PINNED, NOT COINCIDENTAL. The gate's requirement and the boundary's text are
+    checked against each other, so a later change to either side fails a test instead of
+    surfacing at the next handover.
+  VERIFIABLE: Vitest over the pure text builder — the produced handover reason satisfies the same
+  predicate the publish gate applies, with a case for an empty queue and a case that FAILS if the
+  point number is dropped from the text.
+  Criticality: low — it costs one hand-rewrite per session boundary and risks the drift the
+  verbatim rule was built to stop, but nothing is lost.
+  Bundle: Chat & Tafel.

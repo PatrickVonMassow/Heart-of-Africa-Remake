@@ -207,7 +207,9 @@ Ein Kohärenz-Audit fand acht Stellen, an denen die Dokumente etwas anderes beha
 
 Dieselbe Wette schließt, wer eine Beschriftung im **Testcode** wörtlich erwartet, statt sie aus der Sprachdatei zu lesen: Eine live laufende Prüfung suchte den deutschen Platzhalter, während ihre Suite auf Englisch lief — sie schlug bei völlig korrektem Verhalten fehl. Eine Prüfzusicherung ist eine Kopie wie jede andere.
 
-**Lehre:** Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man. Ein verbindlicher Ort je Faktum, alle anderen verweisen; für Tests heißt das, gegen die Quelle der Wahrheit zu prüfen statt gegen eine abgeschriebene Zeichenkette.
+Die Variante ohne menschlichen Schreiber ist am zähesten: Am 19.08.2026 druckte die Sitzungsgrenze den Text der Übergabekarte mit der Anweisung, ihn WÖRTLICH zu übernehmen — und die Veröffentlichungsprüfung der Tafel wies genau diesen Text ab, weil er den nächsten Punkt nicht benennt. Zwei Mechanismen, gebaut für dieselbe Karte, waren sich über deren Inhalt uneins; keiner von beiden konnte das bemerken, und der Ausweg war jedes Mal die Handschrift, die der Wörtlich-Vorschrift zuvorkommen sollte.
+
+**Lehre:** Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man. Ein verbindlicher Ort je Faktum, alle anderen verweisen; für Tests heißt das, gegen die Quelle der Wahrheit zu prüfen statt gegen eine abgeschriebene Zeichenkette. Wo zwei Mechanismen dasselbe Artefakt erzeugen und prüfen, gilt dasselbe: Die Anforderung gehört an EINE Stelle, gegen die beide laufen.
 
 ### 3.22 Der rote Test, der den Unschuldigen anklagt
 
@@ -253,6 +255,8 @@ Ich hatte erklärt, parallele Stränge vervielfachten den Token-Verbrauch, weil 
 Zäh war die Fehlannahme, weil die Erfahrung sie zu bestätigen schien: Das Wochenkontingent war tatsächlich vorzeitig erschöpft — aber das belegte die Rate, nicht die Kosten. Der echte Aufschlag ist kleiner und liegt woanders: Nacharbeit, wenn zwei Stränge denselben Code berühren, plus die Aufsicht. Die eigentliche Grenze ist ohnehin keine Kostenfrage, sondern der **Haupt-Agent**: Bei ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
 
 **Lehre:** Bevor man etwas beziffert, muss der Nenner feststehen — pro Arbeit oder pro Zeit. Beides „Kosten" zu nennen führt zu falschen Entscheidungen; hier zu einer Drosselung, die nichts sparte und nur langsamer machte.
+
+Dieselbe Prüfung schuldet jede Zahl, die der Nutzer liest: Die Zeitschätzungen der Warteschlange waren durchweg von Hand gesetzt. Als der Nutzer am 19.08.2026 auffiel, die Punkte liefen schneller durch als angekündigt, ergab die Messung elf Landungen in 15,5 Stunden gegen rund vier Stunden je Punkt davor — die Tafel versprach für 316 Karten zusammen 952 Stunden, ohne dass je eine dieser Zahlen aus einer Messung stammte. Eine geschätzte Zahl, die wie eine gemessene aussieht, ist keine Information, sondern eine Behauptung.
 
 ### 3.28 Die teuerste Prüfung war die unschärfste
 
@@ -1309,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 18.08.2026, 22:33 · Quellen-Fingerprint: `b7e491ceaf55…`
+Zuletzt aktualisiert: Mittwoch, 19.08.2026, 12:20 · Quellen-Fingerprint: `bde94d1f61f4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1340,12 +1344,12 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
-| Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, Fable stays the escalation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, Fable stays the escalation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1400,10 +1404,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 58 Prozess-/Meta-TASKS-Punkte (davon 24 offen).
+Erfasste Quellen: 83 Feedback-/Projekt-Memories · 53 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 60 Prozess-/Meta-TASKS-Punkte (davon 26 offen).
 
-<!-- RETRO-FINGERPRINT: b7e491ceaf552bab2b48162930e381292e6243d334cdea2661dcbd2dfe5fbdc0 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-18T20:33:38.650Z -->
+<!-- RETRO-FINGERPRINT: bde94d1f61f4caa8b7f69032f4eff9e5e9295eedec829ebeaf01f79ebb450531 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-19T10:20:13.107Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1684,3 +1688,63 @@ Uhr, die abläuft. Die Reparatur — eine einzige Graph-Abfrage statt der Paarsc
 wurde nicht nur als „schneller" abgenommen, sondern als GLEICHLAUTEND belegt: 9901 Paare
 gegen die alte Antwort geprüft, null Abweichung. Ein Umbau an einem Tor darf sein Urteil
 nicht ändern, und das ist messbar, statt behauptet.
+
+### 3.123 Zwei Mechanismen, die sich über dasselbe Artefakt widersprechen
+
+Beim Abschluss von Punkt 726 druckte die Sitzungsgrenze ihren Übergabetext mit der
+Anweisung, ihn WÖRTLICH zu übernehmen — und hielt ausdrücklich fest, dass er mit Absicht
+keine Punktnummer nennt. Der Tafel-Befehl, der genau diesen Text entgegennimmt, wies ihn
+ab: Eine Übergabekarte ohne genannten Folgepunkt lässt das Veröffentlichungs-Tor nicht
+durch. Wer der gedruckten Anweisung wörtlich folgt, steht also.
+
+Auffällig ist, warum es nicht auffiel. Beide Seiten sind für sich richtig und beide sind
+getestet — nur testet jede ihre eigene Hälfte. Der Widerspruch lebt im Zwischenraum, den
+kein Test besitzt, und er wurde hier nur deshalb nicht zum Blocker, weil ein früherer
+Schritt zufällig schon eine nummernnennende Karte gesetzt hatte. Ein Zufall ist keine
+Absicherung: Ohne ihn hätte die Grenze eine Sitzung am Aufhören gehindert.
+
+**Lehre:** Wo ein Mechanismus den Inhalt eines Artefakts VORGIBT und ein anderer ihn
+PRÜFT, gehören Vorgabe und Prüfung in eine Hand — oder die Vorgabe muss durch die Prüfung
+gelaufen sein, bevor sie gedruckt wird. Ein wörtlich gemeinter Text, den das eigene Tor
+zurückweist, ist ein Defekt, keine Ungenauigkeit. Verwandt mit 3.21: Dort veraltet ein
+Fakt an vier von fünf Stellen; hier sind beide Stellen aktuell und trotzdem unvereinbar.
+
+### 3.124 Die Bedingung war gebaut, geprüft und wirksam — an einem von zwei Eingängen
+
+Der leichte Chat-Antworter darf nur anspringen, wenn keine Sitzung den Stapel hält. Die
+Regel ist alt, sie ist verdrahtet, und sie funktioniert: Im selben Protokoll stehen drei
+Einträge »skip: owner-live«. Danebenliegt der Eintrag, der den Schaden gemacht hat —
+»spawn: defer-expired«, gesetzt vom Nachzügler-Weg, der dieselbe Bedingung gar nicht erst
+fragt. Der Nutzer bekam daraufhin drei vollständige Antworten auf eine Nachricht, während
+die Sitzung, die den Stapel wirklich hielt, an derselben Nachricht arbeitete.
+
+Das ist nicht der Fall »die Regel fehlt« und auch nicht »die Regel ist falsch«. Die Regel
+war an der Stelle, an der man sie sucht, korrekt und beweisbar wirksam — und genau das ist
+das Tückische: Wer prüft, ob der Besitzer-Schutz greift, findet ihn greifen. Ein zweiter
+Eingang, später hinzugekommen, erbt ihn nicht, weil er ihn nicht erbt, sondern hätte
+aufrufen müssen. Dieselbe Form wie 3.120 (gerankt, aber nicht durchgesetzt), nur eine Ebene
+tiefer: dort trägt ein Artefakt die Entscheidung, die niemand anwendet, hier trägt eine
+Funktion die Bedingung, die nicht jeder Aufrufer stellt.
+
+**Lehre:** Eine Bedingung, die den Zutritt regelt, gehört an die Stelle, an der zugetreten
+wird — in die Spawn-Funktion selbst —, nicht an jeden Aufrufer einzeln. Sonst ist die
+Prüfung, ob die Regel wirkt, systematisch zu optimistisch: Sie befragt den Eingang, den es
+schon gab. Der Test, der das findet, ist nicht »greift die Bedingung?«, sondern »gibt es
+einen Weg an ihr vorbei?« — und der muss fehlschlagen, wenn ein Pfad den Zutritt erreicht,
+ohne sie gefragt zu haben.
+
+### 3.125 Die Blockade wächst mit dem Pool, nicht mit der Arbeit
+
+Ein Autorenlauf sichert seine Arbeit alle zwei Minuten; jede Sicherung stößt einen
+Prüflauf an, der den vorigen abbricht. Als Ein-Spur-Problem ist das seit Punkt 669
+beschrieben und wirkt wie eine Unbequemlichkeit: Man wartet eben einen Lauf ab. Mit zwei
+gleichzeitig laufenden Spuren wurde daraus etwas anderes. Drei Läufe hintereinander endeten
+»cancelled«, und während zwei Spuren abwechselnd sichern, ist immer irgendeiner
+unabgeschlossen — das Tor, das einen abgeschlossen grünen Lauf verlangt, findet nie einen.
+Aus »wiederholt« wurde »dauerhaft«, ohne dass sich an der Ursache etwas geändert hätte.
+
+**Lehre:** Bei einem Defekt, den Parallelität berührt, ist die gemessene Häufigkeit bei
+einem Strang keine Schätzung für zwei. Die Frage lautet nicht »wie oft passiert es?«,
+sondern »wovon hängt die Häufigkeit ab?« — hängt sie an der Anzahl gleichzeitiger Stränge,
+kippt das Ärgernis bei der nächsten Pool-Erhöhung in einen Stillstand. Wir haben den Pool
+auf drei gehoben, ohne diese Frage zu stellen.

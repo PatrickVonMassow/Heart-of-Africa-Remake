@@ -27,28 +27,30 @@ meint den Mehrverbrauch der betroffenen Arbeit, nicht des Projekts.
 
 ### Primäres und sekundäres Modell
 
-Lege **zwei** Modelle fest und gib ihnen klare Rollen:
+Lege **zwei** Modelle fest, mit klaren Rollen:
 
 - Ein **primäres Modell** macht die gewöhnliche Arbeit. Nimm die jeweils stärkste
   verfügbare Version.
 - Ein **sekundäres, anderes Modell** übernimmt das **Vier-Augen-Prinzip**, die
   **Ausweichstufe** — und die **harten Fälle**: als schwierig/fehleranfällig
-  Eingeschätztes, und was nach einer Nachbesserung immer noch durchfällt.
+  Eingeschätztes. Ist seine Spur **knapp**, eskaliere erst nach **mehreren** erfolglosen
+  Runden.
 
 > *Prompt:* „Gewöhnliche Arbeit macht **\<primäres Modell\>**. **\<sekundäres Modell\>**
 > übernimmt Vier-Augen, Ausweichstufe und als schwierig/fehleranfällig eingeschätzte
-> Aufgaben — ebenso Arbeit, die nach einer Nachbesserung erneut durchfällt. Etabliere
-> einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells erkennt und die
-> Arbeit stoppt, statt sie stillschweigend zu übernehmen."
+> Aufgaben; zur knappen Spur eskalierst du erst nach **\<n\>** erfolglosen Runden;
+> **\<n\>** ist eine Konstante. Etabliere einen Mechanismus, der ein
+> Arbeitsergebnis eines **anderen** Modells erkennt und die Arbeit stoppt, statt sie
+> stillschweigend zu übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
 Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
-steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller Test
-sofort zeigt, nie.
+steuert oder Arbeit vernichten kann, wird gegengeprüft; was ein schneller Test
+zeigt, nie.
 
-**Kontingent ist nicht austauschbar.** Ist ein Modell knapp, gib das Schreiben von Code — den
-größten Verbraucher — dem anderen und behalte für das knappe, was **nur** es kann. Ein
-Verteiler, der den Füllstand nicht liest, empfiehlt ein längst leeres Modell.
+**Kontingent ist nicht austauschbar.** Ist ein Modell knapp, behalte ihm vor, was **nur** es
+kann; das Schreiben von Code, der größte Verbraucher, geht ans andere. Ein Verteiler, der den
+Füllstand nicht liest, empfiehlt ein leeres Modell.
 
 > *Prompt:* „Sag mir vor Ende eines Kontingents, welche Arbeit an das Modell mit Restvolumen
 > geht; eine leere Spur empfiehlst du nie. Ist das zweite Modell nicht erreichbar, melde die
@@ -167,16 +169,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
-  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte. Ein
-  Fehlalarm meldet sich, ein ausgefallener nie.
+  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
   echte Treffer noch da. Die Fälle erfindet das **andere Modell**, an der Mechanik gemessen statt
   an Testnamen." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; oder die Verbesserung ist fertig, nur führt nichts jemanden dorthin.
-  → *Prompt:* „Eine Ausnahme trägst du **im selben Zug** dort ein, wo der Mechanismus sie liest,
-  eine Fähigkeit dort, wo jemand nach ihr greift. Und wenn etwas ‚wartet': **worauf genau**?"
+  die das Werkzeug liest; zur fertigen Verbesserung führt nichts; oder der Schutz wirkt — nur
+  fragt ihn ein zweiter Weg nie.
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, eine
+  Fähigkeit, wo jemand greift, eine Zutrittsbedingung **dort, wo zugetreten wird**. Der Test heißt
+  ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -210,8 +213,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   miss auf einer ruhigen Maschine."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert; eine Warnung in einer **geglückten** Aktion ist unsichtbar — und ein
-  Tor, das den Push zu Recht verweigert, meldet nichts — es wächst nur ein Stapel.
+  trotzdem nicht passiert; eine Warnung in einer **geglückten** Aktion ist unsichtbar, und ein
+  Tor, das den Push zu Recht verweigert, lässt nur einen Stapel wachsen.
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der
   Erfolgsmeldung, und melde beim Start, was **lokal fertig, aber nirgends angekommen** ist."
 
@@ -222,8 +225,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den
   Satz**." *(einmalig hoch)*
 
-- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht
-  gefährlicher als ein Grün.
+- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet —
   nie eine Uhr. Schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
@@ -409,4 +411,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b7e491ceaf552bab2b48162930e381292e6243d334cdea2661dcbd2dfe5fbdc0 -->
+<!-- GUIDE-FINGERPRINT: 0a70b40a74b6bb639bd9377417fe675d8e28698c0fc709737c8b9a2675c70cec -->

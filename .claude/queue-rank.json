@@ -68,10 +68,6 @@
       "at": "2026-08-13T20:19:36.791Z",
       "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
     },
-    "685": {
-      "at": "2026-08-13T21:09:57.053Z",
-      "why": "Kleine Nachbesserung am gerade gelieferten Symbol; sie kostet nichts, wenn sie hinter den Release-Bugfixes wartet"
-    },
     "693": {
       "at": "2026-08-13T23:44:58.490Z",
       "why": "Der Umweg ist bekannt und kostenlos (author-sol --anyway, in der Merk-Datei festgehalten), deshalb steht der Punkt hinter den Spielfehlern und dem Verständigungsumbau, die der Nutzer für diese Auslieferung zuerst sehen will"
@@ -135,10 +131,22 @@
     "725": {
       "at": "2026-08-19T02:12:32.321Z",
       "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright."
+    },
+    "728": {
+      "at": "2026-08-19T09:07:16.285Z",
+      "why": "Neu angelegter Fehlerbefund vom 19.08.2026 (dreifache Chat-Antwort neben lebendem Besitzer). Er bleibt hinten: der Fehler kostet den Nutzer Lesezeit, korrumpiert aber nichts, und die vorderen Punkte sind entweder vom Nutzer vorgezogen oder bereits im Bau. Vor die grossen Finder-Punkte gehoert er trotzdem, was die Anhaengeposition ohnehin leistet."
+    },
+    "729": {
+      "at": "2026-08-19T09:26:29.525Z",
+      "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf."
+    },
+    "731": {
+      "at": "2026-08-19T10:19:49.258Z",
+      "why": "Low-criticality one-line inconsistency; it costs a hand-rewrite per boundary and nothing is lost, so it waits behind the queue's settled order."
     }
   },
   "settled": {
-    "at": "2026-08-19T02:44:39.001Z",
+    "at": "2026-08-19T10:19:49.258Z",
     "points": [
       174,
       184,
@@ -313,7 +321,6 @@
       681,
       682,
       683,
-      685,
       686,
       687,
       688,
@@ -327,7 +334,6 @@
       696,
       698,
       699,
-      701,
       704,
       705,
       706,
@@ -341,7 +347,11 @@
       720,
       722,
       724,
-      725
+      725,
+      728,
+      729,
+      730,
+      731
     ]
   }
 }

@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@05eaa324
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@19ee578a
 //
 // `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
@@ -226,8 +226,9 @@ export const HOUSE_RULES = Object.freeze([
  * reviewed, and these are the findings to answer. That is where the four eyes
  * actually close, so it is the same command rather than a separate one.
  */
-export function buildAuthoringPrompt({ point = '', brief = '', branch = '', findings = '' } = {}) {
+export function buildAuthoringPrompt({ point = '', brief = '', branch = '', findings = '', framing = '' } = {}) {
   const answering = String(findings ?? '').trim()
+  const stance = String(framing ?? '').trim()
   return [
     `You are AUTHORING work-order point ${point} for this repository as ${SOL_MODEL_NAME}.`,
     'You were chosen for it: this project runs two authoring lanes from different vendors, and',
@@ -242,6 +243,14 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
     // A rule that runs over one line continues INDENTED, not as a second bullet.
     ...HOUSE_RULES.map((rule) => (/^\s/.test(rule) ? `    ${rule.trim()}` : `  - ${rule}`)),
     '',
+    ...(stance
+      ? [
+          'THIS ROUND IS DELIBERATELY RE-FRAMED. Carry this stance through the whole answer:',
+          stance,
+          'The framing supplements the findings and the point; it does not replace either.',
+          '',
+        ]
+      : []),
     answering
       ? [
           'THIS IS THE SECOND LEG: your work was REVIEWED and the findings are below. Answer every',
@@ -266,6 +275,41 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
     'DONE: <what you built, in one line>',
     'GATES: <NAME each of test:unit, build and lint with what it did — an unnamed gate reads as one you did not run>',
     'OPEN: <what you left undone or escalated, or the single word none>',
+  ].join('\n')
+}
+
+/**
+ * The non-authoring step immediately before Fable escalation. It gives the
+ * other vendor the point text, the generated brief and every recorded finding
+ * in one read, and asks for the only two outcomes the ledger accepts.
+ */
+export function buildSpecExaminationPrompt({
+  point = '',
+  pointText = '',
+  brief = '',
+  history = {},
+  currentFindings = '',
+} = {}) {
+  const rounds = Array.isArray(history?.rounds) ? history.rounds : []
+  const findings = rounds.length
+    ? rounds.map((round) => `round ${round.freshRound ?? 'repeat'}: ${round.evidence || '(no finding text recorded)'}`).join('\n')
+    : '(no unsuccessful findings recorded)'
+  return [
+    `SPEC EXAMINATION FOR WORK-ORDER POINT ${point} — this is not an authoring commission.`,
+    'Read the point and its generated brief against every recorded finding below.',
+    'Return `sound` if the specification is coherent and the difficulty is real.',
+    'Return `amended` only if the work-order point itself must change; identify the exact amendment.',
+    'Do not run a suite and do not write a commit.',
+    '',
+    '=== POINT TEXT ===',
+    String(pointText ?? '').trim() || '(point text unavailable)',
+    '=== GENERATED POINT BRIEF ===',
+    String(brief ?? '').trim() || '(generated brief unavailable)',
+    '=== FINDINGS SO FAR ===',
+    findings,
+    ...(String(currentFindings ?? '').trim()
+      ? ['=== CURRENT FINDINGS HAND-OFF ===', String(currentFindings).trim()]
+      : []),
   ].join('\n')
 }
 
@@ -456,7 +500,15 @@ const short = (sha) => String(sha ?? '').slice(0, 7)
  * is real either way — commits that exist are reviewed and landed or thrown
  * away deliberately, never left lying on a branch nobody looked at.
  */
-export function formatAuthoringReport({ point = '', branch = '', judged = {}, parsed = {}, reviewer = 'Opus 5', pushed = null } = {}) {
+export function formatAuthoringReport({
+  point = '',
+  branch = '',
+  judged = {},
+  parsed = {},
+  reviewer = 'Opus 5',
+  pushed = null,
+  framing = '',
+} = {}) {
   const lines = []
   const commits = judged.commits ?? []
   if (judged.delivered) {
@@ -486,7 +538,8 @@ export function formatAuthoringReport({ point = '', branch = '', judged = {}, pa
     '    2. run the gates and, for a render change, the picture on both backends,',
     `    3. hand the findings back for a second leg:  node scripts/author-sol.mjs --point ${point} --findings <file>`,
     '    4. record the review where a mechanism was touched:',
-    `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --point ${point}`,
+    `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --mode review --point ${point}` +
+      `${String(framing).trim() ? ` --author-framing "${String(framing).trim()}"` : ''}`,
     `    5. then land it:  node scripts/land-point.mjs ${point} --model "${SOL_MODEL_NAME}"`,
   )
   return lines.join('\n')

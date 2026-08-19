@@ -308,7 +308,7 @@ coverage map live in `scripts/verify/README.md`.
   A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
-- **Model policy (users 25.07.–18.08.2026, points 309/624/667). AUTHOR AND REVIEWER ARE
+- **Model policy (users 25.07.–19.08.2026, points 309/624/667). AUTHOR AND REVIEWER ARE
   SEPARATE ROLES.** SERVING chain: **Opus 5**, then **Fable
   5**, then **Opus 4.8** — what `scripts/batch-autostart.mjs` launches. AUTHORING:
   **GPT-5.6 Sol** authors through `node scripts/author-sol.mjs`, and since
@@ -316,9 +316,9 @@ coverage map live in `scripts/verify/README.md`.
   error-prone or tagged HIGH criticality is a reason FOR Sol, not against it.
   **Opus 5** authors what is left: a point whose
   VERIFICATION is the work and that nothing marks hard.
-  **FABLE 5 IS THE ESCALATION**: the cut sends work there only once the review still
-  finds problems after a re-work; its weekly pool is the scarcest. The cut is
-  made by `scripts/author-routing-core.mjs`. REVIEWERS:
+  **FABLE 5 IS THE ESCALATION, REACHED ONLY AFTER FIVE UNSUCCESSFUL REVIEW
+  ROUNDS** (user 19.08.2026); its weekly pool is the scarcest. The cut is made
+  by `scripts/author-routing-core.mjs`. REVIEWERS:
   the OTHER vendor, never an author of the range —
   Sol at effort HIGH on Claude's work; where SOL authored, CLAUDE reviews, runs the
   suites, judges the picture and lands. Reviews run through `node
