@@ -119,7 +119,13 @@ put it is the mistake this line exists to stop.
   - THE STARTUP COST IS MEASURED, NOT ESTIMATED: at the first COMPLETE api usage event of a
     session, not from the character count of the preamble. `parseContextTokens` returns nothing
     at all immediately after SessionStart, so a reading taken there would be silently absent
-    rather than wrong.
+    rather than wrong. A SECOND MEASUREMENT already exists and belongs in the series (19.08.2026,
+    23:44): a freshly autostarted session that had done NO work stood at 85,225 tokens against
+    the 82,000 trigger at its first writing call, and could only hand over. Composition: the
+    preamble carries the bulk, plus ~20k of pure ORIENTATION taken in the MAIN session — the
+    full `point-brief.mjs` output (~7k, which belongs in the delegated agent, not here), the
+    findings carrier read whole (~5k, greppable), the dashboard section (~4k), guard preflight
+    (~1.5k), work-order extracts (~2k). This is the reading point 747 wants for a recalibration.
   VERIFIABLE: Vitest over the pure record shape and the growth extraction, with recorded
   fixtures — an overshoot inside the margin (no record), one beyond it (a record), and one whose
   largest growth step BEGAN below the watermark and is still reported; the reading command runs
@@ -143,8 +149,10 @@ put it is the mistake this line exists to stop.
   FINAL STATE: the template produces a text that ALREADY names the point the successor picks
   up and ALREADY names sending the now-card back as its first step, so the printed sequence
   passes both gates as printed; and the boundary is then measured across three clean
-  handovers, the result recorded beside `CONTEXT_WATERMARK_TOKENS` as the named constant point
-  743's arithmetic consumes.
+  handovers, the result recorded beside `CONTEXT_TRIGGER_TOKENS`: the clean figure REPLACES the
+  contaminated 27,336 in that constant's arithmetic comment, and the trigger is recomputed from
+  it. (Point 743 split the former `CONTEXT_WATERMARK_TOKENS` into `CONTEXT_CEILING_TOKENS` and
+  `CONTEXT_TRIGGER_TOKENS`; the old name exists nowhere in the code any more.)
   THIS IS A FUNCTIONAL CHANGE, not bookkeeping (GPT-5.6 Sol, audit 19.08.2026): it must not be
   filed under "measurement only", and the measurement is worthless until it lands, because the
   contradiction is inside every reading taken before it.
