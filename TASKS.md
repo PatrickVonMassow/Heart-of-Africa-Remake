@@ -76,6 +76,51 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 735. The mechanism gate fires on a TOUCH, where it was built for a CHANGE (user
+  19.08.2026, reading the board: the user saw four-eyes on over half the cards and asked whether
+  so many points are judged critical). They are not. MEASURED 19.08.2026 over the 71 points
+  landed since 01.08.: 56 carry a review record (79 %), but only 16 of those reviews come
+  from a criticality decision — 38 were demanded by `mechanism-review-guard`, which is
+  NAME-based (`scripts/*-guard*.mjs`, `*-gate*.mjs`, anything beside one by stem,
+  `scripts/git-hooks/*`, plus the named exceptions in MECHANISM_EXTRA) and asks nothing about
+  what the diff does. 40 of the 71 points (56 %) touch such a path, while the criticality tags
+  across all 156 tagged points read 41 high (26 %), 86 medium, 29 low. The gate was written
+  when a guard change was the exception; the queue is now mostly guard work, so the exception
+  became the rule and a comment line in a guard file costs a full cross-model round.
+  FINAL STATE:
+  - THE GATE ASKS WHETHER THE DIFF CAN CHANGE BEHAVIOUR, not only which file it sits in. The
+    path rule stays the entry condition and is not widened or narrowed; a NEW, pure classifier
+    beside it decides whether the changed HUNKS in a mechanism file are review-worthy. Only
+    changes that provably cannot alter what the mechanism decides are exempt: comment- and
+    JSDoc-only hunks, pure whitespace/formatting, and a test file that only ADDS cases. Any
+    deletion or weakening in a test file, any change to an assertion, and every hunk of
+    executable code stay review-worthy — a weakened test is exactly the failure the gate exists
+    to catch, so a test file is never exempt as a class.
+  - A MIXED DIFF IS REVIEW-WORTHY. One executable hunk anywhere in the point's mechanism files
+    puts the whole point back under the full gate; the exemption is all-or-nothing per point,
+    never per file, so nothing lands by being bundled with a comment fix.
+  - THE EXEMPTION IS RECORDED, NOT SILENT. A point cleared this way writes a record naming
+    every mechanism file it touched and why each was exempt, through the existing
+    `mechanism-review.mjs --record` path with its own verdict value, so the ledger keeps
+    answering "was this mechanism reviewed" and a later reader sees the gate was asked and
+    answered rather than absent.
+  - THE RULE IS PROVEN AGAINST HISTORY BEFORE IT IS ARMED. One command replays the classifier
+    over every commit the ledger already judged and reports how many recorded do-not-merge
+    verdicts sat on a diff the new rule would have exempted. That number must be ZERO; a single
+    real finding on an exempt diff refutes the rule, and the point then narrows the exemption
+    rather than accepting the loss. The replay's output is committed as the evidence.
+  VERIFIABLE: Vitest over the pure classifier with recorded fixtures — a comment-only hunk in a
+  guard core (exempt), an added test case (exempt), a deleted assertion (review-worthy), a
+  one-character change inside an executable line (review-worthy), a diff mixing a comment fix
+  with an executable hunk (review-worthy as a whole), and a rename that moves executable code
+  between mechanism files (review-worthy); the history replay reports zero missed findings; and
+  the guard's own change carries the cross-model review it demands of everything else.
+  Criticality: high — this loosens a safety gate that exists because the pre-push gate once
+  went live unreviewed. The saving is real but bounded and must not be overstated: cross-vendor
+  review rounds measured 0.5 % of the tokens in the ten-point cost ledger, so the gain is fewer
+  Sol rounds and shorter wall clock per point, NOT a large token saving, and it does not touch
+  the Fable pool at all (Fable ran 0 reviews this week; its volume is authoring).
+  Bundle: Modell & Wächter.
 - [ ] 734. A run whose reds exceed the capture cap can never be closed, so it blocks the render
   set forever (measured 19.08.2026 while landing point 732). `render-verify-guard` blocked with
   12 unexplained red runs, the oldest from 17.08.2026 — `webgpu/enrichments` from 08:25 on, and
@@ -8735,3 +8780,42 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs one hand-rewrite per session boundary and risks the drift the
   verbatim rule was built to stop, but nothing is lost.
   Bundle: Chat & Tafel.
+
+- [ ] 736. The escalation lane has no stopping rule, and one point burns the Fable pool in it
+  (measured 19.08.2026 from the harness transcripts under `/home/node/.claude/projects/-workspace-hoa`,
+  window since 18.08. 19:00). Fable ran 1137 turns for 164.9M cache-read tokens. The split:
+  point 713 (escalation authoring, six Fable agents, rounds 3 to 8) 95.1M = 58 %; point 712
+  (escalated after four do-not-merge rounds) 35.0M = 21 %; two batch-serving sessions that came
+  up on Fable instead of Opus 5 33.3M = 18 %; the session that asked about the spend 1.5M.
+  Escalation authoring is therefore 79 % of the Fable spend and ONE open point is 58 % of it.
+  WHY THE COMMIT COUNT HIDES IT: read from the `Co-Authored-By` trailers, Fable has zero commits
+  on 19.08., which reads as "the spend stopped". It did not — point 713 NEVER LANDED, so its
+  Fable work appears in no commit on `main`. The commit proxy misses exactly the most expensive
+  work there is: a grinding escalation that never lands. THE GAP: point 726 rules WHEN the
+  escalation to Fable engages (after five failed review rounds) and nothing rules when it STOPS.
+  Point 713 stands at 14 do-not-merge verdicts and in its EIGHTH cross-review round, each round a
+  fresh Fable agent. Point 596 (the cost-tail hook at three times the median) touches the theme,
+  is open, and does not cover this; no other open point covers it.
+  FINAL STATE:
+  - THE ESCALATION HAS A CEILING, AND REACHING IT STOPS THE POINT. A bounded number of escalation
+    rounds is spent on one point; on the last one the point STOPS rather than commissioning
+    another author. It is then re-cut into smaller points or put to the user as a decision, and
+    which of the two happened is recorded with the point. A stopped point is never silently
+    re-entered by the next session.
+  - THE COUNT IS READ FROM THE RECORD THAT EXISTS. The rounds are counted from the recorded review
+    verdicts of the point (`.claude/mechanism-reviews.jsonl`), not from a hand-kept tally, so a
+    session that did not run the earlier rounds sees the same number.
+  - SPEND IS MEASURED IN TOKENS, NOT COMMITS. The check that answers "what has this point cost"
+    reads the transcripts, because an unlanded point produces no commit and the commit proxy
+    reports zero for the most expensive case. Where the transcripts are unavailable, that is
+    reported as unmeasured rather than as zero.
+  - THE STOP IS ENFORCED, NOT REMEMBERED. Commissioning an escalation round past the ceiling is
+    refused by the same path that commissions the author, with the remedy named in the refusal.
+  VERIFIABLE: Vitest over the pure round-counting and ceiling decision — a point below the
+  ceiling commissions normally, a point at the ceiling is refused with the re-cut/decide remedy,
+  a point whose ledger holds rounds from several sessions counts them all, and a case that FAILS
+  if the counter is fed commits instead of review records; plus a fixture proving an unlanded
+  point reports its measured token spend rather than zero.
+  Criticality: high — it governs how the scarcest model pool is spent, and its absence has
+  already put 58 % of a week's Fable volume into a single point that never landed.
+  Bundle: Modell & Wächter.
