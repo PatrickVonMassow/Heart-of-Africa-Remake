@@ -244,6 +244,41 @@ describe('derived now-section membership', () => {
     expect(comparison).toMatchObject({ ok: true, idleCards: 0, emptyStateCount: 0 })
     expect(html).toContain('Text für diesen Punkt fehlt noch')
     expect(html).not.toContain(NO_CURRENT_WORK_TITLE)
+    // The AUTHORED handover prose survives the transition — carried into the
+    // created stub, never dropped with the idle card (point 491's lesson;
+    // fifth cross-vendor round, pass 2).
+    expect(html).toContain('Sitzungsgrenze; der Nachfolger nimmt Punkt 700.')
+  })
+
+  it('carries the idle prose into the FIRST stub only when several points resume at once', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">16:45</span></span></summary>\n' +
+      '  <div class="body">\n<p><span class="stamp">Stand 16:45</span> Sitzungsgrenze; der Nachfolger nimmt ' +
+      'Punkt 700.</p>\n  </div>\n</details>\n'
+    const out = reconcileNowProjection(fullBoard({ now: idleReason }), [700, 697], { focusPoint: 700, stamp: '20:10' })
+    expect(out.match(/Sitzungsgrenze; der Nachfolger nimmt Punkt 700\./g)).toHaveLength(1)
+    const at = out.indexOf('Sitzungsgrenze')
+    expect(at).toBeGreaterThan(out.indexOf('<span class="num">700</span>'))
+    expect(at).toBeLessThan(out.indexOf('<span class="num">697</span>'))
+    expect(compareNowProjection(out, [700, 697]).ok).toBe(true)
+  })
+
+  it('refuses a document without the now-section heading in both render and comparison', () => {
+    // The lenient slice used to treat the WHOLE document as the now-section:
+    // the render mutated foreign sections and the comparison blessed the
+    // result, so the fail-closed preflight was open (fifth cross-vendor
+    // round, pass 2). A missing heading refuses in both halves.
+    const noSection =
+      `<main>\n${sect('Von dir zu klären', '')}${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(noSection, [700])).toThrow(/section heading is missing/)
+    expect(() => reconcileNowProjection(noSection, [])).toThrow(/section heading is missing/)
+    expect(compareNowProjection(noSection, [700]))
+      .toMatchObject({ ok: false, error: expect.stringMatching(/section heading is missing/) })
+    // A bare card fragment no longer passes as its own section either.
+    expect(compareNowProjection(nowEntry(700, 'A', '20:07'), [700]).ok).toBe(false)
+    expect(() => projectNowForPublish(noSection, { ok: true, points: [700], focusPoint: 700 }))
+      .toThrow(/section heading is missing/)
   })
 
   it('creates missing stubs, removes stale cards and preserves surviving prose byte for byte', () => {

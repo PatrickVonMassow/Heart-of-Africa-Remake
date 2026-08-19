@@ -427,6 +427,15 @@ function nowSectionSlice(html) {
   }
 }
 
+/** A card's authored body text, stamp spans stripped — the prose a render owes. */
+function cardBodyText(card) {
+  const body = (String(card).match(/<div class="body">([\s\S]*?)<\/div>/) ?? [])[1] ?? ''
+  return [...body.matchAll(/<p>([\s\S]*?)<\/p>/g)]
+    .map((m) => m[1].replace(/<span class="stamp">[\s\S]*?<\/span>\s*/g, '').trim())
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 /** Every complete current-work card in section order, with its exact bytes. */
 function projectedNowCards(html) {
   const section = nowSectionSlice(html).text
@@ -461,6 +470,21 @@ const emptyStatePattern = () => /<p class="now-empty" data-state="idle">[\s\S]*?
  */
 export function compareNowProjection(html, expectedPoints, { knownPoints = null } = {}) {
   try {
+    // A document without the now-section heading is judged NOWHERE: the lenient
+    // slice would read cards from any section as the projection and bless the
+    // result, leaving the fail-closed preflight open (fifth cross-vendor round,
+    // pass 2). A missing section refuses by name, never guesses.
+    try {
+      sectionBounds(String(html ?? ''), 'now')
+    } catch {
+      return {
+        ok: false,
+        error: 'the current-work section heading is missing — nothing to compare against',
+        missing: [],
+        extra: [],
+        duplicates: [],
+      }
+    }
     const expected = Array.isArray(expectedPoints) ? expectedPoints.map(Number) : []
     if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
       return { ok: false, error: 'the expected active-point set is malformed', missing: [], extra: [], duplicates: [] }
@@ -517,13 +541,20 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
   }
 }
 
-/** A visible placeholder; its copy is explicitly not mistaken for authored prose. */
-export function renderNowStub(point, { stamp = berlinStamp() } = {}) {
+/** A visible placeholder; its copy is explicitly not mistaken for authored prose.
+ *  `carried` is authored text rescued from the idle card the render replaces —
+ *  it rides in the stub's body so the transition never blanks what a session
+ *  wrote (fifth cross-vendor round, pass 2). */
+export function renderNowStub(point, { stamp = berlinStamp(), carried = '' } = {}) {
+  const note = String(carried ?? '').trim()
+  const text = note
+    ? `Diese Karte braucht noch ihren handgeschriebenen Text.\n\nAus der Übergabekarte übernommen: ${note}`
+    : 'Diese Karte braucht noch ihren handgeschriebenen Text.'
   return (
     `<details class="now" data-state="stub">\n  <summary>${numberChip(point)}` +
     `<span class="t">Text für diesen Punkt fehlt noch</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody('Diese Karte braucht noch ihren handgeschriebenen Text.', { stamp })}\n` +
+    `  <div class="body">\n${renderCardBody(text, { stamp })}\n` +
     '  </div>\n</details>\n'
   )
 }
@@ -556,6 +587,15 @@ export function reconcileNowProjection(
   { focusPoint = null, stamp = berlinStamp(), transformExisting = (card) => card } = {},
 ) {
   const source = String(html ?? '')
+  // A missing now-section heading REFUSES (fifth cross-vendor round, pass 2):
+  // the lenient slice treated the whole document as the section, so the render
+  // deleted cards out of foreign sections and inserted stubs outside any.
+  let bounds
+  try {
+    bounds = sectionBounds(source, 'now')
+  } catch {
+    throw new Error('board: the current-work section heading is missing — refusing to project the now-section')
+  }
   const expected = Array.isArray(expectedPoints) ? expectedPoints.map(Number) : []
   if (expected.some((n) => !Number.isInteger(n) || n <= 0) || new Set(expected).size !== expected.length) {
     throw new Error('board: active-point projection is malformed')
@@ -590,6 +630,18 @@ export function reconcileNowProjection(
     )
   }
 
+  // The lone idle card's authored handover prose is CARRIED, never dropped
+  // with the card (point 491's lesson; fifth cross-vendor round, pass 2): when
+  // active work replaces the idle state, the written reason moves into the
+  // first created stub instead of vanishing with the `return ''` below.
+  const carried = expected.length > 0
+    ? unnumbered
+        .filter((card) => isTrulyStateCard(card.html, 'idle'))
+        .map((card) => cardBodyText(card.html))
+        .filter(Boolean)
+        .join('\n\n')
+    : ''
+
   const byPoint = new Map(numbered.map((card) => [card.point, card.html]))
   const kept = []
   for (const point of expected) {
@@ -610,12 +662,21 @@ export function reconcileNowProjection(
     : previous
   const survivorMap = new Map(kept.map((card) => [card.point, card.html]))
   const newPoints = expected.filter((point) => !survivorMap.has(point))
+  // Unreachable today (idle beside numbered work threw above, so a carried
+  // text always meets an all-stub render) — but if a future path got here with
+  // prose and nowhere to put it, refusing beats blanking it.
+  if (carried && newPoints.length === 0) {
+    throw new Error("board: reconciliation would drop the idle card's authored prose with nowhere to carry it")
+  }
   const ordered = [
     ...survivorOrder.map((point) => ({ point, html: survivorMap.get(point) })),
-    ...newPoints.map((point) => ({ point, html: renderNowStub(point, { stamp }) })),
+    ...newPoints.map((point, index) => ({
+      point,
+      html: renderNowStub(point, { stamp, carried: index === 0 ? carried : '' }),
+    })),
   ]
 
-  const now = nowSectionSlice(source)
+  const now = { ...bounds, text: source.slice(bounds.from, bounds.end) }
   let remainder = now.text
     .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
       const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
