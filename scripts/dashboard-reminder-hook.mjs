@@ -13,7 +13,9 @@ import { PENDING_PATH, STATE_PATH, boardFilePath, readJson, writeJsonAtomic, mer
 import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 // The injected board obligation, in a pure module so its size is measurable and
 // its content testable (point 436).
-import { promptInjectionText } from './dashboard-reminder-core.mjs'
+import { hookInjectionText } from './dashboard-reminder-core.mjs'
+import { parseContextTokens } from './context-watermark-core.mjs'
+import { readTail } from './context-watermark.mjs'
 import { seedDecisionCardBaseline } from './decision-card-guard.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
@@ -24,6 +26,7 @@ import { seedDecisionCardBaseline } from './decision-card-guard.mjs'
 let standDown = false
 let sid = ''
 let transcriptPath = ''
+let contextTokens = null
 try {
   const payload = JSON.parse(fs.readFileSync(0, 'utf8'))
   sid = payload.session_id || ''
@@ -35,6 +38,15 @@ try {
   standDown = heldByOtherLiveOwner(sid)
 } catch {
   standDown = false
+}
+// The header reading comes from the newest non-sidechain usage record. Read
+// only the bounded tail used by context-watermark.mjs, then delegate the
+// counting rule to its pure core — one definition of what "context" means.
+try {
+  const tail = transcriptPath ? readTail(transcriptPath) : null
+  contextTokens = tail === null ? null : (parseContextTokens(tail)?.tokens ?? null)
+} catch {
+  contextTokens = null
 }
 // A user prompt is the earliest possible proof that a session which took a point
 // boundary is alive and about to work again — earlier than any tool call, and it
@@ -97,11 +109,7 @@ try {
 // rejects. See PROMPT_ENFORCED_CLAIMS.
 
 if (standDown) {
-  console.log(
-    '[batch-singleton] Eine ANDERE Session hält den Batch-Lock (lebendig geprüft). STAND DOWN: ' +
-      'Diese Session ist NICHT der Batch-Worker — keine Batch-Arbeit, kein Merge nach main, ' +
-      'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.',
-  )
+  process.stdout.write(hookInjectionText({ standDown: true, contextTokens }))
 } else {
 // The age of the CANONICAL board file (point 435). It used to stat the
 // scratchpad copy of the retired mirror, which most sessions never write — so
@@ -122,5 +130,5 @@ try {
 // end while it stands — naming `focus.mjs confirm`, `focus.mjs set`, the now-card
 // update, the republish and `--synced` in its own block text, which is read
 // exactly when it is needed instead of on every prompt.
-process.stdout.write(promptInjectionText(mtimeNote))
+process.stdout.write(hookInjectionText({ mtimeNote, contextTokens }))
 }

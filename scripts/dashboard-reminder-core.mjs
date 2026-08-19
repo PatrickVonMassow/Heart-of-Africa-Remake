@@ -94,11 +94,39 @@ export const PROMPT_ENFORCED_CLAIMS = [
 /**
  * A CEILING on EVERYTHING the project-scope UserPromptSubmit hook injects, not
  * just the board paragraph — the level the user's question was asked at ("what
- * else is billed every turn for nothing"). It equals REMINDER_CHAR_BUDGET plus
- * the newline, because after point 440 the board obligation is the only text
- * left; a new block would have to raise this number and justify it here.
+ * else is billed every turn for nothing"). The small added allowance is the
+ * measured header-suffix handoff; a new block would have to raise one of these
+ * numbers and justify it here.
  */
-export const PROMPT_CHAR_BUDGET = REMINDER_CHAR_BUDGET + 1
+export const CONTEXT_LEVEL_CHAR_BUDGET = 80
+export const PROMPT_CHAR_BUDGET = REMINDER_CHAR_BUDGET + 1 + CONTEXT_LEVEL_CHAR_BUDGET
+
+/** The non-owner message is output through the same formatter as the owner's
+ * reminder so the context level cannot disappear in stand-down sessions. */
+export const STAND_DOWN_TEXT =
+  '[batch-singleton] Eine ANDERE Session hält den Batch-Lock (lebendig geprüft). STAND DOWN: ' +
+  'Diese Session ist NICHT der Batch-Worker — keine Batch-Arbeit, kein Merge nach main, ' +
+  'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.'
+
+/** The literal suffix for the reply header. A missing measurement is unknown,
+ * never zero: zero would claim a real reading that the transcript did not make. */
+export function contextLevelSuffix(tokens) {
+  const reading = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0 ? String(tokens) : '--'
+  return ` · Kontext: ${reading} Tokens`
+}
+
+/** The compact per-prompt handoff. The user-scope timestamp hook supplies the
+ * bold German stamp; this project hook supplies what belongs directly after it. */
+export function contextLevelInstruction(tokens) {
+  return `[context-level] Kopfzeilen-Suffix:${contextLevelSuffix(tokens)}\n`
+}
+
+/** Everything the UserPromptSubmit hook writes, selected without I/O so Vitest
+ * can pin the owner and stand-down branches to the same context measurement. */
+export function hookInjectionText({ standDown = false, mtimeNote = '', contextTokens = null } = {}) {
+  const body = standDown ? `${STAND_DOWN_TEXT}\n` : promptInjectionText(mtimeNote)
+  return contextLevelInstruction(contextTokens) + body
+}
 
 /**
  * Everything the hook writes to stdout for a session that owns the batch — the
