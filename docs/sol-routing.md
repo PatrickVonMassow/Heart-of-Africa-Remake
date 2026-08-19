@@ -119,6 +119,12 @@ the function with `Author lane: sol|fable|opus` **on a line of its own** in its
 spec, and `--rounds <n>` is the deliberate override for history the ledger
 cannot know.
 
+**What the cut actually moved**, measured over the whole open queue on
+18.08.2026, before and after the day's ruling: **203 points → 120 Sol / 0 Fable
+/ 83 main session**, against 65 / 0 / 138 the day before. This is a MEASUREMENT,
+not a restatement of the policy — it stands here because nothing else records it,
+and it is the reading against which a later re-measurement is judged.
+
 **The lane runs like any delegated agent**: an isolated worktree, its own
 `feat/` branch, the point handed over as a BRIEF rather than a reading
 assignment, and a commit per self-contained step. The child is given no
