@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import {
   failedRuns,
+  ciRedAlertMessage,
   notifiedFromState,
   pruneFamine,
   pruneNotifiedRefs,
@@ -41,7 +42,19 @@ import {
   refTargets,
   sweepTargets,
 } from './ci-status-guard-core.mjs'
-import { JOBS_PAGE_SIZE, classifyFailureCause, jobsComplete, moreJobPages } from './ci-failure-cause-core.mjs'
+import {
+  JOBS_PAGE_SIZE,
+  PAGES_WORKFLOW,
+  classifyFailureCause,
+  failedJobNames,
+  jobsComplete,
+  moreJobPages,
+} from './ci-failure-cause-core.mjs'
+import {
+  INSPECT_LIMIT,
+  blockingDeployments,
+  candidateDeployments,
+} from './pages-deploy-unblock-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -277,6 +290,49 @@ async function fetchJobs(repo, runId) {
   return jobsComplete({ fetched: jobs.length, totalCount }) ? jobs : null
 }
 
+/** Read-only proof of which Pages deployments can still be holding the queue.
+ * `[]` is returned only when the complete probe proves there is no blocker;
+ * null means the API could not decide, and keeps the conservative old refusal. */
+async function fetchPagesBlockers(repo) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'hoa-ci-status-guard',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = readToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const listed = await httpsRequest(
+    `https://api.github.com/repos/${repo}/deployments?environment=github-pages&per_page=${INSPECT_LIMIT}`,
+    { headers },
+  )
+  if (!listed || listed.status !== 200) return null
+  let candidates
+  try {
+    candidates = candidateDeployments(JSON.parse(listed.body))
+  } catch {
+    return null
+  }
+  const inspected = []
+  for (const candidate of candidates) {
+    const res = await httpsRequest(
+      `https://api.github.com/repos/${repo}/pages/deployments/${candidate.sha}`,
+      { headers },
+    )
+    if (!res) return null
+    if (res.status === 404) {
+      inspected.push({ ...candidate, status: 'not_found' })
+      continue
+    }
+    if (res.status !== 200) return null
+    try {
+      inspected.push({ ...candidate, status: JSON.parse(res.body)?.status ?? '' })
+    } catch {
+      return null
+    }
+  }
+  return blockingDeployments(inspected)
+}
+
 /** ntfy push, same channel as scripts/notify.mjs but via node:https (see top).
  *  Silent no-op without a configured topic; failures never break the guard. */
 async function notifyCiRed(message) {
@@ -342,10 +398,17 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
   const judged = []
   const stillFamished = {}
   for (const red of reds.length > 0 ? reds : [classification]) {
+    const jobs = await fetchJobs(repo, red.runId)
+    const failed = failedJobNames(jobs)
+    const pagesBlockers =
+      red.workflowName === PAGES_WORKFLOW && failed.length > 0 && failed.every((name) => name === 'deploy')
+        ? await fetchPagesBlockers(repo)
+        : null
     const cause = classifyFailureCause({
       workflowName: red.workflowName,
       conclusion: red.conclusion,
-      jobs: await fetchJobs(repo, red.runId),
+      jobs,
+      pagesBlockers,
       workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, sha),
       famineSince: Number(famine[red.workflowName]) || 0,
       now,
@@ -412,14 +475,7 @@ async function main() {
     fetchRuns: (sha) => fetchRuns(repo, sha),
     judgeRed: (args) => judgeRed(repo, args),
     notify: ({ target, classification, standDown }) =>
-      notifyCiRed(
-        `CI failed for pushed ${target.ref} ${String(target.sha).slice(0, 7)}: "${classification.workflowName}" ` +
-          `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
-          `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}` +
-          // Once the outage waiver has expired, the alert stops saying "nothing
-          // to do" and NAMES the reading only a push can fix.
-          (classification.escalate ? ` ${classification.detail}. ${classification.remedy}` : ''),
-      ),
+      notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
   if (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified)) {
