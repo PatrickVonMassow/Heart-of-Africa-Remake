@@ -746,9 +746,14 @@ const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
  * file-descriptor syntax keeps `> result.txt`, `>& result.txt` and an arbitrary
  * ampersand expression opaque. The residual `>`/`<` check below remains the
  * authority for every other redirection.
+ *
+ * A SEPARATOR ENDS THE MERGE AS SURELY AS A SPACE (Claude review of a6bcd9a5):
+ * `--clear 2>&1|tail -3` is the same harmless decoration as the spaced form, and
+ * demanding the space would leave the very shape this point exists to unblock
+ * denied for a typing habit.
  */
 export function withoutOutputDescriptorMerges(command) {
-  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=\s|$)/g, '$1')
+  return String(command ?? '').replace(/(^|\s)\d*>>?&\d+(?=[\s;|&]|$)/g, '$1')
 }
 
 /**

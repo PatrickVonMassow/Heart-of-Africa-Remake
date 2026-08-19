@@ -364,6 +364,9 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
       'node scripts/board.mjs attest 2>&1 | tail -3',
       'node scripts/board-queue.mjs 2>&1 | head -3',
       'node scripts/finding.mjs --drain 2>&1 | more',
+      // A separator closes the merge as surely as a space does.
+      'node scripts/batch-boundary.mjs --clear 2>&1|tail -3',
+      'node scripts/board.mjs attest 2>&1;node scripts/board-publish.mjs',
     ]) {
       expect(call({ command }).survives, command).toBe(true)
     }
@@ -384,6 +387,12 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     expect(withoutOutputDescriptorMerges('x 2>&1 1>&2')).toBe('x  ')
     expect(withoutOutputDescriptorMerges('x > out 2> err')).toBe('x > out 2> err')
     expect(withoutOutputDescriptorMerges('x >& out')).toBe('x >& out')
+    // The merge ends at a separator too, not only at whitespace.
+    expect(withoutOutputDescriptorMerges('x 2>&1|y')).toBe('x |y')
+    expect(withoutOutputDescriptorMerges('x 2>&1;y')).toBe('x ;y')
+    expect(withoutOutputDescriptorMerges('x 2>&1&& y')).toBe('x && y')
+    // A digit that keeps running is not a file descriptor merge we understand.
+    expect(withoutOutputDescriptorMerges('x 2>&1a')).toBe('x 2>&1a')
   })
 
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
