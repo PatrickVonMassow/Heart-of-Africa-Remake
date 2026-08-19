@@ -120,7 +120,11 @@ function fallbackSubject(point) {
  * resurrects one edit. Rotation and publish stay inside too, so the transaction
  * reports and publishes the board version it actually wrote.
  */
-function edit(fn, done, preparePublish = () => {}) {
+function edit(fn, done) {
+  return withBoardEditLock(() => applyEdit(fn, done))
+}
+
+function editPrepared(fn, done, preparePublish = () => {}) {
   return withBoardEditLock(() => applyEdit(fn, done, preparePublish))
 }
 
@@ -213,7 +217,7 @@ try {
     // it carried an estimate — and a now-card promoted without one renders a
     // start time and no expected end, which is the invisibility point 439 ends.
     const noEstimate = promotionEstimateWarning(readFileSync(BOARD, 'utf8'), point)
-    edit(
+    editPrepared(
       (html) => toNow(html, point, textOf(words), { stamp: at }),
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: current work` }),
@@ -222,7 +226,7 @@ try {
   } else if (cmd === 'queue') {
     const [point, ...words] = rest
     if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
-    edit(
+    editPrepared(
       (html) => toQueue(html, point, { text: textOf(words) }),
       `${point} returned to the queue`,
       prepareActiveTransition({ exitPoint: Number(point), note: `point ${point}: returned to queue` }),
@@ -239,7 +243,7 @@ try {
     }
     const at = berlinStamp()
     const noEstimate = next == null ? null : promotionEstimateWarning(readFileSync(BOARD, 'utf8'), next)
-    edit(
+    editPrepared(
       (html) =>
         closeCard(html, point, {
           text: textOf(words),
@@ -340,7 +344,7 @@ try {
     if (!point || !times || !title || words.length === 0) {
       throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"|--text-stdin')
     }
-    edit(
+    editPrepared(
       (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
       `${point} promoted to current work`,
       prepareActiveTransition({ focusPoint: Number(point), note: `point ${point}: promoted to current work` }),
