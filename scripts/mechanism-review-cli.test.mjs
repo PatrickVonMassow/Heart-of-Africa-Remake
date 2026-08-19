@@ -37,6 +37,7 @@ describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
     const flags = [
       '--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing',
+      '--author-framing', '--spec-examination',
       '--pass', '--pass-files', '--pass-commits', '--carried-from', '--list',
     ]
     for (const flag of flags) {
@@ -847,6 +848,31 @@ describe('the mode round-trips into the ledger', () => {
     const built = build({ mode: 'review' })
     expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
     expect(Object.hasOwn(built.record, 'framing')).toBe(false)
+  })
+
+  it('records the re-authoring framing beside an ordinary review', () => {
+    const authorFraming = 'Act as a hostile tester and probe every adjacent transition.'
+    const built = build({ mode: 'review', authorFraming })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.authorFraming).toBe(authorFraming)
+    expect(built.record.framing).toBeUndefined()
+  })
+
+  it('records one sound or amended spec examination, never as an authoring round', () => {
+    for (const specExamination of ['sound', 'amended']) {
+      const built = build({ mode: 'review', verdict: 'merge', specExamination })
+      expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+      expect(built.record.specExamination).toBe(specExamination)
+    }
+    expect(build({ mode: 'review', specExamination: 'unclear' }).errors.join('\n')).toContain('sound | amended')
+    expect(build({ mode: 'review', verdict: 'do-not-merge', specExamination: 'sound' }).ok).toBe(false)
+    expect(
+      build({
+        mode: 'review',
+        specExamination: 'sound',
+        authorFraming: 'Act as a hostile tester and probe every adjacent transition.',
+      }).ok,
+    ).toBe(false)
   })
 
   it('still reads a legacy row that predates the flag', () => {
