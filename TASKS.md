@@ -98,6 +98,47 @@ put it is the mistake this line exists to stop.
   review before it lands.
   Bundle: Chat & Tafel.
 
+- [ ] 751. The turn-end gate and the context fence contradict each other, so a session past the
+  watermark can neither drain nor stop (measured 19.08.2026, 19:18-19:27). The session that
+  crossed the mark committed its context boundary at 19:21 (marker `committed`, cause `context`,
+  173,893 tokens). Its Stop chain then blocked on `carrier-not-drained` — three findings written
+  at 19:18 sat in the memory carrier while it held the batch — and the context fence denied the
+  only remedy it named: writing them into `TASKS.md` is authoring a point, which the fence
+  refuses past the watermark, while the fence's own instruction is that findings go to the
+  carrier. The session could therefore neither drain nor end cleanly, `batch-progress-guard`
+  never reached its `allow-boundary` branch, `markHandover` was never called, and the lock kept
+  naming a session the user had already cleared. The launcher's 19:14 tick skipped on "owner
+  alive", no successor was spawned, and the user received the same "please /clear" answer five
+  times while the batch stood still; it took a hand-run `batch-singleton.mjs release` in the
+  attended window to move it.
+  FINAL STATE:
+  1. `carrier-not-drained` does not fire against a session the fence has closed. The precedent
+     stands in the same file: `request-not-queued` is already scoped to the boundary "because
+     demanding it mid-branch would block a session for something the workflow forbids it to do,
+     and that is how a guard gets routed around" (`scripts/findings-core.mjs`). The drain demand
+     is scoped the same way — it is owed by a session that MAY write the work order, and a
+     session past the trigger may not.
+  2. The carrier is then explicitly the handover channel rather than a debt: entries written past
+     the fence are the successor's inbox, and the successor's FIRST turn is where the drain is
+     owed. The guard's message names which session owes it.
+  3. A committed context boundary reaches the handover even when another Stop guard blocks. The
+     lock is marked handed over as part of COMMITTING the boundary, not only from the branch
+     `batch-progress-guard` reaches after every other guard has allowed the stop, so a blocked
+     turn end can no longer leave a dead session owning the batch and the launcher unable to
+     spawn.
+  4. A Stop guard that blocks a session which has already committed its boundary names the
+     boundary and the one command that finishes it, instead of repeating a demand the fence
+     forbids the session to satisfy.
+  VERIFIABLE: Vitest over `auditFindings` — an owner past the trigger with pending carrier
+  entries produces no `carrier-not-drained` violation while the same owner below the trigger
+  still does; a case asserting the lock carries `handedOver` after a committed context boundary
+  whose turn end was blocked by an unrelated guard; and a case that the drain is demanded of the
+  successor's first turn.
+  Criticality: high — the failure mode is the batch standing still with a dead session owning the
+  lock, and the only way out was a hand-run release from the user's own window.
+  Bundle: Session- & Repo-Hygiene.
+
+
 - [ ] 743. The watermark is set where its own arithmetic holds (user 19.08.2026, on being
   shown that a handover AT the mark means the damage is already done: "Wenn bei 150.000
   abgegeben wird, ist das Kind ja schon in den Brunnen gefallen"). `CONTEXT_WATERMARK_TOKENS`
@@ -106,7 +147,12 @@ put it is the mistake this line exists to stop.
   the ceiling that everything which still happens after it fits underneath. Measured
   19.08.2026: the fence first fired at 167,277 tokens — the mark had been crossed with
   nothing firing, because no STARTING call lay on the way up — and the boundary was committed
-  at 194,613, i.e. 44,613 past it, of which 27,336 were spent purely on leaving.
+  at 194,613, i.e. 44,613 past it, of which 27,336 were spent purely on leaving. THE SAME
+  FAILURE MODE WAS MEASURED A SECOND TIME the same evening: at 19:18 the fence denied a
+  document edit at 164,737 tokens, 14,737 past the mark, again because no earlier call of that
+  turn was classified as a START. So the overshoot is a SERIES, not one reading, and a
+  backward-looking check cannot refuse growth that has already been paid for — which is the
+  same evidence point 745's prospective admission rests on.
   FINAL STATE: the two numbers become two NAMED constants, because one name for both is how
   the confusion got in — `CONTEXT_CEILING_TOKENS = 150000` and `CONTEXT_TRIGGER_TOKENS =
   82000`, and every consumer names the one it means: point 742's incident record and point
@@ -533,7 +579,7 @@ put it is the mistake this line exists to stop.
   `.claude/batch-paused` is gone.
   Criticality: medium — it touches the alert path, which must keep reaching the user; the
   change removes a board card, never a notification.
-  Bundle: Session- & Repo-Hygiene.
+  Bundle: Chat & Tafel.
 
 - [ ] 750. A session that dies without a boundary leaves no reading, so the overshoot series
   under-counts exactly where it matters most (GPT-5.6 Sol, review of the context-ceiling
