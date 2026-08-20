@@ -9130,6 +9130,36 @@ to land than a mechanism that needs a review.
   in its first turn and on the board, because a multi-hour run on the scarcest pool is a decision
   nobody made. The spawn's own fallback is therefore Opus 4.8, not Fable — the scarce lane is
   reached by escalation, never by an outage.
+  WHAT THE AVAILABILITY MARK OF (1) IS, IN DETAIL (carried over 20.08.2026 from point 693, which
+  measured the same defect at the other end: on 14.08.2026, 01:33-01:40, the routing sent point 666
+  to Fable 5 — "tagged HIGH criticality, a hard case by definition" — and the delegated agent died
+  on its FIRST API call with "You've reached your Fable 5 limit"). The mark is a small operator
+  file beside `sol-share.json`, recorded PER PROVIDER: that it is exhausted, and the timestamp at
+  which its allowance resets. Three properties are not optional:
+  - a lane whose provider is recorded exhausted is never the PRINTED recommendation — the next
+    lane of the chain is named instead, with the reason, so the reader sees a substitution rather
+    than the ordinary cut;
+  - a missing, unreadable or LAPSED file means "nothing known" and routes exactly as today.
+    Exhaustion may never be inferred from silence, and it expires by itself at the reset timestamp
+    rather than waiting for someone to remember to clear it;
+  - an author or agent run that dies on a provider limit RECORDS that provider as exhausted before
+    it exits, so the next session does not repeat the delegation that just failed. Marking by hand
+    stays possible; it is not the only way the mark appears.
+  THE ORDINARY CUT IS UNTOUCHED by all of this, exactly as the user's ruling of 18.08.2026 (commit
+  c3256a50) left it: a hard marker or criticality HIGH answers Sol, above the verification lane;
+  Opus 5 keeps the points whose VERIFICATION is the work and that nothing marks hard; Fable stays
+  the escalation for work the review still rejects after a re-work. This point adds a VETO on an
+  empty lane, never a second opinion about difficulty. One half of 693 was already delivered on
+  17.08.2026 ("State all three authoring lanes where the routing is described"): the texts that
+  contradicted each other about who authors what were corrected and the shortage wording that
+  lived only in a memory file was retired. What no text can carry is the pool state, which is the
+  half above.
+  VERIFY BEFORE BUILDING (20.08.2026): CLAUDE.md §6 still states the serving fallback as
+  Opus 5 → Fable 5 → Opus 4.8, which is what (3) above wants changed. The chain text and the spawn
+  arguments move in the SAME commit, or this point states why Fable stays first — a mechanism that
+  disagrees with the binding file is how the next session re-derives the wrong order.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes which vendor authors, which is the
+  decision the four-eyes principle rests on.
   VERIFIABLE: Vitest over the routing (an available lane keeps its work, an unavailable one falls
   to the next chain member with the reason in the verdict, and an unknown lane name is an error
   rather than a silent pass-through); Vitest over the rescue path (a dirty worktree produces a
@@ -9138,6 +9168,10 @@ to land than a mechanism that needs a review.
   that is killed mid-work and whose branch afterwards carries everything the worktree held; plus a
   case over the spawn arguments asserting the fallback is Opus 4.8 and that the launcher log names
   both the requested and the actual model.
+  For the availability mark: an exhausted lane is never recommended and the substitution names its
+  reason; a missing, corrupt or lapsed pool file leaves today's routing unchanged; a recorded
+  exhaustion that has not lapsed yields the next lane; plus one real `--routing` run whose printed
+  reason names what it applied.
   UNTIL IT IS BUILT, the rule is operational and stated by the user (13.08.2026, 19:55): NOTHING is
   delegated to Fable 5 while its quota is out — not authoring, not four-eyes review. A hard case
   needs no substitute lane for that, because a hard case is authored by Opus 5 and only ESCALATES to
