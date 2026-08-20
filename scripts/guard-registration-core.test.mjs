@@ -5,6 +5,7 @@ import {
   evaluate,
   formatVerdict,
   registeredIdsFromSource,
+  STAGED_PATH_ARGS,
   touchesGuardWiring,
 } from './guard-registration-core.mjs'
 
@@ -17,7 +18,36 @@ const wire = (...ids) => ({
 const registry = (...ids) =>
   ['export const GUARDS = [', ...ids.map((id) => `  {\n    id: '${id}',\n  },`), ']', ''].join('\n')
 
+function expectUnreadableRegistry(source, registeredId) {
+  const settingsJson = JSON.stringify(wire(registeredId, 'plain-guard'))
+  const changed = evaluate({
+    paths: ['scripts/guard-preflight.mjs'],
+    settingsJson,
+    preflightSource: source,
+  })
+  expect(changed).toMatchObject({
+    block: true,
+    registryUnreadable: true,
+    unregistered: [],
+    why: 'this commit makes the GUARDS registry unreadable',
+  })
+
+  const unchanged = evaluate({
+    paths: ['.claude/settings.json'],
+    settingsJson,
+    preflightSource: source,
+  })
+  expect(unchanged.block).toBe(false)
+  expect(unchanged.unregistered).toEqual([])
+  expect(unchanged.why).toContain('no registry found')
+}
+
 describe('which commits are judged', () => {
+  it('includes deletions and both sides of renames in the staged paths', () => {
+    expect(STAGED_PATH_ARGS).toContain('--no-renames')
+    expect(STAGED_PATH_ARGS.some((arg) => arg.startsWith('--diff-filter'))).toBe(false)
+  })
+
   it('judges a commit that touches the settings file', () => {
     expect(touchesGuardWiring(['.claude/settings.json'])).toBe(true)
   })
@@ -43,6 +73,44 @@ describe('reading the registry as text', () => {
       'dashboard-guard',
       'model-guard',
     ])
+  })
+
+  it('does not treat a commented-out entry or text inside a string as registered', () => {
+    const source = [
+      'export const GUARDS = [',
+      "  // { id: 'commented-out-guard' },",
+      `  { note: "id: 'string-only-guard'" },`,
+      "  { id: 'registered-guard' },",
+      ']',
+    ].join('\n')
+    expect(registeredIdsFromSource(source)).toEqual(['registered-guard'])
+  })
+
+  it('reads double-quoted ids', () => {
+    expect(registeredIdsFromSource('export const GUARDS = [{ id: "double-quoted" }]')).toEqual([
+      'double-quoted',
+    ])
+  })
+
+  it('reports a spread registry element as unreadable instead of returning a partial list', () => {
+    const source = [
+      "const OTHER = [{ id: 'spread-guard' }]",
+      "export const GUARDS = [...OTHER, { id: 'plain-guard' }]",
+    ].join('\n')
+    expectUnreadableRegistry(source, 'spread-guard')
+  })
+
+  it('reports an identifier-valued id as unreadable instead of returning a partial list', () => {
+    const source = [
+      "const NAME = 'named-guard'",
+      "export const GUARDS = [{ id: NAME }, { id: 'plain-guard' }]",
+    ].join('\n')
+    expectUnreadableRegistry(source, 'named-guard')
+  })
+
+  it('reports a template-literal id as unreadable instead of returning a partial list', () => {
+    const source = "export const GUARDS = [{ id: `template-guard` }, { id: 'plain-guard' }]"
+    expectUnreadableRegistry(source, 'template-guard')
   })
 
   // The registry ends at the closing bracket; ids further down the file belong
@@ -83,6 +151,16 @@ describe('the verdict', () => {
     expect(verdict.unregistered).toEqual([])
   })
 
+  it('blocks a commit that wires a hook and empties GUARDS', () => {
+    const verdict = evaluate({
+      paths: ['.claude/settings.json', 'scripts/guard-preflight.mjs'],
+      settingsJson: JSON.stringify(wire('clear-claim-guard')),
+      preflightSource: registry(),
+    })
+    expect(verdict.block).toBe(true)
+    expect(verdict.unregistered).toEqual(['clear-claim-guard'])
+  })
+
   it('does not judge a commit that touches no wiring, even with drift present', () => {
     const verdict = evaluate({
       paths: ['src/world/river.ts'],
@@ -104,11 +182,22 @@ describe('the verdict', () => {
     expect(verdict.block).toBe(false)
   })
 
-  it('judges nothing when the preflight source has no recognisable registry', () => {
+  it('blocks when the commit itself makes the preflight registry unrecognisable', () => {
     const verdict = evaluate({
       paths: ['scripts/guard-preflight.mjs'],
       settingsJson: JSON.stringify(wire('clear-claim-guard')),
       preflightSource: 'export const SOMETHING_ELSE = []',
+    })
+    expect(verdict.block).toBe(true)
+    expect(verdict.why).toBe('this commit makes the GUARDS registry unreadable')
+    expect(formatVerdict(verdict)).toContain('this commit makes the GUARDS registry unreadable')
+  })
+
+  it('judges nothing when it cannot reach an unchanged preflight registry', () => {
+    const verdict = evaluate({
+      paths: ['.claude/settings.json'],
+      settingsJson: JSON.stringify(wire('clear-claim-guard')),
+      preflightSource: '',
     })
     expect(verdict.block).toBe(false)
   })

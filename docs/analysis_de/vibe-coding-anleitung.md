@@ -195,11 +195,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
-  oder er ist nur dort grün, wo er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
-  gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest. Vor dem
-  Abgeben: ‚auch im **Hauptstand** grün?'"
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
+  ist nur dort grün, wo er lief — das Werkzeug nur dort, wo es geschrieben wurde.
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen nach gemessener Last.
+  Vor dem Abgeben: ‚auch im **Hauptstand** grün — und einmal **von dem Ort aus** geprüft, an dem es
+  wirklich läuft?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -412,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 627ffd0abf0a18fd33c57cdc67e382b7b4af68e43e1aa3ec1d3ef4521ce4b27e -->
+<!-- GUIDE-FINGERPRINT: 9d7ca8d29b0b2ad634de9ff19506442b779ea5742a6737416a060144fcfcf7e4 -->

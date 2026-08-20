@@ -76,56 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 775. Answer the cross-vendor review of the commit-time guard registration (GPT-5.6 Sol,
-  20.08.2026, verdict **do-not-merge** on both passes of `5ce597cf`, recorded in
-  `.claude/mechanism-reviews.jsonl`). The mechanism landed before the review concluded, so its
-  findings are owed as work rather than as a merge decision. Three stand against
-  `scripts/guard-registration-core.mjs`, and all three are real:
-  1. A COMMENT DEFEATS THE REGISTRY. `registeredIdsFromSource` counts every textual `id: '…'`
-     inside the block, so `// id: 'clear-claim-guard'` — or the same text in a string — registers a
-     hook that is not registered, and the wired-but-unregistered commit passes.
-  2. AN UNRECOGNISABLE REGISTRY FAILS OPEN ON A RELEVANT INPUT. A commit may wire a Stop hook while
-     deleting, emptying, renaming or breaking `GUARDS`, and the check judges nothing. The fail-open
-     direction is right for an input the check cannot READ; it is wrong when the very commit under
-     judgement is what made it unreadable. The current test pins the bypass instead of the refusal.
-  3. SINGLE QUOTES ONLY. `id: "double-quoted"` is not seen, so a mixed-quote registry yields a
-     partial list and REFUSES a hook that is in fact registered — a false block, the direction that
-     makes a tree uncommittable.
-  FINAL STATE: the registry is read so that comments and string literals cannot register anything
-  and both quote styles count; a registry the commit itself broke is a REFUSAL naming that reason,
-  while a registry this check merely cannot reach stays fail-open; and the tests assert the
-  refusals rather than the bypasses.
-  VERIFIABLE: Vitest — a commented-out entry does not register; a double-quoted entry does; a
-  commit that wires a hook and empties GUARDS is refused; an unreadable settings file still passes;
-  and the existing green cases stay green.
-  Criticality: high — this is the guard that decides whether a commit may land, and two of the
-  three findings let exactly the incident it was built for through.
-  Bundle: Session- & Repo-Hygiene.
-- [ ] 771. The claim guard was narrowed until it catches almost nothing (measured 20.08.2026,
-  10:50, on `main` at `fdd8c394`). Between 09:15 and 10:37 the guard landed at 08:29 was reworked
-  seven times — `a8f13c0d`, `19efc9d5`, `28c8e63d`, `c70f151c`, `72d832f0`, `25d1c3e7`, `0f025d89`,
-  `fdd8c394` — each round removing another way an innocent line could be refused. The two false
-  positives that started it are indeed gone. So is nearly everything else: `invitesClear` now
-  answers FALSE for »Mach bitte einen /clear und fang neu an.«, »Bitte clear die Session jetzt.«,
-  »Du kannst jetzt /clear machen.«, »Starte mit /clear neu.«, »Ein /clear wäre jetzt sinnvoll.«,
-  "Run /clear now." and "You can /clear now." Every pattern is anchored to the END of the sentence,
-  so only a line that literally stops at `/clear` matches — »Wenn du willst, mach jetzt /clear.«
-  is the one probe of nine that still fires. English imperatives are not covered at all.
-  This is the failure mode CLAUDE.md §7.2 names: a mechanism that is wrong is worse than none,
-  because the rule then COUNTS as enforced and nobody looks again.
-  FINAL STATE: the guard refuses a genuine invitation in the forms this project's replies actually
-  use — German and English, imperative or offer, with the token anywhere in the sentence — while
-  still passing a report ABOUT a past clear and a line that merely names the guard. Whatever cannot
-  be decided by shape is decided by the surrounding sentence, not by requiring the sentence to end
-  in the token.
-  VERIFIABLE: Vitest with a fixture table of BOTH kinds — every probe listed above with its
-  required verdict, refusals and passes in one table, so a later narrowing cannot silently drop a
-  refusal again. The table is the regression: it goes red the moment a round of tuning trades a
-  true positive for a false one.
-  Criticality: high — the guard governs the batch handover, and a handover lost to a guard that
-  does not fire is the incident it was built for.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
   while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
   exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
@@ -153,6 +103,72 @@ put it is the mistake this line exists to stop.
   Criticality: high — a verification script red on `main` whose green half proves nothing, and the
   acceptance-criteria pointers are what CLAUDE.md §7.1 rests on since the cut.
   Bundle: Testinfrastruktur.
+- [ ] 783. The four-eyes gate on the morning's guards cannot be satisfied by EITHER vendor, so it
+  blocks every turn on `main` (measured 20.08.2026 while trying to clear it).
+  `scripts/mechanism-review-guard.mjs` demands a recorded cross-vendor review for the
+  Claude-authored guard commits `99f467c`, `1ce35ae`, `1615e5f`, `a8f13c0`, `0bb3b56`. The review
+  itself was run and returned findings — they are point 782 — but the RECORD cannot be made to
+  cover the demanded set:
+  1. A SCOPED PASS CANNOT BE RECORDED AS ONE. `scripts/review-sol.mjs --since 5ddfc4e --sha 1615e5f`
+     completed a full pass (13/13 file contributions, nothing dropped) and then printed NO record
+     command, because a record at a head clears back further than the pass actually read.
+  2. THE UNSCOPED RANGE HAS NO ELIGIBLE REVIEWER. Its own remedy — re-run without `--since` over the
+     whole range — cannot be taken: that range now contains points 771 and 775, which GPT-5.6 Sol
+     AUTHORED, and CLAUDE.md §6 forbids a model reviewing its own work. The only reviewer the range
+     admits is the vendor that wrote half of it.
+  3. A `do-not-merge` RECORD DOES NOT CLEAR, and should not — the mechanism was refused, so the work
+     is owed. That is correct behaviour and not the defect; the defect is that there is no path from
+     "reviewed and refused" to "the gate knows it was read".
+  WHY IT IS URGENT RATHER THAN TIDY: this is not a warning, it is a Stop-family refusal on the
+  default branch. Every session inherits it, and the only way past it today is a waiver.
+  FINAL STATE: a pass that read a bounded range can be RECORDED as covering exactly that range, so
+  partial coverage accumulates instead of being discarded; and where a range mixes authorship, the
+  gate accepts it split by author, naming for each part which vendor is eligible. No range may end
+  up with zero eligible reviewers without the gate saying so in as many words.
+  VERIFIABLE: Vitest over the pure layer — a scoped pass record clears the commits inside its range
+  and NO commit outside it; a range whose every eligible reviewer authored part of it is reported as
+  UNREVIEWABLE with the reason, rather than as an ordinary refusal; a `do-not-merge` still does not
+  clear. Plus the real repository: the gate reports a reachable next step for the current `main`.
+  Criticality: high — it is a blocking gate on `main` with no legitimate way through, and the
+  workaround it invites is a waiver, which is how a four-eyes rule quietly stops being one.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 782. Answer the cross-vendor review of the morning's three guard mechanisms (GPT-5.6 Sol,
+  20.08.2026, verdict **do-not-merge** on `5ddfc4e..1615e5f`). The three mechanisms — the
+  clear-claim guard, its preflight registration, and the commit-time guard-registration check —
+  were authored by Claude and landed without a second pair of eyes; the review was run after the
+  fact and its findings are owed as work. Sol's fourth finding is NOT carried here: the excluded
+  deletions it names were already fixed by point 775, whose `STAGED_PATH_ARGS` drops the
+  `--diff-filter=ACMR` — verified at HEAD. Three stand.
+  1. A THIRD LIST DECIDES, AND NOTHING CHECKS IT. `evaluate` compares `.claude/settings.json`
+     against `GUARDS`, but `scripts/guard-preflight-core.test.mjs` keeps a hard-coded sorted list of
+     every expected guard id as a mandatory third copy. Registering a new hook in the settings AND in
+     `GUARDS` while forgetting that list passes the commit-time check and still takes the unit suite
+     red at pre-push — the exact committed-but-unpushable state this mechanism exists to prevent,
+     reached through the one door it does not watch.
+  2. THE PRE-COMMIT HOOK ASKS THE WORKING TREE, NOT THE INDEX. `scripts/git-hooks/pre-commit` guards
+     its own call with `[ -f scripts/guard-registration-guard.mjs ] || exit 0`. That reads the
+     WORKING TREE, while everything downstream judges the INDEX. In a partially staged tree where the
+     wrapper is removed from the working tree but still staged, the check exits 0 and the staged
+     wiring drift is never judged, although the wrapper is in the commit being made. The skip itself
+     is right — a branch predating the check must stay committable — only its subject is wrong.
+  3. THE WRAPPER PATH HAS NO TEST. Every case in `scripts/clear-claim-guard.test.mjs` drives the pure
+     core with a supplied `lastText`; nothing drives the wrapper's own reading of the transcript. That
+     is where `extractLastAssistantText` can return the PREVIOUS text block, so a corrected reply can
+     be refused again on the strength of the invitation it just removed. The age check added by the
+     earlier review covers only text older than the claim; the same-claim rereading is untested and
+     unproven. The flush race itself is filed as its own point — what is owed HERE is the coverage
+     that would show which half of it this guard actually suffers.
+  FINAL STATE: the expected-guard list has ONE home that the commit-time check reads, so no third
+  copy can disagree silently; the pre-commit skip asks the index it is about to judge; and the
+  wrapper's transcript reading is exercised by a test that fails when a stale reply is judged as the
+  current one.
+  VERIFIABLE: Vitest — a hook registered in the settings and in `GUARDS` but absent from the expected
+  list is a FINDING rather than a pass; a staged-but-working-tree-deleted wrapper is still judged; and
+  a wrapper case over a fixture transcript whose final reply is unflushed asserts which text is
+  judged. Plus the existing green cases stay green.
+  Criticality: high — two of the three let a commit reach the state the whole mechanism was built to
+  prevent, and the third leaves the deciding path unproven.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 773. `cut-account-core.test.mjs` is red in every worktree and green only in the main
   checkout (measured 20.08.2026, 10:43). The case »docs/document-cut-757.md — the measured floors >
   takes each floor from a transcript of the kind it claims« resolves the repository root with
@@ -173,6 +189,31 @@ put it is the mistake this line exists to stop.
   suite that is not theirs.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 781. Two exported `mainCheckoutFrom` helpers disagree about what `null` means, and the next
+  point to need one has to guess (found 20.08.2026 while prepping point 773).
+  `scripts/worktree-bootstrap-core.mjs` and `scripts/review-sol-core.mjs` both export
+  `mainCheckoutFrom(gitCommonDir, root)` and they do NOT answer the same question. The bootstrap
+  version returns `null` for a bare repository AND `null` when the resolved main checkout IS the
+  given root — there `null` means »you are already in the main checkout, there is nothing to
+  borrow«. The review-sol version returns the passed-in root in both of those cases, so its caller
+  cannot tell »already main« from »resolved to main« at all.
+  WHY IT IS MORE THAN A DUPLICATE. The two callers today are lucky: each happens to use the shape
+  it needs. The next caller is point 773, whose whole fix is to tell the MAIN checkout apart from
+  the worktree it runs in — the exact distinction one of these two helpers silently throws away.
+  Importing the wrong one gives back the main checkout where the caller expected `null`, and the
+  worktree/main distinction the helper exists to draw disappears without an error. A duplicated
+  name whose two versions differ only in their edge cases is worse than two clearly different
+  names, because the difference is invisible at the call site.
+  FINAL STATE: one implementation with one documented meaning for the `null` case, imported by both
+  callers — or two names that each say which question they answer. Whichever is chosen, the
+  worktree/main distinction must survive it, and the caller must not have to read the body to know
+  which behaviour it gets.
+  VERIFIABLE: Vitest — a single case table covering bare repository, already-in-main and
+  resolved-from-worktree, asserting the same documented answer for every caller; both existing
+  call sites keep their current behaviour or are changed with the case that proves it.
+  Criticality: medium — no product defect, but it is a trap laid directly in front of the next
+  point in the queue.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
   running it (measured 20.08.2026, 10:52). With the batch lock naming session
   `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers

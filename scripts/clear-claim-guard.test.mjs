@@ -8,6 +8,26 @@ const SID = 'd5fcb9cf-2936-4743-9502-f504f08b8ac5'
 const claim = (over = {}) => ({ claimantSid: SID, releasedAt: null, ...over })
 
 describe('invitesClear — what counts as asking the user to end the session', () => {
+  it('keeps the complete claim-guard regression table', () => {
+    const fixtures = [
+      { expected: true, text: 'Mach bitte einen /clear und fang neu an.' },
+      { expected: true, text: 'Bitte clear die Session jetzt.' },
+      { expected: true, text: 'Du kannst jetzt /clear machen.' },
+      { expected: true, text: 'Starte mit /clear neu.' },
+      { expected: true, text: 'Ein /clear wäre jetzt sinnvoll.' },
+      { expected: true, text: 'Run /clear now.' },
+      { expected: true, text: 'You can /clear now.' },
+      { expected: true, text: 'Wenn du willst, mach jetzt /clear.' },
+      { expected: true, text: 'Mach bitte `/clear`.' },
+      { expected: false, text: 'I ran /clear before this session started.' },
+      { expected: false, text: 'The clear-claim guard detects /clear invitations.' },
+    ]
+
+    for (const { expected, text } of fixtures) {
+      expect(invitesClear(text), text).toBe(expected)
+    }
+  })
+
   it('catches the shapes this project actually writes', () => {
     for (const text of [
       '**Donnerstag, 20.08.2026, 08:22**\n\nGesichert ist alles. Mach bitte `/clear`.',
