@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 07:48 · Quellen-Fingerprint: `caf65cf18990…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 08:06 · Quellen-Fingerprint: `bf90a5c40227…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1336,7 +1336,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 8 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 9 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1406,10 +1406,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 84 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 65 Prozess-/Meta-TASKS-Punkte (davon 29 offen).
+Erfasste Quellen: 84 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 66 Prozess-/Meta-TASKS-Punkte (davon 30 offen).
 
-<!-- RETRO-FINGERPRINT: caf65cf18990e23abf1288165dc4a1e4207aa28e9e4fa22973ecf59a35d14d05 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T05:48:03.073Z -->
+<!-- RETRO-FINGERPRINT: bf90a5c402271ea881d3aee311f76b4409cb1b78adef7a185f42264f3642cb1e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T06:06:57.419Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2030,6 +2030,18 @@ Bemerkenswert ist auch, wie das Loch entstand: Nur der Index wird pro Sitzung ge
 Merkdatei selbst blieb unversehrt und vollständig richtig. Es gab also keinen Moment, in dem
 etwas offensichtlich kaputt aussah — die Regel existierte weiter, sie wurde nur nie mehr
 gelesen. Ein Verlust, der sich als vollständiger Bestand tarnt, ist die schwerste Form.
+
+Noch in derselben Nacht kamen zwei weitere Fälle derselben Bauart dazu, beide ohne Zutun
+des Schnitts. Das Register, das jeder Lektion dieses Abschnitts eine Durchsetzungs-Entscheidung
+zuordnen soll, endet in Wahrheit an einer Marke in der Mitte des Dokuments: Vierundzwanzig
+Lektionen stehen dahinter, der Prüfer sieht sie nicht, und ein nachgetragener Eintrag wird als
+verwaist zurückgewiesen — das Register ist dort nicht leer, es ist unbefüllbar, während das
+Dokument seine Vollständigkeit behauptet. Und die Eskalation nach fünf erfolglosen Prüfrunden
+wird ausschließlich dort befragt, wo ein Punkt an einen fremden Autor vergeben wird; was der
+Stapel selbst schreibt, kommt an der Weiche nie vorbei. Sie hat deshalb seit ihrem Bestehen kein
+einziges Mal gegriffen, obwohl die Schwelle an genau dem Punkt erreicht war, der an diesem
+Morgen gelandet ist. Dreimal dasselbe Muster in einer Nacht: Die Regel steht allgemein da, ihr
+Mechanismus greift an einer Stelle, die der Normalfall nie berührt.
 
 **Lehren:** Erstens, »ein Wächter deckt das ab« ist eine Messung, keine Einschätzung: Sie
 verlangt einen Blick in die Zusicherung des Wächters, und wo die Zusicherung schmaler ist als
