@@ -5549,6 +5549,15 @@ Build order, chosen so no two parallel agents own the same file:
   `{samples:[0,…]}` on a quiet box means the desert anchor streams nothing at all any more,
   which is a player-visible regression of the §19.9 dressing and belongs in its own point
   rather than here. Take that reading before touching the check.
+  THE ROTATING FAMILY HAS THREE NAMED MEMBERS, all still open (carried 20.08.2026 from the
+  10.08.2026 four-eyes work-order analysis, which proposed folding them here): point 336
+  (the crocodile staging family, four consecutive runs each failing a different check),
+  point 568 (the polish water-sameness check, red then green at the identical commit and
+  seed) and point 570 (the children-photographable check, red on `main` and green twice on
+  the same change). 336 and 570 already name this point in their own text; 568 did not, and
+  now does. They stay separate points because each has its own suspected cause, but they
+  are ONE measurement: the quiet-machine repeat run this point owes is taken for all four
+  at once rather than paid three more times.
 
 - [ ] 309. Serving-model degradation: repair + tripwire (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
@@ -6751,6 +6760,10 @@ Build order, chosen so no two parallel agents own the same file:
   tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
   tolerance is NOT widened to make the red go away until it is established which of the
   two it is; if it is the product, the water fix comes first and the check stays.
+  SAME FAMILY AS POINT 200 (carried 20.08.2026 from the 10.08.2026 four-eyes work-order
+  analysis, not a fresh finding): points 336 and 570 already name 200's rotating-staging
+  family and this check is the third member of it. The ten-run reading below belongs to the
+  same quiet-machine round rather than a separate one.
   VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
   time, and whichever cause was found is named in the commit message with its evidence.
   Criticality: medium — it does not itself hide a product defect, but it may BE one, and
@@ -8493,6 +8506,13 @@ to land than a mechanism that needs a review.
   long-dt hitch). Proof: enrichments 207 pass / 0 fail / 0 console-errors with
   the tripwire armed; build+lint+vitest+audit clean. (B)-(N) and the visual
   sweep (C) remain open above.
+  READ IT AS THE INSPECTION HALF, and nothing more (carried 20.08.2026 from the 10.08.2026
+  four-eyes work-order analysis, not a fresh finding): (A) is DELIVERED and standing in the
+  code — the anchoring tripwire with its `grounded` gate and its buried/floating visits
+  sits in `src/scenes/travel/Wildlife.tsx` and reports through the 207(i) assert channel —
+  yet the block still reads as sixty lines of unstarted work in every context that loads
+  the work order. WHAT REMAINS is (B), (D), (E), the cheap extras (F/G/H/I/K/N) and (C) as
+  the standing pre-closing sweep; the (A) paragraphs are history and are not work.
 
 - [ ] 207. Additional finding methods that complement the existing audits (Pillar
   2 code, 203 visual/behaviour, 205 plausibility) and together lift coverage
@@ -8537,6 +8557,17 @@ to land than a mechanism that needs a review.
      shader-recompile / dropped-frame / THREE-deprecation noise, fail on new ones.
   BUILD ORDER: (i) then (ii) first (highest leverage), the rest layer in over the
   finder. These join 203/204/205 as the pre-tag quality framework.
+  READ IT AS (ii)-(vii), AND (ii) IS GATED (carried 20.08.2026 from the 10.08.2026
+  four-eyes work-order analysis, not a fresh finding). (i) is delivered, by this point's own
+  DONE record and `src/systems/devAssert.ts`, so the block is no longer a seven-part
+  proposal. And the golden-image differential of (ii) may NOT simply be built: point 361's
+  bug replay REJECTED it (`docs/picture-check-levers.md` — the quietest frame diverges
+  27.81 % against a 0.75 % signal, and the buggy season diffs 91.60 % and would sail through
+  a "did it change?" gate), and CLAUDE.md §7.2 admits the method only once
+  `scripts/picture-stability.mjs <suite>` reports STABLE. 361 also handed this point the
+  levers that survived as NEW controls rather than cheaper ones — the temporal-variance
+  probe, fail-fast on `enrichments`, frame-reading pixel probes, a WebGPU-primary lane. So
+  (ii) begins at the stability gate, not at a baseline bake.
 
 - [ ] 184. Pre-tag hardening — a much stronger, systematic quality pass to reach a
   high-confidence bug-free state.
