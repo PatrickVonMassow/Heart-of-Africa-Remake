@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   evaluate,
+  EXPECTED_PATH,
   formatVerdict,
   registeredIdsFromSource,
   STAGED_PATH_ARGS,
@@ -18,12 +19,15 @@ const wire = (...ids) => ({
 const registry = (...ids) =>
   ['export const GUARDS = [', ...ids.map((id) => `  {\n    id: '${id}',\n  },`), ']', ''].join('\n')
 
+const expected = (...ids) => `export const EXPECTED_GUARD_IDS = ${JSON.stringify(ids)}\n`
+
 function expectUnreadableRegistry(source, registeredId) {
   const settingsJson = JSON.stringify(wire(registeredId, 'plain-guard'))
   const changed = evaluate({
     paths: ['scripts/guard-preflight.mjs'],
     settingsJson,
     preflightSource: source,
+    expectedSource: expected(registeredId, 'plain-guard'),
   })
   expect(changed).toMatchObject({
     block: true,
@@ -36,6 +40,7 @@ function expectUnreadableRegistry(source, registeredId) {
     paths: ['.claude/settings.json'],
     settingsJson,
     preflightSource: source,
+    expectedSource: expected(registeredId, 'plain-guard'),
   })
   expect(unchanged.block).toBe(false)
   expect(unchanged.unregistered).toEqual([])
@@ -56,6 +61,7 @@ describe('which commits are judged', () => {
     expect(touchesGuardWiring(['scripts/clear-claim-guard.mjs'])).toBe(true)
     expect(touchesGuardWiring(['scripts/guard-preflight.mjs'])).toBe(true)
     expect(touchesGuardWiring(['scripts/guard-registration-core.mjs'])).toBe(true)
+    expect(touchesGuardWiring([EXPECTED_PATH])).toBe(true)
   })
 
   // The check taxes every commit it runs on, so a commit that cannot introduce
@@ -136,6 +142,7 @@ describe('the verdict', () => {
       paths: ['.claude/settings.json', 'scripts/clear-claim-guard.mjs'],
       settingsJson: JSON.stringify(wire('dashboard-guard', 'clear-claim-guard')),
       preflightSource: registry('dashboard-guard'),
+      expectedSource: expected('dashboard-guard'),
     })
     expect(verdict.block).toBe(true)
     expect(verdict.unregistered).toEqual(['clear-claim-guard'])
@@ -146,6 +153,7 @@ describe('the verdict', () => {
       paths: ['.claude/settings.json'],
       settingsJson: JSON.stringify(wire('dashboard-guard', 'clear-claim-guard')),
       preflightSource: registry('dashboard-guard', 'clear-claim-guard'),
+      expectedSource: expected('dashboard-guard', 'clear-claim-guard'),
     })
     expect(verdict.block).toBe(false)
     expect(verdict.unregistered).toEqual([])
@@ -156,6 +164,7 @@ describe('the verdict', () => {
       paths: ['.claude/settings.json', 'scripts/guard-preflight.mjs'],
       settingsJson: JSON.stringify(wire('clear-claim-guard')),
       preflightSource: registry(),
+      expectedSource: expected('clear-claim-guard'),
     })
     expect(verdict.block).toBe(true)
     expect(verdict.unregistered).toEqual(['clear-claim-guard'])
@@ -166,6 +175,7 @@ describe('the verdict', () => {
       paths: ['src/world/river.ts'],
       settingsJson: JSON.stringify(wire('clear-claim-guard')),
       preflightSource: registry('dashboard-guard'),
+      expectedSource: expected('dashboard-guard'),
     })
     expect(verdict.block).toBe(false)
   })
@@ -178,6 +188,7 @@ describe('the verdict', () => {
       paths: ['.claude/settings.json'],
       settingsJson: '{ not json',
       preflightSource: registry('dashboard-guard'),
+      expectedSource: expected('dashboard-guard'),
     })
     expect(verdict.block).toBe(false)
   })
@@ -187,6 +198,7 @@ describe('the verdict', () => {
       paths: ['scripts/guard-preflight.mjs'],
       settingsJson: JSON.stringify(wire('clear-claim-guard')),
       preflightSource: 'export const SOMETHING_ELSE = []',
+      expectedSource: expected('clear-claim-guard'),
     })
     expect(verdict.block).toBe(true)
     expect(verdict.why).toBe('this commit makes the GUARDS registry unreadable')
@@ -198,8 +210,57 @@ describe('the verdict', () => {
       paths: ['.claude/settings.json'],
       settingsJson: JSON.stringify(wire('clear-claim-guard')),
       preflightSource: '',
+      expectedSource: expected('clear-claim-guard'),
     })
     expect(verdict.block).toBe(false)
+  })
+
+  it('blocks a hook registered in settings and GUARDS but absent from the expected list', () => {
+    const verdict = evaluate({
+      paths: ['.claude/settings.json', 'scripts/guard-preflight.mjs'],
+      settingsJson: JSON.stringify(wire('dashboard-guard', 'new-guard')),
+      preflightSource: registry('dashboard-guard', 'new-guard'),
+      expectedSource: expected('dashboard-guard'),
+    })
+    expect(verdict.block).toBe(true)
+    expect(verdict.unregistered).toEqual([])
+    expect(verdict.absentFromExpected).toEqual(['new-guard'])
+  })
+
+  it('blocks a staged deletion or malformed expected-guard list', () => {
+    const verdict = evaluate({
+      paths: [EXPECTED_PATH],
+      settingsJson: JSON.stringify(wire('dashboard-guard')),
+      preflightSource: registry('dashboard-guard'),
+      expectedSource: 'export const SOMETHING_ELSE = []',
+    })
+    expect(verdict).toMatchObject({ block: true, expectedUnreadable: true })
+    expect(formatVerdict(verdict)).toContain('expected-guard list unreadable')
+  })
+
+  it('blocks an expected guard omitted from GUARDS even when it is not a Stop hook', () => {
+    const verdict = evaluate({
+      paths: ['scripts/guard-preflight.mjs'],
+      settingsJson: JSON.stringify(wire('dashboard-guard')),
+      preflightSource: registry('dashboard-guard'),
+      expectedSource: expected('dashboard-guard', 'commission-guard'),
+    })
+    expect(verdict.block).toBe(true)
+    expect(verdict.absentFromRegistry).toEqual(['commission-guard'])
+  })
+
+  it('blocks duplicate ids in either list', () => {
+    const verdict = evaluate({
+      paths: [EXPECTED_PATH],
+      settingsJson: JSON.stringify(wire('dashboard-guard')),
+      preflightSource: registry('dashboard-guard', 'dashboard-guard'),
+      expectedSource: expected('dashboard-guard', 'dashboard-guard'),
+    })
+    expect(verdict).toMatchObject({
+      block: true,
+      duplicateExpected: ['dashboard-guard'],
+      duplicateRegistry: ['dashboard-guard'],
+    })
   })
 })
 
@@ -208,13 +269,12 @@ describe('the refusal', () => {
     const text = formatVerdict({ unregistered: ['clear-claim-guard'] })
     expect(text).toContain('clear-claim-guard')
     expect(text).toContain('scripts/guard-preflight.mjs')
-    expect(text).toContain('scripts/guard-preflight-core.test.mjs')
+    expect(text).toContain(EXPECTED_PATH)
   })
 })
 
-// THE REPOSITORY ITSELF. The two lists this check compares are the same pair
-// the unit suite compares, so a green suite and a red check would mean one of
-// them is reading the wrong thing.
+// THE REPOSITORY ITSELF. Settings, GUARDS and the shared expected list must all
+// describe the same checked-in chain.
 describe('the real repository', () => {
   it('finds no drift in the checked-in state', () => {
     const root = process.cwd()
@@ -222,7 +282,15 @@ describe('the real repository', () => {
       paths: ['.claude/settings.json'],
       settingsJson: readFileSync(resolve(root, '.claude/settings.json'), 'utf8'),
       preflightSource: readFileSync(resolve(root, 'scripts/guard-preflight.mjs'), 'utf8'),
+      expectedSource: readFileSync(resolve(root, EXPECTED_PATH), 'utf8'),
     })
-    expect(verdict.unregistered, 'register these in scripts/guard-preflight.mjs').toEqual([])
+    expect(verdict).toMatchObject({
+      block: false,
+      unregistered: [],
+      absentFromExpected: [],
+      absentFromRegistry: [],
+      duplicateExpected: [],
+      duplicateRegistry: [],
+    })
   })
 })

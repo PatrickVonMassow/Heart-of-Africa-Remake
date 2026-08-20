@@ -19,6 +19,7 @@ import {
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
+  mainCheckoutFrom,
   modelsInTrailerField,
   newFilePathsIn,
   OUTCOME,
@@ -800,6 +801,12 @@ describe('the model-id probe receipt', () => {
 })
 
 describe('the saved login survives what it has to survive', () => {
+  it('finds the same MAIN checkout from that checkout and from an isolation worktree', () => {
+    const common = '/workspace/hoa/.git'
+    expect(mainCheckoutFrom(common, '/workspace/hoa')).toBe('/workspace/hoa')
+    expect(mainCheckoutFrom(common, '/workspace/hoa/.claude/worktrees/point-773')).toBe('/workspace/hoa')
+  })
+
   it('is kept in the MAIN checkout, not in a worktree that gets deleted', () => {
     expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-1')).toBe(
       '/workspace/hoa/local/codex-auth.json',
