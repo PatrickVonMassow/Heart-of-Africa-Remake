@@ -1328,8 +1328,10 @@ put it is the mistake this line exists to stop.
   THOSE ELEVEN RUNS ARE EACH STILL OWED A DISPOSITION, one apiece and not one of them another
   deferral: cause named and fixed, charged to the open point that owns it, or filed as its own
   point, exactly the three ways point 640 allows. The reds among them that are real product
-  defects are named with their owner — the WebGPU async render-pipeline console error, the
-  TRAA/MSAA path (point 514), the first-person ground micro-detail (already owned by point 603) —
+  defects are named with their owner — the TRAA/MSAA path (point 514), the first-person ground
+  micro-detail (already owned by point 603), and the WebGPU async render-pipeline console error,
+  which has NO owning point in the work order today (searched 20.08.2026) and must be given one
+  the moment a run reproduces it; an unowned product defect is the hole this whole point is about —
   and a run whose reds were provably never recorded is closed AS an incomplete recording under
   this point's own way out below, which is a disposition and not a waiver. That the set has since
   left the guard's window (the oldest run blocking on 19.08. is from 17.08.) ends the blockage,
