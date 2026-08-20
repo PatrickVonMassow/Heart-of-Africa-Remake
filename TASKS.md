@@ -1608,6 +1608,18 @@ put it is the mistake this line exists to stop.
   (4) THE TURN'S END has no command at all: `focus set`, `board-publish`, `dashboard-guard --synced`,
   `board.mjs attest`, `guard-preflight`. `attest` bundles three of them, but neither the publish nor
   the focus, and `batch-progress-guard` alone names seven different commands across its remedies.
+  WHAT THE BOUNDARY'S CARD MUST SAY, since the command that prints it owns its wording (carried
+  over 20.08.2026 from point 731, measured at the point-701 boundary and again at 17:27 on
+  19.08.2026): `--prepare` reads the head of the OPEN work order the same way the board's queue
+  does and NAMES that point in the handover text it prints, so the verbatim paste passes the
+  publish gate unedited; where no open point remains it prints the wording the gate accepts for
+  that case rather than a number that does not exist. The template also names every step the card
+  needs: `board.mjs none` refuses the card while a now-card stands, so sending the now-card back to
+  the queue is the printed handover's FIRST step — three steps the template omitted, at the most
+  expensive place in a session, its end above the watermark, where nothing new may begin. And the
+  agreement is PINNED, not coincidental: the gate's requirement and the boundary's text are checked
+  against each other, so a later change to either side fails a test instead of surfacing at the
+  next handover.
   FINAL STATE: one command per sequence, built like `land-point.mjs` — fixed order, one verdict per
   step, STOPS at the first red, leaves no half state and bypasses no guard. Built in this order, by
   how often each runs: (2) file a point, (4) end the turn, (1) take the boundary, (3) hand a point out.
@@ -1620,6 +1632,9 @@ put it is the mistake this line exists to stop.
   VERIFIABLE: Vitest over each sequence's pure plan — the step list, the stop-at-first-red behaviour
   and the `--dry` output; plus one driven run per command against a fixture repository, ending in the
   state the hand-driven chain produced.
+  For the boundary's text: a Vitest case over the pure builder proving the produced handover reason
+  satisfies the same predicate the publish gate applies, one for an empty queue, and one that FAILS
+  when the point number is dropped from the text.
   Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
   a place a step gets forgotten.
   Bundle: Session- & Repo-Hygiene.
