@@ -33,6 +33,7 @@ const ROOT = resolve(process.cwd())
 const MAIN_ROOT = dirname(
   execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
     encoding: 'utf8',
+    windowsHide: true,
   }).trim(),
 )
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
