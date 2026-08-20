@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 11:23 · Quellen-Fingerprint: `30b8337921b9…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 12:10 · Quellen-Fingerprint: `b0e061a541f1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1351,6 +1351,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1406,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 84 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 72 Prozess-/Meta-TASKS-Punkte (davon 36 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 72 Prozess-/Meta-TASKS-Punkte (davon 35 offen).
 
-<!-- RETRO-FINGERPRINT: 30b8337921b9e8e2928c65805ce70bc81077db39a3fe145184f9924a02b79ac8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T09:23:03.174Z -->
+<!-- RETRO-FINGERPRINT: b0e061a541f13d848634c800294fe941f9d4abe72cb25221612e2e495564fb07 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T10:10:22.351Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2077,3 +2078,34 @@ derselben Mechanik wird gezählt und einmal gemeldet, sobald sie den gewohnten R
 verlässt, und ein stehender Anspruch wird innerhalb einer begrenzten Zahl von Zugenden
 entweder aufgenommen oder ausdrücklich abgelehnt. Prüffrage an sich selbst: *Wäre dieser
 Commit auch nötig, wenn ich den Wächter heute nicht gelandet hätte?*
+
+### 3.136 Die Zusammenlegung behält das Thema und verliert die Schärfe
+
+Am 20.08.2026 wurde beim Aufräumen des Auftrags ein Punkt hoher Kritikalität in einen anderen
+gefaltet. Die Zusammenlegung war inhaltlich richtig — der Überlebende beschreibt dieselbe Sache —
+und trotzdem hat die Gegenlesung sie dreimal hintereinander zurückgewiesen. Sieben Klauseln waren
+unterwegs verloren gegangen: eine Pflicht, elf Läufe je einzeln zu schließen, war zu einer
+„Kostenaufstellung mit aufgeschobener Zuordnung" geworden; zwei Abnahme-Nachweise fehlten ganz;
+ein Beleg fehlte, der die Läufe überhaupt erst unerklärt macht; ein Defekt wurde ohne seinen
+Eigner genannt; und die Kritikalität war von hoch auf mittel gesunken, mitsamt der Folge, die sie
+begründete.
+
+Das Muster dahinter ist nicht Nachlässigkeit, sondern die Form der Arbeit. Wer zwei Texte
+zusammenführt, prüft gegen das THEMA — sagt der Überlebende dasselbe? — und das tut er ja. Was
+dabei nicht geprüft wird, ist die STÄRKE: „jeder Lauf bekommt eine benannte Zuordnung" und „die
+Läufe sind als Kosten verzeichnet" handeln von denselben elf Läufen und verpflichten zu
+Verschiedenem. Dieselbe Blindheit traf die Abnahmezeile, die beim Zusammenfassen wie Beiwerk
+aussieht, und die Kritikalitätszeile, die wie ein Etikett aussieht und in Wahrheit die
+Spezifikation ist. Bemerkt hat es nur das Tor, das für gefaltete Punkte hoher Kritikalität eine
+Gegenlesung verlangt — und auch das erst, nachdem ihm beide VOLLSTÄNDIGEN Texte gereicht wurden:
+Aus dem Unterschied allein sagte das andere Modell zu Recht, es könne die Vollständigkeit nicht
+beurteilen.
+
+**Lehren:** Erstens, eine Zusammenlegung wird nicht gegen das Thema geprüft, sondern gegen drei
+Stellen einzeln — die Pflichtsätze, die Abnahmezeile Punkt für Punkt, und die Einstufung. Wo der
+Überlebende schwächer formuliert, gewinnt die stärkere Formulierung; eine Einstufung darf eine
+Zusammenlegung nie senken. Zweitens, wer eine Vollständigkeitsfrage stellt, muss den VOLLSTÄNDIGEN
+Bestand mitgeben: Ein Unterschied beantwortet „ist das Gemeldete behoben?", niemals „fehlt sonst
+noch etwas?". Und drittens ist ein Prüfer, der genau diese Grenze benennt, statt grün zu melden,
+das Wertvollste an der Gegenlesung — hier hat er den Unterschied zwischen sechs gefundenen und
+einer gefundenen Klausel gemacht.
