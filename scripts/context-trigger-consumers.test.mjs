@@ -2,6 +2,8 @@
 // different contracts. This test follows the live consumers by VALUE so
 // swapping any two cannot read plausibly while sending the handover to the
 // ceiling, the overshoot to the handover, or the refusal to either.
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { boundaryContextDistanceNote } from './batch-boundary.mjs'
@@ -73,5 +75,40 @@ describe('the handover/refusal/ceiling consumer split', () => {
         watermark: triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '400000' }),
       }).state,
     ).toBe('below')
+  })
+
+  it('THE CALL SITES route it too — the boundary asks for no override, the fence asks for the refusal mark', () => {
+    // The cases above prove the VALUES. They cannot prove the ROUTING, because
+    // both live consumers read their threshold inside a CLI/hook body that no
+    // test can import: adding `watermark: refusalTokens()` to the boundary's
+    // call would send the HANDOVER to 110k and leave every assertion above
+    // green. So the call sites themselves are pinned here, in the one form a
+    // regression cannot slip past — asked of the source, not of a mock.
+    const HERE = dirname(fileURLToPath(import.meta.url))
+    const source = (name) => readFileSync(resolve(HERE, name), 'utf8')
+    const argumentsOf = (src) => [...src.matchAll(/gatherWatermark\(\{([^}]*)\}/g)].map((m) => m[1])
+
+    const boundary = source('batch-boundary.mjs')
+    const boundaryCalls = argumentsOf(boundary)
+    expect(boundaryCalls.length).toBeGreaterThanOrEqual(2)
+    for (const args of boundaryCalls) {
+      // No override → gatherWatermark's own default, which is triggerTokens().
+      expect(args, 'the boundary must take the HANDOVER mark, never a passed-in one').not.toContain('watermark')
+    }
+    expect(boundary).not.toContain('refusalTokens')
+    expect(boundary).not.toContain('CONTEXT_REFUSAL_TOKENS')
+
+    const fence = source('context-fence-guard.mjs')
+    const fenceCalls = argumentsOf(fence)
+    expect(fenceCalls.length).toBeGreaterThanOrEqual(2)
+    for (const args of fenceCalls) {
+      expect(args, 'the fence must judge against the REFUSAL mark').toContain('watermark: refusalTokens()')
+    }
+    // Neither may hard-code what the constants say — a literal is how the two
+    // sides drift apart again.
+    for (const src of [boundary, fence]) {
+      expect(src).not.toMatch(/\b110[_,]?000\b/)
+      expect(src).not.toMatch(/\b122[_,]?000\b/)
+    }
   })
 })

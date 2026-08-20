@@ -21,6 +21,10 @@ let repo
 const lockPath = () => resolve(repo, '.claude', 'batch-lock.json')
 const transcriptPath = () => resolve(repo, 'transcript.jsonl')
 const observationsPath = () => resolve(repo, '.claude', 'context-fence-observations.jsonl')
+// Point 742's OVERSHOOT SERIES — a different file, written by a different
+// mechanism (the boundary), and point 747 recalibrates the ceiling from it. The
+// fence must never append to it, so the suite keeps its path here and checks it.
+const incidentsPath = () => resolve(repo, '.claude', 'context-incidents.jsonl')
 const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value))
 
 // Point 758 made OBSERVATION the default mode, so a suite that wants the
@@ -350,6 +354,27 @@ describe('context-fence-guard, OBSERVING (spawned) — the default', () => {
     writeTranscript(CONTEXT_REFUSAL_TOKENS - 1)
     callGuard('Agent', {}, { env: OBSERVE })
     expect(observations()).toEqual([])
+  })
+
+  it("LEAVES POINT 742's INCIDENT SERIES UNTOUCHED — the two logs are separate on purpose", () => {
+    // The observation log is deliberately NOT the incident series: 747 will
+    // recalibrate the ceiling from the boundary's overshoots, and a fence that
+    // also appended there would silently poison that reading. Seeded with a
+    // record of its own, the file must come out byte-identical — while the
+    // observation log demonstrably grew, so this is not a no-op check.
+    const seeded = `${JSON.stringify({ at: '2026-08-19T12:00:00.000Z', kind: 'overshoot', tokens: 311_039 })}\n`
+    writeFileSync(incidentsPath(), seeded)
+    rmSync(observationsPath(), { force: true })
+    callGuard('Agent', {}, { env: OBSERVE })
+    callGuard('Edit', { file_path: 'TASKS.md' }, { env: OBSERVE })
+    callGuard('Agent', {}) // armed, and therefore refusing — the same must hold
+    expect(readFileSync(incidentsPath(), 'utf8')).toBe(seeded)
+    expect(observations()).toHaveLength(3)
+    rmSync(incidentsPath(), { force: true })
+    // And it does not CREATE the series either: nothing must appear where the
+    // boundary alone writes.
+    callGuard('Agent', {}, { env: OBSERVE })
+    expect(existsSync(incidentsPath()), 'the fence must not create the incident series').toBe(false)
   })
 
   it('--status says IN WORDS that the fence is disarmed, and names the handover mark that still binds', () => {
