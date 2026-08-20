@@ -201,19 +201,32 @@ export function workOrderPoints(text) {
   // Points quote the work order's own shape — a specimen line in a fenced block, a
   // remedy printed as an example. Splitting on those would cut ONE oversized point
   // into several compliant fragments, which is evasion rather than measurement, and
-  // the ceiling would report green on the very point it exists for. The fence is
-  // tracked exactly as CommonMark opens and closes one: three or more backticks or
-  // tildes at column zero, closed only by the same character.
-  const FENCE = /^(`{3,}|~{3,})/
+  // the ceiling would report green on the very point it exists for.
+  //
+  // THE FENCE IS TRACKED AS COMMONMARK DEFINES IT, not as it usually looks (second
+  // cross-vendor round, which found both shortcuts of the first attempt). An opener
+  // is three or more backticks or tildes indented by AT MOST THREE spaces — the
+  // work order indents its examples, so a column-zero-only rule left the whole
+  // evasion open. A closer is the SAME character, AT LEAST AS LONG as the opener,
+  // and followed by nothing but whitespace: a shorter run or a run with text after
+  // it does not close, or a four-backtick block would end at the first three-backtick
+  // line inside it and everything after would read as work order again.
+  const FENCE_OPEN = /^ {0,3}((`{3,})|(~{3,}))(.*)$/
   const out = []
   let cur = null
-  let fence = null
+  let fence = null // { marker, length } while open
   for (const line of lines) {
-    const f = FENCE.exec(line)
+    const f = FENCE_OPEN.exec(line)
     if (f) {
-      const marker = f[1][0]
-      if (fence === null) fence = marker
-      else if (fence === marker) fence = null
+      const run = f[2] ?? f[3]
+      const marker = run[0]
+      const info = f[4] ?? ''
+      if (fence === null) {
+        // A backtick opener may not carry a backtick in its info string.
+        if (!(marker === '`' && info.includes('`'))) fence = { marker, length: run.length }
+      } else if (marker === fence.marker && run.length >= fence.length && info.trim() === '') {
+        fence = null
+      }
       if (cur) cur.lines.push(line)
       continue
     }
@@ -279,12 +292,19 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
     // other unusable value — a negative, a string, NaN, a typo — used to fail open and
     // disable the ceiling silently, which is the failure this whole guard exists to
     // prevent one layer up.
-    const cap = budget.perPoint?.maxWords
-    if (cap !== undefined && !(Number.isInteger(cap) && cap >= 0)) {
+    // A DECLARED perPoint MUST CARRY A USABLE NUMBER (second cross-vendor round). The
+    // first attempt validated only a value that was THERE, so a misspelled field, an
+    // empty object or an explicit `undefined` still switched the ceiling off in
+    // silence — which is the very failure it was written to stop. Declaring the block
+    // at all is now the commitment; `0` is the one value that means "measured later".
+    const perPoint = budget.perPoint
+    const declared = perPoint !== undefined && perPoint !== null
+    const cap = declared ? perPoint.maxWords : undefined
+    if (declared && !(Number.isInteger(cap) && cap >= 0)) {
       findings.push({
         path: budget.path,
         kind: 'per-point ceiling is not a whole number of words',
-        actual: String(cap),
+        actual: cap === undefined ? '(no maxWords)' : String(cap),
         budget: 'a non-negative integer (0 = not measured yet)',
         why: 'an unusable ceiling must refuse rather than switch the check off',
       })
