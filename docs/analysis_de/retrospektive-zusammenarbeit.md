@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 13:40 · Quellen-Fingerprint: `9c0ff6cb01b5…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 14:37 · Quellen-Fingerprint: `70bcf5363160…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 73 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 73 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 9c0ff6cb01b56973c21214e3a544b4b3e5505da8934cc8b52c87225827b21d46 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T11:40:17.136Z -->
+<!-- RETRO-FINGERPRINT: 70bcf5363160b5655ab635bfbb916c3fe84cf29c9418624be800f16aa20729c9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T12:37:21.001Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2140,3 +2140,25 @@ Die Lehre ist billig zu ziehen und teuer zu ignorieren: Ein Werkzeug, das der Pr
 Isolation schickt, wird EINMAL aus der Isolation heraus geprüft, bevor es als fertig gilt. Und ein
 Vorgang, der schreibt und dann committet, räumt seinen Schreibvorgang auf, wenn der Commit nicht
 kommt.
+
+### 3.138 Ein Name, zwei Bedeutungen — und der Unterschied ist an der Aufrufstelle unsichtbar
+
+Beim Vorbereiten eines Punktes am 20.08.2026 fiel auf, dass derselbe Hilfsbaustein zweimal im
+Projekt steht: `mainCheckoutFrom` wird aus zwei Dateien exportiert, mit gleichem Namen, gleicher
+Signatur — und zwei verschiedenen Antworten im Randfall. Die eine Fassung liefert `null`, wenn der
+Aufrufer bereits im Hauptbaum steht; die andere gibt dort einfach den Hauptbaum zurück. Beide sind
+für sich genommen sinnvoll, und beide heutigen Aufrufer haben zufällig die Fassung erwischt, die zu
+ihnen passt.
+
+Gefährlich wird das erst am nächsten Aufrufer, und der stand schon in der Warteschlange: ein Punkt,
+dessen ganze Aufgabe darin besteht, Hauptbaum und Arbeitsbereich zu unterscheiden — also genau die
+Unterscheidung, die eine der beiden Fassungen stillschweigend wegwirft. Wer den falschen Import
+wählt, bekommt keinen Fehler, sondern eine plausible Antwort, und die Unterscheidung verschwindet
+lautlos aus dem Ergebnis.
+
+Das ist keine gewöhnliche Doppelung. Zwei Bausteine mit verschiedenen Namen zwingen zur Wahl; zwei
+mit demselben Namen und derselben Signatur sehen an der Aufrufstelle austauschbar aus, und ihr
+Unterschied steht ausschließlich im Rumpf. Deshalb ist gerade die fast identische Doppelung
+teurer als die offensichtliche: Sie täuscht Gleichheit vor, und niemand liest zwei Rümpfe, um eine
+Import-Zeile zu schreiben. Die Lehre ist entsprechend eng: Ein Name, eine Bedeutung — oder zwei
+Namen, die sagen, welche Frage sie beantworten.
