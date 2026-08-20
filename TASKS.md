@@ -118,6 +118,15 @@ put it is the mistake this line exists to stop.
   document's intended growth. The ceilings were set from PRE-MERGE readings (the code comments
   still said 45 / 700 and five lines until point 761 corrected them), so this is not drift but a
   budget never confirmed against what actually landed.
+  IT IS NOT ONLY THE CUT DOCUMENTS (measured 20.08.2026, same session). The beginner guide
+  `docs/analysis_de/vibe-coding-anleitung.md` stood at EXACTLY its word budget — 3,677 of 3,677
+  in `scripts/guide-brevity-guard.mjs` — so adding one pitfall of house-normal length (~55 words)
+  put it 99 words over and the only ways under were to butcher unrelated, well-written entries or
+  to drop the addition. The addition was dropped and the lesson kept in the retrospective, which
+  is where that guard points; but the choice was forced by an accident of where the file happened
+  to sit, not by the guide being full of the wrong things. Four documents now, all at or within a
+  word of their ceiling, which says the ceilings were set by measuring the file and writing the
+  number down rather than by deciding what the file is allowed to be.
   FINAL STATE: the two budgets carry a DECIDED shape rather than an accident of the merge. Either
   `MEMORY.md` gets a stated growth allowance — its purpose is one hook line per topic, so a
   ceiling with no room for one is the wrong shape, and the allowance is written as the
