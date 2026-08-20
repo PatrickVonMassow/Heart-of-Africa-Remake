@@ -139,12 +139,14 @@ export const RED_CHARGES = [
     // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
     // expires. 642 carries 506's mechanism, so it owns this red now.
     // THE STATED REASON NO LONGER HOLDS AS WRITTEN. 506 argued from a SOFTWARE WebGPU lane.
-    // Measured today with scripts/verify/backend-lane-check.mjs, BOTH lanes are hardware-backed
-    // on the same GPU and WebGPU runs at COMPATIBILITY level, where three.js takes its compat
-    // branches and drops MSAA — a different artefact from "too slow to answer a rate question".
-    // Point 725 disputes the artefact reading altogether. So this entry is a stopgap on
-    // contested ground: it keeps the release branch honest, and 642 owes the decision whether
-    // the red is a compat-lane artefact or a product defect.
+    // Measured today with scripts/verify/backend-lane-check.mjs: BOTH lanes are hardware-backed
+    // on the same GPU and WebGPU reports COMPATIBILITY level. That refutes the software premise
+    // and nothing more — it does not measure the two lanes' rates against each other and it
+    // does not show what causes the stance red. (The cross-vendor review of 20.08.2026 refused
+    // the causal reading this comment first carried, and it was right to.) Point 725 disputes
+    // the artefact reading altogether. So this entry is a stopgap on contested ground: it keeps
+    // the release branch honest, and 642 owes the measurement that decides whether the red is a
+    // lane artefact or a product defect.
     point: 642,
     suite: 'polish',
     backend: 'webgpu',
@@ -154,8 +156,9 @@ export const RED_CHARGES = [
       'Measured 07.08.2026: the stance check reds in BOTH WebGPU runs (20 stance intervals, ' +
       'worst foot travel 0.967) and passes on WebGL 2 (0.337). The original reading — a software ' +
       'lane too slow to answer a rate question — was REFUTED on 20.08.2026: both lanes are ' +
-      'hardware-backed and WebGPU runs at compatibility level, so what differs is the compat ' +
-      'branch and MSAA, not the rate. Point 725 disputes the artefact reading altogether. ' +
+      'hardware-backed and WebGPU reports compatibility level. What causes the difference is ' +
+      'UNMEASURED, and point 725 disputes the artefact reading altogether, so this entry now ' +
+      'excuses a red whose explanation is open. ' +
       'Backend-scoped on purpose: on the WebGL 2 lane this check stays a real red.',
   },
   {
