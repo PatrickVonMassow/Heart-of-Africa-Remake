@@ -145,13 +145,22 @@ put it is the mistake this line exists to stop.
   found THIRD, behind 762 and 760, with neither point's text naming 614 or giving a reason for
   passing a rank the user set. A machine ranking may not silently overtake a user ranking: it is
   restored to the front here, and a point that genuinely must go first says so in its own text.
-  614 IS HALF RUN, NOT UNSTARTED: `local/614/STATE.md` (19.08.2026, 18:33) is a full handover —
-  list B complete (54 entries, Opus 5, all 208 points read), list A present as five raw Sol chunk
-  answers awaiting mechanical assembly, the 10.08. verdict extracted unread for the later
-  reconciliation, and `scripts/fold-point.mjs` built and green (it made its first real run on
-  20.08.2026, folding the withdrawn point 224). RESUME FROM STATE.md STEP 1 rather than re-running
-  the analysis. Every point filed since — 759, 760, 761, 762, 763 — widens the window the run has
-  to re-read, which is the standing cost of leaving it parked.
+  THE PARKED RUN IS DISCARDED A SECOND TIME (user, 20.08.2026, 07:20, verbatim: »Hole dir die
+  Batch, verwerfe die alte Analyse, führe eine neue doppelt blind aus und erledige sie sofort.«).
+  `local/614/STATE.md` (19.08.2026, 18:33) offered a full handover — list B complete, list A as
+  five raw Sol chunk answers, a digest and chunks — and it goes the same way the 10.08. verdict
+  went on 19.08., for the same stated reason: an analysis of a moving set is worthless once it is
+  parked. Do NOT resume from it. WHAT SURVIVES, because it is not analysis: `scripts/fold-point.mjs`
+  (built, green, and proven by the first real fold on 20.08.2026, the withdrawn point 224) and the
+  extracted-unread 10.08. verdict in `local/614/old-verdict.md`, which is the reconciliation input
+  either way.
+  SO THE RUN IS: a fresh blind-parallel find over the CURRENT open set by two models that see
+  neither each other nor any earlier verdict; a third-model counted merge through
+  `scripts/blind-merge.mjs`; reconciliation against the old verdict AFTERWARDS, with its miss
+  count recorded; and THE EXECUTION IN THE SAME RUN — the point is not done when the verdict
+  exists. That is the user's standing rule (memory `analysis-and-execution-in-one-go`). Scope the
+  run to what ONE session can carry through to the executed end: if the context will not hold both
+  halves, cut the ANALYSIS scope, never the execution.
   QUEUE RANK 2, directly behind point 757 (user 20.08.2026): 223 open points with duplicates
   make every brief generation and every queue reading more expensive, and 614 is the only point
   that cuts that set.
@@ -9820,4 +9829,73 @@ to land than a mechanism that needs a review.
   the old behaviour hid.
   Criticality: medium — it drops user rulings on the floor silently, and its failure mode is
   indistinguishable from an empty inbox.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 766. The lesson register cannot be kept for the last two dozen lessons, and the document
+  says it is complete (measured 20.08.2026, at point 761's boundary).
+  `docs/analysis_de/retrospektive-zusammenarbeit.md` states in its own prose that EVERY lesson of
+  section 3 carries a recorded mechanism decision in `docs/analysis_de/lesson-mechanisms.md`, and
+  that `retro-currency-guard` blocks the turn end while one is missing. It cannot:
+  `parseLessonSubsections()` in `scripts/retro-core.mjs` cuts the document at the
+  `AUTO-GENERATED:START` marker and reads only the prose BEFORE it. Sections 3.111 through 3.134
+  all stand AFTER that marker, and the ledger's last row is 3.110 — twenty-four lessons carry no
+  recorded enforcement decision and nothing reports it.
+  THE FAILURE IS NOT A FALSE GREEN BUT A LOCKED DOOR. Adding a ledger row for a lesson past the
+  marker is REJECTED as an orphan: measured today, a row for 3.134 turned `scripts/retro-core.test.mjs`
+  red with "refers to no lesson in the retrospective". The mechanism therefore actively PREVENTS
+  the register from being kept for those lessons while the document claims it is complete — the
+  register is not merely unenforced there, it is unfillable.
+  FINAL STATE: the parser reads the WHOLE document rather than stopping at the marker, so every
+  numbered lesson is ledgerable wherever it stands, and the twenty-four unregistered lessons are
+  worked through — each gets an existing enforcer widened, a new one, or an explicit "LÜCKE: …"
+  with its reason, exactly as the three permitted outcomes require. If reading past the marker is
+  wrong for some reason this measurement does not see, then the alternative is the honest one: the
+  prose at line 179 is narrowed to say what actually holds, and the lessons past the marker are
+  declared unregistered by design. Silently claiming a completeness the mechanism forbids is the
+  one outcome that is not allowed.
+  VERIFIABLE: Vitest over the pure core — a lesson heading after the auto marker is parsed as a
+  lesson; a ledger row for it is accepted rather than reported as an orphan; a lesson with no row
+  is still reported as missing; and the auto section's own content is never mistaken for a lesson
+  heading. A second case asserts the shipped pair is clean, which is the case that goes red today
+  the moment anyone tries to do the right thing.
+  Criticality: medium — nothing breaks in the product, but a document that claims every lesson is
+  enforced while two dozen are not is the exact failure this register exists to prevent, and its
+  own guard reports clean.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 767. The five-round escalation covers commissions only, so the batch's own work can never
+  trigger it (measured 20.08.2026 from `.claude/mechanism-reviews.jsonl`, 510 rows, plus the commit
+  trailers). The rule landed 19.08.2026 09:37 Berlin (`FABLE_ESCALATION_ROUNDS = 5` in
+  `scripts/author-routing-core.mjs`): after five unsuccessful review rounds a point escalates to
+  the third lane. IT HAS NEVER FIRED. The only Fable-authored rows after that timestamp are four
+  on point 713 at 19.08. 13:04, and 713 had been Fable's since 06:13 that morning — a continuation,
+  not a takeover. Since then there is no Fable authoring at all: 191 commits carry an Opus 5
+  trailer and 76 a Sol trailer, none a Fable one.
+  THE THRESHOLD WAS NEVERTHELESS MET. Point 761 — the owner document floor, landed 20.08.2026 —
+  accumulated exactly five unsuccessful rounds between 04:10 and 05:00 (five merge-with-fixes
+  verdicts; both merge-with-fixes and do-not-merge count as unsuccessful per
+  `isUnsuccessfulReview`), and nothing escalated. Point 713 stands at eighteen, moot only because
+  it was already in that lane.
+  WHY IT DID NOT FIRE, and this is the defect: the routing switch is consulted ONLY where a point
+  is COMMISSIONED to a delegated author — `scripts/author-sol.mjs` is the sole caller of
+  `authorRoundHistory` outside the module and its own tests. A point that the batch-owner session
+  authors and revises IN PLACE never passes the switch at all, so its round count climbs past five
+  with no moment at which the lane could change. The rule as built covers delegated points; the
+  batch's own work, which is most of it, sits outside it.
+  FINAL STATE: the round count is checked where the rounds are RECORDED. `scripts/mechanism-review.mjs`
+  reads the point's history as it writes each verdict and refuses the next IN-PLACE revision once
+  the threshold is passed, naming the lane the point must move to — so an owner-authored point
+  meets the same rule as a commissioned one. If that is judged wrong, the alternative is honest and
+  explicit: `CLAUDE.md` §6 and the routing module both say the escalation applies to commissions
+  alone, and the batch's own points are stated as exempt. What may not stand is a rule written as
+  general whose only enforcement point most work never reaches.
+  VERIFIABLE: Vitest over the pure core — a point with five recorded unsuccessful rounds refuses a
+  sixth in-place revision with a message naming the required lane; four rounds do not; a
+  successful round resets nothing that the current rule does not already reset; and a commissioned
+  point keeps behaving exactly as it does today. One case replays point 761's five real verdicts
+  and asserts the refusal fires where it did not.
+  CAVEAT ON THE MEASUREMENT, stated because it is the standing one: both sources see only landed
+  and recorded work, so a session that produced nothing recorded is invisible to it.
+  Criticality: medium — no product defect, but it is an escalation rule that has never once
+  escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.

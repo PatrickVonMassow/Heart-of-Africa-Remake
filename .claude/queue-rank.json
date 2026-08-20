@@ -191,10 +191,18 @@
     "765": {
       "at": "2026-08-20T05:43:43.591Z",
       "why": "The carrier defect drops rulings silently, but its one known case is already re-filed and landed, so nothing is waiting on it."
+    },
+    "766": {
+      "at": "2026-08-20T06:03:28.398Z",
+      "why": "The register is unfillable for those lessons but nothing is blocked by it today; it waits behind the cut re-check that produced it."
+    },
+    "767": {
+      "at": "2026-08-20T06:03:57.318Z",
+      "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night."
     }
   },
   "settled": {
-    "at": "2026-08-20T05:43:43.591Z",
+    "at": "2026-08-20T06:03:57.319Z",
     "points": [
       174,
       184,
@@ -423,7 +431,9 @@
       762,
       763,
       764,
-      765
+      765,
+      766,
+      767
     ]
   }
 }
