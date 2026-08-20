@@ -6148,16 +6148,16 @@ Build order, chosen so no two parallel agents own the same file:
   it. The user chose the recommended option — ABOLISH the prescriptive half rather than
   revive it with a mechanism, because what is actually read is the per-card ESTIMATE on
   the board, and that survives without the bookkeeping.
-  FINAL STATE: the memory entry prescribes nothing any more. Deleted from it: the four
-  checkbox states with every instruction to set `[*]`/`[~]`, and the `(track: …)` line
-  with its start/finish/minutes/token/model fields and the 85/15 input-output token
-  heuristic. KEPT, as the entry's whole remaining content: ETA calibration — dashboard
+  FINAL STATE: what the mandate prescribed is gone, and what was worth keeping comes
+  BACK. The prescriptive half needs nothing further (see the struck clause below); what
+  the same measurement shows missing is the other half. KEPT, and to be restored as the
+  entry's whole content: ETA calibration — dashboard
   finish estimates are stated at the CATEGORY MEDIAN (small/logic 25–50 min,
   scene/behaviour 60–100 min, minus ~10–15 min under the scoped regression process),
   they LEARN from what points actually took, and an ETA refresh rides on a publish that
-  happens anyway instead of causing one. The entry is renamed and re-described to match
-  what it now says — it is no longer about tracking — its `MEMORY.md` index line
-  rewritten with it, and any `[[tasks-time-tracking]]` link updated.
+  happens anyway instead of causing one. The entry stands under a name that matches what
+  it says — it is no longer about tracking — with its own `MEMORY.md` index line, and any
+  `[[tasks-time-tracking]]` link updated.
   `docs/rule-corpus-audit.md` records it as DECIDED-ABOLISHED with this date and the
   user's ruling, not as an open question. The 32 historical `(track: …)` lines in
   `docs/tasks-archive.md` STAY untouched — they record what happened, and rewriting
@@ -6170,6 +6170,14 @@ Build order, chosen so no two parallel agents own the same file:
   no rule text demanding them; the rewritten memory entry names no obligation, and
   `MEMORY.md` holds exactly one line for it under its new name. `npm run test:unit` and
   the doc-budget guard stay green (the change only shortens).
+  STRUCK 20.08.2026 (work-order review): the abolition half, because it is already in
+  force — the memory `tasks-time-tracking` no longer exists in the memory directory,
+  `MEMORY.md` carries no index line for it, and `(track:` stands only in
+  `docs/tasks-archive.md` (32 times) and inside this point's own text. The same
+  measurement is why the point STAYS OPEN: the entry was deleted whole instead of
+  rewritten, so the ETA calibration above survives nowhere in the corpus a session loads,
+  and `docs/rule-corpus-audit.md` row A52 still reads INEFFECTIVE with the choice pending
+  rather than DECIDED-ABOLISHED.
   Criticality: low — process hygiene. A rule that formally binds every session while
   nobody follows it teaches that the rule corpus may be ignored, and that cost is
   charged to every other rule.
