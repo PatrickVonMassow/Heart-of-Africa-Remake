@@ -1318,12 +1318,18 @@ put it is the mistake this line exists to stop.
   on WebGPU (13.08., 15:24 and 23:19-23:22, 18-19 reds each), `collision` on WebGPU (3 reds),
   `flow` on WebGPU ("the run ended in a crash, not in its own report") and `settings` on WebGL 2 —
   and four of them carried the same cap line, `103 further result line(s) exceeded the capture
-  cap`. That set has since left the guard's window (the oldest run blocking on 19.08. is from
-  17.08.), so it is the COST RECORD here rather than work still owed, and it proves the trap is
-  not one week's accident. What does not lapse with it: whichever of those reds are real product
-  defects — the WebGPU async render-pipeline console error, the TRAA/MSAA path (point 514), the
-  first-person ground micro-detail (point 603) — is named with the point that owns it when a run
-  reproduces it, never waved off as cap noise.
+  cap`. The gate was DEFERRED on 14.08.2026 for one purpose, to let point 666 land, which is the
+  valve working as designed and no closing at all — the same hand waiver this point exists to make
+  unnecessary, taken five days before the deferral of 19.08. above.
+  THOSE ELEVEN RUNS ARE EACH STILL OWED A DISPOSITION, one apiece and not one of them another
+  deferral: cause named and fixed, charged to the open point that owns it, or filed as its own
+  point, exactly the three ways point 640 allows. The reds among them that are real product
+  defects are named with their owner — the WebGPU async render-pipeline console error, the
+  TRAA/MSAA path (point 514), the first-person ground micro-detail (already owned by point 603) —
+  and a run whose reds were provably never recorded is closed AS an incomplete recording under
+  this point's own way out below, which is a disposition and not a waiver. That the set has since
+  left the guard's window (the oldest run blocking on 19.08. is from 17.08.) ends the blockage,
+  never the obligation, and it proves the trap is not one week's accident.
   THE CAUSE FIX IS PARTLY ELSEWHERE: point 460 persists every suite's complete output to
   `local/verify-logs/`, which is what makes a red readable at all. This point decides what a run
   whose reds were never recorded IS, and how it leaves the guard.
