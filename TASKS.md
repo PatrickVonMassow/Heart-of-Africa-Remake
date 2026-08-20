@@ -10389,3 +10389,37 @@ to land than a mechanism that needs a review.
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
 
+
+- [ ] 785. The chat header's context reading is wrong exactly where it is read most — at the start
+  of a session and after a blocked turn (measured 20.08.2026 in the transcript of session
+  c0ad5041). Point 764 is about whether the suffix is ENFORCED; this point is about whether the
+  number it carries is TRUE. The two are separable and both were seen in the same hour.
+  THE MEASUREMENT. `scripts/dashboard-reminder-hook.mjs` injected `· Kontext: -- Tokens` at the
+  FIRST prompt after `/clear` (15:13:21 UTC). That was honest at the time — no usage record
+  existed yet; the first one appears four seconds later at 15:13:25 carrying 43,154 tokens. But
+  the reader is told `--` while roughly 43k of context is ALREADY loaded from the system prompt,
+  `CLAUDE.md` and the memory index. `--` and "nothing loaded" read the same to a human, and the
+  one number a session starts with is the one it never gets.
+  THE SECOND `--` DID NOT COME FROM THE HOOK. `UserPromptSubmit` does not run on a turn that
+  resumes after a Stop hook blocked it — that turn was the findings-guard block — so no fresh
+  suffix was delivered and the assistant repeated the STALE one from the previous turn. The header
+  then states a reading that is not a reading, and nothing distinguishes it from a measured one:
+  the two failure shapes produce byte-identical text.
+  WHAT THE USER ASKED FOR BESIDE THE REPAIR: a consumption OVERVIEW rather than an absolute value
+  alone — the delta per turn, so the growth is visible while it happens rather than only at the
+  watermark. `node scripts/context-watermark.mjs --status --transcript <transcript>` already
+  reports tokens, watermark and state, so the number exists and only its presentation is missing.
+  FINAL STATE: the first header of a session names the loaded base rather than `--`, falling back
+  to the measured base load or the previous session's last reading when no usage record exists
+  yet; a turn that receives no fresh hook line does not repeat the previous suffix, but says so in
+  a form a reader can tell apart from a measurement; and the suffix carries the per-turn delta
+  beside the absolute value. `--` remains reserved for the case where the reading genuinely cannot
+  be taken.
+  VERIFIABLE: Vitest over the pure suffix builder — a first turn with no usage record yields the
+  base-load reading rather than `--`; a turn whose input carries no hook line yields the
+  not-measured form rather than the previous value; a normal turn yields absolute plus delta; and
+  a case replays the three real headers of session c0ad5041 and asserts the first two are no
+  longer indistinguishable from measured ones. Plus the existing green cases stay green.
+  Criticality: medium — no product defect, but the header is the user's only continuous view of
+  the batch's dominant cost, and it lies precisely at the two moments the cost is least visible.
+  Bundle: Session- & Repo-Hygiene.
