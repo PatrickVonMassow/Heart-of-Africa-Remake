@@ -103,6 +103,35 @@ describe('per-contribution review baseline', () => {
     ])
   })
 
+  it('clears a bounded one-pass scope and no contribution outside it', () => {
+    const before = commit('a', 'Claude Opus 5', ['shared', 'before'])
+    const inside = commit('b', 'Claude Opus 5', ['shared', 'inside'])
+    const after = commit('c', 'Claude Opus 5', ['shared', 'after'])
+    const result = outstandingContributions({
+      commits: [before, inside, after],
+      recordUsable: usable,
+      records: [
+        {
+          sha: after.sha,
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          containedShas: [before.sha, inside.sha, after.sha],
+          pass: { index: 1, total: 1, files: ['shared', 'inside'], commits: [inside.sha] },
+        },
+      ],
+    })
+    expect(result.covered.map((c) => [c.sha, c.file])).toEqual([
+      [inside.sha, 'shared'],
+      [inside.sha, 'inside'],
+    ])
+    expect(result.outstanding.map((c) => [c.sha, c.file])).toEqual([
+      [before.sha, 'shared'],
+      [before.sha, 'before'],
+      [after.sha, 'shared'],
+      [after.sha, 'after'],
+    ])
+  })
+
   it('does not let a reviewer retire its own contribution to a mixed file', () => {
     const result = outstandingContributions({
       commits,

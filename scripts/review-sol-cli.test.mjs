@@ -609,14 +609,15 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/--since/)
   })
 
-  it('reviews a narrowed range but prints NO record for it', () => {
-    // The verdict is still reported; the ready-to-run command is not, because a
-    // record at that sha would clear commits this review never saw.
+  it('records a narrowed one-round range as exactly one scoped pass', () => {
     provenId()
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'])
     expect(r.status).toBe(0)
-    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
-    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "added.txt"')
+    expect(printed).toContain(`--pass-commits "${headSha}"`)
+    expect(r.stdout).toContain('SCOPED record clears only the listed commit/file contributions')
   })
 
   it('refuses an explicit --since that is not a proper ancestor, in each of its three forms', () => {
@@ -816,30 +817,32 @@ describe('a modified gitlink', () => {
   })
 })
 
-// ESCALATION ROUND: both early routes hard-coded `partial: null`, so a fitting
-// range with an explicit narrowed `--since` printed a whole-SHA record template
-// although only the narrowed range was measured — bypassing the coverage
-// refusal the normal route makes.
+// A fitting narrowed range is handed over with the same exact contribution
+// scope as a completed Sol round; the placeholder still prevents recording a
+// verdict nobody gave.
 describe('a narrowed --since on the early routes', () => {
-  it('prints NO record template at claude-only while --since narrows the range', () => {
+  it('prints a scoped record template at claude-only while --since narrows the range', () => {
     const shareFile = join(dir, 'sol-share.json')
     writeFileSync(shareFile, JSON.stringify({ setting: 'claude-only' }))
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'], { SOL_SHARE_FILE: shareFile })
     expect(r.status).toBe(3)
-    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
-    expect(r.stdout).toMatch(/clears every commit it contains/)
-    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "added.txt"')
+    expect(printed).toContain(`--pass-commits "${headSha}"`)
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
   })
 
-  it('prints NO record template for a narrowed Sol-authored range either', () => {
+  it('prints a scoped record template for a narrowed Sol-authored range too', () => {
     writeFileSync(join(dir, 'calls.log'), '')
     const r = run(['--sha', solHeadSha, '--since', `${solHeadSha}~1`, '--brief', 'judge it'])
     expect(r.status).toBe(3)
-    expect(r.stdout).toMatch(/NO RECORD COMMAND IS PRINTED/)
-    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    const printed = recordCommandIn(r.stdout)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "sol2.txt"')
+    expect(printed).toContain(`--pass-commits "${solHeadSha}"`)
     expect(calls()).toEqual([])
   })
 

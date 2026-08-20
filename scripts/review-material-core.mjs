@@ -1284,9 +1284,10 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
 /**
  * The `--pass k/n` value, parsed.
  *
- * Refuses n = 1: a single pass is an ordinary whole-range record, and letting one
- * be recorded as a pass would put a composition marker on a review that never
- * needed one — the gate would then wait forever for a pass 2 nobody owes.
+ * `1/1` is meaningful for a BOUNDED review: it says the one round covered only
+ * the commit/file contributions named beside it. The recorder requires commit
+ * scope on that shape, so it can never masquerade as an ordinary whole-range
+ * record. Larger totals remain the size/authorship split used by passComposition.
  */
 export function parsePassSpec(value) {
   const raw = String(value ?? '').trim()
@@ -1297,8 +1298,8 @@ export function parsePassSpec(value) {
   const index = Number(m[1])
   const total = Number(m[2])
   const errors = []
-  if (total < 2) {
-    errors.push('--pass <k>/<n>: n must be at least 2 — one pass over the whole range is an ordinary record')
+  if (total < 1) {
+    errors.push('--pass <k>/<n>: n must be at least 1')
   }
   // BOUNDED, so no ledger row can spin the gate (final-round pass 5): the
   // composition walks 1..total, and a hand-written huge total would hang the

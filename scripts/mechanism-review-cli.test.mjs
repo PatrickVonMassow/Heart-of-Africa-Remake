@@ -247,6 +247,30 @@ describe('the mode round-trips into the ledger', () => {
     expect(built.record.partialReview).toBe(true)
   })
 
+  it('round-trips a bounded one-pass contribution scope', () => {
+    const boundary = 'b'.repeat(40)
+    const built = build({
+      mode: 'review',
+      pass: '1/1',
+      passFiles: 'scripts/scoped-guard.mjs',
+      passCommits: boundary,
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.pass).toEqual({
+      index: 1,
+      total: 1,
+      files: ['scripts/scoped-guard.mjs'],
+      commits: [boundary],
+    })
+    expect(built.record.partialReview).toBe(true)
+  })
+
+  it('refuses a one-pass marker without the contribution boundary that scopes it', () => {
+    const built = build({ mode: 'review', pass: '1/1', passFiles: 'scripts/scoped-guard.mjs' })
+    expect(built.ok).toBe(false)
+    expect(built.errors.join('\n')).toMatch(/needs --pass-commits/)
+  })
+
   it('stores a contribution boundary WHOLE, so the gate can match it at all', () => {
     const full = 'a'.repeat(40)
     const built = build({

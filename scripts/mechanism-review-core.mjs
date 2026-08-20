@@ -870,9 +870,10 @@ export function validateMode({ mode, framing } = {}) {
 /**
  * Is the PASS this record claims a usable one, and does it say what it read?
  *
- * A pass record is the answer to a range no single review round can hold (point
- * 714): the material is cut through the FILE SET, each pass is reviewed on its
- * own, and the range is cleared only once every pass is on record. So a pass
+ * A pass record is either a bounded one-round scope or the answer to a range no
+ * single review round can hold (points 783 and 714): the material is cut through
+ * the FILE SET, each pass is reviewed on its own, and the range is cleared only
+ * once every contribution (and, for a split, every pass) is on record. So a pass
  * MUST name its files — a verdict that covers "one of three passes" without
  * saying which files it read is a coverage claim nobody can check — and the two
  * flags come as a pair, because either alone describes half a composition.
@@ -932,6 +933,11 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
   const commits = commitList ? commitList.split(',') : []
+  if (parsed.ok && parsed.total === 1 && !hasCommits) {
+    errors.push(
+      '--pass 1/1 is a scoped review and needs --pass-commits: without contribution boundaries it would claim the whole range',
+    )
+  }
   if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
     errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
   }

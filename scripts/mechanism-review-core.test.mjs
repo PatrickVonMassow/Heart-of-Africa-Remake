@@ -1447,8 +1447,17 @@ describe('validatePass', () => {
     expect(v.errors.join('\n')).toContain('--pass')
   })
 
-  it('REFUSES a single-pass split — that is an ordinary whole-range record', () => {
+  it('REFUSES a one-pass scope without contribution boundaries', () => {
     expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs' }).ok).toBe(false)
+  })
+
+  it('accepts a bounded one-pass scope with its exact contribution boundaries', () => {
+    const boundary = 'a'.repeat(40)
+    expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs', passCommits: boundary })).toEqual({
+      ok: true,
+      errors: [],
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], commits: [boundary] },
+    })
   })
 
   it('REFUSES a pass number outside its own split, and a malformed spec', () => {
