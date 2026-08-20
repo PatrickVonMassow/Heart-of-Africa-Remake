@@ -102,6 +102,13 @@ put it is the mistake this line exists to stop.
   and NO commit outside it; a range whose every eligible reviewer authored part of it is reported as
   UNREVIEWABLE with the reason, rather than as an ordinary refusal; a `do-not-merge` still does not
   clear. Plus the real repository: the gate reports a reachable next step for the current `main`.
+  MEASURED AGAIN 20.08.2026 WHILE LANDING POINT 776, a third face of the same hole: a review that WAS
+  run cannot be recorded, because the branch head is mixed. GPT-5.6 Sol authored the whole mechanism
+  there; Opus 5 read it, ran the suites, and then wrote a DOCUMENTATION commit on top. Recording the
+  verdict at that head is refused as a SELF-REVIEW — the recorder judges the head author alone, so a
+  reviewer is locked out of the record by its own non-mechanism follow-up. The record was made at the
+  last Sol commit instead, which worked only because that follow-up touched no mechanism at all.
+  The eligibility cut therefore has to run per CONTRIBUTION rather than on the head commit author.
   Criticality: high — it is a blocking gate on `main` with no legitimate way through, and the
   workaround it invites is a waiver, which is how a four-eyes rule quietly stops being one.
   Bundle: Session- & Repo-Hygiene.
