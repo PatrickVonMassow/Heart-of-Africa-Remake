@@ -9605,6 +9605,14 @@ to land than a mechanism that needs a review.
   - A successor's orientation never describes an unmeasured agent as dead. Where the state cannot be
     read, it says so and names what to probe — an honest unknown, since acting on a wrong death is
     what puts two writers in one tree.
+  THIS IS THE FIX ON TODAY'S PLANE, and it is not point 676 (read against it in full, 20.08.2026).
+  676 replaces the plane itself — daemon-owned detached workers, a lease epoch fencing every
+  mutation, a successor adopting by stable job identity — and under it an Agent-tool child is
+  declared NON-transferable and blocks a boundary until it finishes. It never names the STAND-DOWN
+  path, and it never names the dead-owner verdict, which are precisely this point's two failure
+  directions; fencing a mutation does not stop a session from calling a working agent dead. So this
+  point stays open and is built on mechanisms that exist today (`batch-in-flight.mjs --adopt`,
+  `--agent-check`), and 676 inherits these rules instead of repeating them.
   VERIFIABLE: Vitest over the pure core — a stand-down with a live declared agent produces a
   transfer rather than a silent exit; one with no agent produces today's plain stand-down; an
   adopting successor sees the transferred declaration; and a dead-owner verdict is refused while a
