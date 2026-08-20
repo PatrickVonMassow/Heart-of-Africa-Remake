@@ -109,6 +109,37 @@ put it is the mistake this line exists to stop.
   again, one landing at a time.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 787. The handover card that `batch-boundary` dictates verbatim is refused by the board's own
+  publish gate, so every point boundary costs two extra attempts (measured 20.08.2026 at the
+  boundary of point 782, hit twice in the same session).
+  THE TWO RULES CONTRADICT EACH OTHER DIRECTLY, and both are absolute.
+  `node scripts/batch-boundary.mjs --prepare <N>` prints the handover text with the instruction to
+  take it VERBATIM — "take this text verbatim rather than writing it again" — and explains the one
+  property that makes it refusable: "It names NO point number on purpose: it goes into the
+  unnumbered gap card, where the topic guard reads every point reference as a foreign one."
+  `node scripts/board.mjs none --text-stdin` then refuses exactly that text: "die Übergabe-Karte
+  ist die eine Karte ohne Nummer, also muss ihr Grund den Punkt NENNEN, den der Stapel als
+  nächstes aufnimmt. Das Publish-Tor verweigert eine Übergabe-Karte, die keinen nennt."
+  ONE OF THEM IS WRONG AND NEITHER YIELDS. The session got past it only by rewriting a text that
+  was declared verbatim — which is precisely what the instruction exists to prevent, and it means
+  the card the user reads is hand-written at the one moment the mechanism was built to standardise.
+  It fires twice per boundary in the claim variant, where the dictated text is longer: once for the
+  ordinary handover and again for the reserved-for-a-claiming-window form.
+  FINAL STATE: one rule owns the handover card's shape. Either `batch-boundary` composes the next
+  point into the text it dictates — it already reads the work order and knows which point comes
+  next — or the publish gate accepts an unnumbered handover card and the topic guard is taught that
+  this one card may name a point without the reference being foreign. Whichever is chosen, the text
+  that `--prepare` prints publishes unchanged, and a session never has to rewrite what it was told
+  to copy.
+  VERIFIABLE: Vitest — the text `batch-boundary --prepare` produces for a landed point is fed to
+  the publish gate's pure check and passes, in the ordinary form AND in the claimed-window form; a
+  case asserts the dictated text names the next open point when the chosen fix is the composing
+  one, or that an unnumbered handover card is accepted when it is the gate; and the topic guard
+  still rejects a foreign point reference in every OTHER card.
+  Criticality: medium — no product defect, but it taxes every point boundary of every session, and
+  it makes the one card the user reads on his phone hand-written instead of dictated.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 781. Two exported `mainCheckoutFrom` helpers disagree about what `null` means, and the next
   point to need one has to guess (found 20.08.2026 while prepping point 773).
   `scripts/worktree-bootstrap-core.mjs` and `scripts/review-sol-core.mjs` both export
