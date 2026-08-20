@@ -76,30 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 792. The Fable switch judges the PAST: flipping it off turned thirty-four legal commits into a
-  batch-stopping policy breach (measured 20.08.2026, 20:40, minutes after the switch landed).
-  WHAT WAS MEASURED. The switch was set OFF at 19:34. The serving-model tripwire then named 34
-  commits carrying `Co-Authored-By: Claude Fable 5` — among them `d0f88666` and `55c9e445` of
-  19.08.2026 and `c32d33e1` of 18.08.2026 — as "a model outside the allowlist", and demanded the
-  batch be paused. Every one of them predates the switch by days, and Fable was a regular authoring
-  lane when they were written: no rule was broken when they were made. The baseline
-  `.claude/model-guard-baseline.json` stands at 07.08.2026, so nothing grandfathers them.
-  WHY IT MATTERS: a decision taken tonight stopped the batch over a past that complied with the
-  policy then in force. That is the opposite of what the switch is for — it governs what may be
-  SPENT from now on, not what was legitimately spent before — and every session that starts while it
-  holds walks into the same pause.
-  FINAL STATE: a commit is judged by the policy in force AT ITS OWN TIME. The recorded switch state
-  carries `changedAt`; a commit older than that instant is judged under the previous policy, and only
-  a commit made after the flip is a breach. The refusal text says which of the two it is, so a
-  genuine degradation after the flip still reads as the emergency it is, and a historic Fable commit
-  reads as history.
-  VERIFIABLE: pure tests — a Fable-trailered commit dated before `changedAt` is not a breach while
-  the switch is off; the same trailer dated after it is; an unreadable switch state still refuses
-  loudly rather than grandfathering everything; and the existing Sonnet/Haiku verdicts are unchanged
-  in both directions, since no switch ever admitted them.
-  Criticality: high — it stops the batch, and it stops it for a reason that is not true.
-  Bundle: Modell & Wächter.
-
 - [ ] 793. A paused batch locks out the one message that ends the pause (measured 20.08.2026, 21:28).
   WHAT WAS MEASURED. The batch stopped at 20:40 on the serving-model tripwire, whose own instruction
   is to wait for the user's word. He gave it: two chat messages at 21:09 and 21:10, one clearing the
