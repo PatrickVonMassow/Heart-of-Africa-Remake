@@ -37,13 +37,14 @@
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { execFileSync } from 'node:child_process'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
 import {
   formatArgErrors,
   KNOWN_FLAGS,
+  ledgerPathFrom,
   modelFromTrailers,
   modelsFromTrailers,
   MODES,
@@ -61,8 +62,27 @@ export { KNOWN_FLAGS }
 /** An injective identity for an unordered set of Git paths. */
 export const reviewFileSetKey = (files = []) => JSON.stringify([...(files ?? [])].map(String).sort())
 
-/** The tracked ledger of recorded mechanism reviews (JSON Lines). */
-export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
+/** The git toplevel of a working directory, or '' outside a checkout. Its own
+ *  spawn rather than `git()` above: that one is pinned to REPO_ROOT, which is
+ *  the very assumption this lookup exists to replace, and a missing checkout is
+ *  an answer here, not a failure. */
+export function gitToplevel(cwd = process.cwd()) {
+  const res = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', windowsHide: true })
+  return res.status === 0 && !res.error ? (res.stdout ?? '').trim() : ''
+}
+
+/** The tracked ledger of the checkout this command RUNS IN — see
+ *  ledgerPathFrom. REPO_ROOT remains the fallback for a call from outside any
+ *  checkout, which is where the module's own root is the only answer left. */
+export function recordsPathFor(cwd = process.cwd()) {
+  return ledgerPathFrom(gitToplevel(cwd), REPO_ROOT)
+}
+
+/** The tracked ledger of recorded mechanism reviews (JSON Lines). Resolved ONCE
+ *  at load against the invocation's working directory: no script here chdirs,
+ *  and a per-call git spawn on every default argument would be paid by every
+ *  reader of the ledger. A caller that needs another checkout passes its own. */
+export const RECORDS_PATH = recordsPathFor()
 
 // AN ARGUMENT VECTOR, NEVER A SHELL LINE (landing-round pass 4): the sha this
 // command interpolated reached a shell before any validation ran, so a value

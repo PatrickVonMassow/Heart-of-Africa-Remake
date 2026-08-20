@@ -6,6 +6,7 @@
 // wrote the thing, a refusal that must not be treated as advice, and the twenty-
 // odd guards that predate the gate and owe nothing.
 import { describe, it, expect } from 'vitest'
+import { resolve } from 'node:path'
 import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
@@ -14,6 +15,8 @@ import {
   formatMechanismReviewVerdict,
   isMechanismPath,
   KNOWN_FLAGS,
+  ledgerPathFrom,
+  LEDGER_RELATIVE_PATH,
   MERGE_ACCOUNTING_SINCE,
   MODE_REQUIRED_SINCE,
   mechanismPathsIn,
@@ -1931,5 +1934,25 @@ describe('the refusal teaches the command that actually works', () => {
     const text = formatMechanismReviewVerdict(v)
     expect(text).toContain('--mode')
     for (const m of MODES) expect(text).toContain(m)
+  })
+})
+
+// WHICH CHECKOUT'S LEDGER (point 780). The I/O half asks git for the toplevel;
+// this is what it does with the answer.
+describe('the ledger path of a checkout', () => {
+  it('resolves the relative ledger against the toplevel it was given', () => {
+    expect(ledgerPathFrom('/repo/.claude/worktrees/point-780', '/repo')).toBe(
+      resolve('/repo/.claude/worktrees/point-780', LEDGER_RELATIVE_PATH),
+    )
+  })
+
+  it('falls back to the module root when git names no toplevel', () => {
+    for (const empty of [null, undefined, '', '   ']) {
+      expect(ledgerPathFrom(empty, '/repo')).toBe(resolve('/repo', LEDGER_RELATIVE_PATH))
+    }
+  })
+
+  it('answers relatively rather than throwing when there is no root at all', () => {
+    expect(ledgerPathFrom('', '')).toBe(LEDGER_RELATIVE_PATH)
   })
 })

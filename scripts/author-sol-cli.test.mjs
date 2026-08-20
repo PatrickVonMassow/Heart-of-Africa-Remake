@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -70,6 +70,41 @@ describe('author-sol records a commission before dispatch', () => {
     const retry = recordAuthoringCommission({ ...input, records: [first.record] })
     expect(retry).toEqual({ written: false, record: first.record })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
+  })
+
+  it('leaves the ledger byte-identical when the commit that seals the append fails', () => {
+    // THE HALF-STATE THE RECORD EXISTS TO PREVENT (point 780). A commission that
+    // aborts before the authoring starts must not leave a line claiming it ran:
+    // two governing rules count rounds out of this append-only file.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-commission-rollback-'))
+    dirs.push(dir)
+    const ledger = join(dir, 'mechanism-reviews.jsonl')
+    const priorLine = `${JSON.stringify({ sha: 'a'.repeat(40), kind: 'note' })}\n`
+    writeFileSync(ledger, priorLine)
+    const before = readFileSync(ledger)
+
+    const input = {
+      records: [],
+      point,
+      round: 0,
+      framing: AUTHORING_FRAMINGS[0],
+      sha: 'b'.repeat(40),
+      now: 1_787_130_000_000,
+      append: (record) => appendFileSync(ledger, `${JSON.stringify(record)}\n`),
+      commit: () => {
+        throw new Error('git add -- … is outside repository')
+      },
+      rollback: () => writeFileSync(ledger, before),
+    }
+    expect(() => recordAuthoringCommission(input)).toThrow(/outside repository/)
+    expect(readFileSync(ledger)).toEqual(before)
+    expect(readFileSync(ledger, 'utf8')).toBe(priorLine)
+
+    // …and the SAME commission succeeds once the commit can run, so the rollback
+    // undoes the append rather than poisoning the round.
+    const sealed = recordAuthoringCommission({ ...input, commit: () => {}, rollback: () => {} })
+    expect(sealed.written).toBe(true)
+    expect(readFileSync(ledger, 'utf8').trim().split('\n')).toHaveLength(2)
   })
 
   it('refuses to rewrite the framing already recorded for a round', () => {

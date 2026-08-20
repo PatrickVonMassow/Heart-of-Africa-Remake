@@ -8,21 +8,23 @@
 // The spawned cases are all READ-ONLY: `--list` reads the tracked ledger and the
 // refusals exit before any write, so this suite can run against the real
 // checkout without touching it.
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
   appendRecord,
   buildRecord,
+  gitToplevel,
   KNOWN_FLAGS,
   readRecords,
+  recordsPathFor,
   resolveCommit,
   reviewFileSetKey,
   usage,
 } from './mechanism-review.mjs'
-import { MODES, VERDICTS } from './mechanism-review-core.mjs'
+import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
 const run = (...args) =>
@@ -999,5 +1001,57 @@ describe('a boundary resolves against the object database, not against refs', ()
     // ambiguity fail open, which is the one direction this check must not fail.
     const run = runner({ objects: [OBJECT, SIBLING], unreadable: [SIBLING] })
     expect(() => resolveCommit(PREFIX, { run })).toThrow(/cannot read/)
+  })
+})
+
+// THE LEDGER FOLLOWS THE CHECKOUT THE COMMAND RUNS IN (point 780).
+//
+// It was pinned to the module's own directory, so a command invoked by its
+// main-tree path from an isolation worktree — which is where CLAUDE.md §6 sends
+// every delegated author — appended to the MAIN tree and then failed to commit
+// it there. These cases build a real repository with a real worktree, because
+// the defect lives exactly in the difference between the two.
+describe('the ledger path follows the working directory', () => {
+  const tempDirs = []
+  const git = (cwd, ...args) => {
+    const res = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
+    if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`)
+    return (res.stdout ?? '').trim()
+  }
+
+  afterEach(() => {
+    while (tempDirs.length) rmSync(tempDirs.pop(), { recursive: true, force: true })
+  })
+
+  const repoWithWorktree = () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-ledger-cwd-'))
+    tempDirs.push(root)
+    const main = join(root, 'main')
+    mkdirSync(main, { recursive: true })
+    git(main, 'init', '-q', '-b', 'main')
+    git(main, 'config', 'user.email', 'test@example.invalid')
+    git(main, 'config', 'user.name', 'Test')
+    writeFileSync(join(main, 'seed.txt'), 'seed\n')
+    git(main, 'add', '-A')
+    git(main, 'commit', '-q', '-m', 'seed')
+    const worktree = join(root, 'wt')
+    git(main, 'worktree', 'add', '-q', '-b', 'feat/x', worktree)
+    return { main, worktree }
+  }
+
+  it('resolves to the worktree from a worktree and to the main checkout from the main tree', () => {
+    const { main, worktree } = repoWithWorktree()
+    // realpathSync: macOS hands out /var symlinks for temp directories, and git
+    // answers with the resolved form — the comparison, not the code, needs it.
+    expect(recordsPathFor(worktree)).toBe(resolve(realpathSync(worktree), LEDGER_RELATIVE_PATH))
+    expect(recordsPathFor(main)).toBe(resolve(realpathSync(main), LEDGER_RELATIVE_PATH))
+    expect(recordsPathFor(worktree)).not.toBe(recordsPathFor(main))
+  })
+
+  it('falls back to the module root outside any checkout', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'hoa-ledger-nogit-'))
+    tempDirs.push(outside)
+    expect(gitToplevel(outside)).toBe('')
+    expect(recordsPathFor(outside)).toBe(resolve(process.cwd(), LEDGER_RELATIVE_PATH))
   })
 })

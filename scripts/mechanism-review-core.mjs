@@ -17,6 +17,8 @@
 // scripts/mechanism-review-guard.mjs (fail-open) and the record CLI
 // scripts/mechanism-review.mjs. Pinned by mechanism-review-core.test.mjs.
 
+import { resolve } from 'node:path'
+
 // What a co-author trailer naming a MODEL looks like. It is the author
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
@@ -164,6 +166,31 @@ export const LEDGER_AT_MIN_MS = 1_700_000_000_000
 export const LEDGER_AT_MAX_MS = 4_102_444_800_000
 export const ledgerAtUsable = (at) =>
   typeof at === 'number' && Number.isFinite(at) && at >= LEDGER_AT_MIN_MS && at <= LEDGER_AT_MAX_MS
+
+/** Where the tracked ledger sits inside ANY checkout of this repository. */
+export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
+
+/**
+ * The ledger of the checkout a command is ACTUALLY RUNNING IN (point 780).
+ *
+ * It used to be pinned to the module's own directory, which is the MAIN
+ * checkout whenever the command is invoked by its main-tree path — and every
+ * delegated author runs from an isolation worktree (CLAUDE.md §6). The append
+ * then landed in the main tree while the commit that seals it ran in the
+ * worktree, so `git add` refused the absolute main path as "outside repository"
+ * and the run aborted having already written a line about a commission that
+ * never started. Resolving against the git TOPLEVEL of the working directory
+ * puts the record on the point's own branch, where the comment above it always
+ * said it belonged, and it travels to `main` with the merge.
+ *
+ * `toplevel` is what `git rev-parse --show-toplevel` said; outside a checkout it
+ * says nothing, and then the module's own root is the only answer left.
+ */
+export function ledgerPathFrom(toplevel, fallbackRoot) {
+  const root = String(toplevel ?? '').trim() || String(fallbackRoot ?? '').trim()
+  if (!root) return LEDGER_RELATIVE_PATH
+  return resolve(root, LEDGER_RELATIVE_PATH)
+}
 
 /** The mechanism paths out of a commit's file list. */
 export function mechanismPathsIn(paths, opts) {

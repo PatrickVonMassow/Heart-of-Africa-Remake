@@ -18,7 +18,7 @@
 // The decisions are pure and tested (author-sol-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
 import { spawn, spawnSync } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -35,7 +35,7 @@ import {
 } from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
-import { appendRecord, readRecords, RECORDS_PATH } from './mechanism-review.mjs'
+import { appendRecord, readRecords, recordsPathFor } from './mechanism-review.mjs'
 import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -98,6 +98,7 @@ export function recordAuthoringCommission({
   now = Date.now(),
   append = () => {},
   commit = () => {},
+  rollback = () => {},
 } = {}) {
   const wanted = Number(point)
   const attempt = Number(round)
@@ -132,8 +133,18 @@ export function recordAuthoringCommission({
     at,
     atIso: new Date(at).toISOString(),
   }
+  // THE APPEND AND ITS COMMIT STAND OR FALL TOGETHER (point 780). A failed
+  // commit used to leave the appended line behind, so the append-only ledger
+  // described a commission that never ran and the next session reading it would
+  // count a round the point never had — the exact half-state this record exists
+  // to prevent, in the one file that is supposed to be the honest ledger.
   append(record)
-  commit(record)
+  try {
+    commit(record)
+  } catch (error) {
+    rollback(record)
+    throw error
+  }
   return { written: true, record }
 }
 
@@ -569,7 +580,19 @@ if (isMainModule(import.meta.url)) {
     // confirmation rather than the only evidence, and committing it now means
     // a killed authoring run cannot erase which commission was actually sent.
     const commissionSha = git(['rev-parse', 'HEAD'], { cwd, required: true })
-    const recordsPath = process.env.AUTHOR_REVIEW_RECORDS_FILE || RECORDS_PATH
+    // THE LEDGER OF THE CHECKOUT THIS RUN IS IN, not of the module's own tree
+    // (point 780): the commit below runs in `cwd`, so an absolute main-tree path
+    // is "outside repository" here and the whole delegated lane was shut from
+    // the only place it is meant to run. The override stays a knob for a test.
+    const recordsPath = process.env.AUTHOR_REVIEW_RECORDS_FILE || recordsPathFor(cwd)
+    // The bytes to restore if the commit fails — null means "there was no file".
+    const ledgerBefore = (() => {
+      try {
+        return readFileSync(recordsPath)
+      } catch {
+        return null
+      }
+    })()
     const commissioned = recordAuthoringCommission({
       records,
       point,
@@ -577,6 +600,13 @@ if (isMainModule(import.meta.url)) {
       framing: authoringStep.framing,
       sha: commissionSha,
       append: (record) => appendRecord(record, recordsPath),
+      rollback: () => {
+        if (ledgerBefore === null) rmSync(recordsPath, { force: true })
+        else writeFileSync(recordsPath, ledgerBefore)
+        // `-A` so a ledger that did not exist before is UNSTAGED again rather
+        // than left staged as an addition of a file that is now gone.
+        git(['add', '-A', '--', recordsPath], { cwd })
+      },
       commit: () => {
         git(['add', '--', recordsPath], { cwd, required: true })
         git(
