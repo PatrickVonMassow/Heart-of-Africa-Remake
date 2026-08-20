@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 18:52 · Quellen-Fingerprint: `ea94b2526c8b…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 20:00 · Quellen-Fingerprint: `6401225c5ae5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1362,7 +1362,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| State only what was just measured, with its reading time; never assert machine/repo state from a plausible model | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 75 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 76 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: ea94b2526c8b546d84129457132a77e342cea03a4983cf85bc4249575b93eb6b -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T16:52:29.633Z -->
+<!-- RETRO-FINGERPRINT: 6401225c5ae572c7c03a8c9a8c30b0aef766a53041c659c2d0a4c99c38139cc0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T18:00:51.344Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2212,3 +2212,27 @@ ein anderer denselben Text PRÜFT, ohne dass eine Seite die andere kennt. Prüff
 Mechanismus, der eine Ausgabe diktiert: *Wer prüft diese Ausgabe später — und ist das Diktat schon
 gegen dessen Regel gehalten worden?* Wo ein Text vorgeschrieben wird, gehört sein eigener Prüfer in
 den Test des Vorschreibenden.
+
+### 3.141 Die vorgesehene Ausnahme hatte keinen Befehl — und der ehrliche Wortlaut fiel durch
+
+Am 20.08.2026 hat der Nutzer verlangt, den Demo-Tag auf den aktuellen Stand zu ziehen, obwohl
+für diesen Commit kein Closing gelaufen war. Das Tor sieht diesen Fall ausdrücklich vor; sein
+eigener Verweigerungstext sagt, ein vom Nutzer erlassener Schritt werde ALS Verzicht vermerkt.
+Nur gibt es dafür keinen Befehl: Der Verzicht wird als dreizehn einzelne Schritt-Eintragungen
+getippt, jede mit derselben Begründung. Und ein Schritt prüft zusätzlich die Reihenfolge — er
+verlangt im Beweistext einen Commit oder einen maschinenlesbaren Zeitstempel. Der ehrliche
+Wortlaut (»NICHT GELAUFEN — vom Nutzer erlassen«) fiel damit durch, während ein Satz, der wie
+ein Laufnachweis klingt, angenommen wird.
+
+Das ist eine eigene Klasse neben der fehlenden Ausnahme: Die Ausnahme EXISTIERT, sie ist sogar
+im Verweigerungstext benannt — aber sie ist nur als Prosa vorgesehen und nirgends als Weg
+gebaut. Wer sie nimmt, muss sie in die Formulare des Normalfalls pressen, und die Prüfung des
+Normalfalls misst den Ausnahmefall dann an Merkmalen, die er per Definition nicht haben kann.
+Der Ausweg, den die Mechanik übrig lässt, ist ausgerechnet der unehrliche: den Verzicht so zu
+schreiben, dass er wie eine Erledigung aussieht — genau die Verwechslung, die das Protokoll
+verhindern soll.
+
+**Lehre:** Eine Ausnahme, die ein Mechanismus im Text zugesteht, braucht einen eigenen Zustand
+und einen eigenen Befehl, nicht den Eintragungsweg des Normalfalls. Prüffrage: *Kann der
+ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?* Wenn nicht, ist die Ausnahme
+nicht gebaut, sondern nur behauptet, und der Mechanismus erzieht zum Schönschreiben.
