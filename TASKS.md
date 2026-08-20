@@ -1289,7 +1289,8 @@ put it is the mistake this line exists to stop.
   charge ledger (point 550) was built to abolish. It was deferred on 19.08.2026 with that reason
   named, so point 732 could land; the defer is a logged exception, not a pass.
   IT WAS ALREADY MEASURED ONCE, IN AN EARLIER WINDOW (14.08.2026, 04:20, on `main` at b4c0bc36
-  while closing point 666): eleven recorded runs failed with nothing to explain them — `settings`
+  while closing point 666): eleven recorded runs failed with nothing to explain them, and they
+  belonged to no work that session did — `settings`
   on WebGPU (13.08., 15:24 and 23:19-23:22, 18-19 reds each), `collision` on WebGPU (3 reds),
   `flow` on WebGPU ("the run ended in a crash, not in its own report") and `settings` on WebGL 2 —
   and four of them carried the same cap line, `103 further result line(s) exceeded the capture
@@ -1324,8 +1325,14 @@ put it is the mistake this line exists to stop.
   as an incomplete recording and not as an unexplained red; a genuinely unexplained red still
   blocks; a closed incomplete recording no longer blocks a later render edit. Plus the real proof:
   the 17.08. runs stop blocking without a `--defer`.
-  Criticality: medium — it blocks no player-visible behaviour, but it disarms the gate that keeps
-  the picture honest, and a gate whose only exit is a hand waiver decays into a formality.
+  Plus at the RECORDER: a Vitest case proving that a run past the cap still carries a chargeable
+  NAME for every red it reports — a red whose name is gone can be charged by nobody, which is the
+  whole trap — and `node scripts/render-verify-guard.mjs --status` on a quiet machine showing no
+  unexplained run left in the window.
+  Criticality: high — it is the release branch's picture gate: while it stands, every turn either
+  blocks or waves reds through with a deferral, which is how a real regression slips past. It
+  breaks no player-visible behaviour itself, but a gate whose only exit is a hand waiver decays
+  into a formality.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 733. The loading picture freezes about twice as long as its own budget allows (measured
