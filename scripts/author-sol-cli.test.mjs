@@ -44,7 +44,10 @@ function examine(records) {
     cwd,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
+    // Examination intentionally runs before an authoring worktree exists, so
+    // it gives the management checkout explicitly instead of asking the live
+    // script's source path to override its cwd.
+    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
   })
 }
 

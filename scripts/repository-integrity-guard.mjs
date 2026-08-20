@@ -17,9 +17,14 @@ export function repositoryStatePaths(root = process.cwd()) {
   return { checkout, commonDir, configPath: resolve(commonDir, 'config'), headPath }
 }
 
-/** Byte-for-byte state whose mutation makes a unit run unsafe. */
+/** Byte-for-byte state whose mutation makes a unit run unsafe.
+ *
+ * Remote-tracking refs are deliberately outside the boundary: the authoring
+ * harness pushes this branch every two minutes and updates origin/* in this
+ * same shared repository. Fixture damage has always landed under refs/heads;
+ * those are the refs a local git command can move without network activity. */
 export function repositoryState(paths) {
-  const refs = execFileSync('git', ['--git-dir', paths.commonDir, 'for-each-ref'], {
+  const refs = execFileSync('git', ['--git-dir', paths.commonDir, 'for-each-ref', 'refs/heads'], {
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   })

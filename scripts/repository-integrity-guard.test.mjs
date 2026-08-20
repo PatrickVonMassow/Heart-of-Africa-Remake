@@ -42,6 +42,12 @@ describe('unit-suite repository integrity guard', () => {
     expect(verify).toThrow(/refs changed/)
   })
 
+  it('ignores remote-tracking updates made by the external branch pusher', () => {
+    const verify = protectRepository(repo)
+    runGit('update-ref', 'refs/remotes/origin/main', 'HEAD')
+    expect(verify).not.toThrow()
+  })
+
   it('fails when the shared repository config changes', () => {
     const paths = repositoryStatePaths(repo)
     const verify = protectRepository(repo)
