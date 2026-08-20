@@ -567,6 +567,15 @@ describe('docs/document-cut-757.md — the measured floors', () => {
           return path
         }
       }
+      // ABSOLUTE FIRST, canonical second. Canonicalizing before the check undid
+      // it: a recorded `.` resolved to the runner's own root and was accepted as
+      // owner evidence, so the core's refusal of relative paths never saw it
+      // (review 9d1cfcb). The unit cases pass paths straight in and could not
+      // catch this — it lives only on the integration path.
+      expect(
+        String(first.cwd).startsWith('/'),
+        `${r.transcript} records a relative cwd (${first.cwd}), which is no evidence of any tree`,
+      ).toBe(true)
       const kind = sessionKindOf({ cwd: canon(first.cwd), prompt, root: realpathSync(ROOT) })
       expect(
         kind,
