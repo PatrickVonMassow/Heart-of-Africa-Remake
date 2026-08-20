@@ -55,7 +55,10 @@ function readClaim() {
  */
 export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
   const standing = claim === undefined ? readClaim() : claim
-  if (!standing) {
+  // A RELEASED claim is not a standing one — `claimStands` says so, and reporting
+  // a released record as "not judged" or as another session's claim told the
+  // reader the guard might fire when it cannot (cross-vendor review, 20.08.2026).
+  if (!standing || standing.releasedAt) {
     return { applicable: false, why: 'no claim stands, so nothing could be refused' }
   }
   // A claim EXISTS but we do not know who is asking: that is not a clean skip.

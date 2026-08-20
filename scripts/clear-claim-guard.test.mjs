@@ -24,7 +24,6 @@ describe('invitesClear — what counts as asking the user to end the session', (
     for (const text of [
       'Starte eine neue Sitzung, die den Rest aufnimmt.',
       'Beginne bitte eine frische Sitzung.',
-      'Nimm den Rest in einer neuen Sitzung auf.',
     ]) {
       expect(invitesClear(text), text).toBe(true)
     }
@@ -83,6 +82,10 @@ describe('invitesClear — what counts as asking the user to end the session', (
       'Der Kontext ist nicht mehr nötig, starte eine neue Sitzung.',
       'Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.',
       'Danach mach bitte einen Clear.',
+      // Structurally identical to "Starte den Test für eine neue Sitzung", which
+      // is NOT an invitation: an object and a preposition stand between the verb
+      // and the session. No pattern separates the two, so both pass.
+      'Nimm den Rest in einer neuen Sitzung auf.',
     ]) {
       expect(invitesClear(text), text).toBe(false)
     }
@@ -102,6 +105,17 @@ describe('invitesClear — what counts as asking the user to end the session', (
     expect(invitesClear('Jetzt arbeite ich weiter, der Befehl /clear leert den Kontext.')).toBe(false)
     expect(invitesClear('Der Negativtest verwendet den Satz „Mach bitte /clear“.')).toBe(false)
     expect(invitesClear('Mach bitte `/clear`.')).toBe(true)
+  })
+
+  it('does not read a quoted or fenced fixture as an order, in any of its forms', () => {
+    for (const text of [
+      '`Mach bitte einen clear` ist der Positivfall.',
+      '`Starte eine neue Sitzung` ist der Positivfall.',
+      'Starte den Test für eine neue Sitzung.',
+      'Positivfixture:\n```\n/clear\n```',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
   })
 
   it('does not read a verb-first CONDITIONAL as an order', () => {
@@ -229,6 +243,16 @@ describe('gatherClearClaimCondition — what the preflight reports', () => {
     const got = gatherClearClaimCondition({ sessionId: SID, claim: null })
     expect(got.applicable).toBe(false)
     expect(got.cause).toBeUndefined()
+  })
+
+  it('is not applicable when the record is a RELEASED claim, whatever the session', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const released = claim({ releasedAt: Date.parse('2026-08-20T09:00:00.000Z') })
+    for (const sid of [SID, '']) {
+      const got = gatherClearClaimCondition({ sessionId: sid, claim: released })
+      expect(got.applicable, sid || '(no session)').toBe(false)
+      expect(got.cause, sid || '(no session)').toBeUndefined()
+    }
   })
 
   it('is not applicable when the standing claim is another session’s', async () => {

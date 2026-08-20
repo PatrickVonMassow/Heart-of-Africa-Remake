@@ -58,12 +58,17 @@ const SUBJECT = String.raw`(?!\s+(?:ich|du|er|sie|es|wir|ihr|man)\b)`
 // A 40-character wildcard let an object slip in — "Führe den Test für /clear aus"
 // is an order about something else entirely — and only these few words can stand
 // between an imperative and its object without changing what is being ordered.
-const FILLER = String.raw`(?:\s+(?:bitte|jetzt|nun|dann|danach|noch|mal|am\s+besten|zuerst|gleich))*\s*`
+const FILLER = String.raw`(?:\s+(?:bitte|jetzt|nun|dann|danach|noch|mal|am\s+besten|zuerst|gleich|z\.\s*B\.|zum\s+Beispiel))*\s*`
+// An article may stand between the verb and the object, and nothing else.
+const ARTICLE = String.raw`(?:(?:eine|einen|die|den|nen)\s+)?`
 
 // And nothing substantive may follow the command, or the clause is ABOUT it
 // rather than asking for it: "`Mach bitte /clear` ist der Positivfall" quotes the
 // order inside a sentence that makes a claim.
-const TAIL = String.raw`[\s.!?)»"'\u201c\u201d\u0060]*$`
+// A German separable prefix belongs to the verb and may stand after the object:
+// "führe einen clear AUS". It is part of the order, not something after it.
+const PREFIX = String.raw`(?:\s+(?:aus|an|auf|durch|weiter|nach))?`
+const TAIL = String.raw`${PREFIX}[\s.!?)»"'\u201c\u201d\u0060]*$`
 
 /** A clause that IS the slash command, or leads with an imperative carrying it. */
 const SLASH_CLEAR = new RegExp(
@@ -75,15 +80,21 @@ const SLASH_CLEAR = new RegExp(
 // the command: "mach einen clear" is the instruction, "mach das Bild clear" is an
 // adjective and an unrelated editing order (cross-vendor review, 20.08.2026).
 const ARTICLED_CLEAR = new RegExp(
-  String.raw`^${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}(?:einen|den|nen)\s+clear\b`,
+  String.raw`^${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}(?:einen|den|nen)\s+clear\b${TAIL}`,
   'i',
 )
 
 export const CLEAR_INVITATION = Object.freeze([
   SLASH_CLEAR,
   ARTICLED_CLEAR,
-  new RegExp(String.raw`^${LEAD}(?:${IMPERATIVE})${SUBJECT}\b[^\n]{0,40}?\b${SESSION}\b`, 'i'),
-  new RegExp(String.raw`^${LEAD}(?:${POLITE})\b[^\n]{0,40}?\b${SESSION}\b`),
+  new RegExp(
+    String.raw`^${LEAD}(?:${IMPERATIVE})${SUBJECT}\b${FILLER}${ARTICLE}${SESSION}\b${TAIL}`,
+    'i',
+  ),
+  new RegExp(String.raw`^${LEAD}(?:${POLITE})\b${FILLER}${ARTICLE}${SESSION}\b${TAIL}`),
+  // English keeps no end constraint: a trailing prepositional phrase is ordinary
+  // there ("… for the rest"), and the quoted-fixture case it would guard against
+  // is already handled by stripping quotations and fenced code.
   /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
 ])
 
@@ -104,6 +115,10 @@ const NEGATOR = /\b(?:kein|keine|keinen|keinem|keines|keiner|nicht|niemals|nie)\
  */
 function withoutQuotations(text) {
   return String(text ?? '')
+    // Fenced code first, or its own backticks would be unwrapped line by line and
+    // a fixture inside it would read as an order (cross-vendor review, 20.08.2026).
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/~~~[\s\S]*?~~~/g, ' ')
     .replace(/„[^“\n]*“/g, ' ')
     .replace(/»[^«\n]*«/g, ' ')
     .replace(/"[^"\n]*"/g, ' ')
