@@ -11,6 +11,7 @@ import {
   CUT_SOURCES,
   parseCutAccount,
   evaluateCutAccount,
+  accountDestinationFault,
   isExternalDestination,
   userTreeRootOf,
   wiredGuards,
@@ -235,24 +236,42 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     expect(isExternalDestination('/anywhere/at/all.md', '/')).toBe(false)
   })
 
-  it('names the user tree whose absence excuses a missing destination', () => {
+  it('excuses only a destination written against this machine\'s own user tree', () => {
     const HOME = '/home/node'
     expect(userTreeRootOf('~/.claude/projects/x/memory/a.md', HOME)).toBe('/home/node/.claude')
-    expect(userTreeRootOf('~', HOME)).toBe('/home/node/.claude')
-    expect(userTreeRootOf('/home/node/.claude/projects/-workspace-hoa-/memory/b.md', HOME)).toBe(
-      '/home/node/.claude',
-    )
-    // A different user's tree is still a tree, and its own root is what counts.
-    expect(userTreeRootOf('/home/runner/.claude/x.md', HOME)).toBe('/home/runner/.claude')
-    // No tree: absence is a real finding on any machine, so nothing excuses it.
+    expect(userTreeRootOf('~/.claude', HOME)).toBe('/home/node/.claude')
+    // Outside `.claude` nothing is excused, however it is written.
+    expect(userTreeRootOf('~/missing.md', HOME)).toBe('')
+    expect(userTreeRootOf('~', HOME)).toBe('')
+    // A machine-absolute path earns no excuse — it cannot be told from a typo
+    // of one, which is why the account refuses the form outright.
+    expect(userTreeRootOf('/home/node/.claude/projects/x/memory/b.md', HOME)).toBe('')
+    expect(userTreeRootOf('/home/runnre/.claude/x.md', HOME)).toBe('')
     expect(userTreeRootOf('/missing/file.md', HOME)).toBe('')
     expect(userTreeRootOf('docs/batch-owner-runbook.md', HOME)).toBe('')
     expect(userTreeRootOf('', HOME)).toBe('')
     expect(userTreeRootOf(undefined, HOME)).toBe('')
     // `.claude` must be a whole segment, not a prefix of one.
-    expect(userTreeRootOf('/home/node/.claudex/a.md', HOME)).toBe('')
+    expect(userTreeRootOf('~/.claudex/a.md', HOME)).toBe('')
     // Without a home there is nothing to expand a `~` against.
     expect(userTreeRootOf('~/.claude/a.md', '')).toBe('')
+  })
+
+  it('refuses a destination that names a machine instead of a place', () => {
+    expect(accountDestinationFault('docs/batch-owner-runbook.md', ROOT)).toBe('')
+    expect(accountDestinationFault(`${ROOT}/docs/x.md`, ROOT)).toBe('')
+    expect(accountDestinationFault('~/.claude/projects/x/memory/a.md', ROOT)).toBe('')
+    expect(accountDestinationFault('~', ROOT)).toBe('')
+    expect(accountDestinationFault('/home/node/.claude/x.md', ROOT)).toMatch(/names a machine/)
+    expect(accountDestinationFault('/anywhere/at/all.md', ROOT)).toMatch(/names a machine/)
+    expect(accountDestinationFault('', ROOT)).toMatch(/empty/)
+  })
+
+  it('has no machine-absolute destination in the shipped account', () => {
+    for (const e of entries) {
+      const path = e.destination.split(/\s+§|\s+#/)[0].replace(/^`|`$/g, '').trim()
+      expect([path, accountDestinationFault(path, ROOT)]).toEqual([path, ''])
+    }
   })
 
   // The index lives in the user's home, so a runner without that tree cannot
@@ -260,22 +279,36 @@ describe('docs/document-cut-757.md — the shipped account', () => {
   // destination IS judgeable anywhere, so it is judged here and the reachability
   // case below adds the real check on every machine that carries the index,
   // which is every machine that runs the batch.
+  // Selected by SOURCE and rule alone. Filtering by the destination's shape and
+  // then asserting that shape proves nothing: a malformed one would drop out of
+  // the set it was meant to fail.
+  const memoryHooks = () => entries.filter((e) => e.source === 'MEMORY.md' && /\bhooks?\b/i.test(e.rule))
+
   it('keeps every moved memory-topic hook well formed even where the index cannot be read', () => {
-    const hooks = entries.filter(
-      (e) => e.source === 'MEMORY.md' && /\bhooks?\b/i.test(e.rule) && /\/memory\/[^/]+\.md$/.test(e.destination),
-    )
+    const hooks = memoryHooks()
     expect(hooks.length).toBeGreaterThan(0)
     for (const hook of hooks) {
-      expect(hook.account).toBe('MOVED')
-      expect(hook.destination).toMatch(/^(?:~|\/)[^\s]*\/memory\/[a-z0-9-]+\.md$/)
+      // A hook either moved into a repository document — the owner runbook took
+      // thirteen of them — or into its own topic file under the user's memory
+      // directory. Both are judgeable forms; a machine-absolute path is not.
+      expect([hook.rule, hook.account]).toEqual([hook.rule, 'MOVED'])
+      const path = hook.destination.split(/\s+§|\s+#/)[0].replace(/^`|`$/g, '').trim()
+      expect([path, accountDestinationFault(path, ROOT)]).toEqual([path, ''])
+      expect(path).toMatch(/^(?:docs\/[a-z0-9-]+\.md|~\/[^\s]*\/memory\/(?:[a-z0-9-]+\.md)?)$/)
     }
+  })
+
+  // A missing index may only excuse this case where the index CANNOT be there.
+  // Skipping on the file's own absence also skipped on a machine that carries
+  // the user tree under a different project key — exactly where a moved hook
+  // would silently stop being reachable.
+  it('is only unable to read the memory index where there is no user tree at all', () => {
+    if (!existsSync(MEMORY_PATH)) expect(existsSync(resolve(homedir(), '.claude'))).toBe(false)
   })
 
   it.skipIf(!existsSync(MEMORY_PATH))('keeps every moved memory-topic hook reachable from the index', () => {
     const memory = readFileSync(MEMORY_PATH, 'utf8')
-    const hooks = entries.filter(
-      (e) => e.source === 'MEMORY.md' && /\bhooks?\b/i.test(e.rule) && /\/memory\/[^/]+\.md$/.test(e.destination),
-    )
+    const hooks = memoryHooks().filter((e) => /\/memory\/[^/]+\.md$/.test(e.destination))
     expect(hooks.length).toBeGreaterThan(0)
     for (const hook of hooks) {
       const topic = hook.destination.split('/').at(-1)

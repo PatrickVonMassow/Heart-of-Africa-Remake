@@ -69,7 +69,7 @@ this is a recurring document saving, not a different order of magnitude.
 - `MEMORY.md` :: U47 dead halves of Fable and provider-volume entries :: DROPPED -> user ruling 20.08.2026: delete DEAD and ended clauses while keeping live hooks
 - `MEMORY.md` :: U49 solved parallel-session incident :: MOVED -> docs/batch-singleton-analysis.md
 - `MEMORY.md` :: U50 corrected WebGPU headless detail :: MOVED -> ~/.claude/projects/-workspace-hoa/memory/webgpu-testable-headless.md
-- `MEMORY.md` :: U51 findings-carrier path derivation and workflow :: MOVED -> /home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md
+- `MEMORY.md` :: U51 findings-carrier path derivation and workflow :: MOVED -> ~/.claude/projects/-workspace-hoa-/memory/findings-carrier.md
 - `MEMORY.md` :: U52 project-path index duplicate :: COVERED -> path-scope-guard
 - `MEMORY.md` :: U52 container-work index duplicate :: COVERED -> container-ask-guard
 - `MEMORY.md` :: U52 chat-timestamp index duplicate :: COVERED -> timestamp-guard

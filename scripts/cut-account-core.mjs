@@ -147,18 +147,42 @@ export function isExternalDestination(path, root = '') {
 }
 
 /**
- * The user-level tree an EXTERNAL destination belongs to, or '' when it belongs
- * to none. This is what decides whether absence is evidence: a destination
- * inside a `.claude` tree that is not on this machine cannot be judged here,
- * while `/missing/file.md` names no such tree and its absence is a real finding
- * anywhere. Pure — the caller does the existence test.
+ * The user-level tree whose ABSENCE would excuse this destination, or '' when
+ * nothing excuses it. Only THIS machine's `~/.claude` qualifies, and only for a
+ * destination written against it: a runner without that tree cannot judge such a
+ * path, so its absence is no evidence there.
+ *
+ * Everything else is judged normally, deliberately. A machine-absolute
+ * `/home/someone/.claude/…` is indistinguishable from a typo of it, so it earns
+ * no excuse — `accountDestinationFault` refuses that form outright, which is why
+ * this function never has to guess. `~/missing.md` sits outside `.claude` and is
+ * judged; bare `~` is the home directory itself and is judged.
+ *
+ * Pure — the caller does the existence test.
  */
 export function userTreeRootOf(path, home = '') {
+  const p = posix.normalize(String(path ?? '').trim() || '.')
+  const h = String(home ?? '')
+    .trim()
+    .replace(/(?!^)\/+$/, '')
+  if (!h) return ''
+  if (p !== '~/.claude' && !p.startsWith('~/.claude/')) return ''
+  return posix.join(h, '.claude')
+}
+
+/**
+ * Why this destination may not stand in the account, or '' when it may. The
+ * account is read on machines that share no home directory, so a destination
+ * must be either repository-relative or written against `~`. An absolute path
+ * into somebody's home names a machine rather than a place, and no reader
+ * elsewhere can tell it from a misspelling of one.
+ */
+export function accountDestinationFault(path, root = '') {
   const p = String(path ?? '').trim()
-  const h = String(home ?? '').trim().replace(/\/+$/, '')
-  if (p === '~' || p.startsWith('~/')) return h ? posix.join(h, '.claude') : ''
-  const m = /^(\/.*?\/\.claude)(?:\/|$)/.exec(posix.normalize(p))
-  return m ? m[1] : ''
+  if (!p) return 'the destination is empty'
+  if (p === '~' || p.startsWith('~/')) return ''
+  if (!isExternalDestination(p, root)) return ''
+  return 'an absolute destination outside the repository names a machine, not a place — write it against `~`'
 }
 
 /** Every guard basename actually wired into a hook chain of the settings object. */
