@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import {
   ACCOUNTS,
   CUT_SOURCES,
@@ -34,16 +34,22 @@ const fullPath = (path) => {
   const expanded = expandDestination(path, homedir())
   return expanded.startsWith('/') ? expanded : resolve(ROOT, expanded)
 }
-// Absence is evidence only where the file could have been — which is its own
-// PARENT DIRECTORY, not the user tree in general. Keying on `~/.claude` made the
-// same missing destination a finding on a machine with an unrelated, partly
-// populated home and an excuse on one without it. Where the directory exists the
-// file is genuinely missing and must be reported; where it does not, this
-// machine was never going to carry it. Anything outside the user tree —
-// including a repository path — is judged unconditionally.
+// Absence is evidence wherever this project's user-level memory directory is
+// present, and nowhere else. The anchor is that ONE fixed directory on purpose:
+// keying on `~/.claude` in general made an unrelated, partly populated home
+// fail, and keying on the destination's OWN parent let a misspelled directory
+// component excuse itself — the very typo the check exists to catch. A fixed
+// anchor cannot be moved by the string being judged. Anything outside the user
+// tree, a repository path included, is judged unconditionally.
+//
+// RESIDUAL, and it is irreducible: on a machine without that directory — every
+// CI runner — no `~/…` destination is checked at all. This is a REFUSED READ,
+// not a missed write: the two documents concerned are the user's and cannot be
+// checked in. The batch machine, which is where the account is read and where a
+// cut is made, carries the directory and checks every one of them.
 const judgeable = (path) => {
   const tree = userTreeRootOf(path, homedir())
-  return !tree || existsSync(dirname(fullPath(path)))
+  return !tree || existsSync(MEMORY_DIR)
 }
 
 const line = (where, rule, account, dest) => `- \`${where}\` :: ${rule} :: ${account} -> ${dest}`
