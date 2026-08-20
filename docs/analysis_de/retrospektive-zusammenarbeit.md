@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 14:58 · Quellen-Fingerprint: `228f39acdd07…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 15:57 · Quellen-Fingerprint: `9d7ca8d29b0b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 74 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 74 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 228f39acdd07d72dc83dd69ba1150b9f87bad64e952cdba9928a46746ffd8994 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T12:58:10.252Z -->
+<!-- RETRO-FINGERPRINT: 9d7ca8d29b0b2ad634de9ff19506442b779ea5742a6737416a060144fcfcf7e4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T13:57:54.174Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
