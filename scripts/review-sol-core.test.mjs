@@ -35,6 +35,9 @@ import {
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
 } from './review-sol-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
 
 const solSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
   `I checked the change.\n\nVERDICT: ${verdict}\nEVIDENCE: ${evidence}\n`
@@ -342,6 +345,17 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
       FALLBACK_MODEL_NAME,
     )
     expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
+  })
+
+  it('removes Fable from both review directions while the shared switch refuses it', () => {
+    const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
+    expect(decideReview({ ...failed, fableState: FABLE_OFF }).model).toBe('Opus 5')
+    expect(fallbackReviewerFor('', FABLE_OFF)).toBe('Opus 5')
+    expect(claudeReviewerFor(['GPT-5.6 Sol', 'Opus 5'], FABLE_OFF)).toBe('Opus 4.8')
+    expect(decideReview({ ...failed, authorModel: ['Opus 5', 'Opus 4.8'], fableState: FABLE_OFF })).toMatchObject({
+      model: '',
+      chain: ['Opus 5', 'Opus 4.8'],
+    })
   })
 
   it('looks at EVERY author in the reviewed range, and picks one that wrote none of it', () => {

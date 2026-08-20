@@ -8,6 +8,8 @@ export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
 export const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5'
 export const SOL_MODEL = 'GPT-5.6 Sol'
+export const FABLE_MODEL_ID = 'claude-fable-5'
+export const OPUS_FALLBACK_MODEL_ID = 'claude-opus-4-8[1m]'
 
 const MAX_TIMESTAMP = 8.64e15
 
@@ -93,6 +95,11 @@ export function fableIsOn(value) {
 /** The Claude serving chain in force. */
 export function servingChain(value) {
   return Object.freeze(['Opus 5', ...(fableIsOn(value) ? [FABLE_MODEL] : []), 'Opus 4.8'])
+}
+
+/** The launcher CLI's first fallback model, from the same serving chain. */
+export function servingFallbackModelId(value) {
+  return fableIsOn(value) ? FABLE_MODEL_ID : OPUS_FALLBACK_MODEL_ID
 }
 
 /** The session-start policy sentence, with both sides derived from one state. */

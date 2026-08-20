@@ -11,6 +11,7 @@ import {
   readState,
   requireState,
   servingChain,
+  servingFallbackModelId,
   servingPolicyLine,
   statePathFrom,
   statusReport,
@@ -61,6 +62,8 @@ describe('decisions derived from the state', () => {
   it('includes Fable in the serving chain only while on', () => {
     expect(servingChain(on())).toEqual(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
     expect(servingChain(off())).toEqual(['Opus 5', 'Opus 4.8'])
+    expect(servingFallbackModelId(on())).toBe('claude-fable-5')
+    expect(servingFallbackModelId(off())).toBe('claude-opus-4-8[1m]')
   })
 
   it('builds the serving briefing and forbidden names from the same direction', () => {
