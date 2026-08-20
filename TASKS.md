@@ -170,6 +170,125 @@ put it is the mistake this line exists to stop.
   against the union before anything is deleted.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 775. Answer the cross-vendor review of the commit-time guard registration (GPT-5.6 Sol,
+  20.08.2026, verdict **do-not-merge** on both passes of `5ce597cf`, recorded in
+  `.claude/mechanism-reviews.jsonl`). The mechanism landed before the review concluded, so its
+  findings are owed as work rather than as a merge decision. Three stand against
+  `scripts/guard-registration-core.mjs`, and all three are real:
+  1. A COMMENT DEFEATS THE REGISTRY. `registeredIdsFromSource` counts every textual `id: '…'`
+     inside the block, so `// id: 'clear-claim-guard'` — or the same text in a string — registers a
+     hook that is not registered, and the wired-but-unregistered commit passes.
+  2. AN UNRECOGNISABLE REGISTRY FAILS OPEN ON A RELEVANT INPUT. A commit may wire a Stop hook while
+     deleting, emptying, renaming or breaking `GUARDS`, and the check judges nothing. The fail-open
+     direction is right for an input the check cannot READ; it is wrong when the very commit under
+     judgement is what made it unreadable. The current test pins the bypass instead of the refusal.
+  3. SINGLE QUOTES ONLY. `id: "double-quoted"` is not seen, so a mixed-quote registry yields a
+     partial list and REFUSES a hook that is in fact registered — a false block, the direction that
+     makes a tree uncommittable.
+  FINAL STATE: the registry is read so that comments and string literals cannot register anything
+  and both quote styles count; a registry the commit itself broke is a REFUSAL naming that reason,
+  while a registry this check merely cannot reach stays fail-open; and the tests assert the
+  refusals rather than the bypasses.
+  VERIFIABLE: Vitest — a commented-out entry does not register; a double-quoted entry does; a
+  commit that wires a hook and empties GUARDS is refused; an unreadable settings file still passes;
+  and the existing green cases stay green.
+  Criticality: high — this is the guard that decides whether a commit may land, and two of the
+  three findings let exactly the incident it was built for through.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 771. The claim guard was narrowed until it catches almost nothing (measured 20.08.2026,
+  10:50, on `main` at `fdd8c394`). Between 09:15 and 10:37 the guard landed at 08:29 was reworked
+  seven times — `a8f13c0d`, `19efc9d5`, `28c8e63d`, `c70f151c`, `72d832f0`, `25d1c3e7`, `0f025d89`,
+  `fdd8c394` — each round removing another way an innocent line could be refused. The two false
+  positives that started it are indeed gone. So is nearly everything else: `invitesClear` now
+  answers FALSE for »Mach bitte einen /clear und fang neu an.«, »Bitte clear die Session jetzt.«,
+  »Du kannst jetzt /clear machen.«, »Starte mit /clear neu.«, »Ein /clear wäre jetzt sinnvoll.«,
+  "Run /clear now." and "You can /clear now." Every pattern is anchored to the END of the sentence,
+  so only a line that literally stops at `/clear` matches — »Wenn du willst, mach jetzt /clear.«
+  is the one probe of nine that still fires. English imperatives are not covered at all.
+  This is the failure mode CLAUDE.md §7.2 names: a mechanism that is wrong is worse than none,
+  because the rule then COUNTS as enforced and nobody looks again.
+  FINAL STATE: the guard refuses a genuine invitation in the forms this project's replies actually
+  use — German and English, imperative or offer, with the token anywhere in the sentence — while
+  still passing a report ABOUT a past clear and a line that merely names the guard. Whatever cannot
+  be decided by shape is decided by the surrounding sentence, not by requiring the sentence to end
+  in the token.
+  VERIFIABLE: Vitest with a fixture table of BOTH kinds — every probe listed above with its
+  required verdict, refusals and passes in one table, so a later narrowing cannot silently drop a
+  refusal again. The table is the regression: it goes red the moment a round of tuning trades a
+  true positive for a false one.
+  Criticality: high — the guard governs the batch handover, and a handover lost to a guard that
+  does not fire is the incident it was built for.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 773. `cut-account-core.test.mjs` is red in every worktree and green only in the main
+  checkout (measured 20.08.2026, 10:43). The case »docs/document-cut-757.md — the measured floors >
+  takes each floor from a transcript of the kind it claims« resolves the repository root with
+  `realpathSync(ROOT)`, which in a worktree is the WORKTREE path, while the transcripts it measures
+  record `cwd=/workspace/hoa`. `sessionKindOf` then judges the tree to be neither and returns null:
+  »cwd and prompt disagree, or the tree is neither«. So the case does not measure the document-cut
+  accounting, it measures which checkout it was started from.
+  WHY IT MATTERS BEYOND ONE RED CASE: `npm run test:unit` is therefore red out of every isolated
+  worktree — which is exactly where CLAUDE.md §6 sends larger mechanisms to be built. A delegated
+  author meets a red suite it did not cause, and the honest reading of a red run (fix it, charge it,
+  or file it) costs that author a full investigation every time.
+  FINAL STATE: the case resolves the MAIN checkout — the git common directory rather than the
+  current one — so it measures the same thing from anywhere, or it skips explicitly and says why
+  when it cannot. It never passes by accident in the main tree while failing elsewhere.
+  VERIFIABLE: the suite runs green from a fresh worktree; a Vitest case pins the root resolution
+  itself, so a checkout-dependent root goes red rather than the transcript assertion downstream.
+  Criticality: medium — no product defect, but it taxes every delegated mechanism author with a red
+  suite that is not theirs.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
+  running it (measured 20.08.2026, 10:52). With the batch lock naming session
+  `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers
+  »not applicable — another live session owns the batch lock«, with or without `--session`. The
+  cause is directly measurable: `heldByOtherLiveOwner('1e85312a-…')` is `false` while
+  `heldByOtherLiveOwner('')` is `true`, so the status path evaluates with an EMPTY session id and
+  concludes the owner is somebody else. The Stop-chain path is unaffected — it passes the real id
+  and fires correctly.
+  IT IS NOT ONE GUARD. `node scripts/mechanism-review-guard.mjs --status` answers the owning
+  session with »stands down: another live session owns the batch lock« in the same breath, so the
+  defect sits in the shared status path rather than in either guard. Every `--status` reader has to
+  be checked for it, and the fix belongs where the session id is resolved, not in one caller.
+  WHY IT IS NOT COSMETIC: `--status` is what CLAUDE.md §7.2 and point 614 name as the way to READ
+  the bundle coverage. Asked by the very session that owns the batch, it answers with a stand-down
+  instead of the count, so the reading a point is verified against cannot be taken at all.
+  FINAL STATE: the status path takes the session id from the same source the hook path uses and
+  reports the bundle state for the owner; an id it genuinely cannot determine is reported as
+  unknown rather than as somebody else's lock.
+  VERIFIABLE: Vitest — status with the owning id reports the coverage; status with no id reports
+  unknown and never a stand-down; the hook path keeps its current behaviour.
+  Criticality: medium — no product defect, but it silently withholds a reading two governing
+  documents ask for.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 772. An owner session repaired its own mechanism for two hours and never handed over
+  (measured 20.08.2026; the user ended it by hand at 10:38 after asking whether it was still
+  productive). A claim was recorded at 08:32. The owner then committed at 09:15, 09:23, 09:32,
+  09:44, 10:19, 10:27 and 10:37 — eight commits, every one of them a repair of the Stop hook it had
+  landed at 08:29 — and in those 126 minutes no work-order point moved: nothing landed, nothing was
+  ticked, point 614 was never begun. It also never handed over, although
+  `gatherBatchProgressInputs` computed `claim: "release"`, `inFlight: false` for its session id
+  throughout, which is the clean state that releases. At least seven of its turn ends passed
+  without the hand-back. Its board card stood at 08:30 the whole time and announced a handover that
+  never happened, while `dashboard-guard`, `dashboard-integrity-guard` and `dashboard-sync` sat in
+  the same Stop chain.
+  TWO SEPARATE QUESTIONS, and the point owes both: WHY the hand-back did not run in that session
+  when the same guard runs it here, and WHAT BOUNDS a repair loop — a mechanism whose own follow-up
+  fixes never end has to become visible as a number, the way point 769 makes a review round count
+  visible, rather than being noticed only because the user asked.
+  FINAL STATE: a standing claim is honoured within a bounded number of the owner's turn ends or the
+  reason it is not is stated in the owner's own output; and consecutive commits that only repair
+  the same mechanism are counted and surfaced once the count leaves the ordinary range.
+  VERIFIABLE: Vitest over the pure halves — a claim that has survived N clean turn ends is
+  reported; a session whose last N commits all touch the same guard file is reported once, not
+  every turn. Plus the measured 20.08. sequence as a fixture, which must be reported by both.
+  Criticality: high — the batch stood still for two hours with a live owner, and neither the
+  handover mechanism nor the board noticed.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 764. The chat header's context reading is required by nothing, and six replies proved it
   (measured 20.08.2026, session d5fcb9cf; the user found it before we did: "Dann war es da und
   mit dem nächsten clear wieder weg"). Point 740 (archived, done 19.08.2026) put the session's
@@ -10055,122 +10174,3 @@ to land than a mechanism that needs a review.
   user.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 771. The claim guard was narrowed until it catches almost nothing (measured 20.08.2026,
-  10:50, on `main` at `fdd8c394`). Between 09:15 and 10:37 the guard landed at 08:29 was reworked
-  seven times — `a8f13c0d`, `19efc9d5`, `28c8e63d`, `c70f151c`, `72d832f0`, `25d1c3e7`, `0f025d89`,
-  `fdd8c394` — each round removing another way an innocent line could be refused. The two false
-  positives that started it are indeed gone. So is nearly everything else: `invitesClear` now
-  answers FALSE for »Mach bitte einen /clear und fang neu an.«, »Bitte clear die Session jetzt.«,
-  »Du kannst jetzt /clear machen.«, »Starte mit /clear neu.«, »Ein /clear wäre jetzt sinnvoll.«,
-  "Run /clear now." and "You can /clear now." Every pattern is anchored to the END of the sentence,
-  so only a line that literally stops at `/clear` matches — »Wenn du willst, mach jetzt /clear.«
-  is the one probe of nine that still fires. English imperatives are not covered at all.
-  This is the failure mode CLAUDE.md §7.2 names: a mechanism that is wrong is worse than none,
-  because the rule then COUNTS as enforced and nobody looks again.
-  FINAL STATE: the guard refuses a genuine invitation in the forms this project's replies actually
-  use — German and English, imperative or offer, with the token anywhere in the sentence — while
-  still passing a report ABOUT a past clear and a line that merely names the guard. Whatever cannot
-  be decided by shape is decided by the surrounding sentence, not by requiring the sentence to end
-  in the token.
-  VERIFIABLE: Vitest with a fixture table of BOTH kinds — every probe listed above with its
-  required verdict, refusals and passes in one table, so a later narrowing cannot silently drop a
-  refusal again. The table is the regression: it goes red the moment a round of tuning trades a
-  true positive for a false one.
-  Criticality: high — the guard governs the batch handover, and a handover lost to a guard that
-  does not fire is the incident it was built for.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 772. An owner session repaired its own mechanism for two hours and never handed over
-  (measured 20.08.2026; the user ended it by hand at 10:38 after asking whether it was still
-  productive). A claim was recorded at 08:32. The owner then committed at 09:15, 09:23, 09:32,
-  09:44, 10:19, 10:27 and 10:37 — eight commits, every one of them a repair of the Stop hook it had
-  landed at 08:29 — and in those 126 minutes no work-order point moved: nothing landed, nothing was
-  ticked, point 614 was never begun. It also never handed over, although
-  `gatherBatchProgressInputs` computed `claim: "release"`, `inFlight: false` for its session id
-  throughout, which is the clean state that releases. At least seven of its turn ends passed
-  without the hand-back. Its board card stood at 08:30 the whole time and announced a handover that
-  never happened, while `dashboard-guard`, `dashboard-integrity-guard` and `dashboard-sync` sat in
-  the same Stop chain.
-  TWO SEPARATE QUESTIONS, and the point owes both: WHY the hand-back did not run in that session
-  when the same guard runs it here, and WHAT BOUNDS a repair loop — a mechanism whose own follow-up
-  fixes never end has to become visible as a number, the way point 769 makes a review round count
-  visible, rather than being noticed only because the user asked.
-  FINAL STATE: a standing claim is honoured within a bounded number of the owner's turn ends or the
-  reason it is not is stated in the owner's own output; and consecutive commits that only repair
-  the same mechanism are counted and surfaced once the count leaves the ordinary range.
-  VERIFIABLE: Vitest over the pure halves — a claim that has survived N clean turn ends is
-  reported; a session whose last N commits all touch the same guard file is reported once, not
-  every turn. Plus the measured 20.08. sequence as a fixture, which must be reported by both.
-  Criticality: high — the batch stood still for two hours with a live owner, and neither the
-  handover mechanism nor the board noticed.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 773. `cut-account-core.test.mjs` is red in every worktree and green only in the main
-  checkout (measured 20.08.2026, 10:43). The case »docs/document-cut-757.md — the measured floors >
-  takes each floor from a transcript of the kind it claims« resolves the repository root with
-  `realpathSync(ROOT)`, which in a worktree is the WORKTREE path, while the transcripts it measures
-  record `cwd=/workspace/hoa`. `sessionKindOf` then judges the tree to be neither and returns null:
-  »cwd and prompt disagree, or the tree is neither«. So the case does not measure the document-cut
-  accounting, it measures which checkout it was started from.
-  WHY IT MATTERS BEYOND ONE RED CASE: `npm run test:unit` is therefore red out of every isolated
-  worktree — which is exactly where CLAUDE.md §6 sends larger mechanisms to be built. A delegated
-  author meets a red suite it did not cause, and the honest reading of a red run (fix it, charge it,
-  or file it) costs that author a full investigation every time.
-  FINAL STATE: the case resolves the MAIN checkout — the git common directory rather than the
-  current one — so it measures the same thing from anywhere, or it skips explicitly and says why
-  when it cannot. It never passes by accident in the main tree while failing elsewhere.
-  VERIFIABLE: the suite runs green from a fresh worktree; a Vitest case pins the root resolution
-  itself, so a checkout-dependent root goes red rather than the transcript assertion downstream.
-  Criticality: medium — no product defect, but it taxes every delegated mechanism author with a red
-  suite that is not theirs.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
-  running it (measured 20.08.2026, 10:52). With the batch lock naming session
-  `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers
-  »not applicable — another live session owns the batch lock«, with or without `--session`. The
-  cause is directly measurable: `heldByOtherLiveOwner('1e85312a-…')` is `false` while
-  `heldByOtherLiveOwner('')` is `true`, so the status path evaluates with an EMPTY session id and
-  concludes the owner is somebody else. The Stop-chain path is unaffected — it passes the real id
-  and fires correctly.
-  IT IS NOT ONE GUARD. `node scripts/mechanism-review-guard.mjs --status` answers the owning
-  session with »stands down: another live session owns the batch lock« in the same breath, so the
-  defect sits in the shared status path rather than in either guard. Every `--status` reader has to
-  be checked for it, and the fix belongs where the session id is resolved, not in one caller.
-  WHY IT IS NOT COSMETIC: `--status` is what CLAUDE.md §7.2 and point 614 name as the way to READ
-  the bundle coverage. Asked by the very session that owns the batch, it answers with a stand-down
-  instead of the count, so the reading a point is verified against cannot be taken at all.
-  FINAL STATE: the status path takes the session id from the same source the hook path uses and
-  reports the bundle state for the owner; an id it genuinely cannot determine is reported as
-  unknown rather than as somebody else's lock.
-  VERIFIABLE: Vitest — status with the owning id reports the coverage; status with no id reports
-  unknown and never a stand-down; the hook path keeps its current behaviour.
-  Criticality: medium — no product defect, but it silently withholds a reading two governing
-  documents ask for.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 775. Answer the cross-vendor review of the commit-time guard registration (GPT-5.6 Sol,
-  20.08.2026, verdict **do-not-merge** on both passes of `5ce597cf`, recorded in
-  `.claude/mechanism-reviews.jsonl`). The mechanism landed before the review concluded, so its
-  findings are owed as work rather than as a merge decision. Three stand against
-  `scripts/guard-registration-core.mjs`, and all three are real:
-  1. A COMMENT DEFEATS THE REGISTRY. `registeredIdsFromSource` counts every textual `id: '…'`
-     inside the block, so `// id: 'clear-claim-guard'` — or the same text in a string — registers a
-     hook that is not registered, and the wired-but-unregistered commit passes.
-  2. AN UNRECOGNISABLE REGISTRY FAILS OPEN ON A RELEVANT INPUT. A commit may wire a Stop hook while
-     deleting, emptying, renaming or breaking `GUARDS`, and the check judges nothing. The fail-open
-     direction is right for an input the check cannot READ; it is wrong when the very commit under
-     judgement is what made it unreadable. The current test pins the bypass instead of the refusal.
-  3. SINGLE QUOTES ONLY. `id: "double-quoted"` is not seen, so a mixed-quote registry yields a
-     partial list and REFUSES a hook that is in fact registered — a false block, the direction that
-     makes a tree uncommittable.
-  FINAL STATE: the registry is read so that comments and string literals cannot register anything
-  and both quote styles count; a registry the commit itself broke is a REFUSAL naming that reason,
-  while a registry this check merely cannot reach stays fail-open; and the tests assert the
-  refusals rather than the bypasses.
-  VERIFIABLE: Vitest — a commented-out entry does not register; a double-quoted entry does; a
-  commit that wires a hook and empties GUARDS is refused; an unreadable settings file still passes;
-  and the existing green cases stay green.
-  Criticality: high — this is the guard that decides whether a commit may land, and two of the
-  three findings let exactly the incident it was built for through.
-  Bundle: Session- & Repo-Hygiene.
