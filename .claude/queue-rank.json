@@ -64,25 +64,13 @@
       "at": "2026-08-13T18:54:12.170Z",
       "why": "Gehoert zum Release-Thema Verstaendigung und wird zusammen mit 682 und 659 gespielt; die Reihenfolge dort entscheidet 659"
     },
-    "682": {
-      "at": "2026-08-13T18:54:12.244Z",
-      "why": "Gehoert zum Release-Thema Verstaendigung; 659 spielt die Kette durch und entscheidet, was zuerst greifen muss"
-    },
     "683": {
       "at": "2026-08-13T20:19:36.791Z",
       "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
     },
-    "693": {
-      "at": "2026-08-13T23:44:58.490Z",
-      "why": "Der Umweg ist bekannt und kostenlos (author-sol --anyway, in der Merk-Datei festgehalten), deshalb steht der Punkt hinter den Spielfehlern und dem Verständigungsumbau, die der Nutzer für diese Auslieferung zuerst sehen will"
-    },
     "694": {
       "at": "2026-08-14T01:20:00.398Z",
       "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor."
-    },
-    "695": {
-      "at": "2026-08-14T02:25:45.277Z",
-      "why": "Es blockiert das Bild-Tor jeder Sitzung, gehört aber hinter die laufenden Spieler-Fixes; als Werkzeug-Punkt kommt es mit dem nächsten Werkzeug-Block."
     },
     "696": {
       "at": "2026-08-14T05:13:27.358Z",
@@ -144,10 +132,6 @@
       "at": "2026-08-19T10:37:26.991Z",
       "why": "Der Nutzer hat 730 ausdrücklich vorgezogen (Tafel-Chat 19.08.2026, 12:36: »Ziehe 730 vor.«) — die Schätzungen sind das, wonach er die Tafel liest, und 713 läuft bereits auf seinem Zweig."
     },
-    "731": {
-      "at": "2026-08-19T10:19:49.258Z",
-      "why": "Low-criticality one-line inconsistency; it costs a hand-rewrite per boundary and nothing is lost, so it waits behind the queue's settled order."
-    },
     "733": {
       "at": "2026-08-19T11:53:10.666Z",
       "why": "Direkt hinter 732, das den Befund erst sichtbar gemacht hat: Solange startup rot ist, ist die Suite rot, an der jeder andere Lauf gemessen wird."
@@ -195,10 +179,6 @@
     "767": {
       "at": "2026-08-20T06:03:57.318Z",
       "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night."
-    },
-    "770": {
-      "at": "2026-08-20T06:31:20.240Z",
-      "why": "It costs nothing while it waits and the user is currently the reader who notices; it follows the header work that measures the same number."
     }
   },
   "settled": {
@@ -255,7 +235,6 @@
       415,
       422,
       428,
-      438,
       448,
       449,
       451,
@@ -275,10 +254,7 @@
       495,
       497,
       498,
-      500,
-      501,
       504,
-      506,
       507,
       508,
       510,
@@ -373,7 +349,6 @@
       678,
       680,
       681,
-      682,
       683,
       686,
       687,
@@ -382,9 +357,7 @@
       690,
       691,
       692,
-      693,
       694,
-      695,
       696,
       698,
       699,
@@ -404,7 +377,6 @@
       728,
       729,
       730,
-      731,
       733,
       734,
       735,
@@ -421,7 +393,6 @@
       749,
       750,
       752,
-      753,
       754,
       755,
       756,
@@ -435,7 +406,6 @@
       767,
       768,
       769,
-      770,
       771,
       772,
       773,

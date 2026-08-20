@@ -1187,15 +1187,18 @@ describe('the shipped charge ledger', () => {
   })
 
   // THE TWO LANES ANSWER TO DIFFERENT POINTS, and that separation is the whole
-  // value of the charge (13.08.2026). Point 506 is the software lane's rate
-  // problem and says in its own words that on WebGL 2 the check "stays a real
-  // red" — so it must never swallow a hardware-lane occurrence. When one
-  // appeared, it did not become 506's: it became point 671, which must classify
-  // it by measurement. The pairing below is what stops the two from merging back
-  // together, and 671's entry dies with 671, which is the point of the charge.
+  // value of the charge (13.08.2026). The WebGPU entry says in its own words that
+  // on WebGL 2 the check "stays a real red" — so it must never swallow a
+  // hardware-lane occurrence. When one appeared, it did not join it: it became
+  // point 671, which must classify it by measurement. The pairing below is what
+  // stops the two from merging back together, and 671's entry dies with 671,
+  // which is the point of the charge.
+  // THE OWNER MOVED 20.08.2026: point 506 was folded into 642, which carries its
+  // mechanism, and a charge to a ticked point expires. The number changed; the
+  // pairing this case exists for did not.
   it('charges the goat-stance red to a DIFFERENT point on each lane', () => {
     const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(642)
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
   })
 

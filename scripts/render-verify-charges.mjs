@@ -136,16 +136,27 @@ export const RED_CHARGES = [
       'than for a number, and on both backends.',
   },
   {
-    point: 506,
+    // RE-POINTED 20.08.2026: point 506 was folded into 642, and a charge to a ticked point
+    // expires. 642 carries 506's mechanism, so it owns this red now.
+    // THE STATED REASON NO LONGER HOLDS AS WRITTEN. 506 argued from a SOFTWARE WebGPU lane.
+    // Measured today with scripts/verify/backend-lane-check.mjs, BOTH lanes are hardware-backed
+    // on the same GPU and WebGPU runs at COMPATIBILITY level, where three.js takes its compat
+    // branches and drops MSAA — a different artefact from "too slow to answer a rate question".
+    // Point 725 disputes the artefact reading altogether. So this entry is a stopgap on
+    // contested ground: it keeps the release branch honest, and 642 owes the decision whether
+    // the red is a compat-lane artefact or a product defect.
+    point: 642,
     suite: 'polish',
     backend: 'webgpu',
     kind: 'check',
     match: /settlement walker \(goat\)/i,
     why:
       'Measured 07.08.2026: the stance check reds in BOTH WebGPU runs (20 stance intervals, ' +
-      'worst foot travel 0.967) and passes on WebGL 2 (0.337) — the software lane cannot draw ' +
-      'fast enough to answer a rate question, which is point 506. Backend-scoped on purpose: ' +
-      'on the WebGL 2 lane this check stays a real red.',
+      'worst foot travel 0.967) and passes on WebGL 2 (0.337). The original reading — a software ' +
+      'lane too slow to answer a rate question — was REFUTED on 20.08.2026: both lanes are ' +
+      'hardware-backed and WebGPU runs at compatibility level, so what differs is the compat ' +
+      'branch and MSAA, not the rate. Point 725 disputes the artefact reading altogether. ' +
+      'Backend-scoped on purpose: on the WebGL 2 lane this check stays a real red.',
   },
   {
     point: 514,
