@@ -161,7 +161,7 @@ export function isExternalDestination(path, root = '') {
  * Pure — the caller does the existence test.
  */
 export function userTreeRootOf(path, home = '') {
-  const p = posix.normalize(String(path ?? '').trim() || '.')
+  const p = posix.normalize(String(path ?? '').trim().replace(/^~\/+/, '~/') || '.')
   const h = String(home ?? '')
     .trim()
     .replace(/(?!^)\/+$/, '')
@@ -181,8 +181,35 @@ export function accountDestinationFault(path, root = '') {
   const p = String(path ?? '').trim()
   if (!p) return 'the destination is empty'
   if (p === '~' || p.startsWith('~/')) return ''
-  if (!isExternalDestination(p, root)) return ''
-  return 'an absolute destination outside the repository names a machine, not a place — write it against `~`'
+  // Absolute means absolute, INCLUDING one that happens to name this checkout:
+  // it reads as valid here and as a fault wherever the root differs, which is
+  // the environment dependence this whole gate exists to be free of.
+  if (p.startsWith('/')) {
+    return 'an absolute destination names a machine, not a place — write it relative to the repository, or against `~`'
+  }
+  if (isExternalDestination(p, root)) {
+    return 'the destination resolves outside the repository — write it against `~` if it belongs to the user tree'
+  }
+  return ''
+}
+
+/**
+ * The destination as a path on THIS machine: `~` against the given home,
+ * anything else unchanged for the caller to resolve against the repository.
+ * It exists so the classification and the existence test cannot disagree — a
+ * review found `~//.claude/…` classified against the user tree while resolving
+ * to a filesystem-rooted `/.claude/…`, which excused a destination that was
+ * simply missing. PURE.
+ */
+export function expandDestination(path, home = '') {
+  const p = String(path ?? '').trim()
+  const h = String(home ?? '')
+    .trim()
+    .replace(/(?!^)\/+$/, '')
+  if (!p) return ''
+  if (p === '~') return h
+  if (!p.startsWith('~/')) return p
+  return h ? posix.normalize(posix.join(h, p.slice(1))) : ''
 }
 
 /** Every guard basename actually wired into a hook chain of the settings object. */

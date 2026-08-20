@@ -12,6 +12,7 @@ import {
   parseCutAccount,
   evaluateCutAccount,
   accountDestinationFault,
+  expandDestination,
   isExternalDestination,
   userTreeRootOf,
   wiredGuards,
@@ -28,14 +29,10 @@ const MEMORY_PATH = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 
 // it can be trusted — a repository destination is asserted everywhere, an
 // external one only on a machine that carries the user-level tree — so a typo
 // is still caught in the batch, which is where these documents are read.
-const fullPath = (path) =>
-  path === '~'
-    ? homedir()
-    : path.startsWith('~/')
-      ? resolve(homedir(), path.slice(2))
-      : path.startsWith('/')
-        ? path
-        : resolve(ROOT, path)
+const fullPath = (path) => {
+  const expanded = expandDestination(path, homedir())
+  return expanded.startsWith('/') ? expanded : resolve(ROOT, expanded)
+}
 // Absence is evidence only where the tree could have been. A destination inside
 // a `.claude` tree this machine does not carry is unjudgeable here; anything
 // else — including an absolute path naming no such tree — must exist.
@@ -259,12 +256,29 @@ describe('docs/document-cut-757.md — the shipped account', () => {
 
   it('refuses a destination that names a machine instead of a place', () => {
     expect(accountDestinationFault('docs/batch-owner-runbook.md', ROOT)).toBe('')
-    expect(accountDestinationFault(`${ROOT}/docs/x.md`, ROOT)).toBe('')
     expect(accountDestinationFault('~/.claude/projects/x/memory/a.md', ROOT)).toBe('')
     expect(accountDestinationFault('~', ROOT)).toBe('')
     expect(accountDestinationFault('/home/node/.claude/x.md', ROOT)).toMatch(/names a machine/)
     expect(accountDestinationFault('/anywhere/at/all.md', ROOT)).toMatch(/names a machine/)
+    // Absolute stays a fault even when it names THIS checkout: accepting it
+    // would pass here and fail wherever the root differs.
+    expect(accountDestinationFault(`${ROOT}/docs/x.md`, ROOT)).toMatch(/names a machine/)
+    expect(accountDestinationFault('../outside/x.md', ROOT)).toMatch(/outside the repository/)
     expect(accountDestinationFault('', ROOT)).toMatch(/empty/)
+  })
+
+  it('expands a destination the same way it classifies one', () => {
+    const HOME = '/home/node'
+    expect(expandDestination('~/.claude/x.md', HOME)).toBe('/home/node/.claude/x.md')
+    // The escape a review found: a doubled separator classified against the user
+    // tree while resolving to a filesystem-rooted path.
+    expect(expandDestination('~//.claude/x.md', HOME)).toBe('/home/node/.claude/x.md')
+    expect(userTreeRootOf('~//.claude/x.md', HOME)).toBe('/home/node/.claude')
+    expect(expandDestination('~', HOME)).toBe(HOME)
+    expect(expandDestination('docs/x.md', HOME)).toBe('docs/x.md')
+    expect(expandDestination('', HOME)).toBe('')
+    expect(expandDestination(undefined, HOME)).toBe('')
+    expect(expandDestination('~/.claude/x.md', '')).toBe('')
   })
 
   it('has no machine-absolute destination in the shipped account', () => {
