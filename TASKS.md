@@ -5777,6 +5777,14 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest — a card written through `board.mjs queue` survives a
   rebuild; a rebuild that would blank an existing card's prose is refused or
   restores it; the report names the cards it emptied.
+  NARROWED 20.08.2026 (work-order review): struck is the blanket "nothing writes it back
+  to the data file" — `node scripts/board-queue.mjs set <N> …` now stores title, body and
+  estimate through `setQueueEntry`, and `board.mjs title` writes the data file too. What
+  the same read leaves standing is this point's own case and both its consequences:
+  `board.mjs queue <N> "<text>"` is still `edit((html) => toQueue(…))` and touches the
+  HTML alone; the rebuild still reports only `queue rebuilt from the work order: N
+  card(s)` and lists emptied cards as "no prose yet"; and nothing refuses a rebuild that
+  would blank a card. Clauses 1-3 are unchanged.
 
 - [ ] 495. A versioned git hook without its executable bit is silently inert
   (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
