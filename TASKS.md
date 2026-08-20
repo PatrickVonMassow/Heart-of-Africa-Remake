@@ -125,6 +125,34 @@ put it is the mistake this line exists to stop.
   waits on.
   Bundle: Chat & Tafel.
 
+- [ ] 794. The user ruled on the guide's size budget: raise the ceiling, drop no pitfall
+  (USER-ANSWERED(2026-08-20), given at 21:10 and first executed against the wrong mechanism).
+  WHAT WAS ASKED. `docs/analysis_de/vibe-coding-anleitung.md` stands exactly at its ceiling — 415
+  lines, 3677 words — and the standing rule is shorten-before-raise, so every new pitfall displaces
+  an old one. The lesson of retrospective §3.141 (a guard grants an exception in its text but builds
+  no command for it, so the only wording that passes is the dishonest one) was therefore written to
+  the retrospective and taken back OUT of the guide rather than sacrificing an existing entry, and
+  the choice went to the user as a decision card. HIS ANSWER: raise the limit. No entry is dropped.
+  WHY IT MATTERS: the guide is what a reader copies process from, and the lesson is a decision, not
+  an experience to read about — the class of guard that describes an escape it does not provide is
+  one a reader must recognise before he meets it.
+  THE SECOND HALF, TO BE CHECKED WITH IT: the comment at `LIMITS.maxWords` in
+  `scripts/guide-brevity-core.mjs` records that the user withdrew the ask-before-raising requirement
+  generally on 10.08.2026 ("Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen") — a raise
+  is ours to take and to justify in writing. Under that ruling this card should never have been put
+  to him. Whatever produced it is found and either follows the withdrawal or states why it still
+  asks.
+  FINAL STATE: §3.141's lesson stands in the guide as a pitfall entry in the house form, with no
+  existing entry removed; `LIMITS.maxLines`/`maxWords` rise by exactly the measured net size of that
+  entry, with the usual written justification in the comment; and the escalation path that raised
+  the card no longer routes a budget raise to the user.
+  VERIFIABLE: `node scripts/guide-brevity-guard.mjs` green at the new ceilings; a Vitest case that
+  the guide carries the entry and that the ceilings equal the measured size rather than carrying
+  slack; and a case over the escalation path proving a budget raise produces no decision card.
+  Criticality: medium — no product defect, but it is a user ruling that was already lost once and
+  executed against the wrong mechanism the first time.
+  Bundle: Dokumentation.
+
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
