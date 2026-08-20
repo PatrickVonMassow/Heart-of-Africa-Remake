@@ -25,8 +25,18 @@ import {
   usage,
 } from './mechanism-review.mjs'
 import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
+import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
+const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs']
+const installFableSwitch = (repo, state = 'on') => {
+  for (const file of FABLE_FILES) copyFileSync(resolve(process.cwd(), 'scripts', file), join(repo, 'scripts', file))
+  mkdirSync(join(repo, '.claude'), { recursive: true })
+  writeFileSync(
+    join(repo, '.claude', 'fable-switch.json'),
+    JSON.stringify(writeFableState(state, { why: 'test switch decision', by: 'test', now: 1 })),
+  )
+}
 const run = (...args) =>
   spawnSync(process.execPath, [SCRIPT, ...args], {
     windowsHide: true,
@@ -435,6 +445,7 @@ describe('the mode round-trips into the ledger', () => {
       ]) {
         copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
       }
+      installFableSwitch(repo, 'off')
       const git = (...args) =>
         spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
       git('init', '-q', '-b', 'main')
@@ -463,7 +474,6 @@ describe('the mode round-trips into the ledger', () => {
             '--verdict', 'merge',
             '--evidence', 'read both lists and the union that folded them',
             '--mode', 'blind-parallel',
-            '--merged-by', 'Fable 5',
             '--union', unionPath,
             '--list-a', listA,
             '--list-b', listB,
@@ -474,7 +484,8 @@ describe('the mode round-trips into the ledger', () => {
       const ok = record(union)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
-      expect(row).toMatchObject({ sha, mergedBy: 'Fable 5', accountingSource: 'computed', mode: 'blind-parallel' })
+      expect(row).toMatchObject({ sha, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
+      expect(row.mergeFallback).toContain('node scripts/fable-switch.mjs --status')
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
 
       // …and a union that drops an entry exits non-zero and writes nothing more.
@@ -506,6 +517,7 @@ describe('the mode round-trips into the ledger', () => {
       ]) {
         copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
       }
+      installFableSwitch(repo)
       const git = (...args) =>
         spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
       git('init', '-q', '-b', 'main')
@@ -722,6 +734,7 @@ describe('the mode round-trips into the ledger', () => {
       ]) {
         copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
       }
+      installFableSwitch(repo)
       // A REAL checkout: since point 780 the ledger is the one belonging to the
       // git toplevel of the working directory, and a directory that is no
       // checkout has no ledger at all rather than the caller's own.
@@ -812,6 +825,7 @@ describe('the mode round-trips into the ledger', () => {
       ]) {
         copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
       }
+      installFableSwitch(repo)
       const git = (...args) =>
         spawnSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: { ...process.env, HOME: dir } })
       git('init', '-q', '-b', 'main')

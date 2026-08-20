@@ -113,6 +113,13 @@ export function mergerModel(value) {
   return fableIsOn(value) ? FABLE_MODEL : SOL_MODEL
 }
 
+/** Additional framing owed when Sol merges material that includes Sol's own half. */
+export function mergePromptFraming(value) {
+  return fableIsOn(value)
+    ? ''
+    : 'DECORRELATED MERGE FRAMING: reconstruct the union from the two numbered evidence lists and their invariants; do not reuse the framing, ordering, or categories of Sol\'s own half.'
+}
+
 /** The canonical, ledger-safe reason Sol may merge its own blind half while OFF. */
 export function mergeFallbackReason(value) {
   const state = requireState(value)

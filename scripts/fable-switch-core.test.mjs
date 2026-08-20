@@ -6,6 +6,7 @@ import {
   fableIsOn,
   isSwitchFallbackReason,
   mergeFallbackReason,
+  mergePromptFraming,
   mergerModel,
   readState,
   requireState,
@@ -73,6 +74,12 @@ describe('decisions derived from the state', () => {
   it('selects Fable as merger while on and Sol while off', () => {
     expect(mergerModel(on())).toBe(FABLE_MODEL)
     expect(mergerModel(off())).toBe(SOL_MODEL)
+  })
+
+  it('adds an independent merge framing only for the same-model fallback', () => {
+    expect(mergePromptFraming(on())).toBe('')
+    expect(mergePromptFraming(off())).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(off())).toMatch(/do not reuse.*Sol's own half/)
   })
 
   it('emits one checkable switch fallback without accepting a bare claim', () => {

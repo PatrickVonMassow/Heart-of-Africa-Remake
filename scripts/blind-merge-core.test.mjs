@@ -28,6 +28,9 @@ import {
   validateList,
   validateMerger,
 } from './blind-merge-core.mjs'
+import { mergeFallbackReason, readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
 const listA = readList('A', {
   model: 'Opus 5',
@@ -326,6 +329,22 @@ describe('who may merge', () => {
       fallback: 'GPT-5.6 Sol was unreachable and Fable 5 was not available in this session',
     })
     expect(r).toMatchObject({ ok: true, fallback: true })
+  })
+
+  it('admits the canonical switch reason for a Sol-merged Sol/Opus stage as weaker', () => {
+    const r = validateMerger({
+      mergedBy: 'GPT-5.6 Sol',
+      authors: ['Opus 5', 'GPT-5.6 Sol'],
+      fallback: mergeFallbackReason(FABLE_OFF),
+    })
+    expect(r).toMatchObject({ ok: true, fallback: true, weaker: true })
+    expect(
+      validateMerger({
+        mergedBy: 'GPT-5.6 Sol',
+        authors: ['Opus 5', 'GPT-5.6 Sol'],
+        fallback: 'Fable 5 was there',
+      }).ok,
+    ).toBe(false)
   })
 
   it('refuses a fallback that names no model — otherwise it is a free pass', () => {

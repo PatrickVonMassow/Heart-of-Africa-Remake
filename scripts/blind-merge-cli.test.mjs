@@ -9,10 +9,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeState } from './fable-switch-core.mjs'
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), 'blind-merge.mjs')
 
 let dir = ''
+let switchOn = ''
+let switchOff = ''
 const p = (name) => join(dir, name)
 const write = (name, value) => {
   writeFileSync(p(name), typeof value === 'string' ? value : JSON.stringify(value))
@@ -20,19 +23,27 @@ const write = (name, value) => {
 }
 
 /** Run the command; never throws — the exit code is what is under test. */
-const run = (...args) => {
+const runWith = (switchFile, ...args) => {
   try {
     return {
       status: 0,
-      out: execFileSync(process.execPath, [CLI, ...args], { encoding: 'utf8', windowsHide: true }),
+      out: execFileSync(process.execPath, [CLI, ...args], {
+        encoding: 'utf8',
+        windowsHide: true,
+        env: { ...process.env, FABLE_SWITCH_FILE: switchFile },
+      }),
     }
   } catch (e) {
     return { status: e.status ?? -1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` }
   }
 }
+const run = (...args) => runWith(switchOn, ...args)
+const runOff = (...args) => runWith(switchOff, ...args)
 
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'hoa-blind-merge-'))
+  switchOn = write('fable-on.json', writeState('on', { why: 'test capacity restored', by: 'test', now: 1 }))
+  switchOff = write('fable-off.json', writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 }))
   write('A.json', {
     model: 'Opus 5',
     entries: [
@@ -49,6 +60,13 @@ beforeAll(() => {
     ],
   })
   write('U-dropped.json', { mergedBy: 'Fable 5', entries: [{ id: 'U1', from: ['A1'] }] })
+  write('U-sol.json', {
+    mergedBy: 'GPT-5.6 Sol',
+    entries: [
+      { id: 'U1', from: ['A1'] },
+      { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
+    ],
+  })
 })
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -105,13 +123,13 @@ describe('the command', () => {
     expect(r.out).not.toMatch(/record it:/)
   })
 
-  it('exits 1 when the merger wrote one of the lists', () => {
+  it('refuses a merger that contradicts the switch', () => {
     const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Opus 5')
     expect(r.status).toBe(1)
-    expect(r.out).toMatch(/may not merge them/)
+    expect(r.out).toMatch(/contradicts the Fable switch/)
   })
 
-  it('carries the two-model fallback into the printed record command', () => {
+  it('refuses a hand-stated outage in place of the switch-owned merger reason', () => {
     const r = run(
       '--a',
       p('A.json'),
@@ -123,9 +141,9 @@ describe('the command', () => {
       '--fallback',
       'GPT-5.6 Sol was unreachable in this session',
     )
-    expect(r.status).toBe(0)
-    expect(r.out).toMatch(/TWO-MODEL fallback/)
-    expect(r.out).toMatch(/--merge-fallback "GPT-5.6 Sol was unreachable/)
+    expect(r.status).toBe(1)
+    expect(r.out).toMatch(/contradicts the Fable switch/)
+    expect(r.out).toMatch(/stated fallback contradicts/)
   })
 
   it('lists the pairs to decide when no union is given, and says the ranking is not the merge', () => {
@@ -134,6 +152,21 @@ describe('the command', () => {
     expect(r.out).toMatch(/CANDIDATE PAIRS/)
     expect(r.out).toMatch(/A2 ↔ B1/)
     expect(r.out).toMatch(/RANKING, not the merge/)
+  })
+
+  it('selects Sol while off, decorrelates its prompt, and records the switch fallback as weaker', () => {
+    const prompt = runOff('--a', p('A.json'), '--b', p('B.txt'))
+    expect(prompt.status).toBe(0)
+    expect(prompt.out).toContain('MERGING MODEL — GPT-5.6 Sol')
+    expect(prompt.out).toContain('DECORRELATED MERGE FRAMING')
+
+    const countedOff = runOff(
+      '--a', p('A.json'), '--b', p('B.txt'), '--union', p('U-sol.json'), '--model-b', 'GPT-5.6 Sol',
+    )
+    expect(countedOff.status).toBe(0)
+    expect(countedOff.out).toContain('WEAKER TWO-MODEL fallback')
+    expect(countedOff.out).toContain('node scripts/fable-switch.mjs --status')
+    expect(countedOff.out).toContain('--merged-by "GPT-5.6 Sol"')
   })
 
   it('refuses an unknown flag and a missing list rather than guessing', () => {
