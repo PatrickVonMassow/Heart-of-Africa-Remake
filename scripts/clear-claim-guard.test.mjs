@@ -116,6 +116,9 @@ describe('invitesClear — what counts as asking the user to end the session', (
       '`Mach bitte /clear`',
       '- `Mach bitte /clear`',
       'Start a new session fixture in the test suite.',
+      'Start a new session in the test suite.',
+      '  - `Mach bitte /clear`',
+      '\t* `Starte eine neue Sitzung`',
     ]) {
       expect(invitesClear(text), text).toBe(false)
     }

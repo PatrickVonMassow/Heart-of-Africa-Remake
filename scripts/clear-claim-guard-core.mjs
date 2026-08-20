@@ -95,10 +95,11 @@ export const CLEAR_INVITATION = Object.freeze([
   // English keeps no end constraint: a trailing prepositional phrase is ordinary
   // there ("… for the rest"), and the quoted-fixture case it would guard against
   // is already handled by stripping quotations and fenced code.
-  // "session" must END the order or be followed by a preposition. Without that,
-  // "Start a new session fixture in the test suite" — an order about something
-  // else entirely — matched (cross-vendor review, 20.08.2026).
-  /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b(?=[\s.!?,;]*$|\s+(?:for|to|with|in|on|after|before|once|when|now|please)\b)/i,
+  // "session" must END the order or be followed by one of the prepositions that
+  // can only introduce a purpose or a time. "in" and "on" are NOT among them:
+  // "Start a new session in the test suite" is an order about something else
+  // entirely (cross-vendor rounds, 20.08.2026).
+  /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b(?=[\s.!?,;]*$|\s+(?:for|to|with|after|before|once|when|now|please)\b)/i,
 ])
 
 /**
@@ -130,7 +131,7 @@ function withoutQuotations(text) {
     // Only inline code INSIDE a sentence is unwrapped, because this project
     // writes the command in backticks while asking for it (cross-vendor review,
     // 20.08.2026).
-    .replace(/^(?:[-*•]\s*|\d+\.\s*)?`[^`\n]*`\s*$/gm, ' ')
+    .replace(/^[ \t]*(?:[-*•]\s*|\d+\.\s*)?`[^`\n]*`\s*$/gm, ' ')
     .replace(/`([^`\n]*)`/g, '$1')
 }
 
