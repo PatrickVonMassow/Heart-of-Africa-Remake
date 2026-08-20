@@ -4876,6 +4876,14 @@ Build order, chosen so no two parallel agents own the same file:
      a teardown racing an in-flight readback is decided BY THE EVIDENCE the first
      step now produces, and the answer is written into
      `docs/host-environment.md`'s lane section.
+  "THE SOFTWARE WEBGPU LANE" IN THIS POINT'S HEADING IS DEAD (carried 20.08.2026 from the
+  10.08.2026 four-eyes work-order analysis, whose one premise to re-measure this was, and it
+  was measured that day at `622f5113`): `node scripts/verify/backend-lane-check.mjs` reports
+  BOTH lanes drawing the game on the card — `ANGLE (Microsoft, D3D12 (NVIDIA GeForce RTX
+  4070 Ti))` — with the WebGPU chain at `level=compatibility`. The device loss recorded here
+  therefore cannot be charged to a software device giving up under a long run, which removes
+  one of item 4's two candidates before the work starts: what is left to decide between is
+  the compatibility chain itself and a teardown racing an in-flight readback.
   VERIFIABLE: a Vitest case proves the loss handler fires the assert and the
   localized notice from a simulated `device.lost` in both languages; a browser
   case proves a suite that loses its device reports the loss as its failure
@@ -6443,6 +6451,16 @@ Build order, chosen so no two parallel agents own the same file:
   that guess was never measured, and a measured cause outranks it. Nothing else moves:
   the herdsRef red, the `settings`/MSAA classification of items 5 and 6 and the
   `bootGame` pin of item 7 all stay here.
+  THE LANE IS HARDWARE-BACKED AND RUNS AT COMPATIBILITY LEVEL, measured 20.08.2026 at
+  `622f5113` with `node scripts/verify/backend-lane-check.mjs` (carried from the 10.08.2026
+  four-eyes work-order analysis, which asked for exactly this measurement): both lanes draw
+  the game through `ANGLE (Microsoft, D3D12 (NVIDIA GeForce RTX 4070 Ti))`, and the WebGPU
+  chain reports `level=compatibility`. That is the answer item 5 was waiting for — the
+  missing multisampling is the compatibility branch three.js takes, not a slow or software
+  device — so it IS structural, and the consequence is bigger than one suite's verdict: this
+  lane is coverage of the WebGPU code path and NOT of the core path a player with a full
+  WebGPU device gets. The host-environment section says it in those terms, so a reader knows
+  which verdict the lane can carry.
   VERIFIABLE: `enrichments` and `settings` run green twice in a row on the
   compatibility lane on a quiet machine, or the host-environment section names the
   difference that makes it structurally impossible there. Plus: a probe built on
