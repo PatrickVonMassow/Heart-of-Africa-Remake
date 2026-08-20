@@ -201,6 +201,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest. Vor dem
   Abgeben: ‚auch im **Hauptstand** grün?'"
 
+- **Am bequemen Ort geprüft, am echten Ort kaputt.** Ein Werkzeug entsteht dort, wo jeder Pfad von
+  selbst stimmt — und läuft später woanders: im abgetrennten Arbeitsbereich, im Container, im
+  Prüflauf. Die Annahme über den Ort wird nie widerlegt, weil nie dort gemessen wird.
+  → *Prompt:* „Ein Werkzeug, das anderswo laufen soll, wird **einmal von dort aus** geprüft, bevor
+  es fertig heißt — nicht nur da, wo ich es geschrieben habe. Und ein Schritt, der erst schreibt
+  und dann festschreibt: Misslingt das Festschreiben, **nimm das Geschriebene zurück**. Ein
+  Fehlversuch, der eine Behauptung hinterlässt, ist teurer als gar keiner."
+
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
   miss auf einer ruhigen Maschine."
@@ -412,4 +420,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 627ffd0abf0a18fd33c57cdc67e382b7b4af68e43e1aa3ec1d3ef4521ce4b27e -->
+<!-- GUIDE-FINGERPRINT: 9c0ff6cb01b56973c21214e3a544b4b3e5505da8934cc8b52c87225827b21d46 -->
