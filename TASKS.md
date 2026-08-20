@@ -198,6 +198,30 @@ put it is the mistake this line exists to stop.
   from doing so.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 797. The watermark only speaks at the END of the turn, so it warns after the expensive turn
+  has already run (measured 20.08.2026, 22:20).
+  WHAT WAS MEASURED. The user had to point at the context level twice within one hour ("du bist
+  inzwischen weit über 150k, also abgeben"). The session has NO reading of its own while a turn
+  runs: the number in the chat header comes from the `UserPromptSubmit` hook and is a value from the
+  START of the turn, it ages while the turn works, and nothing refreshes it. The watermark check
+  hangs off the `Stop` hook, so it fires only once the whole turn is spent — this session climbed
+  from 160k to 236k inside a SINGLE turn, and the warning arrived at its end.
+  WHY IT MATTERS: the turns that break the ceiling are the long ones, and those are exactly the
+  turns for which an end-of-turn signal is too late. The cost the watermark exists to bound is
+  incurred before it may speak, and the gap is closed today by the user watching the number for us.
+  FINAL STATE: a session can measure its own context DURING a turn — one project command reads the
+  transcript and reports the current size, so a long turn can ask before its next expensive step —
+  and the header instruction states that its figure is from the turn's start rather than presenting
+  it as the current level.
+  VERIFIABLE: a unit case that the command reports a transcript's measured size and fails loudly
+  where none can be read; and a case over the header instruction that its wording names the reading
+  as a start-of-turn value.
+  RELATED: point 785 is the other half — it is about whether the START value is TRUE, this one about
+  whether it is ever refreshed. They share the header path and are read together.
+  Criticality: medium — no product defect, but context above the watermark is the batch's dominant
+  cost and the user is currently the mechanism that catches it.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
