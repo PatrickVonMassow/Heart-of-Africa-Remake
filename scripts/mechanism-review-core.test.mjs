@@ -1997,18 +1997,21 @@ describe('the refusal teaches the command that actually works', () => {
 // this is what it does with the answer.
 describe('the ledger path of a checkout', () => {
   it('resolves the relative ledger against the toplevel it was given', () => {
-    expect(ledgerPathFrom('/repo/.claude/worktrees/point-780', '/repo')).toBe(
+    expect(ledgerPathFrom('/repo/.claude/worktrees/point-780')).toBe(
       resolve('/repo/.claude/worktrees/point-780', LEDGER_RELATIVE_PATH),
     )
+    expect(ledgerPathFrom('/repo')).toBe(resolve('/repo', LEDGER_RELATIVE_PATH))
   })
 
-  it('falls back to the module root when git names no toplevel', () => {
-    for (const empty of [null, undefined, '', '   ']) {
-      expect(ledgerPathFrom(empty, '/repo')).toBe(resolve('/repo', LEDGER_RELATIVE_PATH))
-    }
+  it('answers null rather than another tree when git names no toplevel', () => {
+    // The cross-vendor review of this very point: a fallback checkout is the
+    // same silent cross-tree write, only quieter. There is no ledger here.
+    for (const nothing of [null, undefined, '']) expect(ledgerPathFrom(nothing)).toBe(null)
   })
 
-  it('answers relatively rather than throwing when there is no root at all', () => {
-    expect(ledgerPathFrom('', '')).toBe(LEDGER_RELATIVE_PATH)
+  it('uses the toplevel exactly as git gave it, spaces and all', () => {
+    // Trimming would rename a legitimate POSIX directory into a different one.
+    expect(ledgerPathFrom('/repo/odd name ')).toBe(resolve('/repo/odd name ', LEDGER_RELATIVE_PATH))
+    expect(ledgerPathFrom('   ')).toBe(resolve('   ', LEDGER_RELATIVE_PATH))
   })
 })

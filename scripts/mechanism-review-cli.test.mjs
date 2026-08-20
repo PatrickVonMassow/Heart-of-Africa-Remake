@@ -722,6 +722,10 @@ describe('the mode round-trips into the ledger', () => {
       ]) {
         copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
       }
+      // A REAL checkout: since point 780 the ledger is the one belonging to the
+      // git toplevel of the working directory, and a directory that is no
+      // checkout has no ledger at all rather than the caller's own.
+      spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo, encoding: 'utf8', windowsHide: true })
       mkdirSync(join(repo, '.claude'), { recursive: true })
       writeFileSync(
         join(repo, '.claude', 'mechanism-reviews.jsonl'),
@@ -1072,10 +1076,49 @@ describe('the ledger path follows the working directory', () => {
     expect(recordsPathFor(worktree)).not.toBe(recordsPathFor(main))
   })
 
-  it('falls back to the module root outside any checkout', () => {
+  it('names no ledger at all outside any checkout, and refuses the write', () => {
+    // The cross-vendor review of point 780 asked for exactly this: with no
+    // checkout there is no checkout-local ledger, and answering with the
+    // module's own tree would silently write a DIFFERENT repository's tracked
+    // file — the same defect, one level quieter.
     const outside = mkdtempSync(join(tmpdir(), 'hoa-ledger-nogit-'))
     tempDirs.push(outside)
     expect(gitToplevel(outside)).toBe('')
-    expect(recordsPathFor(outside)).toBe(resolve(process.cwd(), LEDGER_RELATIVE_PATH))
+    expect(recordsPathFor(outside)).toBe(null)
+    expect(readRecords(null)).toEqual([])
+    expect(() => appendRecord({ sha: 'a'.repeat(40) }, null)).toThrow(/outside a git checkout/)
+  })
+
+  it('tells an absent ledger apart from one it merely cannot read', () => {
+    // Round 3 of the cross-vendor review: every read failure answered "no
+    // reviews recorded", so an unreadable ledger looked to a gate exactly like
+    // an empty one. A directory in the ledger's place is unreadable, not absent.
+    const root = mkdtempSync(join(tmpdir(), 'hoa-ledger-unreadable-'))
+    tempDirs.push(root)
+    expect(readRecords(join(root, 'not-there.jsonl'))).toEqual([])
+
+    const blocked = join(root, 'ledger.jsonl')
+    mkdirSync(blocked, { recursive: true })
+    let thrown = null
+    try {
+      readRecords(blocked)
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown.message).toMatch(/cannot read the review ledger/)
+    // The flag is what keeps the two gates from waving it through as an
+    // ordinary environment error.
+    expect(thrown.ledgerUnreadable).toBe(true)
+  })
+
+  it('keeps a toplevel that ends in a space instead of trimming it away', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-ledger-space-'))
+    tempDirs.push(root)
+    const odd = join(root, 'checkout ')
+    mkdirSync(odd, { recursive: true })
+    git(odd, 'init', '-q', '-b', 'main')
+    expect(gitToplevel(odd)).toBe(realpathSync(odd))
+    expect(recordsPathFor(odd)).toBe(resolve(realpathSync(odd), LEDGER_RELATIVE_PATH))
   })
 })

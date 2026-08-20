@@ -65,23 +65,31 @@ export const reviewFileSetKey = (files = []) => JSON.stringify([...(files ?? [])
 /** The git toplevel of a working directory, or '' outside a checkout. Its own
  *  spawn rather than `git()` above: that one is pinned to REPO_ROOT, which is
  *  the very assumption this lookup exists to replace, and a missing checkout is
- *  an answer here, not a failure. */
+ *  an answer here, not a failure.
+ *
+ *  Only git's TERMINATING LINE BREAK is stripped (cross-vendor review, rounds 1
+ *  and 2): a POSIX directory may end in a space — trimming would then name a
+ *  path that is not the checkout — and it may legitimately end in a CARRIAGE
+ *  RETURN, which is why `\r` is only stripped where it is really part of the
+ *  platform's line ending and cannot occur inside a path. */
 export function gitToplevel(cwd = process.cwd()) {
   const res = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', windowsHide: true })
-  return res.status === 0 && !res.error ? (res.stdout ?? '').trim() : ''
+  if (res.status !== 0 || res.error) return ''
+  const out = (res.stdout ?? '').replace(/\n$/, '')
+  return process.platform === 'win32' ? out.replace(/\r$/, '') : out
 }
 
-/** The tracked ledger of the checkout this command RUNS IN — see
- *  ledgerPathFrom. REPO_ROOT remains the fallback for a call from outside any
- *  checkout, which is where the module's own root is the only answer left. */
+/** The tracked ledger of the checkout this command RUNS IN, or `null` outside
+ *  any checkout — see ledgerPathFrom for why there is no fallback tree. */
 export function recordsPathFor(cwd = process.cwd()) {
-  return ledgerPathFrom(gitToplevel(cwd), REPO_ROOT)
+  return ledgerPathFrom(gitToplevel(cwd))
 }
 
-/** The tracked ledger of recorded mechanism reviews (JSON Lines). Resolved ONCE
- *  at load against the invocation's working directory: no script here chdirs,
- *  and a per-call git spawn on every default argument would be paid by every
- *  reader of the ledger. A caller that needs another checkout passes its own. */
+/** The tracked ledger of recorded mechanism reviews (JSON Lines), or `null`
+ *  when this command runs outside a checkout. Resolved ONCE at load against the
+ *  invocation's working directory: no script here chdirs, and a per-call git
+ *  spawn on every default argument would be paid by every reader of the ledger.
+ *  A caller that needs another checkout passes its own. */
 export const RECORDS_PATH = recordsPathFor()
 
 // AN ARGUMENT VECTOR, NEVER A SHELL LINE (landing-round pass 4): the sha this
@@ -93,11 +101,22 @@ const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_R
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */
 export function readRecords(path = RECORDS_PATH) {
+  // No checkout, no ledger — an empty history, not another tree's file.
+  if (!path) return []
   let text = ''
   try {
     text = readFileSync(path, 'utf8')
-  } catch {
-    return []
+  } catch (e) {
+    // ABSENT IS AN EMPTY HISTORY; UNREADABLE IS NOT (cross-vendor review of
+    // point 780, round 3). EACCES, EISDIR and an I/O error all used to answer
+    // "no reviews recorded" — which a writer reads as a clean ledger and a gate
+    // reads as a ledger with nothing in it: two different wrong answers out of
+    // one silent catch. The flag is what keeps the gates from treating it as
+    // the environment error their fail-open catch waves through.
+    if (e && e.code === 'ENOENT') return []
+    const error = new Error(`cannot read the review ledger at ${path}: ${(e && e.message) || e}`)
+    error.ledgerUnreadable = true
+    throw error
   }
   const out = []
   for (const line of text.split(/\r?\n/)) {
@@ -117,6 +136,15 @@ export function readRecords(path = RECORDS_PATH) {
 
 /** Append one record. Callers validate first — this only writes. */
 export function appendRecord(record, path = RECORDS_PATH) {
+  // A WRITE HAS NO FALLBACK TREE (cross-vendor review of point 780): appending
+  // to the module's own checkout from outside any checkout is exactly the
+  // silent cross-tree write this resolution was changed to end.
+  if (!path) {
+    throw new Error(
+      'mechanism-review: no ledger here — this command is running outside a git checkout, ' +
+        'and the record belongs to the checkout it judges. Run it inside one.',
+    )
+  }
   mkdirSync(dirname(path), { recursive: true })
   appendFileSync(path, `${JSON.stringify(record)}\n`)
   return record

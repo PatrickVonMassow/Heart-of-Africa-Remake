@@ -183,12 +183,20 @@ export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
  * puts the record on the point's own branch, where the comment above it always
  * said it belonged, and it travels to `main` with the merge.
  *
- * `toplevel` is what `git rev-parse --show-toplevel` said; outside a checkout it
- * says nothing, and then the module's own root is the only answer left.
+ * NO FALLBACK CHECKOUT (cross-vendor review of this point, both passes). A run
+ * outside any checkout — a bare repository, a stray working directory — has NO
+ * ledger, and answering it with the module's own tree is the very defect this
+ * function exists to remove, only quieter: it would silently read and write a
+ * DIFFERENT checkout's tracked file. `null` says so, and the writers refuse on
+ * it rather than guessing.
+ *
+ * The toplevel is used EXACTLY as git gave it (same review): a POSIX path may
+ * legitimately end in a space, so only "git said nothing" is special-cased here
+ * and the caller strips git's terminating line break, nothing else.
  */
-export function ledgerPathFrom(toplevel, fallbackRoot) {
-  const root = String(toplevel ?? '').trim() || String(fallbackRoot ?? '').trim()
-  if (!root) return LEDGER_RELATIVE_PATH
+export function ledgerPathFrom(toplevel) {
+  const root = toplevel == null ? '' : String(toplevel)
+  if (root === '') return null
   return resolve(root, LEDGER_RELATIVE_PATH)
 }
 

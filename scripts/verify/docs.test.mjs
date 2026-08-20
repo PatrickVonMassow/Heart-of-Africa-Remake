@@ -5,7 +5,7 @@
 // three ways a moved criterion can rot. The live documents are checked by the
 // suite (`node scripts/verify/docs.mjs`); what is pinned here is the judgment.
 import { describe, it, expect } from 'vitest'
-import { checkPointers, criteriaSection, criterionNumbers, pointerRe, sectionNumbers } from './docs.mjs'
+import { checkPointers, criteriaSection, criterionNumbers, pointerRe, pointerRules, sectionNumbers } from './docs.mjs'
 
 const DETAIL = 'docs/acceptance-criteria-detail.md'
 
@@ -57,10 +57,18 @@ describe('the two readers', () => {
 })
 
 describe('pointerRe', () => {
-  it('matches its own family and not the other one', () => {
+  it.each([
+    ['Detail', DETAIL],
+    ['Evidence', 'docs/acceptance-evidence.md'],
+  ])('matches bare and backticked %s paths', (keyword, doc) => {
+    const pointer = pointerRe(keyword, doc)
+    expect(`   ${keyword}: ${doc} §12.`.match(pointer)[1]).toBe('12')
+    expect(`   ${keyword}: \`${doc}\` §12.`.match(pointer)[1]).toBe('12')
+  })
+
+  it('does not cross pointer families', () => {
     const detail = pointerRe('Detail', DETAIL)
-    expect(`   Detail: ${DETAIL} §12.`.match(detail)[1]).toBe('12')
-    expect(detail.test('   Evidence: docs/acceptance-evidence.md §12.')).toBe(false)
+    expect(detail.test('   Evidence: `docs/acceptance-evidence.md` §12.')).toBe(false)
   })
 
   it('takes the document path literally — the dots are not wildcards', () => {
@@ -71,18 +79,21 @@ describe('pointerRe', () => {
 describe('checkPointers — a pointer into a section that IS there', () => {
   it('finds nothing to report', () => {
     expect(checkPointers(section, detailDoc, 'Detail', DETAIL)).toEqual({
+      pointerCount: 2,
       misdirected: [],
       unresolved: [],
       orphans: [],
     })
   })
 
-  it('leaves a criterion without a pointer alone — no dangling pointer is demanded', () => {
-    // Criteria 1 and 3 carry no `Evidence:` line, and the evidence document has
-    // no section for them: a criterion whose condition is already one short
-    // statement needs neither (CLAUDE.md §7.1 nos. 1, 11, 18).
+  it('does not invent a target section for a criterion omitted from this synthetic family', () => {
+    // Criteria 1 and 3 carry no `Evidence:` line in this miniature, and its
+    // synthetic evidence document has no section for them. `checkPointers`
+    // judges the pointers and target sections it receives; `pointerRules`
+    // separately refuses the disappearance of the whole family.
     const evidenceDoc = ['# evidence', '', '## 2. Two perspectives.', '', 'the proof chain', ''].join('\n')
     expect(checkPointers(section, evidenceDoc, 'Evidence', 'docs/acceptance-evidence.md')).toEqual({
+      pointerCount: 1,
       misdirected: [],
       unresolved: [],
       orphans: [],
@@ -94,6 +105,17 @@ describe('checkPointers — a pointer into a section that is MISSING', () => {
   it('names the unresolved number', () => {
     const without3 = detailDoc.slice(0, detailDoc.indexOf('## 3.'))
     expect(checkPointers(section, without3, 'Detail', DETAIL).unresolved).toEqual([3])
+  })
+
+  it('reports a backticked evidence pointer to an absent section by number', () => {
+    const criterion = [
+      '11. **Game graphics.** Presentation is appealing.',
+      '    Evidence: `docs/acceptance-evidence.md` §11.',
+    ].join('\n')
+    const verdict = checkPointers(criterion, '## 12. Atmosphere.\n', 'Evidence', 'docs/acceptance-evidence.md')
+
+    expect(verdict).toMatchObject({ pointerCount: 1, unresolved: [11] })
+    expect(pointerRules('evidence', 'docs/acceptance-evidence.md', verdict)[1]).toMatchObject({ ok: false, detail: '11' })
   })
 
   it('reports an empty target document as every pointer unresolved', () => {
@@ -134,9 +156,28 @@ describe('checkPointers — an ORPHANED section', () => {
 
   it('is total on junk input', () => {
     expect(checkPointers(null, null, 'Detail', DETAIL)).toEqual({
+      pointerCount: 0,
       misdirected: [],
       unresolved: [],
       orphans: [],
     })
+  })
+})
+
+describe('pointerRules — the number judged is part of the verdict', () => {
+  it('makes a zero-pointer family three findings instead of three vacuous passes', () => {
+    const verdict = checkPointers(section.replaceAll(/\s+Detail:.*\n/g, '\n'), '', 'Detail', DETAIL)
+    const rules = pointerRules('detail', DETAIL, verdict)
+
+    expect(rules.map(({ ok }) => ok)).toEqual([false, false, false])
+    expect(rules.every(({ name }) => name.includes('(0 detail pointers judged)'))).toBe(true)
+    expect(rules.every(({ detail }) => detail === 'no pointers matched')).toBe(true)
+  })
+
+  it('states the non-zero pointer count on every passing rule', () => {
+    const rules = pointerRules('detail', DETAIL, checkPointers(section, detailDoc, 'Detail', DETAIL))
+
+    expect(rules.map(({ ok }) => ok)).toEqual([true, true, true])
+    expect(rules.every(({ name }) => name.includes('(2 detail pointers judged)'))).toBe(true)
   })
 })

@@ -616,6 +616,22 @@ if (isMainModule(import.meta.url)) {
     if (gathered.head) writeBaseline(gathered.branch, gathered.head)
     process.exit(0)
   } catch (e) {
+    // AN UNREADABLE LEDGER IS NOT AN ENVIRONMENT TRANSIENT (cross-vendor review
+    // of point 780). The ledger IS this gate's evidence: without it the gate
+    // cannot tell a reviewed mechanism from an unreviewed one, so the fail-open
+    // catch below would wave through exactly what it exists to stop.
+    if (e && e.ledgerUnreadable) {
+      process.stdout.write(
+        JSON.stringify({
+          decision: 'block',
+          reason:
+            `mechanism-review-guard: the review ledger cannot be read, so nothing here can be proven reviewed.\n` +
+            `  ${e.message}\n` +
+            '  Repair the ledger (it is tracked in git) and end the turn again.',
+        }),
+      )
+      process.exit(0)
+    }
     console.error(`mechanism-review-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }
