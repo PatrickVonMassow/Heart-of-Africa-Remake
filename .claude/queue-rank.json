@@ -167,10 +167,14 @@
     "767": {
       "at": "2026-08-20T06:03:57.318Z",
       "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night."
+    },
+    "785": {
+      "at": "2026-08-20T15:51:25.029Z",
+      "why": "Last is right: it improves what the header REPORTS, while 764 first has to make the suffix mandatory at all — until that lands there is nothing requiring a truer value, and both edit the same header path, so they must not run in parallel anyway."
     }
   },
   "settled": {
-    "at": "2026-08-20T14:58:46.104Z",
+    "at": "2026-08-20T15:51:25.030Z",
     "points": [
       174,
       184,
@@ -390,14 +394,13 @@
       768,
       769,
       772,
-      773,
       774,
       777,
       778,
       779,
       781,
-      782,
-      784
+      784,
+      785
     ]
   }
 }

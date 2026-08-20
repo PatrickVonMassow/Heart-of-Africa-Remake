@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 15:57 · Quellen-Fingerprint: `9d7ca8d29b0b…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 17:51 · Quellen-Fingerprint: `469c065886de…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 74 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 74 Prozess-/Meta-TASKS-Punkte (davon 30 offen).
 
-<!-- RETRO-FINGERPRINT: 9d7ca8d29b0b2ad634de9ff19506442b779ea5742a6737416a060144fcfcf7e4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T13:57:54.174Z -->
+<!-- RETRO-FINGERPRINT: 469c065886dec28d80fc8cc87bb4b0657afeaaac292951e36e6e2f18ddfa851e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T15:51:57.317Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2162,3 +2162,30 @@ Unterschied steht ausschließlich im Rumpf. Deshalb ist gerade die fast identisc
 teurer als die offensichtliche: Sie täuscht Gleichheit vor, und niemand liest zwei Rümpfe, um eine
 Import-Zeile zu schreiben. Die Lehre ist entsprechend eng: Ein Name, eine Bedeutung — oder zwei
 Namen, die sagen, welche Frage sie beantworten.
+
+### 3.139 Der Mechanismus gegen die zweite Kopie ließ die dritte stehen
+
+Am Morgen des 20.08.2026 landete eine Prüfung zur Commit-Zeit, die genau eine Drift verhindern
+soll: Ein Stop-Hook, der in `.claude/settings.json` verdrahtet ist, aber in der Registratur des
+Preflights fehlt, meldet im Preflight nichts und blockiert trotzdem. Der Anlass war real — ein
+solcher Commit war entstanden, der Push wurde verweigert, `main` stand rot und unpushbar, und eine
+zweite laufende Sitzung erklärte sich daran für blockiert. Die neue Prüfung fragt beide Seiten am
+Index und macht den kaputten Commit unmöglich, statt ihn hinterher zu bemängeln. So weit war alles
+richtig gedacht.
+
+Die herstellerübergreifende Gegenprüfung fand dann, was der Mechanismus nicht ansah: Eine DRITTE
+Liste entscheidet mit. Der Unit-Test hielt seine eigene, fest verdrahtete Aufzählung aller
+erwarteten Guard-Kennungen. Wer einen Hook in den Einstellungen UND in der Registratur eintrug und
+diese dritte Liste vergaß, kam an der Commit-Prüfung vorbei und lief erst am Pre-Push in genau den
+Zustand, den der Mechanismus verhindern sollte — durch die einzige Tür, die er nicht bewacht. Der
+zweite Befund derselben Prüfung hatte dieselbe Form eine Ebene tiefer: Der Übersprung im
+pre-commit-Hook fragte den ARBEITSBAUM, während alles dahinter den INDEX beurteilt.
+
+**Lehre:** Ein Mechanismus gegen Drift muss zuerst zählen, wie viele Stellen die Wahrheit
+behaupten — und nicht, wie viele er gerade vergleicht. Zwei Kopien abzugleichen und eine dritte
+stehen zu lassen, verlagert die Drift nur an die Stelle, die niemand mehr ansieht; sie ist danach
+schwerer zu finden als vorher, weil ein grüner Wächter Deckung gibt. Und wer eine Bedingung
+formuliert, muss dieselbe Quelle fragen, die die Entscheidung dahinter beurteilt: Arbeitsbaum und
+Index sehen im Normalfall gleich aus, und der Unterschied zeigt sich ausgerechnet im teilweise
+vorgemerkten Baum, also im Ausnahmefall, für den die Ausnahme gebaut wurde. Prüffrage:
+*Wie viele Stellen sagen dasselbe — und liest meine Prüfung sie alle, aus derselben Quelle?*

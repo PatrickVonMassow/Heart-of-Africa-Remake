@@ -228,6 +228,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört. Berührt eine
   Änderung das Design, aktualisiere Doc und Code im **selben** Commit."
 
+- **Der Wächter gegen die Drift ließ die dritte Kopie stehen.** Er gleicht zwei Stellen ab, eine
+  dritte entscheidet mit — und weil er grün ist, sieht dort niemand mehr nach. Verwandt: die
+  Bedingung vor der Prüfung fragt eine **andere Quelle** als die Entscheidung dahinter; im
+  Normalfall sagen beide dasselbe, und sie gehen auseinander genau im Sonderfall, für den die
+  Bedingung gebaut wurde.
+  → *Prompt:* „Bevor du gegen Drift baust, **zähl die Stellen**, die diese Wahrheit behaupten,
+  und lies sie **alle** — nicht nur die zwei, die dir gerade einfallen. Jede Vorbedingung fragt
+  **dieselbe Quelle**, die die Entscheidung dahinter beurteilt."
+
 - **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet.
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
@@ -412,4 +421,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9d7ca8d29b0b2ad634de9ff19506442b779ea5742a6737416a060144fcfcf7e4 -->
+<!-- GUIDE-FINGERPRINT: 469c065886dec28d80fc8cc87bb4b0657afeaaac292951e36e6e2f18ddfa851e -->

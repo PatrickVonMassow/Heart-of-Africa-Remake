@@ -10410,14 +10410,13 @@ to land than a mechanism that needs a review.
   watermark. `node scripts/context-watermark.mjs --status --transcript <transcript>` already
   reports tokens, watermark and state, so the number exists and only its presentation is missing.
   FINAL STATE: the first header of a session names the loaded base rather than `--`, falling back
-  to the measured base load or the previous session's last reading when no usage record exists
-  yet; a turn that receives no fresh hook line does not repeat the previous suffix, but says so in
-  a form a reader can tell apart from a measurement; and the suffix carries the per-turn delta
-  beside the absolute value. `--` remains reserved for the case where the reading genuinely cannot
+  to the measured base load when no usage record exists yet; a turn that receives no fresh hook
+  line states that no reading was taken, in a form a reader can tell apart from a measurement;
+  and the suffix carries the per-turn delta beside the absolute value. `--` remains reserved for the case where the reading genuinely cannot
   be taken.
   VERIFIABLE: Vitest over the pure suffix builder — a first turn with no usage record yields the
   base-load reading rather than `--`; a turn whose input carries no hook line yields the
-  not-measured form rather than the previous value; a normal turn yields absolute plus delta; and
+  not-measured form; a normal turn yields absolute plus delta; and
   a case replays the three real headers of session c0ad5041 and asserts the first two are no
   longer indistinguishable from measured ones. Plus the existing green cases stay green.
   Criticality: medium — no product defect, but the header is the user's only continuous view of
