@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
+  HEADER_SUFFIX_RE,
   MINUTES_AHEAD,
   MINUTES_BACK,
   TIMESTAMP_RE,
@@ -16,6 +17,7 @@ import {
   berlinStamp,
   evaluate,
   extractLastAssistantText,
+  timestampReplyCondition,
 } from './timestamp-guard-core.mjs'
 
 // Vitest runs with cwd = repo root; import.meta.url is an http URL under the
@@ -184,5 +186,96 @@ describe('end-to-end guard process', () => {
     expect(runGuard({ transcript_path: p }, { session: 'fix' })?.decision).toBe('block')
     writeFileSync(p, `${assistantText(`**${berlinStamp()}** Nachgereicht.`, { id: 'fix2' })}\n`)
     expect(runGuard({ transcript_path: p }, { session: 'fix' })).toBe(null)
+  })
+})
+
+// THE SECOND HALF OF THE HEADER (user 20.08.2026, "schon wieder verschwunden").
+// The reply header is the stamp AND the context reading. The reading kept
+// disappearing for one mechanical reason: a blocked turn is told to begin "with
+// exactly this line", and the line handed over carried only the stamp — so
+// every guard that fired silently amputated the header it was enforcing.
+describe('the context reading in the header', () => {
+  const stamp = () => `**${berlinStamp()}**`
+  const SUFFIX = ' · Kontext: 115.942 Tokens'
+
+  it('hands over the WHOLE header in the line to copy, not just the stamp', () => {
+    const verdict = evaluate({ lastText: 'no stamp at all', headerSuffix: SUFFIX })
+    expect(verdict?.decision).toBe('block')
+    expect(verdict.reason).toContain(SUFFIX)
+  })
+
+  it('hands over the unknown reading rather than nothing when nothing measured', () => {
+    const verdict = evaluate({ lastText: 'no stamp at all', headerSuffix: ' · Kontext: -- Tokens' })
+    expect(verdict.reason).toContain(' · Kontext: -- Tokens')
+  })
+
+  it('blocks a reply that carries the stamp but drops the reading', () => {
+    const verdict = evaluate({
+      lastText: `${stamp()} Kurze Bestätigung.`,
+      headerSuffix: SUFFIX,
+      enforceSuffix: true,
+    })
+    expect(verdict?.decision).toBe('block')
+    expect(verdict.reason).toContain('CONTEXT READING')
+  })
+
+  it('allows the complete header', () => {
+    expect(
+      evaluate({
+        lastText: `${stamp()}${SUFFIX}\n\nKurze Bestätigung.`,
+        headerSuffix: SUFFIX,
+        enforceSuffix: true,
+      }),
+    ).toBe(null)
+  })
+
+  // The guard reads the transcript at turn END, which may already show a newer
+  // usage record than the prompt hook handed over. Blocking a reply for copying
+  // the number it was given would be absurd, so the SHAPE is judged, not the value.
+  it('accepts a reading that differs from the one handed over', () => {
+    expect(
+      evaluate({
+        lastText: `${stamp()} · Kontext: 7.001 Tokens\n\nText.`,
+        headerSuffix: SUFFIX,
+        enforceSuffix: true,
+      }),
+    ).toBe(null)
+  })
+
+  it('accepts the unknown reading in the reply', () => {
+    expect(
+      evaluate({
+        lastText: `${stamp()} · Kontext: -- Tokens`,
+        headerSuffix: SUFFIX,
+        enforceSuffix: true,
+      }),
+    ).toBe(null)
+  })
+
+  // Where nothing measured the context, demanding the reading back would insist
+  // on a value nobody supplied. The line still carries it; the block does not.
+  it('does not demand the reading when no measurement exists', () => {
+    expect(evaluate({ lastText: `${stamp()} Text.`, headerSuffix: ' · Kontext: -- Tokens' })).toBe(null)
+  })
+
+  it('reads only the FIRST line, so a reading further down does not count', () => {
+    const verdict = evaluate({
+      lastText: `${stamp()}\n\nIrgendwo später · Kontext: 12.000 Tokens`,
+      headerSuffix: SUFFIX,
+      enforceSuffix: true,
+    })
+    expect(verdict?.decision).toBe('block')
+  })
+
+  it('the shape accepts both a grouped number and the unknown reading', () => {
+    expect(HEADER_SUFFIX_RE.test(' · Kontext: 1.234.567 Tokens')).toBe(true)
+    expect(HEADER_SUFFIX_RE.test(' · Kontext: -- Tokens')).toBe(true)
+    expect(HEADER_SUFFIX_RE.test(' · Kontext: Tokens')).toBe(false)
+  })
+
+  // The preflight names the same line the Stop hook will judge, so the two
+  // cannot drift into demanding different headers.
+  it('the preflight condition names the whole header too', () => {
+    expect(timestampReplyCondition(new Date(), SUFFIX)).toContain(SUFFIX)
   })
 })
