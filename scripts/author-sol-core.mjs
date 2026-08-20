@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@6f66efa2
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@058e29dc
 //
 // `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its
@@ -279,7 +279,9 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
 }
 
 /**
- * The non-authoring step immediately before Fable escalation. It gives the
+ * The non-authoring step at the round that used to precede Fable escalation.
+ * It outlives that escalation's suspension (20.08.2026): the pause was always
+ * the point, and the lane change only followed it. It gives the
  * other vendor the point text, the generated brief and every recorded finding
  * in one read, and asks for the only two outcomes the ledger accepts.
  */

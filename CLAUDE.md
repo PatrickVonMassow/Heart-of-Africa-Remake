@@ -111,7 +111,7 @@ strategy and suite map: `scripts/verify/README.md`.
   in-flight adoption mechanics live in `docs/batch-owner-runbook.md`.
 - **Model policy.** GPT-5.6 Sol authors difficult, complex, error-prone, and
   HIGH-criticality points; Opus 5 authors points whose verification is the work.
-  Fable 5 is the escalation only after five unsuccessful review rounds. Review
+  Fable 5 authors only where a point's lane tag names it. Review
   is cross-vendor and never by an author of the range: Sol reviews Claude work
   through `scripts/review-sol.mjs`, Claude reviews Sol work. Serving fallback
   is Opus 5 → Fable 5 → Opus 4.8; Sonnet, Haiku, and any other serving model

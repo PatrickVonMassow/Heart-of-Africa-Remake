@@ -99,7 +99,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     expect(result.stdout).toContain('review record: 0 unsuccessful round(s)')
   })
 
-  it('derives N non-passing reviews and moves at the exported boundary', () => {
+  it('derives N non-passing reviews and holds the lane while the escalation is suspended', () => {
     const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, (_, round) => ({
       point: Number(point),
       mode: 'review',
@@ -116,7 +116,8 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     rows.unshift({ point: Number(point), mode: 'review', verdict: 'merge' })
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → fable`)
+    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain('but the Fable escalation is SUSPENDED')
     expect(result.stdout).toContain(
       `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
     )
@@ -139,7 +140,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     expect(result.stdout).toContain('REPEAT — no author framing was recorded')
   })
 
-  it('keeps all reviews from before commission receipts in the escalation count', () => {
+  it('keeps all reviews from before commission receipts in the round count', () => {
     const rows = Array.from({ length: 11 }, () => ({
       point: Number(point),
       mode: 'review',
@@ -147,14 +148,16 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     }))
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → fable`)
+    expect(result.stdout).toContain(`point ${point} → sol`)
     expect(result.stdout).toContain('11 unsuccessful round(s); 11 fresh attempt(s)')
   })
 
   it('accepts an explicit numeric override for history outside the ledger', () => {
     const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout).toContain(`point ${point} → fable`)
+    // The override still carries the count; only the lane change is suspended.
+    expect(result.stdout).toContain(`point ${point} → sol`)
+    expect(result.stdout).toContain('but the Fable escalation is SUSPENDED')
   })
 
   it('turns the override immediately before the threshold into the examination step', () => {

@@ -11,6 +11,7 @@ import {
   authorRoundHistory,
   authorLaneFor,
   FABLE_ESCALATION_ROUNDS,
+  FABLE_ESCALATION_SUSPENDED,
   formatAuthorRoundHistory,
   formatLaneReport,
   HARD_MARKERS,
@@ -104,17 +105,31 @@ describe('authorLaneFor — which lane authors a point', () => {
     }
   })
 
-  it('escalates at the exported boundary, above ordinary lane tags but below operator decisions', () => {
+  it('sends nothing to Fable at the boundary while the escalation is suspended', () => {
+    expect(FABLE_ESCALATION_SUSPENDED).toBe(true)
     const reworkRounds = FABLE_ESCALATION_ROUNDS
-    expect(lane('Something mechanical.', { reworkRounds })).toBe('fable')
-    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('fable')
-    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('fable')
-    expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('fable')
+    // Past the threshold the point stays in the lane its other signals demand.
+    expect(lane('Something mechanical.', { reworkRounds })).toBe('sol')
+    expect(lane('A complex screenshot problem.', { criticality: 'high', reworkRounds })).toBe('sol')
+    expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('sol')
+    expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('opus')
     expect(lane('x', { reworkRounds, override: 'sol' })).toBe('sol')
+    // Both deliberate doors into the lane stay open.
     expect(lane('x\nAuthor lane: fable', { reworkRounds: 0 })).toBe('fable')
-    expect(authorLaneFor({ body: 'x', reworkRounds }).why[0]).toBe(
-      `${FABLE_ESCALATION_ROUNDS} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
-    )
+    expect(lane('x', { reworkRounds: 0, override: 'fable' })).toBe('fable')
+  })
+
+  it('says at every crossed round that the escalation was suspended, not missed', () => {
+    for (const reworkRounds of [FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_ROUNDS + 7]) {
+      const why = authorLaneFor({ body: 'x', reworkRounds }).why
+      expect(why[0]).toBe('mechanical or mid-difficulty, and nothing marks it otherwise')
+      expect(why[1]).toBe(
+        `${reworkRounds} unsuccessful review rounds would have reached the §6 escalation threshold of ` +
+          `${FABLE_ESCALATION_ROUNDS}, but the Fable escalation is SUSPENDED (user 20.08.2026)`,
+      )
+    }
+    // Below the threshold nothing is said about it at all.
+    expect(authorLaneFor({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {

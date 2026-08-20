@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@6f66efa2
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@058e29dc
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -19,10 +19,11 @@
 //          the main session's job, so authoring it elsewhere buys nothing) —
 //          and only while nothing marks that point hard, because the user's
 //          18.08. ruling outranks this lane, not the other way round.
-//   fable  Fable 5 is the escalation described by CLAUDE.md §6. Its weekly
-//          pool is the scarcest of the three, so the CUT sends nothing else
-//          there — a point's own Fable tag and the caller's override still can,
-//          and both are deliberate.
+//   fable  Fable 5 was the escalation described by CLAUDE.md §6, and that
+//          escalation is SUSPENDED since 20.08.2026: its weekly pool is the
+//          scarcest of the three and too little of it is left. The CUT now
+//          sends nothing there at all — a point's own Fable tag and the
+//          caller's override still can, and both are deliberate.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -46,6 +47,16 @@ export const LANE_MODEL = Object.freeze({
 
 /** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
 export const FABLE_ESCALATION_ROUNDS = 5
+
+/**
+ * User decision 20.08.2026: the automatic escalation is SUSPENDED — too little
+ * of the Fable pool is left to spend on authoring. The threshold above is kept
+ * at its ruled value rather than raised to an unreachable number, because a
+ * fake threshold reads as a live rule to the next reader and hides that this is
+ * a suspension somebody has to lift. Both other doors into the lane stay open
+ * and are deliberate: a point's own `Author lane: fable` and a caller override.
+ */
+export const FABLE_ESCALATION_SUSPENDED = true
 
 /** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
 export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
@@ -218,7 +229,7 @@ export function nextAuthoringStep({
       framing: '',
       history,
       reason:
-        `${freshRounds} fresh attempts have reached the step before the Fable escalation threshold of ${escalationRounds}; ` +
+        `${freshRounds} fresh attempts have reached the step before the escalation threshold of ${escalationRounds}; ` +
         'the point text and generated brief must be examined against every finding before another commission',
     }
   }
@@ -433,7 +444,19 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
   const verification = hits(VERIFICATION_MARKERS, text)
   const rounds = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : 0
   const signals = { tag, criticality: criticality ?? null, reworkRounds: rounds, hard, verification }
-  const decide = (lane, reason) => ({ lane, model: LANE_MODEL[lane], why: [reason], signals })
+  // A SUSPENDED ESCALATION SAYS SO WHERE IT WOULD HAVE FIRED. Silently routing
+  // such a point onward would read as "the threshold was never reached".
+  const suspended =
+    FABLE_ESCALATION_SUSPENDED && rounds >= FABLE_ESCALATION_ROUNDS
+      ? `${rounds} unsuccessful review rounds would have reached the §6 escalation threshold of ` +
+        `${FABLE_ESCALATION_ROUNDS}, but the Fable escalation is SUSPENDED (user 20.08.2026)`
+      : ''
+  const decide = (lane, reason) => ({
+    lane,
+    model: LANE_MODEL[lane],
+    why: suspended ? [reason, suspended] : [reason],
+    signals,
+  })
 
   if (LANES.includes(String(override).toLowerCase())) {
     return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
@@ -442,7 +465,7 @@ export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0,
   // remains immediate while tags naming the ordinary lanes yield once the
   // recorded escalation boundary has actually been reached.
   if (tag === 'fable') return decide(tag, 'the point itself carries `Author lane: fable`')
-  if (rounds >= FABLE_ESCALATION_ROUNDS) {
+  if (!FABLE_ESCALATION_SUSPENDED && rounds >= FABLE_ESCALATION_ROUNDS) {
     return decide(
       'fable',
       `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
