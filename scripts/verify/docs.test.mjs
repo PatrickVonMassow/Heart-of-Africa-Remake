@@ -106,6 +106,17 @@ describe('checkPointers — a pointer into a section that is MISSING', () => {
     expect(checkPointers(section, without3, 'Detail', DETAIL).unresolved).toEqual([3])
   })
 
+  it('reports a backticked evidence pointer to an absent section by number', () => {
+    const criterion = [
+      '11. **Game graphics.** Presentation is appealing.',
+      '    Evidence: `docs/acceptance-evidence.md` §11.',
+    ].join('\n')
+    const verdict = checkPointers(criterion, '## 12. Atmosphere.\n', 'Evidence', 'docs/acceptance-evidence.md')
+
+    expect(verdict).toMatchObject({ pointerCount: 1, unresolved: [11] })
+    expect(pointerRules('evidence', 'docs/acceptance-evidence.md', verdict)[1]).toMatchObject({ ok: false, detail: '11' })
+  })
+
   it('reports an empty target document as every pointer unresolved', () => {
     expect(checkPointers(section, '', 'Detail', DETAIL).unresolved).toEqual([2, 3])
   })
