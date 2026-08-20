@@ -6452,7 +6452,12 @@ Build order, chosen so no two parallel agents own the same file:
       surfaces afterwards as a MAILING red on `main`. So the branch gate is read where it
       still matters: before a merge to `main`, the branch head's `ci/gate (branch)` commit
       status must be green, and a red one blocks the merge with the failing step named.
-      Turn ends on a branch stay unblocked.
+      Turn ends on a branch stay unblocked. In the same commit `CLAUDE.md` §7.2 stops
+      claiming more than that: its sentence that `ci-status-guard` covers every
+      pushed ref is true only where a run's conclusion still carries the truth —
+      since 513 a `feat/**` run concludes green by construction, so for a branch ref
+      the commit status `ci/gate (branch)` read at the merge is the coverage, not
+      the guard.
   (b) A FAILURE BEFORE THE VERDICT STEP IS NOT A GREEN. `checkout` and `setup-node` carry
       no `id`, so if one fails soft on a branch, every later step — including
       `node scripts/ci-gate-verdict.mjs`, whose file was never checked out — fails soft,
