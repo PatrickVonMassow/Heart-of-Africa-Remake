@@ -120,10 +120,6 @@
       "at": "2026-08-18T13:41:45.936Z",
       "why": "Batch autonomy defect with a known workaround (the successor adopts the strand); it waits behind the token and communication blocks the user ordered first."
     },
-    "718": {
-      "at": "2026-08-18T13:41:46.018Z",
-      "why": "The lane ruling it records is already in force since 714 landed; what remains is the tag plus its unit case, which nothing blocks."
-    },
     "722": {
       "at": "2026-08-18T16:54:33.891Z",
       "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first"
@@ -206,7 +202,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-20T09:24:02.967Z",
+    "at": "2026-08-20T09:39:36.201Z",
     "points": [
       174,
       184,
@@ -400,7 +396,6 @@
       713,
       715,
       716,
-      718,
       719,
       720,
       722,
