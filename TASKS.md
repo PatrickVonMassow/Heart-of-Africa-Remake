@@ -6863,6 +6863,14 @@ Build order, chosen so no two parallel agents own the same file:
   wildlife point; the RESEARCH half and the pure schema/behaviour helpers (in new
   files) can start in parallel, the scene wiring waits for the wildlife cluster to be
   free. Implementation-ready.
+  THE RESEARCH HALF IS DELIVERED — no Fable pass is owed (carried 20.08.2026 from the
+  10.08.2026 four-eyes work-order analysis, not a fresh finding). `docs/fauna-behaviour-1890.md`
+  carries all of it, cited and marked: the senescence cues per species group including the
+  crocodile's absence of legible ones, the old solitary male and where it is real, the molar
+  biology and the near-water death with the graveyard marked MYTH, the vultures around a
+  dying animal, a renderable dying sequence, the per-species implementation table, and a
+  SECOND pass filed under this point's own number (§10, 24.07.2026). The "RESEARCH FIRST"
+  clause above is satisfied; what remains is the BUILD (a)-(d) against that document.
 
 - [ ] 269. Birds flee by flying + region-appropriate aerial predators (research-gated)
   (user 23.07.2026). Two linked additions, BOTH gated on a Fable research pass first.
@@ -6913,6 +6921,13 @@ Build order, chosen so no two parallel agents own the same file:
   cluster (Wildlife.tsx/wildlifeBehavior.ts/fauna.ts) — the RESEARCH runs in parallel
   now; the BUILD waits for the cluster to be free and does NOT run concurrently with
   another Wildlife.tsx point. Implementation-ready once the research lands.
+  THE RESEARCH GATE IS DELIVERED FOR BOTH HALVES (carried 20.08.2026 from the 10.08.2026
+  four-eyes work-order analysis, not a fresh finding). The point records it for (B), but its
+  opening clause still gates (A) on a Fable pass as well — and `docs/fauna-behaviour-1890.md`
+  §B1 answers (A) too: which prey birds fly off, the flamingo's laborious running take-off
+  as the vulnerable window, the plover chick that crouches while the adult flies, and
+  whether "a ground predator only gets a bird caught on the ground" matches real behaviour.
+  So no research is owed at all; only the build waits for the wildlife cluster to be free.
 
 - [ ] 310. Low-preset performance pass for two opposite devices (user 25.07.2026,
   recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
