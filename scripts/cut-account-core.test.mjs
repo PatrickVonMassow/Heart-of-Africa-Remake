@@ -12,6 +12,7 @@ import {
   FLOOR_KINDS,
   parseCutAccount,
   parseFloorReadings,
+  sessionKindOfPrompt,
   evaluateCutAccount,
   accountDestinationFault,
   expandDestination,
@@ -469,25 +470,33 @@ describe('docs/document-cut-757.md — the measured floors', () => {
     expect(inWords).toHaveLength(1)
   })
 
-  // Where the transcript is still on this machine the figure is not merely
-  // well-formed, it is re-derived. On any other machine the file is absent and
-  // the case is a refused read, exactly like the external destinations above.
-  it('re-derives each floor from its own transcript where that transcript exists', () => {
-    let checked = 0
+  // Where the transcripts are still on this machine the figures are not merely
+  // well-formed, they are re-derived. On any other machine both files are absent
+  // and the case is a refused read, exactly like the external destinations above.
+  //
+  // WHY BOTH, and not "each one that happens to exist": skipping an absent file
+  // individually let a fabricated or stale owner reading pass on the very
+  // machine that can check it, as long as the subagent file was still there.
+  // Absence is only evidence-free where NEITHER can be read, so the anchor
+  // demands the whole set or nothing.
+  const jsonl = (path) =>
+    readFileSync(path, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => {
+        try {
+          return JSON.parse(l)
+        } catch {
+          return null
+        }
+      })
+
+  it('re-derives every floor from its own transcript on the batch machine', () => {
+    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
       const path = fullPath(r.transcript)
-      if (!existsSync(path)) continue
-      const first = readFileSync(path, 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => {
-          try {
-            return JSON.parse(l)
-          } catch {
-            return null
-          }
-        })
-        .find((o) => o?.type === 'assistant' && o?.message?.usage)
+      expect(existsSync(path), `transcript named for the ${r.kind} floor is missing`).toBe(true)
+      const first = jsonl(path).find((o) => o?.type === 'assistant' && o?.message?.usage)
       expect(first, `no assistant message with usage in ${r.transcript}`).toBeTruthy()
       const u = first.message.usage
       expect([
@@ -495,12 +504,41 @@ describe('docs/document-cut-757.md — the measured floors', () => {
         u.cache_read_input_tokens ?? 0,
         u.cache_creation_input_tokens ?? 0,
       ]).toEqual(r.summands)
-      checked++
     }
-    // On the batch machine — the one anchor this suite trusts, as above — at
-    // least one transcript is present, so a vacuous pass there would mean the
-    // re-derivation never ran. Elsewhere both files are absent by construction.
-    if (existsSync(MEMORY_DIR)) expect(checked).toBeGreaterThan(0)
+  })
+
+  // The account's whole argument is that these are two KINDS of session, so a
+  // reading re-derives correctly and still proves nothing if it came from the
+  // wrong kind. Shape and arithmetic cannot catch that; the prompt can.
+  it('takes each floor from a transcript of the kind it claims', () => {
+    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
+    for (const r of readings) {
+      const first = jsonl(fullPath(r.transcript)).find((o) => o?.type === 'user')
+      expect(first, `no user message in ${r.transcript}`).toBeTruthy()
+      const c = first.message.content
+      const text = typeof c === 'string' ? c : c.map((x) => x.text ?? '').join('\n')
+      expect(sessionKindOfPrompt(text), `${r.transcript} is not an ${r.kind} transcript`).toBe(
+        r.kind,
+      )
+    }
+  })
+
+  // The defect this pins is the one the cross-vendor review caught: the durable
+  // saving had been stated as the total MINUS the truncation artefact, which
+  // silently banked the unexplained residual as if it had been attributed. The
+  // durable figure must equal the component actually attributed to the removed
+  // document text, and nothing looser.
+  it('claims no more durable saving than it attributes to the removed documents', () => {
+    const flowed = text.replace(/\s+/g, ' ')
+    const attributed = /~([\d.]+)k is the removed document text/.exec(flowed)
+    const durable = /durable recurring saving is ABOUT ([\d.]+)k/.exec(flowed)
+    expect(attributed, 'the reconciliation names no document-text component').toBeTruthy()
+    expect(durable, 'the account states no durable saving').toBeTruthy()
+    expect(Number(durable[1])).toBe(Number(attributed[1]))
+  })
+
+  it('does not read both floors out of the same transcript', () => {
+    expect(new Set(readings.map((r) => r.transcript)).size).toBe(readings.length)
   })
 })
 
@@ -553,5 +591,18 @@ describe('docs/document-cut-757.md — the ceilings table', () => {
       expect(row).toContain(`${lines} lines`)
       expect(row).toContain(`${words.toLocaleString('en-US')} words`)
     }
+  })
+})
+
+describe('sessionKindOfPrompt', () => {
+  it('calls a batch-resume prompt an owner session, in either language', () => {
+    expect(sessionKindOfPrompt('Autonome Batch-Wiederaufnahme (vom OS-Scheduler …)')).toBe('owner')
+    expect(sessionKindOfPrompt('[batch-resume] TASKS.md has 226 open point(s)')).toBe('owner')
+  })
+
+  it('calls anything else a subagent session', () => {
+    expect(sessionKindOfPrompt('This is a context-floor measurement probe.')).toBe('subagent')
+    expect(sessionKindOfPrompt('')).toBe('subagent')
+    expect(sessionKindOfPrompt(undefined)).toBe('subagent')
   })
 })

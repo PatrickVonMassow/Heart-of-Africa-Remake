@@ -278,3 +278,21 @@ export function parseFloorReadings(text) {
   }
   return readings
 }
+
+/**
+ * What makes a transcript an OWNER session rather than a delegated subagent:
+ * the batch-resume prompt the SessionStart path injects only into the session
+ * that holds the batch lock. It is the one difference the two floors are
+ * attributed to, so the account's claim is only checkable if the kind is.
+ */
+const OWNER_SESSION_MARKERS = [/Batch-Wiederaufnahme/, /batch-resume/]
+
+/**
+ * Classify a transcript's FIRST user message. Returns 'owner' when it carries a
+ * batch-resume prompt and 'subagent' otherwise — deliberately a two-way cut,
+ * because those are the only two kinds the account distinguishes.
+ */
+export function sessionKindOfPrompt(text) {
+  const s = String(text ?? '')
+  return OWNER_SESSION_MARKERS.some((re) => re.test(s)) ? 'owner' : 'subagent'
+}

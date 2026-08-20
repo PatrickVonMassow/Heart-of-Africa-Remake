@@ -55,10 +55,22 @@ That 14,355 does not all recur, and the reconciliation says why:
   byte-identical between the two readings. Nothing in this repository records
   that share per session, so the residual cannot be closed from here.
 
-So the durable recurring saving is about 12.3k tokens per turn, paid back to
-every turn of every session and to every delegated subagent. The measured gap of
-4,078 between the two floors understates the owner surcharge for the same
-truncation reason.
+So the durable recurring saving is ABOUT 11.4k tokens per turn — the removed
+document text, and nothing else that is affirmatively attributed. It is not
+12.3k: subtracting only the truncation artefact from 14,355 would quietly bank
+the ~850 residual as if it had been explained. The honest statement is 11.4k
+attributed, with an upper bound of 12.3k that holds only if the residual turns
+out to be document-related too, which nothing here shows.
+
+Two claims above are ATTRIBUTED, not measured, and are marked so on purpose. The
+first is that the owner/subagent gap is the SessionStart output and the runbook:
+that follows from the two sessions being otherwise alike, and the accompanying
+test pins their KINDS — the owner transcript carries the batch-resume prompt and
+the subagent transcript does not — but it does not weigh the hook's share
+against any other difference between two harness runs. The second is the ~4
+bytes per token these documents run at, which is a ratio taken from their
+character counts, not a tokenizer reading. Both would need a per-session record
+of the harness share to become measurements, and that record does not exist.
 
 ## Ceilings confirmed against the landed files
 
