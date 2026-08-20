@@ -8,14 +8,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { execSync } from 'node:child_process'
-import {
-  anchorCommand,
-  auditGuardHealth,
-  commandAnchoring,
-  formatGuardHealth,
-  RUNNER_CONFIG_NAMES,
-  runnerWiredScripts,
-} from './guard-health-core.mjs'
+import { anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -27,19 +20,9 @@ const SETTINGS = repoPath('.claude', 'settings.json')
 const PAUSE = repoPath('.claude', 'batch-paused')
 
 /**
- * Everything that could invoke an enforcer: the hook settings, the contents of an
- * ACTIVE git hooks directory, and the test runner's own configuration. An inactive
- * hooks path contributes nothing — which is the point, since that is exactly how a
- * gate script ends up dead.
- *
- * THE RUNNER COUNTS AS A CALLER (20.08.2026). Not every enforcer is a hook:
- * `repository-integrity-guard.mjs` is wired as Vitest `globalSetup` and reddens the
- * whole unit run when the live repository moves under it. Reading only the hook
- * sources called it `cannot-fire` while it was firing on every suite — the exact
- * false accusation the comment below warns a reader not to trust. What enters the
- * blob is not the config TEXT but what `runnerWiredScripts` reads out of the ONE
- * config the runner would load: a name in a comment or in a shadowed file is not
- * an invocation, and a false all-clear is worse than the false accusation.
+ * Everything that could invoke an enforcer: the hook settings plus the contents
+ * of an ACTIVE git hooks directory. An inactive hooks path contributes nothing —
+ * which is the point, since that is exactly how a gate script ends up dead.
  *
  * TWO shapes, on purpose (point 438). The BLOB answers "is this enforcer named
  * anywhere at all", where a git hook counts exactly like a settings line. The
@@ -76,21 +59,6 @@ function wiringText() {
     }
   } catch {
     /* no hooksPath configured — nothing to add */
-  }
-  // ONE config, the one the runner would load, and only the entries it actually
-  // invokes: concatenating every candidate would let a stale or shadowed file
-  // mark a dead guard as wired, and pasting the whole text would let a mention in
-  // a comment do it (GPT-5.6 Sol, review of 65022b1).
-  for (const name of RUNNER_CONFIG_NAMES) {
-    let raw
-    try {
-      raw = readFileSync(resolve(REPO_ROOT, name), 'utf8')
-    } catch {
-      continue
-    }
-    const invoked = runnerWiredScripts(raw)
-    if (invoked.length > 0) text += `\n${invoked.join('\n')}\n`
-    break
   }
   return { text, hooks }
 }

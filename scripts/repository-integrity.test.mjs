@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -8,7 +8,8 @@ import {
   protectRepository,
   repositoryState,
   repositoryStatePaths,
-} from './repository-integrity-guard.mjs'
+} from './repository-integrity.mjs'
+import { repoPath } from './repo-paths.mjs'
 
 describe('unit-suite repository integrity guard', () => {
   let repo
@@ -93,5 +94,18 @@ describe('unit-suite repository integrity guard', () => {
     expect(verify).toThrow(
       /head changed: "ref: refs\/heads\/main" -> "ref: refs\/heads\/escaped"/,
     )
+  })
+})
+
+// THE WIRING IS PART OF THE MECHANISM, so it is asserted here rather than left to
+// a registry that only knows hooks. This module is NOT a hook enforcer — it is the
+// unit run's own boundary, invoked by Vitest — and it was named `-guard` at first,
+// which put it in `guard-health`'s enforcer set and had that audit report an
+// enforcer firing on every suite as one that can never fire (20./21.08.2026). The
+// name states what it is; this case states that the runner really invokes it.
+describe('the runner invokes this module', () => {
+  it('stands in vitest.config.ts as globalSetup', () => {
+    const config = readFileSync(repoPath('vitest.config.ts'), 'utf8')
+    expect(config).toContain("globalSetup: ['./scripts/repository-integrity.mjs']")
   })
 })

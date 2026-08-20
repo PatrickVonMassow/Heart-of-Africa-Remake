@@ -49,47 +49,6 @@ export const INTENTIONALLY_DORMANT = {
   // deleted this entry. The map is EMPTY again, which is the state it wants.
 }
 
-/** Vitest's own config precedence, most specific first. The runner picks ONE. */
-export const RUNNER_CONFIG_NAMES = [
-  'vitest.config.ts',
-  'vitest.config.mts',
-  'vitest.config.cts',
-  'vitest.config.js',
-  'vitest.config.mjs',
-  'vitest.config.cjs',
-]
-
-/**
- * THE SCRIPTS THE TEST RUNNER ITSELF INVOKES — the entries of `globalSetup` and
- * `setupFiles`, and nothing else.
- *
- * NOT EVERY ENFORCER IS A HOOK: `repository-integrity-guard.mjs` runs as Vitest
- * `globalSetup` and reddens the whole unit run when the live repository moves
- * under it. Reading only the hook sources called it `cannot-fire` while it was
- * firing on every suite — a false accusation. But the answer may not be "add the
- * config text to the blob": a name in a COMMENT, in a dead branch, or in a config
- * this runner never loads would then read as wired, and a false all-clear is the
- * one failure this audit exists to prevent (GPT-5.6 Sol, review of 65022b1).
- *
- * So the invocation is read STRUCTURALLY: line comments go first, then only the
- * string literals inside those two keys count. PURE, over the config TEXT.
- */
-export function runnerWiredScripts(configText) {
-  const text = String(configText ?? '').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
-  const found = new Set()
-  for (const key of ['globalSetup', 'setupFiles']) {
-    // Both shapes Vitest accepts: a bare string, or an array of them.
-    const re = new RegExp(`\\b${key}\\s*:\\s*(\\[[^\\]]*\\]|'[^']*'|"[^"]*"|\`[^\`]*\`)`, 'g')
-    for (const m of text.matchAll(re)) {
-      for (const lit of m[1].matchAll(/'([^']*)'|"([^"]*)"|`([^`]*)`/g)) {
-        const value = lit[1] ?? lit[2] ?? lit[3] ?? ''
-        if (value.trim()) found.add(value.trim())
-      }
-    }
-  }
-  return [...found].sort()
-}
-
 /**
  * IS THIS ENFORCER WIRED, AND ON THE EVENT AND TOOLS IT NEEDS? PURE, over the
  * settings TEXT.

@@ -22,7 +22,7 @@ export default defineConfig({
     // The suite itself is a hostile boundary: a fixture that escapes through a
     // script's source-derived root must turn the whole run red if it changes a
     // live ref, the shared config, or this checkout's HEAD.
-    globalSetup: ['./scripts/repository-integrity-guard.mjs'],
+    globalSetup: ['./scripts/repository-integrity.mjs'],
     // The R3F/three scenes never render here; only pure modules and HUD
     // components are imported, so no canvas/WebGL is needed.
     css: false,
