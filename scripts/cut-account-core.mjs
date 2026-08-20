@@ -233,3 +233,48 @@ export function wiredGuards(settings) {
   }
   return names
 }
+
+/** The two session kinds whose document floor this account records. */
+export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
+
+/**
+ * One floor reading, as the document writes it:
+ *
+ *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>`
+ *
+ * The reading may wrap after any `::`, which is why the shape is matched against
+ * the paragraph rather than a single line. The three summands are
+ * `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` of
+ * the FIRST assistant message, and they are carried instead of the total alone
+ * so a later reader can re-derive the number from the named transcript rather
+ * than trust it. A sum that does not add up is the one failure this parser
+ * cannot excuse: it is what a copied-over figure looks like.
+ */
+const FLOOR_RE =
+  /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`/g
+
+const num = (s) => Number(String(s).replace(/,/g, ''))
+
+/**
+ * Parse the floor readings out of the account document. Each carries its kind,
+ * date, transcript path, three summands and stated total, plus whether the
+ * summands actually add to that total.
+ */
+export function parseFloorReadings(text) {
+  const readings = []
+  for (const m of String(text ?? '').matchAll(FLOOR_RE)) {
+    const [, kind, date, transcript, a, b, c] = m
+    const summands = [num(a), num(b), num(c)]
+    const stated = num(m[7])
+    readings.push({
+      kind,
+      date,
+      transcript,
+      summands,
+      stated,
+      total: summands.reduce((x, y) => x + y, 0),
+      adds: summands.reduce((x, y) => x + y, 0) === stated,
+    })
+  }
+  return readings
+}

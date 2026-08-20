@@ -49,8 +49,9 @@ export const DOC_BUDGETS = [
   {
     path: 'MEMORY.md',
     location: 'project-memory',
-    // LOWERED to the 20.08.2026 cut: 100 lines / 2133 words became 45 / 700
-    // by this guard's tokenizer,
+    // LOWERED to the 20.08.2026 cut: 100 lines / 2133 words became 46 / 710
+    // by this guard's tokenizer, CONFIRMED against the landed file on
+    // 20.08.2026 (the 45 / 700 written here was a pre-merge reading),
     // and the longest index entry is 21 words. The whole-file ceiling prevents
     // new duplicate entries; the entry ceiling preserves “the hook only”.
     maxLines: 47,
@@ -61,8 +62,10 @@ export const DOC_BUDGETS = [
   {
     path: 'global-CLAUDE.md',
     location: 'user-global',
-    // LOWERED to the 20.08.2026 cut: 78 lines / 752 words became the five-line,
-    // 33-word deletion-pending stub. Live rules moved into project CLAUDE.md.
+    // LOWERED to the 20.08.2026 cut: 78 lines / 752 words became the six-line,
+    // 33-word deletion-pending stub, CONFIRMED against the landed file on
+    // 20.08.2026 (the five lines written here was a pre-merge reading).
+    // Live rules moved into project CLAUDE.md.
     maxLines: 6,
     maxWords: 36,
     why: 'loaded at every turn although this repository is its only reader',

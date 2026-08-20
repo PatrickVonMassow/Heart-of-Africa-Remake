@@ -5,21 +5,85 @@ Each line names what left an always-loaded document and its surviving authority.
 The five entries awaiting the user's ruling — U6, U45 part 1, U48, U55 and U65
 — remain unchanged in substance and are therefore not cut entries below.
 
-Two floors are involved here and they are NOT interchangeable. The pre-cut
-baseline of 57,970 tokens was read from a batch-OWNER session. The post-cut
-reading of 39,537 comes from a delegated SUBAGENT: the first assistant message
-of transcript `ffafb607-4609-4d8c-8ac9-49fc0bd74ea4` in the agent worktree,
-`input_tokens 2 + cache_read_input_tokens 21,417 + cache_creation_input_tokens
-18,118`. A subagent carries neither the SessionStart batch-resume output nor
-the owner runbook this cut newly serves to the lock holder, so its floor is
-structurally lower than an owner's and the difference between those two numbers
-overstates what an owner session saves.
+## The two floors, both now measured
 
-What is therefore MEASURED: the subagent floor after the cut, 39,537, and every
-byte/line/word figure below. What is still OWED: the owner-session floor the
-57,970 belongs to, which only a session started after this cut can read — point
-761 carries it. Either way the harness and tool schemas dominate the remainder;
-this is a recurring document saving, not a different order of magnitude.
+Two floors are involved here and they are NOT interchangeable. Both are the
+first assistant message of a real transcript, summed as `input_tokens +
+cache_read_input_tokens + cache_creation_input_tokens`, taken before that
+session's first tool call.
+
+FLOOR owner :: 20.08.2026 :: `~/.claude/projects/-workspace-hoa/3141e458-63d3-4825-81bf-f135a96a50b4.jsonl`
+:: `2 + 22,579 + 21,034 = 43,615`
+
+FLOOR subagent :: 20.08.2026 :: `~/.claude/projects/-workspace-hoa--claude-worktrees-agent-a3d55aa0d296e011a/ffafb607-4609-4d8c-8ac9-49fc0bd74ea4.jsonl`
+:: `2 + 21,417 + 18,118 = 39,537`
+
+The owner reading is the one point 757 owed and point 761 took: the first
+batch-owner session started after the cut landed, reading its own transcript.
+The subagent reading stays exactly where it was, and it is the SUBAGENT floor,
+not a second opinion on the owner's — a delegated agent carries neither the
+SessionStart batch-resume output nor the owner runbook this cut newly serves to
+the lock holder.
+
+The useful number is the gap between them: an owner session pays four thousand
+and seventy-eight tokens more than a subagent for the same documents, and that
+difference is what the SessionStart hook output and the owner runbook cost,
+because nothing else separates the two.
+
+## What the cut actually saved
+
+Against the pre-cut owner baseline of 57,970 the measured owner floor of 43,615
+is a saving of 14,355 tokens per turn, and the comparison is finally like for
+like: owner against owner. Point 757 estimated a yield of 4-6k and a resulting
+floor near 55-57k, so the executed cut beat its own estimate roughly threefold.
+The estimate was low because it assumed a quarter of the documents could go; the
+cut removed 45,682 of 68,748 bytes, two thirds of them.
+
+That 14,355 does not all recur, and the reconciliation says why:
+
+- ~11.4k is the removed document text itself — 45,682 bytes at the ~4 bytes per
+  token these files run at.
+- ~2.1k is an artefact of THIS session and will not repeat in the same form: the
+  SessionStart hook printed 10,394 bytes, more than the harness carries inline,
+  so it delivered a ~2 KB preview plus a file pointer and the remaining ~8,346
+  bytes arrived as a tool result AFTER the floor was taken. An owner session
+  whose hook output fits inline reads a floor near 45.7k, not 43,615. This is
+  the mechanism open point 597 is about.
+- ~850 tokens are RESIDUAL and the missing information is named: the 57,970
+  baseline was read from a different session, and the harness system prompt and
+  tool schemas — the ~42k share we do not control — need not have been
+  byte-identical between the two readings. Nothing in this repository records
+  that share per session, so the residual cannot be closed from here.
+
+So the durable recurring saving is about 12.3k tokens per turn, paid back to
+every turn of every session and to every delegated subagent. The measured gap of
+4,078 between the two floors understates the owner surcharge for the same
+truncation reason.
+
+## Ceilings confirmed against the landed files
+
+Measured 20.08.2026 on merged `main` with `measure()` from
+`scripts/doc-budget-core.mjs` — the guard's OWN tokenizer, not `wc`, because a
+ceiling is only confirmed against the counter that enforces it.
+`evaluateDocBudgets()` reports no findings, so all three hold.
+
+| document | landed | ceiling | headroom |
+| --- | --- | --- | --- |
+| `CLAUDE.md` | 332 lines / 2,091 words / 17,255 B | 334 / 2,095 | 2 lines, 4 words |
+| `MEMORY.md` | 46 lines / 710 words / 5,575 B | 47 / 710 | 1 line, **0 words** |
+| global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
+
+They hold, but two of them hold with nothing to spare, and that is the finding
+this confirmation produced. The ceilings were set from figures taken BEFORE the
+merge — the code comments in `scripts/doc-budget-core.mjs` still said MEMORY.md
+had landed at 45 lines / 700 words and the global stub at five lines, where the
+landed files measure 46 / 710 and six. Those comments are corrected in the same
+commit as this table. The ceilings themselves are NOT raised here: `MEMORY.md`
+is designed to gain one index line per new memory, and at zero word headroom the
+next one blocks the guard, so the budget needs a decision rather than a quiet
+widening. That is filed as its own work-order point.
+
+## The cut entries
 
 - `CLAUDE.md §1` :: U1 duplicate design-authority sentence :: DROPPED -> user ruling 20.08.2026: merge duplicate statements in place
 - `CLAUDE.md §8` :: U2 duplicate outside-scope section :: DROPPED -> user ruling 20.08.2026: fold its only distinct condition into §2

@@ -9,7 +9,9 @@ import { resolve } from 'node:path'
 import {
   ACCOUNTS,
   CUT_SOURCES,
+  FLOOR_KINDS,
   parseCutAccount,
+  parseFloorReadings,
   evaluateCutAccount,
   accountDestinationFault,
   expandDestination,
@@ -17,6 +19,7 @@ import {
   userTreeRootOf,
   wiredGuards,
 } from './cut-account-core.mjs'
+import { DOC_BUDGETS, measure } from './doc-budget-core.mjs'
 
 const ROOT = resolve(process.cwd())
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
@@ -381,5 +384,174 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     const verdict = evaluateCutAccount(entries, { files, guards: wiredGuards(settings) })
     expect(verdict.findings.map((f) => f.why)).toEqual([])
     expect(verdict.block).toBe(false)
+  })
+})
+
+// THE FLOOR READINGS (point 761). Point 757 claimed a saving by setting an
+// owner-session baseline against a SUBAGENT reading, which is not the same kind
+// of session. These cases pin the corrected account: both floors present, each
+// re-derivable from the transcript it names, and the owner/subagent gap stated
+// so a reader sees what the SessionStart hook and the owner runbook cost.
+describe('parseFloorReadings', () => {
+  const doc = (s) => parseFloorReadings(s)
+
+  it('reads kind, date, transcript and the three summands', () => {
+    const [r] = doc('FLOOR owner :: 20.08.2026 :: `~/t.jsonl` :: `2 + 22,579 + 21,034 = 43,615`')
+    expect(r).toMatchObject({
+      kind: 'owner',
+      date: '20.08.2026',
+      transcript: '~/t.jsonl',
+      summands: [2, 22579, 21034],
+      stated: 43615,
+      adds: true,
+    })
+  })
+
+  it('reads a reading that wraps after a separator', () => {
+    expect(doc('FLOOR subagent :: 20.08.2026 :: `~/a.jsonl`\n:: `2 + 1 + 1 = 4`')).toHaveLength(1)
+  })
+
+  it('reports a sum that does not add up rather than trusting it', () => {
+    // This is what a figure copied from another document looks like.
+    const [r] = doc('FLOOR owner :: 20.08.2026 :: `~/t.jsonl` :: `1 + 1 + 1 = 99`')
+    expect(r.adds).toBe(false)
+    expect(r.total).toBe(3)
+  })
+
+  it('ignores prose and is total on missing input', () => {
+    expect(doc('The floor fell a lot.')).toEqual([])
+    expect(doc(undefined)).toEqual([])
+  })
+
+  it('does not swallow a cut-account line, and cut parsing does not swallow a floor', () => {
+    const both = [
+      'FLOOR owner :: 20.08.2026 :: `~/t.jsonl` :: `2 + 1 + 1 = 4`',
+      '- `CLAUDE.md §1` :: U1 something :: DROPPED -> user ruling 20.08.2026',
+    ].join('\n')
+    expect(doc(both)).toHaveLength(1)
+    expect(parseCutAccount(both)).toHaveLength(1)
+  })
+})
+
+describe('docs/document-cut-757.md — the measured floors', () => {
+  const text = existsSync(ACCOUNT_PATH) ? readFileSync(ACCOUNT_PATH, 'utf8') : ''
+  const readings = parseFloorReadings(text)
+  const byKind = new Map(readings.map((r) => [r.kind, r]))
+
+  it('carries exactly one floor for each session kind', () => {
+    expect([...byKind.keys()].sort()).toEqual([...FLOOR_KINDS].sort())
+    expect(readings).toHaveLength(FLOOR_KINDS.length)
+  })
+
+  it('gives every floor a date, a transcript path and three summands that add up', () => {
+    for (const r of readings) {
+      expect(r.date).toMatch(/^\d{2}\.\d{2}\.\d{4}$/)
+      expect(r.transcript).toMatch(/\.jsonl$/)
+      expect(r.summands).toHaveLength(3)
+      expect(r.adds).toBe(true)
+    }
+  })
+
+  // The whole point of recording BOTH is that they are not interchangeable, so
+  // an account that let them coincide would have lost the distinction it exists
+  // to make. The owner carries strictly more at startup, never less.
+  it('puts the owner floor above the subagent floor', () => {
+    expect(byKind.get('owner').stated).toBeGreaterThan(byKind.get('subagent').stated)
+  })
+
+  it('states the owner-minus-subagent gap once, in words', () => {
+    const gap = byKind.get('owner').stated - byKind.get('subagent').stated
+    expect(gap).toBe(4078)
+    // The phrase is prose and wraps at the margin, so it is matched against the
+    // paragraph with whitespace normalised, not against a single line.
+    const flowed = text.replace(/\s+/g, ' ')
+    const inWords = flowed.match(/four thousand and seventy-eight/g) ?? []
+    expect(inWords).toHaveLength(1)
+  })
+
+  // Where the transcript is still on this machine the figure is not merely
+  // well-formed, it is re-derived. On any other machine the file is absent and
+  // the case is a refused read, exactly like the external destinations above.
+  it('re-derives each floor from its own transcript where that transcript exists', () => {
+    let checked = 0
+    for (const r of readings) {
+      const path = fullPath(r.transcript)
+      if (!existsSync(path)) continue
+      const first = readFileSync(path, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => {
+          try {
+            return JSON.parse(l)
+          } catch {
+            return null
+          }
+        })
+        .find((o) => o?.type === 'assistant' && o?.message?.usage)
+      expect(first, `no assistant message with usage in ${r.transcript}`).toBeTruthy()
+      const u = first.message.usage
+      expect([
+        u.input_tokens ?? 0,
+        u.cache_read_input_tokens ?? 0,
+        u.cache_creation_input_tokens ?? 0,
+      ]).toEqual(r.summands)
+      checked++
+    }
+    // On the batch machine — the one anchor this suite trusts, as above — at
+    // least one transcript is present, so a vacuous pass there would mean the
+    // re-derivation never ran. Elsewhere both files are absent by construction.
+    if (existsSync(MEMORY_DIR)) expect(checked).toBeGreaterThan(0)
+  })
+})
+
+// THE CEILINGS, against the LANDED files rather than the pre-merge ones. Point
+// 761 asks for that confirmation because the budgets were written from figures
+// measured before the merge, and two of them turned out to be off by a line and
+// ten words — enough to leave MEMORY.md sitting exactly on its word ceiling.
+describe('docs/document-cut-757.md — the ceilings table', () => {
+  const text = existsSync(ACCOUNT_PATH) ? readFileSync(ACCOUNT_PATH, 'utf8') : ''
+  // The global file shares its BASENAME with the project one, so a row cannot be
+  // found by the basename alone — that matched the project row for both and made
+  // the global ceiling unchecked while the suite stayed green.
+  const ROW_LABEL = {
+    'CLAUDE.md': '| `CLAUDE.md` |',
+    'MEMORY.md': '| `MEMORY.md` |',
+    'global-CLAUDE.md': '| global `CLAUDE.md` |',
+  }
+  const rowFor = (path) => text.split('\n').find((l) => l.startsWith(ROW_LABEL[path]))
+
+  it('quotes each cut document at the ceiling the budget module actually enforces', () => {
+    for (const budget of DOC_BUDGETS.filter((b) => CUT_SOURCES.includes(b.path))) {
+      const row = rowFor(budget.path)
+      expect(row, `no ceilings row for ${budget.path}`).toBeTruthy()
+      const n = (v) => v.toLocaleString('en-US')
+      expect(row).toContain(`${n(budget.maxLines)} / ${n(budget.maxWords)}`)
+    }
+  })
+
+  it('names all three cut documents in the table, each exactly once', () => {
+    for (const path of CUT_SOURCES) {
+      const rows = text.split('\n').filter((l) => l.startsWith(ROW_LABEL[path]))
+      expect(rows, `ceilings rows for ${path}`).toHaveLength(1)
+    }
+  })
+
+  // The landed measurement is the point of the table: a row still quoting the
+  // pre-merge figure is exactly the defect point 761 exists to remove.
+  it('quotes the landed line and word counts the guard tokenizer reports', () => {
+    const files = {
+      'CLAUDE.md': resolve(ROOT, 'CLAUDE.md'),
+      'MEMORY.md': MEMORY_PATH,
+      'global-CLAUDE.md': resolve(homedir(), '.claude', 'CLAUDE.md'),
+    }
+    for (const path of CUT_SOURCES) {
+      const file = files[path]
+      if (!existsSync(file)) continue // refused read off the batch machine
+      const { lines, words } = measure(readFileSync(file, 'utf8'))
+      const row = rowFor(path)
+      expect(row, `no ceilings row for ${path}`).toBeTruthy()
+      expect(row).toContain(`${lines} lines`)
+      expect(row).toContain(`${words.toLocaleString('en-US')} words`)
+    }
   })
 })
