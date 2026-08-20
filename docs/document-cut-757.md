@@ -5,12 +5,21 @@ Each line names what left an always-loaded document and its surviving authority.
 The five entries awaiting the user's ruling — U6, U45 part 1, U48, U55 and U65
 — remain unchanged in substance and are therefore not cut entries below.
 
-The freshly cleared interactive-session floor measured 57,970 tokens before
-and 39,537 after against the 55–57k target. The after record is the first
-assistant message of transcript `ffafb607-4609-4d8c-8ac9-49fc0bd74ea4`:
+Two floors are involved here and they are NOT interchangeable. The pre-cut
+baseline of 57,970 tokens was read from a batch-OWNER session. The post-cut
+reading of 39,537 comes from a delegated SUBAGENT: the first assistant message
+of transcript `ffafb607-4609-4d8c-8ac9-49fc0bd74ea4` in the agent worktree,
 `input_tokens 2 + cache_read_input_tokens 21,417 + cache_creation_input_tokens
-18,118`. The harness and tool schemas still dominate; this is a recurring
-document saving, not a different order of magnitude.
+18,118`. A subagent carries neither the SessionStart batch-resume output nor
+the owner runbook this cut newly serves to the lock holder, so its floor is
+structurally lower than an owner's and the difference between those two numbers
+overstates what an owner session saves.
+
+What is therefore MEASURED: the subagent floor after the cut, 39,537, and every
+byte/line/word figure below. What is still OWED: the owner-session floor the
+57,970 belongs to, which only a session started after this cut can read — point
+761 carries it. Either way the harness and tool schemas dominate the remainder;
+this is a recurring document saving, not a different order of magnitude.
 
 - `CLAUDE.md §1` :: U1 duplicate design-authority sentence :: DROPPED -> user ruling 20.08.2026: merge duplicate statements in place
 - `CLAUDE.md §8` :: U2 duplicate outside-scope section :: DROPPED -> user ruling 20.08.2026: fold its only distinct condition into §2
