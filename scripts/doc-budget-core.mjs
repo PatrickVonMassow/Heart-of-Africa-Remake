@@ -104,8 +104,17 @@ export const DOC_BUDGETS = [
     // ceiling was measured from the size point 555 reached — never chosen
     // beforehand. A point that genuinely needs more raises this with its reason in
     // the comment beside it; a longer retelling of what it already says does not.
+    // MEASURED 20.08.2026 from the result of the cut, over all 227 points the work
+    // order then held: 132,088 words in total, mean 582, median 459, p90 1,026,
+    // p95 1,300, and a maximum of 3,458 (the largest of the unbundled audits). The
+    // ceiling is that maximum plus a sentence — the same shape the always-loaded
+    // file's ceiling has, and the same ratchet: it HOLDS THE LINE the cut reached
+    // and comes DOWN whenever a later cut reaches a smaller one. It does not roll
+    // today's umbrella points back; that is a separate decision, and the numbers
+    // above are what it would be taken against — a cap at p95 would name eleven
+    // points, a cap at 2,300 would name four.
     perPoint: {
-      maxWords: 0, // set from the measurement in the same commit
+      maxWords: 3480,
       why: 'point-brief.mjs pays a point spec IN FULL at every delegation',
     },
   },
