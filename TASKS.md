@@ -4180,21 +4180,31 @@ put it is the mistake this line exists to stop.
   for judging the remaining structural levers.
 
 - [ ] 511. The memory index still carries what thirty guards now enforce
-  (measured 05.08.2026 on the user's question about context cost). The numbers
-  first, so the effort goes where the cost is: the memory INDEX is 13.2 KB / 86
-  lines (~3.3k tokens) per session and the 74 entry files load only on recall,
-  while `CLAUDE.md` is 61.6 KB (~15k tokens) and is paid AGAIN by every subagent —
-  ~82 % of the session floor against the index's ~16 %, and the floor multiplies
-  per agent. Splitting `CLAUDE.md` is the real lever, is the user's call and is
-  published as the decision card "Bauanleitung für Subagenten aufteilen?"; this
-  point does the part that needs no decision.
+  (measured 05.08.2026 on the user's question about context cost).
+  RE-CUT 20.08.2026: the whole 05.08. arithmetic is struck. Measured today with the
+  guard's own tokenizer, `CLAUDE.md` is 332 lines / 2,091 words and `MEMORY.md` is
+  47 lines / 708 words — not the 61.6 KB and 13.2 KB / 86 lines this point was
+  written against — so the ~82 % against ~16 % split of the session floor, the 74
+  entry files and "splitting `CLAUDE.md` is the real lever" no longer describe
+  anything. The split itself was decided and executed on 20.08.2026, and point 768
+  owns the cut and its ratchet from here on; the decision card it named is answered.
+  AND THE RETIREMENT HAS PARTLY HAPPENED, which is what this point still exists for:
+  the 20.08. document cut retired seven index entries on the guard-coverage ground
+  and recorded each beside its enforcing guard in `docs/document-cut-757.md`
+  (path-scope, container-ask, timestamp, dashboard-card-topic, queue-order, prep and
+  retro-currency). Point 768 records that the same cut dropped six rules on that
+  ground with NO check of the guard's actual assertion and that at least one claim
+  was false (point 764). So the work left here is the CHECK — every "COVERED -> guard"
+  claim held against what the guard really asserts, a false one restored — and the
+  retirement of whatever the check leaves standing.
   FINAL STATE:
   1. Every memory entry whose rule is ENFORCED by an armed guard is retired from
      the index, its content living on wherever the guard documents itself. An
      entry stays when it carries a JUDGEMENT a guard cannot make (taste, history,
      a user ruling) — the test is "would a session behave differently without it,
      given the guard already fires?".
-  2. `docs/rule-corpus-audit.md` records the measurement above and each retirement
+  2. `docs/rule-corpus-audit.md` records the re-measurement above, the outcome of
+     the check on the seven already-retired entries, and each further retirement
      with its enforcing guard, so the next audit starts from evidence.
   VERIFIABLE: the index names no entry whose whole content is an armed guard's
   rule; the audit doc lists each retired entry beside the guard that replaced it.
