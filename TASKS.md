@@ -159,6 +159,37 @@ put it is the mistake this line exists to stop.
   blind-parallel, the merge goes to a third model and the review is cross-vendor.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 760. The launcher's own CLI can lose its native binary, and the arming probe cannot see it
+  (measured 20.08.2026). The global `@anthropic-ai/claude-code` install stood with NO native
+  binary: `claude --version` answered "native binary not installed", because npm 11 refuses a
+  package's postinstall by default (`allow-scripts`) and the platform-optional package was
+  therefore never fetched. The launcher spawns every successor session by invoking that CLI, so
+  the batch would have died at the next handover in the quietest way it can die — the launcher
+  reports ARMED, the owner releases the lock, and no successor ever comes up. The arming probe
+  only asks whether the task is REGISTERED; nothing executes the CLI, so "armed" today means
+  "the schedule exists", not "a session can still be started". It was repaired by hand
+  (`npm install -g @anthropic-ai/claude-code-linux-x64`, then the package's own `install.cjs`),
+  and the CLI answers again — but nothing would have reported it, and the same npm default will
+  strip it again on the next global install.
+  FINAL STATE: the launcher's readiness probe RUNS the CLI. `scripts/batch-launcher.mjs`
+  (and the arming path in `scripts/batch-autostart.mjs`) invoke the configured spawn command with
+  a harmless argument — `--version` is enough — under a short timeout, and treat a non-answer,
+  a non-zero exit or the "native binary not installed" text as NOT ARMED. A launcher that is
+  registered but cannot spawn reports `armed: false` with the CLI's own output as the reason, and
+  raises the same hard alert a forbidden serving model raises (`scripts/notify.mjs`), because
+  both are conditions under which the batch must stop rather than pretend to continue. The probe
+  result is CACHED for a few minutes so the per-tick supervision does not pay for it every time.
+  VERIFIABLE: Vitest over the pure probe core — a CLI that answers a version string is armed; a
+  non-zero exit, an empty answer, a timeout and the literal "native binary not installed" each
+  yield `armed: false` with the reason carried through; a cached result inside its window is not
+  re-run and outside it is; and a probe that throws leaves the launcher's other state untouched
+  (fail-open on the probe's own bug, never a false ARMED). One case pins that the alert path is
+  reached exactly once per transition into the broken state, not on every tick.
+  Criticality: high — it is the single point on which unattended continuation rests, its failure
+  is silent, and the guard that would have caught it is the one being built. A mechanism, so it
+  needs the other model's recorded review before it lands.
+  Bundle: Urlaubsfestigkeit.
+
 - [ ] 614. Re-run the four-eyes work-order cleanup FROM SCRATCH, and execute it in the same
   point (user 19.08.2026: »Dann schmeiße die Ergebnisse von 614 weg und fange nochmal komplett
   neu mit der Analyse mit Vier Augen an. Setze die dieses Mal auch direkt vollständig um.«).
@@ -9711,34 +9742,3 @@ to land than a mechanism that needs a review.
   refusal nobody can distinguish from a real one. A guard change is a mechanism, so it needs the
   other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 760. The launcher's own CLI can lose its native binary, and the arming probe cannot see it
-  (measured 20.08.2026). The global `@anthropic-ai/claude-code` install stood with NO native
-  binary: `claude --version` answered "native binary not installed", because npm 11 refuses a
-  package's postinstall by default (`allow-scripts`) and the platform-optional package was
-  therefore never fetched. The launcher spawns every successor session by invoking that CLI, so
-  the batch would have died at the next handover in the quietest way it can die — the launcher
-  reports ARMED, the owner releases the lock, and no successor ever comes up. The arming probe
-  only asks whether the task is REGISTERED; nothing executes the CLI, so "armed" today means
-  "the schedule exists", not "a session can still be started". It was repaired by hand
-  (`npm install -g @anthropic-ai/claude-code-linux-x64`, then the package's own `install.cjs`),
-  and the CLI answers again — but nothing would have reported it, and the same npm default will
-  strip it again on the next global install.
-  FINAL STATE: the launcher's readiness probe RUNS the CLI. `scripts/batch-launcher.mjs`
-  (and the arming path in `scripts/batch-autostart.mjs`) invoke the configured spawn command with
-  a harmless argument — `--version` is enough — under a short timeout, and treat a non-answer,
-  a non-zero exit or the "native binary not installed" text as NOT ARMED. A launcher that is
-  registered but cannot spawn reports `armed: false` with the CLI's own output as the reason, and
-  raises the same hard alert a forbidden serving model raises (`scripts/notify.mjs`), because
-  both are conditions under which the batch must stop rather than pretend to continue. The probe
-  result is CACHED for a few minutes so the per-tick supervision does not pay for it every time.
-  VERIFIABLE: Vitest over the pure probe core — a CLI that answers a version string is armed; a
-  non-zero exit, an empty answer, a timeout and the literal "native binary not installed" each
-  yield `armed: false` with the reason carried through; a cached result inside its window is not
-  re-run and outside it is; and a probe that throws leaves the launcher's other state untouched
-  (fail-open on the probe's own bug, never a false ARMED). One case pins that the alert path is
-  reached exactly once per transition into the broken state, not on every tick.
-  Criticality: high — it is the single point on which unattended continuation rests, its failure
-  is silent, and the guard that would have caught it is the one being built. A mechanism, so it
-  needs the other model's recorded review before it lands.
-  Bundle: unbundled (batch autonomy).
