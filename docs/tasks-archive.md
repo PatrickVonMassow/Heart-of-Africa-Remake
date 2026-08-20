@@ -20546,3 +20546,23 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — two of the three let a commit reach the state the whole mechanism was built to
   prevent, and the third leaves the deciding path unproven.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 773. `cut-account-core.test.mjs` is red in every worktree and green only in the main
+  checkout (measured 20.08.2026, 10:43). The case »docs/document-cut-757.md — the measured floors >
+  takes each floor from a transcript of the kind it claims« resolves the repository root with
+  `realpathSync(ROOT)`, which in a worktree is the WORKTREE path, while the transcripts it measures
+  record `cwd=/workspace/hoa`. `sessionKindOf` then judges the tree to be neither and returns null:
+  »cwd and prompt disagree, or the tree is neither«. So the case does not measure the document-cut
+  accounting, it measures which checkout it was started from.
+  WHY IT MATTERS BEYOND ONE RED CASE: `npm run test:unit` is therefore red out of every isolated
+  worktree — which is exactly where CLAUDE.md §6 sends larger mechanisms to be built. A delegated
+  author meets a red suite it did not cause, and the honest reading of a red run (fix it, charge it,
+  or file it) costs that author a full investigation every time.
+  FINAL STATE: the case resolves the MAIN checkout — the git common directory rather than the
+  current one — so it measures the same thing from anywhere, or it skips explicitly and says why
+  when it cannot. It never passes by accident in the main tree while failing elsewhere.
+  VERIFIABLE: the suite runs green from a fresh worktree; a Vitest case pins the root resolution
+  itself, so a checkout-dependent root goes red rather than the transcript assertion downstream.
+  Criticality: medium — no product defect, but it taxes every delegated mechanism author with a red
+  suite that is not theirs.
+  Bundle: Session- & Repo-Hygiene.
