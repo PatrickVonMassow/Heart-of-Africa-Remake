@@ -19706,3 +19706,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   inzwischen völlig uninteressant geworden. Der Tag ist ausgeliefert, mehr ist da nicht mehr zu
   tun." The two HTTP checks above were NOT performed and are NOT owed — the user withdrew the
   work, he did not accept it as delivered. No later reader may re-derive them from this block.
+
+- [x] 718. Point 714's authoring lane is GPT-5.6 Sol from here on, its review is Opus 5, and the
+  round that was running when this was decided is its LAST (user 18.08.2026, 14:30). The point had
+  gone through twelve rework rounds; the ruling ends the open-ended cycle, not the work. FINAL
+  STATE: point 714 carries an `Author lane: Sol` tag, so `scripts/author-routing-core.mjs` routes it
+  there whatever the cut would otherwise decide, and its review runs on the Anthropic side (Opus 5)
+  per the cross-vendor rule of CLAUDE.md §6 — no Sol reading its own work, and no escalation to
+  Fable for this point. The round in flight at the time of the ruling is the last one: when it comes
+  back, 714 is verified against the evidence that round produced and LANDED once its gates are
+  green. Findings that survive it do NOT open a thirteenth round — each is carried into point 717
+  (the review-material tail) or filed as its own numbered point, and named on 714's record as
+  deferred WITH its destination, so nothing vanishes at the cut-off.
+  VERIFIABLE: the tag stands on 714 and a Vitest case pins that the routing cut returns the Sol lane
+  for it; 714 is ticked with its round count stated and every surviving finding traceable to 717 or
+  to a numbered point.
+  Criticality: medium — a work-order ruling; no player-visible behaviour.
+  Bundle: unbundled (review tooling).
