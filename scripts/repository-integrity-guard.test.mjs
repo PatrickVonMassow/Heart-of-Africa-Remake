@@ -36,10 +36,22 @@ describe('unit-suite repository integrity guard', () => {
     expect(() => assertRepositoryUnchanged(repositoryState(paths), repositoryState(paths))).not.toThrow()
   })
 
-  it('fails when any ref changes', () => {
+  it('names added, removed, and moved refs with their old and new object ids', () => {
+    runGit('branch', 'removed-fixture-branch')
     const verify = protectRepository(repo)
-    runGit('branch', 'escaped-fixture-branch')
-    expect(verify).toThrow(/refs changed/)
+    const oldObject = runGit('rev-parse', 'main')
+    const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'fixture ref move')
+    runGit('branch', '-D', 'removed-fixture-branch')
+    runGit('update-ref', 'refs/heads/main', newObject, oldObject)
+    runGit('branch', 'added-fixture-branch', newObject)
+
+    expect(verify).toThrow(
+      new RegExp(
+        `refs changed: refs/heads/added-fixture-branch <absent> -> ${newObject}, ` +
+          `refs/heads/main ${oldObject} -> ${newObject}, ` +
+          `refs/heads/removed-fixture-branch ${oldObject} -> <absent>`,
+      ),
+    )
   })
 
   it('ignores remote-tracking updates made by the external branch pusher', () => {
@@ -52,13 +64,15 @@ describe('unit-suite repository integrity guard', () => {
     const paths = repositoryStatePaths(repo)
     const verify = protectRepository(repo)
     appendFileSync(paths.configPath, '\n[core]\n\tbare = true\n')
-    expect(verify).toThrow(/config changed/)
+    expect(verify).toThrow(/config changed \(keys: core\.bare\)/)
   })
 
   it('fails when the checkout HEAD changes', () => {
     const paths = repositoryStatePaths(repo)
     const verify = protectRepository(repo)
     writeFileSync(paths.headPath, 'ref: refs/heads/escaped\n')
-    expect(verify).toThrow(/head changed/)
+    expect(verify).toThrow(
+      /head changed: "ref: refs\/heads\/main" -> "ref: refs\/heads\/escaped"/,
+    )
   })
 })

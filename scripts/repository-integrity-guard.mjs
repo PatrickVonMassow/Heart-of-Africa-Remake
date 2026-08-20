@@ -24,24 +24,100 @@ export function repositoryStatePaths(root = process.cwd()) {
  * same shared repository. Fixture damage has always landed under refs/heads;
  * those are the refs a local git command can move without network activity. */
 export function repositoryState(paths) {
-  const refs = execFileSync('git', ['--git-dir', paths.commonDir, 'for-each-ref', 'refs/heads'], {
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  const refs = execFileSync(
+    'git',
+    ['--git-dir', paths.commonDir, 'for-each-ref', '--format=%(refname)%00%(objectname)', 'refs/heads'],
+    {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
+  const config = readFileSync(paths.configPath)
+  let configEntries
+  try {
+    configEntries = execFileSync('git', ['config', '--file', paths.configPath, '--null', '--list'], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } catch {
+    configEntries = null
+  }
   return {
     refs,
-    config: readFileSync(paths.configPath),
+    config,
+    configEntries,
     head: readFileSync(paths.headPath),
   }
 }
 
 const changed = (before, after, field) => !before[field].equals(after[field])
 
+const refMap = (snapshot) =>
+  new Map(
+    snapshot
+      .toString('utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.split('\0')),
+  )
+
+const refChanges = (before, after) => {
+  const beforeRefs = refMap(before.refs)
+  const afterRefs = refMap(after.refs)
+  return [...new Set([...beforeRefs.keys(), ...afterRefs.keys()])]
+    .sort()
+    .filter((name) => beforeRefs.get(name) !== afterRefs.get(name))
+    .map(
+      (name) =>
+        `${name} ${beforeRefs.get(name) ?? '<absent>'} -> ${afterRefs.get(name) ?? '<absent>'}`,
+    )
+}
+
+const configMap = (snapshot) => {
+  if (!snapshot.configEntries) return null
+  const entries = new Map()
+  for (const entry of snapshot.configEntries.toString('utf8').split('\0').filter(Boolean)) {
+    const separator = entry.indexOf('\n')
+    const key = separator === -1 ? entry : entry.slice(0, separator)
+    const value = separator === -1 ? '' : entry.slice(separator + 1)
+    entries.set(key, [...(entries.get(key) ?? []), value])
+  }
+  return entries
+}
+
+const configChanges = (before, after) => {
+  const beforeConfig = configMap(before)
+  const afterConfig = configMap(after)
+  if (!beforeConfig || !afterConfig) return null
+  return [...new Set([...beforeConfig.keys(), ...afterConfig.keys()])]
+    .sort()
+    .filter(
+      (key) =>
+        JSON.stringify(beforeConfig.get(key) ?? []) !== JSON.stringify(afterConfig.get(key) ?? []),
+    )
+}
+
+const headValue = (snapshot) => JSON.stringify(snapshot.head.toString('utf8').trim())
+
 export function assertRepositoryUnchanged(before, after) {
-  const fields = ['refs', 'config', 'head'].filter((field) => changed(before, after, field))
-  if (fields.length === 0) return
+  const details = []
+  if (changed(before, after, 'refs')) details.push(`refs changed: ${refChanges(before, after).join(', ')}`)
+  if (changed(before, after, 'config')) {
+    const keys = configChanges(before, after)
+    details.push(
+      keys === null
+        ? 'config changed (the config could not be parsed)'
+        : keys.length > 0
+          ? `config changed (keys: ${keys.join(', ')})`
+          : 'config changed (raw bytes changed; parsed keys are identical)',
+    )
+  }
+  if (changed(before, after, 'head')) {
+    details.push(`head changed: ${headValue(before)} -> ${headValue(after)}`)
+  }
+  if (details.length === 0) return
   throw new Error(
-    `UNIT SUITE MUTATED ITS LIVE REPOSITORY: ${fields.join(', ')} changed. ` +
+    `UNIT SUITE MUTATED ITS LIVE REPOSITORY: ${details.join('; ')}. ` +
       'Do not trust this run; inspect and restore the repository before continuing.',
   )
 }
