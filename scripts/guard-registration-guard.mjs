@@ -38,6 +38,7 @@ try {
       paths: names,
       settingsJson: staged('.claude/settings.json'),
       preflightSource: staged('scripts/guard-preflight.mjs'),
+      expectedSource: staged('scripts/guard-preflight-expected.mjs'),
     })
     if (verdict.block) {
       process.stderr.write(`${formatVerdict(verdict)}\n`)
