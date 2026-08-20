@@ -1313,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 05:38 · Quellen-Fingerprint: `b61d078c2642…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 06:19 · Quellen-Fingerprint: `4069e9676eb4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1406,10 +1406,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 64 Prozess-/Meta-TASKS-Punkte (davon 28 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 65 Prozess-/Meta-TASKS-Punkte (davon 29 offen).
 
-<!-- RETRO-FINGERPRINT: b61d078c264246c087d1ece2f0942fd0f2a4850e85bcb92bdf78222787ae91f3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T03:38:35.627Z -->
+<!-- RETRO-FINGERPRINT: 4069e9676eb458e48b4c8e08d77527d8829870c292bf527489829791503d1c49 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T04:19:33.283Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1959,3 +1959,43 @@ sie genau den Fall nicht, für den es sie gibt. Zweitens, eine Zuständigkeitsgr
 Haupt- und Helfersitzung ist eine Regel wie jede andere: Steht sie nur im Auftragstext, ist
 sie eine Bitte. Drittens, das Ergebnis war brauchbar — was den Fall gefährlicher macht, nicht
 harmloser. Ein Übergriff, der gute Arbeit abliefert, erzeugt keinen Anlass hinzusehen.
+
+### 3.133 Zwei Zahlen, die verschiedene Dinge messen, ergeben keine Ersparnis
+
+Der Dokumentschnitt meldete eine Ersparnis, indem er 57.970 gegen 39.537 stellte. Beide
+Zahlen waren echt und beide waren korrekt abgelesen. Der Vergleich war es nicht: Der erste
+Wert stammte aus einer Batch-Sitzung, der zweite aus einem delegierten Helfer. Ein Helfer
+bekommt beim Start weder die Startmeldung des Stapels noch das Owner-Runbook — genau die
+Texte, die dieser Schnitt dem Sperrhalter neu ausliefert. Die beiden Böden unterscheiden sich
+also *von Konstruktion wegen*, und ihre Differenz enthält einen Anteil, der mit dem Schnitt
+nichts zu tun hat. Aufgefallen ist es nicht beim Messen, sondern beim Aufschreiben: Der
+Punkt, der die Zahl festhalten sollte, benannte den Bruch selbst und forderte die fehlende
+Owner-Messung nach.
+
+Bemerkenswert ist, dass mir derselbe Fehler beim Beheben ein zweites Mal unterlief, in
+kleinerer Form. Ich hatte die gemessenen 14.355 in drei Teile zerlegt — entfernter
+Dokumenttext, ein Artefakt dieser Sitzung, ein unerklärter Rest — und danach als »dauerhaft«
+die Summe aus Text *und unerklärtem Rest* ausgewiesen. Der Rest war damit stillschweigend als
+erklärt verbucht, obwohl der Absatz direkt darüber sagte, dass er es nicht ist. Erst der
+Cross-Vendor-Review hat es gesehen. Beide Male ist dasselbe passiert: Aus zwei Zahlen wurde
+eine Differenz gebildet, und die Differenz wurde als Ergebnis berichtet, ohne dass jemand
+geprüft hätte, ob die beiden Zahlen dasselbe messen.
+
+Der Unterschied zu einem gewöhnlichen Rechenfehler ist, dass hier nichts falsch *gerechnet*
+wird. Jede Einzelzahl hält jeder Nachprüfung stand, und genau deshalb wirkt das Ergebnis
+belastbar. Was fehlt, ist eine Angabe, die in keiner der beiden Zahlen steckt: unter welchen
+Bedingungen sie entstanden ist. Ohne die ist eine Differenz keine Messung, sondern eine
+Behauptung mit zwei Belegen daneben.
+
+**Lehren:** Erstens, eine Differenz ist erst dann ein Ergebnis, wenn beide Summanden dieselbe
+Art von Ding messen — und die Art gehört mit aufgeschrieben, nicht nur der Wert. Die
+Abrechnung führt beide Böden deshalb jetzt nebeneinander, jeweils mit Datum, Herkunft und
+Einzelposten, und ein Test verlangt, dass jede Zahl aus einem Transkript der Art stammt, die
+sie behauptet: Der Arbeitsordner entscheidet — Hauptbaum oder Isolations-Arbeitsbaum —, der
+Prompt bestätigt, und widersprechen sich die beiden Signale, fällt der Test, statt sich für
+eines zu entscheiden. Zweitens, ein Rest, der als unerklärt benannt ist, darf nirgends
+weiter unten wieder mitgezählt werden; das ist keine Rundung, sondern das Rückgängigmachen
+der eigenen Einschränkung. Drittens, beide Male hat nicht das Messen den Fehler gefunden,
+sondern das Aufschreiben und das Gegenlesen durch ein Modell, das die Zahl nicht erzeugt
+hatte — ein Argument für den Cross-Vendor-Review genau dort, wo das Ergebnis am solidesten
+aussieht.
