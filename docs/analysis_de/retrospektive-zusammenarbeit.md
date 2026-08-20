@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 10:55 · Quellen-Fingerprint: `64d0aabd3914…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 11:23 · Quellen-Fingerprint: `30b8337921b9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1406,10 +1406,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 84 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 71 Prozess-/Meta-TASKS-Punkte (davon 35 offen).
+Erfasste Quellen: 84 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 72 Prozess-/Meta-TASKS-Punkte (davon 36 offen).
 
-<!-- RETRO-FINGERPRINT: 64d0aabd3914541fe5bc8d0616510e60d1a2c2b236724f103bb74dee5fe24359 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T08:55:14.804Z -->
+<!-- RETRO-FINGERPRINT: 30b8337921b9e8e2928c65805ce70bc81077db39a3fe145184f9924a02b79ac8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T09:23:03.174Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2051,3 +2051,29 @@ liegen bleibt — die Streichung ist an der Wirkung zu bemessen, nicht am Dateib
 Drittens, eine Streichkategorie, die auf einer Behauptung beruht, braucht einen Testfall, der
 die Behauptung nachrechnet; ohne den ist ein Schnitt kein Aufräumen, sondern ein Verlust mit
 Protokoll.
+
+### 3.135 Der Mechanismus verzehrte die Sitzung, für die er gebaut war
+
+Am 20.08.2026 hat eine Sitzung um 08:29 einen neuen Stop-Wächter gelandet und danach zwei
+Stunden nichts anderes getan, als ihn zu reparieren: acht Commits zwischen 09:15 und 10:37,
+jeder einzelne eine weitere Verengung desselben Musters, damit es eine harmlose Zeile nicht
+mehr abweist. Um 08:32 lag ein Anspruch auf den Stapel vor; aufgenommen wurde er nicht. Der
+Nutzer hat die Sitzung um 10:38 von Hand beendet, nachdem er gefragt hatte, ob das noch
+produktiv sei. Der Zustand war die ganze Zeit sauber — es gab nichts, was die Übergabe
+verhindert hätte.
+
+Zwei Dinge fallen zusammen. Erstens ist ein neu gelandeter Wächter der einzige Gegenstand,
+bei dem die Sitzung ihre eigene Arbeit sofort als roten Lauf zurückbekommt: Er feuert gegen
+sie selbst, jede Runde erzeugt die nächste, und die Rückkopplung sieht von innen wie
+Fortschritt aus. Zweitens misst nichts die Form dieser Arbeit. Weder die Übergabe noch die
+Tafel fragt, ob die letzten acht Commits dieselbe Datei wieder und wieder anfassen; und ein
+gestellter Anspruch verfällt nicht, er wartet, so lange der Eigner arbeitet — und Arbeit war
+es ja, nur nicht die des Stapels.
+
+**Lehre:** Wer den Mechanismus repariert, der ihn gerade behindert, arbeitet nicht an der
+Warteschlange, sondern an sich selbst — und das ist der eine Fall, in dem Beschäftigung kein
+Fortschritt ist. Zwei Messungen fangen ihn ab: eine Reihe aufeinanderfolgender Commits an
+derselben Mechanik wird gezählt und einmal gemeldet, sobald sie den gewohnten Rahmen
+verlässt, und ein stehender Anspruch wird innerhalb einer begrenzten Zahl von Zugenden
+entweder aufgenommen oder ausdrücklich abgelehnt. Prüffrage an sich selbst: *Wäre dieser
+Commit auch nötig, wenn ich den Wächter heute nicht gelandet hätte?*

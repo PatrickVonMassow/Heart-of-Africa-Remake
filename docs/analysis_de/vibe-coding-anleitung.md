@@ -372,6 +372,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
+- **Die KI repariert den Wächter, den sie gerade gebaut hat.** Ein frisch gelandeter
+  Prüfmechanismus feuert als Erstes gegen die eigene Arbeit — und die nächsten Stunden gehen
+  für seine Nachbesserung drauf. Von innen sieht das aus wie Fortschritt, denn es wird ja
+  gemessen, gefixt und committet.
+  → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es mir beim
+  dritten Mal. Frag dich vor jedem solchen Commit: **wäre er auch nötig, wenn dieser Wächter
+  heute nicht gelandet wäre?** Wenn nicht, geht er in einen eigenen Punkt und die
+  Warteschlange läuft weiter."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -410,4 +419,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2e6dd47683660d27086ece1f8c23fb69af6fc79aae6d5a7cec114f42fcae7dc4 -->
+<!-- GUIDE-FINGERPRINT: 30b8337921b9e8e2928c65805ce70bc81077db39a3fe145184f9924a02b79ac8 -->
