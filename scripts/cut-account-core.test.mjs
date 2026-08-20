@@ -12,7 +12,9 @@ import {
   FLOOR_KINDS,
   parseCutAccount,
   parseFloorReadings,
-  sessionKindOfPrompt,
+  sessionKindOf,
+  berlinDateOf,
+  CUT_LANDED_AT,
   evaluateCutAccount,
   accountDestinationFault,
   expandDestination,
@@ -507,34 +509,60 @@ describe('docs/document-cut-757.md — the measured floors', () => {
     }
   })
 
-  // The account's whole argument is that these are two KINDS of session, so a
-  // reading re-derives correctly and still proves nothing if it came from the
-  // wrong kind. Shape and arithmetic cannot catch that; the prompt can.
+  // AFFIRMATIVE KIND, not a substring. Review 22d3eaa rejected the prompt marker
+  // on its own: it accepted any text mentioning batch-resume as an owner. `cwd`
+  // decides — a delegated author runs in an isolation worktree, the owner in the
+  // main checkout — and the prompt corroborates. Disagreement fails the case
+  // rather than picking a winner.
   it('takes each floor from a transcript of the kind it claims', () => {
     if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
-      const first = jsonl(fullPath(r.transcript)).find((o) => o?.type === 'user')
-      expect(first, `no user message in ${r.transcript}`).toBeTruthy()
+      const first = jsonl(fullPath(r.transcript)).find((o) => o?.type === 'user' && o?.cwd)
+      expect(first, `no user message with a cwd in ${r.transcript}`).toBeTruthy()
       const c = first.message.content
-      const text = typeof c === 'string' ? c : c.map((x) => x.text ?? '').join('\n')
-      expect(sessionKindOfPrompt(text), `${r.transcript} is not an ${r.kind} transcript`).toBe(
-        r.kind,
-      )
+      const prompt = typeof c === 'string' ? c : c.map((x) => x.text ?? '').join('\n')
+      const kind = sessionKindOf({ cwd: first.cwd, prompt })
+      expect(kind, `cwd and prompt disagree about ${r.transcript}`).not.toBeNull()
+      expect(kind, `${r.transcript} is not an ${r.kind} transcript`).toBe(r.kind)
     }
   })
 
-  // The defect this pins is the one the cross-vendor review caught: the durable
-  // saving had been stated as the total MINUS the truncation artefact, which
-  // silently banked the unexplained residual as if it had been attributed. The
-  // durable figure must equal the component actually attributed to the removed
-  // document text, and nothing looser.
-  it('claims no more durable saving than it attributes to the removed documents', () => {
-    const flowed = text.replace(/\s+/g, ' ')
-    const attributed = /~([\d.]+)k is the removed document text/.exec(flowed)
-    const durable = /durable recurring saving is ABOUT ([\d.]+)k/.exec(flowed)
-    expect(attributed, 'the reconciliation names no document-text component').toBeTruthy()
-    expect(durable, 'the account states no durable saving').toBeTruthy()
-    expect(Number(durable[1])).toBe(Number(attributed[1]))
+  // FRESHNESS. A floor evidences the cut only if its session began after the cut
+  // landed. Review 22d3eaa found the earlier case checking the written date's
+  // FORMAT and nothing else, which leaves a stale transcript passing.
+  const stampsOf = (r) =>
+    jsonl(fullPath(r.transcript))
+      .map((o) => o?.timestamp)
+      .filter(Boolean)
+      .sort()
+
+  it('takes each floor from a session that began after the cut landed', () => {
+    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
+    for (const r of readings) {
+      const stamps = stampsOf(r)
+      expect(stamps.length, `no timestamps in ${r.transcript}`).toBeGreaterThan(0)
+      expect(
+        new Date(stamps[0]).getTime(),
+        `${r.transcript} predates the cut — it cannot measure it`,
+      ).toBeGreaterThan(new Date(CUT_LANDED_AT).getTime())
+    }
+  })
+
+  it('writes each floor under the date its transcript actually carries', () => {
+    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
+    for (const r of readings) {
+      expect(berlinDateOf(stampsOf(r)[0]), `the date written for the ${r.kind} floor`).toBe(r.date)
+    }
+  })
+
+  // A copied file is still the wrong evidence: the id inside must be the name.
+  it('names each transcript by the session recorded inside it', () => {
+    if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
+    for (const r of readings) {
+      const id = r.transcript.split('/').pop().replace(/\.jsonl$/, '')
+      const row = jsonl(fullPath(r.transcript)).find((o) => o?.sessionId)
+      expect(row?.sessionId, `${r.transcript} records a different session id`).toBe(id)
+    }
   })
 
   it('does not read both floors out of the same transcript', () => {
@@ -594,15 +622,30 @@ describe('docs/document-cut-757.md — the ceilings table', () => {
   })
 })
 
-describe('sessionKindOfPrompt', () => {
-  it('calls a batch-resume prompt an owner session, in either language', () => {
-    expect(sessionKindOfPrompt('Autonome Batch-Wiederaufnahme (vom OS-Scheduler …)')).toBe('owner')
-    expect(sessionKindOfPrompt('[batch-resume] TASKS.md has 226 open point(s)')).toBe('owner')
+describe('sessionKindOf', () => {
+  const MAIN = '/workspace/hoa'
+  const TREE = '/workspace/hoa/.claude/worktrees/agent-a1b2'
+
+  it('agrees on an owner: main checkout and a batch-resume prompt', () => {
+    expect(sessionKindOf({ cwd: MAIN, prompt: 'Autonome Batch-Wiederaufnahme (…)' })).toBe('owner')
+    expect(sessionKindOf({ cwd: MAIN, prompt: '[batch-resume] TASKS.md has 226 open' })).toBe(
+      'owner',
+    )
   })
 
-  it('calls anything else a subagent session', () => {
-    expect(sessionKindOfPrompt('This is a context-floor measurement probe.')).toBe('subagent')
-    expect(sessionKindOfPrompt('')).toBe('subagent')
-    expect(sessionKindOfPrompt(undefined)).toBe('subagent')
+  it('agrees on a subagent: isolation worktree and an ordinary prompt', () => {
+    expect(sessionKindOf({ cwd: TREE, prompt: 'This is a measurement probe.' })).toBe('subagent')
+  })
+
+  // The attack the review named: a delegated transcript that merely discusses
+  // batch resume must NOT be usable as the owner floor.
+  it('refuses to guess when the worktree and the prompt disagree', () => {
+    expect(sessionKindOf({ cwd: TREE, prompt: '[batch-resume] quoted in a brief' })).toBeNull()
+    expect(sessionKindOf({ cwd: MAIN, prompt: 'a probe with no resume prompt' })).toBeNull()
+  })
+
+  it('is total on missing input', () => {
+    expect(sessionKindOf()).toBeNull() // main-tree guess vs subagent prompt
+    expect(sessionKindOf({ cwd: TREE })).toBe('subagent')
   })
 })

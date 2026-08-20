@@ -280,19 +280,54 @@ export function parseFloorReadings(text) {
 }
 
 /**
- * What makes a transcript an OWNER session rather than a delegated subagent:
- * the batch-resume prompt the SessionStart path injects only into the session
- * that holds the batch lock. It is the one difference the two floors are
- * attributed to, so the account's claim is only checkable if the kind is.
+ * When point 757's cut landed on `main` — commit 79b6e4f, "Cut the always-loaded
+ * document floor". A floor reading only evidences the cut if the session that
+ * produced it began AFTER this instant; a date written by hand cannot show that,
+ * and a stale transcript is exactly what checking the date's FORMAT lets through.
  */
-const OWNER_SESSION_MARKERS = [/Batch-Wiederaufnahme/, /batch-resume/]
+export const CUT_LANDED_AT = '2026-08-20T02:18:59Z'
+
+/** Where a delegated author works, by this project's own isolation rule. */
+const WORKTREE_SEGMENT = '/.claude/worktrees/'
 
 /**
- * Classify a transcript's FIRST user message. Returns 'owner' when it carries a
- * batch-resume prompt and 'subagent' otherwise — deliberately a two-way cut,
- * because those are the only two kinds the account distinguishes.
+ * The batch-resume prompt the SessionStart path injects into the session holding
+ * the batch lock, in either form it is printed in.
  */
-export function sessionKindOfPrompt(text) {
-  const s = String(text ?? '')
-  return OWNER_SESSION_MARKERS.some((re) => re.test(s)) ? 'owner' : 'subagent'
+const OWNER_PROMPT_MARKERS = [/Batch-Wiederaufnahme/, /\[batch-resume\]/]
+
+/**
+ * Classify a transcript by TWO independent signals and require them to agree.
+ *
+ * `cwd` is the affirmative one: a delegated author runs in an isolation worktree
+ * and the batch owner in the main checkout, which is structure rather than
+ * wording. The prompt marker corroborates.
+ *
+ * The prompt ALONE was rejected on review (22d3eaa) and rightly: any text merely
+ * mentioning batch-resume passed as an owner, and an owner transcript that
+ * happened not to quote it passed as a subagent. Neither signal is trusted alone
+ * now.
+ *
+ * Returns 'owner', 'subagent', or null when the two CONTRADICT each other. null
+ * is not a third kind — it is a refusal to guess, and a caller that treats it as
+ * a kind has put the defect back.
+ */
+export function sessionKindOf({ cwd, prompt } = {}) {
+  const byTree = String(cwd ?? '').includes(WORKTREE_SEGMENT) ? 'subagent' : 'owner'
+  const byPrompt = OWNER_PROMPT_MARKERS.some((re) => re.test(String(prompt ?? '')))
+    ? 'owner'
+    : 'subagent'
+  return byTree === byPrompt ? byTree : null
+}
+
+/** The Berlin calendar date of an ISO instant, in the form the account writes. */
+export function berlinDateOf(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Berlin',
+  }).format(d)
 }
