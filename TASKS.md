@@ -6032,6 +6032,14 @@ Build order, chosen so no two parallel agents own the same file:
   DELIVER: delete those four names; keep `lock-release-hook`, `prep-guard` and `prep-arm-hook`
   — which has no local import at all — each with its debt named in one line. Add the ratchet's
   own check: a name whose core IS tested fails the gate instead of sitting there.
+  RE-CHECKED 20.08.2026, carried from the 10.08.2026 four-eyes work-order analysis (not a
+  fresh finding): `KNOWN_UNTESTED` (`scripts/guard-health-core.mjs:169`) now holds SIX
+  names, not seven — `prep-guard.mjs` left the list on 07.08.2026 with its reason written
+  in place. The four names this point deletes are all still there, so the overstated debt
+  stands as measured; what changes is the keep-list, which is `lock-release-hook` and
+  `prep-arm-hook` only. The ratchet's own check is still missing too: `auditGuardHealth`
+  merely EXEMPTS a listed name (line 522), so a name whose core has since gained a test
+  goes on sitting there instead of failing the gate.
   VERIFIABLE: pure Vitest — a tested core still listed in `KNOWN_UNTESTED` FAILS; the three
   remaining names pass; the list cannot grow without a written reason. Criticality: medium.
 
@@ -6102,6 +6110,15 @@ Build order, chosen so no two parallel agents own the same file:
      "is this guard reachable from the settings chain at all?", and an unwired guard is named
      loudly rather than counted as present. `guard-health-guard` carries the verdict, so the
      next one cannot sit unwired for a month.
+  CARRIED FROM THE 10.08.2026 four-eyes work-order analysis (not a fresh finding), which
+  judged this point a fold into point 542 — and 542 has since landed. RE-CHECKED
+  20.08.2026: `point-proof-guard` is named in `.claude/settings.json`,
+  `INTENTIONALLY_DORMANT` in `scripts/guard-health-core.mjs` is empty again, and item 3 is
+  built as well — `scripts/guard-inventory-core.mjs` raises an `orphan` finding for an
+  enforcer-named script no hook and no git hook names, with its Vitest case in
+  `scripts/guard-inventory-core.test.mjs`. What is left of this point is item 1's LIVE
+  proof alone: a recorded run in which a point carrying a `PROOF:` line is refused the tick
+  until its command has run at HEAD, and one without such a line is ticked untouched.
   VERIFIABLE: Vitest — the inventory check fails on a fixture whose guard has no hook entry
   and passes when it has one; plus the recorded live proof of 1, since an armed hook is the
   one thing the unit layer cannot demonstrate about the real settings file.
