@@ -823,8 +823,8 @@ put it is the mistake this line exists to stop.
 - [ ] 747. The ceiling is recalibrated from a series, and gives ground back only against
   evidence (19.08.2026). Point 743 buys safety with a small working window, and that price is
   meant to be temporary: once the output budget of 597 caps the largest single jump and point
-  744 has made leaving cheap, the same ceiling tolerates a HIGHER trigger — roughly 125,000 on
-  today's numbers — and the working window nearly doubles at unchanged safety. The temptation
+  744 has made leaving cheap, the same ceiling tolerates a HIGHER trigger, and the working
+  window nearly doubles at unchanged safety. The temptation
   is to raise it after a quiet stretch, which is exactly when the evidence is weakest.
   FINAL STATE: a raise is admissible only when all of these hold, and the commit that raises
   it records each: a MINIMUM SAMPLE of handovers measured AFTER 597 landed; the decision taken
@@ -851,9 +851,19 @@ put it is the mistake this line exists to stop.
   (measured 19./20.08.2026). Three consecutive fresh sessions stood at 85,225 / 83,079 / 86,416
   tokens after their orientation turn against a trigger of 82,000 and had to hand over without
   starting a single point; the cause is the 61,372-token start floor standing before the first
-  tool call, which point 757 cuts. The trigger was lifted to 110,000 as an INTERIM value on
+  tool call, which point 757 cuts. The trigger was lifted as an INTERIM value on
   20.08.2026 (`CONTEXT_TRIGGER_TOKENS`, commit e650c0f6; ceiling unchanged at 150,000), and this
   point replaces that interim value with one derived from the series.
+  STRUCK 20.08.2026 (work-order review): the figure "roughly 125,000 on today's numbers".
+  It was an estimate from the 82,000 regime and the hand-set interim value has already
+  overtaken it — measured today, `scripts/context-watermark-core.mjs` stands at
+  `CONTEXT_CEILING_TOKENS` 150,000, `CONTEXT_TRIGGER_TOKENS` 122,000 and
+  `CONTEXT_REFUSAL_TOKENS` 110,000, so the interim record above (110,000) named what is now
+  the refusal mark. That does not shrink this point, it sharpens it: a value in the region
+  the old estimate proposed is ALREADY in force without any of the evidence this point
+  demands, so the sample, the per-kind quantile, the step cap and the rollback are owed for
+  a raise that has already happened. Everything else here holds — the ceiling anchoring,
+  the floor rule, the censoring argument and the re-arming condition are untouched.
   THE TRIGGER IS ANCHORED AT THE CEILING, NEVER AT THE FLOOR (user 20.08.2026, 01:28). Floor and
   safety distance are independent: the floor sets the SIZE of the working window, the distance
   the SAFETY before the ceiling — so a falling floor must widen the window without the distance
