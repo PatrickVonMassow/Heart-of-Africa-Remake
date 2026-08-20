@@ -180,17 +180,13 @@
       "at": "2026-08-19T21:23:30.975Z",
       "why": "Shares the fence's classifier files with the running context-ceiling programme, so it must not run beside it; the defect has a working workaround (reword the card), so it waits behind 755 rather than displacing anything"
     },
-    "757": {
-      "at": "2026-08-19T23:29:03.426Z",
-      "why": "user 20.08.2026: the document-floor cut takes queue position 1"
-    },
     "759": {
       "at": "2026-08-20T01:05:34.270Z",
       "why": "Vorbedingung des Wiederscharfschaltens in 747: solange der Ausstieg nicht feuert, stellt ein scharfer Zaun die Blockade delegierter Agenten vollstaendig wieder her."
     }
   },
   "settled": {
-    "at": "2026-08-20T01:05:34.270Z",
+    "at": "2026-08-20T04:12:04.712Z",
     "points": [
       174,
       184,
@@ -415,8 +411,9 @@
       754,
       755,
       756,
-      757,
-      759
+      759,
+      760,
+      761
     ]
   }
 }

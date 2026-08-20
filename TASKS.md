@@ -107,6 +107,33 @@ put it is the mistake this line exists to stop.
   sort of number this project has been burned by.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 762. Two document budgets have zero headroom, so the next memory blocks the guard
+  (measured 20.08.2026, point 761). Confirming point 757's ceilings against the LANDED files
+  found two of the three budgets in `scripts/doc-budget-core.mjs` with nothing to spare:
+  `MEMORY.md` measures 46 lines / 710 words against `maxLines` 47 / `maxWords` 710, and the
+  global `CLAUDE.md` stub measures 6 lines against `maxLines` 6. `doc-budget-guard` compares
+  with `<=`, so both hold TODAY and nothing is red. The defect is what happens next: `MEMORY.md`
+  is designed to gain one index line per new memory, and at zero word headroom the very next
+  memory trips the guard and blocks the turn that writes it — a guard that fires on its own
+  document's intended growth. The ceilings were set from PRE-MERGE readings (the code comments
+  still said 45 / 700 and five lines until point 761 corrected them), so this is not drift but a
+  budget never confirmed against what actually landed.
+  FINAL STATE: the two budgets carry a DECIDED shape rather than an accident of the merge. Either
+  `MEMORY.md` gets a stated growth allowance — its purpose is one hook line per topic, so a
+  ceiling with no room for one is the wrong shape, and the allowance is written as the
+  justification the budget module requires — or the ceiling stays tight and
+  `doc-budget-guard`'s refusal names which entry has to go, so the turn that hits it can act
+  instead of stalling. The global stub is settled the same way in the same commit. Point 761
+  deliberately did not raise either ceiling, because raising a budget needs a written
+  justification and that justification is a decision, not a measurement.
+  VERIFIABLE: every cut document has stated headroom for at least one further entry of its own
+  kind, or the guard's refusal text names the entry to remove; a unit case adds an entry to each
+  document at its landed size and asserts the guard's answer is the decided one rather than a
+  bare block.
+  Criticality: medium — nothing is red today, but it fires on the next memory written, and it
+  fires inside the guard that is supposed to protect the very document being edited.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 760. The launcher's own CLI can lose its native binary, and the arming probe cannot see it
   (measured 20.08.2026). The global `@anthropic-ai/claude-code` install stood with NO native
   binary: `claude --version` answered "native binary not installed", because npm 11 refuses a
