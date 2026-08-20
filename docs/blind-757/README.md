@@ -1,5 +1,14 @@
 # Blind-parallel records — cutting the per-turn document floor (work-order point 757)
 
+**STATUS — the analysis is CLOSED, only the execution is left.** The divergent stage
+(list-A, list-B) and the counted merge (`union.json`, 66 entries, every input entry
+accounted for) are FINISHED and may not be re-run: no session re-opens a blind half, and
+no session re-merges. What remains of point 757 is the EXECUTION — apply `union.json`
+entry by entry, each cut landing in the same commit as its twin, with the account naming
+a destination for every rule that moves. The five entries flagged DROPPED-NEEDS-RULING
+(U6, U45 part 1, U48, U55, U65) are OUT OF SCOPE for the execution: they are questions
+standing before the user, and their rules stay untouched until he answers.
+
 The four-eyes DIVERGENT stage of 20.08.2026 that decided what leaves the three documents
 loaded into every session and every subagent before any work begins. CLAUDE.md §6 form:
 two blind halves from the same inputs, then a counted merge by a third model that wrote
