@@ -2511,11 +2511,24 @@ put it is the mistake this line exists to stop.
      carrier never crosses the running lane. A settlement with no bank carries
      neither rocks nor the children's bank game; its adults keep only `DIG`, and
      its children play the SILENT tag game the ports have (see the port point), so
-     no settlement is ever left without a children's game.
+     no settlement is ever left without a children's game. Each rock is drawn as an
+     upright erratic of the same shape family as the goal boulder of
+     `src/world/communicationRock.ts` at settlement scale, so the object `ROCK` is
+     learnt on is the same KIND of thing the chief's message points at. Standing one
+     upstream and one downstream of the descent also KEEPS the rock/direction
+     discriminator that the old village placement existed for: a rock on the
+     upstream stretch alone would make "go upstream" and "go to the rock" the same
+     picture, and that must not be dropped while the stones move to the bank.
   6. The three areas — village core (adults), children's roaming quarter, bank
      stage — each clear the others by at least the hearing radius. Where a layout
      cannot give all three, the ADULTS are moved, not the children: their words do
      not depend on where they stand, the children's do.
+  7. THE LAYOUT COMMENT SAYS WHERE THE ROCKS STAND AND WHY. `layout.ts` long placed a
+     single teaching stone 6.5 to 13.6 m from the village centre while
+     `docs/communication-poc-spec.md` already assumed the rock lay upstream — the
+     code and the spec must never again describe different places. The placement
+     comment states the built arrangement; the spec's own rock sentences belong to
+     the document sweep (point 692) and are not rewritten twice.
 
   Test: Vitest over the layout — the rocks lie on the bank on either side of the
   descent, the water path meets the bank outside the stretch, no dig site lies on
@@ -2534,6 +2547,11 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:42: »Insgesamt sagen mir die Erwachsenen mit nur einem Wort bisher zu wenig. Vielleicht können sie auch noch irgendwie RIVER benutzen.«
   Nutzer, 13.08.2026 22:48: »Ein Krug fände ich schon in Ordnung. Wenn der Spieler dann RIVER als WATER interpretiert, wäre das für die Botschaft des Häuptlings nicht schlimm.«
   Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
+  Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
+  The same evening's reading, kept because it names the defect precisely: a boulder
+  on the village square that everybody walks to for no reason, with people digging
+  beside it, reads as meaningless — and the settlement's rock was not the rock the
+  chief's message means.
   Refs: src/scenes/place/adultErrands.ts, src/scenes/place/PlaceLife.tsx (TaskWalker, HEAD_CARRY_POSE), src/scenes/place/layout.ts (teachingStone, digSites), src/scenes/place/riverBank.ts
   Bundle: Dorfleben.
 
