@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 21:53 · Quellen-Fingerprint: `3d5d53b7e971…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 22:15 · Quellen-Fingerprint: `4575ad524afd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 77 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: 3d5d53b7e971c7c5eeecab65b26139492a1ce1ce0dc75c3cf6ce41433ddac76c -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T19:53:54.757Z -->
+<!-- RETRO-FINGERPRINT: 4575ad524afd2ead36382a2fc13f7a75e55b1abd623071214e4ab092e91b2565 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T20:15:32.614Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2273,3 +2273,43 @@ verschwendet keine Sitzung an einen ruhenden Stapel.
 
 **Lehre:** Wer einen Zustand baut, der nur von außen endet, muss den Weg von außen ausdrücklich
 offenhalten. Prüffrage: *Kommt das, was diesen Zustand beendet, im Zustand selbst noch an?*
+
+### 3.144 Die Sperre band nur den, der sie genommen hatte
+
+Am 20.08.2026 um 21:48 startete der Autostart eine zweite Stapel-Sitzung mit der Begründung,
+der bisherige Eigentümer sei nachweislich tot. Er war es nicht: Die Fenstersitzung arbeitete
+ununterbrochen weiter, committete um 21:38 und 21:39 auf main, um 21:59 erneut, pushte um 22:01
+und hängte Punkte an die Arbeitsliste an. Beide Sitzungen haben in derselben Viertelstunde auf
+denselben main geschrieben. Gemessen hatte der Starter nicht den Prozess, sondern die
+Sperrdatei — und die nannte seit 21:48 die neue Sitzung.
+
+Die Klasse ist der Ausschluss, der nur die Angemeldeten bindet. Der Eigentums-Riegel greift bei
+dem, der die Sperre hält; wer sie nie nimmt, wird von ihm auch nie gebremst. Damit ist die
+Sperre keine gegenseitige Ausschließung mehr, sondern eine Anmeldung, und ihre Abwesenheit
+bedeutet zwei verschiedene Dinge, die niemand auseinanderhält: »hier arbeitet niemand« und
+»hier arbeitet jemand, der sich nicht angemeldet hat«. Der Starter las die zweite Lage als die
+erste.
+
+**Lehre:** Eine Sperre beweist Anwesenheit, nie Abwesenheit. Prüffrage: *Misst mein
+Lebendigkeits-Test den Vorgang selbst oder nur dessen Eintrag?* Wo er den Eintrag misst, muss
+das Fehlen des Eintrags als UNGEKLÄRT gelten und nicht als frei — dieselbe Asymmetrie, die die
+Modell-Wache schon zwischen »konnte nicht nachsehen« und »ist weg« zieht.
+
+### 3.145 »Hat nichts geschrieben« stand über 118 fertigen Zeilen
+
+Am selben Abend schloss ein Autorenlauf für Punkt 792 mit dem Satz, das andere Haus habe auf
+diesem Zweig NICHTS geschrieben, und nannte drei Problemzeilen: nichts committet, uncommittete
+Änderungen zurückgelassen, kein Abschluss. Im Arbeitsbaum lagen 118 fertige Zeilen — die
+verlangte Per-Commit-Beurteilung samt 67 Zeilen Tests. Die Arbeit war da; sie war nur nicht
+committet. Gerettet hat sie allein der Blick in den Diff.
+
+Die Klasse ist die absolute Verneinung über einem Zustand, den der Melder gar nicht geprüft
+hat. »Nichts geschrieben« ist eine Aussage über den Baum, belegt war aber nur etwas über die
+Commit-Historie. Gefährlich wird sie durch die Handlung, die sie nahelegt: Wer sie beim Wort
+nimmt, räumt den Zweig ab — und das ist genau der Moment, in dem sie am ehesten beim Wort
+genommen wird, weil ein gescheiterter Lauf unter Zeitdruck gelesen wird.
+
+**Lehre:** Eine Meldung darf nur verneinen, was sie gemessen hat. Prüffrage: *Deckt der
+Wortlaut meines Negativbefunds genau den Bereich ab, den ich geprüft habe?* Wo ein Rest
+ungeprüft bleibt, nennt die Meldung dessen Größe und den Weg, ihn zu sichern, statt ihn
+wegzureden.
