@@ -76,6 +76,36 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
+- [ ] 761. The document cut's own proof is still owed: measure the floor a cleared session
+  actually pays (20.08.2026, closing point 757). The cut landed and is measured where it could be:
+  `CLAUDE.md` fell from 786 lines / 6,585 words / 46,854 B to 332 / 2,091 / 17,255 B, `MEMORY.md`
+  from 16,801 B and 88 index lines to 5,575 B and 41, and the global `CLAUDE.md` from 5,093 B to a
+  236 B stub. What point 757 named as its VERIFIABLE could not be taken by the session that did the
+  work: the floor is read from the FIRST assistant response of a FRESHLY CLEARED session
+  (`input_tokens + cache_read + cache_creation`), and that session must already be loading the cut
+  documents. The pre-cut reading is 57,970 tokens; the 39,537 standing beside it in
+  `docs/document-cut-757.md` is a PROJECTION from the byte counts, not a reading, and is labelled
+  as one. A projection is what this project calls an estimate, and an estimate may not close a
+  point whose whole claim is a measured saving.
+  FINAL STATE: a session that starts with the cut documents loaded reads its own first response
+  from its transcript and records the figure in `docs/document-cut-757.md` beside the pre-cut
+  57,970 — with the date, the transcript path and the three summands, so a later reader can
+  re-derive it. The projection is then marked as superseded rather than deleted, because the gap
+  between a projection and the reading is itself the lesson. If the measured floor misses the
+  projection by more than ~2,000 tokens, the point NAMES where the difference sits (harness system
+  prompt, tool schemas, the SessionStart hook, the owner runbook the hook now serves to the batch
+  owner) instead of adjusting the claim; the owner runbook in particular is served to the lock
+  holder and is NOT part of a delegated subagent's floor, so the two floors differ by design and
+  both are worth one line.
+  VERIFIABLE: `docs/document-cut-757.md` carries the measured after-figure, its date, its
+  transcript path and its three summands; the projection stands beside it marked superseded; and
+  the doc-budget ceilings for `CLAUDE.md`, `MEMORY.md` and the global file are confirmed against
+  the landed files rather than the pre-merge ones.
+  Criticality: low — it writes down a number and corrects a document; nothing it touches can break
+  the build. But it is the only step that turns point 757's claim into a measurement, and an
+  unmeasured saving is exactly the class of assertion this project has been burned by.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 760. The launcher's own CLI can lose its native binary, and the arming probe cannot see it
   (measured 20.08.2026). The global `@anthropic-ai/claude-code` install stood with NO native
   binary: `claude --version` answered "native binary not installed", because npm 11 refuses a
