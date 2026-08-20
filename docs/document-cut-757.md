@@ -68,7 +68,8 @@ document saving, not a different order of magnitude.
 - `MEMORY.md` :: U52 queue and bundle index duplicates :: COVERED -> queue-order-guard
 - `MEMORY.md` :: U52 preparation index duplicate :: COVERED -> prep-guard
 - `MEMORY.md` :: U52 retrospective index duplicate :: COVERED -> retro-currency-guard
-- `MEMORY.md` :: U53 second copies of project policy rules :: DROPPED -> user ruling 20.08.2026: project CLAUDE.md is their single binding copy
+- `MEMORY.md` :: U53 effort-high-for-implementation hook :: MOVED -> ~/.claude/projects/-workspace-hoa/memory/effort-high-for-implementation.md
+- `MEMORY.md` :: U53 remaining second copies of project policy rules :: DROPPED -> user ruling 20.08.2026: project CLAUDE.md is their single binding copy
 - `MEMORY.md` :: U54 batch-owner and board-operation hooks :: MOVED -> docs/batch-owner-runbook.md
 - `MEMORY.md` :: U56 detail beyond each surviving one-line hook :: MOVED -> ~/.claude/projects/-workspace-hoa/memory/
 - `MEMORY.md` :: U57 regrowth prevention and entry-length ceiling :: COVERED -> doc-budget-guard

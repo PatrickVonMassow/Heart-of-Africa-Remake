@@ -16,6 +16,7 @@ import {
 
 const ROOT = resolve(process.cwd())
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
+const MEMORY_PATH = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory', 'MEMORY.md')
 
 const line = (where, rule, account, dest) => `- \`${where}\` :: ${rule} :: ${account} -> ${dest}`
 
@@ -183,6 +184,18 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     // half waits for the user.
     const accounted = new Set(entries.flatMap((e) => e.rule.match(/\bU\d+\b/g) ?? []))
     expect([...accounted].sort()).toEqual([...executed].sort())
+  })
+
+  it('keeps every moved memory-topic hook reachable from the index', () => {
+    const memory = readFileSync(MEMORY_PATH, 'utf8')
+    const hooks = entries.filter(
+      (e) => e.source === 'MEMORY.md' && /\bhooks?\b/i.test(e.rule) && /\/memory\/[^/]+\.md$/.test(e.destination),
+    )
+    expect(hooks.length).toBeGreaterThan(0)
+    for (const hook of hooks) {
+      const topic = hook.destination.split('/').at(-1)
+      expect(memory).toContain(`(${topic})`)
+    }
   })
 
   it('has a real destination behind every account', () => {
