@@ -171,9 +171,9 @@ describe('the per-point ceiling of the work order', () => {
     const text = order(
       '- [ ] 11. ' + Array.from({ length: 12 }, (_, i) => 'w' + i).join(' '),
       '  It prints this remedy:',
-      '  \`\`\`',
+      '  ```',
       '  - [ ] 99. a specimen line that only looks like a point',
-      '  \`\`\`',
+      '  ```',
       '  and then says one more thing here',
     )
     const points = workOrderPoints(text)
@@ -183,7 +183,7 @@ describe('the per-point ceiling of the work order', () => {
 
   it('closes a fence only with its own marker, so a tilde never ends a backtick block', () => {
     const points = workOrderPoints(
-      order('- [ ] 11. one', '\`\`\`', '~~~', '- [ ] 12. still inside the backtick fence', '\`\`\`', '- [ ] 13. out'),
+      order('- [ ] 11. one', '```', '~~~', '- [ ] 12. still inside the backtick fence', '```', '- [ ] 13. out'),
     )
     expect(points.map((p) => p.number)).toEqual([11, 13])
   })
