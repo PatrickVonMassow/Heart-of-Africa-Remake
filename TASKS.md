@@ -3466,6 +3466,9 @@ put it is the mistake this line exists to stop.
      suspended wording, so re-activating the escalation makes a test red for saying what the
      configuration then means — the reversal the suspension promises costs a test edit nobody
      documented.
+     SUPERSEDED 20.08.2026 by the Fable switch (landed the same evening): the hand-set constant is
+     gone, the state is a runtime fact read by every consumer, and flipping it is one command that
+     reddens nothing. What remains of this finding is finding 1 alone.
   FINAL STATE: a routing report carries every reason a lane decision has, not the first; and flipping
   `FABLE_ESCALATION_SUSPENDED` back leaves no stale assertion behind — the documentation test asserts
   the wording that MATCHES the flag rather than one of the two states.
