@@ -7577,6 +7577,16 @@ Build order, chosen so no two parallel agents own the same file:
   commits to nothing and can be replaced when §13 is settled.
   KEEP: the drums as they are, the port and travel soundscapes untouched, and the single
   master volume in charge of everything (§20).
+  THE WORDLESS-VOICES CLAUSE IS OVERTAKEN (carried 20.08.2026 from the 10.08.2026 four-eyes
+  work-order analysis, not a fresh finding): it rests on §13.4 being undecided, and the
+  communication PoC has since answered it for a playable slice — `docs/communication-poc-spec.md`
+  from the user's brief of 03.08.2026, built as the village speech in `src/systems/ambience.ts`,
+  which plans tonal syllables on their own speech bus under `balance.communication.speechVolume`.
+  Villages therefore already have voices and they are NOT wordless, so the murmur layer is
+  not this point's to add and would sit on top of the speech rather than beside it. What this
+  point still owes is the rest of the bed — the mortar's thud timed to the animated pestle,
+  the goats, and the fire's crackle rising with proximity — and its levels must be judged
+  against the speech that is now in the mix, not against drums alone.
   VERIFIABLE: pure (`src/systems/ambience.test.ts`) — each new layer's gain follows its
   own slider and the master, is zero outside a village, and the fire layer rises and
   falls with distance across a swept range. Live (`scripts/verify/settings.mjs`): inside
