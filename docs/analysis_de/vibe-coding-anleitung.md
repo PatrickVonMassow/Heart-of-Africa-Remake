@@ -206,10 +206,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   miss auf einer ruhigen Maschine."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert; eine Warnung in einer **geglückten** Aktion ist unsichtbar, und ein
-  Tor, das den Push zu Recht verweigert, lässt nur einen Stapel wachsen.
-  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der
-  Erfolgsmeldung, und melde beim Start, was **lokal fertig, aber nirgends angekommen** ist."
+  trotzdem nicht passiert; ein Tor, das zu Recht verweigert, lässt nur einen Stapel wachsen.
+  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim
+  Start, was **lokal fertig, aber nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
   und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird geglaubt, deckt
@@ -243,8 +242,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Kein Blocker auf die Lücke selbst — eine benannte Lücke ist mehr wert als erfundene Deckung."
 
 - **Die aufgeschriebene Grenze deckt nicht, was sie behauptet.** Der Satz, was ein Mechanismus
-  *nicht* leistet, wird zur Ablage für das, was bloß nicht getan wurde — zweimal stand so ein
-  echter Defekt als „gewollte Restlücke" im Vertrag, einmal mit grünem Test.
+  *nicht* leistet, wird zur Ablage für das, was bloß nicht getan wurde.
   → *Prompt:* „Liegt die Information zum **Schließen** vor, wird geschlossen. Jede verbleibende
   Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
@@ -266,10 +264,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
-  Einträge, dem Prüfer wurde die Hälfte nie gereicht. Nicht geliefert ist abwesend, nicht rot —
-  und liest sich *grüner* als ein Fehlschlag.
+  Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
-  Anzahl. Melde die **Abdeckung** mit; ein Urteil über unvollständigem Material ist **Teilprüfung**."
+  Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
@@ -333,25 +330,30 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
 - **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
-  „es lief durch" beweist den Weg nicht — du hattest den Dialog weggeklickt.
+  „es lief durch" beweist den Weg nicht.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
   welches Ergebnis welche Erklärung ausschließt."
 
 - **Zwei Aufträge für einen Fehler.** Derselbe Mangel wird arglos ein zweites Mal aufgeschrieben.
-  → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab — gibt es einen,
-  **erweitere ihn**. Verwirfst du einen Zweig, rette, was über seinen Auftrag hinaus darin steckt."
+  → *Prompt:* „Vor jedem neuen Punkt: Such die offenen nach demselben Problem ab und **erweitere**
+  den vorhandenen. Verwirfst du einen Zweig, rette, was darin über seinen Auftrag hinausgeht."
+
+- **Zusammenlegen behält das Thema und verliert die Schärfe.** Der Überlebende sagt dasselbe —
+  nur schwächer: aus „jeder Fall wird benannt geschlossen" wird „verzeichnet".
+  → *Prompt:* „Prüf **drei Stellen einzeln**: Pflichtsätze, Abnahmezeile, Einstufung; die
+  **stärkere** Fassung gewinnt. Zum Nachprüfen beide **ganzen** Texte, nie nur den Unterschied."
 
 - **Gebaut heißt nicht auffindbar.** Dein Test fragt „wirkt es?", der Nutzer „komme ich dorthin?".
   → *Prompt:* „Meldet er etwas erneut, das repariert ist, nimm an, er **erreicht** es nicht — prüf
-  die **Nachbarschaft**, und wo das als Test schreibbar ist, schreib es als Test."
+  die **Nachbarschaft** und schreib es als Test."
 
 - **Der erste Fehlschlag macht sich selbst dauerhaft.** Eine wiederkehrende Aufgabe liest ihre
   eigene Spur, die es beim ersten Lauf nicht gibt — und bricht von da an immer ab.
-  → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**; so beginnt sie nach
-  jedem Neustart. ‚Übersprungen' ist **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
+  → *Prompt:* „Prüf jede wiederkehrende Aufgabe gegen den **leeren Zustand**. ‚Übersprungen' ist
+  **kein Betriebszustand** — was sie nicht tut, meldet sie laut."
 
 - **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
-  unterbindet, verbiegt das Verhalten überall sonst mit.
+  unterbindet, verbiegt alles andere mit.
   → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
   die Kur gegen gesunde Fälle. Ist sie teurer als der Fehler, **buche** ihn mit Zahlen und
   verworfener Kur — verschweigen gilt nicht, still beheben auch nicht."
@@ -410,4 +412,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 30b8337921b9e8e2928c65805ce70bc81077db39a3fe145184f9924a02b79ac8 -->
+<!-- GUIDE-FINGERPRINT: b0e061a541f13d848634c800294fe941f9d4abe72cb25221612e2e495564fb07 -->
