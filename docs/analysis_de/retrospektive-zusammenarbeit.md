@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 17:51 · Quellen-Fingerprint: `469c065886de…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 18:52 · Quellen-Fingerprint: `ea94b2526c8b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 74 Prozess-/Meta-TASKS-Punkte (davon 30 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 75 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
 
-<!-- RETRO-FINGERPRINT: 469c065886dec28d80fc8cc87bb4b0657afeaaac292951e36e6e2f18ddfa851e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T15:51:57.317Z -->
+<!-- RETRO-FINGERPRINT: ea94b2526c8b546d84129457132a77e342cea03a4983cf85bc4249575b93eb6b -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T16:52:29.633Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2189,3 +2189,26 @@ formuliert, muss dieselbe Quelle fragen, die die Entscheidung dahinter beurteilt
 Index sehen im Normalfall gleich aus, und der Unterschied zeigt sich ausgerechnet im teilweise
 vorgemerkten Baum, also im Ausnahmefall, für den die Ausnahme gebaut wurde. Prüffrage:
 *Wie viele Stellen sagen dasselbe — und liest meine Prüfung sie alle, aus derselben Quelle?*
+
+### 3.140 Zwei Durchsetzer, beide absolut formuliert, und sie schließen einander aus
+
+Am 20.08.2026 gab die Punktgrenze am Sitzungsende den Text der Übergabe-Karte wörtlich vor — mit
+der ausdrücklichen Anweisung, ihn nicht neu zu schreiben, und mit der Begründung, warum er KEINE
+Punktnummer nennt: Die Karte ist die eine ohne Nummer, und der Themenwächter läse jede
+Punktreferenz darin als fremd. Das Publish-Tor der Tafel verweigerte genau diesen Text mit der
+umgekehrten Regel: Eine Übergabe-Karte ohne Nummer wird nicht veröffentlicht, ihr Grund MUSS den
+nächsten Punkt nennen. Ein drittes Tor kam dazu — der vorgegebene Text ist 103 Wörter in einem
+Block, das Kürzungsbudget erlaubt 90 und verlangt Absätze.
+
+Die Sitzung kam nur weiter, indem sie den als wörtlich deklarierten Text zweimal von Hand
+umschrieb. Genau das sollte die Vorgabe verhindern: Die eine Karte, die der Nutzer am Ende auf dem
+Handy liest, entsteht dadurch handgeschrieben an dem Moment, den der Mechanismus vereinheitlichen
+wollte. Jeder der drei Durchsetzer ist für sich richtig begründet, und keiner weiß vom anderen.
+
+**Lehre:** Das ist nicht 3.116 — dort hebt eine Mechanik ihre eigene Voraussetzung auf. Hier sind
+es ZWEI, jede für sich schlüssig, deren Vorschriften einander ausschließen; wer der einen folgt,
+verletzt zwangsläufig die andere. Solche Paare entstehen, wenn ein Durchsetzer den TEXT vorgibt und
+ein anderer denselben Text PRÜFT, ohne dass eine Seite die andere kennt. Prüffrage bei jedem
+Mechanismus, der eine Ausgabe diktiert: *Wer prüft diese Ausgabe später — und ist das Diktat schon
+gegen dessen Regel gehalten worden?* Wo ein Text vorgeschrieben wird, gehört sein eigener Prüfer in
+den Test des Vorschreibenden.
