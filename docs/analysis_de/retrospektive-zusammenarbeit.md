@@ -48,7 +48,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
-| 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614) |
+| 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 12:44 · Quellen-Fingerprint: `627ffd0abf0a…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 13:40 · Quellen-Fingerprint: `9c0ff6cb01b5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 72 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 73 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: 627ffd0abf0a18fd33c57cdc67e382b7b4af68e43e1aa3ec1d3ef4521ce4b27e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T10:44:57.038Z -->
+<!-- RETRO-FINGERPRINT: 9c0ff6cb01b56973c21214e3a544b4b3e5505da8934cc8b52c87225827b21d46 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T11:40:17.136Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2109,3 +2109,34 @@ Bestand mitgeben: Ein Unterschied beantwortet „ist das Gemeldete behoben?", ni
 noch etwas?". Und drittens ist ein Prüfer, der genau diese Grenze benennt, statt grün zu melden,
 das Wertvollste an der Gegenlesung — hier hat er den Unterschied zwischen sechs gefundenen und
 einer gefundenen Klausel gemacht.
+
+### 3.137 Der Mechanismus war an den Ort gebunden, an dem die Arbeit gerade nicht stattfindet
+
+Am 20.08.2026 standen binnen einer Vormittagsstunde zwei unabhängige Defekte derselben Bauart im
+Auftrag. Ein Prüffall löst die Wurzel des Repositoriums über den laufenden Checkout auf und ist
+deshalb aus jedem isolierten Arbeitsbereich rot — also genau dort, wohin CLAUDE.md §6 jede
+größere Mechanik zum Bauen schickt. Und die Beauftragung eines delegierten Autors trägt ihren
+Eintrag in ein Verzeichnis, dessen Pfad fest am Hauptbaum hängt, während der Commit, der ihn
+besiegelt, im Arbeitsbereich läuft: Der Eintrag landet im einen Baum, das Hinzufügen scheitert im
+anderen. Beide Male ist der Code für sich genommen richtig; falsch ist nur die Annahme, wo er
+läuft.
+
+Das ist eine eigene Fehlerklasse, und sie ist keine Nachlässigkeit. Sie entsteht, weil das
+Werkzeug im Hauptbaum geschrieben, im Hauptbaum geprüft und im Hauptbaum für gut befunden wird,
+während der Prozess daneben verlangt, dass die eigentliche Arbeit woanders passiert. Der
+Hauptbaum ist der bequeme Ort: Dort stimmt jeder Pfad von selbst, und eine Annahme über ihn wird
+nie widerlegt. Die Isolation ist dagegen der teure Ort — und der einzige, an dem der Defekt
+auftritt. Wer nur im Hauptbaum misst, misst systematisch am falschen Ort.
+
+Die zweite Hälfte ist schlimmer als die erste und gehört ausdrücklich dazu. Der fehlgeschlagene
+Auftrag brach nicht sauber ab: Das Anhängen des Eintrags war schon geschehen, als das Sichern
+scheiterte, und zurück blieb im Hauptbaum eine unversionierte Zeile über eine Beauftragung, die
+nie gelaufen ist. Ein Register, das gerade dafür da ist, den wahren Verlauf festzuhalten, hätte
+eine Runde gezählt, die es nicht gab. Ein Schritt, der zwei Bäume anfasst, muss beide Hälften
+zusammen gelingen oder beide zusammen unterlassen — sonst ist der Fehlversuch teurer als das
+Nichtstun, weil er eine Behauptung hinterlässt.
+
+Die Lehre ist billig zu ziehen und teuer zu ignorieren: Ein Werkzeug, das der Prozess in die
+Isolation schickt, wird EINMAL aus der Isolation heraus geprüft, bevor es als fertig gilt. Und ein
+Vorgang, der schreibt und dann committet, räumt seinen Schreibvorgang auf, wenn der Commit nicht
+kommt.
