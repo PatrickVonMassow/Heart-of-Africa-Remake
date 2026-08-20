@@ -28,7 +28,14 @@ import {
   seedRecord,
   settleRecord,
   unrankedAppends,
+  ORIGIN_MACHINE,
+  ORIGIN_USER,
+  originOf,
+  releaseBoundaryBreaches,
+  releaseBoundaryMessage,
+  statesHighUrgency,
 } from './queue-rank-core.mjs'
+import { RELEASE_TAG_POINT } from './board-queue-core.mjs'
 
 /** A record whose baseline says "these points were here when the order was last settled". */
 const settledAt = (points, ranked = {}) => ({ ranked, settled: { at: '2026-08-10T09:00:00.000Z', points } })
@@ -162,7 +169,9 @@ describe('PROVENANCE — which points are new since the order was last settled',
   it('carries the baseline through a decision and a prune', () => {
     const record = recordRank(settledAt([615]), 616, { why: 'b' })
     expect(record.settled.points).toEqual([615])
-    expect(pruneRankRecord(record, [616]).ranked).toEqual({ 616: { at: '', why: 'b' } })
+    // The ORIGIN travels with the decision (point 789) — an unstated one is the
+    // machine's, so a prune can never quietly hand a point the user's exemption.
+    expect(pruneRankRecord(record, [616]).ranked).toEqual({ 616: { at: '', why: 'b', origin: ORIGIN_MACHINE } })
     expect(pruneRankRecord(record, [616]).settled.points).toEqual([615])
   })
 })
@@ -474,5 +483,169 @@ describe('the LIVE record, which is what every checkout inherits', () => {
     expect(record.torn).toBe(false)
     expect(record.settled).not.toBeNull()
     expect(appendGateState(openPointsOf(readTasksOpen()), record).state).not.toBe('unarmed')
+  })
+})
+
+// ---- THE RELEASE BOUNDARY (point 789) --------------------------------------
+//
+// The append gate above asks whether the END of the order is right and accepts
+// both answers. It says nothing about a ticket the MACHINE filed for itself and
+// ranked in FRONT of the release — which is how eight of them came to stand
+// there on 20.08.2026, until the user moved them back by hand and asked for the
+// mechanism. Every case below is a synthetic order: the boundary is whatever
+// position the release point currently holds, never a number this module knows.
+
+/** A body that STATES high urgency through the tag every point carries. */
+const HIGH = 'Some spec text.\n  Criticality: high — it would otherwise ship broken.'
+
+/** A body that states the opposite, which is the ordinary case. */
+const MEDIUM = 'Some spec text.\n  Criticality: medium — no product defect.'
+
+describe('URGENCY is read off what the point STATES', () => {
+  it('accepts the high tag, in either spelling', () => {
+    expect(statesHighUrgency(HIGH)).toBe(true)
+    expect(statesHighUrgency('Criticality: HIGH — blocking.')).toBe(true)
+  })
+  it('accepts a NAMED blocking condition without a tag', () => {
+    expect(statesHighUrgency('The launcher spawns twice and this stops the batch until it is fixed.')).toBe(true)
+    expect(statesHighUrgency('It blocks the release: the tag cannot be cut while it stands.')).toBe(true)
+    expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
+    expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
+  })
+  it('does NOT read a DENIED blocking condition as a claim', () => {
+    // The most natural way to say a defect is bearable is to name what it does
+    // not do — and read as a claim, that sentence excuses exactly the point the
+    // rule exists to place behind the release.
+    expect(statesHighUrgency('No behaviour is wrong and this does not stop the batch.')).toBe(false)
+    expect(statesHighUrgency('Nothing blocks the release here.')).toBe(false)
+    expect(statesHighUrgency('It never blocks a lane.')).toBe(false)
+    // …but a negation binds to its OWN clause: the second half states it outright.
+    expect(statesHighUrgency('It does not block a lane, but it stops the batch.')).toBe(true)
+  })
+  it('reads an ordinary point as NOT high — the tag, the prose and the silence alike', () => {
+    expect(statesHighUrgency(MEDIUM)).toBe(false)
+    expect(statesHighUrgency('It is annoying and the batch would be nicer without it.')).toBe(false)
+    expect(statesHighUrgency('')).toBe(false)
+    expect(statesHighUrgency(undefined)).toBe(false)
+  })
+})
+
+describe('ORIGIN is stated, never inherited by omission', () => {
+  it('records the machine by default and the user only when asked', () => {
+    const machine = recordRank({}, 7, { why: 'w' })
+    expect(machine.ranked[7].origin).toBe(ORIGIN_MACHINE)
+    const user = recordRank({}, 7, { why: 'w', origin: ORIGIN_USER })
+    expect(user.ranked[7].origin).toBe(ORIGIN_USER)
+  })
+  it('refuses an origin it does not know rather than filing it as machine work', () => {
+    expect(() => recordRank({}, 7, { why: 'w', origin: 'users' })).toThrow(/--origin must be machine or user/)
+  })
+  it('reads a missing, old or damaged origin as the MACHINE', () => {
+    expect(originOf({ ranked: { 7: { why: 'w' } } }, 7)).toBe(ORIGIN_MACHINE)
+    expect(originOf({ ranked: { 7: { why: 'w', origin: 'users' } } }, 7)).toBe(ORIGIN_MACHINE)
+    expect(originOf({}, 7)).toBe(ORIGIN_MACHINE)
+    expect(originOf({ ranked: { 7: { why: 'w', origin: ORIGIN_USER } } }, 7)).toBe(ORIGIN_USER)
+  })
+})
+
+describe('THE RELEASE BOUNDARY — what may stand in front of the release', () => {
+  // Baseline [50, 90]: 50 is the release point, 90 stands behind it, and every
+  // point named in a case below is NEW, which is what puts it on trial at all.
+  const armed = (ranked = {}) => settledAt([50, 90], ranked)
+  const breach = (open, record, bodies) => releaseBoundaryBreaches(open, record, { releasePoint: 50, bodies })
+
+  it('blocks a machine-filed point that states high urgency but records no reason', () => {
+    expect(breach([60, 50, 90], armed(), { 60: HIGH })).toEqual([{ point: 60, cause: 'unrecorded' }])
+  })
+
+  it('lets it stand once the reason is recorded', () => {
+    const record = armed({ 60: { at: '', why: 'It holds the red that blocks every push.', origin: ORIGIN_MACHINE } })
+    expect(breach([60, 50, 90], record, { 60: HIGH })).toEqual([])
+  })
+
+  it('blocks a machine-filed point that states no urgency AT ALL — recorded or not', () => {
+    expect(breach([60, 50, 90], armed(), { 60: MEDIUM })).toEqual([{ point: 60, cause: 'not-high' }])
+    const recorded = armed({ 60: { at: '', why: 'I would like it sooner.', origin: ORIGIN_MACHINE } })
+    // A recorded reason cannot make a point urgent: the urgency is in the POINT.
+    expect(breach([60, 50, 90], recorded, { 60: MEDIUM })).toEqual([{ point: 60, cause: 'not-high' }])
+  })
+
+  it('says nothing about the same point once it stands BEHIND the release', () => {
+    expect(breach([50, 90, 60], armed(), { 60: MEDIUM })).toEqual([])
+  })
+
+  it('exempts a point the USER ranked there, however unurgent it reads', () => {
+    const record = armed({ 60: { at: '', why: 'Der Nutzer will es zuerst.', origin: ORIGIN_USER } })
+    expect(breach([60, 50, 90], record, { 60: MEDIUM })).toEqual([])
+  })
+
+  it('moves the boundary with the release point rather than remembering an index', () => {
+    // The SAME order and the SAME record, with the release point re-sequenced:
+    // 60 stands in front of it in the first reading and behind it in the second.
+    const record = armed()
+    expect(breach([60, 50, 90], record, { 60: MEDIUM })).toEqual([{ point: 60, cause: 'not-high' }])
+    expect(breach([50, 60, 90], record, { 60: MEDIUM })).toEqual([])
+    // And a release point that has CLOSED leaves no boundary to break.
+    expect(breach([60, 90], record, { 60: MEDIUM })).toEqual([])
+  })
+
+  it('never re-litigates the order that stood before the rule existed', () => {
+    // 90 is remembered by the baseline. Moved in front of the release it is not
+    // an append the machine ranked there — it is the order somebody arranged
+    // under the old regime, and asking about all of it at once is a block loop.
+    expect(breach([90, 50], armed(), { 90: MEDIUM })).toEqual([])
+  })
+
+  it('draws no verdict from a record it cannot read, or one that remembers nothing', () => {
+    expect(breach([60, 50], parseRankRecord('{oops'), { 60: MEDIUM })).toEqual([])
+    expect(breach([60, 50], { ranked: {} }, { 60: MEDIUM })).toEqual([])
+  })
+
+  it('states the refusal, and names BOTH remedies in it', () => {
+    expect(releaseBoundaryMessage([{ point: 60, cause: 'unrecorded' }], 50)).toBe(
+      'MACHINE-FILED POINT IN FRONT OF THE RELEASE: point(s) 60 stand before point 50 without having earned the ' +
+        'place. The user ruled on 20.08.2026 that a point the MACHINE files itself — a drained finding, a charged ' +
+        'red, a review finding, a guard remedy — is ranked by its urgency, and only a high one may stand before ' +
+        'the release. Point(s) 60 do state high urgency, but nothing records why they cannot wait: MOVE the block ' +
+        'inside TASKS.md to BEHIND point 50, or record the reason in one line — node scripts/queue-rank.mjs ' +
+        '--ranked <N> --origin machine --why "<why it cannot wait for the release>". A point the USER asked for ' +
+        'is exempt, and says so: node scripts/queue-rank.mjs --ranked <N> --origin user --why "<one line>".',
+    )
+    const notHigh = releaseBoundaryMessage([{ point: 60, cause: 'not-high' }], 50)
+    expect(notHigh).toContain('MOVE the block inside TASKS.md to BEHIND point 50')
+    expect(notHigh).toContain('say so IN THE POINT and rank it there')
+    expect(releaseBoundaryMessage([], 50)).toBe('')
+    expect(releaseBoundaryMessage(null, 50)).toBe('')
+  })
+
+  it('keeps the release number OUT of the ranking code — one copy, in the order module', () => {
+    // The prose may QUOTE the user's instruction, which names the number; the
+    // CODE may not, or the boundary would have two homes and the second would be
+    // the one nobody updates when the release point moves.
+    const code = readFileSync(resolve(REPO_ROOT, 'scripts/queue-rank-core.mjs'), 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/?\*)/.test(line))
+      .join('\n')
+    expect(code).not.toContain(String(RELEASE_TAG_POINT))
+  })
+})
+
+describe('a breach FREEZES the baseline, exactly as an unranked append does', () => {
+  it('refuses to grow the remembered set while a breach stands', () => {
+    const record = settledAt([50, 90])
+    // Without the breach the settle takes today's order …
+    expect(settleRecord([60, 50, 90], record, { at: 'now' }).record.settled.points).toEqual([50, 60, 90])
+    // … and with it, nothing grows: 60 must stay NEW or the rule sees it once.
+    expect(settleRecord([60, 50, 90], record, { at: 'now', blocked: [60] })).toEqual({ changed: false, record: null })
+  })
+  it('still SHRINKS while a breach stands — a closed point may never re-enter unquestioned', () => {
+    const record = settledAt([50, 90])
+    const next = settleRecord([60, 50], record, { at: 'now', blocked: [60] })
+    expect(next.changed).toBe(true)
+    expect(next.record.settled.points).toEqual([50])
+  })
+  it('ignores a blocked point that is not in the order at all', () => {
+    const record = settledAt([50, 90])
+    expect(settleRecord([50, 90], record, { at: 'now', blocked: [999] })).toEqual({ changed: false, record: null })
   })
 })

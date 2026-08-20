@@ -19,6 +19,11 @@
 //       append-and-defer puts every new point there by DEFAULT — 589 landed at
 //       the very back although the user wanted it worked at once. This rule is
 //       about the work order ALONE and is judged without a board.
+//   (1d) THE RELEASE BOUNDARY (point 789) — a point the MACHINE filed for itself
+//       may stand BEFORE the release point only when the point STATES high
+//       urgency and the rank record carries the one-line reason; anything else
+//       belongs behind it. The user's own points are exempt, because he ranks
+//       them himself. Judged without a board, like (1c).
 //   (2) DASHBOARD TRUTH — a queue/now card must not CLAIM its point is done
 //       ("behoben", "erledigt", …) while that point is still open ([ ]) in
 //       TASKS.md. A conservative negation/qualifier window keeps honest
@@ -36,7 +41,15 @@ import {
   openPointsOf,
   queueOrder,
 } from './board-queue-core.mjs'
-import { RANK_CMD, SEED_CMD, appendGateState, parseRankRecord } from './queue-rank-core.mjs'
+import {
+  RANK_CMD,
+  SEED_CMD,
+  appendGateState,
+  parseRankRecord,
+  releaseBoundaryBreaches,
+  releaseBoundaryMessage,
+} from './queue-rank-core.mjs'
+import { parsePointBlocks } from './criticality-review-guard-core.mjs'
 
 // The rank constants moved to board-queue-core with the ranking itself (point
 // 608) — this guard is now a CONSUMER of that order, and owning them here would
@@ -308,6 +321,33 @@ export function unrankedAppendProblem(tasksMd, rankRecordJson) {
   )
 }
 
+/**
+ * The OPEN point blocks of a work order as `{ <n>: '<body>' }` — the text each
+ * rule below judges a point by. Ticked blocks are left out: a point the order
+ * calls finished states nothing about where it should stand.
+ */
+export function openPointBodies(tasksMd) {
+  const bodies = {}
+  for (const block of parsePointBlocks(tasksMd)) if (!block.done) bodies[block.n] = block.body
+  return bodies
+}
+
+/**
+ * Rule 1d (point 789): machine-filed points standing in front of the release.
+ *
+ * The append gate above asks whether the END of the order is right; this asks
+ * whether the FRONT was earned. Both read the same record, and both judge only
+ * points the provenance baseline does not remember, so the order as it stood
+ * before the rule existed is not re-litigated at the first turn end.
+ */
+export function releaseBoundaryProblem(tasksMd, rankRecordJson) {
+  const breaches = releaseBoundaryBreaches(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
+    releasePoint: RELEASE_TAG_POINT,
+    bodies: openPointBodies(tasksMd),
+  })
+  return { breaches, reason: releaseBoundaryMessage(breaches, RELEASE_TAG_POINT) }
+}
+
 /** Top-level decision on the raw file contents. Total: any bad input → allow. */
 export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
   try {
@@ -322,6 +362,11 @@ export function evaluate({ dashboardHtml, tasksMd, rankRecordJson } = {}) {
     // board rules below keep their own "nothing to judge" test instead.
     const unranked = unrankedAppendProblem(tasksMd, rankRecordJson)
     if (unranked) problems.push(unranked)
+
+    // The RELEASE BOUNDARY, judged beside it and for the same reason: it is a
+    // statement about the work order alone, and it must not depend on a board.
+    const boundary = releaseBoundaryProblem(tasksMd, rankRecordJson)
+    if (boundary.reason) problems.push(boundary.reason)
 
     const cards = parseQueueCards(dashboardHtml)
 

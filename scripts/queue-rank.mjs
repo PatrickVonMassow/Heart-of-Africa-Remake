@@ -2,6 +2,7 @@
 //
 //   node scripts/queue-rank.mjs --status                          # what is still unranked
 //   node scripts/queue-rank.mjs --ranked <N> --why "<one line>"   # last IS right, and why
+//   node scripts/queue-rank.mjs --ranked <N> --origin user --why …# the USER ranked it there
 //   node scripts/queue-rank.mjs --seed --why "<one line>"         # arm: what stands today is judged
 //
 // WHY IT EXISTS. Append-and-defer puts a new point at the END of the work order,
@@ -30,7 +31,9 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { QUEUE_REBUILD_CMD, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
+import { releaseBoundaryProblem } from './queue-order-guard-core.mjs'
 import {
+  ORIGIN_MACHINE,
   RANK_CMD,
   RANK_RECORD_PATH,
   SEED_CMD,
@@ -68,11 +71,16 @@ export function readRankRecord(path = RECORD) {
  * the order in the same write; one that leaves another question standing does
  * not, or the point still in question would be swallowed into the baseline.
  */
-function writeRankRecord(record, open, path = RECORD) {
+function writeRankRecord(record, open, tasksMd = '', path = RECORD) {
   // The ticks matter only where the open order is empty — see settleRecord — and
   // that is also the only case worth reading the whole archive for.
   const closed = open.length ? [] : closedPointsOf(readTasksAll())
-  const settled = settleRecord(open, record, { at: new Date().toISOString(), closed })
+  // The release boundary freezes the baseline exactly as an unranked append does
+  // (point 789), and it has to be applied HERE as well as in the guard: this
+  // command writes the record too, and a settle from either side would remember
+  // the breaching point as a survivor and end the question by forgetting it.
+  const blocked = releaseBoundaryProblem(tasksMd, JSON.stringify(record)).breaches.map((b) => b.point)
+  const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
   writeTextAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
   return next
@@ -183,15 +191,22 @@ function flagValue(argv, flag) {
 if (isMainModule(import.meta.url)) {
   try {
     const argv = process.argv.slice(2)
-    const open = openPointsOf(readTasksOpen())
+    const tasksMd = readTasksOpen()
+    const open = openPointsOf(tasksMd)
     const record = readRankRecord()
     const why = flagValue(argv, '--why')
+    // Stated, never inferred: an omitted origin is the MACHINE's, so the user's
+    // exemption from the release boundary can only be claimed out loud.
+    const origin = flagValue(argv, '--origin') ?? ORIGIN_MACHINE
 
     if (argv.includes('--ranked')) {
       const point = Number(flagValue(argv, '--ranked'))
       if (!open.includes(point)) throw new Error(`point ${point} is not open in the work order`)
-      writeRankRecord(recordRank(record, point, { why, at: new Date().toISOString() }), open)
-      console.log(`queue-rank: point ${point} keeps the place the work order gives it — "${why.trim()}"`)
+      writeRankRecord(recordRank(record, point, { why, origin, at: new Date().toISOString() }), open, tasksMd)
+      console.log(
+        `queue-rank: point ${point} keeps the place the work order gives it, filed by the ${origin} — ` +
+          `"${why.trim()}"`,
+      )
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
     } else if (argv.includes('--seed')) {
       // THE ARMING BASELINE, and nothing more: the order as it stands today is
@@ -210,6 +225,7 @@ if (isMainModule(import.meta.url)) {
           ...recordProvenance(),
         }),
         open,
+        tasksMd,
       )
       const unstaged = stageRecord()
       if (unstaged) {
@@ -250,6 +266,14 @@ if (isMainModule(import.meta.url)) {
         )
         console.log('  Either MOVE the point’s block inside TASKS.md to where it belongs (verbatim, with its number),')
         console.log(`  or record that last is right: ${RANK_CMD}`)
+        process.exitCode = 1
+      }
+      // The FRONT of the order, asked in the same breath as its end (point 789):
+      // the append gate says nothing about a point that ranked itself ahead of
+      // the release, and the status is where somebody looks before the guard does.
+      const boundary = releaseBoundaryProblem(tasksMd, JSON.stringify(record))
+      if (boundary.reason) {
+        console.log(`queue-rank: ${boundary.reason}`)
         process.exitCode = 1
       }
     }

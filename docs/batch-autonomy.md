@@ -2064,9 +2064,29 @@ PARSE is torn: the gate stays quiet — every
 guard here is fail-open — while the CLI refuses to write over it, and a `ranked`
 entry without a reason is no decision and is dropped. Whether the gate is armed
 is read off `settled` alone, so an emptied `ranked` cannot pose as a fresh
-checkout. The decision logic is pure in `scripts/queue-rank-core.mjs`, which
-imports nothing: it judges provenance, `board-queue-core.mjs` renders the order,
-and neither owns a copy of the other's fact.
+checkout. The decision logic is pure in `scripts/queue-rank-core.mjs`: it judges
+provenance and urgency, `board-queue-core.mjs` renders the order and names the
+release point once, and neither owns a copy of the other's fact.
+
+**And the FRONT of the order is earned, not taken** (point 789, user instruction
+20.08.2026, in the turn that moved eight machine-filed points behind point 174 by
+hand: "wenn automatisch neue Tickets angelegt werden, diese nur bei hoher
+Dringlichkeit vorne einreihen"). A point the MACHINE filed for itself — a drained
+finding, a charged red, a review finding, a guard remedy — may stand BEFORE the
+release point only when the point itself STATES high urgency (the
+`Criticality: high` tag, or one of the four named blocking conditions: it stops
+the batch, blocks a lane or the release, or holds a red that cannot otherwise
+close) and the rank record carries the one-line reason
+(`--ranked <N> --origin machine --why …`). Anything else belongs behind the
+release. The urgency is read off the POINT, never off the reason, so it cannot be
+argued into the record by whoever files the ticket; the ORIGIN is read off the
+record and defaults to the machine, so the user's exemption
+(`--origin user`) can only ever be claimed out loud. The boundary is wherever the
+release point CURRENTLY stands in `TASKS.md`, so re-sequencing moves it, and a
+breach freezes the provenance baseline exactly as an unranked append does — a
+gate that could be answered by forgetting the question would have a one-turn
+life. Only points the baseline does not remember are judged: re-litigating the
+order that stood before the rule existed is a block loop, not a decision.
 
 The watchdog runs as its own process (`scripts/board-watchdog.mjs`), called by
 the launcher. That is not tidiness: on this platform a `process.exit()` after any

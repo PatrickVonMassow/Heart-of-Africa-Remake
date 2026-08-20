@@ -17,6 +17,7 @@ import {
   parseWorkablePoints,
   unrankedAppendProblem,
   evaluate,
+  openPointBodies,
 } from './queue-order-guard-core.mjs'
 
 /** Minimal dashboard in the real board's markup (queue cards + now-card + Erledigt). */
@@ -610,5 +611,57 @@ describe('the APPEND GATE — a new point is ranked once, deliberately', () => {
     // Anything that is not the file's own bytes reads as TORN, which is quiet.
     expect(unrankedAppendProblem('- [ ] 1. A.', {})).toBe('')
     expect(unrankedAppendProblem('- [ ] 1. A.', ranks([1]))).toBe('')
+  })
+})
+
+describe('rule 1d — the release boundary (point 789)', () => {
+  /** A work order in which `point` stands in front of the release, or behind it. */
+  const order = (point, body, { ahead = true } = {}) =>
+    [
+      ...(ahead ? [`- [ ] ${point}. A finding the machine drained.`, `  ${body}`] : []),
+      `- [ ] ${RELEASE_TAG_POINT}. Tag the demo build and publish it.`,
+      ...(ahead ? [] : [`- [ ] ${point}. A finding the machine drained.`, `  ${body}`]),
+    ].join('\n')
+
+  const MEDIUM = 'Criticality: medium — no product defect.'
+  const HIGH = 'Criticality: high — it stops the batch until it is fixed.'
+  // The baseline remembers the release point ALONE, so the point under test is
+  // the new one — which is exactly what puts it on trial.
+  const baseline = ranks([RELEASE_TAG_POINT])
+
+  it('blocks a machine-filed point that ranked itself in front of the release', () => {
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: baseline })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('MACHINE-FILED POINT IN FRONT OF THE RELEASE')
+    expect(r.reason).toContain(`MOVE the block inside TASKS.md to BEHIND point ${RELEASE_TAG_POINT}`)
+  })
+
+  it('says nothing once the same point stands behind the release', () => {
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM, { ahead: false }), rankRecordJson: baseline })
+    expect(r.reason).not.toContain('MACHINE-FILED POINT IN FRONT OF THE RELEASE')
+    // The APPEND gate still speaks — the point now stands last, which is where
+    // append-and-defer puts one — and that is the other rule doing its own job.
+    expect(r.reason).toContain('APPENDED POINT NOT RANKED')
+  })
+
+  it('lets a high-urgency point stand there once its reason is recorded', () => {
+    const recorded = ranks([RELEASE_TAG_POINT], { 900: { at: '', why: 'It stops the batch.', origin: 'machine' } })
+    expect(evaluate({ dashboardHtml: '', tasksMd: order(900, HIGH), rankRecordJson: recorded }).block).toBe(false)
+    // …and the SAME point without the record is still refused, so the record is
+    // what the pass hangs on rather than the tag alone.
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, HIGH), rankRecordJson: baseline })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('nothing records why they cannot wait')
+  })
+
+  it('exempts a point the USER ranked there', () => {
+    const byUser = ranks([RELEASE_TAG_POINT], { 900: { at: '', why: 'Der Nutzer will es zuerst.', origin: 'user' } })
+    expect(evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: byUser }).block).toBe(false)
+  })
+
+  it('reads the bodies of OPEN points only', () => {
+    const bodies = openPointBodies(['- [ ] 900. Open.', '  Criticality: high', '- [x] 901. Done.'].join('\n'))
+    expect(Object.keys(bodies)).toEqual(['900'])
+    expect(bodies[900]).toContain('Criticality: high')
   })
 })
