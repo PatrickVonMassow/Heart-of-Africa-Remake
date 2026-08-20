@@ -778,6 +778,12 @@ put it is the mistake this line exists to stop.
   cannot be commissioned, and it is answered by the point actually being split — otherwise a
   recorded demand is exactly the "we wrote it down" that changes nothing. The emergency permit
   of point 745 is the one way past it, and it is recorded like every other use of the lever.
+  WHAT THIS POINT DOES NOT DO (20.08.2026, after reading it against point 553 in full): the
+  MID-POINT half stays with 553 — the written handoff a session produces when it spends its budget
+  while a point is already open, the delegated agent's copy of that duty, and the guard's third
+  legal stop. This guard answers one question only, before any of that: may this point be BEGUN
+  with what is left. Neither point contains the other, so nothing here rebuilds the handoff, and a
+  point refused here is refused BEFORE it can need one.
   VERIFIABLE: Vitest over the decision — a point that fits, one that does not, one of unknown
   class, and one larger than a whole fresh window (decomposition demanded, not refusal); and a
   replay over the last twenty landed points showing which would have been deferred and which
