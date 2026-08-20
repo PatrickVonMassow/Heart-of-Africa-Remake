@@ -153,6 +153,51 @@ put it is the mistake this line exists to stop.
   executed against the wrong mechanism the first time.
   Bundle: Dokumentation.
 
+- [ ] 795. The launcher judges liveness by the LOCK, so it started a second batch session beside a
+  live working one — and both wrote main (measured 20.08.2026, 21:48–22:02).
+  WHAT WAS MEASURED. The OS autostart began session pid 2962038 with the reason "the previous owner
+  was demonstrably dead". The VS Code window session pid 2156063 had never stopped: it committed
+  three times on main at 21:38/21:39, committed `c846147b` at 21:59:42, pushed main at 22:01, ran a
+  cross-vendor review and appended points to the work order. Both sessions committed on the same
+  main inside that window — `4ed5c5c8` from the lock holder, `c846147b` from the window session.
+  WHY IT MATTERS: the ownership fence binds whoever HOLDS the lock, so a session that never took it
+  is never braked by it. The lock is therefore a registration, not an exclusion, and the launcher
+  reads that registration as proof of life. Two writers on one main is the state every branch,
+  worktree and landing rule in CLAUDE.md §6 is built to prevent, and it arose without either session
+  doing anything forbidden.
+  FINAL STATE: liveness is judged on the PROCESS, not on the lock — an unlocked but live batch-
+  writing session counts as alive and the launcher starts nothing beside it. A session that writes
+  main without holding the lock is either braked by the fence or takes the lock by doing so; which
+  of the two is chosen, the refusal or the acquisition says so in words. The launcher's start record
+  names what it measured, so "demonstrably dead" is never again a claim about a lock file.
+  VERIFIABLE: pure tests over the launcher's start decision — a live process with no lock yields no
+  start; a stale lock with no process yields one; and a start record always carries the measured
+  evidence. Plus a case over the fence: a main-writing action from a session that holds no lock does
+  not silently pass.
+  Criticality: high — it produces concurrent writers on main, which no later check can untangle.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 796. "Authored NOTHING" was said over 118 finished lines lying in the tree (measured
+  20.08.2026, 22:00 on point 792).
+  WHAT WAS MEASURED. `scripts/author-sol.mjs` closed its run with `GPT-5.6 Sol authored NOTHING on
+  feat/792-…` and three problem lines — nothing committed, uncommitted changes left behind, no
+  DONE/GATES/OPEN closing. The worktree held 118 finished lines: `fableStateAtCommit()` in
+  `scripts/model-guard-core.mjs` plus 67 lines of tests, exactly the per-commit judgement the point
+  asks for. The work existed; it was merely uncommitted. Only reading the diff saved it, and it was
+  rescued into checkpoint `5bdea763`.
+  WHY IT MATTERS: whoever takes the message at its word clears the worktree and throws away a
+  complete delivery. The wording is demonstrably false the moment the tree is dirty, and it is the
+  one moment the message is read under time pressure.
+  FINAL STATE: a run that leaves uncommitted changes says HOW MUCH lies there and offers the
+  checkpoint, instead of reporting that nothing was authored. "Nothing authored" is reserved for a
+  clean tree with no commits, which is the only state in which it is true.
+  VERIFIABLE: pure tests over the run's closing report — a dirty tree with no commits reports the
+  measured size and names the checkpoint command; a clean tree with no commits still reports nothing
+  authored; and a tree with commits reports them regardless of what else is dirty.
+  Criticality: high — the message invites destroying finished work, and it was one diff read away
+  from doing so.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
