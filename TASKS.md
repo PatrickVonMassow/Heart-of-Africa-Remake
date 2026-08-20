@@ -1339,7 +1339,10 @@ put it is the mistake this line exists to stop.
     reads the transcripts, because an unlanded point produces no commit and the commit proxy
     reports zero for the most expensive case. Where the transcripts are unavailable that is
     reported as unmeasured, never as zero.
-  - AN OPERATOR CAN OVERRIDE THE LANE ABOVE THE THRESHOLD, and today nobody can. MEASURED
+  - AN OPERATOR CAN OVERRIDE THE LANE ABOVE THE THRESHOLD, and today nobody can (SUPERSEDED
+    20.08.2026 by the re-cut below, which measures the same command answering `→ sol`; the
+    reading is kept because it names the ordering defect that would return the moment the
+    suspension is lifted). MEASURED
     19.08.2026: `node scripts/author-sol.mjs --routing --point 713` answers `point 713 → fable`
     at 18 unsuccessful rounds, and there is NO hand route around it. `authorLaneFor` tests
     `tag === fable` first, then `rounds >= FABLE_ESCALATION_ROUNDS → fable`, and only THEN
