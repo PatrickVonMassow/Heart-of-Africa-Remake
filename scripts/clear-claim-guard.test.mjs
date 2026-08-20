@@ -41,6 +41,34 @@ describe('invitesClear — what counts as asking the user to end the session', (
     }
   })
 
+  // Every case below is one the cross-vendor review found and the first two
+  // drafts got wrong (20.08.2026). They are the reason the unit is the sentence.
+  it('reads a negation wherever it stands in the sentence, not only inside the match', () => {
+    for (const text of [
+      'Mach keinen /clear.',
+      'Führe einen Clear bitte nicht aus.',
+      'Starte jetzt keine neue Sitzung.',
+      'Mach nicht keinen Clear.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
+  it('judges each sentence, so a negated one cannot cover a real invitation after it', () => {
+    expect(invitesClear('Mach keinen Clear. Danach mach bitte einen Clear.')).toBe(true)
+    expect(invitesClear('Alles ist gepusht.\nStarte eine neue Sitzung.')).toBe(true)
+  })
+
+  it('needs an imperative, so a description of what happens next does not block', () => {
+    for (const text of [
+      'Die neue Sitzung startet automatisch.',
+      'Die neue Sitzung nimmt den Rest auf.',
+      'Der Launcher beginnt die neue Sitzung innerhalb seines Intervalls.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
   it('does not fire on the word alone, so talking ABOUT the rule stays possible', () => {
     for (const text of [
       'Das Bild ist clear und der Horizont stimmt.',
@@ -93,5 +121,82 @@ describe('evaluate — only the one combination blocks', () => {
     expect(evaluate({ lastText: 'Der Punkt ist gelandet.', claim: claim(), sessionId: SID })).toBe(null)
     expect(evaluate({ lastText: invitation, claim: claim({ claimantSid: 'other' }), sessionId: SID })).toBe(null)
     expect(evaluate({})).toBe(null)
+  })
+})
+
+// The preflight gather is the half the pure core cannot cover: it does the I/O,
+// and the drift check only asserts that it is REGISTERED, not what it answers.
+// The cross-vendor review of 20.08.2026 asked for exactly these cases.
+describe('gatherClearClaimCondition — what the preflight reports', () => {
+  const withClaimPath = async (value, run) => {
+    const before = process.env.BATCH_CLAIM_PATH
+    if (value === null) delete process.env.BATCH_CLAIM_PATH
+    else process.env.BATCH_CLAIM_PATH = value
+    try {
+      return await run()
+    } finally {
+      if (before === undefined) delete process.env.BATCH_CLAIM_PATH
+      else process.env.BATCH_CLAIM_PATH = before
+    }
+  }
+
+  it('reports NOT JUDGED when a claim stands but the session is unknown', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const got = gatherClearClaimCondition({ sessionId: '', claim: claim() })
+    expect(got.applicable).toBe(false)
+    expect(got.cause).toBe('not-judged')
+    expect(got.why).toMatch(/session id/i)
+  })
+
+  it('is not applicable when no claim stands at all', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const got = gatherClearClaimCondition({ sessionId: SID, claim: null })
+    expect(got.applicable).toBe(false)
+    expect(got.cause).toBeUndefined()
+  })
+
+  it('is not applicable when the standing claim is another session’s', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const got = gatherClearClaimCondition({ sessionId: 'someone-else', claim: claim() })
+    expect(got.applicable).toBe(false)
+    expect(got.why).toMatch(/another session/i)
+  })
+
+  it('states the condition, and names the withdraw command, on this session’s own claim', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const got = gatherClearClaimCondition({ sessionId: SID, claim: claim() })
+    expect(got.applicable).toBe(true)
+    expect(got.condition).toBe(true)
+    expect(got.why).toContain(withdrawCommand(SID))
+  })
+
+  it('reads BATCH_CLAIM_PATH when no claim is passed in, and the repo file otherwise', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const { writeFileSync, mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'claim-'))
+    const file = join(dir, 'batch-claim.json')
+    writeFileSync(file, JSON.stringify(claim()), 'utf8')
+    await withClaimPath(file, () => {
+      const got = gatherClearClaimCondition({ sessionId: SID })
+      expect(got.applicable).toBe(true)
+      expect(got.condition).toBe(true)
+    })
+    // An unreadable override is the ordinary "no claim" state, never a throw.
+    await withClaimPath(join(dir, 'gone.json'), () => {
+      expect(gatherClearClaimCondition({ sessionId: SID }).applicable).toBe(false)
+    })
+  })
+
+  it('defaults to the repository’s own claim file, which is where the hook writes it', async () => {
+    const { claimPath } = await import('./clear-claim-guard.mjs')
+    const { repoPath } = await import('./repo-paths.mjs')
+    await withClaimPath(null, () => {
+      expect(claimPath()).toBe(repoPath('.claude/batch-claim.json'))
+    })
+    await withClaimPath('/tmp/elsewhere.json', () => {
+      expect(claimPath()).toBe('/tmp/elsewhere.json')
+    })
   })
 })

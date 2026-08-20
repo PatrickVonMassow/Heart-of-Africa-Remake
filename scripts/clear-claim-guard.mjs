@@ -23,11 +23,19 @@ import { isMainModule } from './is-main.mjs'
 // this module for its gather step, and under the test transform import.meta.url
 // is not a file URL — resolving it at import time took the whole preflight down
 // (measured 20.08.2026).
-const CLAIM_PATH = process.env.BATCH_CLAIM_PATH || repoPath('.claude/batch-claim.json')
+/**
+ * Resolved per CALL, not once at import: a module-level constant freezes
+ * whatever `BATCH_CLAIM_PATH` happened to hold when the first importer loaded
+ * this file, which is the wrong answer for every later reader and untestable
+ * besides (cross-vendor review, 20.08.2026).
+ */
+export function claimPath() {
+  return process.env.BATCH_CLAIM_PATH || repoPath('.claude/batch-claim.json')
+}
 
 function readClaim() {
   try {
-    return JSON.parse(readFileSync(CLAIM_PATH, 'utf8'))
+    return JSON.parse(readFileSync(claimPath(), 'utf8'))
   } catch {
     // No claim file is the ordinary state: a withdrawn claim is a deleted file.
     return null

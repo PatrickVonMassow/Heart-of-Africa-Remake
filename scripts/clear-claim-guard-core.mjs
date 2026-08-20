@@ -25,39 +25,60 @@
  * "das Bild ist clear" and a sentence ABOUT the clear mechanism must not trip a
  * guard whose refusal costs a turn.
  *
- * The session patterns exist in BOTH word orders. German puts the object either
- * way round — "die neue Sitzung … starte sie" and "Starte eine neue Sitzung" are
- * the same instruction — and a guard that only reads one of them misses the more
- * natural one (found in the cross-vendor review, 20.08.2026).
+ * The session patterns exist in BOTH word orders, because German puts the object
+ * either way round — "die neue Sitzung … starte sie" and "Starte eine neue
+ * Sitzung" are one instruction. BOTH orders demand a real imperative FORM, never
+ * a stem with `\w*` after it: "Die neue Sitzung startet automatisch" is a
+ * description, and a guard whose refusal costs a turn may not read it as an order
+ * (cross-vendor review, 20.08.2026).
  */
+const IMPERATIVE = String.raw`(?:starte|start|beginne|beginn|nimm|nehmt|f[üu]hre|mach|mache|machst)`
+
 export const CLEAR_INVITATION = Object.freeze([
   /(?:^|[\s(«"'`])\/clear\b/i,
   /\b(?:mach|mache|machst|starte|f[üu]hre)\b[^.!?\n]{0,60}\bclear\b/i,
   /\bclear\b[^.!?\n]{0,60}\b(?:kann kommen|kannst du machen|bitte|jetzt machen)\b/i,
-  /\b(?:neue|frische)\s+Sitzung\b[^.!?\n]{0,60}\b(?:starte|beginn|nimm|aufnehmen|weiter)\w*\b/i,
-  /\b(?:starte|beginne?|nimm)\b[^.!?\n]{0,60}\b(?:neue|neuen|frische|frischen)\s+Sitzung\b/i,
+  new RegExp(String.raw`\b(?:neue|neuen|frische|frischen)\s+Sitzung\b[^.!?\n]{0,60}\b${IMPERATIVE}\b`, 'i'),
+  new RegExp(String.raw`\b${IMPERATIVE}\b[^.!?\n]{0,60}\b(?:neue|neuen|frische|frischen)\s+Sitzung\b`, 'i'),
   /\bstart(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
 ])
 
 /**
- * A NEGATED instruction is not an invitation. "Mach keinen Clear" and "starte
- * jetzt keine neue Sitzung" carry every word the patterns look for and mean the
- * opposite, and this guard's refusal costs a turn — so a negator between the
- * imperative and its object disarms the match (cross-vendor review, 20.08.2026).
+ * A NEGATED instruction is not an invitation. "Mach keinen Clear", "Mach keinen
+ * `/clear`" and "Führe einen Clear bitte nicht aus" carry every word the patterns
+ * look for and mean the opposite.
+ *
+ * DOUBLE NEGATION ("mach nicht keinen Clear") is deliberately read as negated
+ * rather than counted out. Counting negators would be wrong in the ordinary case
+ * — "Starte keine neue Sitzung, ich brauche das nicht" holds two and IS negated —
+ * and this guard's stated fail direction is to ALLOW whenever it cannot be sure.
  */
-const NEGATOR = /\b(?:kein|keine|keinen|keinem|keiner|nicht|niemals|nie)\b/i
+const NEGATOR = /\b(?:kein|keine|keinen|keinem|keines|keiner|nicht|niemals|nie)\b/i
+
+/**
+ * Sentences, so each instruction is judged on its own words.
+ *
+ * The unit has to be the SENTENCE, not the matched span: a span ends at the word
+ * that matched, so a negation before it ("Mach keinen /clear") or after it
+ * ("Führe einen Clear bitte nicht aus") falls outside and the guard reads the
+ * opposite of what stands there. Judging sentence by sentence also stops one
+ * negated sentence from covering a genuine invitation later in the same reply —
+ * "Mach keinen Clear. Danach mach bitte einen Clear." must still block
+ * (cross-vendor review, 20.08.2026).
+ */
+export function sentencesOf(text) {
+  return String(text ?? '')
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
 
 /** Does this reply ask the user to clear or to start a fresh session? */
 export function invitesClear(text) {
-  const value = String(text ?? '')
-  return CLEAR_INVITATION.some((pattern) => {
-    const hit = pattern.exec(value)
-    if (!hit) return false
-    // Only the matched span is judged: a negation elsewhere in the reply says
-    // nothing about THIS sentence, and reading further would make an unrelated
-    // "nicht" anywhere on the page disarm a real invitation.
-    return !NEGATOR.test(hit[0])
-  })
+  return sentencesOf(text).some(
+    (sentence) =>
+      !NEGATOR.test(sentence) && CLEAR_INVITATION.some((pattern) => pattern.test(sentence)),
+  )
 }
 
 /**
