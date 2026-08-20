@@ -4794,6 +4794,28 @@ Build order, chosen so no two parallel agents own the same file:
   pass. Whatever the band looks like in the game, its evidence has been absent long
   enough that a red on `main` stopped being noticed, which is exactly the state
   point 387 exists to end.
+  THE TWO DIAGNOSED CAUSES ARE ON RECORD, one per failing check, and both were
+  measured 3 of 3 runs on the slow container host during the point-499 triage
+  (04.08.2026). FOR THE TERRAIN BAND: the capture fires as the travel scene
+  MOUNTS, so no amount of waiting afterwards can change what it photographed,
+  and `panoramaCaptureReady` gates on terrain chunks being COMMITTED rather
+  than DRAWABLE — on the fast Windows host the two coincide, on this one they
+  do not. The gate therefore has to hold until the surrounding terrain actually
+  RENDERS, read from what the renderer draws and never from a chunk count or a
+  wall-clock allowance; point 227's grey-horizon check stays and is not
+  weakened; and a capture that would still be unready at its deadline says so
+  instead of silently writing a black or terrainless band.
+  FOR THE COMPASS PILLAR: the water fractions of the SAME capture became
+  non-zero once the scene was built, so the capture happens and the DEV probe
+  pillar is simply not in it. The recorded suspicion is that
+  `hasPanoramaCapture` short-circuits the re-capture, so the check's
+  `delete window.__placePanorama` clears the hook but not the cached image and
+  the pillar is added to a capture that is never taken again. That suspicion is
+  CONFIRMED OR REFUTED at the code before anything is changed — a fix built on
+  the wrong cause is the more expensive mistake — and then either the probe
+  reliably enters the capture it is set up for, or the orientation is measured
+  another way that does not depend on injecting geometry into a cached capture,
+  whichever is chosen written down with its reason.
   FINAL STATE: the leave-capture produces a non-empty image again — the cause is
   found and named (a capture taken before the panorama is drawn, a target that
   moved, or a capture path that silently yields a blank surface), not worked around
@@ -4804,6 +4826,11 @@ Build order, chosen so no two parallel agents own the same file:
   leave-capture's opacity and its west/east pixel counts printed in the run so an
   empty capture can never again read as a threshold miss; plus a pure test that the
   check FAILS on an all-transparent capture instead of reporting a band verdict.
+  Both checks pass three consecutive runs on the container host and the band is
+  inspected as a PICTURE once, not only as a number; and the compass check FAILS
+  when the panorama orientation is deliberately inverted — a check that cannot
+  fail proves nothing.
+
 
 - [ ] 500. The leave capture bakes a terrainless band on a slow host
   (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
