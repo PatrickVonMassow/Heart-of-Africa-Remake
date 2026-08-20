@@ -108,11 +108,18 @@ export const STAND_DOWN_TEXT =
   'Diese Session ist NICHT der Batch-Worker — keine Batch-Arbeit, kein Merge nach main, ' +
   'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.'
 
+/** German thousands grouping, done here rather than through `toLocaleString`
+ * so the string does not depend on the ICU data a given Node build carries. */
+export function groupThousands(value) {
+  return String(Math.trunc(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
 /** The literal suffix for the reply header. A missing measurement is unknown,
- * never zero: zero would claim a real reading that the transcript did not make. */
+ * never zero: zero would claim a real reading that the transcript did not make.
+ * The reading is grouped (user 20.08.2026: "143495" does not read as a number). */
 export function contextLevelSuffix(tokens) {
-  const reading = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0 ? String(tokens) : '--'
-  return ` · Kontext: ${reading} Tokens`
+  const readable = typeof tokens === 'number' && Number.isFinite(tokens) && tokens > 0
+  return ` · Kontext: ${readable ? groupThousands(tokens) : '--'} Tokens`
 }
 
 /** The compact per-prompt handoff. The user-scope timestamp hook supplies the

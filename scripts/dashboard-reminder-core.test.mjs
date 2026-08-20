@@ -23,6 +23,7 @@ import {
   UNENFORCEABLE_DUTIES,
   boardReminderText,
   contextLevelSuffix,
+  groupThousands,
   hookInjectionText,
   promptInjectionText,
 } from './dashboard-reminder-core.mjs'
@@ -167,7 +168,7 @@ describe('the context level in the answer header', () => {
     ['stand-down', true],
   ])('puts a readable transcript measurement in the %s hook text', (_name, standDown) => {
     const text = hookInjectionText({ standDown, contextTokens: transcriptTokens(readableTranscript) })
-    expect(text).toContain('[context-level] Kopfzeilen-Suffix: · Kontext: 123534 Tokens')
+    expect(text).toContain('[context-level] Kopfzeilen-Suffix: · Kontext: 123.534 Tokens')
     expect(text).toContain(standDown ? STAND_DOWN_TEXT : '[dashboard-reminder]')
   })
 
@@ -184,6 +185,16 @@ describe('the context level in the answer header', () => {
     const now = new Date('2026-08-19T16:36:00.000Z')
     const header = `**${berlinStamp(now)}**${contextLevelSuffix(transcriptTokens(readableTranscript))}`
     expect(timestampEvaluate({ lastText: header, now })).toBe(null)
+  })
+
+  it.each([
+    [999, '999'],
+    [1000, '1.000'],
+    [143495, '143.495'],
+    [1234567, '1.234.567'],
+  ])('groups %i as %s so the reading reads as a number', (tokens, grouped) => {
+    expect(groupThousands(tokens)).toBe(grouped)
+    expect(contextLevelSuffix(tokens)).toBe(` · Kontext: ${grouped} Tokens`)
   })
 
   it('has the live hook read through the shared context parser and output the pure branch text', () => {
