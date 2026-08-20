@@ -16,6 +16,7 @@
 // while a real finding fails CLOSED, which is the whole point.
 import { readFileSync } from 'node:fs'
 import { evaluateCommitTrailers, formatCommitTrailerVerdict } from './model-guard-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import { isMainModule } from './is-main.mjs'
 
 if (isMainModule(import.meta.url)) {
@@ -30,7 +31,12 @@ if (isMainModule(import.meta.url)) {
     } catch {
       message = ''
     }
-    const verdict = evaluateCommitTrailers(message)
+    const fableState = currentFableState()
+    if (!fableState.ok) {
+      process.stderr.write(`model-trailer-gate: refusing because ${fableState.problem}\n`)
+      process.exit(1)
+    }
+    const verdict = evaluateCommitTrailers(message, fableState)
     if (verdict.block) {
       process.stderr.write(`${formatCommitTrailerVerdict(verdict)}\n`)
       process.exit(1)

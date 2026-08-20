@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ALLOWED_TRAILERS,
+  allowedTrailers,
   backupRefsIn,
   classifyTrailer,
   coAuthorTrailers,
@@ -18,6 +18,9 @@ import {
   parseLogLine,
   splitTrailerField,
 } from './model-guard-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
 const T0 = Date.parse('2026-07-24T22:00:00Z')
 const line = (sha, iso, trailer) => `${sha}|${iso}|${trailer}`
@@ -87,6 +90,35 @@ describe('isPolicyBreach (allowlist: Opus 5 / Opus 4.8 / Fable 5)', () => {
   it('one forbidden co-author flags the commit even next to an allowed one', () => {
     expect(isPolicyBreach('Claude Opus 4.8 <a@x>,Claude Haiku 4.5 <b@x>')).toBe(true)
     expect(isPolicyBreach('Claude Opus 4.8 <a@x>,Claude Fable 5 <b@x>')).toBe(false)
+  })
+})
+
+describe('the serving allowlist follows the Fable switch', () => {
+  const fableTrailer = 'Claude Fable 5 <noreply@anthropic.com>'
+  const message = `A change\n\nCo-Authored-By: ${fableTrailer}\n`
+
+  it('drops Fable from the allowlist and advertised trailers while off', () => {
+    expect(isAllowedModelName('Fable 5', FABLE_OFF)).toBe(false)
+    expect(classifyTrailer(fableTrailer, FABLE_OFF)).toBe('forbidden')
+    expect(allowedTrailers(FABLE_OFF).join('\n')).not.toContain('Fable')
+  })
+
+  it('generates the commit refusal from the switch record', () => {
+    const verdict = evaluateCommitTrailers(message, FABLE_OFF)
+    expect(verdict.block).toBe(true)
+    const text = formatCommitTrailerVerdict(verdict)
+    expect(text).toContain('node scripts/fable-switch.mjs --status')
+    expect(text).toContain('test capacity exhausted')
+    expect(text).not.toContain('Co-Authored-By: Claude Fable 5')
+  })
+
+  it('treats a Fable commit as the same serving breach as Sonnet and Haiku', () => {
+    const log = line('2222222', '2026-07-24T22:30:00Z', fableTrailer)
+    const hits = findForbiddenCommits(log, T0, FABLE_OFF)
+    expect(hits).toHaveLength(1)
+    const text = formatForbiddenReason(hits, { fableState: FABLE_OFF })
+    expect(text).toContain('Fable, Sonnet and Haiku')
+    expect(text).toContain('node scripts/fable-switch.mjs --status')
   })
 })
 
@@ -352,7 +384,7 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
       'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
     ]) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
     // every spelling the refusal advertises must itself pass the gate
-    for (const t of ALLOWED_TRAILERS) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+    for (const t of allowedTrailers()) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
   })
 
   it('rejects the bare trailer', () => {
@@ -447,8 +479,8 @@ describe('the GPT-5.6 Sol authoring lane', () => {
   })
 
   it('advertises the Sol trailer, and every advertised trailer passes the gate', () => {
-    expect(ALLOWED_TRAILERS).toContain('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-    for (const t of ALLOWED_TRAILERS) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+    expect(allowedTrailers()).toContain('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
+    for (const t of allowedTrailers()) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
   })
 
   it('names only SOL, never GPT at large — another GPT is a breach like any other', () => {

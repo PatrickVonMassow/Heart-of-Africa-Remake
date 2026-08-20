@@ -34,6 +34,7 @@ import { isMainModule } from './is-main.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import { berlinStamp, resolveCardText, TEXT_STDIN_FLAG } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
@@ -167,7 +168,12 @@ function main(argv) {
       if (e.repair) console.error(`  repair: ${e.repair}`)
       return 2
     }
-    if (evaluateCommitTrailers(message).block) {
+    const fableState = currentFableState()
+    if (!fableState.ok) {
+      console.error(`fold-point: ${fableState.problem}`)
+      return 2
+    }
+    if (evaluateCommitTrailers(message, fableState).block) {
       console.error(
         `fold-point: --model "${args.model}" is not an allowed authoring model (CLAUDE.md §6).\n` +
           '  Name the model actually running this fold.',

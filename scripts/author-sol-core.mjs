@@ -30,7 +30,7 @@
 // Side-effect free: the spawn, the git work and the push belong to
 // scripts/author-sol.mjs. Pinned by author-sol-core.test.mjs.
 
-import { ALLOWED_TRAILERS, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
+import { allowedTrailers, classifyTrailer, modelNamesIn } from './model-guard-core.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import { charStripped, rawFieldValue, stripDecoration, SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
@@ -38,7 +38,7 @@ export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
 
 /** The trailer every commit of this lane carries — the allowlist's own spelling,
  *  so the `commit-msg` gate and the serving-model tripwire both accept it. */
-export const SOL_TRAILER = ALLOWED_TRAILERS.find((t) => /sol/i.test(t)) ?? ''
+export const SOL_TRAILER = allowedTrailers().find((t) => /sol/i.test(t)) ?? ''
 
 /** An authoring run may take longer than a review: it builds and tests. */
 export const AUTHOR_TIMEOUT_MS = 60 * 60_000

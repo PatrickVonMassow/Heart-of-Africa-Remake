@@ -4,8 +4,6 @@
 // scripts/fable-switch.mjs owns its I/O; every policy consumer receives the decoded
 // state and derives its answer here instead of carrying a second switch.
 
-import { mainCheckoutFrom } from './review-sol-core.mjs'
-
 export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
 export const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5'
@@ -15,7 +13,9 @@ const MAX_TIMESTAMP = 8.64e15
 
 /** The state file in the MAIN checkout, even when called from a worktree. */
 export function statePathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
-  return `${mainCheckoutFrom(gitCommonDir, repoRoot)}${sep}.claude${sep}${STATE_FILE_NAME}`
+  const common = String(gitCommonDir ?? '').trim().replace(/[/\\]+$/, '')
+  const main = /(?:^|[/\\])\.git$/.test(common) ? common.replace(/[/\\]\.git$/, '') : String(repoRoot ?? '')
+  return `${main || String(repoRoot ?? '')}${sep}.claude${sep}${STATE_FILE_NAME}`
 }
 
 const repair = () =>
