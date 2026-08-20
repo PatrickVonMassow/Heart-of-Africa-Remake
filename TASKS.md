@@ -129,6 +129,35 @@ put it is the mistake this line exists to stop.
   Criticality: high — a verification script red on `main` whose green half proves nothing, and the
   acceptance-criteria pointers are what CLAUDE.md §7.1 rests on since the cut.
   Bundle: Testinfrastruktur.
+- [ ] 783. The four-eyes gate on the morning's guards cannot be satisfied by EITHER vendor, so it
+  blocks every turn on `main` (measured 20.08.2026 while trying to clear it).
+  `scripts/mechanism-review-guard.mjs` demands a recorded cross-vendor review for the
+  Claude-authored guard commits `99f467c`, `1ce35ae`, `1615e5f`, `a8f13c0`, `0bb3b56`. The review
+  itself was run and returned findings — they are point 782 — but the RECORD cannot be made to
+  cover the demanded set:
+  1. A SCOPED PASS CANNOT BE RECORDED AS ONE. `scripts/review-sol.mjs --since 5ddfc4e --sha 1615e5f`
+     completed a full pass (13/13 file contributions, nothing dropped) and then printed NO record
+     command, because a record at a head clears back further than the pass actually read.
+  2. THE UNSCOPED RANGE HAS NO ELIGIBLE REVIEWER. Its own remedy — re-run without `--since` over the
+     whole range — cannot be taken: that range now contains points 771 and 775, which GPT-5.6 Sol
+     AUTHORED, and CLAUDE.md §6 forbids a model reviewing its own work. The only reviewer the range
+     admits is the vendor that wrote half of it.
+  3. A `do-not-merge` RECORD DOES NOT CLEAR, and should not — the mechanism was refused, so the work
+     is owed. That is correct behaviour and not the defect; the defect is that there is no path from
+     "reviewed and refused" to "the gate knows it was read".
+  WHY IT IS URGENT RATHER THAN TIDY: this is not a warning, it is a Stop-family refusal on the
+  default branch. Every session inherits it, and the only way past it today is a waiver.
+  FINAL STATE: a pass that read a bounded range can be RECORDED as covering exactly that range, so
+  partial coverage accumulates instead of being discarded; and where a range mixes authorship, the
+  gate accepts it split by author, naming for each part which vendor is eligible. No range may end
+  up with zero eligible reviewers without the gate saying so in as many words.
+  VERIFIABLE: Vitest over the pure layer — a scoped pass record clears the commits inside its range
+  and NO commit outside it; a range whose every eligible reviewer authored part of it is reported as
+  UNREVIEWABLE with the reason, rather than as an ordinary refusal; a `do-not-merge` still does not
+  clear. Plus the real repository: the gate reports a reachable next step for the current `main`.
+  Criticality: high — it is a blocking gate on `main` with no legitimate way through, and the
+  workaround it invites is a waiver, which is how a four-eyes rule quietly stops being one.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 782. Answer the cross-vendor review of the morning's three guard mechanisms (GPT-5.6 Sol,
   20.08.2026, verdict **do-not-merge** on `5ddfc4e..1615e5f`). The three mechanisms — the
   clear-claim guard, its preflight registration, and the commit-time guard-registration check —
