@@ -1406,6 +1406,21 @@ put it is the mistake this line exists to stop.
     verdicts sat on a diff the new rule would have exempted. That number must be ZERO; a single
     real finding on an exempt diff refutes the rule, and the point then narrows the exemption
     rather than accepting the loss. The replay's output is committed as the evidence.
+  THE ENTRY CONDITION'S REACH IS A SEPARATE QUESTION, AND THIS POINT OWNS THE ORDER
+  (20.08.2026). "The path rule stays the entry condition and is not widened or narrowed" above
+  binds THIS point's own change and nothing else. Point 535 wants that rule WIDENED — to `-hook`
+  names, to the lint/audit configuration a gate is wired through, and to a corpus counter that
+  matches `guard-inventory`'s enforcer set — and point 536 wants two conventionally unnamed
+  enforcers renamed so the selectors reach them at all. Both still stand (verified 20.08.2026:
+  `classifiesAsMechanism` matches `-guard`/`-gate`, "beside one by stem", `scripts/git-hooks/*`
+  and `NAMED_MECHANISM_FILES`, and neither a `-hook` name nor `.oxlintrc.json`, so
+  `dashboard-reminder-hook` and `dashboard-sync` are outside the gate today). The decision falls
+  here because this point carries the measurement of what the reach COSTS — 38 of 56 recorded
+  reviews demanded by a touch — and because the hunk classifier is what makes a wider reach
+  affordable at all. THE ORDER IS THEREFORE: this classifier lands FIRST, and 535's widening and
+  536's renames enter through it, so the coverage grows while the per-touch cost does not.
+  Nothing here narrows the reach, exempts a file class, or settles the coverage question those
+  two points ask — which enforcers guard-health and the counters must see is theirs.
   VERIFIABLE: Vitest over the pure classifier with recorded fixtures — a comment-only hunk in a
   guard core (exempt), an added test case (exempt), a deleted assertion (review-worthy), a
   one-character change inside an executable line (review-worthy), a diff mixing a comment fix
@@ -5894,6 +5909,13 @@ Build order, chosen so no two parallel agents own the same file:
   to kill return undetected. So the reach must also cover WHAT A GATE IS WIRED THROUGH, not
   only what a file is called: at minimum the lint/audit configuration the gate commands read
   (`.oxlintrc.json`, and the `test`/`lint` script definitions in `package.json`).
+  THE ENTRY CONDITION IS NOT DECIDED HERE (20.08.2026). Point 735 owns whether the gate keeps
+  deciding by file name and what a matched file then costs; it keeps the path rule as the entry
+  condition and puts a behaviour classifier beside it, because 38 of 56 recorded reviews were
+  demanded by a TOUCH rather than by a change. This point's widening therefore lands with or
+  after that classifier and inherits it — the reach grows, the review cost of a comment-only
+  touch does not — and this point neither narrows the rule nor claims an exemption of its own.
+  Its own subject, the coverage the widening buys, is unaffected by that decision.
   VERIFIABLE: pure Vitest — a `-hook` path is a mechanism path and a `-hook` change with no
   review record BLOCKS; an `.oxlintrc.json` rule change likewise BLOCKS unreviewed; the corpus
   count matches `guard-inventory`'s enforcer count on the real tree.
@@ -5910,6 +5932,12 @@ Build order, chosen so no two parallel agents own the same file:
   tests with them) in ONE commit together with their `.claude/settings.json` lines, so the
   chain is never half-renamed. ATTENDED: the settings file always prompts, so this point is
   worked in an attended session, not by a delegated agent.
+  WHAT BEING REACHED COSTS IS DECIDED IN POINT 735 (20.08.2026). The rename pulls both files
+  into a name-based gate whose touch trigger that point is re-cutting. The rename's PURPOSE
+  survives the re-cut — 735 keeps the path rule as the entry condition and only asks afterwards
+  whether the changed hunks can alter behaviour — so nothing here is contradicted; what this
+  point does not decide is the review cost the two new matches create. Sequenced behind 735 like
+  point 535's widening, for the same reason.
   VERIFIABLE: `node scripts/guard-inventory.mjs` reports `unconventional 0`, `guard-health`
   lists both, and the corpus count rises by two — with the attestation re-recorded in the same
   commit as in point 535. Criticality: medium.
