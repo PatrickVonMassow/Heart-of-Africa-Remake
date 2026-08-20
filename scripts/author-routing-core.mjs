@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@7f2f2a79
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@6f66efa2
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
