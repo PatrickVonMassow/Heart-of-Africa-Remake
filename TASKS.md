@@ -220,6 +220,33 @@ put it is the mistake this line exists to stop.
   does not fire is the incident it was built for.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
+  while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
+  exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
+  section of `docs/acceptance-criteria-detail.md` is reported as orphaned, while the two rules
+  above it report PASS.
+  THE CAUSE IS MEASURED. `pointerRe(keyword, doc)` builds `Detail: docs/acceptance-criteria-detail.md
+  §(\d+)\.` — a BARE path. The 20.08.2026 document cut wrapped both pointer paths in BACKTICKS, so
+  CLAUDE.md §7.1 now reads ``Detail: `docs/acceptance-criteria-detail.md` §1.`` and the regex matches
+  NOTHING. `checkPointers` then finds zero pointers: `misdirected` and `unresolved` come back empty
+  because there is nothing to judge, and every section of the target document is orphaned because no
+  pointer names it. Verified directly — the regex returns false on the backticked line and true on the
+  bare one, and the `Evidence:` family has the same shape.
+  WHY IT IS MORE THAN A REGEX. The two GREEN lines are the defect, not the red one. A pointer family
+  that has stopped matching reports "every pointer has a section — all present" in exactly the same
+  words as a healthy one, so the check reads as two-thirds sound while it is blind. The orphan rule is
+  the only reason this was noticed at all, and it was noticed by a point looking for something else.
+  The same shape — a check whose subject count can silently fall to zero — is what point 555's
+  four-eyes review already closed once, for the deleted-pointer case.
+  FINAL STATE: the pointer families are recognised whether or not the path is written as code, and
+  every rule states the NUMBER of pointers it judged, so a family that matches nothing is loud rather
+  than green. `node scripts/verify/docs.mjs` exits 0 on `main`.
+  VERIFIABLE: Vitest over the pure layer — a backticked and a bare pointer both resolve; a family with
+  zero matched pointers is a FINDING rather than three passes; the existing present / missing /
+  misspelled cases stay green. Plus `scripts/verify/docs.mjs` green at HEAD.
+  Criticality: high — a verification script red on `main` whose green half proves nothing, and the
+  acceptance-criteria pointers are what CLAUDE.md §7.1 rests on since the cut.
+  Bundle: Testinfrastruktur.
 - [ ] 773. `cut-account-core.test.mjs` is red in every worktree and green only in the main
   checkout (measured 20.08.2026, 10:43). The case »docs/document-cut-757.md — the measured floors >
   takes each floor from a transcript of the kind it claims« resolves the repository root with
@@ -289,6 +316,92 @@ put it is the mistake this line exists to stop.
   handover mechanism nor the board noticed.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 777. A decision card published after its answer arrived is never retired (measured
+  20.08.2026). The reply of 07:27 asked whether the three priority levels still hold.
+  `decision-card-guard` forces every question in a reply into a card, so »Stufenordnung vom 17.08.:
+  beschreibt sie noch deine Prioritäten?« was filed and the owner published it at 07:47. The user had
+  ALREADY answered at 07:31 (»Die Reihenfolge-Regel zum Release stimmt noch.«). The card then stood
+  through every republish — 08:27, 10:38, 11:06, 11:45 — until the user asked why, and it was retired
+  by hand on 20.08.2026.
+  TWO INDEPENDENT CAUSES, and both have to go. First, the answered-card review in
+  `scripts/decision-card-guard-core.mjs` compares the CURRENT turn's user message against the cards
+  that exist AT THAT MOMENT, so an answer that arrives BEFORE its card is published can never be
+  matched — the card is born already answered and nothing looks again. Second, even with the card
+  standing, `sharedDistinctiveTerms()` would probably have missed this pair: the answer says
+  »Reihenfolge-Regel zum Release«, the title says »Stufenordnung« and »Prioritäten«, and no
+  distinctive term is shared.
+  FINAL STATE: a card is reviewed against the recent user messages of the asking session at the moment
+  it is ADDED, not only against the turn that happens to run later; and the answered-card match no
+  longer rests on shared literal terms alone, so an answer in the user's own words retires the card it
+  answers.
+  VERIFIABLE: Vitest — the measured 20.08. pair (answer at 07:31, card added at 07:47) is retired at
+  the add; the same pair is retired although title and answer share no distinctive term; a card whose
+  question is genuinely unanswered survives both paths.
+  Criticality: medium — no product defect, but the board asked the user a question he had already
+  answered for four hours, which is exactly what the decision section exists to prevent.
+  Bundle: Chat & Tafel.
+- [ ] 778. Answer the cross-vendor review of the suspended Fable escalation (GPT-5.6 Sol,
+  20.08.2026, verdict **merge-with-fixes** on both passes of `5631247f`, recorded in
+  `.claude/mechanism-reviews.jsonl`). The suspension itself was judged sound — the automatic branch is
+  guarded and reversible, and the remaining Fable uses are the documented fallback and explicit roles —
+  but two findings stand and both are real.
+  1. THE QUEUE REPORT DROPS THE REASON. `formatLaneLine()` in `scripts/author-routing-core.mjs` prints
+     `why[0]` only. The suspension explanation is stored in `why[1]`, so a whole-queue routing report
+     omits it entirely, while the ACTIVE escalation reason it replaced occupied `why[0]` and was
+     visible. The single-point CLI is covered by tests; a multi-reason `formatLaneReport()` row is not.
+  2. THE FLAG CANNOT BE FLIPPED BACK CLEANLY. `src/config/fableEscalationDoc.test.ts` pins the
+     suspended wording, so re-activating the escalation makes a test red for saying what the
+     configuration then means — the reversal the suspension promises costs a test edit nobody
+     documented.
+  FINAL STATE: a routing report carries every reason a lane decision has, not the first; and flipping
+  `FABLE_ESCALATION_SUSPENDED` back leaves no stale assertion behind — the documentation test asserts
+  the wording that MATCHES the flag rather than one of the two states.
+  VERIFIABLE: Vitest — a two-reason lane row renders both reasons in the queue report; the
+  documentation test passes with the flag in either position; the existing single-reason cases stay
+  green.
+  Criticality: medium — the routing decision is explained to whoever reads the queue, and a suspension
+  that cannot be lifted without a red test is not the reversible switch it claims to be.
+  Bundle: Modell & Wächter.
+- [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
+  (measured 20.08.2026, all three in a single session). They are filed together because they are
+  one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
+  until it does, every asking pays for it again in tokens that then ride along in every later
+  answer of the same turn.
+  1. »WANN HAT DER NUTZER X GESAGT« HAT KEIN WERKZEUG. Answering "why is this card still on the
+     board" needed the timeline of one user answer across five session transcripts under
+     `/home/node/.claude/projects/-workspace-hoa/*.jsonl`. None of the 418 scripts reads those
+     transcripts, so the search ran as hand-written node one-liners and pulled roughly 25,000
+     tokens of raw prose into the session context — for FOUR timestamps. The same turn hand-wrote
+     the same JSONL walker twice.
+     WANTED: `scripts/user-said.mjs --grep "<term>" [--since <iso>] [--sessions N]`, printing ONE
+     line per human message (timestamp, 8-char session id, first 120 characters) and `--full` for
+     a single hit. Same source, same answer, about twenty lines instead of twenty-five thousand
+     tokens.
+  2. `batch-claim.mjs` HAS NO `--wait`. Taking the batch over is three steps: claim, wait for the
+     owner's clean release, claim again. Step two has no support — the script knows only
+     `--session`, `--status`, `--withdraw`, `--why`, `--git-path`, `--unmerged`. So the waiting
+     session writes its own poll loop against a JSON shape it has to GUESS: the first attempt here
+     keyed on a `lock` field that does not exist, reported FREE while the owner held a fresh
+     heartbeat, and cost a full extra turn (~10,000 tokens) plus a wrong statement to the user.
+     WANTED: `--wait [--timeout <min>]`, blocking until the lock is free or the claim is spent and
+     exiting 0/1, plus `--take` as the explicit second half. Nobody parses that JSON by hand again.
+  3. 418 SCRIPTS HAVE NO INDEX. To learn that removing a board card is `board.mjs vdzk-remove`, a
+     turn ran `ls scripts | grep -iE 'board|question|decision'`, took seventy lines of file names
+     into context, and then read `board.mjs --help` on top.
+     WANTED: either `node scripts/help.mjs <topic>`, resolving a topic to the owning script and its
+     usage line, or a generated `docs/command-index.md` kept honest by a unit test — one line per
+     script, name and one-sentence purpose. The cheapest correct version greps the scripts' own
+     usage strings, so nothing is maintained twice.
+  FINAL STATE: all three exist as commands, and none of them requires a caller to parse another
+  script's JSON or to list a directory to find a name.
+  VERIFIABLE: Vitest over the pure halves — the transcript reader returns one line per human
+  message and honours `--since`/`--sessions` against a fixture; `--wait` returns as soon as a
+  fixture lock frees and exits non-zero on timeout; the index (or `help.mjs`) resolves a known
+  topic to its script and goes red when a script gains or loses its usage line. Plus the measured
+  25,000-token search reproduced as a twenty-line answer.
+  Criticality: medium — no product defect, but it is the token cost the whole 738–759 programme is
+  about, in the one shape that programme does not cover: a question with no command behind it.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 764. The chat header's context reading is required by nothing, and six replies proved it
   (measured 20.08.2026, session d5fcb9cf; the user found it before we did: "Dann war es da und
   mit dem nächsten clear wieder weg"). Point 740 (archived, done 19.08.2026) put the session's
@@ -10119,76 +10232,3 @@ to land than a mechanism that needs a review.
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
-  while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
-  exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
-  section of `docs/acceptance-criteria-detail.md` is reported as orphaned, while the two rules
-  above it report PASS.
-  THE CAUSE IS MEASURED. `pointerRe(keyword, doc)` builds `Detail: docs/acceptance-criteria-detail.md
-  §(\d+)\.` — a BARE path. The 20.08.2026 document cut wrapped both pointer paths in BACKTICKS, so
-  CLAUDE.md §7.1 now reads ``Detail: `docs/acceptance-criteria-detail.md` §1.`` and the regex matches
-  NOTHING. `checkPointers` then finds zero pointers: `misdirected` and `unresolved` come back empty
-  because there is nothing to judge, and every section of the target document is orphaned because no
-  pointer names it. Verified directly — the regex returns false on the backticked line and true on the
-  bare one, and the `Evidence:` family has the same shape.
-  WHY IT IS MORE THAN A REGEX. The two GREEN lines are the defect, not the red one. A pointer family
-  that has stopped matching reports "every pointer has a section — all present" in exactly the same
-  words as a healthy one, so the check reads as two-thirds sound while it is blind. The orphan rule is
-  the only reason this was noticed at all, and it was noticed by a point looking for something else.
-  The same shape — a check whose subject count can silently fall to zero — is what point 555's
-  four-eyes review already closed once, for the deleted-pointer case.
-  FINAL STATE: the pointer families are recognised whether or not the path is written as code, and
-  every rule states the NUMBER of pointers it judged, so a family that matches nothing is loud rather
-  than green. `node scripts/verify/docs.mjs` exits 0 on `main`.
-  VERIFIABLE: Vitest over the pure layer — a backticked and a bare pointer both resolve; a family with
-  zero matched pointers is a FINDING rather than three passes; the existing present / missing /
-  misspelled cases stay green. Plus `scripts/verify/docs.mjs` green at HEAD.
-  Criticality: high — a verification script red on `main` whose green half proves nothing, and the
-  acceptance-criteria pointers are what CLAUDE.md §7.1 rests on since the cut.
-  Bundle: Testinfrastruktur.
-- [ ] 777. A decision card published after its answer arrived is never retired (measured
-  20.08.2026). The reply of 07:27 asked whether the three priority levels still hold.
-  `decision-card-guard` forces every question in a reply into a card, so »Stufenordnung vom 17.08.:
-  beschreibt sie noch deine Prioritäten?« was filed and the owner published it at 07:47. The user had
-  ALREADY answered at 07:31 (»Die Reihenfolge-Regel zum Release stimmt noch.«). The card then stood
-  through every republish — 08:27, 10:38, 11:06, 11:45 — until the user asked why, and it was retired
-  by hand on 20.08.2026.
-  TWO INDEPENDENT CAUSES, and both have to go. First, the answered-card review in
-  `scripts/decision-card-guard-core.mjs` compares the CURRENT turn's user message against the cards
-  that exist AT THAT MOMENT, so an answer that arrives BEFORE its card is published can never be
-  matched — the card is born already answered and nothing looks again. Second, even with the card
-  standing, `sharedDistinctiveTerms()` would probably have missed this pair: the answer says
-  »Reihenfolge-Regel zum Release«, the title says »Stufenordnung« and »Prioritäten«, and no
-  distinctive term is shared.
-  FINAL STATE: a card is reviewed against the recent user messages of the asking session at the moment
-  it is ADDED, not only against the turn that happens to run later; and the answered-card match no
-  longer rests on shared literal terms alone, so an answer in the user's own words retires the card it
-  answers.
-  VERIFIABLE: Vitest — the measured 20.08. pair (answer at 07:31, card added at 07:47) is retired at
-  the add; the same pair is retired although title and answer share no distinctive term; a card whose
-  question is genuinely unanswered survives both paths.
-  Criticality: medium — no product defect, but the board asked the user a question he had already
-  answered for four hours, which is exactly what the decision section exists to prevent.
-  Bundle: Chat & Tafel.
-- [ ] 778. Answer the cross-vendor review of the suspended Fable escalation (GPT-5.6 Sol,
-  20.08.2026, verdict **merge-with-fixes** on both passes of `5631247f`, recorded in
-  `.claude/mechanism-reviews.jsonl`). The suspension itself was judged sound — the automatic branch is
-  guarded and reversible, and the remaining Fable uses are the documented fallback and explicit roles —
-  but two findings stand and both are real.
-  1. THE QUEUE REPORT DROPS THE REASON. `formatLaneLine()` in `scripts/author-routing-core.mjs` prints
-     `why[0]` only. The suspension explanation is stored in `why[1]`, so a whole-queue routing report
-     omits it entirely, while the ACTIVE escalation reason it replaced occupied `why[0]` and was
-     visible. The single-point CLI is covered by tests; a multi-reason `formatLaneReport()` row is not.
-  2. THE FLAG CANNOT BE FLIPPED BACK CLEANLY. `src/config/fableEscalationDoc.test.ts` pins the
-     suspended wording, so re-activating the escalation makes a test red for saying what the
-     configuration then means — the reversal the suspension promises costs a test edit nobody
-     documented.
-  FINAL STATE: a routing report carries every reason a lane decision has, not the first; and flipping
-  `FABLE_ESCALATION_SUSPENDED` back leaves no stale assertion behind — the documentation test asserts
-  the wording that MATCHES the flag rather than one of the two states.
-  VERIFIABLE: Vitest — a two-reason lane row renders both reasons in the queue report; the
-  documentation test passes with the flag in either position; the existing single-reason cases stay
-  green.
-  Criticality: medium — the routing decision is explained to whoever reads the queue, and a suspension
-  that cannot be lifted without a red test is not the reversible switch it claims to be.
-  Bundle: Modell & Wächter.
