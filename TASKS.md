@@ -5125,6 +5125,24 @@ Build order, chosen so no two parallel agents own the same file:
   the scar tint sampling; live check that the front's leading pixels read clearly
   brighter/warmer than the trailing scar and the scar clearly DARKER than unburnt
   savanna; screenshot 131 refreshed and judged on BOTH backends.
+  AND THE EVIDENCE FRAME MUST ITSELF FAIL WHILE THE FIRE IS INVISIBLE (observed
+  05.08.2026 while closing point 323, carried here 20.08.2026): today
+  `verification/131-burning-grass.png` is the frame that proves the §19.9 bush fire,
+  and no fire is visible in it to the eye — dry grass, and the checks green. That is
+  the looks-wrong-but-passes class, a green check standing in front of an invisible
+  feature, and it is not the shutter-aim defect of point 518: MEASURED in
+  `scripts/verify/enrichments.mjs`, the `burning-grass` section polls until
+  `f.mode === 'smoulder'` and only THEN takes the shot, so the frame deliberately
+  photographs the aftermath, and its check reads state flags (`trapped`, `calfDead`,
+  `parentDead`, `resolved`) rather than the picture. FINAL STATE for that half: the
+  shutter opens while the front is burning, flame and smoke READ in the frame at the
+  zoom the criterion is judged at, and the guarding check measures the DRAWN fire —
+  pixels of flame and smoke in the frame region — not a state flag beside it. Its
+  negative control is part of the work: the check FAILS when the fire is switched off
+  in the debug menu, proving it reads the picture rather than the intent. If the
+  effect turns out to draw correctly and only the frame's aim or moment is wrong, the
+  aim is fixed and the finding is recorded as such — a feature that cannot be seen is
+  not delivered either way.
 
 - [ ] 319. Crocodile kill aftermath: prey dissolves without sink or visible scavenger
   (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
