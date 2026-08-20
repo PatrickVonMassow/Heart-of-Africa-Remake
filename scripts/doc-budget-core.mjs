@@ -212,6 +212,11 @@ export function workOrderPoints(text) {
   // it does not close, or a four-backtick block would end at the first three-backtick
   // line inside it and everything after would read as work order again.
   const FENCE_OPEN = /^ {0,3}((`{3,})|(~{3,}))(.*)$/
+  // CommonMark allows only SPACES AND TABS after a closing run — nothing else, and
+  // `trim()` is not that rule (third cross-vendor round): it eats every Unicode
+  // space, so a non-breaking space behind a fence would close the block and the next
+  // checkbox would split the point that quoted it.
+  const CLOSER_TAIL = /^[ \t]*$/
   const out = []
   let cur = null
   let fence = null // { marker, length } while open
@@ -224,7 +229,7 @@ export function workOrderPoints(text) {
       if (fence === null) {
         // A backtick opener may not carry a backtick in its info string.
         if (!(marker === '`' && info.includes('`'))) fence = { marker, length: run.length }
-      } else if (marker === fence.marker && run.length >= fence.length && info.trim() === '') {
+      } else if (marker === fence.marker && run.length >= fence.length && CLOSER_TAIL.test(info)) {
         fence = null
       }
       if (cur) cur.lines.push(line)
@@ -297,9 +302,12 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
     // empty object or an explicit `undefined` still switched the ceiling off in
     // silence — which is the very failure it was written to stop. Declaring the block
     // at all is now the commitment; `0` is the one value that means "measured later".
+    // `null` IS A DECLARATION, and an unusable one (third cross-vendor round): the
+    // rule above is that writing the block at all is the commitment, so an explicit
+    // null must refuse exactly like a misspelled field rather than pass as absent.
     const perPoint = budget.perPoint
-    const declared = perPoint !== undefined && perPoint !== null
-    const cap = declared ? perPoint.maxWords : undefined
+    const declared = perPoint !== undefined
+    const cap = perPoint == null ? undefined : perPoint.maxWords
     if (declared && !(Number.isInteger(cap) && cap >= 0)) {
       findings.push({
         path: budget.path,

@@ -223,6 +223,25 @@ describe('the per-point ceiling of the work order', () => {
     }
   })
 
+  it('REFUSES an explicit null block, which is a declaration and not an absence', () => {
+    const broken = [{ ...budget[0], perPoint: null }]
+    const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 5)) }], broken)
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings[0].kind).toBe('per-point ceiling is not a whole number of words')
+  })
+
+  it('does not let a non-breaking space behind a fence close the block', () => {
+    const points = workOrderPoints(
+      order('- [ ] 11. one', '```', '```\u00a0', '- [ ] 12. inside', '```', '- [ ] 13. out'),
+    )
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('lets spaces and tabs behind a closing run close it, as CommonMark does', () => {
+    const points = workOrderPoints(order('- [ ] 11. one', '```', '- [ ] 12. inside', '``` \t ', '- [ ] 13. out'))
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
   it('judges nothing when no per-point block is declared at all', () => {
     const none = [{ ...budget[0], perPoint: undefined }]
     expect(evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 500)) }], none).block).toBe(false)
