@@ -8,18 +8,16 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { execSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO_ROOT = R('..')
-const SCRIPTS = R('.')
-const SETTINGS = R('../.claude/settings.json')
-const PAUSE = R('../.claude/batch-paused')
+const SCRIPTS = repoPath('scripts')
+const SETTINGS = repoPath('.claude', 'settings.json')
+const PAUSE = repoPath('.claude', 'batch-paused')
 
 /**
  * Everything that could invoke an enforcer: the hook settings plus the contents

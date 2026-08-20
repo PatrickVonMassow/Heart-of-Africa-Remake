@@ -10,15 +10,13 @@
 // session owns the batch lock.
 import { existsSync, readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { evaluatePushArrival } from './push-arrival-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO_ROOT = R('..')
-const PAUSE = R('../.claude/batch-paused')
+const PAUSE = repoPath('.claude', 'batch-paused')
 
 function git(args) {
   try {
