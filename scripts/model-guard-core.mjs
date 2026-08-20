@@ -60,8 +60,12 @@ export const ALLOWED = Object.freeze([
 
 const FABLE_ALLOWED = /^fable[\s.\d]*$/i
 
-/** Undefined is retained only for policy-neutral parsing callers and historic tests. */
-const admitsFable = (fableState) => fableState === undefined || fableIsOn(fableState)
+/** Explicit opt-out from switch policy for pure parsing fixtures and historic-log tests. */
+export const POLICY_NEUTRAL = Symbol('model-policy-neutral')
+
+/** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
+const admitsFable = (fableState) =>
+  fableState === POLICY_NEUTRAL || (fableState !== undefined && fableIsOn(fableState))
 
 /** May this PARSED model name author a commit here? */
 export function isAllowedModelName(name, fableState) {
