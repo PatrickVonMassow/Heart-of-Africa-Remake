@@ -8072,24 +8072,6 @@ to land than a mechanism that needs a review.
   1973, 2375, 3027, 4071, 4102, 4182, 4544, 4611, 4756, 5335; polish 270;
   settings 183, 277; flow 242; voice 56; touch 75) → 200.
 
-- [ ] 224. Confirm the v0.2 checkpoint is served (re-cut 10.08.2026 from the
-  four-eyes work-order analysis; the original demanded work that is already done).
-  The checkpoint itself SHIPPED: `git tag` carries `v0.2` at `bafd9b25` (24.07.2026),
-  the `poc` tag has since moved on, and the Pages workflow enumerates every `v*` tag
-  plus `poc` dynamically (`.github/workflows/deploy-pages.yml`) rather than through the
-  hard-coded tag loop this point described. The tick was evidently lost in the
-  24./25.07.2026 degradation repair.
-  WHAT REMAINS: confirm that /v0.2/ and /poc/ both resolve and serve their frozen
-  builds, then close this point. The v0.2 tag is FROZEN and is never re-pointed
-  (`tags-only-on-request`) — this point may not cut, move or re-cut any tag.
-  VERIFIABLE: two HTTP 200s with the expected build stamp, recorded in the closing
-  evidence.
-  Criticality: low — bookkeeping on a delivery that already happened.
-  WITHDRAWN BY THE USER, 20.08.2026: "Der Punkt 224 kann aus der Arbeitsliste raus. v0.2 ist
-  inzwischen völlig uninteressant geworden. Der Tag ist ausgeliefert, mehr ist da nicht mehr zu
-  tun." The two HTTP checks above were NOT performed and are NOT owed — the user withdrew the
-  work, he did not accept it as delivered. No later reader may re-derive them from this block.
-
 - [ ] 615. The not-run gate is disarmed by a comment, and the bootstrap skips its own
   LOCKFILE CHECK (four-eyes review of the landed point 573 by the second model,
   10.08.2026, verdict merge-with-fixes; both defects live-verified by the reviewer, not
