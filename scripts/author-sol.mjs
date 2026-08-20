@@ -18,9 +18,9 @@
 // The decisions are pure and tested (author-sol-core.mjs, author-routing-core.mjs);
 // this half does the process work, the git work and the push, and fails LOUD.
 import { spawn, spawnSync } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
@@ -35,7 +35,7 @@ import {
 } from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
-import { appendRecord, readRecords, RECORDS_PATH } from './mechanism-review.mjs'
+import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
 import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -85,6 +85,60 @@ export function recordedReworkRounds(number, { records } = {}) {
 export { AUTHORING_COMMISSION_KIND }
 
 /**
+ * The ledger's state before an append: its BYTES and its INDEX entry.
+ *
+ * The index half is not decoration (cross-vendor review of point 780, finding
+ * 2). The commit that seals a commission runs `git add` first, so an undo that
+ * only rewrites the working tree leaves the appended line STAGED — the next
+ * commit in that worktree would carry it, and the record would claim a round
+ * that never ran after all. `git ls-files --stage` is the whole prior entry:
+ * mode, blob and name, or nothing at all when the file was not staged.
+ */
+export function ledgerSnapshot(path, { cwd = process.cwd(), git: run = git } = {}) {
+  let bytes = null
+  try {
+    bytes = readFileSync(path)
+  } catch (e) {
+    // ONLY "IT IS NOT THERE" MEANS ABSENT (cross-vendor review, round 2): any
+    // other read failure was being recorded as "there was no file", and the undo
+    // would then DELETE a ledger it had simply failed to read. Refuse instead —
+    // a commission is cheap to repeat, an erased append-only record is not.
+    if (!e || e.code !== 'ENOENT') {
+      throw new Error(`cannot read the ledger at ${path}: ${(e && e.message) || e}`)
+    }
+    bytes = null
+  }
+  const staged = (run(['ls-files', '--stage', '--', path], { cwd }) ?? '').trim()
+  return { path, bytes, staged, cwd }
+}
+
+/** Put both halves back exactly as `ledgerSnapshot` found them. Loud on
+ *  failure: a restore that quietly did not happen is worse than the append. */
+export function restoreLedger(snapshot, { git: run = git } = {}) {
+  const { path, bytes, staged, cwd } = snapshot ?? {}
+  if (!path) throw new Error('restoreLedger needs the snapshot it is undoing')
+  if (bytes === null || bytes === undefined) rmSync(path, { force: true })
+  else writeFileSync(path, bytes)
+
+  // gitToplevel, NOT the local git helper (cross-vendor review, round 2): that
+  // one trims, so a checkout whose path ends in whitespace would name a
+  // different directory here and the index entry would be removed by a name
+  // that is not the one git holds.
+  const top = gitToplevel(cwd)
+  if (staged) {
+    // "<mode> <blob> <stage>\t<name>" — the name git itself uses for the entry.
+    const [meta, name] = staged.split('\t')
+    const [mode, blob] = String(meta).trim().split(/\s+/)
+    run(['update-index', '--add', '--cacheinfo', `${mode},${blob},${name}`], { cwd, required: true })
+    return
+  }
+  // Nothing was staged before, so nothing may be staged after — including the
+  // ADDITION of a file that no longer exists.
+  const name = top ? relative(top, path).split(sep).join('/') : path
+  run(['update-index', '--force-remove', '--', name], { cwd, required: true })
+}
+
+/**
  * Append one commission to the shared ledger and make that append durable.
  * The injected callbacks keep the state transition unit-testable; production
  * appends to the tracked review ledger and commits it before Sol starts.
@@ -98,6 +152,7 @@ export function recordAuthoringCommission({
   now = Date.now(),
   append = () => {},
   commit = () => {},
+  rollback = () => {},
 } = {}) {
   const wanted = Number(point)
   const attempt = Number(round)
@@ -132,8 +187,30 @@ export function recordAuthoringCommission({
     at,
     atIso: new Date(at).toISOString(),
   }
-  append(record)
-  commit(record)
+  // THE APPEND AND ITS COMMIT STAND OR FALL TOGETHER (point 780). A failed
+  // commit used to leave the appended line behind, so the append-only ledger
+  // described a commission that never ran and the next session reading it would
+  // count a round the point never had — the exact half-state this record exists
+  // to prevent, in the one file that is supposed to be the honest ledger.
+  // THE APPEND IS INSIDE THE TRANSACTION TOO (cross-vendor review, finding 3):
+  // a write that fails PART WAY THROUGH would otherwise leave a fragment in the
+  // append-only ledger and never reach the undo at all.
+  try {
+    append(record)
+    commit(record)
+  } catch (error) {
+    try {
+      rollback(record)
+    } catch (undo) {
+      // BOTH failures are reported. A rollback that itself failed leaves the
+      // half-state the caller has to see, and hiding it behind the first error
+      // is how a ledger goes quietly wrong.
+      throw new Error(
+        `${(error && error.message) || error}\n  AND the ledger could not be restored: ${(undo && undo.message) || undo}`,
+      )
+    }
+    throw error
+  }
   return { written: true, record }
 }
 
@@ -569,7 +646,13 @@ if (isMainModule(import.meta.url)) {
     // confirmation rather than the only evidence, and committing it now means
     // a killed authoring run cannot erase which commission was actually sent.
     const commissionSha = git(['rev-parse', 'HEAD'], { cwd, required: true })
-    const recordsPath = process.env.AUTHOR_REVIEW_RECORDS_FILE || RECORDS_PATH
+    // THE LEDGER OF THE CHECKOUT THIS RUN IS IN, not of the module's own tree
+    // (point 780): the commit below runs in `cwd`, so an absolute main-tree path
+    // is "outside repository" here and the whole delegated lane was shut from
+    // the only place it is meant to run. The override stays a knob for a test.
+    const recordsPath = process.env.AUTHOR_REVIEW_RECORDS_FILE || recordsPathFor(cwd)
+    // Both halves of the ledger's state before the append: bytes and index.
+    const ledgerBefore = ledgerSnapshot(recordsPath, { cwd })
     const commissioned = recordAuthoringCommission({
       records,
       point,
@@ -577,6 +660,7 @@ if (isMainModule(import.meta.url)) {
       framing: authoringStep.framing,
       sha: commissionSha,
       append: (record) => appendRecord(record, recordsPath),
+      rollback: () => restoreLedger(ledgerBefore),
       commit: () => {
         git(['add', '--', recordsPath], { cwd, required: true })
         git(

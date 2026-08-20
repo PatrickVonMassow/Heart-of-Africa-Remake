@@ -6,6 +6,7 @@
 // wrote the thing, a refusal that must not be treated as advice, and the twenty-
 // odd guards that predate the gate and owe nothing.
 import { describe, it, expect } from 'vitest'
+import { resolve } from 'node:path'
 import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
@@ -14,6 +15,8 @@ import {
   formatMechanismReviewVerdict,
   isMechanismPath,
   KNOWN_FLAGS,
+  ledgerPathFrom,
+  LEDGER_RELATIVE_PATH,
   MERGE_ACCOUNTING_SINCE,
   MODE_REQUIRED_SINCE,
   mechanismPathsIn,
@@ -1931,5 +1934,28 @@ describe('the refusal teaches the command that actually works', () => {
     const text = formatMechanismReviewVerdict(v)
     expect(text).toContain('--mode')
     for (const m of MODES) expect(text).toContain(m)
+  })
+})
+
+// WHICH CHECKOUT'S LEDGER (point 780). The I/O half asks git for the toplevel;
+// this is what it does with the answer.
+describe('the ledger path of a checkout', () => {
+  it('resolves the relative ledger against the toplevel it was given', () => {
+    expect(ledgerPathFrom('/repo/.claude/worktrees/point-780')).toBe(
+      resolve('/repo/.claude/worktrees/point-780', LEDGER_RELATIVE_PATH),
+    )
+    expect(ledgerPathFrom('/repo')).toBe(resolve('/repo', LEDGER_RELATIVE_PATH))
+  })
+
+  it('answers null rather than another tree when git names no toplevel', () => {
+    // The cross-vendor review of this very point: a fallback checkout is the
+    // same silent cross-tree write, only quieter. There is no ledger here.
+    for (const nothing of [null, undefined, '']) expect(ledgerPathFrom(nothing)).toBe(null)
+  })
+
+  it('uses the toplevel exactly as git gave it, spaces and all', () => {
+    // Trimming would rename a legitimate POSIX directory into a different one.
+    expect(ledgerPathFrom('/repo/odd name ')).toBe(resolve('/repo/odd name ', LEDGER_RELATIVE_PATH))
+    expect(ledgerPathFrom('   ')).toBe(resolve('   ', LEDGER_RELATIVE_PATH))
   })
 })

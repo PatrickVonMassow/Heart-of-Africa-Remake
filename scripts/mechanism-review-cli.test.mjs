@@ -8,21 +8,23 @@
 // The spawned cases are all READ-ONLY: `--list` reads the tracked ledger and the
 // refusals exit before any write, so this suite can run against the real
 // checkout without touching it.
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
   appendRecord,
   buildRecord,
+  gitToplevel,
   KNOWN_FLAGS,
   readRecords,
+  recordsPathFor,
   resolveCommit,
   reviewFileSetKey,
   usage,
 } from './mechanism-review.mjs'
-import { MODES, VERDICTS } from './mechanism-review-core.mjs'
+import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
 const run = (...args) =>
@@ -696,6 +698,10 @@ describe('the mode round-trips into the ledger', () => {
       ]) {
         copyFileSync(resolve(process.cwd(), 'scripts', f), join(repo, 'scripts', f))
       }
+      // A REAL checkout: since point 780 the ledger is the one belonging to the
+      // git toplevel of the working directory, and a directory that is no
+      // checkout has no ledger at all rather than the caller's own.
+      spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo, encoding: 'utf8', windowsHide: true })
       mkdirSync(join(repo, '.claude'), { recursive: true })
       writeFileSync(
         join(repo, '.claude', 'mechanism-reviews.jsonl'),
@@ -999,5 +1005,96 @@ describe('a boundary resolves against the object database, not against refs', ()
     // ambiguity fail open, which is the one direction this check must not fail.
     const run = runner({ objects: [OBJECT, SIBLING], unreadable: [SIBLING] })
     expect(() => resolveCommit(PREFIX, { run })).toThrow(/cannot read/)
+  })
+})
+
+// THE LEDGER FOLLOWS THE CHECKOUT THE COMMAND RUNS IN (point 780).
+//
+// It was pinned to the module's own directory, so a command invoked by its
+// main-tree path from an isolation worktree — which is where CLAUDE.md §6 sends
+// every delegated author — appended to the MAIN tree and then failed to commit
+// it there. These cases build a real repository with a real worktree, because
+// the defect lives exactly in the difference between the two.
+describe('the ledger path follows the working directory', () => {
+  const tempDirs = []
+  const git = (cwd, ...args) => {
+    const res = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
+    if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`)
+    return (res.stdout ?? '').trim()
+  }
+
+  afterEach(() => {
+    while (tempDirs.length) rmSync(tempDirs.pop(), { recursive: true, force: true })
+  })
+
+  const repoWithWorktree = () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-ledger-cwd-'))
+    tempDirs.push(root)
+    const main = join(root, 'main')
+    mkdirSync(main, { recursive: true })
+    git(main, 'init', '-q', '-b', 'main')
+    git(main, 'config', 'user.email', 'test@example.invalid')
+    git(main, 'config', 'user.name', 'Test')
+    writeFileSync(join(main, 'seed.txt'), 'seed\n')
+    git(main, 'add', '-A')
+    git(main, 'commit', '-q', '-m', 'seed')
+    const worktree = join(root, 'wt')
+    git(main, 'worktree', 'add', '-q', '-b', 'feat/x', worktree)
+    return { main, worktree }
+  }
+
+  it('resolves to the worktree from a worktree and to the main checkout from the main tree', () => {
+    const { main, worktree } = repoWithWorktree()
+    // realpathSync: macOS hands out /var symlinks for temp directories, and git
+    // answers with the resolved form — the comparison, not the code, needs it.
+    expect(recordsPathFor(worktree)).toBe(resolve(realpathSync(worktree), LEDGER_RELATIVE_PATH))
+    expect(recordsPathFor(main)).toBe(resolve(realpathSync(main), LEDGER_RELATIVE_PATH))
+    expect(recordsPathFor(worktree)).not.toBe(recordsPathFor(main))
+  })
+
+  it('names no ledger at all outside any checkout, and refuses the write', () => {
+    // The cross-vendor review of point 780 asked for exactly this: with no
+    // checkout there is no checkout-local ledger, and answering with the
+    // module's own tree would silently write a DIFFERENT repository's tracked
+    // file — the same defect, one level quieter.
+    const outside = mkdtempSync(join(tmpdir(), 'hoa-ledger-nogit-'))
+    tempDirs.push(outside)
+    expect(gitToplevel(outside)).toBe('')
+    expect(recordsPathFor(outside)).toBe(null)
+    expect(readRecords(null)).toEqual([])
+    expect(() => appendRecord({ sha: 'a'.repeat(40) }, null)).toThrow(/outside a git checkout/)
+  })
+
+  it('tells an absent ledger apart from one it merely cannot read', () => {
+    // Round 3 of the cross-vendor review: every read failure answered "no
+    // reviews recorded", so an unreadable ledger looked to a gate exactly like
+    // an empty one. A directory in the ledger's place is unreadable, not absent.
+    const root = mkdtempSync(join(tmpdir(), 'hoa-ledger-unreadable-'))
+    tempDirs.push(root)
+    expect(readRecords(join(root, 'not-there.jsonl'))).toEqual([])
+
+    const blocked = join(root, 'ledger.jsonl')
+    mkdirSync(blocked, { recursive: true })
+    let thrown = null
+    try {
+      readRecords(blocked)
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeInstanceOf(Error)
+    expect(thrown.message).toMatch(/cannot read the review ledger/)
+    // The flag is what keeps the two gates from waving it through as an
+    // ordinary environment error.
+    expect(thrown.ledgerUnreadable).toBe(true)
+  })
+
+  it('keeps a toplevel that ends in a space instead of trimming it away', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-ledger-space-'))
+    tempDirs.push(root)
+    const odd = join(root, 'checkout ')
+    mkdirSync(odd, { recursive: true })
+    git(odd, 'init', '-q', '-b', 'main')
+    expect(gitToplevel(odd)).toBe(realpathSync(odd))
+    expect(recordsPathFor(odd)).toBe(resolve(realpathSync(odd), LEDGER_RELATIVE_PATH))
   })
 })
