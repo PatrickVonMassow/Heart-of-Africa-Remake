@@ -882,9 +882,15 @@ export function respawnDecision({ output } = {}) {
 // must not become a nag, which is why every state in which the empty slots are
 // genuinely unusable answers "no reason needed" on its own.
 
-/** The delegation pool cap (CLAUDE.md §6): at most three concurrent agents — and
- *  since point 427 also a TARGET while independent work is queued. */
-export const POOL_CAP = 3
+/** The delegation pool cap (CLAUDE.md §6): at most five concurrent agents — and
+ *  since point 427 also a TARGET while independent work is queued.
+ *
+ *  Raised from 3 to 5 on the user's instruction of 20.08.2026, 21:10 ("Limit
+ *  anheben"), measured against this machine: 16 cores, 15 GB RAM, load 1.07. RAM
+ *  is the binding constraint because delegated verification starts browsers, so
+ *  the number steps back down if suites begin rotating red under the wider pool
+ *  rather than failing for their own reason. */
+export const POOL_CAP = 5
 
 /**
  * How many delegated agents the declaration's own evidence SHOWS. PURE.

@@ -180,8 +180,12 @@ export function gatherCommissionInputs({
  * queue verdict per point. A call opening two points is refused when EITHER is
  * refused — a line that cuts a front-most branch beside a queue-jumping one is
  * still a queue jump.
+ *
+ * `cap` defaults to POOL_CAP and exists so a case can pin the width its fixture
+ * was measured against; the guard itself never passes it, which "reads the pool
+ * cap from one place" holds to.
  */
-export function commissionVerdict(inputs, { now = Date.now() } = {}) {
+export function commissionVerdict(inputs, { now = Date.now(), cap = POOL_CAP } = {}) {
   const targets =
     Array.isArray(inputs?.points) && inputs.points.length ? inputs.points : inputs?.point != null ? [inputs.point] : []
   const verdicts = targets.map((point) => ({
@@ -191,7 +195,7 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
       open: inputs.open,
       gates: inputs.gates,
       inFlight: inputs.inFlight,
-      cap: POOL_CAP,
+      cap,
       // Each point's OWN recorded override, never the first one's.
       override: commissionOverrideFor(inputs.record, point) || (point === inputs.point ? inputs.override : ''),
     }),
@@ -210,7 +214,7 @@ export function commissionVerdict(inputs, { now = Date.now() } = {}) {
     points: targets,
     refs: Array.isArray(inputs.refs) ? inputs.refs : [],
     looseRefs: inputs.refsLoose === true,
-    cap: POOL_CAP,
+    cap,
     readable: inputs.readable,
     now,
   })

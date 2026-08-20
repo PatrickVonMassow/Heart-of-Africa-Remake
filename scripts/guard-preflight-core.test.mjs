@@ -28,6 +28,7 @@ import { EXPECTED_GUARD_IDS } from './guard-preflight-expected.mjs'
 import { gatherRuleEchoInputs, gatherStampedFiles } from './rule-echo-guard.mjs'
 import { RULE_REGISTRY, checkAll, formatVerdict, unregisteredStamps } from './rule-echo-core.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+import { POOL_CAP } from './batch-in-flight-core.mjs'
 import { isMainModule } from './is-main.mjs'
 
 import { gatherDashboardInputs } from './dashboard-guard.mjs'
@@ -210,11 +211,10 @@ describe('commission preflight', () => {
       open: [700, 701, 702, 707],
       gates: null,
       inFlight: [],
-      branches: [
-        { ref: 'feat/700-a', tipAt: 1, behind: 1 },
-        { ref: 'feat/701-b', tipAt: 1, behind: 1 },
-        { ref: 'feat/702-c', tipAt: 1, behind: 1 },
-      ],
+      // A FULL pool, however wide the pool currently is: the case is that the
+      // queue refusal and the slot refusal are reported TOGETHER, so the branch
+      // count has to keep filling every slot when POOL_CAP is raised.
+      branches: Array.from({ length: POOL_CAP }, (_, i) => ({ ref: `feat/${800 + i}-full`, tipAt: 1, behind: 1 })),
       readable: true,
       record: { overrides: { 707: { reason: 'critical production repair', at: '2026-08-17T20:03:00Z' } }, parked: {} },
       override: 'critical production repair',

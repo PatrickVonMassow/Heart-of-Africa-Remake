@@ -931,24 +931,29 @@ describe('the request card inside a rebuilt queue', () => {
 const QUEUE_17_08 = [700, 701, 707, 708, 711, 705, 706, 710, 662, 553, 596, 597, 686, 687, 697]
 
 describe('frontCandidates — the workable head of the derived order', () => {
+  // `count` is passed EXPLICITLY wherever the assertion is about the ORDER: the
+  // window's width is the configured pool cap and may be raised, the sequence it
+  // takes may not. The default width itself is asserted against POOL_CAP.
   it('is the first `count` open points of queueOrder', () => {
-    expect(frontCandidates({ open: QUEUE_17_08 })).toEqual([700, 701, 707])
+    expect(frontCandidates({ open: QUEUE_17_08, count: 3 })).toEqual([700, 701, 707])
     expect(frontCandidates({ open: QUEUE_17_08, count: 1 })).toEqual([700])
     expect(frontCandidates({ open: QUEUE_17_08, count: 5 })).toEqual([700, 701, 707, 708, 711])
+    // …and with no count at all, the window is exactly as wide as the pool.
+    expect(frontCandidates({ open: QUEUE_17_08 })).toHaveLength(POOL_CAP)
   })
 
   it('SKIPS a user-gated point — it cannot be worked, so it may not hold a slot open', () => {
     const gates = { gated: new Set([700, 701]), answered: new Set(), since: new Map() }
-    expect(frontCandidates({ open: QUEUE_17_08, gates })).toEqual([707, 708, 711])
+    expect(frontCandidates({ open: QUEUE_17_08, gates, count: 3 })).toEqual([707, 708, 711])
   })
 
-  it('SKIPS a point already in flight, so the window stays three real candidates deep', () => {
-    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [700, 707] })).toEqual([701, 708, 711])
+  it('SKIPS a point already in flight, so the window stays as many real candidates deep', () => {
+    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [700, 707], count: 3 })).toEqual([701, 708, 711])
   })
 
   it('lifts an ANSWERED point to the head, exactly as the board ranks it', () => {
     const gates = { gated: new Set(), answered: new Set([662]), since: new Map() }
-    expect(frontCandidates({ open: QUEUE_17_08, gates })).toEqual([662, 700, 701])
+    expect(frontCandidates({ open: QUEUE_17_08, gates, count: 3 })).toEqual([662, 700, 701])
   })
 
   it('accepts the raw work-order text as its gates, like every other queue rule', () => {
@@ -962,13 +967,13 @@ describe('frontCandidates — the workable head of the derived order', () => {
     expect(frontCandidates({ open: QUEUE_17_08, count: 0 })).toHaveLength(POOL_CAP)
     expect(frontCandidates({ open: QUEUE_17_08, count: -4 })).toHaveLength(POOL_CAP)
     expect(frontCandidates({ open: QUEUE_17_08, count: 2.7 })).toEqual([700, 701])
-    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [null, 'x', 0, -1] })).toEqual([700, 701, 707])
+    expect(frontCandidates({ open: QUEUE_17_08, inFlight: [null, 'x', 0, -1], count: 3 })).toEqual([700, 701, 707])
   })
 })
 
 describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
   it('REFUSES point 697 against that queue and names 700, 701 and 707', () => {
-    const d = commissionDecision({ point: 697, open: QUEUE_17_08 })
+    const d = commissionDecision({ point: 697, open: QUEUE_17_08, cap: 3 })
     expect(d.allowed).toBe(false)
     expect(d.why).toBe('behind-front')
     expect(d.candidates).toEqual([700, 701, 707])
@@ -988,8 +993,8 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
   })
 
   it('lets the fourth point through the moment the three ahead of it are in flight', () => {
-    expect(commissionDecision({ point: 708, open: QUEUE_17_08 })).toMatchObject({ allowed: false })
-    expect(commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [700, 701, 707] })).toMatchObject({
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: 3 })).toMatchObject({ allowed: false })
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [700, 701, 707], cap: 3 })).toMatchObject({
       allowed: true,
       why: 'at-front',
     })
@@ -997,7 +1002,7 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
 
   it('skips a GATED point when the front three are chosen, and refuses commissioning it', () => {
     const gates = { gated: new Set([701]), answered: new Set(), since: new Map() }
-    const d = commissionDecision({ point: 708, open: QUEUE_17_08, gates })
+    const d = commissionDecision({ point: 708, open: QUEUE_17_08, gates, cap: 3 })
     expect(d.candidates).toEqual([700, 707, 708])
     expect(d).toMatchObject({ allowed: true, why: 'at-front' })
     const gated = commissionDecision({ point: 701, open: QUEUE_17_08, gates })
@@ -1024,7 +1029,7 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
   })
 
   it('skips an IN-FLIGHT point when the front three are chosen', () => {
-    const d = commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [701] })
+    const d = commissionDecision({ point: 708, open: QUEUE_17_08, inFlight: [701], cap: 3 })
     expect(d.candidates).toEqual([700, 707, 708])
     expect(d.allowed).toBe(true)
   })
@@ -1104,7 +1109,13 @@ describe('commissionDecision — the real 17.08.2026 pick is refused', () => {
   })
 
   it('follows the pool cap rather than a second number', () => {
+    // A wider cap admits the fourth point, a narrower one refuses it…
     expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: 4 })).toMatchObject({ allowed: true })
-    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: POOL_CAP })).toMatchObject({ allowed: false })
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08, cap: 3 })).toMatchObject({ allowed: false })
+    // …and with no cap given, the decision reads the SAME front the pool sets,
+    // so raising POOL_CAP widens this verdict and no second number holds it back.
+    expect(commissionDecision({ point: 708, open: QUEUE_17_08 })).toMatchObject({
+      allowed: QUEUE_17_08.indexOf(708) < POOL_CAP,
+    })
   })
 })
