@@ -5822,6 +5822,13 @@ Build order, chosen so no two parallel agents own the same file:
   `--text-stdin` with the same meaning as in `board.mjs`, and REFUSE any unknown `--flag`
   loudly (exit 1, naming it) instead of sending it as text — a send that silently publishes an
   option is worse than no send. Check the sibling writers for the same shape while there.
+  HALF DELIVERED, measured 20.08.2026 (carried from the 10.08.2026 four-eyes work-order
+  analysis, not a fresh finding): `scripts/chat-reply.mjs` does read stdin — but only as the
+  FALLBACK when no argument is given (`process.argv.slice(2).join(' ') || readStdin()`).
+  There is still no `--text-stdin` flag with `board.mjs`'s meaning, and still no refusal of
+  an unknown flag, so the reported defect is intact: hand this script `--text-stdin` and the
+  flag is joined into the message and published as the answer, exactly as on 30.07.2026.
+  Both remaining halves are what this point delivers.
   VERIFIABLE: Vitest on the argument parsing — `--text-stdin` reads stdin, an unknown flag
   exits non-zero and posts nothing, a plain text argument still works, and a text that merely
   BEGINS with a dash is still sendable (via stdin), so the guard cannot swallow legitimate
@@ -6095,6 +6102,12 @@ Build order, chosen so no two parallel agents own the same file:
   figure, so a drifted count fails the unit layer instead of quietly aging. The rest of
   `docs/acceptance-evidence.md` is swept for the same class of hand-maintained number in
   the same commit.
+  IT DRIFTED AGAIN, measured 20.08.2026 (carried from the 10.08.2026 four-eyes work-order
+  analysis, not a fresh finding): `docs/acceptance-evidence.md` §20 now reads "a COMPLETENESS
+  pin names all 165 controls" where this point quotes 132 and the menu carried 158 when it
+  was written. Three figures for one hand-maintained sentence, in ten days — which is this
+  point's own thesis with a third data point under it. The fix is not to write 165 there;
+  it is to take the number out of the prose or put a test in charge of it.
   VERIFIABLE: Vitest — the guard fails on a deliberately wrong count and passes on the
   real one; `npm run test:unit` green.
   Criticality: low — a documentation defect, but in the file the closing run reads as
