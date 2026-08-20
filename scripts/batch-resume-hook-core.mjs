@@ -25,6 +25,21 @@
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
+const OWNER_OWNERSHIP = new Set(['acquired-spawn', 'acquired', 'mine'])
+
+/**
+ * Content that belongs to the batch dispatcher is injected only after this
+ * SessionStart has proved ownership. Keeping this decision pure prevents a
+ * stand-down session from inheriting the runbook merely because the file is
+ * readable on disk.
+ */
+export function ownerRunbookContext(ownership, runbookText) {
+  if (!OWNER_OWNERSHIP.has(ownership)) return ''
+  const body = String(runbookText ?? '').trim()
+  if (!body) return ''
+  return `\n\n--- OWNER-ONLY BATCH RUNBOOK ---\n${body}\n--- END OWNER-ONLY BATCH RUNBOOK ---`
+}
+
 /**
  * How the SessionStart text opens: how much is open, and the one point the
  * session will actually carry (point 440).
