@@ -93,18 +93,36 @@ export function extractLastAssistantText(jsonl) {
   return lastTextKey === null ? null : firstTextById.get(lastTextKey)
 }
 
-/** The exact line the assistant must copy verbatim, embedded in every reason. */
-function copyLine(now) {
-  return `**${berlinStamp(now)}**`
+/**
+ * The header suffix shape, not its value: ` · Kontext: 115.942 Tokens`, or the
+ * `--` reading when no measurement was made. The VALUE is deliberately not
+ * compared — the guard reads the transcript at turn END, which may already show
+ * a newer usage record than the one the prompt hook handed over, and blocking a
+ * reply for copying the number it was given would be absurd.
+ */
+export const HEADER_SUFFIX_RE = / · Kontext: (?:\d{1,3}(?:\.\d{3})*|--) Tokens/
+
+/**
+ * The exact line the assistant must copy verbatim, embedded in every reason.
+ *
+ * IT CARRIES THE SUFFIX (user 20.08.2026, "schon wieder verschwunden"). The
+ * header is a stamp AND the context reading, but a blocked turn is told to copy
+ * "exactly this line" — so whatever this function omits gets dropped from the
+ * reply, every single time a guard fires. Twice in a row that was the reading.
+ * The line handed over is therefore the WHOLE header, never half of it.
+ */
+function copyLine(now, suffix = '') {
+  return `**${berlinStamp(now)}**${suffix}`
 }
 
 /** What the preflight can decide before the reply exists: the exact opening it
  * will be judged against, and the action that settles the condition this turn. */
-export function timestampReplyCondition(now = new Date()) {
+export function timestampReplyCondition(now = new Date(), suffix = '') {
   return (
-    `The not-yet-written reply must begin with ${copyLine(now)} in the canonical ` +
-    '`**Wochentag, TT.MM.JJJJ, HH:MM**` form (German weekday, Europe/Berlin). ' +
-    'Action: compose the reply with that line first; the Stop hook then judges the actual reply.'
+    `The not-yet-written reply must begin with ${copyLine(now, suffix)} in the canonical ` +
+    '`**Wochentag, TT.MM.JJJJ, HH:MM**` form (German weekday, Europe/Berlin)' +
+    (suffix ? ', followed by the context reading' : '') +
+    '. Action: compose the reply with that line first; the Stop hook then judges the actual reply.'
   )
 }
 
@@ -114,8 +132,8 @@ export function timestampReplyCondition(now = new Date()) {
  * A null/empty lastText blocks too (the wrapper routes the unverifiable-
  * transcript case through its bounded-escape counter before calling this).
  */
-export function evaluate({ lastText, now = new Date() }) {
-  const expected = copyLine(now)
+export function evaluate({ lastText, now = new Date(), headerSuffix = '', enforceSuffix = false }) {
+  const expected = copyLine(now, headerSuffix)
   const rule =
     'Chat-timestamp rule: EVERY reply to the user begins with the bold Berlin ' +
     'timestamp (**Wochentag, TT.MM.JJJJ, HH:MM**, German weekday, Europe/Berlin).'
@@ -138,6 +156,24 @@ export function evaluate({ lastText, now = new Date() }) {
       reason:
         `${rule} Your last reply begins with "**${match[1]}**", which is not the ` +
         `current Berlin time (stale or wrong). ${shortAckDemand(expected)}`,
+    }
+  }
+  // THE SECOND HALF OF THE HEADER. The stamp was never the whole rule — the
+  // reading belongs directly after it — and it is the half that keeps going
+  // missing, because a blocked turn copies the handed-over line and nothing
+  // else.
+  //
+  // ENFORCED ONLY WHERE A REAL READING EXISTS. The handed-over line always
+  // carries the suffix, `--` included, because a header with an unknown reading
+  // is still a whole header. Demanding it back is a different question: where
+  // nothing measured the context, the guard would be insisting on a value
+  // nobody supplied — so it asks only when the measurement is real.
+  if (enforceSuffix && !HEADER_SUFFIX_RE.test(lastText.trimStart().split('\n')[0])) {
+    return {
+      decision: 'block',
+      reason:
+        `${rule} The stamp is right, but the CONTEXT READING after it is missing — the header is ` +
+        `both halves, and the reading is the half that keeps getting dropped. ${shortAckDemand(expected)}`,
     }
   }
   return null

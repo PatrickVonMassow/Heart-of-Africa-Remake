@@ -2,4 +2,15 @@
 # Versioned git hook (core.hooksPath = scripts/git-hooks), so the rule lives in
 # the repository and is reviewable, rather than in an unversioned .git/hooks.
 # Enable once per clone:  git config core.hooksPath scripts/git-hooks
-exec node scripts/commit-scope-guard.mjs
+node scripts/commit-scope-guard.mjs || exit 1
+
+# A wired Stop hook that no preflight entry covers reports nothing while it
+# still blocks, and takes the unit suite red with it — which the pre-push gate
+# then refuses, leaving the branch committed but unpushable (measured
+# 20.08.2026). Asked here, that commit is never made in the first place.
+#
+# Worktrees share one .git/config, so this hook also runs on branches that
+# predate the check. Skip silently there rather than make a checkout
+# uncommittable over a file that branch cannot have.
+[ -f scripts/guard-registration-guard.mjs ] || exit 0
+exec node scripts/guard-registration-guard.mjs
