@@ -124,18 +124,22 @@ put it is the mistake this line exists to stop.
   was declared verbatim — which is precisely what the instruction exists to prevent, and it means
   the card the user reads is hand-written at the one moment the mechanism was built to standardise.
   It fires twice per boundary in the claim variant, where the dictated text is longer: once for the
-  ordinary handover and again for the reserved-for-a-claiming-window form.
+  ordinary handover and again for the reserved-for-a-claiming-window form. A THIRD gate joins them
+  there: `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while
+  the dictated claim text is 103 words in one block — so the same prescribed text is refused twice
+  over, for two unrelated reasons, and the session rewrites it a second time.
   FINAL STATE: one rule owns the handover card's shape. Either `batch-boundary` composes the next
   point into the text it dictates — it already reads the work order and knows which point comes
   next — or the publish gate accepts an unnumbered handover card and the topic guard is taught that
   this one card may name a point without the reference being foreign. Whichever is chosen, the text
-  that `--prepare` prints publishes unchanged, and a session never has to rewrite what it was told
-  to copy.
+  that `--prepare` prints publishes unchanged — within the conciseness budget and paragraphed, so
+  no gate refuses it — and a session never has to rewrite what it was told to copy.
   VERIFIABLE: Vitest — the text `batch-boundary --prepare` produces for a landed point is fed to
   the publish gate's pure check and passes, in the ordinary form AND in the claimed-window form; a
   case asserts the dictated text names the next open point when the chosen fix is the composing
-  one, or that an unnumbered handover card is accepted when it is the gate; and the topic guard
-  still rejects a foreign point reference in every OTHER card.
+  one, or that an unnumbered handover card is accepted when it is the gate; one asserts the
+  dictated text stays inside the conciseness budget in both forms; and the topic guard still
+  rejects a foreign point reference in every OTHER card.
   Criticality: medium — no product defect, but it taxes every point boundary of every session, and
   it makes the one card the user reads on his phone hand-written instead of dictated.
   Bundle: Session- & Repo-Hygiene.
