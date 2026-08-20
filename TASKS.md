@@ -3750,6 +3750,15 @@ put it is the mistake this line exists to stop.
   no frame written, killed by hand — and while it does, a figure or settlement point has no second
   backend at all: that merge owes a loud deferral, never a silent single-backend picture.
 
+  THE GOAT PLANTED FOOT IS NOT CLASSIFIED HERE (20.08.2026). Point 725 holds a cross-vendor
+  review verdict that the release frame really does teleport the foot and that `judgeStanceSlip`
+  excludes exactly that frame, so the check may be measuring around a defect rather than
+  suffering a slow lane. That point owns the measurement which decides between the two, and it
+  is taken on the hardware lane. This sweep may give that check a throughput declaration only
+  once the measurement has come back "no jump" — a skip laid over a real defect is the one
+  outcome this mechanism must never produce. The other named cases are unaffected and are
+  classified as specified.
+
   VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
   with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
   passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
@@ -6647,7 +6656,8 @@ Build order, chosen so no two parallel agents own the same file:
      UNDECIDED — "failed twice, but the machine could not be shown to be quiet; re-run on
      a quiet machine before believing this" — never as a candidate real failure.
   2. The rate-sensitive checks are MARKED as such where they are defined (the same set
-     point 506 already names for the software lane), and the classifier says so when one
+     point 642 carries from the withdrawn point 506 for a lane that cannot answer a check),
+     and the classifier says so when one
      of them is the twice-failing check.
   3. The diff-word match is reported as what it is: a word overlap, not a causal link. It
      may not appear at all in an UNDECIDED verdict, where it reads as corroboration.
@@ -9943,6 +9953,19 @@ to land than a mechanism that needs a review.
   - THE MEASUREMENT WINDOW COVERS THE RELEASE FRAME EITHER WAY. Whatever the first step measures,
     a frame excluded from `judgeStanceSlip` is a frame no invariant watches: the release frame
     enters the judged set, so a future regression there fails a suite instead of passing one.
+  THIS POINT OWNS WHAT THE GOAT-STANCE RED MEANS, AND MEASURES IT BEFORE ANYONE EXCUSES IT
+  (20.08.2026). Point 642 carries — folded in from the withdrawn point 506 — the rule that a
+  check whose subject is a RATE declares the throughput it needs and SKIPS below it, and it names
+  `polish`'s goat planted foot as a member of that class (1 usable stance interval where it needs
+  3). Read beside the verdict above, the two say opposite things about one red: a lane that
+  cannot answer the check, or a product defect the check measures around. 506's own premise is
+  already gone — re-measured 20.08.2026, `node scripts/verify/backend-lane-check.mjs` shows BOTH
+  lanes hardware-backed on the same GPU, WebGPU at compatibility rather than core level, so there
+  is no software lane left to blame — but that reading says nothing about what causes this red,
+  and no third measurement exists. THE MEASUREMENT: the release-frame sampling above is run on
+  the hardware lane, and the same run records how many usable stance intervals `polish` actually
+  gets there. Both numbers go into the closing note whichever way they fall. Until they exist the
+  check is neither excused as lane-limited nor charged as a defect, and 642 may not classify it.
   VERIFIABLE: Vitest over the pure pose logic — a sampled sequence across a release frame whose
   per-frame displacement stays within the gait's own step, and a synthetic sequence carrying an
   injected jump on exactly the release frame that FAILS, proving the window now covers it.
