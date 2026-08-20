@@ -9409,43 +9409,6 @@ to land than a mechanism that needs a review.
   Criticality: medium — the seal holds against every other mutation, so this is the last gap
   in it rather than an open door.
 
-- [ ] 693. The author routing recommends a lane whose pool is empty (measured 14.08.2026,
-  01:33–01:40, at the start of an autonomous batch session). `scripts/author-routing-core.mjs`
-  routed point 666 to Fable 5 — "tagged HIGH criticality, a hard case by definition" — and the
-  delegated Fable agent died on its FIRST API call with "You've reached your Fable 5 limit". The
-  routing knows only the point's text; it cannot know that the lane it names has nothing left,
-  so it keeps naming it and every delegation to that lane is wasted before it starts. The
-  fallback chain then walks to the next Anthropic model, which is a spend nobody chose.
-  ONE HALF IS ALREADY DONE (17.08.2026, commit "State all three authoring lanes where the
-  routing is described"): the texts that contradicted each other about who authors what were
-  corrected, and the shortage wording that lived only in a memory file is retired with the
-  emergency itself. What is left is the pool state, which no text can carry.
-  FINAL STATE:
-  - The routing cut reads a recorded POOL STATE beside `sol-share.json`: a small operator file
-    naming, per provider, that it is exhausted and the timestamp at which its allowance resets.
-    A lane whose provider is recorded exhausted is never the printed recommendation — the next
-    lane is named instead, WITH the reason, so the reader sees it was a substitution and not the
-    ordinary cut.
-  - A missing, unreadable or lapsed file means "nothing known", and routes exactly as today. The
-    exhaustion may never be inferred from silence, and it expires on its own at the reset
-    timestamp rather than needing anyone to remember to clear it.
-  - An author or agent run that dies on a provider limit RECORDS that provider as exhausted
-    before it exits, so the next session does not repeat the delegation that just failed.
-  - The ordinary cut of `authorLaneFor` is UNCHANGED, as the user's ruling of 18.08.2026
-    (commit c3256a50) left it: a hard marker or criticality HIGH answers Sol, ABOVE the
-    verification lane, so the hard and critical points go there too; Opus 5 keeps the points
-    whose VERIFICATION is the work and that nothing marks hard; Fable stays the escalation for
-    work the review still rejects after a re-work. This point adds a veto on an empty lane, not a
-    second opinion about difficulty.
-  VERIFIABLE: Vitest cases over the pure core — exhausted lane never recommended and the
-  substitution named in the reason; missing, corrupt and lapsed pool file → today's routing
-  unchanged; a recorded exhaustion that has not lapsed → the next lane; plus one real
-  `--routing` run whose printed reason names what it applied.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it changes which vendor authors, which is the
-  decision the four-eyes principle rests on.
-  Criticality: medium — it wastes a delegation per hard case whenever a pool runs dry, which is
-  exactly when the batch can least afford one.
-
 - [ ] 694. The children's accepted WebGL 2 composition needs a home that survives a tick
   (found 14.08.2026 by the cross-vendor review of point 666 — Claude Opus 5 on the Sol-authored
   branch — and verified against the mechanism itself, not argued). Point 666 answered the
