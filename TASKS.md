@@ -231,30 +231,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no product defect, but it is a trap laid directly in front of the next
   point in the queue.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
-  running it (measured 20.08.2026, 10:52). With the batch lock naming session
-  `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers
-  »not applicable — another live session owns the batch lock«, with or without `--session`. The
-  cause is directly measurable: `heldByOtherLiveOwner('1e85312a-…')` is `false` while
-  `heldByOtherLiveOwner('')` is `true`, so the status path evaluates with an EMPTY session id and
-  concludes the owner is somebody else. The Stop-chain path is unaffected — it passes the real id
-  and fires correctly.
-  IT IS NOT ONE GUARD. `node scripts/mechanism-review-guard.mjs --status` answers the owning
-  session with »stands down: another live session owns the batch lock« in the same breath, so the
-  defect sits in the shared status path rather than in either guard. Every `--status` reader has to
-  be checked for it, and the fix belongs where the session id is resolved, not in one caller.
-  WHY IT IS NOT COSMETIC: `--status` is what CLAUDE.md §7.2 and point 614 name as the way to READ
-  the bundle coverage. Asked by the very session that owns the batch, it answers with a stand-down
-  instead of the count, so the reading a point is verified against cannot be taken at all.
-  FINAL STATE: the status path takes the session id from the same source the hook path uses and
-  reports the bundle state for the owner; an id it genuinely cannot determine is reported as
-  unknown rather than as somebody else's lock.
-  VERIFIABLE: Vitest — status with the owning id reports the coverage; status with no id reports
-  unknown and never a stand-down; the hook path keeps its current behaviour.
-  Criticality: medium — no product defect, but it silently withholds a reading two governing
-  documents ask for.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 772. An owner session repaired its own mechanism for two hours and never handed over
   (measured 20.08.2026; the user ended it by hand at 10:38 after asking whether it was still
   productive). A claim was recorded at 08:32. The owner then committed at 09:15, 09:23, 09:32,
@@ -280,52 +256,6 @@ put it is the mistake this line exists to stop.
   handover mechanism nor the board noticed.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 777. A decision card published after its answer arrived is never retired (measured
-  20.08.2026). The reply of 07:27 asked whether the three priority levels still hold.
-  `decision-card-guard` forces every question in a reply into a card, so »Stufenordnung vom 17.08.:
-  beschreibt sie noch deine Prioritäten?« was filed and the owner published it at 07:47. The user had
-  ALREADY answered at 07:31 (»Die Reihenfolge-Regel zum Release stimmt noch.«). The card then stood
-  through every republish — 08:27, 10:38, 11:06, 11:45 — until the user asked why, and it was retired
-  by hand on 20.08.2026.
-  TWO INDEPENDENT CAUSES, and both have to go. First, the answered-card review in
-  `scripts/decision-card-guard-core.mjs` compares the CURRENT turn's user message against the cards
-  that exist AT THAT MOMENT, so an answer that arrives BEFORE its card is published can never be
-  matched — the card is born already answered and nothing looks again. Second, even with the card
-  standing, `sharedDistinctiveTerms()` would probably have missed this pair: the answer says
-  »Reihenfolge-Regel zum Release«, the title says »Stufenordnung« and »Prioritäten«, and no
-  distinctive term is shared.
-  FINAL STATE: a card is reviewed against the recent user messages of the asking session at the moment
-  it is ADDED, not only against the turn that happens to run later; and the answered-card match no
-  longer rests on shared literal terms alone, so an answer in the user's own words retires the card it
-  answers.
-  VERIFIABLE: Vitest — the measured 20.08. pair (answer at 07:31, card added at 07:47) is retired at
-  the add; the same pair is retired although title and answer share no distinctive term; a card whose
-  question is genuinely unanswered survives both paths.
-  Criticality: medium — no product defect, but the board asked the user a question he had already
-  answered for four hours, which is exactly what the decision section exists to prevent.
-  Bundle: Chat & Tafel.
-- [ ] 778. Answer the cross-vendor review of the suspended Fable escalation (GPT-5.6 Sol,
-  20.08.2026, verdict **merge-with-fixes** on both passes of `5631247f`, recorded in
-  `.claude/mechanism-reviews.jsonl`). The suspension itself was judged sound — the automatic branch is
-  guarded and reversible, and the remaining Fable uses are the documented fallback and explicit roles —
-  but two findings stand and both are real.
-  1. THE QUEUE REPORT DROPS THE REASON. `formatLaneLine()` in `scripts/author-routing-core.mjs` prints
-     `why[0]` only. The suspension explanation is stored in `why[1]`, so a whole-queue routing report
-     omits it entirely, while the ACTIVE escalation reason it replaced occupied `why[0]` and was
-     visible. The single-point CLI is covered by tests; a multi-reason `formatLaneReport()` row is not.
-  2. THE FLAG CANNOT BE FLIPPED BACK CLEANLY. `src/config/fableEscalationDoc.test.ts` pins the
-     suspended wording, so re-activating the escalation makes a test red for saying what the
-     configuration then means — the reversal the suspension promises costs a test edit nobody
-     documented.
-  FINAL STATE: a routing report carries every reason a lane decision has, not the first; and flipping
-  `FABLE_ESCALATION_SUSPENDED` back leaves no stale assertion behind — the documentation test asserts
-  the wording that MATCHES the flag rather than one of the two states.
-  VERIFIABLE: Vitest — a two-reason lane row renders both reasons in the queue report; the
-  documentation test passes with the flag in either position; the existing single-reason cases stay
-  green.
-  Criticality: medium — the routing decision is explained to whoever reads the queue, and a suspension
-  that cannot be lifted without a red test is not the reversible switch it claims to be.
-  Bundle: Modell & Wächter.
 - [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
   (measured 20.08.2026, all three in a single session). They are filed together because they are
   one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
@@ -1729,41 +1659,6 @@ put it is the mistake this line exists to stop.
   merge (`mechanism-review-guard`).
   Bundle: Chat & Tafel.
 
-- [ ] 705. The board is republished once per guard correction, instead of once at the end
-  (measured 17.08.2026). One session published the whole board about a dozen times in fifty
-  minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card
-  edit and the publish into one step — its `edit()` applies the transform, rotates the archive
-  and publishes — and there is no edit-without-publish mode at all. The guard chain then
-  multiplies it: `board-first-guard`, `dashboard-guard`'s focus reconcile,
-  `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and `queue-order-guard` each
-  demanded a correction one after another, and every correction was another publish plus another
-  commit on `refs/heads/board`.
-  WHAT THIS POINT IS NOT: it is not the cause of the HTTP 429 that took the board offline the
-  same day. That was measured separately and is a READ limit on `raw.githubusercontent.com`
-  covering the whole repository — `main/README.md` and `main/package.json`, which nobody
-  published, answered 429 in the same minute as `board/board.html`. Publishing pushes to
-  `github.com` and spends none of that quota. The reading side is point 704's subject; this
-  point stands on its own cost — a dozen full-board publishes per session, each one a commit,
-  a push and a model call in a context that is already large.
-  FINAL STATE:
-  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
-    publish is one explicit closing step. The one-shot form stays the default for a single edit,
-    so no caller has to learn a new protocol for the common case.
-  - The board checks run TOGETHER against the FILE before that one publish, so every objection
-    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
-    it named all three board guards in a single call — so the staged publish asks it, rather than
-    discovering the guards one refusal at a time.
-  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
-    published and what was refused. A rate that silently keeps writing is how the quota was spent
-    without anyone noticing.
-  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
-  closing step publishes once, the ceiling aborts on the publish past the limit and names both
-  sides; plus a driven run of the sequence that produced this finding (a card edit that five
-  guards object to in turn) ending with exactly one publish.
-  Criticality: medium — it spends a shared quota the user's only window depends on, and the
-  failure is invisible to the session that causes it.
-  Bundle: Chat & Tafel.
-
 - [ ] 708. Only the landing is one command; the beginning and the turn's end are hand-driven chains
   (analysed 17.08.2026 against the code). The project knows the pattern: `land-point.mjs` drives 15
   steps — merge, gate, tick, archive, push, board, cleanup — as ONE command, and CLAUDE.md calls it
@@ -1971,68 +1866,6 @@ put it is the mistake this line exists to stop.
   NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
   but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
   on its own branch; the shared branch lands 595 and 598 alone.
-
-- [ ] 706. The queue commands lose the card text one way and re-write a blocked one the other
-  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
-  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
-  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
-  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
-  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
-  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
-  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
-  offers, and with the edit-publish coupling each of those was another publish.
-  FINAL STATE:
-  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
-    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
-    order. The same holds for `--title` followed by more than a title.
-  - The success line names EVERY field it set, so a missing one is visible in the output.
-  - `queue <N>` on a point that IS the standing now-card does not silently empty the now section.
-    Measured 17.08.2026: refreshing the stale queue text of the point in active work moved the card
-    OUT of "Woran ich gerade arbeite" and reported `700 returned to the queue`, leaving that section
-    blank — the exact state point 713 exists to prevent — and the next `now <N>` then failed with
-    `no queue card for point 700`, because the round trip had consumed the queue card the command
-    reads from. Either the queue text of a point in active work is editable WITHOUT unseating its
-    now-card, or the attempt is refused and names `status <N>` as the way to restate it; a command
-    that moves a card between sections says which section it left.
-  - The REBUILD does not write a card the card guard then blocks. Measured 17.08.2026: a queue
-    rebuild regenerates every card body from the work-order spec, and a spec that names another
-    point therefore lands in the card verbatim — `dashboard-card-topic-guard` blocked the turn end
-    on a cross-point sentence the rebuild had just written, and the hand-fix in the board file
-    survives only until the next rebuild. The generator strips or rewrites the cross-point passage
-    the way the guard demands, so a rebuilt board is publishable without a hand pass.
-  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
-  correct order named, the well-formed three-field call accepted, and the success line listing each
-  field it wrote; plus a case that renders a spec naming another point and asserts the generated
-  card body passes the card-topic rule; plus a case that edits the queue text of the point holding
-  the now-card and asserts the now section still holds it afterwards.
-  PLACEMENT AND SUBSUMPTION (18.08.2026, point 723's counted union U8/U17): moved behind the
-  token-reduction levers on the user's 17.08 word (token reduction outranks low bookkeeping), and
-  point 713 lands first — its derived now-section re-creates the card `queue <N>` unseats, so the
-  third bullet shrinks to a regression test once 713 is in; the parser and rebuild-card halves
-  stay this point's own work.
-  Criticality: low — one command's argument handling, but it silently discards the user-visible
-  text of a board card.
-  Bundle: Chat & Tafel.
-
-- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
-  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
-  The union in `docs/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries
-  (rescued from git-ignored `local/` on 18.08.2026, point 723's U16); its six priority findings
-  already resolve to points 700, 701, 705, 707 and 708, but 45 entries named only by Sol's list
-  stand nowhere in the work order, each with its own defect line.
-  FINAL STATE:
-  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
-    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
-    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
-  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
-    they are now the evidence a committed mapping cites.
-  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
-    and session sizes first; nothing is filed as a feature point.
-  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
-  checks the id set against the union and fails on an unaccounted entry.
-  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
-  discard a paid-for four-eyes stage.
-  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
@@ -3384,103 +3217,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it stalls every landing behind a dice roll on a runner's network.
   Bundle: unbundled (infrastructure).
 
-- [ ] 664. The estimate on the board expires unseen, and every card says "stand" twice (user
-  13.08.2026: "Wieso ist die Endzeitschätzung der Karten wieder so veraltet? Ich denke, dagegen
-  gibt es einen Mechanismus. Außerdem steht inzwischen immer 2x Stand drin - z. B. Stand 04:48
-  Stand 04:49"). Two defects in the board, both MEASURED on the published page at 07:42 on
-  13.08.2026.
-  
-  FIRST, THE STALE ESTIMATE. The mechanism the user remembers exists — `etaStatus` in
-  `scripts/dashboard-guard-core.mjs` with `ETA_MARGIN_MIN` 15, read by the `eta` rule
-  (`dashboard-guard-core.mjs`) and by `scripts/batch-in-flight-core.mjs` — but it speaks ONLY at
-  the owning session's TURN END, so it says nothing while that session sits inside one long turn,
-  and nothing at all once the session stalls or dies. Measured: the two now-cards read
-  `22:59 · ~06:30` and `23:00 · ~05:30` while the clock read 07:42 — 72 and 132 minutes past,
-  with no turn end in between. Point 411 already shifted the comparison forward by a margin for
-  exactly this reason; the margin cannot help when nothing ticks. THE FIX MUST NOT DEPEND ON A
-  SESSION: the promised end travels to the reader as DATA on the card (a `data-eta` attribute
-  beside the rendered meta, written by `renderQueueCard`/`setCardStatus` from the same parse
-  `etaMinutes` performs), and the board's own viewer script — which already runs in the reader's
-  browser and whose clock always ticks (`scripts/board-refresher-core.mjs`) — renders an expired
-  promise AS expired ("seit 1 h überfällig", German like the rest of the board), so the phone
-  never shows a promise the page itself knows is gone. The session-side rule STAYS as it is; it
-  is the second line, not the first. Additionally the launcher tick (`scripts/batch-autostart.mjs`,
-  which already compares the published page against the repository) reports a card past its
-  margin, so an owner that is alive is told before the reader notices.
-  
-  SECOND, THE DOUBLED STAMP. `renderCardBody` (`scripts/board-core.mjs`) prepends
-  `<span class="stamp">Stand HH:MM</span>` to the first paragraph, while sessions additionally
-  type "Stand HH:MM:" at the start of the text they hand in — the live board shows
-  `<p><span class="stamp">Stand 04:48</span> Stand 04:49: Nach einer halben Stunde …</p>`, and the
-  two times differ, so the reader cannot tell which one is the card's. `renderCardBody` therefore
-  STRIPS a leading `Stand HH:MM` (with an optional trailing colon, dash or period) from the text
-  it is given, and when that stripped time is LATER than the stamp it was called with, that time
-  becomes the stamp — the writer's own reading is the more recent one and must not be silently
-  discarded. One stamp per card, always, whichever way the text was written.
-  
-  TESTS: Vitest cases in `scripts/board-core.test.mjs` for the strip (leading stamp with and
-  without colon, a later and an earlier one, prose that merely CONTAINS "Stand" mid-sentence,
-  which must survive untouched) and in `scripts/board-refresher-core.test.mjs` for the
-  viewer-side overdue rendering (before the end, inside the margin, hours past, and across
-  midnight — `etaMinutes` already lifts a wrapped end onto the card's day and the viewer must use
-  that same function, not a second parser). A rule in `scripts/dashboard-guard-core.mjs` refuses a
-  card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
-  quietly stop working.
-  
-  THIRD, THE ESCALATION CARD THAT OUTLIVES ITS PAUSE. Measured 17.08.2026 on the live board: the
-  watchdog writes a "Von dir zu klären" card when it pauses the batch after unanswered alerts, and
-  nothing withdraws that card when the pause ends. The card still told the reader the batch was
-  paused and asked him to lift it while `.claude/batch-paused` was gone and the batch was running;
-  it surfaced only because the card-topic guard tripped over an unrelated cross-point reference in
-  it. A card whose premise is a FILE withdraws itself when that file goes: the writer records the
-  premise on the card, and the same publish path that renders the board drops a card whose premise
-  no longer holds, so no reader is asked to act on a state that has passed. TESTS: cases in
-  `scripts/board-core.test.mjs` for a premise-bearing card kept while its file exists, dropped once
-  it is gone, and an ordinary question card — which carries no premise — never touched.
-
-- [ ] 665. Every board card names its problem before its status — and a mechanism enforces it
-  (user 12.08.2026, 23:21–23:24, asking about the 641 now-card).
-  
-  MEASURED 12.08.2026 23:24 on the published board: the 641 now-card body reads, in full,
-  "Der Zweig zum ungeklärten Rot am Giza-Rand liegt seit einer gestorbenen Sitzung gebaut,
-  aber ungeprüft im Baum. Ein zweites Modell nimmt ihn auf, urteilt zuerst über den
-  erreichten Stand und schließt das Rot über eine benannte Ursache — nicht über einen
-  späteren grünen Lauf. Berührt keine Datei der Kinder-Kur." — pure fix status. A reader
-  cannot tell WHAT the unexplained red is (the `polish` suite's Giza settlement-edge
-  picture check reds on WebGPU in one of three full runs; nobody knows the cause yet).
-  The user had to ask in chat what the point is about; the board exists so he never has to.
-  
-  FINAL STATE:
-  1. IMMEDIATE REPAIR: the 641 card (and any other card currently in the same state) is
-     rewritten so its body OPENS with one sentence saying what the point is about, in
-     terms the user recognises — the problem, not the branch state — with the status
-     following. For 641 that sentence is roughly: "Der Bildcheck am Giza-Siedlungsrand
-     (gefegter Boden messbar dunkler als das offene Land) wird auf WebGPU sporadisch rot,
-     Ursache unbekannt."
-  2. THE RULE: every card on the board — now-cards, queue cards, decision cards alike —
-     opens with WHAT the point is about before any status. A body consisting only of
-     status prose is not a valid card.
-  3. THE MECHANISM (the user's explicit demand: "vor allem, dass es eine Mechanik dafür
-     braucht, damit das nicht wieder passiert" — enforce, don't remind): the check must be
-     STRUCTURAL, not a prose heuristic. The suggested shape — the author decides the final
-     design, under mechanism review as usual: `board.mjs`'s card-writing commands take the
-     problem statement as its own REQUIRED field, stored distinctly in the card structure;
-     the renderer places it as the body's opening; a card whose problem field is missing,
-     empty, or identical to its status text is REFUSED at write time, and the board guard
-     in the Stop chain blocks a publish containing such a card (same family as the
-     one-topic-per-card guard). Cards already published get a migration pass that fills
-     the field from TASKS.md's point titles/first lines where possible and flags the rest.
-  
-  VERIFIABLE: Vitest over the board core — writing a card without the problem field (or
-  with an empty one, or one equal to the status) is refused; the guard core flags a
-  published card missing it; and the live board shows the 641 card opening with its
-  problem sentence.
-  
-  Criticality: medium — the board is the user's only window into the batch; a status-only
-  card hides what the work is FOR, and this is the second card-content rule that had to be
-  retrofitted (after one-topic-per-card), so the class needs a structural gate, not
-  another reminder.
-
 - [ ] 669. A working author's pushes run CI over, and the supervisor pays for it (measured
   13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
   minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
@@ -3591,6 +3327,270 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
+  order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
+  The union in `docs/multistep-analysis-17-08/multistep-union.json` holds 57 accounted entries
+  (rescued from git-ignored `local/` on 18.08.2026, point 723's U16); its six priority findings
+  already resolve to points 700, 701, 705, 707 and 708, but 45 entries named only by Sol's list
+  stand nowhere in the work order, each with its own defect line.
+  FINAL STATE:
+  - Every union entry is either MAPPED to a standing point (named in the mapping), FILED into an
+    existing bundle per bundle-first (a new point only where no bundle fits), or REJECTED with a
+    one-line reason. The mapping is committed under `docs/` so it survives the checkout.
+  - The analysis artefacts (lists A and B and the union) move with it into the repository, since
+    they are now the evidence a committed mapping cites.
+  - Priority follows the user's instruction of 17.08.2026: process cleanup, redundant consumption
+    and session sizes first; nothing is filed as a feature point.
+  VERIFIABLE: the committed mapping accounts for all 57 ids — a Vitest case over the mapping file
+  checks the id set against the union and fails on an unaccounted entry.
+  Criticality: low — it is bookkeeping over an existing analysis, but losing it silently would
+  discard a paid-for four-eyes stage.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 706. The queue commands lose the card text one way and re-write a blocked one the other
+  (measured 17.08.2026 against the code and the stored state, while filing points). `parseSetArgs`
+  in `scripts/board-queue-core.mjs` treats `--title`/`--estimate` as a MODE switch and pushes every
+  following argument into THAT bucket (`buckets[field].push(a)`). So `set 702 --estimate "~2 h"
+  "<prose>"` files the prose under `estimate`, where `setQueueEntry` discards it while normalising —
+  what remains stored is `~2 h`, and the card text was never there. The command reported `estimate
+  for point 702 stored` and said nothing about the swallowed argument. The cost is not only the lost
+  text: it forces three calls per card (title, body, estimate) instead of the ONE the usage line
+  offers, and with the edit-publish coupling each of those was another publish.
+  FINAL STATE:
+  - An argument the parser does not use as what the caller plainly meant is REFUSED LOUDLY instead
+    of dropped: text after `--estimate` that does not read as a duration aborts and names the right
+    order. The same holds for `--title` followed by more than a title.
+  - The success line names EVERY field it set, so a missing one is visible in the output.
+  - `queue <N>` on a point that IS the standing now-card does not silently empty the now section.
+    Measured 17.08.2026: refreshing the stale queue text of the point in active work moved the card
+    OUT of "Woran ich gerade arbeite" and reported `700 returned to the queue`, leaving that section
+    blank — the exact state point 713 exists to prevent — and the next `now <N>` then failed with
+    `no queue card for point 700`, because the round trip had consumed the queue card the command
+    reads from. Either the queue text of a point in active work is editable WITHOUT unseating its
+    now-card, or the attempt is refused and names `status <N>` as the way to restate it; a command
+    that moves a card between sections says which section it left.
+  - The REBUILD does not write a card the card guard then blocks. Measured 17.08.2026: a queue
+    rebuild regenerates every card body from the work-order spec, and a spec that names another
+    point therefore lands in the card verbatim — `dashboard-card-topic-guard` blocked the turn end
+    on a cross-point sentence the rebuild had just written, and the hand-fix in the board file
+    survives only until the next rebuild. The generator strips or rewrites the cross-point passage
+    the way the guard demands, so a rebuilt board is publishable without a hand pass.
+  VERIFIABLE: Vitest over `parseSetArgs` with exactly this call — the mixed form refused with the
+  correct order named, the well-formed three-field call accepted, and the success line listing each
+  field it wrote; plus a case that renders a spec naming another point and asserts the generated
+  card body passes the card-topic rule; plus a case that edits the queue text of the point holding
+  the now-card and asserts the now section still holds it afterwards.
+  PLACEMENT AND SUBSUMPTION (18.08.2026, point 723's counted union U8/U17): moved behind the
+  token-reduction levers on the user's 17.08 word (token reduction outranks low bookkeeping), and
+  point 713 lands first — its derived now-section re-creates the card `queue <N>` unseats, so the
+  third bullet shrinks to a regression test once 713 is in; the parser and rebuild-card halves
+  stay this point's own work.
+  Criticality: low — one command's argument handling, but it silently discards the user-visible
+  text of a board card.
+  Bundle: Chat & Tafel.
+
+- [ ] 705. The board is republished once per guard correction, instead of once at the end
+  (measured 17.08.2026). One session published the whole board about a dozen times in fifty
+  minutes, and that is not carelessness but the design. `scripts/board.mjs` couples the card
+  edit and the publish into one step — its `edit()` applies the transform, rotates the archive
+  and publishes — and there is no edit-without-publish mode at all. The guard chain then
+  multiplies it: `board-first-guard`, `dashboard-guard`'s focus reconcile,
+  `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and `queue-order-guard` each
+  demanded a correction one after another, and every correction was another publish plus another
+  commit on `refs/heads/board`.
+  WHAT THIS POINT IS NOT: it is not the cause of the HTTP 429 that took the board offline the
+  same day. That was measured separately and is a READ limit on `raw.githubusercontent.com`
+  covering the whole repository — `main/README.md` and `main/package.json`, which nobody
+  published, answered 429 in the same minute as `board/board.html`. Publishing pushes to
+  `github.com` and spends none of that quota. The reading side is point 704's subject; this
+  point stands on its own cost — a dozen full-board publishes per session, each one a commit,
+  a push and a model call in a context that is already large.
+  FINAL STATE:
+  - `board.mjs` gains a staged mode in which several card edits accumulate in the file and the
+    publish is one explicit closing step. The one-shot form stays the default for a single edit,
+    so no caller has to learn a new protocol for the common case.
+  - The board checks run TOGETHER against the FILE before that one publish, so every objection
+    appears in one pass instead of one per turn. `guard-preflight.mjs` already does nearly this —
+    it named all three board guards in a single call — so the staged publish asks it, rather than
+    discovering the guards one refusal at a time.
+  - A ceiling on publishes per turn that ABORTS LOUDLY when it is reached, naming what was
+    published and what was refused. A rate that silently keeps writing is how the quota was spent
+    without anyone noticing.
+  VERIFIABLE: Vitest over the staged controller — several edits accumulate with no publish, the
+  closing step publishes once, the ceiling aborts on the publish past the limit and names both
+  sides; plus a driven run of the sequence that produced this finding (a card edit that five
+  guards object to in turn) ending with exactly one publish.
+  Criticality: medium — it spends a shared quota the user's only window depends on, and the
+  failure is invisible to the session that causes it.
+  Bundle: Chat & Tafel.
+
+- [ ] 665. Every board card names its problem before its status — and a mechanism enforces it
+  (user 12.08.2026, 23:21–23:24, asking about the 641 now-card).
+  
+  MEASURED 12.08.2026 23:24 on the published board: the 641 now-card body reads, in full,
+  "Der Zweig zum ungeklärten Rot am Giza-Rand liegt seit einer gestorbenen Sitzung gebaut,
+  aber ungeprüft im Baum. Ein zweites Modell nimmt ihn auf, urteilt zuerst über den
+  erreichten Stand und schließt das Rot über eine benannte Ursache — nicht über einen
+  späteren grünen Lauf. Berührt keine Datei der Kinder-Kur." — pure fix status. A reader
+  cannot tell WHAT the unexplained red is (the `polish` suite's Giza settlement-edge
+  picture check reds on WebGPU in one of three full runs; nobody knows the cause yet).
+  The user had to ask in chat what the point is about; the board exists so he never has to.
+  
+  FINAL STATE:
+  1. IMMEDIATE REPAIR: the 641 card (and any other card currently in the same state) is
+     rewritten so its body OPENS with one sentence saying what the point is about, in
+     terms the user recognises — the problem, not the branch state — with the status
+     following. For 641 that sentence is roughly: "Der Bildcheck am Giza-Siedlungsrand
+     (gefegter Boden messbar dunkler als das offene Land) wird auf WebGPU sporadisch rot,
+     Ursache unbekannt."
+  2. THE RULE: every card on the board — now-cards, queue cards, decision cards alike —
+     opens with WHAT the point is about before any status. A body consisting only of
+     status prose is not a valid card.
+  3. THE MECHANISM (the user's explicit demand: "vor allem, dass es eine Mechanik dafür
+     braucht, damit das nicht wieder passiert" — enforce, don't remind): the check must be
+     STRUCTURAL, not a prose heuristic. The suggested shape — the author decides the final
+     design, under mechanism review as usual: `board.mjs`'s card-writing commands take the
+     problem statement as its own REQUIRED field, stored distinctly in the card structure;
+     the renderer places it as the body's opening; a card whose problem field is missing,
+     empty, or identical to its status text is REFUSED at write time, and the board guard
+     in the Stop chain blocks a publish containing such a card (same family as the
+     one-topic-per-card guard). Cards already published get a migration pass that fills
+     the field from TASKS.md's point titles/first lines where possible and flags the rest.
+  
+  VERIFIABLE: Vitest over the board core — writing a card without the problem field (or
+  with an empty one, or one equal to the status) is refused; the guard core flags a
+  published card missing it; and the live board shows the 641 card opening with its
+  problem sentence.
+  
+  Criticality: medium — the board is the user's only window into the batch; a status-only
+  card hides what the work is FOR, and this is the second card-content rule that had to be
+  retrofitted (after one-topic-per-card), so the class needs a structural gate, not
+  another reminder.
+
+- [ ] 778. Answer the cross-vendor review of the suspended Fable escalation (GPT-5.6 Sol,
+  20.08.2026, verdict **merge-with-fixes** on both passes of `5631247f`, recorded in
+  `.claude/mechanism-reviews.jsonl`). The suspension itself was judged sound — the automatic branch is
+  guarded and reversible, and the remaining Fable uses are the documented fallback and explicit roles —
+  but two findings stand and both are real.
+  1. THE QUEUE REPORT DROPS THE REASON. `formatLaneLine()` in `scripts/author-routing-core.mjs` prints
+     `why[0]` only. The suspension explanation is stored in `why[1]`, so a whole-queue routing report
+     omits it entirely, while the ACTIVE escalation reason it replaced occupied `why[0]` and was
+     visible. The single-point CLI is covered by tests; a multi-reason `formatLaneReport()` row is not.
+  2. THE FLAG CANNOT BE FLIPPED BACK CLEANLY. `src/config/fableEscalationDoc.test.ts` pins the
+     suspended wording, so re-activating the escalation makes a test red for saying what the
+     configuration then means — the reversal the suspension promises costs a test edit nobody
+     documented.
+  FINAL STATE: a routing report carries every reason a lane decision has, not the first; and flipping
+  `FABLE_ESCALATION_SUSPENDED` back leaves no stale assertion behind — the documentation test asserts
+  the wording that MATCHES the flag rather than one of the two states.
+  VERIFIABLE: Vitest — a two-reason lane row renders both reasons in the queue report; the
+  documentation test passes with the flag in either position; the existing single-reason cases stay
+  green.
+  Criticality: medium — the routing decision is explained to whoever reads the queue, and a suspension
+  that cannot be lifted without a red test is not the reversible switch it claims to be.
+  Bundle: Modell & Wächter.
+- [ ] 777. A decision card published after its answer arrived is never retired (measured
+  20.08.2026). The reply of 07:27 asked whether the three priority levels still hold.
+  `decision-card-guard` forces every question in a reply into a card, so »Stufenordnung vom 17.08.:
+  beschreibt sie noch deine Prioritäten?« was filed and the owner published it at 07:47. The user had
+  ALREADY answered at 07:31 (»Die Reihenfolge-Regel zum Release stimmt noch.«). The card then stood
+  through every republish — 08:27, 10:38, 11:06, 11:45 — until the user asked why, and it was retired
+  by hand on 20.08.2026.
+  TWO INDEPENDENT CAUSES, and both have to go. First, the answered-card review in
+  `scripts/decision-card-guard-core.mjs` compares the CURRENT turn's user message against the cards
+  that exist AT THAT MOMENT, so an answer that arrives BEFORE its card is published can never be
+  matched — the card is born already answered and nothing looks again. Second, even with the card
+  standing, `sharedDistinctiveTerms()` would probably have missed this pair: the answer says
+  »Reihenfolge-Regel zum Release«, the title says »Stufenordnung« and »Prioritäten«, and no
+  distinctive term is shared.
+  FINAL STATE: a card is reviewed against the recent user messages of the asking session at the moment
+  it is ADDED, not only against the turn that happens to run later; and the answered-card match no
+  longer rests on shared literal terms alone, so an answer in the user's own words retires the card it
+  answers.
+  VERIFIABLE: Vitest — the measured 20.08. pair (answer at 07:31, card added at 07:47) is retired at
+  the add; the same pair is retired although title and answer share no distinctive term; a card whose
+  question is genuinely unanswered survives both paths.
+  Criticality: medium — no product defect, but the board asked the user a question he had already
+  answered for four hours, which is exactly what the decision section exists to prevent.
+  Bundle: Chat & Tafel.
+- [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
+  running it (measured 20.08.2026, 10:52). With the batch lock naming session
+  `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers
+  »not applicable — another live session owns the batch lock«, with or without `--session`. The
+  cause is directly measurable: `heldByOtherLiveOwner('1e85312a-…')` is `false` while
+  `heldByOtherLiveOwner('')` is `true`, so the status path evaluates with an EMPTY session id and
+  concludes the owner is somebody else. The Stop-chain path is unaffected — it passes the real id
+  and fires correctly.
+  IT IS NOT ONE GUARD. `node scripts/mechanism-review-guard.mjs --status` answers the owning
+  session with »stands down: another live session owns the batch lock« in the same breath, so the
+  defect sits in the shared status path rather than in either guard. Every `--status` reader has to
+  be checked for it, and the fix belongs where the session id is resolved, not in one caller.
+  WHY IT IS NOT COSMETIC: `--status` is what CLAUDE.md §7.2 and point 614 name as the way to READ
+  the bundle coverage. Asked by the very session that owns the batch, it answers with a stand-down
+  instead of the count, so the reading a point is verified against cannot be taken at all.
+  FINAL STATE: the status path takes the session id from the same source the hook path uses and
+  reports the bundle state for the owner; an id it genuinely cannot determine is reported as
+  unknown rather than as somebody else's lock.
+  VERIFIABLE: Vitest — status with the owning id reports the coverage; status with no id reports
+  unknown and never a stand-down; the hook path keeps its current behaviour.
+  Criticality: medium — no product defect, but it silently withholds a reading two governing
+  documents ask for.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 664. The estimate on the board expires unseen, and every card says "stand" twice (user
+  13.08.2026: "Wieso ist die Endzeitschätzung der Karten wieder so veraltet? Ich denke, dagegen
+  gibt es einen Mechanismus. Außerdem steht inzwischen immer 2x Stand drin - z. B. Stand 04:48
+  Stand 04:49"). Two defects in the board, both MEASURED on the published page at 07:42 on
+  13.08.2026.
+  
+  FIRST, THE STALE ESTIMATE. The mechanism the user remembers exists — `etaStatus` in
+  `scripts/dashboard-guard-core.mjs` with `ETA_MARGIN_MIN` 15, read by the `eta` rule
+  (`dashboard-guard-core.mjs`) and by `scripts/batch-in-flight-core.mjs` — but it speaks ONLY at
+  the owning session's TURN END, so it says nothing while that session sits inside one long turn,
+  and nothing at all once the session stalls or dies. Measured: the two now-cards read
+  `22:59 · ~06:30` and `23:00 · ~05:30` while the clock read 07:42 — 72 and 132 minutes past,
+  with no turn end in between. Point 411 already shifted the comparison forward by a margin for
+  exactly this reason; the margin cannot help when nothing ticks. THE FIX MUST NOT DEPEND ON A
+  SESSION: the promised end travels to the reader as DATA on the card (a `data-eta` attribute
+  beside the rendered meta, written by `renderQueueCard`/`setCardStatus` from the same parse
+  `etaMinutes` performs), and the board's own viewer script — which already runs in the reader's
+  browser and whose clock always ticks (`scripts/board-refresher-core.mjs`) — renders an expired
+  promise AS expired ("seit 1 h überfällig", German like the rest of the board), so the phone
+  never shows a promise the page itself knows is gone. The session-side rule STAYS as it is; it
+  is the second line, not the first. Additionally the launcher tick (`scripts/batch-autostart.mjs`,
+  which already compares the published page against the repository) reports a card past its
+  margin, so an owner that is alive is told before the reader notices.
+  
+  SECOND, THE DOUBLED STAMP. `renderCardBody` (`scripts/board-core.mjs`) prepends
+  `<span class="stamp">Stand HH:MM</span>` to the first paragraph, while sessions additionally
+  type "Stand HH:MM:" at the start of the text they hand in — the live board shows
+  `<p><span class="stamp">Stand 04:48</span> Stand 04:49: Nach einer halben Stunde …</p>`, and the
+  two times differ, so the reader cannot tell which one is the card's. `renderCardBody` therefore
+  STRIPS a leading `Stand HH:MM` (with an optional trailing colon, dash or period) from the text
+  it is given, and when that stripped time is LATER than the stamp it was called with, that time
+  becomes the stamp — the writer's own reading is the more recent one and must not be silently
+  discarded. One stamp per card, always, whichever way the text was written.
+  
+  TESTS: Vitest cases in `scripts/board-core.test.mjs` for the strip (leading stamp with and
+  without colon, a later and an earlier one, prose that merely CONTAINS "Stand" mid-sentence,
+  which must survive untouched) and in `scripts/board-refresher-core.test.mjs` for the
+  viewer-side overdue rendering (before the end, inside the margin, hours past, and across
+  midnight — `etaMinutes` already lifts a wrapped end onto the card's day and the viewer must use
+  that same function, not a second parser). A rule in `scripts/dashboard-guard-core.mjs` refuses a
+  card body whose first paragraph still opens with a second `Stand HH:MM`, so the strip cannot
+  quietly stop working.
+  
+  THIRD, THE ESCALATION CARD THAT OUTLIVES ITS PAUSE. Measured 17.08.2026 on the live board: the
+  watchdog writes a "Von dir zu klären" card when it pauses the batch after unanswered alerts, and
+  nothing withdraws that card when the pause ends. The card still told the reader the batch was
+  paused and asked him to lift it while `.claude/batch-paused` was gone and the batch was running;
+  it surfaced only because the card-topic guard tripped over an unrelated cross-point reference in
+  it. A card whose premise is a FILE withdraws itself when that file goes: the writer records the
+  premise on the card, and the same publish path that renders the board drops a card whose premise
+  no longer holds, so no reader is asked to act on a state that has passed. TESTS: cases in
+  `scripts/board-core.test.mjs` for a premise-bearing card kept while its file exists, dropped once
+  it is gone, and an ordinary question card — which carries no premise — never touched.
 
 - [ ] 453. What is the lion eating? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
