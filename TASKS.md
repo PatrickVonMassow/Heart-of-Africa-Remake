@@ -164,6 +164,37 @@ put it is the mistake this line exists to stop.
   QUEUE RANK 2, directly behind point 757 (user 20.08.2026): 223 open points with duplicates
   make every brief generation and every queue reading more expensive, and 614 is the only point
   that cuts that set.
+  --- THE RUN, 20.08.2026 (this is the record the point asks for) ---
+  WINDOW. Cut at HEAD `73283638`: 238 open points, 797,540 B of open work order, digest of
+  148,510 characters (every open point, its text cut at ~620 characters). Both lanes saw that
+  same digest and nothing else.
+  THE FIND WAS BLIND-PARALLEL. Lane A: Claude Opus 5, 44 entries. Lane B: GPT-5.6 Sol, 24
+  entries. Neither saw the other, and neither saw the 10.08. verdict — which was extracted
+  unread into `local/614/old-verdict.md` before either lane started.
+  THE MERGE WAS COUNTED, BY A THIRD MODEL THAT WROTE NEITHER LIST. Fable 5 merged by meaning;
+  `scripts/blind-merge.mjs --union` accounts for all 68 input entries — 36 merged into 18 pairs,
+  26 only A, 6 only B — as 50 union entries: 22 duplicates, 16 invalid, 7 contradictions,
+  5 delivered. Nothing was dropped.
+  THE RECONCILIATION CAME AFTERWARDS, NEVER BEFORE. Of the 10.08. verdict's 26 items, 7 were
+  found again, 5 are overtaken (their points have landed, or the work is done), and 14 were
+  MISSED and are still true. MISS COUNT: 14 of 26.
+  WHAT THE MISS COUNT MEASURES — the analysis, not the work order. Thirteen of the fourteen
+  misses live BELOW the digest's 620-character cut: a stale VERIFIABLE line, an internal DONE
+  record, a blocking clause naming an archived point, a research clause already delivered. The
+  execution measured the same boundary from the other side: of the 5 entries claiming a point
+  was already DELIVERED, 4 did not survive the full text, while 7 of 7 "spec has drifted"
+  entries did. So the digest is reliable for drift and unreliable for done-ness, because a
+  point's claim to be finished lives in its tail. A future run reads the whole set for
+  duplicates and contradictions and the TAIL of every point for invalid and delivered.
+  EVERY ENTRY WAS CHECKED AGAINST THE FULL TEXTS BEFORE ANYTHING WAS CUT, in five sequential
+  slices. Roughly a third of the union's leads were rejected or had to be aimed elsewhere. No
+  point was deleted: every folded point's clauses stand in its survivor, and the one fold of a
+  HIGH-criticality point went to cross-vendor review three times before it was clean — seven
+  separate clauses had been lost, none of them visible from a defect summary.
+  ALSO EXECUTED HERE: `docs/work-packages.md` reconciled (the 108 unbundled points the spec
+  claimed measured as 5, all placed, the coverage rule restored rather than withdrawn); the
+  per-point ceiling built and measured from this cut's result; and the fold's own board path
+  proven by every fold above.
   Criticality: high — it rewrites the work order itself, several points at once, and a merge
   that drops a clause loses work no test would miss. The blind-parallel find, the third-model
   merge and the counted union are the assurance; the execution is checked point by point
