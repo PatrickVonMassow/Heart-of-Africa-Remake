@@ -9,10 +9,13 @@
 // that have nothing to do with the batch.
 //
 // It reuses `extractLastAssistantText` rather than copying the transcript rule.
-// That helper can return the previous text block when the final reply has not
-// been flushed yet (filed 20.08.2026); here the cost of that race is a missed
-// block, never a false one, and the claim state — the half that actually
-// matters — is read live from disk.
+// That helper can return the PREVIOUS text block when the final reply has not
+// been flushed yet (filed 20.08.2026 as its own point). That is usually a missed
+// block and therefore cheap — but not always: a reply written BEFORE the claim
+// existed, carrying an invitation that was correct at the time, would be judged
+// against a claim acquired afterwards and falsely refuse a turn that never asked
+// for anything (cross-vendor review, 20.08.2026). So text older than the claim is
+// not judged at all.
 import { existsSync, readFileSync } from 'node:fs'
 import { extractLastAssistantText } from './timestamp-guard-core.mjs'
 import { claimStands, evaluate, withdrawCommand } from './clear-claim-guard-core.mjs'
@@ -80,6 +83,38 @@ export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
   }
 }
 
+/**
+ * Was the text this guard is about to judge written BEFORE the claim was taken?
+ *
+ * Only the newest assistant row is judged, so its own timestamp answers it. A
+ * row without a readable timestamp, or a claim without one, is not evidence of
+ * anything — those pass through and are judged, because the guard's fail
+ * direction is to allow rather than to invent a reason.
+ */
+export function textPredatesClaim(transcript, claim) {
+  const claimedAt = Number(claim && (claim.at ?? claim.claimedAt))
+  if (!Number.isFinite(claimedAt) || claimedAt <= 0) return false
+  let newest = null
+  for (const line of String(transcript ?? '').split('\n')) {
+    if (!line.trim()) continue
+    let row
+    try {
+      row = JSON.parse(line)
+    } catch {
+      continue
+    }
+    const isAssistantText =
+      row && row.type === 'assistant' && row.message && Array.isArray(row.message.content)
+        ? row.message.content.some((part) => part && part.type === 'text')
+        : false
+    if (!isAssistantText) continue
+    const at = Date.parse(row.timestamp ?? '')
+    if (Number.isFinite(at)) newest = at
+  }
+  if (newest === null) return false
+  return newest < claimedAt
+}
+
 function main() {
   let payload = {}
   try {
@@ -94,9 +129,16 @@ function main() {
   if (!claim || !sessionId) return
   const transcriptPath = payload && payload.transcript_path
   if (!transcriptPath || !existsSync(transcriptPath)) return
+  let transcript
+  try {
+    transcript = readFileSync(transcriptPath, 'utf8')
+  } catch {
+    return
+  }
+  if (textPredatesClaim(transcript, claim)) return
   let lastText
   try {
-    lastText = extractLastAssistantText(readFileSync(transcriptPath, 'utf8'))
+    lastText = extractLastAssistantText(transcript)
   } catch {
     return
   }

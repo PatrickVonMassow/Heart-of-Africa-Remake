@@ -21,64 +21,145 @@
  * How a reply asks the user to end the session. German first, since replies to
  * the user are German; the slash form is the one that needs no context at all.
  *
- * Each pattern needs an IMPERATIVE or the slash spelling, never the bare word:
- * "das Bild ist clear" and a sentence ABOUT the clear mechanism must not trip a
- * guard whose refusal costs a turn.
- *
- * The session patterns exist in BOTH word orders, because German puts the object
- * either way round — "die neue Sitzung … starte sie" and "Starte eine neue
- * Sitzung" are one instruction. BOTH orders demand a real imperative FORM, never
- * a stem with `\w*` after it: "Die neue Sitzung startet automatisch" is a
- * description, and a guard whose refusal costs a turn may not read it as an order
- * (cross-vendor review, 20.08.2026).
+ * THE MATCHER IS DELIBERATELY CONSERVATIVE. Three cross-vendor rounds on
+ * 20.08.2026 each found new prose the previous draft read wrongly, which is what
+ * a regex over free German is: an approximation. The two errors are NOT
+ * symmetric — a missed invitation costs nothing (the claim is still withdrawn at
+ * the boundary), while a false refusal costs a whole turn and teaches the reader
+ * to distrust the guard. So every remaining ambiguity resolves toward ALLOW, and
+ * a pattern is only kept when it reads as an INSTRUCTION rather than a mention.
  */
-const IMPERATIVE = String.raw`(?:starte|start|beginne|beginn|nimm|nehmt|f[üu]hre|mach|mache|machst)`
+// UNAMBIGUOUS imperative forms only. `startet`, `beginnt`, `führt` and `macht`
+// are also ordinary third-person indicative — "Die neue Sitzung startet
+// automatisch" is a description — and under the fail direction above an
+// ambiguous form is left out rather than guessed at. The polite forms are
+// unambiguous because of the capital "Sie".
+const IMPERATIVE = String.raw`(?:starte|starten\s+Sie|start|beginne|beginn|beginnen\s+Sie|nimm|nehmen\s+Sie|f[üu]hre|f[üu]hren\s+Sie|mach|mache|machen\s+Sie)`
 
+// The gap between a verb and its object may contain a full stop: "Starte z. B.
+// eine neue Sitzung" is one instruction. Excluding `.` was how the first drafts
+// kept a match inside one sentence; `invitesClear` now splits into sentences
+// BEFORE matching, so the gap only has to stay on one line (cross-vendor review,
+// 20.08.2026).
 export const CLEAR_INVITATION = Object.freeze([
-  /(?:^|[\s(«"'`])\/clear\b/i,
-  /\b(?:mach|mache|machst|starte|f[üu]hre)\b[^.!?\n]{0,60}\bclear\b/i,
-  /\bclear\b[^.!?\n]{0,60}\b(?:kann kommen|kannst du machen|bitte|jetzt machen)\b/i,
-  new RegExp(String.raw`\b(?:neue|neuen|frische|frischen)\s+Sitzung\b[^.!?\n]{0,60}\b${IMPERATIVE}\b`, 'i'),
-  new RegExp(String.raw`\b${IMPERATIVE}\b[^.!?\n]{0,60}\b(?:neue|neuen|frische|frischen)\s+Sitzung\b`, 'i'),
+  /\b(?:mach|mache|machen\s+Sie|starte|starten\s+Sie|f[üu]hre|f[üu]hren\s+Sie)\b[^\n]{0,60}\/?clear\b/i,
+  /\bclear\b[^\n]{0,60}\b(?:kann kommen|kannst du machen|bitte|jetzt machen)\b/i,
+  new RegExp(String.raw`\b(?:neue|neuen|frische|frischen)\s+Sitzung\b[^\n]{0,60}\b${IMPERATIVE}\b`, 'i'),
+  new RegExp(String.raw`\b${IMPERATIVE}\b[^\n]{0,60}\b(?:neue|neuen|frische|frischen)\s+Sitzung\b`, 'i'),
   /\bstart(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
 ])
 
 /**
- * A NEGATED instruction is not an invitation. "Mach keinen Clear", "Mach keinen
- * `/clear`" and "Führe einen Clear bitte nicht aus" carry every word the patterns
- * look for and mean the opposite.
+ * A NEGATED instruction is not an invitation.
  *
  * DOUBLE NEGATION ("mach nicht keinen Clear") is deliberately read as negated
- * rather than counted out. Counting negators would be wrong in the ordinary case
- * — "Starte keine neue Sitzung, ich brauche das nicht" holds two and IS negated —
- * and this guard's stated fail direction is to ALLOW whenever it cannot be sure.
+ * rather than counted out. Counting negators is wrong in the ordinary case —
+ * "Starte keine neue Sitzung, ich brauche das nicht" holds two and IS negated —
+ * and the fail direction above says to allow when unsure.
  */
 const NEGATOR = /\b(?:kein|keine|keinen|keinem|keines|keiner|nicht|niemals|nie)\b/i
 
 /**
- * Sentences, so each instruction is judged on its own words.
- *
- * The unit has to be the SENTENCE, not the matched span: a span ends at the word
- * that matched, so a negation before it ("Mach keinen /clear") or after it
- * ("Führe einen Clear bitte nicht aus") falls outside and the guard reads the
- * opposite of what stands there. Judging sentence by sentence also stops one
- * negated sentence from covering a genuine invitation later in the same reply —
- * "Mach keinen Clear. Danach mach bitte einen Clear." must still block
- * (cross-vendor review, 20.08.2026).
+ * The bare slash spelling is an instruction only where its clause also carries
+ * one. "Der Befehl `/clear` leert den Kontext" EXPLAINS the mechanism and must
+ * not cost a turn; "Jetzt kann /clear kommen" asks for it. Backticks cannot tell
+ * the two apart — this project writes the command in backticks either way — so
+ * the discriminator is the imperative or an asking word beside it (cross-vendor
+ * review, 20.08.2026).
  */
+const SLASH_CLEAR = /(?:^|[\s(«"'`])\/clear\b/i
+const ASKING = new RegExp(
+  String.raw`\b${IMPERATIVE}\b|\b(?:bitte|kann kommen|kannst du|jetzt|danach|dann)\b`,
+  'i',
+)
+
+/**
+ * SENTENCES for the invitation, CLAUSES for the negation — the two scopes are
+ * genuinely different, and collapsing them into one was wrong in both
+ * directions (cross-vendor rounds, 20.08.2026).
+ *
+ * An instruction may span a comma: "Die neue Sitzung nimmt den Schnitt frisch
+ * auf, starte sie danach" is one invitation whose object and verb sit in
+ * different clauses, so matching per clause misses it. A negation may NOT span
+ * one: "Der Kontext ist nicht mehr nötig, starte eine neue Sitzung" is an
+ * unambiguous invitation whose `nicht` governs the other clause, so disarming
+ * per sentence kills it. Match over the sentence; ask about the negation only in
+ * the clauses the match actually touches.
+ *
+ * An abbreviation such as "z. B." must not end a sentence, or the split falls
+ * between an imperative and its object.
+ */
+const ABBREVIATION = /(?:^|\s)(?:[A-Za-zÄÖÜäöü]|z|bzw|ca|vgl|evtl|ggf|Nr|Abs|Dr|usw|etc)\.$/
+const CLAUSE_BREAK = /[,;]/
+
 export function sentencesOf(text) {
-  return String(text ?? '')
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((part) => part.trim())
-    .filter(Boolean)
+  const value = String(text ?? '')
+  const pieces = []
+  let current = ''
+  for (const ch of value) {
+    if (ch === '\n') {
+      pieces.push(current)
+      current = ''
+      continue
+    }
+    current += ch
+    if ((ch === '.' || ch === '!' || ch === '?') && !ABBREVIATION.test(current)) {
+      pieces.push(current)
+      current = ''
+    }
+  }
+  pieces.push(current)
+  return pieces.map((part) => part.trim()).filter(Boolean)
 }
 
-/** Does this reply ask the user to clear or to start a fresh session? */
+/** The clauses a match touches: from the break before it to the break after. */
+function clauseWindow(sentence, from, to) {
+  let left = 0
+  for (let i = from - 1; i >= 0; i -= 1) {
+    if (CLAUSE_BREAK.test(sentence[i])) {
+      left = i + 1
+      break
+    }
+  }
+  let right = sentence.length
+  for (let i = to; i < sentence.length; i += 1) {
+    if (CLAUSE_BREAK.test(sentence[i])) {
+      right = i
+      break
+    }
+  }
+  return sentence.slice(left, right)
+}
+
+/** Is this match disarmed by a negation in the clauses it touches? */
+function negated(sentence, hit) {
+  return NEGATOR.test(clauseWindow(sentence, hit.index, hit.index + hit[0].length))
+}
+
+/**
+ * Does this reply ask the user to clear or to start a fresh session?
+ *
+ * A LIST MARKER inherits from its heading: "Bitte nicht:" followed by bullets is
+ * the one shape where a negation governs what comes after it, so a negated line
+ * ending in a colon disarms the lines below it until the next heading.
+ */
 export function invitesClear(text) {
-  return sentencesOf(text).some(
-    (sentence) =>
-      !NEGATOR.test(sentence) && CLEAR_INVITATION.some((pattern) => pattern.test(sentence)),
-  )
+  let disarmedByHeading = false
+  return sentencesOf(text).some((sentence) => {
+    if (/:$/.test(sentence)) {
+      disarmedByHeading = NEGATOR.test(sentence)
+      return false
+    }
+    if (disarmedByHeading) return false
+    if (SLASH_CLEAR.test(sentence)) {
+      const hit = SLASH_CLEAR.exec(sentence)
+      if (ASKING.test(sentence) && !negated(sentence, hit)) return true
+    }
+    return CLEAR_INVITATION.some((pattern) => {
+      const hit = pattern.exec(sentence)
+      return Boolean(hit) && !negated(sentence, hit)
+    })
+  })
 }
 
 /**

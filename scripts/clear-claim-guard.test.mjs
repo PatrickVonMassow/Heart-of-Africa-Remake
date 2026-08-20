@@ -69,6 +69,40 @@ describe('invitesClear — what counts as asking the user to end the session', (
     }
   })
 
+  // Round three of the cross-vendor review, 20.08.2026. Each case is one the
+  // sentence-only draft got wrong, and together they are why negation is judged
+  // per CLAUSE while the invitation is matched per SENTENCE.
+  it('lets a negation in another clause stand, because it governs that clause', () => {
+    expect(invitesClear('Der Kontext ist nicht mehr nötig, starte eine neue Sitzung.')).toBe(true)
+    expect(invitesClear('Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.')).toBe(true)
+  })
+
+  it('does not split an abbreviation, which would separate the verb from its object', () => {
+    expect(invitesClear('Starte z. B. eine neue Sitzung.')).toBe(true)
+  })
+
+  it('lets a negated heading govern the list under it', () => {
+    expect(invitesClear('Bitte nicht:\n- Starte eine neue Sitzung.')).toBe(false)
+    expect(invitesClear('Als Nächstes:\n- Starte eine neue Sitzung.')).toBe(true)
+  })
+
+  it('reads the slash form as an instruction only where the clause asks for one', () => {
+    expect(invitesClear('Der Befehl `/clear` leert den Kontext.')).toBe(false)
+    expect(invitesClear('Jetzt kann /clear kommen.')).toBe(true)
+    expect(invitesClear('Mach bitte `/clear`.')).toBe(true)
+  })
+
+  it('leaves out the forms that are also ordinary indicative, rather than guessing', () => {
+    for (const text of [
+      'Die neue Sitzung startet automatisch.',
+      'Der Launcher beginnt die neue Sitzung innerhalb seines Intervalls.',
+      'Du machst eine neue Sitzung auf.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+    expect(invitesClear('Starten Sie eine neue Sitzung.')).toBe(true)
+  })
+
   it('does not fire on the word alone, so talking ABOUT the rule stays possible', () => {
     for (const text of [
       'Das Bild ist clear und der Horizont stimmt.',
@@ -198,5 +232,89 @@ describe('gatherClearClaimCondition — what the preflight reports', () => {
     await withClaimPath('/tmp/elsewhere.json', () => {
       expect(claimPath()).toBe('/tmp/elsewhere.json')
     })
+  })
+})
+
+// The hook's own I/O — stdin payload, transcript read, stdout verdict — which no
+// test touched before the third cross-vendor round asked for it (20.08.2026).
+describe('the hook itself, run as the entry script', () => {
+  const run = async ({ payload, claimFile }) => {
+    const { spawnSync } = await import('node:child_process')
+    const { repoPath } = await import('./repo-paths.mjs')
+    const script = repoPath('scripts/clear-claim-guard.mjs')
+    const res = spawnSync(process.execPath, [script], {
+      input: JSON.stringify(payload),
+      encoding: 'utf8',
+      env: { ...process.env, BATCH_CLAIM_PATH: claimFile },
+      windowsHide: true,
+    })
+    return { out: res.stdout.trim(), status: res.status }
+  }
+
+  const fixture = async (rows, claimBody) => {
+    const { writeFileSync, mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'claimhook-'))
+    const transcript = join(dir, 'transcript.jsonl')
+    const claimFile = join(dir, 'claim.json')
+    writeFileSync(transcript, rows.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8')
+    writeFileSync(claimFile, JSON.stringify(claimBody), 'utf8')
+    return { transcript, claimFile }
+  }
+
+  const assistantRow = (text, timestamp) => ({
+    type: 'assistant',
+    timestamp,
+    message: { content: [{ type: 'text', text }] },
+  })
+
+  it('writes the block on stdout when the reply invites a clear under a live claim', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Alles ist gepusht. Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(JSON.parse(out).decision).toBe('block')
+  })
+
+  it('says nothing when the reply carries no invitation', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Alles ist gepusht. Ich arbeite weiter.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
+  })
+
+  it('does not judge a reply written BEFORE the claim was taken', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Mach bitte `/clear`.', '2026-08-20T08:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T09:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
+  })
+
+  it('stays silent, and does not fail, on an unreadable payload or a missing claim', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: 'someone-else', at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const other = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(other.out).toBe('')
+    expect(other.status).toBe(0)
   })
 })
