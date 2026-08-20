@@ -1,4 +1,4 @@
 {
-  "since": "2026-08-20T17:34:12.107Z",
-  "note": "advanced to the Fable switch's own changedAt on the user's ruling of 20.08.2026, 21:09 ('Das passt, mach weiter'): the 34 Fable-trailered commits of 18./19.08. were legal when they were made, and the switch governs what may be spent from now on. Point 792 replaces this manual advance with per-commit judgement by the policy in force at the commit's own time; until it lands, this line is what keeps the tripwire from firing on history."
+  "since": "2026-08-07T03:56:00.000Z",
+  "note": "advanced past 099390c (Opus 5, verified from this session — the commit carried two model trailers and was amended to a single one; the orphan survives only in the reflog). The advance to 2026-08-20T17:34:12.107Z that stood here between 21:09 and this commit was the stopgap for the Fable switch judging the past; it is withdrawn now that each commit is judged by the policy in force at its own time, so the tripwire sees the whole window again."
 }
