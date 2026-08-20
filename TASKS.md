@@ -1006,6 +1006,24 @@ put it is the mistake this line exists to stop.
   signal it uses — what a subagent process carries that a main window does not — rather than
   leaving it to the implementation, because fixtures for a pure three-way decision prove the
   decision and not the classification (GPT-5.6 Sol, review 19.08.2026).
+  THE TRIGGER IS THE READING, NOT THE ROLE (carried over 20.08.2026 from point 770, where the user
+  asked it outright: »Warum machst du eigentlich hier die ganze Zeit weiter, obwohl du inzwischen
+  bei weit über 150k bist?« — the session he was reading stood at 253,185 tokens against the
+  `CONTEXT_WATERMARK_TOKENS` of 150,000 in `scripts/context-watermark-core.mjs`, held no batch lock,
+  and was therefore measured against nothing, because `scripts/batch-boundary.mjs --context` is the
+  only enforcement path and a batch OWNER is the only session that runs it). The number is already
+  computed every turn for the header by `scripts/dashboard-reminder-hook.mjs` — the reading point
+  740 put in front of the user and nobody else judges — so watching it costs nothing new to
+  measure, and the cost argument does not care which kind of session it is: every further turn
+  re-sends the whole context.
+  IT SPEAKS ONCE, AND NOT AT A BAD MOMENT: the reading fires a single time per session rather than
+  every turn, and it stays silent mid-merge, with a verification running, and on an unreadable
+  reading (`--`), which is guessed at never — the same exemptions the batch boundary already makes.
+  A session that IS the batch owner keeps its existing boundary behaviour unchanged.
+  WHILE THE FENCE STANDS IN `observe` it refuses nothing (CLAUDE.md §6), so the attended remedy is
+  delivered in its ASKING form first — the window says it has passed the mark and names `/clear` —
+  and becomes the refusal above when the fence arms. The visible half must not wait for the arming
+  point: an unwatched attended window is what this measured.
   VERIFIABLE: Vitest over the three-way decision with a fixture per case — subagent past its
   budget (refused, return-what-you-have named), batch owner past it (refused, boundary named),
   attended window past it (refused, `/clear` named), and each of them within budget (allowed);
@@ -1014,6 +1032,10 @@ put it is the mistake this line exists to stop.
   from the signal the point names rather than from a hand-built fixture; plus a replay
   against this session's own transcript showing the calls it would have refused and confirming
   no answer, read, commit or push is among them.
+  On the reading itself: a reading below the mark says nothing; one above it asks once; a second
+  turn above it stays silent; a merge in progress or a running verification suppresses it; an
+  unreadable reading suppresses it rather than guessing; and a batch owner keeps its boundary
+  behaviour unchanged.
   Criticality: high — it extends a denying mechanism to a session a human is using, so a false
   deny is felt immediately by the user rather than by a batch nobody watches.
   Bundle: Session- & Repo-Hygiene.
