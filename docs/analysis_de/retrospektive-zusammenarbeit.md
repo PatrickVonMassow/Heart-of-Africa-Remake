@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 00:50 · Quellen-Fingerprint: `9fbcbf41abcb…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 01:07 · Quellen-Fingerprint: `caca7c3a0b1b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1352,7 +1352,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | repository-integrity-guard.mjs | ✔ Mechanismus |
+| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 58 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 9fbcbf41abcb16e79790e9767d30117cb3aa8c303746fa470172eb20becb19d5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T22:50:00.577Z -->
+<!-- RETRO-FINGERPRINT: caca7c3a0b1baa92acae18fce6b748e4c35d81f7e818943c71de53bd1d0de609 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T23:07:38.378Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2313,3 +2313,35 @@ genommen wird, weil ein gescheiterter Lauf unter Zeitdruck gelesen wird.
 Wortlaut meines Negativbefunds genau den Bereich ab, den ich geprüft habe?* Wo ein Rest
 ungeprüft bleibt, nennt die Meldung dessen Größe und den Weg, ihn zu sichern, statt ihn
 wegzureden.
+
+### 3.146 Der Prüflauf schrieb in das Projekt, das er prüfte
+
+In der Nacht auf den 21.08.2026 setzte ein vollständiger Unit-Lauf den Hauptzweig des lebenden
+Projekts auf einen Testcommit zurück, trug `core.bare=true` in dessen Konfiguration ein und ließ
+fünfzehn Fixture-Zweige und zwei Fixture-Arbeitsbäume zurück. Sichtbar wurde es nicht am Schaden,
+sondern an einem harmlosen roten Test — und der erste Reflex, die Datei einzeln zu wiederholen,
+war grün. Die Ursache: Skripte bestimmten ihr Projektverzeichnis aus dem eigenen Quellpfad und
+arbeiteten damit weiter am echten Projekt, obwohl der Test ihnen ein Fixture-Verzeichnis als
+Arbeitsverzeichnis gab.
+
+Die Klasse ist die IDENTITÄT, die aus dem Programm statt aus dem Aufruf kommt. Ein Skript, das
+weiß, wo es liegt, glaubt zu wissen, woran es arbeitet — und keine Isolierung des Aufrufers kann
+es dann noch umlenken. Verschärft wird sie durch das Fehlerbild: Der Schaden trifft nicht den
+Lauf, der ihn anrichtet, sondern den nächsten, und wandert dabei durch wechselnde Dateien, sodass
+er wie Last am Rechner aussieht. Zwei rote Läufe nannten vier verschiedene Testdateien, keine
+davon die schuldige.
+
+**Lehre:** Ein Prüflauf darf das Projekt, in dem er läuft, nicht verändern können — und das wird
+gemessen, nicht angenommen. Prüffrage: *Woher nimmt dieses Skript sein Projektverzeichnis — aus
+dem Aufruf oder aus sich selbst?* Der Lauf hält seinen eigenen Zustand vorher und nachher
+gegeneinander und färbt sich rot, sobald sich etwas bewegt hat.
+
+Ein Nachspiel gehört zur selben Nacht: Der neue Wächter dieses Laufs hieß zuerst `…-guard.mjs`,
+womit die Wächter-Aufsicht ihn in ihre Hook-Liste zog und als »kann nie auslösen« meldete, obwohl
+er bei jedem Lauf greift. Zwei Gegenlesungen wiesen jeden Versuch zurück, der Aufsicht die
+Verdrahtung des Testrunners beizubringen: Ein Text-Auswerter kann nicht beweisen, dass der Runner
+etwas aufgerufen hat, und jede Erweiterung öffnete einen neuen Weg, auf dem ein toter Wächter als
+verdrahtet gelesen worden wäre. Die Auflösung war der Name: Das Modul ist kein Hook-Wächter,
+sondern die Grenze des Prüflaufs selbst — und heißt jetzt so. **Zusatzlehre:** Wenn ein Register
+ein Ding falsch einordnet, ist die erste Frage, ob das Ding richtig benannt ist, und erst die
+zweite, ob das Register mehr lernen muss.
