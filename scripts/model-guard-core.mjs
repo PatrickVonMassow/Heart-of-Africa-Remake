@@ -63,6 +63,23 @@ const FABLE_ALLOWED = /^fable[\s.\d]*$/i
 /** Explicit opt-out from switch policy for pure parsing fixtures and historic-log tests. */
 export const POLICY_NEUTRAL = Symbol('model-policy-neutral')
 
+/**
+ * The Fable policy that governed one historical commit.
+ *
+ * The state record describes the latest transition: at `changedAt` its recorded
+ * direction took effect, and before that instant the opposite direction was in
+ * force. Commit-message callers deliberately do not use this function — a new
+ * commit is always judged against the policy in force now.
+ */
+export function fableStateAtCommit(commitWhen, fableState) {
+  if (fableState === undefined || fableState === POLICY_NEUTRAL) return fableState
+  const currentIsOn = fableIsOn(fableState) // validates the complete state; an unreadable policy never grandfathers history
+  const when = Number(commitWhen)
+  if (!Number.isFinite(when)) throw new Error('the commit timestamp is invalid')
+  if (when >= fableState.changedAt) return fableState
+  return { ...fableState, state: currentIsOn ? 'off' : 'on' }
+}
+
 /** Missing switch policy fails closed; policy-neutral parsing must say so at the call site. */
 const admitsFable = (fableState) =>
   fableState === POLICY_NEUTRAL || (fableState !== undefined && fableIsOn(fableState))
@@ -414,11 +431,17 @@ export function parseLogLine(line) {
 
 /** Commits at/after sinceMs whose trailer field falls into `wanted`. */
 function findCommitsClassified(logText, sinceMs, wanted, fableState) {
+  // Validate once even for an empty/malformed log. Missing policy is a loud
+  // refusal, never a way to make the whole history look compliant.
+  fableStateAtCommit(sinceMs, fableState)
   const hits = []
   for (const line of String(logText ?? '').split(/\r?\n/)) {
     const c = parseLogLine(line)
     if (!c || c.when < sinceMs) continue
-    if (classifyTrailer(c.trailers, fableState) === wanted) hits.push({ sha: c.sha, trailer: c.trailers.trim() })
+    const policyAtCommit = fableStateAtCommit(c.when, fableState)
+    if (classifyTrailer(c.trailers, policyAtCommit) === wanted) {
+      hits.push({ sha: c.sha, when: c.when, trailer: c.trailers.trim() })
+    }
   }
   return hits
 }
@@ -481,6 +504,30 @@ export function backupRefNotice(backupRefs) {
 
 const shaList = (hits) => (hits ?? []).map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
 
+/** Explain why a forbidden Fable trailer is history or a present emergency. */
+function fableTimingNotices(hits, fableState) {
+  if (fableState === undefined || fableState === POLICY_NEUTRAL) return []
+  const current = fableIsOn(fableState) ? 'ON' : 'OFF'
+  const changedAt = Number(fableState.changedAt)
+  return (hits ?? []).flatMap((hit) => {
+    const namesFable = modelNamesIn(hit?.trailer).some((name) => FABLE_ALLOWED.test(name))
+    if (!namesFable || !Number.isFinite(hit?.when)) return []
+    const commitAt = new Date(hit.when).toISOString()
+    const switchAt = new Date(changedAt).toISOString()
+    if (hit.when >= changedAt) {
+      return [
+        `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, after the Fable switch changed to ${current} ` +
+          `at ${switchAt}; it is judged under that post-switch ${current} policy.`,
+      ]
+    }
+    const previous = current === 'ON' ? 'OFF' : 'ON'
+    return [
+      `Commit ${hit.sha.slice(0, 7)} was made at ${commitAt}, before the Fable switch changed to ${current} ` +
+        `at ${switchAt}; it is historical and is judged under the previous ${previous} policy.`,
+    ]
+  })
+}
+
 /** The HARD stop: a named model outside the allowlist. Unchanged in substance —
  *  pause the batch and wait for the user (point 309, incident 24.07.2026).
  *  `alsoUnidentified` are the unnamed commits found in the same window: they are
@@ -488,16 +535,16 @@ const shaList = (hits) => (hits ?? []).map((h) => `${h.sha.slice(0, 7)} (${h.tra
  *  forbidden ones would otherwise clear them unseen (four-eyes review). */
 export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [], fableState } = {}) {
   const unnamed = (alsoUnidentified ?? []).filter(Boolean)
-  const phrase = allowedModelsPhrase(fableState)
-  const forbiddenExamples = admitsFable(fableState) ? 'Sonnet and Haiku' : 'Fable, Sonnet and Haiku'
   const switchRefusal = fableState !== undefined && !admitsFable(fableState) ? ` ${fableRefusalReason(fableState)}` : ''
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
-      `outside the allowlist (only ${phrase} may run the batch — ${forbiddenExamples} ` +
-      `are NOT acceptable under the recorded switch; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work: create ` +
+      `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and GPT-5.6 Sol ` +
+      `may author throughout; Fable 5 may author only while its recorded policy is ON; Sonnet and Haiku ` +
+      `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work: create ` +
       '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user has ' +
       'confirmed an allowed model may .claude/model-guard-baseline.json be advanced past these ' +
       'commits.',
+    ...fableTimingNotices(hits, fableState),
     ...(unnamed.length
       ? [
           '',
