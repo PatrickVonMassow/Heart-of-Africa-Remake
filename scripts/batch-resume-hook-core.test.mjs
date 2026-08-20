@@ -314,4 +314,10 @@ describe('the open-point headline (point 440)', () => {
     expect(hook).toContain('openPointsHeadline(nums, { gated: gatedNums })')
     expect(hook).not.toContain("open point(s): ${nums}")
   })
+
+  it('derives the serving chain from the Fable switch instead of spelling one inline', () => {
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('servingPolicyLine(fableState)')
+    expect(hook).not.toContain("'Fable 5, then Opus 4.8")
+  })
 })

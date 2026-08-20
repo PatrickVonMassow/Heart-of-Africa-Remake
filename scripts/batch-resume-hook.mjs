@@ -49,6 +49,8 @@ import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
+import { currentFableState } from './fable-switch.mjs'
+import { servingPolicyLine } from './fable-switch-core.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
@@ -243,6 +245,7 @@ try {
     if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
+    const fableState = currentFableState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the ALLOWLIST at every
     // session start; the model-guard Stop hook enforces it at the first
@@ -258,11 +261,7 @@ try {
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +
-      'THE SERVING MODEL of this session — the one running the batch — is Opus 5, then ' +
-      'Fable 5, then Opus 4.8. Sonnet, Haiku and every other model are NOT acceptable: if ' +
-      'the serving model is not one of those three, do NOT work — create ' +
-      '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via ' +
-      'scripts/notify.mjs instead.'
+      (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`)
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()

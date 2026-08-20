@@ -95,6 +95,19 @@ export function servingChain(value) {
   return Object.freeze(['Opus 5', ...(fableIsOn(value) ? [FABLE_MODEL] : []), 'Opus 4.8'])
 }
 
+/** The session-start policy sentence, with both sides derived from one state. */
+export function servingPolicyLine(value) {
+  const state = requireState(value)
+  const chain = servingChain(state)
+  const forbidden = [...(state.state === 'off' ? [FABLE_MODEL] : []), 'Sonnet', 'Haiku']
+  return (
+    `THE SERVING MODEL of this session — the one running the batch — is ${chain.join(', then ')}. ` +
+    `${forbidden.join(', ')} and every other model are NOT acceptable under the recorded Fable switch ` +
+    `(${SWITCH_COMMAND} --status): if the serving model is outside that chain, do NOT work — create ` +
+    '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via scripts/notify.mjs instead.'
+  )
+}
+
 /** The model that folds a blind-parallel union. */
 export function mergerModel(value) {
   return fableIsOn(value) ? FABLE_MODEL : SOL_MODEL

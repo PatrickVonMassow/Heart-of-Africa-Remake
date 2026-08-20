@@ -10,6 +10,7 @@ import {
   readState,
   requireState,
   servingChain,
+  servingPolicyLine,
   statePathFrom,
   statusReport,
   unreadableState,
@@ -59,6 +60,14 @@ describe('decisions derived from the state', () => {
   it('includes Fable in the serving chain only while on', () => {
     expect(servingChain(on())).toEqual(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
     expect(servingChain(off())).toEqual(['Opus 5', 'Opus 4.8'])
+  })
+
+  it('builds the serving briefing and forbidden names from the same direction', () => {
+    expect(servingPolicyLine(on())).toContain('Opus 5, then Fable 5, then Opus 4.8')
+    expect(servingPolicyLine(on())).not.toContain('Fable 5, Sonnet, Haiku')
+    expect(servingPolicyLine(off())).toContain('Opus 5, then Opus 4.8')
+    expect(servingPolicyLine(off())).toContain('Fable 5, Sonnet, Haiku')
+    expect(servingPolicyLine(off())).toContain('node scripts/fable-switch.mjs --status')
   })
 
   it('selects Fable as merger while on and Sol while off', () => {
