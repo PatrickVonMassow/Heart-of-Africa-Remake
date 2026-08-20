@@ -1978,6 +1978,30 @@ put it is the mistake this line exists to stop.
   check but an UNFINISHED rollout plus one gap in what the check recognises. I had confirmed Sol's
   count of 39 and inferred its conclusion without reading the rollout record — the count was right
   and the reading was wrong.
+  WHAT A SILENTLY DEAD HOOK COSTS, measured over 46 transcripts (06.-29.07.2026) and carried here
+  on 20.08.2026 from point 438: session 8210a7ce produced 99 hook failures against 11 successes,
+  830a6878 44/51, f8c46e2f 43/245, 68c8c394 12/81, plus two worktree sessions. The failing cwds are
+  the memory directory, `hoa/local`, `~/.claude`, a second checkout and removed agent worktrees; the
+  most frequent victims are lock-heartbeat 45x, prep-arm 28x, closing-guard 26x, board-first-guard
+  20x and every Stop guard 4x. THE PROOF OF CAUSE is in the same reading: the two USER-scope hooks
+  are wired ABSOLUTELY and never failed once. And what is lost is a VETO, not a message — a guard
+  blocks through stdout JSON with EXIT 0, so a crash (exit 1) is non-blocking, and a crashed
+  `closing-guard` would have let a version tag through.
+  HOW THE REMAINING LINES ARE REWIRED, in the shape the four-eyes review of 438 left the procedure:
+  - NEVER all at once. A failed expansion would disable every hook silently, so the lines go one at
+    a time, each verified in a NEW session started from a cwd outside the repository root — settings
+    are read at session start.
+  - A shell-agnostic fallback stays in reserve: the `node -e` bootstrap that reads
+    `process.env.CLAUDE_PROJECT_DIR` and splices the path into `argv[1]`, which fires only when it
+    does splice it. A hardcoded absolute path is the LAST resort alone, because
+    `.claude/settings.json` is committed and would then bind every checkout.
+  - `scripts/git-hooks/pre-push` and `commit-msg` are relative ON PURPOSE — git guarantees the
+    repository root — and the check must never accuse them.
+  - The switch CHANGES WORKTREE SEMANTICS: a worktree agent then runs the MAIN tree's guards
+    against main-tree state instead of its own toothless checkout copies. That is better, and it is
+    a deliberate decision that belongs in the commit message rather than in a silent side effect.
+  - The removed-worktree class is NOT fixed by this — a dead cwd kills the spawn itself — and stays
+    with the worktree-hygiene work.
   FINAL STATE:
   - The rollout is CARRIED TO ITS END: every hook line is anchored and `RELATIVE_WIRING_ROLLOUT` is
     empty, each removal in the same commit as its anchoring, in the attended sessions the record
@@ -1996,6 +2020,9 @@ put it is the mistake this line exists to stop.
   18.08 ranking): placed behind the user's block — attended-only by this spec's own execution
   note, it must not jam the headless picker's front slots; a headless session skips it, an
   attended session takes it from here.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): it moves the wiring every guard fires through.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the guard chain is described, and
+  CLAUDE.md §7.2 only if the families it names change.
   Criticality: medium — the rollout is recorded and progressing, so nothing is silently uncovered;
   what is left is finishing it, not repairing a blind check.
   Bundle: unbundled (guard hygiene).
