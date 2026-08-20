@@ -3630,6 +3630,51 @@ put it is the mistake this line exists to stop.
   `scripts/board-core.test.mjs` for a premise-bearing card kept while its file exists, dropped once
   it is gone, and an ordinary question card — which carries no premise — never touched.
 
+- [ ] 790. The handover card names the session id from BEFORE the `/clear`, so the reader looks for a
+  window that no longer exists (measured 20.08.2026, 19:16, while the user asked why his own window
+  had not taken the batch).
+  WHAT WAS MEASURED. The point-boundary card on the board said "Fenster c0ad5041 hat ihn beansprucht
+  … der Launcher reserviert ihn dort". The launcher's own log named the CURRENT id at the same
+  moment: "skip: session ecc312cf-… has CLAIMED the batch (reserved)". Both ids belong to the same
+  pid 2156063 (`.claude/session-process.json`) — `c0ad5041` was that window's session BEFORE the
+  `/clear`, `ecc312cf` after it. The card is therefore fed from an older source (the parallel-session
+  detection, or text dictated earlier in the session) rather than from `.claude/batch-claim.json`,
+  which is what the launcher reads.
+  WHY IT MATTERS: a session id dies with a `/clear` while the WINDOW lives on, and the card is the
+  one place a reader is told where the batch went. Naming a dead id makes a correct reservation look
+  like a lost one — the user asked exactly that question.
+  FINAL STATE: the dictated card takes its claimant from the claim record the launcher reads, and it
+  identifies the window by something that survives a `/clear` (the pid), not by the session id alone.
+  Where both are known it says so in one breath, so a reader can match what the launcher logs.
+  VERIFIABLE: pure test over the card composer — a claim record whose session id differs from the
+  one last seen in the same pid yields a card naming the CURRENT claimant, and the text never names
+  an id that no claim record carries.
+  Criticality: medium — no product defect, and the reservation itself worked; it misinforms the one
+  reader who has to decide whether to wait or take over.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 791. A user's waiver of the closing has to be typed thirteen times, and once it has to sound
+  like a run (measured 20.08.2026, 19:39, while moving the demo tag on the user's instruction).
+  WHAT WAS MEASURED. `closing-guard` foresees the waiver in so many words — its own refusal text
+  says "A step the user has expressly waived is recorded AS the waiver, naming his decision" — but no
+  command records one: the waiver is typed as thirteen separate `--step` calls carrying the same
+  sentence. Worse, the order check of `regression-after-cleanup` demands that the EVIDENCE name the
+  commit ("on <sha>") or a machine-readable timestamp, or the step counts as RECORDED BUT OUT OF
+  ORDER. An honest waiver text ("NOT RUN — WAIVED BY THE USER, 20.08.2026") therefore fails, and the
+  way through is to phrase the waiver so it reads like proof of a run — the very confusion the
+  record exists to prevent.
+  FINAL STATE: one command records a waiver for the whole checklist — `--waive --why "<the user's
+  decision>"` — and a waived step is its OWN state, never `done`. `--status` and the block reason
+  name it as a waiver, the order check does not judge a waiver as if it were a run, and the state
+  stays bound to the commit it was given for, so the next commit needs the closing again.
+  VERIFIABLE: pure tests — a waived checklist permits the tag and reports every step as WAIVED
+  rather than done; a waiver carries the user's reason and is refused without one; the order rules
+  do not fire on a waived step; and a waiver recorded for one commit does not clear the tag gate at
+  another.
+  Criticality: medium — no product defect, but it is a record that pushes the writer toward a
+  misleading sentence, and the record is the only trace that a release went out unclosed.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 453. What is the lion eating? (user bug report 30.07.2026,
   `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
   "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
