@@ -183,10 +183,18 @@
     "759": {
       "at": "2026-08-20T01:05:34.270Z",
       "why": "Vorbedingung des Wiederscharfschaltens in 747: solange der Ausstieg nicht feuert, stellt ein scharfer Zaun die Blockade delegierter Agenten vollstaendig wieder her."
+    },
+    "763": {
+      "at": "2026-08-20T05:42:49.579Z",
+      "why": "Documentation and memory hygiene on rules the user has already released — nothing depends on it and nothing breaks while it waits, so last is where it belongs."
+    },
+    "765": {
+      "at": "2026-08-20T05:43:43.591Z",
+      "why": "The carrier defect drops rulings silently, but its one known case is already re-filed and landed, so nothing is waiting on it."
     }
   },
   "settled": {
-    "at": "2026-08-20T04:18:31.855Z",
+    "at": "2026-08-20T05:43:43.591Z",
     "points": [
       174,
       184,
@@ -194,7 +202,6 @@
       203,
       205,
       207,
-      224,
       265,
       269,
       285,
@@ -413,8 +420,10 @@
       756,
       759,
       760,
-      761,
-      762
+      762,
+      763,
+      764,
+      765
     ]
   }
 }
