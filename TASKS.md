@@ -76,31 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 775. Answer the cross-vendor review of the commit-time guard registration (GPT-5.6 Sol,
-  20.08.2026, verdict **do-not-merge** on both passes of `5ce597cf`, recorded in
-  `.claude/mechanism-reviews.jsonl`). The mechanism landed before the review concluded, so its
-  findings are owed as work rather than as a merge decision. Three stand against
-  `scripts/guard-registration-core.mjs`, and all three are real:
-  1. A COMMENT DEFEATS THE REGISTRY. `registeredIdsFromSource` counts every textual `id: '…'`
-     inside the block, so `// id: 'clear-claim-guard'` — or the same text in a string — registers a
-     hook that is not registered, and the wired-but-unregistered commit passes.
-  2. AN UNRECOGNISABLE REGISTRY FAILS OPEN ON A RELEVANT INPUT. A commit may wire a Stop hook while
-     deleting, emptying, renaming or breaking `GUARDS`, and the check judges nothing. The fail-open
-     direction is right for an input the check cannot READ; it is wrong when the very commit under
-     judgement is what made it unreadable. The current test pins the bypass instead of the refusal.
-  3. SINGLE QUOTES ONLY. `id: "double-quoted"` is not seen, so a mixed-quote registry yields a
-     partial list and REFUSES a hook that is in fact registered — a false block, the direction that
-     makes a tree uncommittable.
-  FINAL STATE: the registry is read so that comments and string literals cannot register anything
-  and both quote styles count; a registry the commit itself broke is a REFUSAL naming that reason,
-  while a registry this check merely cannot reach stays fail-open; and the tests assert the
-  refusals rather than the bypasses.
-  VERIFIABLE: Vitest — a commented-out entry does not register; a double-quoted entry does; a
-  commit that wires a hook and empties GUARDS is refused; an unreadable settings file still passes;
-  and the existing green cases stay green.
-  Criticality: high — this is the guard that decides whether a commit may land, and two of the
-  three findings let exactly the incident it was built for through.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 780. `scripts/author-sol.mjs` cannot record a commission from a worktree, so the delegated
   authoring lane is closed from the one place it is supposed to run (measured 20.08.2026, 13:24,
   commissioning point 775 from `.claude/worktrees/point-775`). The commission ledger is pinned to
