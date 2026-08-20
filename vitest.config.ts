@@ -19,6 +19,10 @@ export default defineConfig({
     // backend map) — pure modules, no game imports.
     include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.mjs'],
     setupFiles: ['./src/test/setup.ts'],
+    // The suite itself is a hostile boundary: a fixture that escapes through a
+    // script's source-derived root must turn the whole run red if it changes a
+    // live ref, the shared config, or this checkout's HEAD.
+    globalSetup: ['./scripts/repository-integrity-guard.mjs'],
     // The R3F/three scenes never render here; only pure modules and HUD
     // components are imported, so no canvas/WebGL is needed.
     css: false,

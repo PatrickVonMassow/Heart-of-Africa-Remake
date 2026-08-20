@@ -22,7 +22,6 @@
 // (review rounds 7 and 8).
 import { readFileSync, rmSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import {
@@ -51,8 +50,8 @@ import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { servingPolicyLine } from './fable-switch-core.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
 
 function readOwnerRunbook() {
@@ -118,7 +117,7 @@ function ownsBatch(ownership) {
  *  Never throws: an unrunnable doctor reports itself and `resumeRepairMandate` stays
  *  silent about it — the launcher's alert already carries that news, and a session
  *  cannot mend a broken doctor. */
-const MANDATE_PATH = fileURLToPath(new URL('../.claude/repo-mandate.json', import.meta.url))
+const MANDATE_PATH = repoPath('.claude', 'repo-mandate.json')
 
 function readRepoVerdict(nowMs = Date.now()) {
   // One-shot, expiring, junk-proof — and now UNDER TEST (point 443 (h)): the read
@@ -146,7 +145,7 @@ function readRepoVerdict(nowMs = Date.now()) {
 // a DEAD batch. It merely helps BIND the spawned session to the launcher's
 // pending-spawn lock — it never overrides a live lock (the atomic acquire
 // remains the only way to ownership).
-const AUTH_PATH = fileURLToPath(new URL('../.claude/autostart-authorized.json', import.meta.url))
+const AUTH_PATH = repoPath('.claude', 'autostart-authorized.json')
 function autostartAuthorization(nowMs) {
   try {
     const m = JSON.parse(readFileSync(AUTH_PATH, 'utf8'))
@@ -225,7 +224,7 @@ const RESUME_BODY =
   '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'
 
 try {
-  const tasks = readFileSync(new URL('../TASKS.md', import.meta.url), 'utf8')
+  const tasks = readFileSync(repoPath('TASKS.md'), 'utf8')
   // Unticked point lines, MINUS the ones the user explicitly deferred: a point
   // line carrying a `DEFERRED` marker is excluded from the batch and must never
   // auto-resume (2026-07-15 fix — the exclusion travels in TASKS.md itself).

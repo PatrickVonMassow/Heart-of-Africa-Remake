@@ -685,4 +685,9 @@ describe('the harness', () => {
   it('runs against a real git', () => {
     expect(execFileSync('git', ['--version'], { encoding: 'utf8', windowsHide: true })).toMatch(/git version/)
   })
+
+  it('binds every fixture git call to the temporary repository', () => {
+    expect(git(['rev-parse', '--show-toplevel'])).toBe(repo)
+    expect(repo.startsWith(tmpdir())).toBe(true)
+  })
 })

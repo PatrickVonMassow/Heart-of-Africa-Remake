@@ -21,7 +21,6 @@
 //               node scripts/dashboard-sync.mjs --drifts  (what it catches)
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import {
   formatDriftReport,
   nowCardTitles,
@@ -33,12 +32,11 @@ import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO_ROOT = R('..')
-const TASKS = R('../TASKS.md')
-const DASHBOARD = R('../.batch-dashboard.html')
-const PAUSE = R('../.claude/batch-paused')
+const TASKS = repoPath('TASKS.md')
+const DASHBOARD = repoPath('.batch-dashboard.html')
+const PAUSE = repoPath('.claude', 'batch-paused')
 
 function git(args) {
   try {

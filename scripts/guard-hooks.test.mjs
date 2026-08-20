@@ -110,6 +110,10 @@ beforeAll(() => {
   git('init', '-q')
   git('config', 'user.email', 'g@test.local')
   git('config', 'user.name', 'guard hooks test')
+  // Deliberately point the fixture config at this checkout's real hooks. The
+  // git helper's command-local override must still keep every fixture commit
+  // from executing them.
+  git('config', 'core.hooksPath', resolve(SOURCE_SCRIPTS, 'git-hooks'))
   commit('baseline')
   // Every real reader fails loud when this shared decision is absent. Keep the
   // guard fixture explicit too, so its model-trailer cases reach the rule they test.
@@ -135,6 +139,14 @@ describe('the harness itself', { timeout: 60_000 }, () => {
   it('runs against an isolated temp repo, never the real one', () => {
     expect(repo.startsWith(tmpdir())).toBe(true)
     expect(resolve(repo)).not.toBe(resolve(process.cwd()))
+    expect(git('rev-parse', '--show-toplevel').stdout.trim()).toBe(resolve(repo))
+  })
+
+  it('can commit without running the live hook path configured in the fixture', () => {
+    expect(git('config', '--local', 'core.hooksPath').stdout.trim()).toBe(resolve(SOURCE_SCRIPTS, 'git-hooks'))
+    write('fixture-hook-proof.txt', 'a fixture commit with no authoring trailer\n')
+    commit('fixture commit bypasses the live hooks')
+    expect(git('log', '-1', '--format=%s').stdout.trim()).toBe('fixture commit bypasses the live hooks')
   })
 
   it('has every registered guard reachable as a spawnable hook', () => {
