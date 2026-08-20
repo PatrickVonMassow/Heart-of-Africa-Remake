@@ -10180,31 +10180,6 @@ to land than a mechanism that needs a review.
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 770. The context watermark watches the batch role, so an interactive session runs past it
-  unnoticed (raised by the user 20.08.2026: »Warum machst du eigentlich hier die ganze Zeit weiter,
-  obwohl du inzwischen bei weit über 150k bist?« — and he was right).
-  `CONTEXT_WATERMARK_TOKENS` is 150,000 in `scripts/context-watermark-core.mjs`, and the session he
-  was reading stood at 253,185 when he asked. The enforcement path is
-  `scripts/batch-boundary.mjs --context`, which a BATCH OWNER runs at its point boundary. That
-  session held no batch lock, so nothing ever measured it against the mark — while the per-turn
-  header reading, the very number point 740 put in front of the user, was displayed and judged by
-  nobody. The cost argument does not care which kind of session it is: every further turn re-sends
-  the whole context.
-  FINAL STATE: the check fires on the READING, not on the batch role. When the header reading
-  passes the watermark, the session says so and asks for a handover or a clear instead of quietly
-  continuing. It fires ONCE rather than every turn, and it does not fire mid-merge or with a
-  verification running — exactly the exemptions the batch boundary already makes. The reading is
-  already computed for the header by `scripts/dashboard-reminder-hook.mjs`, so this costs nothing
-  new to measure.
-  VERIFIABLE: Vitest over the pure core — a reading below the mark says nothing; a reading above it
-  asks once; a second turn above it stays silent; a merge in progress or a running verification
-  suppresses it; an unreadable reading (`--`) suppresses it rather than guessing; and a session
-  that IS the batch owner keeps its existing boundary behaviour unchanged.
-  Criticality: medium — no product defect, and no session is harmed by running long, but it is the
-  single largest per-turn cost in the project and the only reader currently watching it is the
-  user.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
   while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
   exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
