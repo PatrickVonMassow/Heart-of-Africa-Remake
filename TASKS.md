@@ -9653,6 +9653,12 @@ to land than a mechanism that needs a review.
   a fenced session's exit hangs on no duty it may no longer discharge; the duty is handed to the
   successor through the carrier instead, exactly as 751's clause 1 requires. The guards to scope
   are `bundle-first-guard`, `queue-order-guard` and `retro-currency-guard`.
+  THE SECOND RECORDED INCIDENT OF THE SAME CLASS came 20.08.2026, 01:40, at 132,255 tokens, and
+  it was `bundle-first-guard` again, identically: point 757 had just been filed, the guard
+  demanded its bundle line in `docs/work-packages.md`, and the fence denied that edit. There is
+  no way out inside the tool set — no bundle CLI exists, and the "Not bundled" list stands in the
+  same file — so the point was left in no bundle and a later session had to write the line. Twice
+  in twenty-four hours makes this defect systematic rather than incidental.
   VERIFIABLE: Vitest over each of the three guard cores — past the fence each returns the
   handover verdict rather than a block, and below it blocks exactly as today — plus one case
   that ENUMERATES the mandatory Stop guards from `.claude/settings.json` and fails if any of
