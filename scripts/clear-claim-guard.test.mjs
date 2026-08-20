@@ -11,10 +11,9 @@ describe('invitesClear — what counts as asking the user to end the session', (
   it('catches the shapes this project actually writes', () => {
     for (const text of [
       '**Donnerstag, 20.08.2026, 08:22**\n\nGesichert ist alles. Mach bitte `/clear`.',
-      'Jetzt kann /clear kommen.',
       'Mach am besten einen clear, dann ist der Kontext frei.',
       'Bitte führe einen clear aus.',
-      'Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.',
+      'Starte eine neue Sitzung, sobald das gepusht ist.',
       'Please start a fresh session for the rest.',
     ]) {
       expect(invitesClear(text), text).toBe(true)
@@ -55,7 +54,7 @@ describe('invitesClear — what counts as asking the user to end the session', (
   })
 
   it('judges each sentence, so a negated one cannot cover a real invitation after it', () => {
-    expect(invitesClear('Mach keinen Clear. Danach mach bitte einen Clear.')).toBe(true)
+    expect(invitesClear('Mach keinen Clear. Mach bitte /clear.')).toBe(true)
     expect(invitesClear('Alles ist gepusht.\nStarte eine neue Sitzung.')).toBe(true)
   })
 
@@ -72,9 +71,21 @@ describe('invitesClear — what counts as asking the user to end the session', (
   // Round three of the cross-vendor review, 20.08.2026. Each case is one the
   // sentence-only draft got wrong, and together they are why negation is judged
   // per CLAUSE while the invitation is matched per SENTENCE.
-  it('lets a negation in another clause stand, because it governs that clause', () => {
-    expect(invitesClear('Der Kontext ist nicht mehr nötig, starte eine neue Sitzung.')).toBe(true)
-    expect(invitesClear('Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.')).toBe(true)
+  // THE DELIBERATE MISSES. Each of these IS an invitation and is nevertheless
+  // allowed, because recognising it would take a rule that refuses innocent
+  // prose as well — measured over four cross-vendor rounds on 20.08.2026. A miss
+  // costs nothing (the claim is withdrawn at the boundary anyway); a false
+  // refusal costs a turn. They are pinned so nobody "fixes" one by widening the
+  // matcher without paying that price knowingly.
+  it('MISSES an invitation rather than risk refusing innocent prose', () => {
+    for (const text of [
+      'Jetzt kann /clear kommen.',
+      'Der Kontext ist nicht mehr nötig, starte eine neue Sitzung.',
+      'Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.',
+      'Danach mach bitte einen Clear.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
   })
 
   it('does not split an abbreviation, which would separate the verb from its object', () => {
@@ -86,10 +97,26 @@ describe('invitesClear — what counts as asking the user to end the session', (
     expect(invitesClear('Als Nächstes:\n- Starte eine neue Sitzung.')).toBe(true)
   })
 
-  it('reads the slash form as an instruction only where the clause asks for one', () => {
+  it('reads the slash form only where an imperative leads the clause', () => {
     expect(invitesClear('Der Befehl `/clear` leert den Kontext.')).toBe(false)
-    expect(invitesClear('Jetzt kann /clear kommen.')).toBe(true)
+    expect(invitesClear('Jetzt arbeite ich weiter, der Befehl /clear leert den Kontext.')).toBe(false)
+    expect(invitesClear('Der Negativtest verwendet den Satz „Mach bitte /clear“.')).toBe(false)
     expect(invitesClear('Mach bitte `/clear`.')).toBe(true)
+  })
+
+  it('does not read an indicative or a noun as an order, whatever its case', () => {
+    for (const text of [
+      'Eine neue Sitzung starten sie automatisch.',
+      'Der Beginn einer neuen Sitzung wird protokolliert.',
+      'Mach bitte weiter; die neue Sitzung startet automatisch.',
+      'Mach das Bild bitte clear.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
+  it('lets a postposed negation disarm the order before it', () => {
+    expect(invitesClear('Starte eine neue Sitzung, aber bitte nicht.')).toBe(false)
   })
 
   it('leaves out the forms that are also ordinary indicative, rather than guessing', () => {
@@ -305,7 +332,7 @@ describe('the hook itself, run as the entry script', () => {
     expect(out).toBe('')
   })
 
-  it('stays silent, and does not fail, on an unreadable payload or a missing claim', async () => {
+  it('stays silent on a claim that belongs to another session', async () => {
     const { transcript, claimFile } = await fixture(
       [assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
       { claimantSid: 'someone-else', at: Date.parse('2026-08-20T08:00:00.000Z') },
@@ -316,5 +343,34 @@ describe('the hook itself, run as the entry script', () => {
     })
     expect(other.out).toBe('')
     expect(other.status).toBe(0)
+  })
+
+  it('stays silent, and exits clean, on stdin that is not JSON at all', async () => {
+    const { spawnSync } = await import('node:child_process')
+    const { repoPath } = await import('./repo-paths.mjs')
+    const res = spawnSync(process.execPath, [repoPath('scripts/clear-claim-guard.mjs')], {
+      input: 'this is not json',
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(res.stdout.trim()).toBe('')
+    expect(res.status).toBe(0)
+  })
+
+  it('stays silent when the claim file is missing entirely', async () => {
+    const { transcript } = await fixture(
+      [assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const gone = join(mkdtempSync(join(tmpdir(), 'noclaim-')), 'claim.json')
+    const res = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile: gone,
+    })
+    expect(res.out).toBe('')
+    expect(res.status).toBe(0)
   })
 })
