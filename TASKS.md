@@ -4179,34 +4179,6 @@ put it is the mistake this line exists to stop.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
-- [ ] 512. The build order is paid again by every subagent (user decision
-  05.08.2026 on the card "Bauanleitung für Subagenten aufteilen?"). Measured:
-  `CLAUDE.md` is 61.6 KB — §1–5 8.0 KB, §6 13.6 KB, §7 37.5 KB (of which §7.2 is
-  7.4 KB), §9 2.0 KB — and every delegated agent receives all of it, though a
-  building agent never touches the 32 acceptance criteria, the batch handover, the
-  board rules, the model policy or the release mechanics. An agent-facing core is
-  ~19 KB, so ~68 % of the rule document falls away per agent.
-  FINAL STATE:
-  1. `CLAUDE.md` keeps ONE binding text and gains a declared SPLIT: the
-     agent-facing core (goal, scope guardrails, stack, structure, commands, the
-     working rules a builder obeys — commits, branch discipline, language, voice
-     markup, test layers — and §7.2 self-verification) and the session part (batch
-     ownership and handover, board, delegation machinery, model policy, release
-     and closing). Neither is a summary of the other: every rule lives in exactly
-     one of them, and nothing is dropped.
-  2. Delegated agents receive the core only. The mechanism is the one that already
-     exists for this purpose — the point brief (`scripts/point-brief.mjs`) — so a
-     builder gets brief + core and no longer the whole document.
-  3. A rule that moves keeps its enforcement: any guard, hook or test that reads
-     `CLAUDE.md` by section is updated in the same commit, and the doc-budget
-     entries follow the split.
-  4. The session part stays the authority for a session that OWNS the batch, so
-     nothing about the batch, the board or a release becomes less binding.
-  VERIFIABLE: a delegated agent's prompt carries the core and not the session
-  part; `scripts/point-brief.mjs` names which document it assumes; every rule of
-  the old file is findable in exactly one of the two halves (a test sweeps the
-  section headings for coverage and for duplication).
-
 - [ ] 511. The memory index still carries what thirty guards now enforce
   (measured 05.08.2026 on the user's question about context cost). The numbers
   first, so the effort goes where the cost is: the memory INDEX is 13.2 KB / 86
