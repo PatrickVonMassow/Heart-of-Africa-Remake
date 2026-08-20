@@ -136,10 +136,21 @@ put it is the mistake this line exists to stop.
   is ours to take and to justify in writing. Under that ruling this card should never have been put
   to him. Whatever produced it is found and either follows the withdrawal or states why it still
   asks.
-  FINAL STATE: §3.141's lesson stands in the guide as a pitfall entry in the house form, with no
-  existing entry removed; `LIMITS.maxLines`/`maxWords` rise by exactly the measured net size of that
-  entry, with the usual written justification in the comment; and the escalation path that raised
-  the card no longer routes a budget raise to the user.
+  A SECOND ENTRY IS OWED WITH IT (found 21.08.2026 at the guide review the currency guard demands):
+  the night of 20./21.08.2026 measured a class the guide's pitfall list does not carry at all — the
+  TEST SUITE THAT WRITES INTO THE REPOSITORY IT IS RUN IN. A full unit run force-moved the live
+  main branch to a fixture commit, made the checkout bare and left fifteen fixture branches behind,
+  because scripts resolved their repository root from their own source location and ignored the
+  fixture root the tests handed them. It is exactly the guide's own shape — one sentence of risk,
+  then the prompt ("Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das
+  Projekt verändert hat, in dem er läuft") — and it could not be written on 21.08.2026 because the
+  guide stood at 416 lines against a ceiling of 415. It is therefore part of THIS point's raise,
+  not a separate one. Point 801 is where it was measured.
+  FINAL STATE: §3.141's lesson AND the suite-writes-into-its-own-repository lesson stand in the
+  guide as pitfall entries in the house form, with no existing entry removed;
+  `LIMITS.maxLines`/`maxWords` rise by exactly the measured net size of those entries, with the
+  usual written justification in the comment; and the escalation path that raised the card no
+  longer routes a budget raise to the user.
   VERIFIABLE: `node scripts/guide-brevity-guard.mjs` green at the new ceilings; a Vitest case that
   the guide carries the entry and that the ceilings equal the measured size rather than carrying
   slack; and a case over the escalation path proving a budget raise produces no decision card.
