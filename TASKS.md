@@ -1313,6 +1313,20 @@ put it is the mistake this line exists to stop.
   hand-written `--defer`, which is precisely the "gate routinely overridden by hand" that the
   charge ledger (point 550) was built to abolish. It was deferred on 19.08.2026 with that reason
   named, so point 732 could land; the defer is a logged exception, not a pass.
+  IT WAS ALREADY MEASURED ONCE, IN AN EARLIER WINDOW (14.08.2026, 04:20, on `main` at b4c0bc36
+  while closing point 666): eleven recorded runs failed with nothing to explain them — `settings`
+  on WebGPU (13.08., 15:24 and 23:19-23:22, 18-19 reds each), `collision` on WebGPU (3 reds),
+  `flow` on WebGPU ("the run ended in a crash, not in its own report") and `settings` on WebGL 2 —
+  and four of them carried the same cap line, `103 further result line(s) exceeded the capture
+  cap`. That set has since left the guard's window (the oldest run blocking on 19.08. is from
+  17.08.), so it is the COST RECORD here rather than work still owed, and it proves the trap is
+  not one week's accident. What does not lapse with it: whichever of those reds are real product
+  defects — the WebGPU async render-pipeline console error, the TRAA/MSAA path (point 514), the
+  first-person ground micro-detail (point 603) — is named with the point that owns it when a run
+  reproduces it, never waved off as cap noise.
+  THE CAUSE FIX IS PARTLY ELSEWHERE: point 460 persists every suite's complete output to
+  `local/verify-logs/`, which is what makes a red readable at all. This point decides what a run
+  whose reds were never recorded IS, and how it leaves the guard.
   FINAL STATE:
   - THE CAP CANNOT PRODUCE AN UNCLOSABLE RUN. Either a run that would truncate its result lines
     FAILS LOUDLY as an incomplete recording rather than half-recording itself, or the cap stops
