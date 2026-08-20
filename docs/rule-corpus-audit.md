@@ -233,3 +233,40 @@ Recorded, with the reason, rather than built:
   process sections, the TASKS preamble, the user-global CLAUDE.md, and the two
   user-global timestamp hooks). Named here so the next review starts from a
   complete corpus definition rather than this one's.
+
+## G. Why-history extracted from the per-turn policy (20.08.2026)
+
+The binding rules remain in `CLAUDE.md`; these are the measurements and incidents
+kept for disputes rather than paid on every turn.
+
+- The feature-branch durability rule was set on 22.07.2026 and rescue syntax on
+  28.07. A branch-cleanup review found 31 of 36 remote branches already merged
+  into `main`; that debris led to the explicit “merge ends the branch” rule.
+- Of 60 measured first-parent commits, 42 were main-only bookkeeping and all nine
+  delegable cross-cutting changes were small. That observation supports direct
+  small bookkeeping and worktree delegation for a mechanism, not a universal
+  branch ceremony.
+- Moving closed points out of the work order removed roughly three quarters of
+  its former always-loaded content. `tasks-archive-guard` and
+  `scripts/tasks-source.mjs` are the surviving mechanism.
+- Point briefs measured about 1.8k tokens median versus roughly 108k for reading
+  the complete work order and design document. Ambiguity is printed rather than
+  guessed away.
+- Before point boundaries, 87–94% of spend was above 150k context. The two-phase,
+  sealed boundary and transferable in-flight record replaced multi-point
+  sessions; dispatcher operation now lives in `docs/batch-owner-runbook.md`.
+- The model policy changed repeatedly between 25.07 and 19.08.2026 as quota and
+  serving constraints changed. The current rule and code-owned routing are the
+  authority; dated distributions are evidence, not policy.
+- Divergent review is blind because a reviewer handed a completed list anchors
+  on it. The counted third-model merge exists because folding is the one place a
+  finding can disappear silently. Cross-vendor pairing aims at uncorrelated
+  errors; a same-model repeat is the recorded weaker fallback.
+- A guard-preflight omission once cost roughly 30 blocked turns. Two `world`
+  screenshot runs on identical code photographed different places; shutter-time
+  subject checks were the resulting mechanism. Pixel replay later measured
+  11–98% motion between equivalent captures while the smallest real defect was
+  0.75%, rejecting a golden-image shortcut.
+- The v0.2 closing skipped legacy cleanup; any subsequent cleanup would therefore
+  have missed the regression run. The ordered `CLOSING_STEPS` sequence now owns
+  the rule instead of prose recollection.

@@ -6,6 +6,7 @@ import {
   STAND_DOWN_KINDS,
   allGatedMessage,
   openPointsHeadline,
+  ownerRunbookContext,
   standDownKind,
   standDownMessage,
 } from './batch-resume-hook-core.mjs'
@@ -23,6 +24,23 @@ const watcherClaim = (responderPid) =>
   })
 const userClaim = { v: 1, sessionId: 'user-window-1', pid: 55, pidStartedAt: now - 9000, at: now - 9000 }
 const liveLock = { sessionId: 'owner-1', pid: 42, claimedAt: now - 120_000 }
+
+describe('ownerRunbookContext — role-specific policy stays with the owner', () => {
+  it.each(['acquired-spawn', 'acquired', 'mine'])('serves the runbook to %s', (ownership) => {
+    const text = ownerRunbookContext(ownership, '# Dispatch\nOwner duty.')
+    expect(text).toContain('OWNER-ONLY BATCH RUNBOOK')
+    expect(text).toContain('Owner duty.')
+  })
+
+  it.each(['none', 'reserved', 'stand-down', undefined])('serves nothing to %s', (ownership) => {
+    expect(ownerRunbookContext(ownership, 'secret owner mechanics')).toBe('')
+  })
+
+  it('does not inject an empty or unreadable runbook', () => {
+    expect(ownerRunbookContext('mine', '')).toBe('')
+    expect(ownerRunbookContext('mine', null)).toBe('')
+  })
+})
 
 describe('standDownKind — which of the four situations reached this branch', () => {
   it('THIS session is the responder when the watcher claim names its own claude process', () => {

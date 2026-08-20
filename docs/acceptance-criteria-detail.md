@@ -7,11 +7,15 @@ the evidence chains made to docs/acceptance-evidence.md, and the same one nos. 2
 made first. Each section carries its criterion COMPLETE and verbatim, notices included,
 so the move can drop nothing; §7.1 keeps the number, the bold title, one short
 acceptance condition, the `Detail:` pointer and the `Evidence:` line, and THIS file is
-what governs where the two differ in detail. Only nos. 1, 10 and 11 — genuinely one short
-statement each — and no. 18, which the work order exempts by name, stay whole in §7.1 and
-have no section here. A criterion and its detail section change in the SAME commit.
+what governs where the two differ in detail. A criterion and its detail section change in
+the SAME commit.
 
 ---
+
+## 1. Build/start.
+
+`npm install`, `npm run dev` and `npm run build` run without errors. The
+application loads without console errors.
 
 ## 2. Two perspectives.
 
@@ -123,6 +127,18 @@ item currently in use glows, and the health bar with its affliction badges sits 
 bar's right end per §17.1 (never covered by the journal). Holding Ctrl names animals,
 people and usable objects on screen (§17.8).
 
+## 10. Goal scaffolding.
+
+A procedurally placed goal (the tomb) exists; digging it up with the shovel at
+the site triggers the victory state. The site is triangulated from several
+hints through the knowing-people cascade of `design.md` §13.3.
+
+## 11. Game graphics.
+
+The visual presentation is appealing and elaborate at AAA level and replaces
+the POC's former schematic look. This includes smoothing the continent and
+river geometry, which previously showed visible steps.
+
 ## 12. Atmosphere.
 
 The atmosphere elements of `design.md` §19 are implemented — the ambient wildlife of
@@ -192,6 +208,15 @@ The game is fully playable in English as well as German per `design.md` §17.7 (
 player-visible text from the language files, runtime language switch defaulting to
 English, language-neutral journal storage re-rendered on switch, localized proper names;
 another language must require only a new language file).
+
+## 18. Lint and dependency hygiene.
+
+The codebase has no linter findings or unrecorded known vulnerabilities after
+every change. `npm run lint` reports zero errors and warnings; `npm audit` runs
+through `scripts/audit-check.mjs`, which fails every new advisory and permits
+only a justified entry in its `ALLOW` map. The current allowance is
+GHSA-f88m-g3jw-g9cj (sharp/libvips, high, no upstream fix), a transitive Node
+dependency of kokoro-js that is absent from the browser bundle.
 
 ## 19. Journal voice markup and read-aloud.
 

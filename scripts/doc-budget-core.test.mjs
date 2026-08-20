@@ -10,6 +10,7 @@ import {
   evaluateDocBudgets,
   formatDocBudgetVerdict,
 } from './doc-budget-core.mjs'
+import { docBudgetPath } from './doc-budget-guard.mjs'
 
 const ROOT = resolve(process.cwd())
 
@@ -42,6 +43,14 @@ describe('evaluateDocBudgets', () => {
   it('blocks on lines and on words separately', () => {
     const v = evaluateDocBudgets([{ path: 'X.md', text: 'a b c\nd e f\ng h i\nj k l\n' }], budgets)
     expect(v.findings.map((f) => f.kind).sort()).toEqual(['lines', 'words'])
+  })
+
+  it('blocks a memory entry that grows past the hook-only ceiling', () => {
+    const v = evaluateDocBudgets(
+      [{ path: 'MEMORY.md', text: '- short hook\n- this entry has far too many words for its index line\n' }],
+      [{ path: 'MEMORY.md', maxLines: 4, maxWords: 20, maxEntryWords: 4, why: 'hook only' }],
+    )
+    expect(v.findings.map((f) => f.kind)).toEqual(['entry words (line 2)'])
   })
 
   it('is exact at the boundary (a trailing newline counts as its own line)', () => {
@@ -77,9 +86,9 @@ describe('formatDocBudgetVerdict', () => {
 
 describe('the real documents', () => {
   it('are all within budget', () => {
-    const docs = DOC_BUDGETS.map(({ path }) => {
-      const full = resolve(ROOT, path)
-      return { path, text: existsSync(full) ? readFileSync(full, 'utf8') : null }
+    const docs = DOC_BUDGETS.map((budget) => {
+      const full = docBudgetPath(budget, { repoRoot: ROOT })
+      return { path: budget.path, text: existsSync(full) ? readFileSync(full, 'utf8') : null }
     })
     const v = evaluateDocBudgets(docs)
     expect(formatDocBudgetVerdict(v)).toBe('')
@@ -90,6 +99,17 @@ describe('the real documents', () => {
     const paths = DOC_BUDGETS.map((b) => b.path)
     expect(paths).toContain('CLAUDE.md')
     expect(paths).toContain('TASKS.md')
+    expect(paths).toContain('MEMORY.md')
+    expect(paths).toContain('global-CLAUDE.md')
+  })
+
+  it('resolves user documents without pretending they live in the repository', () => {
+    expect(docBudgetPath({ path: 'MEMORY.md', location: 'project-memory' }, { home: '/u' })).toBe(
+      '/u/.claude/projects/-workspace-hoa/memory/MEMORY.md',
+    )
+    expect(docBudgetPath({ path: 'global-CLAUDE.md', location: 'user-global' }, { home: '/u' })).toBe(
+      '/u/.claude/CLAUDE.md',
+    )
   })
 
   // Point 555 moved §7.1 out of CLAUDE.md, so the detail file is now where the

@@ -39,13 +39,27 @@ import {
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
-import { allGatedMessage, openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
+import {
+  allGatedMessage,
+  openPointsHeadline,
+  ownerRunbookContext,
+  standDownMessage,
+} from './batch-resume-hook-core.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
+
+function readOwnerRunbook() {
+  try {
+    return readFileSync(OWNER_RUNBOOK_PATH, 'utf8')
+  } catch {
+    return ''
+  }
+}
 
 /** Where git stands: current branch + whether a merge is half-done. A resumed
  *  session must know this — a crash can leave a stale feature branch or a
@@ -236,7 +250,7 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@19ee578a
+      // rule:model-policy@6f66efa2
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
       'makes that cut from point text and recorded review history, while a point\'s own ' +
@@ -351,17 +365,20 @@ try {
       // so a stood-down window never starts mending a tree it may not touch.
       const mandate = ownsBatch(ownership) ? resumeRepairMandate(readRepoVerdict()) : null
       const repoLine = mandate ? ` ${mandate}` : ''
+      const ownerContext = ownsBatch(ownership)
+        ? ownerRunbookContext(ownership, readOwnerRunbook())
+        : ''
       if (ownership === 'acquired-spawn') {
         console.log(
           `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher (the previous owner was ` +
             `provably dead). ${RESUME_BODY} ` +
-            'Do NOT idle-stop (the batch-progress-guard enforces this).',
+            `Do NOT idle-stop (the batch-progress-guard enforces this).${ownerContext}`,
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {
         console.log(
           `${header} ${gitStanding()}${repoLine} Standing user instruction: continue the batch autonomously, ` +
             `point by point, then the Closing steps — without waiting for the user to say ` +
-            `"continue". ${RESUME_BODY}`,
+            `"continue". ${RESUME_BODY}${ownerContext}`,
         )
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).

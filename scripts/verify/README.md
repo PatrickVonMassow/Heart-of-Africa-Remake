@@ -1393,6 +1393,34 @@ was ever pointed at its subject. Do NOT resolve a refusal by redeclaring the
 frame `general` — a check that reports its own subject as optional is the
 failure this mechanism exists to prevent.
 
+## Verification rules extracted from the per-turn policy
+
+Exercise features at states a player can reach. In bird's-eye view the ordinary
+zoom range is 0.125–0.5 (default 0.5); use a debug-wide zoom only when testing
+that control. Decide visibility by projecting the subject into the rendered
+frame (`__camera.onScreen`/`ndc`), never from a guessed radius, fog distance, or
+other proxy. A proxy can pass while the pixels remain wrong.
+
+Every frame declares its subject at the shutter: `world` for a place or
+landmark, `local`/`place` for settlement content, `hud` for an interface target,
+or `general` with a reason. `frameSubject.mjs` refuses a frame that does not show
+the named subject, and the unit layer refuses screenshot writes outside the
+shutter.
+
+Every browser suite launches through `launchVerifyBrowser()` and calls
+`assertBackend` after `window.__renderer` appears. WebGPU is the ordinary and
+SMALL lane; LARGE runs the full WebGL 2 regression and then the WebGPU render
+suites. `touch` and `voice` route to WebGL 2 because headless WebGPU cannot drive
+them. `docs` and `preview` are exempt because the first is pure Node and the
+second intentionally lacks the dev-only renderer probe. The accepted residual
+is explicit: a WebGL-2-only regression can surface at the next LARGE.
+
+A red closes only through a named fix, a charge to the owning open point via
+`scripts/render-verify-charges.mjs`, or a newly filed point. Passing on retry is
+SUSPECT and covers nothing; `--defer` waives one record but does not close it.
+To test a load hypothesis, use `scripts/throttle-probe.mjs` rather than inferring
+it from a later green.
+
 ## Headless limitations
 
 WebGPU IS drivable headless — but only through **system Chrome**

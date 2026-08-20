@@ -37,39 +37,35 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    // LOWERED to the size point 555 achieved (770 lines / 6511 words, down from
-    // 990 / 8992): the big cut moved ALL of §7.1 out. Every criterion keeps its
-    // number, its bold title, one short acceptance condition and its `Detail:`/
-    // `Evidence:` pointers, while its complete wording stands verbatim in
-    // docs/acceptance-criteria-detail.md — the grip point 459 first used on nos.
-    // 20 and 21, applied to the whole list — those two included, whose own
-    // conditions were shrunk to one sentence once their sections were verified
-    // to carry the criterion complete. The whole saving is banked, for the
-    // same reason as last time: this file is sent with EVERY turn of EVERY
-    // session and inherited by every delegated subagent, so a ceiling left at
-    // the old figure would simply be refilled and the tokens paid again. The
-    // margin left is the same fraction as before — 0.4 % of the lines, 0.3 % of
-    // the words, a sentence rather than a section — and the standing rule is
-    // unchanged: a genuinely new rule raises the budget by its measured size
-    // with the reason written here, a longer telling of something already in the
-    // file does not.
-    // RAISED 773/6531 → 781/6617 by point 675, the sanctioned new-rule raise:
-    // the §6 boundary paragraph carries three genuinely new rules (the
-    // two-phase sealed boundary, the landed-not-drained condition with
-    // adoption, the context watermark), written as tight as they compress —
-    // measured +5 lines / +66 words on this guard's own counter, after
-    // tightening the §7.2 BATCH-family line to pay one line back. The same
-    // small margin as before rides on top (0.4 % lines, 0.3 % words).
-    // RAISED 781/6617 → 787/6688 by point 700, the same sanctioned raise: the
-    // §6 boundary paragraph gains three genuinely new rules (the binding
-    // PreToolUse context fence with the carrier as the findings path, the
-    // transferable running verification, the recorded boundary context),
-    // measured 784 lines / 6668 words after the edit — one tight sentence
-    // each, the detail in docs/batch-autonomy.md, which is unbudgeted
-    // reference — plus the customary margin (0.4 % lines, 0.3 % words).
-    maxLines: 787,
-    maxWords: 6688,
+    // LOWERED after the 20.08.2026 three-document cut: 786 lines / 6585 words
+    // became 332 / 2091 by this guard's tokenizer. Guard mechanics, owner operation and why-history now
+    // live at their named destinations; §7.1 keeps one condition per criterion.
+    // Two lines and seven words are the same sentence-sized margin used by the
+    // previous cut. Leaving the former ceiling would invite all 4497 words back.
+    maxLines: 334,
+    maxWords: 2095,
     why: 'loaded at every session start — the most expensive document in the project',
+  },
+  {
+    path: 'MEMORY.md',
+    location: 'project-memory',
+    // LOWERED to the 20.08.2026 cut: 100 lines / 2133 words became 45 / 700
+    // by this guard's tokenizer,
+    // and the longest index entry is 21 words. The whole-file ceiling prevents
+    // new duplicate entries; the entry ceiling preserves “the hook only”.
+    maxLines: 47,
+    maxWords: 710,
+    maxEntryWords: 22,
+    why: 'loaded at every turn; the index is one hook line per surviving topic',
+  },
+  {
+    path: 'global-CLAUDE.md',
+    location: 'user-global',
+    // LOWERED to the 20.08.2026 cut: 78 lines / 752 words became the five-line,
+    // 33-word deletion-pending stub. Live rules moved into project CLAUDE.md.
+    maxLines: 6,
+    maxWords: 36,
+    why: 'loaded at every turn although this repository is its only reader',
   },
   {
     path: 'docs/acceptance-criteria-detail.md',
@@ -82,8 +78,11 @@ export const DOC_BUDGETS = [
     // criterion that genuinely gains a rule raises this budget by that rule's
     // measured size with the reason written here — and a criterion that only
     // gets a longer telling does not.
-    maxLines: 554,
-    maxWords: 5476,
+    // Four formerly in-place criteria moved here in the 20.08.2026 cut. The
+    // destination is now 579 lines / 5599 words by this guard's tokenizer; this measured raise holds the
+    // moved rules without giving their always-loaded source room to regrow.
+    maxLines: 581,
+    maxWords: 5616,
     why: 'the destination of the §7.1 cut — uncapped, it would simply refill what the cut bought',
   },
   {
@@ -208,6 +207,21 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         budget: budget.maxWords,
         why: budget.why,
       })
+    }
+    if (Number.isFinite(budget.maxEntryWords)) {
+      const lines = String(doc.text).replace(/\r\n/g, '\n').split('\n')
+      for (const [index, line] of lines.entries()) {
+        if (!/^\s*[-*]\s+/.test(line)) continue
+        const words = line.trim().split(/\s+/).filter(Boolean).length
+        if (words <= budget.maxEntryWords) continue
+        findings.push({
+          path: budget.path,
+          kind: `entry words (line ${index + 1})`,
+          actual: words,
+          budget: budget.maxEntryWords,
+          why: budget.why,
+        })
+      }
     }
   }
   return { block: findings.length > 0, findings }
