@@ -60,10 +60,6 @@
       "at": "2026-08-13T18:48:25.602Z",
       "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
     },
-    "681": {
-      "at": "2026-08-13T18:54:12.170Z",
-      "why": "Gehoert zum Release-Thema Verstaendigung und wird zusammen mit 682 und 659 gespielt; die Reihenfolge dort entscheidet 659"
-    },
     "683": {
       "at": "2026-08-13T20:19:36.791Z",
       "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
@@ -182,7 +178,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-20T09:39:36.201Z",
+    "at": "2026-08-20T10:18:00.426Z",
     "points": [
       174,
       184,
@@ -259,7 +255,6 @@
       508,
       510,
       511,
-      512,
       514,
       515,
       517,
@@ -267,7 +262,6 @@
       519,
       520,
       521,
-      522,
       523,
       528,
       529,
@@ -348,7 +342,6 @@
       677,
       678,
       680,
-      681,
       683,
       686,
       687,
@@ -410,7 +403,11 @@
       772,
       773,
       774,
-      775
+      775,
+      776,
+      777,
+      778,
+      779
     ]
   }
 }
