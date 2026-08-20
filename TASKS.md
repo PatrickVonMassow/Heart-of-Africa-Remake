@@ -6025,12 +6025,11 @@ Build order, chosen so no two parallel agents own the same file:
   is now the project's second evidence lane, so its own faults have to be
   separated from the product's.
   FINAL STATE:
-  1. Each of the two is CLASSIFIED, on a quiet machine, as either a lane fault or
+  1. The herdsRef red is CLASSIFIED, on a quiet machine, as either a lane fault or
      a product defect — the suspicion is recorded so nobody re-derives it: the
      dev hook is deleted on unmount and the compat lane builds the scene on a
      different schedule, so the access may fall into a window the suite does not
-     wait through; and the falls frame may sit differently because compat forces
-     MSAA off.
+     wait through.
   2. What turns out to be the suite's own timing is fixed at the READINESS, not
      with a longer wait: the access waits for the hook the same way the boot
      sequence does.
@@ -6065,6 +6064,15 @@ Build order, chosen so no two parallel agents own the same file:
      two probe runs and it is exactly the shape that gets misread as a product
      defect. Fixed here, with a pure test that the boot's launch options carry the
      pin.
+  NARROWED 20.08.2026: the SECOND red, `frame 72-water-victoria-falls — its subject
+  is not in the rendered picture`, leaves this point and is CHARGED to point 521,
+  which carries the same frame id and, unlike this point, a MEASURED cause for it:
+  `debugJumpTo` sets the position instantly while the travel camera springs, and the
+  shutter then fires after a fixed 1500 ms. Struck with it is this point's guess that
+  the falls frame sits differently because the compatibility lane forces MSAA off —
+  that guess was never measured, and a measured cause outranks it. Nothing else moves:
+  the herdsRef red, the `settings`/MSAA classification of items 5 and 6 and the
+  `bootGame` pin of item 7 all stay here.
   VERIFIABLE: `enrichments` and `settings` run green twice in a row on the
   compatibility lane on a quiet machine, or the host-environment section names the
   difference that makes it structurally impossible there. Plus: a probe built on
@@ -6103,6 +6111,9 @@ Build order, chosen so no two parallel agents own the same file:
   blood-stain criterion is judged by, so a green product looks red and its evidence
   never gets taken. Measured: four such aborts on WebGPU under load, 245/245 green
   on the same tree once the machine quietened.
+  Measured a third time on the WebGPU COMPATIBILITY lane (05.08.2026, charged here
+  from point 514 on 20.08.2026): the same `72-water-victoria-falls` frame missed its
+  subject there while the WebGL 2 run of the same suite, minutes apart, did not.
   FINAL STATE: the wait after a jump POLLS the camera having arrived — the spring's
   own settle, read through the existing `window.__camera` projection the shutter
   already uses — instead of counting milliseconds, with a stated timeout that fails
