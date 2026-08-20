@@ -4652,6 +4652,25 @@ Build order, chosen so no two parallel agents own the same file:
   house rule. A process counts as load only when it IS a suite (its argv NAMES a
   `scripts/verify/` entry point as the program, not inside a prompt), and the session's own
   process and its descendants never count as load against themselves.
+  ONE JUDGEMENT, ONE OWNER, AND IT SITS HERE (20.08.2026). Point 564 demands the other half of
+  the same question and pulls the other way: a check failing in BOTH runs may not be called a
+  candidate real failure while the machine reading is UNKNOWN or LOADED. The two reach different
+  modules — verified 20.08.2026: this point's verdict lives in `describeLoad`/the gate verdict of
+  `scripts/batch-doctor-core.mjs` and in the process probe of
+  `scripts/verify/machine-load-core.mjs`, 564's in `repeatSignature`/`formatRepeatReport` of
+  `scripts/verify/baseline-classify-core.mjs` — so one fix does NOT serve both, and each is built
+  where it lives. What may not differ is the CRITERION, and it is owned here, because this point
+  corrects the probe both verdicts read. The criterion: load must be SHOWN, never inferred from a
+  reading that could not be taken. A worktree nobody has written in, the session's own process
+  and a counter this host does not have are all "nothing known", and nothing known is not load.
+  THE MEASUREMENT NOBODY HAS TAKEN, and 564's default rests on it: over the recorded runs on this
+  host, how often the quiet-machine check can report a MEASURED-quiet machine at all. UNDECIDED
+  is the right verdict for a machine that could not be shown quiet and the wrong one as a
+  permanent state — on a host with no GPU busy counter it would turn every twice-failing check
+  into UNDECIDED for good, which is precisely the standing excuse this point exists to withdraw.
+  If the measurement shows a quiet reading is unreachable here, the criterion names the
+  substitute evidence (CPU and load average, with the worktree and own-process rules above) that
+  a quiet verdict may rest on, so both verdicts keep a reachable green.
   VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
   old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
   inconclusive; the reason string names the deciding measurement. Plus, on the process probe: a
@@ -6632,6 +6651,15 @@ Build order, chosen so no two parallel agents own the same file:
      of them is the twice-failing check.
   3. The diff-word match is reported as what it is: a word overlap, not a causal link. It
      may not appear at all in an UNDECIDED verdict, where it reads as corroboration.
+  WHAT COUNTS AS LOAD IS OWNED BY POINT 455 (20.08.2026). This point keeps its own subject — the
+  retry classifier's confidence wording, the marking of rate-sensitive checks and the demotion of
+  the diff-word match — and takes the definition of load from there: which evidence counts, that
+  a stale worktree and the session's own process never do, and what an unmeasurable machine
+  means. The two verdicts sit in different modules and are built separately, but they may not
+  disagree about the criterion. The one thing rule 1 may not become is a permanent verdict: 455
+  names the measurement of whether a measured-quiet reading is reachable on this host at all, and
+  rule 1 follows its answer — with a substitute reading if quiet is unreachable, so UNDECIDED
+  stays the exception it is written to be.
   VERIFIABLE: pure Vitest over the classifier — the same twice-failed input yields
   CANDIDATE REAL FAILURE under a measured-quiet machine and UNDECIDED under an unknown or
   loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
