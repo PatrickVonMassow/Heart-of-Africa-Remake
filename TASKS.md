@@ -144,6 +144,12 @@ put it is the mistake this line exists to stop.
   GIVEN — an explicit root argument or cwd — and fall back to `import.meta.url` only when nothing
   was given. The four-eyes review of that cut belongs with the other vendor before it is written,
   because it touches every guard's root resolution at once.
+  WHILE YOU WORK, THE HAZARD IS LIVE: every `npm run test:unit` before the fix lands can move the
+  live repository's refs again, and an isolation worktree shares that repository. So take
+  `git for-each-ref`, `.git/config` and `.git/HEAD` of `/workspace/hoa` BEFORE and AFTER every full
+  run, compare them, and restore and report any difference instead of working on. Prefer the
+  targeted test files until the guard from FINAL STATE exists — it is the same check, made
+  permanent.
   RELATED: the leaked branches must be removed from the live repository as part of the fix, and
   the recovery of 20.08.2026 (core.bare reset to false, `main` and `feat/800-boundary-card-one-rule`
   restored to `3e529c24`) is already done.
