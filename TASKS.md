@@ -9100,44 +9100,6 @@ to land than a mechanism that needs a review.
   between it and a landing; what makes it worth a point is that it could not be ANSWERED,
   which is the condition points 455, 640 and 643 all exist to end. Bundle: Testinfrastruktur.
 
-- [ ] 650. A review's coverage is read along with its verdict (retrospective §3.110,
-  11.08.2026). `scripts/review-sol.mjs` builds the reviewer's material from the whole
-  commit range and stops at a cap; past it, files are dropped and the reviewer says so IN
-  PROSE ("TRUNCATED/omitted"). Point 629 was reviewed five times and every single round
-  reported `worktree-cleanup.mjs` and its test tail as unseen. Nobody acted on it for four
-  rounds, and the first read of that file found a defect. An absent finding over material
-  that was never delivered reads exactly like a clean verdict.
-  THE MECHANISM EXISTS AND ONLY NEEDS WIDENING: `review-sol.mjs` already REFUSES to print a
-  record command when the reviewed range is narrower than the sha being recorded — the same
-  place decides here.
-  FINAL STATE: the tool knows what it actually sent. It reports the coverage next to the
-  verdict — how many files went in, which were dropped at the cap — and a verdict over
-  truncated material is marked PARTIAL, both on screen and in the recorded ledger entry, so
-  `.claude/mechanism-reviews.jsonl` can never carry an unqualified "merge" for a change the
-  reviewer only half saw. A PARTIAL review does not satisfy the criticality gate on its own;
-  the uncovered paths are named, and covering them — a second run scoped to the remainder,
-  or a recorded human read — is what completes it. Since the cap bites hardest on the
-  longest branches, the tool also SUGGESTS the narrower range when it truncates, which is
-  what actually worked on 629 and again on 649 (11.08.2026: three whole-branch rounds all
-  reported `worktree-cleanup.mjs` unseen; the range cut to the last two commits delivered
-  it and both test files in full, and that round found two defects the wide ones could not).
-  AND THE NARROW RANGE MUST BECOME RECORDABLE, which today it is not. The tool refuses a
-  record command whenever the reviewed range is narrower than the sha — rightly, since a
-  record at that sha clears every commit back to the merge base. But that leaves the only
-  review that SAW the material with no ledger entry at all, so a real do-not-merge over the
-  decisive files exists nowhere but in a session's memory. FINAL STATE: a narrow review is
-  recorded AS narrow — the entry names the range it actually covered, and it clears exactly
-  that range and nothing before it. A HIGH point is then cleared by a SET of recorded
-  reviews that together cover the branch, not by one entry that claims more than any single
-  run could see.
-  VERIFIABLE: Vitest over the pure part — a reviewer output naming truncation yields a
-  PARTIAL verdict and a ledger entry carrying that flag; a full-material review does not;
-  a narrow review records with its range and clears only that range; and the criticality
-  gate refuses a PARTIAL as the sole clearance for a HIGH point, but accepts a set of
-  narrow reviews that jointly cover the branch.
-  Criticality: medium — it does not break the product, but it decides how much a review is
-  worth, and every HIGH point is signed off on one. Bundle: Modell & Wächter.
-
 - [ ] 652. The session may not assert a state it did not measure, and is handed the facts it
   OTHERWISE GUESSES (user 11.08.2026, after five wrong assertions in one attended session:
   "your playing costs this machine nothing" — the container is WSL2 on the user's own host and
