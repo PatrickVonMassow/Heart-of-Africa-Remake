@@ -19849,3 +19849,51 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   naming the measured frame rate, while `VERIFY_GL=webgl` runs all four for real;
   a Vitest case pins the pure skip decision (needed vs measured throughput) in
   both directions, including that a hardware lane never skips.
+
+- [x] 438. The project hooks cannot fire outside the repo root (29.07.2026, measured in a
+  `/doctor` run and reviewed by the second model; bundle Modell & Wächter). All 31 project hooks in
+  `.claude/settings.json` are wired RELATIVELY (`node scripts/x.mjs`), so a session whose cwd
+  is not the repo root loses the WHOLE guard chain to a non-blocking `Cannot find module` —
+  silently, because a non-blocking hook error produces no notice. MEASURED over 46 transcripts
+  (06.–29.07.): session 8210a7ce 99 failures against 11 successes, 830a6878 44/51, f8c46e2f
+  43/245, 68c8c394 12/81, plus two worktree sessions. The failing cwds are the memory
+  directory, `hoa/local`, `~/.claude`, a second checkout, and removed agent worktrees; most
+  frequent are lock-heartbeat 45×, prep-arm 28×, closing-guard 26×, board-first-guard 20×,
+  every Stop guard 4×. THE PROOF OF CAUSE: the two USER-scope hooks are wired ABSOLUTELY and
+  never failed. The four-eyes review confirmed the damage — a guard blocks via stdout JSON
+  with EXIT 0, so a crash (exit 1) is non-blocking and THE VETO IS LOST: a crashed
+  `closing-guard` would have let a version tag through.
+  STATE 07.08.2026: the DETECTOR is built, reviewed over three rounds and on `main` —
+  `guard-health-core.mjs` judges each hook row's anchoring, `--wiring` prints every
+  replacement line, and `RELATIVE_WIRING_ROLLOUT` ratchets in both directions (a new
+  relative hook is a finding, and so is a record whose line is already anchored). What is
+  OWED is the rewiring itself: all 39 hook lines are still relative, and editing
+  `.claude/settings.json` needs an ATTENDED session. Measured from a foreign cwd with real
+  spawns: the relative form dies with `Cannot find module`, the anchored form fires, and the
+  `node -e` bootstrap fires only when it splices the path into `argv[1]`.
+  THE ROLLOUT, in the shape that review left it, and in this order:
+  (a) PILOT ONE harmless high-frequency hook (`lock-heartbeat-hook`) on
+  `node "$CLAUDE_PROJECT_DIR/scripts/…"` and verify it in a NEW session from a non-root cwd
+  (settings need a session restart) — only then the other 30. Never all at once: a failed
+  expansion would disable all 31 silently.
+  (b) Keep a shell-agnostic fallback ready (a `node -e` bootstrap reading
+  `process.env.CLAUDE_PROJECT_DIR`). A hardcoded absolute path is the LAST resort only —
+  `.claude/settings.json` is committed and would then bind every checkout.
+  (c) The new check belongs in `guard-health-core.mjs`, which already audits "can it fire at
+  all", but it needs STRUCTURED input: `wiringText()` hands it settings plus active git hooks
+  as one blob, and `scripts/git-hooks/pre-push`+`commit-msg` are relative ON PURPOSE (git
+  guarantees the repo root), so a naive check would accuse them.
+  (d) The switch CHANGES WORKTREE SEMANTICS — a worktree agent would run the MAIN tree's
+  guards against main-tree state instead of its own toothless checkout copies. That is
+  better, but it is a deliberate decision and belongs in the commit message, not in a silent
+  side effect.
+  (e) The removed-worktree class is NOT fixed by this (a dead cwd kills the spawn itself) and
+  stays with the worktree-hygiene work.
+  VERIFIABLE: pure Vitest on the wiring audit — a relatively wired project hook is reported, a
+  `$CLAUDE_PROJECT_DIR`-anchored one is not, the two git hooks are never accused, and an
+  unreadable settings file allows (fail-open). Live: one new session started from a non-root
+  cwd shows the piloted hook firing where it previously failed.
+  ATTENDED ONLY: `.claude/settings.json` always raises a permission prompt. MECHANISM REVIEW
+  REQUIRED (CLAUDE.md §7.2).
+  DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
+  CLAUDE.md §7.2 only if the families it names change.
