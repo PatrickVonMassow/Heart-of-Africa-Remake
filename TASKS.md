@@ -2937,8 +2937,16 @@ put it is the mistake this line exists to stop.
   - Items 30 to 32 concern OPEN work-order points, not documents; they are filed
     separately as a finding and are not part of this point.
 
-  Beyond the checklist, two things this point owes on its own:
+  Beyond the checklist, four things this point owes on its own:
 
+  - `CLAUDE.md` §7.1 point 7 is rewritten in its CURRENT wording, which item 23's
+    quote predates: the short criterion now reads "The §13 direction, tonal speech,
+    glossary, deciphering, and message-driven drummer rules hold", and glossary and
+    deciphering are not part of the rebuilt mechanic at all. The criterion names what
+    the five-word design actually asks of the player.
+  - `docs/acceptance-evidence.md` §7's evidence chain points at the tests that really
+    cover `src/communication/`, so the criterion is not signed off against evidence
+    for the superseded catalogue.
   - `design.md` §13.4 stops calling the mechanic undecided and states it in the
     present tense as the decided five-word design (the ZONE cut may remain open —
     only the village mechanic is decided).
@@ -9140,11 +9148,16 @@ to land than a mechanism that needs a review.
      in the same commit as the code change.
   3. A section that declares NO path fails as well: no silent exemption, and a criterion whose
      subject genuinely has no code (e.g. build/lint hygiene) declares that explicitly instead.
-  4. §7 and its short form in `CLAUDE.md` §7.1 point 7 are brought to the built state as the
-     first application, with what is REALLY still open from `design.md` §13.4 (the invented,
-     researched language per region) left standing as a clearly bounded remainder; the evidence
-     chain in `docs/acceptance-evidence.md` §7 points at the tests that actually cover
-     `src/communication/`.
+  4. §7 is the first section STAMPED under 1 to 3, and only stamped. NARROWED 20.08.2026:
+     the concrete REWRITE of §7, of its short form in `CLAUDE.md` §7.1 point 7 and of the
+     evidence chain in `docs/acceptance-evidence.md` §7 is struck from this point and is
+     owned by the document sweep (point 692), because the communication mechanic was rebuilt
+     on 13.08.2026 — text written here would describe the superseded mechanic a second time,
+     and the concrete wording may only be written against the landed rebuild. What stays with
+     the sweep travels with it: what is REALLY still open from `design.md` §13.4 (the
+     invented, researched language per region) stands as a clearly bounded remainder. This
+     point keeps the durable half — the binding of every criterion's detail section to the
+     code it describes, for all 32 — and stamps §7 once the sweep has left it correct.
   
   VERIFIABLE: Vitest against a fixture — a section whose paths moved after its stamp fails, one
   whose paths did not passes, a pathless section fails, and a section naming a path that does
