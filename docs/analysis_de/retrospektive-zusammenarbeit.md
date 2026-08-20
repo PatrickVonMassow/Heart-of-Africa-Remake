@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 20:00 · Quellen-Fingerprint: `6401225c5ae5…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 21:53 · Quellen-Fingerprint: `3d5d53b7e971…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1350,7 +1350,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 5 | hoch | — (Regel/Memory) | ◐ Regel |
+| Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1381,7 +1381,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 6 | hoch | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 4 | hoch | model-guard.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1398,7 +1398,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 3 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1407,10 +1407,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 76 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 77 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
 
-<!-- RETRO-FINGERPRINT: 6401225c5ae572c7c03a8c9a8c30b0aef766a53041c659c2d0a4c99c38139cc0 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T18:00:51.344Z -->
+<!-- RETRO-FINGERPRINT: 3d5d53b7e971c7c5eeecab65b26139492a1ce1ce0dc75c3cf6ce41433ddac76c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T19:53:54.757Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2236,3 +2236,40 @@ verhindern soll.
 und einen eigenen Befehl, nicht den Eintragungsweg des Normalfalls. Prüffrage: *Kann der
 ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?* Wenn nicht, ist die Ausnahme
 nicht gebaut, sondern nur behauptet, und der Mechanismus erzieht zum Schönschreiben.
+
+### 3.142 Die neue Regel verurteilte, was unter der alten erlaubt war
+
+Am 20.08.2026 um 19:34 wurde die Fable-Spur abgeschaltet, weil das Kontingent zur Neige geht.
+Um 20:40 hielt die Modell-Wache den ganzen Stapel an: Sie fand 34 Commits vom 18. und 19.08.
+mit einem Fable-Eintrag im Co-Author-Feld und nannte sie »ein Modell außerhalb der erlaubten
+Liste«. Jeder dieser Commits war regelkonform, als er entstand — Fable war da eine gewöhnliche
+Autorenspur. Die Wache maß die Vergangenheit an einer Entscheidung, die es damals nicht gab,
+und der Stapel stand, bis ein Mensch die Baseline von Hand verschob.
+
+Das ist eine eigene Klasse: Ein Schalter regelt, was von jetzt an ausgegeben werden darf, und
+seine Durchsetzung liest die Historie mit demselben Maßstab. Der aufgezeichnete Zustand trägt
+seinen Umschaltzeitpunkt — er wurde nur nicht benutzt. Und die Fehlfarbe ist die teuerste, die
+es gibt: Der Halt behauptet eine Verschlechterung des laufenden Betriebs, wo nichts vorliegt,
+also verliert genau die Meldung ihre Glaubwürdigkeit, die im Ernstfall sofort greifen muss.
+
+**Lehre:** Eine Regel, die von einem Zeitpunkt an gilt, muss ihren Zeitpunkt auch anwenden.
+Prüffrage: *Beurteilt mein Durchsetzer einen Vorgang nach der Fassung, die galt, als er
+entstand?* Wo die Antwort Nein ist, erzeugt jede Politikänderung rückwirkend Verstöße — und
+die Antwort darauf ist ein per-Vorgang gemessener Zeitvergleich, keine von Hand nachgezogene
+Baseline.
+
+### 3.143 Der Halt sperrte die eine Nachricht, die ihn beenden konnte
+
+Derselbe Halt hatte eine zweite Hälfte. Seine eigene Anweisung lautet, auf das Wort des
+Nutzers zu warten. Der Nutzer gab es um 21:09 und 21:10 — zwei Nachrichten, eine hob den Halt
+auf, eine erhöhte die Poolbreite. Um 21:28 lagen beide noch ungelesen im Postfach: Der
+Chat-Wächter weckt bei angehaltenem Stapel grundsätzlich niemanden und schrieb 45 Minuten lang
+dieselbe Zeile mit dem Grund »paused«.
+
+Die Klasse ist der Selbstverschluss: Ein Zustand nennt eine Bedingung für sein Ende und
+blockiert zugleich den einzigen Kanal, über den diese Bedingung eintreffen kann. Das fällt
+nicht auf, weil beide Hälften für sich richtig aussehen — der Halt hält, und der Wächter
+verschwendet keine Sitzung an einen ruhenden Stapel.
+
+**Lehre:** Wer einen Zustand baut, der nur von außen endet, muss den Weg von außen ausdrücklich
+offenhalten. Prüffrage: *Kommt das, was diesen Zustand beendet, im Zustand selbst noch an?*
