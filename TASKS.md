@@ -1421,6 +1421,18 @@ put it is the mistake this line exists to stop.
   536's renames enter through it, so the coverage grows while the per-touch cost does not.
   Nothing here narrows the reach, exempts a file class, or settles the coverage question those
   two points ask — which enforcers guard-health and the counters must see is theirs.
+  THE OUTSTANDING BACKLOG IS RE-BASELINED UNDER THIS CRITERION BEFORE IT IS READ (20.08.2026).
+  Point 722 owes the reading of two re-baselined ranges — 34 outstanding passes over five weeks
+  of guard work, 65 over point 712's own 46 commits, ~13.2M characters together, on the scarcest
+  reviewing lane. The measurement above says most of what put entries in that backlog was
+  demanded by a name match and never asked what the diff does, so the decision falls here: this
+  point builds the classifier and the replay that can tell a touch from a change. THE
+  MEASUREMENT NOBODY HAS TAKEN, and it is named here rather than guessed: the replay runs over
+  those two ranges as well as over the already-judged commits, and reports how many of the 99
+  outstanding passes a change-based criterion still demands. That number is what point 722 then
+  owes, and it is committed with the replay evidence. The zero-missed-findings bar above governs
+  it unchanged — a range is re-baselined by the classifier, never by the wish to read less. If
+  this point is abandoned, 722 reads both ranges under today's criterion.
   VERIFIABLE: Vitest over the pure classifier with recorded fixtures — a comment-only hunk in a
   guard core (exempt), an added test case (exempt), a deleted assertion (review-worthy), a
   one-character change inside an executable line (review-worthy), a diff mixing a comment fix
@@ -9831,6 +9843,15 @@ to land than a mechanism that needs a review.
   - Point 700's clean re-review is the FIRST record this work produces where it is still owed when
     this point starts (721's rule 4 named it; if a session already cleared it, that is recorded and
     this item is done).
+  HOW MUCH OF THE BACKLOG IS ACTUALLY OWED IS DECIDED IN POINT 735 (20.08.2026). That point
+  measures that 38 of 56 recorded reviews since 01.08. were demanded by a NAME match rather than
+  by a change, and it owns the corrected criterion together with the history replay that applies
+  it; its replay reports how many of these two ranges' 99 outstanding passes a change-based rule
+  still demands. This point's reading starts from that number, so the scarcest lane is not spent
+  on passes the corrected criterion never wanted. It does not shrink its own debt on its own
+  authority: while 735 is unbuilt, every pass recorded here stands and is read as specified. The
+  honesty of the two re-baselines is untouched either way — what 735 can change is how many
+  files the reading has to cover, never whether it is owed.
   VERIFIABLE: `node scripts/mechanism-review-guard.mjs --status` on main reports zero outstanding
   passes for the contributions of BOTH ranges, or names only contributions this point's spec
   retired with their reasons; the criticality gate holds no open finding for point 700.
