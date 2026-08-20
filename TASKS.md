@@ -76,33 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
-  while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
-  exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
-  section of `docs/acceptance-criteria-detail.md` is reported as orphaned, while the two rules
-  above it report PASS.
-  THE CAUSE IS MEASURED. `pointerRe(keyword, doc)` builds `Detail: docs/acceptance-criteria-detail.md
-  §(\d+)\.` — a BARE path. The 20.08.2026 document cut wrapped both pointer paths in BACKTICKS, so
-  CLAUDE.md §7.1 now reads ``Detail: `docs/acceptance-criteria-detail.md` §1.`` and the regex matches
-  NOTHING. `checkPointers` then finds zero pointers: `misdirected` and `unresolved` come back empty
-  because there is nothing to judge, and every section of the target document is orphaned because no
-  pointer names it. Verified directly — the regex returns false on the backticked line and true on the
-  bare one, and the `Evidence:` family has the same shape.
-  WHY IT IS MORE THAN A REGEX. The two GREEN lines are the defect, not the red one. A pointer family
-  that has stopped matching reports "every pointer has a section — all present" in exactly the same
-  words as a healthy one, so the check reads as two-thirds sound while it is blind. The orphan rule is
-  the only reason this was noticed at all, and it was noticed by a point looking for something else.
-  The same shape — a check whose subject count can silently fall to zero — is what point 555's
-  four-eyes review already closed once, for the deleted-pointer case.
-  FINAL STATE: the pointer families are recognised whether or not the path is written as code, and
-  every rule states the NUMBER of pointers it judged, so a family that matches nothing is loud rather
-  than green. `node scripts/verify/docs.mjs` exits 0 on `main`.
-  VERIFIABLE: Vitest over the pure layer — a backticked and a bare pointer both resolve; a family with
-  zero matched pointers is a FINDING rather than three passes; the existing present / missing /
-  misspelled cases stay green. Plus `scripts/verify/docs.mjs` green at HEAD.
-  Criticality: high — a verification script red on `main` whose green half proves nothing, and the
-  acceptance-criteria pointers are what CLAUDE.md §7.1 rests on since the cut.
-  Bundle: Testinfrastruktur.
 - [ ] 783. The four-eyes gate on the morning's guards cannot be satisfied by EITHER vendor, so it
   blocks every turn on `main` (measured 20.08.2026 while trying to clear it).
   `scripts/mechanism-review-guard.mjs` demands a recorded cross-vendor review for the
