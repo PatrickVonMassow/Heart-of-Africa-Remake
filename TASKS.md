@@ -76,31 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 793. A paused batch locks out the one message that ends the pause (measured 20.08.2026, 21:28).
-  WHAT WAS MEASURED. The batch stopped at 20:40 on the serving-model tripwire, whose own instruction
-  is to wait for the user's word. He gave it: two chat messages at 21:09 and 21:10, one clearing the
-  tripwire and one raising the pool cap. At 21:28 both still lay unread in `.claude/chat-spool`, and
-  `.claude/chat-watcher.log` had recorded the same line every few seconds for 45 minutes:
-  `{"event":"defer-sweep","pending":2,"decision":"skip","reason":"paused"}`. `wakeDecision()` refuses
-  every wake while `.claude/batch-paused` exists (`scripts/chat-watcher-core.mjs`), and
-  `watcherSupervision()` stops a live watcher on top of it. The user had to ask in person why his
-  answers were ignored.
-  WHY IT MATTERS: the pause is designed to end ONLY through a user instruction, and a user
-  instruction is the one message class the pause does not let through. That is a deadlock, not a
-  safeguard, and it costs exactly the time between the answer and the next session the user starts
-  by hand.
-  FINAL STATE: a pause never swallows the word that lifts it. An incoming user message wakes the
-  session even while the batch is paused — and only that, so a paused batch still starts no point, no
-  agent and no suite on its own; alternatively the paused session's own start notice names the
-  waiting mail and its count, so the next session reads the spool before anything else. Whichever
-  half is chosen, the other stays impossible to forget.
-  VERIFIABLE: pure tests — a pending user message plus a standing pause yields a wake rather than
-  `skip/paused`; the same pause without pending mail still refuses; and no path a wake opens
-  commissions work while the pause file stands.
-  Criticality: high — it silently drops the user's instructions, which is the input the whole batch
-  waits on.
-  Bundle: Chat & Tafel.
-
 - [ ] 794. The user ruled on the guide's size budget: raise the ceiling, drop no pitfall
   (USER-ANSWERED(2026-08-20), given at 21:10 and first executed against the wrong mechanism).
   WHAT WAS ASKED. `docs/analysis_de/vibe-coding-anleitung.md` stands exactly at its ceiling — 415
