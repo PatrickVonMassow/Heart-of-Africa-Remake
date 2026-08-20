@@ -18,67 +18,177 @@
 // PURE. The wrapper scripts/clear-claim-guard.mjs does the reading.
 
 /**
- * How a reply asks the user to end the session. German first, since replies to
- * the user are German; the slash form is the one that needs no context at all.
+ * How a reply asks the user to end the session — deliberately NARROW.
  *
- * Each pattern needs an IMPERATIVE or the slash spelling, never the bare word:
- * "das Bild ist clear" and a sentence ABOUT the clear mechanism must not trip a
- * guard whose refusal costs a turn.
+ * FOUR cross-vendor rounds on 20.08.2026 each found new prose the previous draft
+ * refused wrongly: an indicative that reads like an imperative, a noun that
+ * contains one, a quotation of the very sentence this guard looks for, an
+ * unrelated "mach das Bild clear", a negation escaping past a comma. That is not
+ * a list of bugs to work through — it is what a regex over free German prose is,
+ * and every round of widening bought a new class of false refusals.
  *
- * The session patterns exist in BOTH word orders, because German puts the object
- * either way round — "die neue Sitzung … starte sie" and "Starte eine neue
- * Sitzung" are one instruction. BOTH orders demand a real imperative FORM, never
- * a stem with `\w*` after it: "Die neue Sitzung startet automatisch" is a
- * description, and a guard whose refusal costs a turn may not read it as an order
- * (cross-vendor review, 20.08.2026).
+ * THE TWO ERRORS ARE NOT SYMMETRIC. A missed invitation costs nothing: the claim
+ * is withdrawn at the boundary anyway and the batch is unharmed. A false refusal
+ * costs a whole turn and teaches the reader to distrust the guard. So this
+ * matcher recognises only shapes that cannot be anything else, and every
+ * ambiguity — every single one — resolves toward ALLOW. Misses are the price and
+ * they are cheap.
+ *
+ * The one structural rule that does the work: a German imperative LEADS its
+ * clause. Requiring the verb to be the clause's first word removes the whole
+ * indicative-and-noun family at a stroke, without a list of exceptions.
  */
-const IMPERATIVE = String.raw`(?:starte|start|beginne|beginn|nimm|nehmt|f[üu]hre|mach|mache|machst)`
+// A leading "Bitte" is the one particle that may precede the verb without making
+// the clause anything other than an order — "Bitte führe einen clear aus". The
+// adverbs that also lead clauses ("jetzt", "dann", "danach") are NOT allowed
+// here: they lead indicative sentences just as readily, and each one bought a
+// false refusal in the cross-vendor rounds of 20.08.2026.
+const LEAD = String.raw`(?:bitte\s+)?`
+const IMPERATIVE = String.raw`(?:starte|beginne|nimm|f[üu]hre|mach|mache)`
+const POLITE = String.raw`(?:Starten|Beginnen|Nehmen|F[üu]hren|Machen)\s+Sie`
+const SESSION = String.raw`(?:neue|neuen|frische|frischen)\s+Sitzung`
+
+// German puts the verb first in a CONDITIONAL too: "Starte ich eine neue Sitzung,
+// verliere ich den Kontext" is a statement, not an order. What separates them is
+// the subject pronoun right after the verb — an imperative never has one
+// (cross-vendor review, 20.08.2026).
+const SUBJECT = String.raw`(?!\s+(?:ich|du|er|sie|es|wir|ihr|man)\b)`
+
+// The gap between the verb and the command is a FILLER whitelist, not a wildcard.
+// A 40-character wildcard let an object slip in — "Führe den Test für /clear aus"
+// is an order about something else entirely — and only these few words can stand
+// between an imperative and its object without changing what is being ordered.
+const FILLER = String.raw`(?:\s+(?:bitte|jetzt|nun|dann|danach|noch|mal|am\s+besten|zuerst|gleich|z\.\s*B\.|zum\s+Beispiel))*\s*`
+// An article may stand between the verb and the object, and nothing else.
+const ARTICLE = String.raw`(?:(?:eine|einen|die|den|nen)\s+)?`
+
+// And nothing substantive may follow the command, or the clause is ABOUT it
+// rather than asking for it: "`Mach bitte /clear` ist der Positivfall" quotes the
+// order inside a sentence that makes a claim.
+// A German separable prefix belongs to the verb and may stand after the object:
+// "führe einen clear AUS". It is part of the order, not something after it.
+const PREFIX = String.raw`(?:\s+(?:aus|an|auf|durch|weiter|nach))?`
+const TAIL = String.raw`${PREFIX}[\s.!?)»"'\u201c\u201d\u0060]*$`
+
+/** A clause that IS the slash command, or leads with an imperative carrying it. */
+const SLASH_CLEAR = new RegExp(
+  String.raw`^(?:${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}\/clear\b|\/clear\b)${TAIL}`,
+  'i',
+)
+
+// The bare word only with an ARTICLE in front of it, which is what turns it into
+// the command: "mach einen clear" is the instruction, "mach das Bild clear" is an
+// adjective and an unrelated editing order (cross-vendor review, 20.08.2026).
+const ARTICLED_CLEAR = new RegExp(
+  String.raw`^${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}(?:einen|den|nen)\s+clear\b${TAIL}`,
+  'i',
+)
 
 export const CLEAR_INVITATION = Object.freeze([
-  /(?:^|[\s(«"'`])\/clear\b/i,
-  /\b(?:mach|mache|machst|starte|f[üu]hre)\b[^.!?\n]{0,60}\bclear\b/i,
-  /\bclear\b[^.!?\n]{0,60}\b(?:kann kommen|kannst du machen|bitte|jetzt machen)\b/i,
-  new RegExp(String.raw`\b(?:neue|neuen|frische|frischen)\s+Sitzung\b[^.!?\n]{0,60}\b${IMPERATIVE}\b`, 'i'),
-  new RegExp(String.raw`\b${IMPERATIVE}\b[^.!?\n]{0,60}\b(?:neue|neuen|frische|frischen)\s+Sitzung\b`, 'i'),
-  /\bstart(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
+  SLASH_CLEAR,
+  ARTICLED_CLEAR,
+  new RegExp(
+    String.raw`^${LEAD}(?:${IMPERATIVE})${SUBJECT}\b${FILLER}${ARTICLE}${SESSION}\b${TAIL}`,
+    'i',
+  ),
+  new RegExp(String.raw`^${LEAD}(?:${POLITE})\b${FILLER}${ARTICLE}${SESSION}\b${TAIL}`),
+  // English keeps no end constraint: a trailing prepositional phrase is ordinary
+  // there ("… for the rest"), and the quoted-fixture case it would guard against
+  // is already handled by stripping quotations and fenced code.
+  // "session" must END the order or be followed by one of the prepositions that
+  // can only introduce a purpose or a time. "in" and "on" are NOT among them:
+  // "Start a new session in the test suite" is an order about something else
+  // entirely (cross-vendor rounds, 20.08.2026).
+  /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b(?=[\s.!?,;]*$|\s+(?:for|to|with|after|before|once|when|now|please)\b)/i,
 ])
 
 /**
- * A NEGATED instruction is not an invitation. "Mach keinen Clear", "Mach keinen
- * `/clear`" and "Führe einen Clear bitte nicht aus" carry every word the patterns
- * look for and mean the opposite.
- *
- * DOUBLE NEGATION ("mach nicht keinen Clear") is deliberately read as negated
- * rather than counted out. Counting negators would be wrong in the ordinary case
- * — "Starte keine neue Sitzung, ich brauche das nicht" holds two and IS negated —
- * and this guard's stated fail direction is to ALLOW whenever it cannot be sure.
+ * A NEGATED sentence is not an invitation — and the unit is the SENTENCE, not
+ * the clause, precisely because that direction only ever produces MISSES. A
+ * postposed "aber bitte nicht" sits in its own clause and still negates the
+ * order before it; under the asymmetry above, reading too much as negated is the
+ * safe mistake.
  */
 const NEGATOR = /\b(?:kein|keine|keinen|keinem|keines|keiner|nicht|niemals|nie)\b/i
 
 /**
- * Sentences, so each instruction is judged on its own words.
- *
- * The unit has to be the SENTENCE, not the matched span: a span ends at the word
- * that matched, so a negation before it ("Mach keinen /clear") or after it
- * ("Führe einen Clear bitte nicht aus") falls outside and the guard reads the
- * opposite of what stands there. Judging sentence by sentence also stops one
- * negated sentence from covering a genuine invitation later in the same reply —
- * "Mach keinen Clear. Danach mach bitte einen Clear." must still block
- * (cross-vendor review, 20.08.2026).
+ * A QUOTED sentence is a mention, not an order: "Der Negativtest verwendet den
+ * Satz „Mach bitte /clear“." talks ABOUT the instruction. Quoted spans and
+ * backticked code are removed before matching, which is a rule that can be read
+ * off the text rather than guessed at.
  */
-export function sentencesOf(text) {
+function withoutQuotations(text) {
   return String(text ?? '')
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((part) => part.trim())
+    // Fenced code first, or its own backticks would be unwrapped line by line and
+    // a fixture inside it would read as an order (cross-vendor review, 20.08.2026).
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/~~~[\s\S]*?~~~/g, ' ')
+    .replace(/„[^“\n]*“/g, ' ')
+    .replace(/»[^«\n]*«/g, ' ')
+    .replace(/"[^"\n]*"/g, ' ')
+    // A backticked span that IS the whole line is a fixture being shown, not an
+    // order being given: "`Mach bitte /clear`" on its own, or as a list item.
+    // Only inline code INSIDE a sentence is unwrapped, because this project
+    // writes the command in backticks while asking for it (cross-vendor review,
+    // 20.08.2026).
+    .replace(/^[ \t]*(?:[-*•]\s*|\d+\.\s*)?`[^`\n]*`\s*$/gm, ' ')
+    .replace(/`([^`\n]*)`/g, '$1')
+}
+
+/**
+ * Sentences, then clauses. An abbreviation such as "z. B." must not end a
+ * sentence, or the split falls between an imperative and its object.
+ */
+const ABBREVIATION = /(?:^|\s)(?:[A-Za-zÄÖÜäöü]|z|bzw|ca|vgl|evtl|ggf|Nr|Abs|Dr|usw|etc)\.$/
+
+export function sentencesOf(text) {
+  const value = withoutQuotations(text)
+  const pieces = []
+  let current = ''
+  for (const ch of value) {
+    if (ch === '\n') {
+      pieces.push(current)
+      current = ''
+      continue
+    }
+    current += ch
+    if ((ch === '.' || ch === '!' || ch === '?') && !ABBREVIATION.test(current)) {
+      pieces.push(current)
+      current = ''
+    }
+  }
+  pieces.push(current)
+  return pieces.map((part) => part.trim()).filter(Boolean)
+}
+
+/** Clauses of one sentence, with the list markers a bullet line carries stripped. */
+export function clausesOf(sentence) {
+  return String(sentence ?? '')
+    .split(/[,;]/)
+    .map((part) => part.trim().replace(/^(?:[-*•]|\d+\.)\s*/, ''))
     .filter(Boolean)
 }
 
-/** Does this reply ask the user to clear or to start a fresh session? */
+/**
+ * Does this reply ask the user to clear or to start a fresh session?
+ *
+ * A negated SENTENCE is skipped whole, and a negated heading ending in a colon
+ * disarms the lines under it — both are miss-producing directions, which is the
+ * side this guard errs on.
+ */
 export function invitesClear(text) {
-  return sentencesOf(text).some(
-    (sentence) =>
-      !NEGATOR.test(sentence) && CLEAR_INVITATION.some((pattern) => pattern.test(sentence)),
-  )
+  let disarmedByHeading = false
+  return sentencesOf(text).some((sentence) => {
+    if (/:$/.test(sentence)) {
+      disarmedByHeading = NEGATOR.test(sentence)
+      return false
+    }
+    if (disarmedByHeading) return false
+    if (NEGATOR.test(sentence)) return false
+    return clausesOf(sentence).some((clause) =>
+      CLEAR_INVITATION.some((pattern) => pattern.test(clause)),
+    )
+  })
 }
 
 /**

@@ -11,10 +11,9 @@ describe('invitesClear — what counts as asking the user to end the session', (
   it('catches the shapes this project actually writes', () => {
     for (const text of [
       '**Donnerstag, 20.08.2026, 08:22**\n\nGesichert ist alles. Mach bitte `/clear`.',
-      'Jetzt kann /clear kommen.',
       'Mach am besten einen clear, dann ist der Kontext frei.',
       'Bitte führe einen clear aus.',
-      'Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.',
+      'Starte eine neue Sitzung, sobald das gepusht ist.',
       'Please start a fresh session for the rest.',
     ]) {
       expect(invitesClear(text), text).toBe(true)
@@ -25,7 +24,6 @@ describe('invitesClear — what counts as asking the user to end the session', (
     for (const text of [
       'Starte eine neue Sitzung, die den Rest aufnimmt.',
       'Beginne bitte eine frische Sitzung.',
-      'Nimm den Rest in einer neuen Sitzung auf.',
     ]) {
       expect(invitesClear(text), text).toBe(true)
     }
@@ -55,7 +53,7 @@ describe('invitesClear — what counts as asking the user to end the session', (
   })
 
   it('judges each sentence, so a negated one cannot cover a real invitation after it', () => {
-    expect(invitesClear('Mach keinen Clear. Danach mach bitte einen Clear.')).toBe(true)
+    expect(invitesClear('Mach keinen Clear. Mach bitte /clear.')).toBe(true)
     expect(invitesClear('Alles ist gepusht.\nStarte eine neue Sitzung.')).toBe(true)
   })
 
@@ -67,6 +65,104 @@ describe('invitesClear — what counts as asking the user to end the session', (
     ]) {
       expect(invitesClear(text), text).toBe(false)
     }
+  })
+
+  // Round three of the cross-vendor review, 20.08.2026. Each case is one the
+  // sentence-only draft got wrong, and together they are why negation is judged
+  // per CLAUSE while the invitation is matched per SENTENCE.
+  // THE DELIBERATE MISSES. Each of these IS an invitation and is nevertheless
+  // allowed, because recognising it would take a rule that refuses innocent
+  // prose as well — measured over four cross-vendor rounds on 20.08.2026. A miss
+  // costs nothing (the claim is withdrawn at the boundary anyway); a false
+  // refusal costs a turn. They are pinned so nobody "fixes" one by widening the
+  // matcher without paying that price knowingly.
+  it('MISSES an invitation rather than risk refusing innocent prose', () => {
+    for (const text of [
+      'Jetzt kann /clear kommen.',
+      'Der Kontext ist nicht mehr nötig, starte eine neue Sitzung.',
+      'Die neue Sitzung nimmt den Schnitt frisch auf, starte sie danach.',
+      'Danach mach bitte einen Clear.',
+      // Structurally identical to "Starte den Test für eine neue Sitzung", which
+      // is NOT an invitation: an object and a preposition stand between the verb
+      // and the session. No pattern separates the two, so both pass.
+      'Nimm den Rest in einer neuen Sitzung auf.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
+  it('does not split an abbreviation, which would separate the verb from its object', () => {
+    expect(invitesClear('Starte z. B. eine neue Sitzung.')).toBe(true)
+  })
+
+  it('lets a negated heading govern the list under it', () => {
+    expect(invitesClear('Bitte nicht:\n- Starte eine neue Sitzung.')).toBe(false)
+    expect(invitesClear('Als Nächstes:\n- Starte eine neue Sitzung.')).toBe(true)
+  })
+
+  it('reads the slash form only where an imperative leads the clause', () => {
+    expect(invitesClear('Der Befehl `/clear` leert den Kontext.')).toBe(false)
+    expect(invitesClear('Jetzt arbeite ich weiter, der Befehl /clear leert den Kontext.')).toBe(false)
+    expect(invitesClear('Der Negativtest verwendet den Satz „Mach bitte /clear“.')).toBe(false)
+    expect(invitesClear('Mach bitte `/clear`.')).toBe(true)
+  })
+
+  it('does not read a quoted or fenced fixture as an order, in any of its forms', () => {
+    for (const text of [
+      '`Mach bitte einen clear` ist der Positivfall.',
+      '`Starte eine neue Sitzung` ist der Positivfall.',
+      'Starte den Test für eine neue Sitzung.',
+      'Positivfixture:\n```\n/clear\n```',
+      '`Mach bitte /clear`',
+      '- `Mach bitte /clear`',
+      'Start a new session fixture in the test suite.',
+      'Start a new session in the test suite.',
+      '  - `Mach bitte /clear`',
+      '\t* `Starte eine neue Sitzung`',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
+  it('does not read a verb-first CONDITIONAL as an order', () => {
+    expect(invitesClear('Starte ich eine neue Sitzung, verliere ich den Kontext.')).toBe(false)
+    expect(invitesClear('Mache ich einen clear, ist der Kontext weg.')).toBe(false)
+  })
+
+  it('does not read an order ABOUT something else, or a quoted fixture, as this order', () => {
+    for (const text of [
+      'Führe den Test für `/clear` aus.',
+      '`Mach bitte /clear` ist der Positivfall.',
+      'Nimm den Befehl /clear in die Dokumentation auf.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
+  it('does not read an indicative or a noun as an order, whatever its case', () => {
+    for (const text of [
+      'Eine neue Sitzung starten sie automatisch.',
+      'Der Beginn einer neuen Sitzung wird protokolliert.',
+      'Mach bitte weiter; die neue Sitzung startet automatisch.',
+      'Mach das Bild bitte clear.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
+  it('lets a postposed negation disarm the order before it', () => {
+    expect(invitesClear('Starte eine neue Sitzung, aber bitte nicht.')).toBe(false)
+  })
+
+  it('leaves out the forms that are also ordinary indicative, rather than guessing', () => {
+    for (const text of [
+      'Die neue Sitzung startet automatisch.',
+      'Der Launcher beginnt die neue Sitzung innerhalb seines Intervalls.',
+      'Du machst eine neue Sitzung auf.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+    expect(invitesClear('Starten Sie eine neue Sitzung.')).toBe(true)
   })
 
   it('does not fire on the word alone, so talking ABOUT the rule stays possible', () => {
@@ -155,6 +251,16 @@ describe('gatherClearClaimCondition — what the preflight reports', () => {
     expect(got.cause).toBeUndefined()
   })
 
+  it('is not applicable when the record is a RELEASED claim, whatever the session', async () => {
+    const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
+    const released = claim({ releasedAt: Date.parse('2026-08-20T09:00:00.000Z') })
+    for (const sid of [SID, '']) {
+      const got = gatherClearClaimCondition({ sessionId: sid, claim: released })
+      expect(got.applicable, sid || '(no session)').toBe(false)
+      expect(got.cause, sid || '(no session)').toBeUndefined()
+    }
+  })
+
   it('is not applicable when the standing claim is another session’s', async () => {
     const { gatherClearClaimCondition } = await import('./clear-claim-guard.mjs')
     const got = gatherClearClaimCondition({ sessionId: 'someone-else', claim: claim() })
@@ -198,5 +304,159 @@ describe('gatherClearClaimCondition — what the preflight reports', () => {
     await withClaimPath('/tmp/elsewhere.json', () => {
       expect(claimPath()).toBe('/tmp/elsewhere.json')
     })
+  })
+})
+
+// The hook's own I/O — stdin payload, transcript read, stdout verdict — which no
+// test touched before the third cross-vendor round asked for it (20.08.2026).
+describe('the hook itself, run as the entry script', () => {
+  const run = async ({ payload, claimFile }) => {
+    const { spawnSync } = await import('node:child_process')
+    const { repoPath } = await import('./repo-paths.mjs')
+    const script = repoPath('scripts/clear-claim-guard.mjs')
+    const res = spawnSync(process.execPath, [script], {
+      input: JSON.stringify(payload),
+      encoding: 'utf8',
+      env: { ...process.env, BATCH_CLAIM_PATH: claimFile },
+      windowsHide: true,
+    })
+    return { out: res.stdout.trim(), status: res.status }
+  }
+
+  const fixture = async (rows, claimBody) => {
+    const { writeFileSync, mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const dir = mkdtempSync(join(tmpdir(), 'claimhook-'))
+    const transcript = join(dir, 'transcript.jsonl')
+    const claimFile = join(dir, 'claim.json')
+    writeFileSync(transcript, rows.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8')
+    writeFileSync(claimFile, JSON.stringify(claimBody), 'utf8')
+    return { transcript, claimFile }
+  }
+
+  const assistantRow = (text, timestamp) => ({
+    type: 'assistant',
+    timestamp,
+    message: { content: [{ type: 'text', text }] },
+  })
+
+  it('writes the block on stdout when the reply invites a clear under a live claim', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Alles ist gepusht. Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(JSON.parse(out).decision).toBe('block')
+  })
+
+  it('says nothing when the reply carries no invitation', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Alles ist gepusht. Ich arbeite weiter.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
+  })
+
+  it('does not judge a reply written BEFORE the claim was taken', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Mach bitte `/clear`.', '2026-08-20T08:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T09:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
+  })
+
+  it('stays silent on a claim that belongs to another session', async () => {
+    const { transcript, claimFile } = await fixture(
+      [assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: 'someone-else', at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const other = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(other.out).toBe('')
+    expect(other.status).toBe(0)
+  })
+
+  it('does not judge a narration row that carries a tool call beside its text', async () => {
+    const { transcript, claimFile } = await fixture(
+      [
+        assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z'),
+        {
+          type: 'assistant',
+          timestamp: '2026-08-20T09:00:01.000Z',
+          message: {
+            content: [
+              { type: 'text', text: 'Jetzt die Änderung.' },
+              { type: 'tool_use', id: 't1', name: 'Bash', input: {} },
+            ],
+          },
+        },
+      ],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
+  })
+
+  it('does not judge while the final reply is still unflushed', async () => {
+    // The transcript ENDS with a tool result, so the newest assistant text is the
+    // previous reply — the refused one whose correction is being written now.
+    const { transcript, claimFile } = await fixture(
+      [
+        assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z'),
+        { type: 'user', timestamp: '2026-08-20T09:00:01.000Z', message: { content: [{ type: 'tool_result', content: 'ok' }] } },
+      ],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
+  })
+
+  it('stays silent, and exits clean, on stdin that is not JSON at all', async () => {
+    const { spawnSync } = await import('node:child_process')
+    const { repoPath } = await import('./repo-paths.mjs')
+    const res = spawnSync(process.execPath, [repoPath('scripts/clear-claim-guard.mjs')], {
+      input: 'this is not json',
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(res.stdout.trim()).toBe('')
+    expect(res.status).toBe(0)
+  })
+
+  it('stays silent when the claim file is missing entirely', async () => {
+    const { transcript } = await fixture(
+      [assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z')],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const gone = join(mkdtempSync(join(tmpdir(), 'noclaim-')), 'claim.json')
+    const res = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile: gone,
+    })
+    expect(res.out).toBe('')
+    expect(res.status).toBe(0)
   })
 })
