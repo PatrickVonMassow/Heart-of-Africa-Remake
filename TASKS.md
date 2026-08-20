@@ -488,6 +488,40 @@ put it is the mistake this line exists to stop.
   delays it invisibly.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 759. The context fence's worktree stand-down never fires, so every delegated agent is
+  fenced against its PARENT session's context (measured 20.08.2026 by the agent on point 758).
+  `scripts/context-fence-guard.mjs` exits early when `isWorktreeCheckout(REPO_ROOT)` holds — the
+  stand-down that is supposed to keep the fence off subagents. But the harness runs the hook from
+  the MAIN checkout, so `REPO_ROOT` is always the main tree and that exit is unreachable. The
+  agent's tool calls carry the PARENT session's id, therefore match the owner lock, and are then
+  judged against the PARENT SESSION'S TRANSCRIPT — a reading that has nothing to do with the
+  agent's own context. The counter-check was taken: the guard's copy inside the worktree admits
+  exactly the payload the live hook had refused.
+  THE COST IS ON THE RECORD, from the day it was found: the agent could not start `node
+  scripts/author-sol.mjs` (refused at 112k–156k against the 110,000 mark), so Claude Opus 5
+  authored point 758 itself instead of GPT-5.6 Sol; and `review-sol.mjs` sits in the same
+  `START_SCRIPTS` set, so the cross-vendor review was unreachable from the worktree too. That is
+  the model policy and the four-eyes principle of CLAUDE.md §6 disabled at once, by a guard whose
+  stand-down was written precisely to prevent it, and it hits EVERY worktree agent.
+  IT IS MASKED, NOT FIXED, BY POINT 758: with the fence in its default observation mode nothing
+  is refused today, so this defect is invisible until the fence is re-armed. Re-arming is a
+  condition inside point 747, and this point is a PRECONDITION of it — arming the fence again
+  while the stand-down is unreachable restores the blockade in full.
+  FINAL STATE: the stand-down no longer hangs on `REPO_ROOT` but on the CALLING tree — the tool
+  call's working directory, and failing that the agent session's own identity — so a call made
+  from a worktree stands down while the owner session's own calls stay fenced. The fence never
+  judges one session's calls against another session's transcript: where the caller cannot be
+  identified, it stands down rather than fencing on the wrong reading, because a refusal taken
+  from a foreign measurement is worse than a missed one.
+  VERIFIABLE: Vitest over the pure core — an agent call whose working directory lies in
+  `.claude/worktrees/` is admitted while the identical payload from the owner session in the main
+  tree is refused (the case must fail against today's code, or it proves nothing); a call with no
+  identifiable tree stands down; and the armed-mode refusal of the owner session is unchanged.
+  Criticality: medium — it refuses nothing while the fence observes, but it silently voids the
+  model policy the moment the fence is armed. A guard change is a mechanism, so it needs the
+  other model's recorded review before it lands.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 747. The ceiling is recalibrated from a series, and gives ground back only against
   evidence (19.08.2026). Point 743 buys safety with a small working window, and that price is
   meant to be temporary: once the output budget of 597 caps the largest single jump and point
@@ -9675,39 +9709,5 @@ to land than a mechanism that needs a review.
   Criticality: medium — it cannot corrupt the repository, but it silently mis-reads quoted text
   as intent in the guard that governs what a session may still do, and its failure mode is a
   refusal nobody can distinguish from a real one. A guard change is a mechanism, so it needs the
-  other model's recorded review before it lands.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 759. The context fence's worktree stand-down never fires, so every delegated agent is
-  fenced against its PARENT session's context (measured 20.08.2026 by the agent on point 758).
-  `scripts/context-fence-guard.mjs` exits early when `isWorktreeCheckout(REPO_ROOT)` holds — the
-  stand-down that is supposed to keep the fence off subagents. But the harness runs the hook from
-  the MAIN checkout, so `REPO_ROOT` is always the main tree and that exit is unreachable. The
-  agent's tool calls carry the PARENT session's id, therefore match the owner lock, and are then
-  judged against the PARENT SESSION'S TRANSCRIPT — a reading that has nothing to do with the
-  agent's own context. The counter-check was taken: the guard's copy inside the worktree admits
-  exactly the payload the live hook had refused.
-  THE COST IS ON THE RECORD, from the day it was found: the agent could not start `node
-  scripts/author-sol.mjs` (refused at 112k–156k against the 110,000 mark), so Claude Opus 5
-  authored point 758 itself instead of GPT-5.6 Sol; and `review-sol.mjs` sits in the same
-  `START_SCRIPTS` set, so the cross-vendor review was unreachable from the worktree too. That is
-  the model policy and the four-eyes principle of CLAUDE.md §6 disabled at once, by a guard whose
-  stand-down was written precisely to prevent it, and it hits EVERY worktree agent.
-  IT IS MASKED, NOT FIXED, BY POINT 758: with the fence in its default observation mode nothing
-  is refused today, so this defect is invisible until the fence is re-armed. Re-arming is a
-  condition inside point 747, and this point is a PRECONDITION of it — arming the fence again
-  while the stand-down is unreachable restores the blockade in full.
-  FINAL STATE: the stand-down no longer hangs on `REPO_ROOT` but on the CALLING tree — the tool
-  call's working directory, and failing that the agent session's own identity — so a call made
-  from a worktree stands down while the owner session's own calls stay fenced. The fence never
-  judges one session's calls against another session's transcript: where the caller cannot be
-  identified, it stands down rather than fencing on the wrong reading, because a refusal taken
-  from a foreign measurement is worse than a missed one.
-  VERIFIABLE: Vitest over the pure core — an agent call whose working directory lies in
-  `.claude/worktrees/` is admitted while the identical payload from the owner session in the main
-  tree is refused (the case must fail against today's code, or it proves nothing); a call with no
-  identifiable tree stands down; and the armed-mode refusal of the owner session is unchanged.
-  Criticality: medium — it refuses nothing while the fence observes, but it silently voids the
-  model policy the moment the fence is armed. A guard change is a mechanism, so it needs the
   other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.

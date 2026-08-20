@@ -1313,7 +1313,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 01:36 · Quellen-Fingerprint: `f860cdf9c655…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 03:05 · Quellen-Fingerprint: `2fb806d09704…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1406,10 +1406,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 63 Prozess-/Meta-TASKS-Punkte (davon 28 offen).
+Erfasste Quellen: 85 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 64 Prozess-/Meta-TASKS-Punkte (davon 29 offen).
 
-<!-- RETRO-FINGERPRINT: f860cdf9c6554c0b97b5a1101d32934aeb39a993df6ccc3bb7ed2a5214ea8709 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-19T23:36:24.655Z -->
+<!-- RETRO-FINGERPRINT: 2fb806d0970478853d8ec9ba1772a01878425140dcf8a3fa33e18e1fac6b3887 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T01:05:48.692Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1877,3 +1877,52 @@ Der Fund ist hier ausdrücklich **kein langsamer Wächter** und keine zu strenge
 Seiten waren richtig; falsch war allein, dass sie nichts voneinander wussten. Und drittens,
 als Gegenprobe zu §3.44: Wer eine Abhilfe nur für den gemessenen Ausschnitt verdrahtet, hat
 die Klasse nicht geschlossen, sondern die Stichprobe.
+
+### 3.130 Die Grenze kam vor der Arbeit, die sie erfüllbar gemacht hätte
+
+Am 20.08.2026, 01:34, hat der Nutzer den Kontext-Zaun abgeräumt, und seine Begründung ist
+die schärfere Fassung dessen, was drei Sitzungen vorher schon gemessen hatten: »Die Limits
+jetzt einzuführen war Unfug. Das hätte ganz am Ende passieren müssen, wenn die offenen
+Tickets den Verbrauch gesenkt haben. So wie es steht, sind die neuen Anforderungen gar nicht
+erfüllbar.« Der Befund dahinter ist arithmetisch und nicht strittig: Der Startboden einer
+frisch geleerten Sitzung lag bei 61.372 Token, drei Sitzungen in Folge standen bei 85.225,
+83.079 und 86.416 Token — vor der ersten eigenen Handlung —, und die Schwelle stand bei
+82.000. Der Zaun verweigerte Schreibzugriff auf genau die Dateimenge, die der Punkt zum
+Senken des Startbodens hätte ändern müssen. Die Grenze verbot die Arbeit, die die Grenze
+erfüllbar gemacht hätte.
+
+Das ist keine zu strenge Schwelle und kein Messfehler, sondern eine Reihenfolge. Eine
+Verbrauchsgrenze ist nur dann eine Grenze, wenn es unterhalb von ihr einen Arbeitsraum gibt;
+ohne den ist sie ein Verbot. Und der Beweis dafür stand vor dem Scharfschalten zur
+Verfügung — der Startboden war messbar, bevor die Schwelle darüber gelegt wurde.
+
+**Lehren:** Eine Grenze wird gegen den GEMESSENEN Boden gelegt, nicht gegen den erhofften,
+und der verbleibende Arbeitsraum ist die Zahl, die man ausrechnet, bevor man scharfschaltet.
+Wo die Reihenfolge unklar ist, kommt die verbrauchssenkende Arbeit zuerst und die Grenze
+danach — die Umkehrung kostet nicht nur die Sitzungen, die sie strandet, sondern verzögert
+die Abhilfe, an der sie hängt. Und ein abgeschaltetes Tor muss als abgeschaltet SICHTBAR
+sein: Der Ersatz war ein benannter Beobachtungsmodus, keine unerreichbar hoch gesetzte
+Schwelle, weil ein Tor, das nie feuert, sonst wie ein bestandenes aussieht.
+
+### 3.131 Die Ausnahme war gebaut, geprüft — und an einer Bedingung aufgehängt, die nie eintritt
+
+Der Kontext-Zaun hat von Anfang an einen Ausstieg für Subagenten: Läuft er in einem Worktree,
+soll er sich heraushalten, denn die Messung gilt der Eigentümersitzung. Der Ausstieg ist
+geschrieben, er ist von Tests gedeckt, und er feuert nie. Denn die Harness führt den Hook aus
+dem HAUPT-Checkout aus — die Variable, die er prüft, ist dort immer der Hauptbaum, und die
+Form, auf die er testet, kann in der Produktion nicht auftreten. Der Test bewies die
+Funktion; die Annahme über ihren Aufrufort hat er nicht geprüft.
+
+Der Schaden war lautlos und traf die Modellpolitik. Die Aufrufe des delegierten Agenten
+tragen die Sitzungs-Id der Elternsitzung, wurden also gegen deren Transkript gezäunt: Der
+Agent konnte das Fremdvergabe-Werkzeug nicht starten, und so hat dasselbe Modell den Punkt
+geschrieben, das ihn hätte prüfen sollen. Kein Fehlschlag, keine rote Zeile — eine stille
+Herabstufung, die erst auffiel, weil der Agent sie in seinem Bericht benannt hat.
+
+**Lehren:** Eine Ausnahme ist erst dann geprüft, wenn ein Fall belegt, dass sie unter echten
+Aufrufbedingungen GREIFT — nicht nur, dass die Funktion bei passender Eingabe das Richtige
+zurückgibt. Ein Test, der die Eingabe selbst herstellt, prüft die Funktion und nicht die
+Verdrahtung. Zweitens: Wo eine Ausnahme aus Unkenntnis nicht greifen kann, muss die
+Voreinstellung das Mildere sein. Das Projekt baut jeden Wächter fail-open; dieser Ausstieg
+war versehentlich fail-closed, und deshalb wurde aus einer nicht erkannten Herkunft eine
+Verweigerung statt eines Durchlasses.

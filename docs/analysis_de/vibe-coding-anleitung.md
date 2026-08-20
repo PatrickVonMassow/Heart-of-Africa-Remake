@@ -182,11 +182,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, Performance auf der
   **Ziel-Hardware**; was altern kann, erhebe neu."
 
-- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe jedes
-  Kontexts, nicht an den Stunden: lange Sitzungen, und Helfer, die ihren Auftrag erst in
-  großen Dokumenten *suchen*.
-  → *Prompt:* „Nenne mir die **gemessenen** Treiber, schick jedem Helfer seinen Auftrag als
-  fertigen Kurzbrief mit und fang je Aufgabe einen **frischen Kontext** an."
+- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Kontextgröße,
+  nicht an den Stunden: lange Sitzungen, Helfer, die ihren Auftrag erst *suchen*.
+  → *Prompt:* „Nenne mir die **gemessenen** Treiber, gib jedem Helfer einen Kurzbrief und fang
+  je Aufgabe einen **frischen Kontext** an. Vor einem Deckel miss den **Startboden**, sonst
+  deckelst du das Aufräumen mit."
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
@@ -410,4 +410,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: f860cdf9c6554c0b97b5a1101d32934aeb39a993df6ccc3bb7ed2a5214ea8709 -->
+<!-- GUIDE-FINGERPRINT: 2fb806d0970478853d8ec9ba1772a01878425140dcf8a3fa33e18e1fac6b3887 -->
