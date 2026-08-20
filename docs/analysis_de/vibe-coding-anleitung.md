@@ -301,10 +301,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Prüf die Erholung mit Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo
   es sollte?'"
 
-- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht —
-  und ein stummer Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
-  → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
-  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**."
+- **Was außerhalb des Repositorys liegt, kommt nicht mit — und geht nicht zurück.** Das Projekt
+  zieht um, die Mechanik nicht; wer dort etwas ändert, hat kein `git`.
+  → *Prompt:* „Führe eine Liste dessen, was **nicht** im Repository liegt, und prüfe sie bei
+  jedem Start gegen eine **Beobachtung**. Dort ändert niemand etwas ohne Kopie."
 
 - **Der Alarm, der nie spricht.** Fällt die Quelle aus, meldet ein Alarm auf ein *Ereignis*
   nichts — und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert.
@@ -371,15 +371,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   durch; und was festhält, gilt als „nicht übergebbar".
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
-
-- **Der Helfer griff dorthin, wo es kein Zurück gibt.** Sein Auftrag war eng gefasst, doch er
-  fasste Dateien **außerhalb der Versionsverwaltung** an — geteilte Einstellungen, Notizen,
-  Konfiguration im Benutzerordner. Dort rettet dich kein `git`, und du merkst es erst, wenn
-  du vergleichen willst.
-  → *Prompt:* „Bevor irgendjemand etwas **außerhalb der Versionsverwaltung** anfasst: erst
-  eine Kopie anlegen. Benenne im Auftrag ausdrücklich, welche Pfade außerhalb liegen, und lass
-  dir am Ende **einzeln aufzählen**, was dort entstanden, geändert, umbenannt oder gelöscht
-  wurde — in der Sammelliste der Projektdateien geht es sonst unter."
 
 ---
 
