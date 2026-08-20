@@ -21,6 +21,26 @@ describe('invitesClear — what counts as asking the user to end the session', (
     }
   })
 
+  it('reads the natural word order too, not only the one the first draft had', () => {
+    for (const text of [
+      'Starte eine neue Sitzung, die den Rest aufnimmt.',
+      'Beginne bitte eine frische Sitzung.',
+      'Nimm den Rest in einer neuen Sitzung auf.',
+    ]) {
+      expect(invitesClear(text), text).toBe(true)
+    }
+  })
+
+  it('does not read a NEGATED instruction as an invitation', () => {
+    for (const text of [
+      'Mach keinen Clear, ich brauche den Kontext noch.',
+      'Starte jetzt keine neue Sitzung.',
+      'Führe bitte nicht clear aus, bevor das gepusht ist.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
   it('does not fire on the word alone, so talking ABOUT the rule stays possible', () => {
     for (const text of [
       'Das Bild ist clear und der Horizont stimmt.',

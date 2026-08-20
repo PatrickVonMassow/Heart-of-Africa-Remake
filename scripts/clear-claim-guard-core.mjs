@@ -24,19 +24,40 @@
  * Each pattern needs an IMPERATIVE or the slash spelling, never the bare word:
  * "das Bild ist clear" and a sentence ABOUT the clear mechanism must not trip a
  * guard whose refusal costs a turn.
+ *
+ * The session patterns exist in BOTH word orders. German puts the object either
+ * way round — "die neue Sitzung … starte sie" and "Starte eine neue Sitzung" are
+ * the same instruction — and a guard that only reads one of them misses the more
+ * natural one (found in the cross-vendor review, 20.08.2026).
  */
 export const CLEAR_INVITATION = Object.freeze([
   /(?:^|[\s(«"'`])\/clear\b/i,
   /\b(?:mach|mache|machst|starte|f[üu]hre)\b[^.!?\n]{0,60}\bclear\b/i,
   /\bclear\b[^.!?\n]{0,60}\b(?:kann kommen|kannst du machen|bitte|jetzt machen)\b/i,
   /\b(?:neue|frische)\s+Sitzung\b[^.!?\n]{0,60}\b(?:starte|beginn|nimm|aufnehmen|weiter)\w*\b/i,
+  /\b(?:starte|beginne?|nimm)\b[^.!?\n]{0,60}\b(?:neue|neuen|frische|frischen)\s+Sitzung\b/i,
   /\bstart(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
 ])
+
+/**
+ * A NEGATED instruction is not an invitation. "Mach keinen Clear" and "starte
+ * jetzt keine neue Sitzung" carry every word the patterns look for and mean the
+ * opposite, and this guard's refusal costs a turn — so a negator between the
+ * imperative and its object disarms the match (cross-vendor review, 20.08.2026).
+ */
+const NEGATOR = /\b(?:kein|keine|keinen|keinem|keiner|nicht|niemals|nie)\b/i
 
 /** Does this reply ask the user to clear or to start a fresh session? */
 export function invitesClear(text) {
   const value = String(text ?? '')
-  return CLEAR_INVITATION.some((pattern) => pattern.test(value))
+  return CLEAR_INVITATION.some((pattern) => {
+    const hit = pattern.exec(value)
+    if (!hit) return false
+    // Only the matched span is judged: a negation elsewhere in the reply says
+    // nothing about THIS sentence, and reading further would make an unrelated
+    // "nicht" anywhere on the page disarm a real invitation.
+    return !NEGATOR.test(hit[0])
+  })
 }
 
 /**

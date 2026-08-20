@@ -44,8 +44,21 @@ function readClaim() {
  */
 export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
   const standing = claim === undefined ? readClaim() : claim
-  if (!standing || !sessionId) {
-    return { applicable: false, why: 'no claim of this session stands, so nothing could be refused' }
+  if (!standing) {
+    return { applicable: false, why: 'no claim stands, so nothing could be refused' }
+  }
+  // A claim EXISTS but we do not know who is asking: that is not a clean skip.
+  // Reporting it as "not applicable" would tell the reader the guard is out of
+  // play when it may well fire, so it is reported as NOT JUDGED instead
+  // (cross-vendor review, 20.08.2026).
+  if (!sessionId) {
+    return {
+      applicable: false,
+      cause: 'not-judged',
+      why:
+        'a claim stands but this preflight was given no session id, so it cannot tell whether the ' +
+        'claim is this session\'s. Action: pass --session <id> to judge it.',
+    }
   }
   if (!claimStands({ claim: standing, sessionId })) {
     return { applicable: false, why: 'the standing claim belongs to another session' }
