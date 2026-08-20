@@ -119,12 +119,12 @@ export function stampOf(value) {
  *   4. an honoured claim is somebody's reservation — the window the user is
  *      sitting at, or another watcher — and spawning into it is the parallel
  *      session this whole apparatus exists to prevent;
- *   5. a verified message crosses a pause into that bounded responder;
- *   6. otherwise a live owner needs no waking: stage 2 hands the message to it
- *      at its next tool call, seconds away — UNLESS that promise has already
- *      expired (`deferralExpired`, point 424), because delivery happens at the
- *      owner's next TOOL CALL and a session that declared a wait makes none. A
- *      paused owner is likewise waiting, so step 5 crosses this gate immediately.
+ *   5. a live owner needs no waking: stage 2 hands the message to it at its next
+ *      tool call, seconds away — UNLESS that promise has already expired
+ *      (`deferralExpired`, point 424), because delivery happens at the owner's
+ *      next TOOL CALL and a session that declared a wait makes none;
+ *   6. a verified message crosses a pause into that bounded responder once no
+ *      live owner has the fresh right to answer it.
  *
  * Returns { decision: 'spawn' | 'skip', reason }.
  */
@@ -145,12 +145,13 @@ export function wakeDecision({
   if (formatAlarm) return skip(WAKE_REASONS.ALARM)
   if (responderLive) return skip(WAKE_REASONS.RESPONDER_LIVE)
   if (claimHonoured) return skip(WAKE_REASONS.CLAIM_HELD)
-  // This is the one deliberate exception to the batch pause. Reaching it proves
-  // there is verified user mail to answer; the empty/unverified path returned
-  // above. The spawned process is the bounded message responder, whose prompt
-  // forbids every batch action — never a batch owner or a point worker.
-  if (paused) return { decision: 'spawn', reason: WAKE_REASONS.PAUSED_MESSAGE }
   if (ownerAlive && !deferralExpired) return skip(WAKE_REASONS.OWNER_LIVE)
+  // This is the one deliberate exception to the batch pause. Reaching it proves
+  // there is verified user mail to answer and no fresh live-owner deferral; the
+  // empty/unverified and live-owner paths returned above. The spawned process is
+  // the bounded message responder, whose prompt forbids every batch action —
+  // never a batch owner or a point worker.
+  if (paused) return { decision: 'spawn', reason: WAKE_REASONS.PAUSED_MESSAGE }
   // Only the owner gate is bypassed by an expired deferral; the format alarm,
   // our own responder and a foreign claim bind exactly as before.
   return { decision: 'spawn', reason: ownerAlive ? WAKE_REASONS.DEFER_EXPIRED : WAKE_REASONS.IDLE }

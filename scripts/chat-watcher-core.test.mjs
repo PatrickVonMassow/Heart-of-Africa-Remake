@@ -63,8 +63,15 @@ describe('wakeDecision — a message wakes a responder only into a genuinely idl
     expect(buildResponderPrompt([])).toBe('')
   })
 
-  it('a paused owner cannot defer the word that ends its pause to its next tool call', () => {
+  it('a fresh live owner still receives paused mail through stage 2', () => {
     expect(wakeDecision({ ...ok, paused: true, ownerAlive: true })).toEqual({
+      decision: 'skip',
+      reason: WAKE_REASONS.OWNER_LIVE,
+    })
+  })
+
+  it('paused mail wakes a responder when its live-owner deferral expires', () => {
+    expect(wakeDecision({ ...ok, paused: true, ownerAlive: true, deferralExpired: true })).toEqual({
       decision: 'spawn',
       reason: WAKE_REASONS.PAUSED_MESSAGE,
     })
