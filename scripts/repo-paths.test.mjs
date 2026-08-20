@@ -30,7 +30,7 @@ describe('repositoryRoot', () => {
   it('uses the repository containing the process working directory', () => {
     const repository = temporaryDirectory()
     const nestedDirectory = join(repository, 'docs')
-    execFileSync('git', ['-C', repository, 'init', '-q'])
+    execFileSync('git', ['-C', repository, 'init', '-q'], { windowsHide: true })
     mkdirSync(nestedDirectory)
 
     expect(
