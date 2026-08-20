@@ -89,7 +89,7 @@ ceiling is only confirmed against the counter that enforces it.
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 332 lines / 2,091 words / 17,255 B | 334 / 2,095 | 2 lines, 4 words |
-| `MEMORY.md` | 46 lines / 702 words / 5,515 B | 47 / 710 | 1 line, 8 words |
+| `MEMORY.md` | 47 lines / 708 words / 5,590 B | 47 / 710 | 0 lines, 2 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, but two of them hold with nothing to spare, and that is the finding
