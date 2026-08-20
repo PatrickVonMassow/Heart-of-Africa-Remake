@@ -3,7 +3,7 @@
 // docs/document-cut-757.md is judged here against the real filesystem and the
 // really wired hook chains, not only against synthetic input.
 import { describe, it, expect } from 'vitest'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import {
@@ -537,12 +537,41 @@ describe('docs/document-cut-757.md — the measured floors', () => {
   it('takes each floor from a transcript of the kind it claims', () => {
     if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
-      const first = jsonl(fullPath(r.transcript)).find((o) => o?.type === 'user' && o?.cwd)
-      expect(first, `no user message with a cwd in ${r.transcript}`).toBeTruthy()
+      const rows = jsonl(fullPath(r.transcript))
+      const usage = rows.findIndex((o) => o?.type === 'assistant' && o?.message?.usage)
+      expect(usage, `no usage row in ${r.transcript}`).toBeGreaterThanOrEqual(0)
+      // THE KIND ROW MUST BELONG TO THE SAME SESSION AND COME FIRST. Read from an
+      // independently chosen row, the kind was spliceable: an owner-looking user
+      // row copied into another transcript satisfied it while every
+      // same-usage-row check still passed (review 82e9ae0).
+      const sid = rows[usage].sessionId
+      const idx = rows.findIndex(
+        (o, i) => i < usage && o?.type === 'user' && o?.cwd && o?.sessionId === sid,
+      )
+      expect(
+        idx,
+        `no user row with a cwd from session ${sid} before the usage row of ${r.transcript}`,
+      ).toBeGreaterThanOrEqual(0)
+      const first = rows[idx]
       const c = first.message.content
       const prompt = typeof c === 'string' ? c : c.map((x) => x.text ?? '').join('\n')
-      const kind = sessionKindOf({ cwd: first.cwd, prompt, root: ROOT })
-      expect(kind, `cwd and prompt disagree, or the tree is neither, for ${r.transcript}`).not.toBeNull()
+      // Canonicalize where the directory still EXISTS, so a symlinked checkout is
+      // judged by what it points at. A finished agent's worktree is removed by
+      // design, so its recorded path cannot be resolved — that one falls back to
+      // the lexical form, and the residual is that a symlink in a path that no
+      // longer exists cannot be seen through. The root always exists.
+      const canon = (path) => {
+        try {
+          return realpathSync(path)
+        } catch {
+          return path
+        }
+      }
+      const kind = sessionKindOf({ cwd: canon(first.cwd), prompt, root: realpathSync(ROOT) })
+      expect(
+        kind,
+        `cwd and prompt disagree, or the tree is neither, for ${r.transcript}`,
+      ).not.toBeNull()
       expect(kind, `${r.transcript} is not an ${r.kind} transcript`).toBe(r.kind)
     }
   })
@@ -670,6 +699,14 @@ describe('sessionKindOf', () => {
     expect(sessionKindOf({ cwd: '/workspace/./hoa', prompt: RESUME, root: ROOT_DIR })).toBe('owner')
   })
 
+  // Two matching RELATIVE paths are not evidence of the same directory: they
+  // resolve against wherever the caller stood (review 82e9ae0).
+  it('refuses a relative cwd or root, even when they match', () => {
+    expect(sessionKindOf({ cwd: 'hoa', prompt: RESUME, root: 'hoa' })).toBeNull()
+    expect(sessionKindOf({ cwd: ROOT_DIR, prompt: RESUME, root: 'workspace/hoa' })).toBeNull()
+    expect(sessionKindOf({ cwd: 'workspace/hoa', prompt: RESUME, root: ROOT_DIR })).toBeNull()
+  })
+
   it('is total on missing input', () => {
     expect(sessionKindOf()).toBeNull()
     expect(sessionKindOf({ cwd: TREE })).toBeNull() // no root: no tree can be judged
@@ -681,17 +718,36 @@ describe('sessionKindOf', () => {
 // to let stale evidence through with the suite still green (review 5d09ed4).
 describe('CUT_LANDED_AT', () => {
   it('is the committer date of the commit that landed the cut', () => {
-    let iso
-    try {
-      iso = execFileSync('git', ['log', '-1', '--format=%cI', CUT_COMMIT], {
+    // A BLANKET catch here silently disabled the binding — an unavailable or
+    // misspelled CUT_COMMIT read as "nothing to check" and the suite stayed green
+    // (review 82e9ae0). Only the one legitimate refusal is tolerated: a checkout
+    // that does not carry the commit. Anything else is a failure.
+    const run = (args) =>
+      execFileSync('git', args, {
         cwd: ROOT,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
         windowsHide: true,
       }).trim()
+
+    let present = true
+    try {
+      run(['cat-file', '-e', `${CUT_COMMIT}^{commit}`])
     } catch {
-      return // refused read: a shallow clone cannot see the commit
+      present = false
     }
-    expect(new Date(CUT_LANDED_AT).getTime()).toBe(new Date(iso).getTime())
+    if (!present) {
+      // ABSENCE ONLY EXCUSES A SHALLOW CHECKOUT. A full clone contains every
+      // commit that landed on `main`, so a missing CUT_COMMIT there means the
+      // constant names no commit — a misspelling that used to read as "nothing
+      // to check" and left the suite green (review 82e9ae0).
+      expect(run(['rev-parse', '--is-inside-work-tree'])).toBe('true')
+      expect(
+        run(['rev-parse', '--is-shallow-repository']),
+        `CUT_COMMIT "${CUT_COMMIT}" names no commit in this full checkout`,
+      ).toBe('true')
+      return
+    }
+    expect(new Date(CUT_LANDED_AT).getTime()).toBe(new Date(run(['log', '-1', '--format=%cI', CUT_COMMIT])).getTime())
   })
 })

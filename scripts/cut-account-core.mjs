@@ -280,18 +280,23 @@ export function parseFloorReadings(text) {
 }
 
 /**
- * The commit that landed point 757's cut, and its committer date. A floor reading
- * only evidences the cut if the session that produced it began AFTER this
- * instant; a date written by hand cannot show that, and checking the date's
- * FORMAT — all the first version did — lets a stale transcript through.
+ * The commit that landed point 757's cut, and its committer date.
  *
- * The constant is BOUND to the commit by its own test, which resolves
- * `CUT_COMMIT` in the repository and fails if the two disagree. Without that
- * binding the cutoff is self-declared and moving it backwards would make stale
- * evidence pass while the suite stayed green (review 5d09ed4). A committer date
- * is not literally the moment the ref moved, but it is the latest instant the
- * content provably existed at, so a transcript older than it cannot have seen
- * the cut — which is the only direction this check is used in.
+ * WHAT THIS BOUNDS, precisely, because the earlier comment overstated it: a
+ * committer date is metadata the committer writes, so it is neither the moment
+ * the commit was created nor the moment `main` came to contain it. What the
+ * check uses it for is one direction only — a transcript that began BEFORE this
+ * instant cannot have run on the cut documents — and for that it is sound as
+ * long as the date is not backdated. It is bound to `CUT_COMMIT` by its own
+ * test, so it cannot be quietly moved backwards to admit stale evidence
+ * (review 5d09ed4).
+ *
+ * RESIDUAL, named rather than papered over: if the commit were backdated, or if
+ * it sat unmerged for a while, a transcript between the real landing and this
+ * timestamp would pass. Nothing in a git checkout records when a ref moved —
+ * the reflog is local and not durable — so this cannot be closed from here. The
+ * two readings the account carries are about ninety minutes clear of it, so the
+ * residual does not touch them.
  */
 export const CUT_COMMIT = '79b6e4f'
 export const CUT_LANDED_AT = '2026-08-20T02:18:59Z'
@@ -319,7 +324,11 @@ const normalize = (p) => posix.normalize(String(p ?? '')).replace(/\/+$/, '')
 function treeKindOf(cwd, root) {
   const dir = normalize(cwd)
   const base = normalize(root)
-  if (!dir || !base) return null
+  // ABSOLUTE ONLY. Two matching relative paths are not evidence of the same
+  // directory — `a` and `a` resolve against whatever happened to be the working
+  // directory — and accepting them made the owner verdict depend on where the
+  // caller stood (review 82e9ae0).
+  if (!dir.startsWith('/') || !base.startsWith('/')) return null
   if (dir === base) return 'owner'
   if (dir.startsWith(`${base}/${WORKTREE_DIR}/`)) return 'subagent'
   return null

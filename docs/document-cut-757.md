@@ -67,13 +67,17 @@ attributed, with an upper bound of 12.3k that holds only if the residual turns
 out to be document-related too, which nothing here shows.
 
 Two claims above are ATTRIBUTED, not measured, and are marked so on purpose. The
-first is that the owner/subagent gap is the SessionStart output and the runbook:
-that follows from the two sessions being otherwise alike. The accompanying tests
-pin their KINDS from two independent signals that must agree — the working
+first is that the hook output and the runbook are the LARGEST part of the
+owner/subagent gap. They are certainly a part of it, and the only part this cut
+changed — but the two sessions also differ in their prompt and their working
+directory, and nothing here compares their harness build or tool schemas, so how
+much of the 4,078 is theirs is not established. The accompanying tests pin the
+sessions' KINDS from two independent signals that must agree — the working
 directory, since a delegated author runs in an isolation worktree and the owner
 in the main checkout, and the batch-resume prompt — and they pin FRESHNESS, so
-neither reading can be a transcript from before the cut. What they do not do is
-weigh the hook's share against any other difference between two harness runs. The second is the ~4
+neither reading can be a transcript from before the cut. What no test does is
+weigh the hook's share against the other differences, which is exactly why the
+gap is written above as an upper bound and not as a cost. The second is the ~4
 bytes per token these documents run at, which is a ratio taken from their
 character counts, not a tokenizer reading. Both would need a per-session record
 of the harness share to become measurements, and that record does not exist.
