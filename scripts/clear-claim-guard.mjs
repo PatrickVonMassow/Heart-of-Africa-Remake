@@ -91,6 +91,38 @@ export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
  * anything — those pass through and are judged, because the guard's fail
  * direction is to allow rather than to invent a reason.
  */
+/**
+ * Is the newest assistant text the FINAL reply, or an earlier one still waiting
+ * for the flush?
+ *
+ * The timestamp check below only catches text older than the CLAIM. It does not
+ * catch the other race: a previous post-claim reply that was refused, whose
+ * correction has not been written yet — the extractor returns the old
+ * invitation, its timestamp is newer than the claim, and the guard refuses the
+ * correction for a fault it no longer contains (cross-vendor review,
+ * 20.08.2026). The condition that separates the two is simple: if the transcript
+ * does not END with the assistant text row, the final reply is not in it yet.
+ */
+export function replyNotFlushed(transcript) {
+  const rows = String(transcript ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (rows.length === 0) return true
+  let last
+  try {
+    last = JSON.parse(rows[rows.length - 1])
+  } catch {
+    // An unparseable tail is a partial write: the flush is in progress.
+    return true
+  }
+  const isAssistantText =
+    last && last.type === 'assistant' && last.message && Array.isArray(last.message.content)
+      ? last.message.content.some((part) => part && part.type === 'text')
+      : false
+  return !isAssistantText
+}
+
 export function textPredatesClaim(transcript, claim) {
   const claimedAt = Number(claim && (claim.at ?? claim.claimedAt))
   if (!Number.isFinite(claimedAt) || claimedAt <= 0) return false
@@ -135,6 +167,7 @@ function main() {
   } catch {
     return
   }
+  if (replyNotFlushed(transcript)) return
   if (textPredatesClaim(transcript, claim)) return
   let lastText
   try {

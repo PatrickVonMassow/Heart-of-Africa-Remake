@@ -104,6 +104,21 @@ describe('invitesClear — what counts as asking the user to end the session', (
     expect(invitesClear('Mach bitte `/clear`.')).toBe(true)
   })
 
+  it('does not read a verb-first CONDITIONAL as an order', () => {
+    expect(invitesClear('Starte ich eine neue Sitzung, verliere ich den Kontext.')).toBe(false)
+    expect(invitesClear('Mache ich einen clear, ist der Kontext weg.')).toBe(false)
+  })
+
+  it('does not read an order ABOUT something else, or a quoted fixture, as this order', () => {
+    for (const text of [
+      'Führe den Test für `/clear` aus.',
+      '`Mach bitte /clear` ist der Positivfall.',
+      'Nimm den Befehl /clear in die Dokumentation auf.',
+    ]) {
+      expect(invitesClear(text), text).toBe(false)
+    }
+  })
+
   it('does not read an indicative or a noun as an order, whatever its case', () => {
     for (const text of [
       'Eine neue Sitzung starten sie automatisch.',
@@ -343,6 +358,23 @@ describe('the hook itself, run as the entry script', () => {
     })
     expect(other.out).toBe('')
     expect(other.status).toBe(0)
+  })
+
+  it('does not judge while the final reply is still unflushed', async () => {
+    // The transcript ENDS with a tool result, so the newest assistant text is the
+    // previous reply — the refused one whose correction is being written now.
+    const { transcript, claimFile } = await fixture(
+      [
+        assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z'),
+        { type: 'user', timestamp: '2026-08-20T09:00:01.000Z', message: { content: [{ type: 'tool_result', content: 'ok' }] } },
+      ],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
   })
 
   it('stays silent, and exits clean, on stdin that is not JSON at all', async () => {

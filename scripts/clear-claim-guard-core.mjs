@@ -48,9 +48,26 @@ const IMPERATIVE = String.raw`(?:starte|beginne|nimm|f[üu]hre|mach|mache)`
 const POLITE = String.raw`(?:Starten|Beginnen|Nehmen|F[üu]hren|Machen)\s+Sie`
 const SESSION = String.raw`(?:neue|neuen|frische|frischen)\s+Sitzung`
 
+// German puts the verb first in a CONDITIONAL too: "Starte ich eine neue Sitzung,
+// verliere ich den Kontext" is a statement, not an order. What separates them is
+// the subject pronoun right after the verb — an imperative never has one
+// (cross-vendor review, 20.08.2026).
+const SUBJECT = String.raw`(?!\s+(?:ich|du|er|sie|es|wir|ihr|man)\b)`
+
+// The gap between the verb and the command is a FILLER whitelist, not a wildcard.
+// A 40-character wildcard let an object slip in — "Führe den Test für /clear aus"
+// is an order about something else entirely — and only these few words can stand
+// between an imperative and its object without changing what is being ordered.
+const FILLER = String.raw`(?:\s+(?:bitte|jetzt|nun|dann|danach|noch|mal|am\s+besten|zuerst|gleich))*\s*`
+
+// And nothing substantive may follow the command, or the clause is ABOUT it
+// rather than asking for it: "`Mach bitte /clear` ist der Positivfall" quotes the
+// order inside a sentence that makes a claim.
+const TAIL = String.raw`[\s.!?)»"'\u201c\u201d\u0060]*$`
+
 /** A clause that IS the slash command, or leads with an imperative carrying it. */
 const SLASH_CLEAR = new RegExp(
-  String.raw`^${LEAD}(?:${IMPERATIVE}|${POLITE})\b[^\n]{0,40}?\/clear\b|^\/clear\b`,
+  String.raw`^(?:${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}\/clear\b|\/clear\b)${TAIL}`,
   'i',
 )
 
@@ -58,14 +75,14 @@ const SLASH_CLEAR = new RegExp(
 // the command: "mach einen clear" is the instruction, "mach das Bild clear" is an
 // adjective and an unrelated editing order (cross-vendor review, 20.08.2026).
 const ARTICLED_CLEAR = new RegExp(
-  String.raw`^${LEAD}(?:${IMPERATIVE}|${POLITE})\b[^\n]{0,40}?\b(?:einen|den|nen)\s+clear\b`,
+  String.raw`^${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}(?:einen|den|nen)\s+clear\b`,
   'i',
 )
 
 export const CLEAR_INVITATION = Object.freeze([
   SLASH_CLEAR,
   ARTICLED_CLEAR,
-  new RegExp(String.raw`^${LEAD}(?:${IMPERATIVE})\b[^\n]{0,40}?\b${SESSION}\b`, 'i'),
+  new RegExp(String.raw`^${LEAD}(?:${IMPERATIVE})${SUBJECT}\b[^\n]{0,40}?\b${SESSION}\b`, 'i'),
   new RegExp(String.raw`^${LEAD}(?:${POLITE})\b[^\n]{0,40}?\b${SESSION}\b`),
   /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
 ])
