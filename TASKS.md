@@ -10220,3 +10220,76 @@ to land than a mechanism that needs a review.
   user.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
+  while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
+  exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
+  section of `docs/acceptance-criteria-detail.md` is reported as orphaned, while the two rules
+  above it report PASS.
+  THE CAUSE IS MEASURED. `pointerRe(keyword, doc)` builds `Detail: docs/acceptance-criteria-detail.md
+  §(\d+)\.` — a BARE path. The 20.08.2026 document cut wrapped both pointer paths in BACKTICKS, so
+  CLAUDE.md §7.1 now reads ``Detail: `docs/acceptance-criteria-detail.md` §1.`` and the regex matches
+  NOTHING. `checkPointers` then finds zero pointers: `misdirected` and `unresolved` come back empty
+  because there is nothing to judge, and every section of the target document is orphaned because no
+  pointer names it. Verified directly — the regex returns false on the backticked line and true on the
+  bare one, and the `Evidence:` family has the same shape.
+  WHY IT IS MORE THAN A REGEX. The two GREEN lines are the defect, not the red one. A pointer family
+  that has stopped matching reports "every pointer has a section — all present" in exactly the same
+  words as a healthy one, so the check reads as two-thirds sound while it is blind. The orphan rule is
+  the only reason this was noticed at all, and it was noticed by a point looking for something else.
+  The same shape — a check whose subject count can silently fall to zero — is what point 555's
+  four-eyes review already closed once, for the deleted-pointer case.
+  FINAL STATE: the pointer families are recognised whether or not the path is written as code, and
+  every rule states the NUMBER of pointers it judged, so a family that matches nothing is loud rather
+  than green. `node scripts/verify/docs.mjs` exits 0 on `main`.
+  VERIFIABLE: Vitest over the pure layer — a backticked and a bare pointer both resolve; a family with
+  zero matched pointers is a FINDING rather than three passes; the existing present / missing /
+  misspelled cases stay green. Plus `scripts/verify/docs.mjs` green at HEAD.
+  Criticality: high — a verification script red on `main` whose green half proves nothing, and the
+  acceptance-criteria pointers are what CLAUDE.md §7.1 rests on since the cut.
+  Bundle: Testinfrastruktur.
+- [ ] 777. A decision card published after its answer arrived is never retired (measured
+  20.08.2026). The reply of 07:27 asked whether the three priority levels still hold.
+  `decision-card-guard` forces every question in a reply into a card, so »Stufenordnung vom 17.08.:
+  beschreibt sie noch deine Prioritäten?« was filed and the owner published it at 07:47. The user had
+  ALREADY answered at 07:31 (»Die Reihenfolge-Regel zum Release stimmt noch.«). The card then stood
+  through every republish — 08:27, 10:38, 11:06, 11:45 — until the user asked why, and it was retired
+  by hand on 20.08.2026.
+  TWO INDEPENDENT CAUSES, and both have to go. First, the answered-card review in
+  `scripts/decision-card-guard-core.mjs` compares the CURRENT turn's user message against the cards
+  that exist AT THAT MOMENT, so an answer that arrives BEFORE its card is published can never be
+  matched — the card is born already answered and nothing looks again. Second, even with the card
+  standing, `sharedDistinctiveTerms()` would probably have missed this pair: the answer says
+  »Reihenfolge-Regel zum Release«, the title says »Stufenordnung« and »Prioritäten«, and no
+  distinctive term is shared.
+  FINAL STATE: a card is reviewed against the recent user messages of the asking session at the moment
+  it is ADDED, not only against the turn that happens to run later; and the answered-card match no
+  longer rests on shared literal terms alone, so an answer in the user's own words retires the card it
+  answers.
+  VERIFIABLE: Vitest — the measured 20.08. pair (answer at 07:31, card added at 07:47) is retired at
+  the add; the same pair is retired although title and answer share no distinctive term; a card whose
+  question is genuinely unanswered survives both paths.
+  Criticality: medium — no product defect, but the board asked the user a question he had already
+  answered for four hours, which is exactly what the decision section exists to prevent.
+  Bundle: Chat & Tafel.
+- [ ] 778. Answer the cross-vendor review of the suspended Fable escalation (GPT-5.6 Sol,
+  20.08.2026, verdict **merge-with-fixes** on both passes of `5631247f`, recorded in
+  `.claude/mechanism-reviews.jsonl`). The suspension itself was judged sound — the automatic branch is
+  guarded and reversible, and the remaining Fable uses are the documented fallback and explicit roles —
+  but two findings stand and both are real.
+  1. THE QUEUE REPORT DROPS THE REASON. `formatLaneLine()` in `scripts/author-routing-core.mjs` prints
+     `why[0]` only. The suspension explanation is stored in `why[1]`, so a whole-queue routing report
+     omits it entirely, while the ACTIVE escalation reason it replaced occupied `why[0]` and was
+     visible. The single-point CLI is covered by tests; a multi-reason `formatLaneReport()` row is not.
+  2. THE FLAG CANNOT BE FLIPPED BACK CLEANLY. `src/config/fableEscalationDoc.test.ts` pins the
+     suspended wording, so re-activating the escalation makes a test red for saying what the
+     configuration then means — the reversal the suspension promises costs a test edit nobody
+     documented.
+  FINAL STATE: a routing report carries every reason a lane decision has, not the first; and flipping
+  `FABLE_ESCALATION_SUSPENDED` back leaves no stale assertion behind — the documentation test asserts
+  the wording that MATCHES the flag rather than one of the two states.
+  VERIFIABLE: Vitest — a two-reason lane row renders both reasons in the queue report; the
+  documentation test passes with the flag in either position; the existing single-reason cases stay
+  green.
+  Criticality: medium — the routing decision is explained to whoever reads the queue, and a suspension
+  that cannot be lifted without a red test is not the reversible switch it claims to be.
+  Bundle: Modell & Wächter.
