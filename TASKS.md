@@ -1432,6 +1432,16 @@ put it is the mistake this line exists to stop.
   under a hostile-tester commission and may not review its own work — so the explosion buys
   thirteen Fable passes for a diff that fits in one round, at the exact moment the Fable pool is
   the constraint point 736 measures.
+  RE-VERIFIED 20.08.2026 AND IT STANDS — BUT NOT WHERE A READER WOULD LOOK FIRST. The SIZE
+  planner is already right: `planPasses` in `scripts/review-material-core.mjs` cuts through the
+  file set over the range's end state (point 714, landed 18.08.2026; its case "CUTS THROUGH THE
+  FILE SET so every file lands in exactly one pass"), so that half must not be rebuilt. The
+  per-(commit × file) cut this point measured lives one layer up, in
+  `scripts/mechanism-review-range-core.mjs`: `contributionsIn` enumerates every changed
+  (commit, file) pair and `planAuthorshipGroups` keeps a per-FILE group only while every
+  contribution to that file came from one vendor — a mixed-vendor file falls back to
+  commit-level cuts, which is exactly how one file reached eight passes. That module is
+  unchanged since 18.08.2026, before the measurement, so the explosion reproduces.
   FINAL STATE:
   - THE PLAN CUTS BY FILE OVER THE RANGE'S END STATE, never by commit contribution. A pass carries
     the CURRENT content of its files plus the range's net diff for exactly those files, so the
