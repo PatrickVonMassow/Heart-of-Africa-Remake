@@ -4384,6 +4384,17 @@ Build order, chosen so no two parallel agents own the same file:
   3. A Vitest case feeds a DRIFTING clock base and proves a live owner of any age
      is never read as recycled; a genuinely recycled pid must still be caught, so
      the test covers both directions.
+  3a. THE FAILURE DIRECTION IS STATED IN THE CODE, and this point owns it for the
+     whole liveness verdict, not only for pid identity (charged here 20.08.2026 from
+     point 696, whose (a) reported the SAME probe from the other side): a wrong
+     "alive" costs a delayed spawn, a wrong "dead" costs two writers in one worktree
+     — so the probe ERRS TOWARD ALIVE at every tie. The other side is measured too
+     (14.08.2026, 06:56): the SessionStart hook told an incoming session "the
+     previous owner was provably dead" while the predecessor, pid 2380442 and 1 h 25
+     min old, went on committing into the same worktree at 06:59:30 and 07:04:22, and
+     a delegated run in that worktree saw foreign commits appear mid-run and authored
+     nothing. A live pid that is still producing commits is NEVER judged dead. Both
+     directions come out of one mechanism and are fixed together, in one core.
   REPRODUCED ON A SECOND OWNER (05.08.2026, 20:37): the launcher spawned session
   e3f5442b against the LIVE owner 7c21e596 (pid 2257916, 30:44 of age, eight
   running child shells including a browser suite in a worktree). Measured on the
@@ -9549,13 +9560,14 @@ to land than a mechanism that needs a review.
   authored nothing. Two writers in one worktree is the exact failure the hard singleton exists to
   prevent. Resolved by hand with `kill -TERM`; `batch-doctor --gate` then reported consistent.
   FINAL STATE: two holes are closed, and each is closed where it is, not by a reminder.
-  (a) THE LIVENESS VERDICT. Whatever `provably dead` is computed from judged a process that was
-  running and committing as dead. The probe is corrected so that a live pid that is still
-  producing commits is NEVER judged dead, and the failure direction is stated: a wrong "alive"
-  costs a delayed spawn, a wrong "dead" costs two writers — so the probe errs toward alive.
-  (`verify-owner-really-dead` in the memory records the OPPOSITE drift on the same probe, a live
-  owner declared pid-reused after ~30 min; both directions come out of one mechanism and are
-  fixed together.)
+  (a) THE LIVENESS VERDICT — NARROWED 20.08.2026, and its correction is NOT built here. The probe
+  that judged a running, committing process dead is the same probe that reads a live owner as
+  pid-reused after ~30 minutes, and that one has an owner with four measured reproductions and a
+  root cause: point 504. The obligation to CORRECT the probe, the err-toward-alive tie-break and
+  the 14.08. measurement have therefore moved into 504 and are struck here — two owners for one
+  mechanism is how two half-fixes get built. What (a) keeps is a dependency: (b) and (c) below are
+  judged against the CORRECTED probe, and the handover this point mechanises may not be built on
+  top of the uncorrected verdict.
   (b) THE FENCE. A session that does not hold the lock must not be able to commit or push in a
   repository worktree. The fence already refuses it merge, push of main, the tick, the board
   publish and `dashboard-state.json`; a branch commit and a branch push are added to what it
@@ -9571,11 +9583,11 @@ to land than a mechanism that needs a review.
   dispatched a SECOND author onto one of them; only that agent's own detection of the live writer
   kept two authors out of one tree. So an AUTHOR is judged by what its WORK does over a sampled
   interval — a branch tip that advances, worktree mtimes that move, an unpushed commit that
-  appears — never by the presence of a process, under the same err-toward-alive tie-break as (a).
-  The judgment lives in the same pure core as (a), and both the rescue path and the dispatch path
-  ask it before they touch a foreign worktree.
-  VERIFIABLE: Vitest cases over the pure liveness core proving a running, recently-committing pid
-  is judged alive and that the tie-break falls toward alive; a case over the fence proving a
+  appears — never by the presence of a process, under the err-toward-alive tie-break point 504 states.
+  The judgment lives in the same pure core as the corrected process verdict, and both the rescue
+  path and the dispatch path ask it before they touch a foreign worktree.
+  VERIFIABLE: the running, recently-committing pid and the tie-break fall to point 504's cases,
+  which cover both directions of the same probe; here, a case over the fence proving a
   commit and a push are refused for a session without the lock; a case proving the boundary
   commit leaves no live predecessor behind; and, for (c), a case proving a worktree whose branch
   tip advanced inside the sample window is judged ALIVE with no process evidence at all, beside
