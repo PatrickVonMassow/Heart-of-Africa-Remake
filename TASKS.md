@@ -5738,27 +5738,37 @@ Build order, chosen so no two parallel agents own the same file:
 - [ ] 531. The spec documents still describe the old bird's-eye collision (found
   06.08.2026 while closing point 299, escalated by the building agent rather than
   guessed around). Point 299 added a settlement footprint to the bird's-eye
-  collision and made a debug jump to an enterable place ENTER it, but two spec
-  passages still describe the state before it: `design.md` §11 names the bird's-eye
-  colliders as "trees and animals" only, and §21.3 describes the jump-to picker as
-  landing in the bird's-eye view in every case. `CLAUDE.md` §7.1 point 4 repeats the
-  same "trees and animals" wording. The evidence chain
-  (`docs/acceptance-evidence.md` §4) was updated with the point and is correct — it
-  is only the two spec files that lag.
-  WHY IT WAS NOT DONE IN THE SAME COMMIT, which is the rule: both files sit AT their
-  measured ceilings in `scripts/doc-budget-core.mjs` (CLAUDE.md 8991 of 8992 words,
-  design.md 28164 of 28171), so the ~70 words the correction needs do not fit.
+  collision and made a debug jump to an enterable place ENTER it, but the spec still
+  describes the state before it.
+  RE-MEASURED 20.08.2026, AND TWO OF THE THREE NAMED PASSAGES HAVE MOVED OR GONE.
+  What still stands, unchanged: `design.md` §11 names the bird's-eye colliders as the
+  large solid dressing (trees and boulder piles) and the wildlife only, with no
+  settlement footprint. STRUCK is the `CLAUDE.md` §7.1 point 4 half — after the
+  20.08.2026 cut that criterion carries only the pointer to `design.md` §11.1/§11.2
+  and no "trees and animals" wording at all. The wording did not disappear, it MOVED:
+  `docs/acceptance-criteria-detail.md` §4 now carries it, and that copy still omits
+  the settlement footprint, so the third target is that file, not `CLAUDE.md`.
+  ALSO STRUCK is the §21.3 premise: the jump-to entry there describes the picker's
+  grouping and sorting and says nothing at all about which view a jump lands in, so
+  there is no false claim left to correct — only the missing statement of the rule.
   FINAL STATE: `design.md` §11 names the settlement footprint among the bird's-eye
   colliders with its one-way rule, §21.3 states that a jump to an ENTERABLE target
   enters it while a jump to any other target stays a bird's-eye jump, and
-  `CLAUDE.md` §7.1 point 4 matches. The words are won back by TIGHTENING prose in
-  the same two files — per the standing rule a blocked budget means shorten or
-  merge, and raising a ceiling is the last resort and needs the user's agreement.
-  If no tightening of comparable value is found, the point ESCALATES the ceiling
-  question to the user instead of silently raising it.
-  VERIFIABLE: `node scripts/doc-budget-core.mjs` (or the doc-budget guard) green
-  with both passages present; `scripts/verify/docs.mjs` green; a grep for "trees and
-  animals" finds no bird's-eye collision passage that omits the settlement.
+  `docs/acceptance-criteria-detail.md` §4 matches. The evidence chain
+  (`docs/acceptance-evidence.md` §4) was updated with point 299 and is correct.
+  THE BUDGET STILL BLOCKS design.md, which is why this was not done in the same
+  commit: re-measured 20.08.2026 it stands at EXACTLY its ceiling in
+  `scripts/doc-budget-core.mjs`, 850 of 850 lines and 28,488 of 28,488 words, so not
+  one word of the correction fits. `docs/acceptance-criteria-detail.md` has 2 lines
+  and 17 words of room, which the shorter half may fit into. The words are won back
+  by TIGHTENING prose in the same files — per the standing rule a blocked budget means
+  shorten or merge, and raising a ceiling is the last resort and needs the user's
+  agreement. If no tightening of comparable value is found, the point ESCALATES the
+  ceiling question to the user instead of silently raising it.
+  VERIFIABLE: the doc-budget guard green with both passages present;
+  `scripts/verify/docs.mjs` no worse than the state its own filed point already
+  records; a grep for "trees and animals" finds no bird's-eye collision passage that
+  omits the settlement.
 
 - [ ] 532. The collision suite counts a different number of checks every run
   (found 07.08.2026 while merging point 349). Three runs of `collision` against the
