@@ -195,19 +195,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
-  oder er ist nur dort grün, wo er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
-  gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest. Vor dem
-  Abgeben: ‚auch im **Hauptstand** grün?'"
-
-- **Am bequemen Ort geprüft, am echten Ort kaputt.** Ein Werkzeug entsteht dort, wo jeder Pfad von
-  selbst stimmt — und läuft später woanders: im abgetrennten Arbeitsbereich, im Container, im
-  Prüflauf. Die Annahme über den Ort wird nie widerlegt, weil nie dort gemessen wird.
-  → *Prompt:* „Ein Werkzeug, das anderswo laufen soll, wird **einmal von dort aus** geprüft, bevor
-  es fertig heißt — nicht nur da, wo ich es geschrieben habe. Und ein Schritt, der erst schreibt
-  und dann festschreibt: Misslingt das Festschreiben, **nimm das Geschriebene zurück**. Ein
-  Fehlversuch, der eine Behauptung hinterlässt, ist teurer als gar keiner."
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
+  ist nur dort grün, wo er lief — das Werkzeug nur dort, wo es geschrieben wurde.
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen nach gemessener Last.
+  Vor dem Abgeben: ‚auch im **Hauptstand** grün — und einmal **von dem Ort aus** geprüft, an dem es
+  wirklich läuft?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und

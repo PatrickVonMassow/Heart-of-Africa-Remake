@@ -199,6 +199,31 @@ put it is the mistake this line exists to stop.
   suite that is not theirs.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 781. Two exported `mainCheckoutFrom` helpers disagree about what `null` means, and the next
+  point to need one has to guess (found 20.08.2026 while prepping point 773).
+  `scripts/worktree-bootstrap-core.mjs` and `scripts/review-sol-core.mjs` both export
+  `mainCheckoutFrom(gitCommonDir, root)` and they do NOT answer the same question. The bootstrap
+  version returns `null` for a bare repository AND `null` when the resolved main checkout IS the
+  given root — there `null` means »you are already in the main checkout, there is nothing to
+  borrow«. The review-sol version returns the passed-in root in both of those cases, so its caller
+  cannot tell »already main« from »resolved to main« at all.
+  WHY IT IS MORE THAN A DUPLICATE. The two callers today are lucky: each happens to use the shape
+  it needs. The next caller is point 773, whose whole fix is to tell the MAIN checkout apart from
+  the worktree it runs in — the exact distinction one of these two helpers silently throws away.
+  Importing the wrong one gives back the main checkout where the caller expected `null`, and the
+  worktree/main distinction the helper exists to draw disappears without an error. A duplicated
+  name whose two versions differ only in their edge cases is worse than two clearly different
+  names, because the difference is invisible at the call site.
+  FINAL STATE: one implementation with one documented meaning for the `null` case, imported by both
+  callers — or two names that each say which question they answer. Whichever is chosen, the
+  worktree/main distinction must survive it, and the caller must not have to read the body to know
+  which behaviour it gets.
+  VERIFIABLE: Vitest — a single case table covering bare repository, already-in-main and
+  resolved-from-worktree, asserting the same documented answer for every caller; both existing
+  call sites keep their current behaviour or are changed with the case that proves it.
+  Criticality: medium — no product defect, but it is a trap laid directly in front of the next
+  point in the queue.
+  Bundle: Session- & Repo-Hygiene.
 - [ ] 774. `bundle-first-guard --status` reports a stand-down that does not apply to the session
   running it (measured 20.08.2026, 10:52). With the batch lock naming session
   `1e85312a-…` and its own pid, `node scripts/bundle-first-guard.mjs --status` answers
