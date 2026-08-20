@@ -53,10 +53,9 @@ import {
 import { normaliseLineEndings } from './board-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
-// The pool cap is the width of the queue's front (point 712) — as many
-// candidates as there are slots. It is IMPORTED rather than restated: a second
-// copy of the number in this file would be a second home for what CLAUDE.md §6
-// states.
+// The pool cap is the width of the queue's front (point 712) — three slots,
+// three candidates. It is IMPORTED rather than restated: a second 3 in this file
+// would be a second home for the number CLAUDE.md §6 states.
 import { POOL_CAP } from './batch-in-flight-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
@@ -829,8 +828,8 @@ export const COMMISSION_STATUS_CMD = 'node scripts/commission-guard.mjs --status
  * while offering nothing. Both are SKIPPED, so the window is always `count` real
  * candidates deep whenever the queue holds that many.
  *
- * `count` is the pool cap, deliberately: one candidate per slot, so the agents
- * the pool may run are exactly the points at the front.
+ * `count` is the pool cap, deliberately: three slots, three candidates, so the
+ * three agents the pool may run are exactly the three points at the front.
  */
 export function frontCandidates({ open = [], gates = null, inFlight = [], count = POOL_CAP } = {}) {
   const g = normaliseGates(gates)

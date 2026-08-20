@@ -2657,13 +2657,9 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     expect(text).toContain('697')
   })
 
-  // The cap these cases exercise is passed EXPLICITLY: they assert what the
-  // decision does at, below and above a cap, which is a property of the rule and
-  // not of the number CLAUDE.md §6 currently sets. Only the cases that read the
-  // configured pool width use POOL_CAP.
   it('ALLOWS while only two branches stand open', () => {
     const two = NINE_BRANCHES.slice(0, 2)
-    expect(branchSlotDecision({ branches: two, point: 697, cap: 3, now: AUG17 })).toMatchObject({
+    expect(branchSlotDecision({ branches: two, point: 697, now: AUG17 })).toMatchObject({
       allowed: true,
       why: 'slots-free',
       count: 2,
@@ -2672,9 +2668,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
   })
 
   it('refuses at exactly the cap — three open branches are three occupied slots', () => {
-    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), point: 697, cap: 3, now: AUG17 }).allowed).toBe(
-      false,
-    )
+    expect(branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), point: 697, now: AUG17 }).allowed).toBe(false)
   })
 
   it('does not count a PARKED branch', () => {
@@ -2772,7 +2766,6 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
         parked,
         points: [336],
         refs: ['feat/336-croc-staging'],
-        cap: 3,
         now: AUG17,
       })
       expect(d.count).toBe(3)
@@ -2795,7 +2788,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
 
     it('reads a POINT-only assignment (a spawn) onto a parked branch the same way', () => {
       const branches = [parked336, ...NINE_BRANCHES.slice(1, 4)]
-      const d = branchSlotDecision({ branches, parked, points: [336], cap: 3, now: AUG17 })
+      const d = branchSlotDecision({ branches, parked, points: [336], now: AUG17 })
       expect(d.adding).toBe(1)
       expect(d.allowed).toBe(false)
       expect(d.reopens).toEqual(['feat/336-croc-staging'])
@@ -2811,7 +2804,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
         { ...parked336, ref: 'feat/336-second', tip: 'bb22cc33' },
         ...NINE_BRANCHES.slice(1, 3),
       ]
-      const d = branchSlotDecision({ branches, parked: twoParks, points: [336], cap: 3, now: AUG17 })
+      const d = branchSlotDecision({ branches, parked: twoParks, points: [336], now: AUG17 })
       expect(d).toMatchObject({ count: 2, adding: 2, allowed: false })
       expect(d.reopens).toEqual(['feat/336-croc-staging', 'feat/336-second'])
     })
@@ -2869,12 +2862,12 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     const three = NINE_BRANCHES.slice(0, 3) // 336, 686, 687
     // Continuing two existing points adds nothing, but all three live branches
     // still occupy their slots.
-    expect(branchSlotDecision({ branches: three, points: [336, 686], cap: 3, now: AUG17 })).toMatchObject({
+    expect(branchSlotDecision({ branches: three, points: [336, 686], now: AUG17 })).toMatchObject({
       allowed: true,
       count: 3,
       adding: 0,
     })
-    const d = branchSlotDecision({ branches: three, points: [705, 697], cap: 3, now: AUG17 })
+    const d = branchSlotDecision({ branches: three, points: [705, 697], now: AUG17 })
     expect(d.allowed).toBe(false)
     expect(branchSlotRefusal(d)).toContain('opening points 705 and 697 would add 2 more')
   })
@@ -2885,17 +2878,17 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
   // is 4 branches under a cap of 3.
   it('refuses TWO points opened into ONE free slot — judged on the state the call would LEAVE', () => {
     const two = NINE_BRANCHES.slice(0, 2)
-    const d = branchSlotDecision({ branches: two, points: [705, 697], cap: 3, now: AUG17 })
+    const d = branchSlotDecision({ branches: two, points: [705, 697], now: AUG17 })
     expect(d.count).toBe(2)
     expect(d.adding).toBe(2)
     expect(d.allowed).toBe(false)
     // ONE of the two points alone fits the free slot.
-    expect(branchSlotDecision({ branches: two, points: [705], cap: 3, now: AUG17 }).allowed).toBe(true)
+    expect(branchSlotDecision({ branches: two, points: [705], now: AUG17 }).allowed).toBe(true)
     // Here landing ONE suffices (2+2−3), and the refusal says exactly that…
     expect(branchSlotRefusal(d)).toContain('one of them must go')
     // …while at THREE occupied plus two opened, landing one leaves the call
     // refused, and the refusal must demand TWO (finding 7).
-    const worse = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), points: [705, 697], cap: 3, now: AUG17 })
+    const worse = branchSlotDecision({ branches: NINE_BRANCHES.slice(0, 3), points: [705, 697], now: AUG17 })
     expect(worse.allowed).toBe(false)
     expect(branchSlotRefusal(worse)).toContain('2 of them must go')
   })
@@ -2943,7 +2936,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
 
   it('refuses a mixed call that continues one occupied point and opens another at the cap', () => {
     const three = NINE_BRANCHES.slice(0, 3)
-    const d = branchSlotDecision({ branches: three, points: [336, 705], cap: 3, now: AUG17 })
+    const d = branchSlotDecision({ branches: three, points: [336, 705], now: AUG17 })
     expect(d).toMatchObject({ count: 3, adding: 1, allowed: false, why: 'branches-open' })
   })
 
@@ -2952,7 +2945,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
   // effective, so each named way out is taken here and the decision re-asked.
   it('following the refusal\'s remedy — LAND or PARK — flips the decision to allowed', () => {
     const three = [{ ...NINE_BRANCHES[0], tip: 'a1b2c3d4' }, ...NINE_BRANCHES.slice(1, 3)]
-    const refused = branchSlotDecision({ branches: three, point: 705, cap: 3, now: AUG17 })
+    const refused = branchSlotDecision({ branches: three, point: 705, now: AUG17 })
     expect(refused.allowed).toBe(false)
     const text = branchSlotRefusal(refused)
     // The refusal names the concrete branch to act on (oldest first) and the
@@ -2961,14 +2954,14 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
     expect(text.indexOf('feat/336-croc-staging')).toBeGreaterThan(-1)
     expect(text).toContain('--reason "<why>"')
     // (a) LAND the oldest: its branch gone, the same call fits.
-    expect(branchSlotDecision({ branches: three.slice(1), point: 705, cap: 3, now: AUG17 }).allowed).toBe(true)
+    expect(branchSlotDecision({ branches: three.slice(1), point: 705, now: AUG17 }).allowed).toBe(true)
     // (b) PARK it exactly as the printed command records it — non-empty reason,
     // tip baseline — and the same call fits too.
     const rec = recordParkedBranch(parseCommissionRecord(''), 'feat/336-croc-staging', 'superseded by 703', {
       at: '2026-08-17T19:00:00.000Z',
       tip: 'a1b2c3d4',
     })
-    expect(branchSlotDecision({ branches: three, parked: rec.parked, point: 705, cap: 3, now: AUG17 })).toMatchObject({
+    expect(branchSlotDecision({ branches: three, parked: rec.parked, point: 705, now: AUG17 })).toMatchObject({
       allowed: true,
       count: 2,
     })
@@ -2977,9 +2970,7 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
       at: '2026-08-17T19:00:00.000Z',
       tip: 'a1b2c3d4',
     })
-    expect(branchSlotDecision({ branches: three, parked: silent.parked, point: 705, cap: 3, now: AUG17 }).allowed).toBe(
-      false,
-    )
+    expect(branchSlotDecision({ branches: three, parked: silent.parked, point: 705, now: AUG17 }).allowed).toBe(false)
   })
 
   // A NAMED REF NARROWS THE EXEMPTION TO ITSELF (Sol, review of 3078d166). 687
@@ -3105,17 +3096,16 @@ describe('slotReasonDecision — the target half counts the same occupancy as th
   // count is the occupancy point 712 specifies, and a full set of running agents
   // is the concurrent-agent cap of CLAUDE.md §6, which still binds a spawn.
   it('names WHICH cap is full — the branches, or the agents that have not cut one', () => {
-    expect(
-      slotReasonDecision({ agents: 0, openBranches: POOL_CAP, openPoints: independent, runningFiles: running }),
-    ).toMatchObject({ needsReason: false, why: 'at-cap', slotsFree: 0, openBranches: POOL_CAP })
-    // THE AGENT COUNT NEVER OCCUPIES A BRANCH SLOT (Sol, review of 3078d166): a
-    // full set of agents that cut no branch suppresses the DEMAND under its own
-    // name, and still reports every branch slot that really stands empty.
-    // Folding the two into `max()` reported one free slot for a pool with none
-    // taken.
-    expect(
-      slotReasonDecision({ agents: POOL_CAP, openBranches: 0, openPoints: independent, runningFiles: running }),
-    ).toMatchObject({ needsReason: false, why: 'agents-at-cap', slotsFree: POOL_CAP, agents: POOL_CAP, openBranches: 0 })
+    expect(slotReasonDecision({ agents: 0, openBranches: 3, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: false, why: 'at-cap', slotsFree: 0, openBranches: 3 },
+    )
+    // THE AGENT COUNT NEVER OCCUPIES A BRANCH SLOT (Sol, review of 3078d166):
+    // three agents that cut no branch suppress the DEMAND under their own name,
+    // and still report the three branch slots that really stand empty. Folding
+    // the two into `max()` reported one free slot for a pool with none taken.
+    expect(slotReasonDecision({ agents: 3, openBranches: 0, openPoints: independent, runningFiles: running })).toMatchObject(
+      { needsReason: false, why: 'agents-at-cap', slotsFree: POOL_CAP, agents: 3, openBranches: 0 },
+    )
     // Neither full: the demand stands, and both counts are reported SEPARATELY.
     expect(slotReasonDecision({ agents: 2, openBranches: 1, openPoints: independent, runningFiles: running })).toMatchObject(
       { needsReason: true, why: 'idle-slots', slotsFree: POOL_CAP - 1, agents: 2, openBranches: 1 },

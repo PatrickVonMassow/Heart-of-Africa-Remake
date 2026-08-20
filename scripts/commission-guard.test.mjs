@@ -91,12 +91,9 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     expect(hookInputNotice()).toContain('internal guard failure')
   })
   it('refuses the real 17.08.2026 pick on BOTH counts and names each', () => {
-    // The cap is pinned to the three this fixture was measured against: what is
-    // under test is that BOTH halves refuse and name their own reason, not the
-    // width CLAUDE.md §6 currently gives the pool.
     const g = gather(697, { branches: NINE })
     expect(g.applicable).toBe(true)
-    const v = commissionVerdict(g.inputs, { now: AUG17, cap: 3 })
+    const v = commissionVerdict(g.inputs, { now: AUG17 })
     expect(v.block).toBe(true)
     // 700 and 711 are skipped as candidates here BECAUSE their branches stand
     // open in this fixture — the front names what could actually be started.
@@ -165,7 +162,7 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
     // AT A FULL POOL the reassignment is refused — it is an opening.
     const full = commissionVerdict(
       gather(336, { branches, record, refs: ['feat/336-croc-staging'] }).inputs,
-      { now: AUG17, cap: 3 },
+      { now: AUG17 },
     )
     expect(full.block).toBe(true)
     expect(full.reason).toContain('A SLOT IS NOT FREE')
@@ -265,7 +262,7 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
   it('derives the in-flight set from the branches, so the front skips them', () => {
     const g = gather(708, { branches: [{ ref: 'feat/700-a', tipAt: AUG17 }, { ref: 'origin/feat/701-b', tipAt: AUG17 }] })
     expect(g.inputs.inFlight).toEqual([700, 701])
-    const v = commissionVerdict(g.inputs, { now: AUG17, cap: 3 })
+    const v = commissionVerdict(g.inputs, { now: AUG17 })
     expect(v.queue.candidates).toEqual([707, 708, 711])
     expect(v.block).toBe(false)
   })
@@ -332,7 +329,7 @@ describe('the wrapper — both refusals, and the stand-downs', () => {
       branchProbe: () => ({ readable: true, branches: NINE.slice(0, 3) }),
       record: { overrides: {}, parked: {}, torn: false },
     })
-    const v = commissionVerdict(g.inputs, { now: AUG17, cap: 3 })
+    const v = commissionVerdict(g.inputs, { now: AUG17 })
     expect(v.block).toBe(true)
     expect(v.reason.match(/A SLOT IS NOT FREE/g)).toHaveLength(1)
   })
