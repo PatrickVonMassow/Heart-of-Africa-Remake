@@ -4540,6 +4540,18 @@ Build order, chosen so no two parallel agents own the same file:
   writing this: `processStartTime` computes `Date.now() - (uptime - starttime/HZ)`,
   and the uptime-derived boot instant stood 0.9 s from the `btime`-derived one on a
   quiet machine — under the 2000 ms tolerance at that moment, but on the same curve.
+  THIS PROBE IS ALSO WHAT POINT 463 PART A WANTS TO PUT ON THE HEARTBEAT PATH, and the order is
+  decided here (20.08.2026). 463 A demands that a fresh heartbeat stop proving life on its own —
+  that inside `DEAD_CONFIRM_MS` the same pid-plus-start-time identity probe the claim path uses
+  confirms it, so a killed owner no longer holds the batch for five minutes. The shape is right
+  and the probe is not: the comparison it would use is `Math.abs(probe.startedAt -
+  lock.pidStartedAt) > PID_START_TOLERANCE_MS`, a fixed 2000 ms to this day (verified 20.08.2026
+  in `scripts/batch-singleton.mjs`), against a start time that drifts ~1 s at 15 minutes and ~3 s
+  at 30. Wiring it into the heartbeat grace before clause 1 lands would carry the false dead
+  verdict into the LAST reading that still holds a live owner alive, against clause 3a's
+  err-toward-alive rule — the same half-fix in two places this point was charged to prevent. So
+  clause 1 first; 463 A is then built on the corrected identity, and the generous window stays
+  where 463 already keeps it, for a lock whose pid the probe cannot decide at all.
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
@@ -4615,6 +4627,14 @@ Build order, chosen so no two parallel agents own the same file:
   directory for the same omission — a guard is either wired with the stand-down or is
   deliberately global with the reason written beside it — and record the sweep's result in
   the commit message, so this is a one-off audit rather than a recurring surprise.
+  THE PROBE ITSELF IS CORRECTED IN POINT 504, NOT HERE (20.08.2026). That point root-caused the
+  derived start time drifting against the recorded one, has four measured reproductions, and owns
+  both directions of the liveness verdict in one core. PART A therefore consumes the corrected
+  identity and waits on 504's clause 1: built on today's fixed 2000 ms tolerance it would spread
+  the false "pid-reused" verdict into the heartbeat grace, the one reading that still keeps a
+  live owner alive. What stays this point's own is the DEMAND — a fresh heartbeat is not proof of
+  life when the process is provably gone — and the exception for a lock without a usable pid.
+  PART B does not depend on it.
   VERIFIABLE: the pure layer covers both — a fresh heartbeat with a dead pid assessed as
   dead, a fresh heartbeat without a pid still assessed alive, and the guard's stand-down for
   a non-owner; the sweep is evidenced by the commit message naming every guard checked.
