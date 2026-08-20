@@ -1273,9 +1273,17 @@ put it is the mistake this line exists to stop.
   of its context already spent (measured 19.08.2026, 18:39). `batch-claim.mjs` is in the context
   fence's `START_SCRIPTS` and `CLEAR_FIRST_SCRIPTS` (`scripts/context-fence-core.mjs`), so the
   fence does refuse a claim past the mark and names `/clear` — that part works. But the mark it
-  refuses against is the 150000-token HANDOVER watermark, and a window that claims the batch at
-  101487 tokens is below it and passes. The user caught that one by hand ("Damit hättest du
-  direkt einen schlechten Start"); the mechanism did not.
+  refuses against is the general session watermark, not one belonging to the claim, and a window
+  that claims the batch at 101487 tokens is below it and passes. The user caught that one by hand
+  ("Damit hättest du direkt einen schlechten Start"); the mechanism did not.
+  THE NUMBER IN THIS POINT IS STRUCK, THE DEFECT IS NOT (re-measured 20.08.2026). It was written
+  against a single 150000-token mark; commit e0813568 of 20.08.2026 02:21 split the two, so
+  `scripts/context-watermark-core.mjs` now carries `CONTEXT_CEILING_TOKENS = 150_000` for the
+  handover and `CONTEXT_REFUSAL_TOKENS = 110_000` for the fence's refusal. The claim path still
+  reads whichever of those the fence uses and has NO threshold of its own, and the incident's
+  101487 tokens sit below 110000 as well — so the same window would pass the same claim today.
+  The same commit put the fence in observation mode, which means the refusal cannot be re-staged
+  by repeating the call either; verify against the pure decision, not the incident.
   WHY TWO NUMBERS, NOT ONE. The 150000 mark answers "when must a RUNNING session hand over?" — a
   session with work in flight. Taking the batch asks the opposite question: "how fresh must a
   worker be to START one?", and a fresh worker should begin near zero. One number cannot serve
@@ -10054,6 +10062,15 @@ to land than a mechanism that needs a review.
   no way out inside the tool set — no bundle CLI exists, and the "Not bundled" list stands in the
   same file — so the point was left in no bundle and a later session had to write the line. Twice
   in twenty-four hours makes this defect systematic rather than incidental.
+  THE INCIDENTS NO LONGER REPRODUCE, THE DEFECT DOES (checked 20.08.2026). Commit e0813568 of
+  20.08.2026 02:21 disarmed the fence into observation mode — `CONTEXT_FENCE_MODE_DEFAULT` is
+  `'observe'` in `scripts/context-watermark-core.mjs` and only `HOA_CONTEXT_FENCE_MODE=armed`
+  restores a refusal — so both recorded incidents happened while it was armed and neither can be
+  re-staged by repeating the call today. That changes nothing about what is wrong: none of
+  `bundle-first-guard.mjs`, `queue-order-guard.mjs` or `retro-currency-guard.mjs` so much as
+  names `scopeMandatoryDuty`, so the mutual block is intact in the code and returns the moment
+  the arming point lands. Verify this point against the guard cores, never by re-running the
+  incident.
   VERIFIABLE: Vitest over each of the three guard cores — past the fence each returns the
   handover verdict rather than a block, and below it blocks exactly as today — plus one case
   that ENUMERATES the mandatory Stop guards from `.claude/settings.json` and fails if any of
@@ -10083,6 +10100,12 @@ to land than a mechanism that needs a review.
   where this point already puts it, in `scripts/command-classify-core.mjs`, and the tests must
   cover BOTH consumers — a case scoped to `context-fence-guard` alone would pass while
   `board-first-guard` still reads card prose as commands.
+  ONLY THE FENCE HALF WENT QUIET (checked 20.08.2026). Commit e0813568 of 20.08.2026 02:21
+  disarmed the fence into observation mode, so the 23:04 refusal cannot be re-staged by
+  repeating the call. The SECOND consumer is untouched by that: `board-first-guard` is not
+  fence-gated, so its misreading of a card's prose as a state-changing segment reproduces today
+  exactly as it did at 02:06 — and `scripts/command-classify-core.mjs` still contains no heredoc
+  handling at all. The defect is verified in the segmenter, not in the incident.
   FINAL STATE: the segmenter strips heredoc bodies before any classification. A redirection of
   the form `<<WORD`, `<<-WORD`, `<<'WORD'` or `<<"WORD"` consumes every following line up to its
   terminator (a tab-indented terminator for the `<<-` form), and those lines are removed from the
