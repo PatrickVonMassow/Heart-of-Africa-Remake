@@ -331,13 +331,13 @@ describe('who may merge', () => {
     expect(r).toMatchObject({ ok: true, fallback: true })
   })
 
-  it('admits the canonical switch reason for a Sol-merged Sol/Opus stage as weaker', () => {
+  it('admits the canonical switch reason as the Sol-merged Sol/Opus fallback', () => {
     const r = validateMerger({
       mergedBy: 'GPT-5.6 Sol',
       authors: ['Opus 5', 'GPT-5.6 Sol'],
       fallback: mergeFallbackReason(FABLE_OFF),
     })
-    expect(r).toMatchObject({ ok: true, fallback: true, weaker: true })
+    expect(r).toMatchObject({ ok: true, fallback: true })
     expect(
       validateMerger({
         mergedBy: 'GPT-5.6 Sol',

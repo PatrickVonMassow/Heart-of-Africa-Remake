@@ -446,7 +446,6 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     ok: errors.length === 0,
     errors,
     fallback: Boolean(conflict && reason),
-    weaker: Boolean(conflict && reason),
   }
 }
 
