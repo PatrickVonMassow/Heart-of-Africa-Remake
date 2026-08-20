@@ -77,15 +77,24 @@ function readRegistry(source = '') {
 
       const ids = []
       for (const element of declaration.initializer.elements) {
-        if (!ts.isObjectLiteralExpression(element)) continue
+        // Every array element must either expose a literal id or plainly be
+        // metadata with no id. Skipping an unresolved element would make this
+        // a partial registry and could falsely call its wired hook unregistered.
+        if (!ts.isObjectLiteralExpression(element)) return { found: false, ids: [] }
         const property = element.properties.find(
           (candidate) =>
-            ts.isPropertyAssignment(candidate) &&
+            candidate.name &&
             ((ts.isIdentifier(candidate.name) && candidate.name.text === 'id') ||
               (ts.isStringLiteral(candidate.name) && candidate.name.text === 'id')),
         )
-        if (!property || !ts.isPropertyAssignment(property) || !ts.isStringLiteral(property.initializer)) {
+        if (!property) {
+          if (element.properties.some((candidate) => ts.isSpreadAssignment(candidate))) {
+            return { found: false, ids: [] }
+          }
           continue
+        }
+        if (!ts.isPropertyAssignment(property) || !ts.isStringLiteral(property.initializer)) {
+          return { found: false, ids: [] }
         }
         if (/^[\w.-]+$/.test(property.initializer.text)) ids.push(property.initializer.text)
       }

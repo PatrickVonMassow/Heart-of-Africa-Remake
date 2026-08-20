@@ -18,6 +18,30 @@ const wire = (...ids) => ({
 const registry = (...ids) =>
   ['export const GUARDS = [', ...ids.map((id) => `  {\n    id: '${id}',\n  },`), ']', ''].join('\n')
 
+function expectUnreadableRegistry(source, registeredId) {
+  const settingsJson = JSON.stringify(wire(registeredId, 'plain-guard'))
+  const changed = evaluate({
+    paths: ['scripts/guard-preflight.mjs'],
+    settingsJson,
+    preflightSource: source,
+  })
+  expect(changed).toMatchObject({
+    block: true,
+    registryUnreadable: true,
+    unregistered: [],
+    why: 'this commit makes the GUARDS registry unreadable',
+  })
+
+  const unchanged = evaluate({
+    paths: ['.claude/settings.json'],
+    settingsJson,
+    preflightSource: source,
+  })
+  expect(unchanged.block).toBe(false)
+  expect(unchanged.unregistered).toEqual([])
+  expect(unchanged.why).toContain('no registry found')
+}
+
 describe('which commits are judged', () => {
   it('includes deletions and both sides of renames in the staged paths', () => {
     expect(STAGED_PATH_ARGS).toContain('--no-renames')
@@ -66,6 +90,27 @@ describe('reading the registry as text', () => {
     expect(registeredIdsFromSource('export const GUARDS = [{ id: "double-quoted" }]')).toEqual([
       'double-quoted',
     ])
+  })
+
+  it('reports a spread registry element as unreadable instead of returning a partial list', () => {
+    const source = [
+      "const OTHER = [{ id: 'spread-guard' }]",
+      "export const GUARDS = [...OTHER, { id: 'plain-guard' }]",
+    ].join('\n')
+    expectUnreadableRegistry(source, 'spread-guard')
+  })
+
+  it('reports an identifier-valued id as unreadable instead of returning a partial list', () => {
+    const source = [
+      "const NAME = 'named-guard'",
+      "export const GUARDS = [{ id: NAME }, { id: 'plain-guard' }]",
+    ].join('\n')
+    expectUnreadableRegistry(source, 'named-guard')
+  })
+
+  it('reports a template-literal id as unreadable instead of returning a partial list', () => {
+    const source = "export const GUARDS = [{ id: `template-guard` }, { id: 'plain-guard' }]"
+    expectUnreadableRegistry(source, 'template-guard')
   })
 
   // The registry ends at the closing bracket; ids further down the file belong
