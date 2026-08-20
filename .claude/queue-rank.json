@@ -199,10 +199,14 @@
     "767": {
       "at": "2026-08-20T06:03:57.318Z",
       "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night."
+    },
+    "770": {
+      "at": "2026-08-20T06:31:20.240Z",
+      "why": "It costs nothing while it waits and the user is currently the reader who notices; it follows the header work that measures the same number."
     }
   },
   "settled": {
-    "at": "2026-08-20T06:03:57.319Z",
+    "at": "2026-08-20T06:31:20.241Z",
     "points": [
       174,
       184,
@@ -433,7 +437,10 @@
       764,
       765,
       766,
-      767
+      767,
+      768,
+      769,
+      770
     ]
   }
 }
