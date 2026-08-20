@@ -973,31 +973,6 @@ put it is the mistake this line exists to stop.
   first stage depends on 744's corrected exit path.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 753. The authoring routing counts almost no unsuccessful review rounds, so the Fable
-  escalation never fires (measured 19.08.2026, 21:06 and again 21:33 on point 751). The first
-  reading printed "0 unsuccessful review round(s), 0 fresh attempt(s)" and "round history: no
-  unsuccessful reviews recorded" while point 751 stood in its THIRD do-not-merge round; the
-  second, one round later, printed 1 — against four recorded do-not-merge reviews. CLAUDE.md §6
-  makes Fable 5 the escalation "REACHED ONLY AFTER FIVE UNSUCCESSFUL REVIEW ROUNDS", and
-  `scripts/author-routing-core.mjs` makes that cut from the recorded review history. A count
-  that lags the real rounds can never reach five, so a point loops on one author indefinitely —
-  which is the cost the memory `commit-proxy-misses-unlanded-work` names as the most expensive
-  thing there is: a grinding, never-landing point has no commits and shows up in no proxy.
-  FINAL STATE: the round count `author-routing-core.mjs` reads is the number of do-not-merge
-  reviews recorded for that point, whatever wrote them. Where `review-sol.mjs` writes a verdict
-  and where the routing reads it are the SAME record, keyed on something every recorded round
-  carries — a review handed to a fallback model, a review recorded from a worktree and a review
-  of a range rather than a single sha all count, because each of them is a round the point did
-  not pass. A verdict the routing cannot key is reported as unkeyable at recording time, not
-  dropped silently.
-  VERIFIABLE: Vitest over the routing's counter — a fixture history of four recorded
-  do-not-merge verdicts yields four, a fifth crosses into the Fable lane, a clean verdict does
-  not count, and a verdict missing the key is refused at recording time with the missing part
-  named; plus a case over the real 751 history asserting the count equals the recorded rounds.
-  Criticality: medium — nothing breaks visibly; the failure is a point that never escalates and
-  keeps consuming rounds on one author.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 748. The attended window is fenced by nothing, and it is the largest remaining source
   (measured 19.08.2026 ON THE SESSION THAT WROTE THIS PROGRAMME). Every guard in this project,
   the context fence included, STANDS DOWN for a session that does not own the batch lock —
