@@ -20156,3 +20156,21 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   QUOTED:
   Nutzer, 13.08.2026 20:46: »Der Lehrstein soll flussaufwärts wandern. Ein großer Felsbrocken mitten im Dorf macht keinen Sinn - ebensowenig, wie dort zugraben.«
   Nutzer, 13.08.2026 20:41 (die Beobachtung dahinter): »dann sagt er GO_THERE BIG_ROCK und zeigt in die Dorfmitte, wo der große Felsen liegt (warum auch immer) … sie bleiben am Felsbrocken stehen und machen nichts«
+
+- [x] 522. The burning grass does not burn (observed 05.08.2026 while closing point
+  323). `verification/131-burning-grass.png` is the frame that proves the §19.9
+  bush fire, and no fire is visible in it to the eye — the frame passes its checks
+  and shows dry grass. Either the dressing does not draw at the moment the shutter
+  opens (the fire is a moving effect and the frame may catch it between states), or
+  it draws too faintly to read at that distance and zoom, or the check measures
+  something the picture does not show. This is exactly the "looks-wrong-but-passes"
+  class: a green check standing in front of an invisible feature.
+  FINAL STATE: the fire READS in the frame a human looks at — flame and smoke
+  visible at the zoom the criterion is judged at — and the check that guards it
+  measures the drawn fire (pixels of flame/smoke in the frame region), not a state
+  flag beside it. If the effect turns out to be drawing correctly and only the
+  frame's aim or moment is wrong, the aim is fixed and the finding recorded as
+  such; a feature that cannot be seen is not delivered either way.
+  VERIFIABLE: the refreshed frame 131 shows the fire to a human on both backends,
+  and its check fails when the fire is switched off in the debug menu — proving the
+  check reads the picture rather than the intent.
