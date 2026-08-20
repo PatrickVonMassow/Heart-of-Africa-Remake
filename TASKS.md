@@ -5316,14 +5316,13 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS: design.md §21.1 already states it; name the parameter in the README's play
   links if that file lists them, so the shareable form is discoverable.
 
-- [ ] 422. The beginner guide is full, and today's lesson has nowhere to go
+- [ ] 422. The beginner guide is full, and three lessons are still outside it
   (29.07.2026, found while doing the guide review the currency guard demands).
   `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — measured
   13.08.2026, 415 lines of 415 and 3677 words of 3677 (`scripts/guide-brevity-core.mjs`).
   The gate is right to hold it there: a beginner guide that grows without bound stops being
-  read. But it means the guide can no longer absorb a new lesson at all, and the currency
-  guard will keep asking for one — two mechanisms pulling opposite ways, with no path
-  through. THREE lessons are now waiting, and each is a pitfall in the guide's own form:
+  read, and a full guide makes every new lesson pay for its place. THREE lessons are still
+  waiting, and each is a pitfall in the guide's own form:
   (A) changing WHERE or HOW something is delivered does not carry the old path's guarantees
   along, and what no test pins falls away SILENTLY — the page still loads, the tests stay
   green, only a promise no longer holds. Point 419 measured four such losses from one move.
@@ -5358,6 +5357,16 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: `scripts/guide-brevity-core.test.mjs` stays green (the real guide inside its
   budget), the guide contains the new pitfall, and `node scripts/retro-refresh.mjs
   --guide-reviewed` is re-attested afterwards.
+  STRUCK 20.08.2026 (work-order review): the deadlock premise — "two mechanisms pulling
+  opposite ways, with no path through". Two things took it back. The user withdrew the
+  escalation generally on 10.08.2026 (point 621: where no tightening of comparable value
+  exists, RAISE the ceiling in the same commit and justify it there), so step (3) above is
+  a decision we may take rather than a question that stalls; and the path was walked this
+  morning — commit 77d34781 paid a new pitfall out of six neighbouring entries instead of
+  out of the ceiling. The 13.08. measurement is stale with it: the guide stands at 413 of
+  415 lines and 3556 of 3677 words (measured 20.08.2026), so a small entry fits today
+  without displacing anything. Everything else here holds: the three lessons are still out
+  of the guide, and (1)–(4) are still the order to work them in.
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
 
