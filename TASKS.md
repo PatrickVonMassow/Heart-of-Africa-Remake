@@ -76,32 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 780. `scripts/author-sol.mjs` cannot record a commission from a worktree, so the delegated
-  authoring lane is closed from the one place it is supposed to run (measured 20.08.2026, 13:24,
-  commissioning point 775 from `.claude/worktrees/point-775`). The commission ledger is pinned to
-  the MAIN checkout — `RECORDS_PATH` is `repoPath('.claude/mechanism-reviews.jsonl')` in
-  `scripts/mechanism-review.mjs` — while the commit that seals it runs with `cwd` set to the
-  isolation worktree. The append therefore lands in the MAIN tree's working copy and the following
-  `git add -- <absolute main path>` dies with »is outside repository at <worktree>«.
-  BOTH HALVES ARE DEFECTS. The run aborted before the authoring ever started, AND it left the main
-  checkout dirty with an `authoring-commission` line describing a commission that never ran — the
-  exact half-state the record exists to prevent, in the file that is supposed to be the honest
-  ledger. A later session reading that line would count a round the point never had.
-  IT CLOSES THE WHOLE LANE, not one point: CLAUDE.md §6 sends every delegated author into an
-  isolated worktree, so no point can be commissioned the intended way. The block was worked around
-  once through the script's own `AUTHOR_REVIEW_RECORDS_FILE` override, which is a knob, not a fix —
-  every commission would need it, and nothing says so.
-  FINAL STATE: the ledger resolves against the checkout the command actually runs in (the git
-  toplevel of `cwd`, not `REPO_ROOT`), so the record lands on the point's own branch exactly as the
-  comment above it intends and travels to `main` with the merge. A failed commit leaves NO appended
-  line behind: the append and its commit either both stand or neither does.
-  VERIFIABLE: Vitest over the pure half — the records path resolves to the worktree toplevel when
-  invoked from a worktree and to the main checkout from the main tree; a commit step that throws
-  leaves the ledger byte-identical to what it was before the append. Plus one commission actually
-  driven from a fresh worktree without the environment override, leaving the main checkout clean.
-  Criticality: high — it blocks every delegated point, and its failure mode writes a false round
-  into the append-only record two governing rules read.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 776. `scripts/verify/docs.mjs` is RED on `main`, and two of its three pointer rules pass
   while judging nothing (measured 20.08.2026 at `622f5113`). `node scripts/verify/docs.mjs`
   exits 1 with »no orphaned detail section that no criterion points at — 1, 2, 3, … 32«: EVERY
