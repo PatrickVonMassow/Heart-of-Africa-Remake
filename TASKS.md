@@ -7718,8 +7718,8 @@ to land than a mechanism that needs a review.
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
-- [ ] 330. Full post-degradation assurance pass — nothing new starts until this is
-  100 % green (user 25.07.2026, after three separate leftovers were found by chance:
+- [ ] 330. Full post-degradation assurance pass (user 25.07.2026, after three separate
+  leftovers were found by chance:
   the board's broken umlauts, the board's inconsistency, and a whole night's work
   sitting unpushed on a feature branch). The user's verdict on the cleanup so far:
   incomplete. Do ALL of the following, in this order, and report each with evidence:
@@ -7790,6 +7790,14 @@ to land than a mechanism that needs a review.
   are absent, no merge artefacts remain, and the retained closing-state cannot
   pre-satisfy the tag gate (it is keyed to a different commit; `--status` reports
   0/11 at HEAD). That review's own findings are queued as point 331.
+
+  STRUCK 20.08.2026 (work-order review): the opening freeze, "nothing new starts until
+  this is 100 % green". It has not been in force for weeks — hundreds of points have been
+  opened and landed since 25.07. — and a clause nobody honours only teaches that the work
+  order may be ignored. The pass itself STANDS, without the freeze: (A) and (B) are done
+  above, and (A) is now held continuously by `branch-hygiene-guard` and `ci-status-guard`
+  rather than by a one-off sweep, so a re-run of (A) is a confirmation, not a hunt.
+  (C), (D) and (E) are still owed as written.
 
 - [ ] 205. A world & functionality plausibility audit — a third audit kind beyond
   code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
