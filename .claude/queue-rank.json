@@ -16,10 +16,6 @@
       "at": "2026-08-11T18:08:07.037Z",
       "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor"
     },
-    "650": {
-      "at": "2026-08-11T18:34:39.594Z",
-      "why": "Verfahrensschaerfe an der Gegenpruefung; wichtig, aber kein Spielfehler und niemand ist darauf blockiert"
-    },
     "652": {
       "at": "2026-08-11T21:10:35.758Z",
       "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release."
@@ -178,7 +174,7 @@
     }
   },
   "settled": {
-    "at": "2026-08-20T10:18:00.426Z",
+    "at": "2026-08-20T10:30:37.765Z",
     "points": [
       174,
       184,
@@ -326,7 +322,6 @@
       643,
       646,
       647,
-      650,
       652,
       653,
       658,
