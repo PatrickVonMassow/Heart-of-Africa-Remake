@@ -19535,3 +19535,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   needs is that the boundary must not fail when the record cannot be written, since the handover
   matters more than the bookkeeping.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 758. The context fence observes instead of refusing until the consumption-reducing points
+  have landed (user 20.08.2026, 01:34, queue FIRST — before 757, because 757 cannot be executed
+  under the fence as it stands). Verbatim: "Give these tasks generous room so they can do their
+  work. Introducing the limits now was nonsense. That should have happened right at the end, once
+  the outstanding tickets had reduced the consumption. As things stand the new requirements are
+  not satisfiable at all." The record bears it out: the fence refuses writes to every authoring
+  target — TASKS.md, the archive, CLAUDE.md, design.md, docs/*.md, memory/ — which is exactly the
+  file set the floor-cutting point 757 must edit, and three fresh sessions in a row were stopped
+  above the mark before beginning any work (85,225 / 83,079 / 86,416 tokens against a start floor
+  of 61,372). Twice in 24 hours a mandatory Stop guard then demanded at the exit what the fence
+  forbade during the turn (points 755, 756).
+  FINAL STATE:
+  - AN EXPLICIT OBSERVATION MODE, AND IT IS THE DEFAULT until the fence is re-armed. The
+    watermark is still measured and still recorded — point 742's series must not break, and 747
+    needs it to recalibrate — but no action is refused. The mode is a named, single-valued switch
+    read by `scripts/context-fence-guard.mjs`, not a threshold set so high it merely never fires:
+    a disabled gate must be visible as disabled, not disguised as a passing one.
+  - THE HANDOVER STAYS, SEPARATED FROM THE REFUSAL. Refusal threshold and handover threshold are
+    one constant today; this point splits them. The point boundary at the watermark remains in
+    force — without it a session ran to 434k on 17.08.2026 — but it moves close under the ceiling
+    instead of forbidding work well before it.
+  - THE STOP-CHAIN DUTIES KEEP THEIR EXIT OPEN. While the fence is armed again later, no guard
+    may demand at the exit what the fence denies during the turn; observation mode makes that
+    contradiction disappear today, and the point records that this is a stopgap for it, not the
+    fix owed by 755.
+  - VITEST PINS BOTH MODES: in observation mode nothing is refused AND the watermark is written
+    anyway; armed, it refuses exactly as before. A test that only covered the armed path would
+    let the observation mode silently stop recording.
+  IMMEDIATE RELIEF, INDEPENDENT OF THE MERGE: `HOA_CONTEXT_TRIGGER_TOKENS` set wide in the
+  launcher environment — `triggerTokens()` reads it, and `context-fence-guard` and
+  `batch-boundary` take their threshold from there — so sessions stop being stranded before this
+  point lands.
+  RE-ARMING IS NOT PART OF THIS POINT. It is a condition inside point 747: only once the
+  consumption-reducing points (757, 614, 742, 744, 597) have LANDED is the start floor measured
+  anew and the threshold computed from that measurement.
+  Criticality: medium — it disarms a live guard, so the risk is the opposite one (a session
+  running past the ceiling unchecked), which the separated handover threshold is there to hold.
+  Bundle: Session- & Repo-Hygiene.
