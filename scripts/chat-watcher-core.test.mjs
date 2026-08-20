@@ -51,14 +51,39 @@ describe('wakeDecision — a message wakes a responder only into a genuinely idl
     expect(wakeDecision({ ...ok, ownerAlive: false, claimHonoured: false }).decision).toBe('spawn')
   })
 
-  it('never spawns while the batch is user-paused — the launcher stop binds here too', () => {
-    expect(wakeDecision({ ...ok, paused: true })).toEqual({ decision: 'skip', reason: WAKE_REASONS.PAUSED })
+  it('verified user mail wakes a bounded responder through a standing pause', () => {
+    expect(wakeDecision({ ...ok, paused: true })).toEqual({
+      decision: 'spawn',
+      reason: WAKE_REASONS.PAUSED_MESSAGE,
+    })
   })
 
-  it('the pause outranks everything else that would otherwise allow a spawn', () => {
-    expect(wakeDecision({ ...ok, paused: true, ownerAlive: false, claimHonoured: false }).reason).toBe(
-      WAKE_REASONS.PAUSED,
+  it('the same pause without pending verified mail still wakes nothing', () => {
+    expect(wakeDecision({ ...ok, accepted: false, paused: true }).decision).toBe('skip')
+    expect(buildResponderPrompt([])).toBe('')
+  })
+
+  it('a fresh live owner still receives paused mail through stage 2', () => {
+    expect(wakeDecision({ ...ok, paused: true, ownerAlive: true })).toEqual({
+      decision: 'skip',
+      reason: WAKE_REASONS.OWNER_LIVE,
+    })
+  })
+
+  it('paused mail wakes a responder when its live-owner deferral expires', () => {
+    expect(wakeDecision({ ...ok, paused: true, ownerAlive: true, deferralExpired: true })).toEqual({
+      decision: 'spawn',
+      reason: WAKE_REASONS.PAUSED_MESSAGE,
+    })
+  })
+
+  it('the pause exception lifts no verification, alarm, responder or claim gate', () => {
+    expect(wakeDecision({ ...ok, accepted: false, paused: true, dropReason: 'bad-signature' }).reason).toBe(
+      'bad-signature',
     )
+    expect(wakeDecision({ ...ok, paused: true, formatAlarm: true }).reason).toBe(WAKE_REASONS.ALARM)
+    expect(wakeDecision({ ...ok, paused: true, responderLive: true }).reason).toBe(WAKE_REASONS.RESPONDER_LIVE)
+    expect(wakeDecision({ ...ok, paused: true, claimHonoured: true }).reason).toBe(WAKE_REASONS.CLAIM_HELD)
   })
 
   it('never spawns while the work-order format alarm is up', () => {
@@ -143,9 +168,9 @@ describe('the deferral has a deadline — a live owner may not sit on a message 
     expect(again.overdue).toEqual([])
   })
 
-  it('lifts ONLY the owner gate — the pause, the alarm, our responder and a foreign claim still bind', () => {
+  it('lifts ONLY the owner gate — the alarm, our responder and a foreign claim still bind', () => {
     const expired = { ...ok, ownerAlive: true, deferralExpired: true }
-    expect(wakeDecision({ ...expired, paused: true }).reason).toBe(WAKE_REASONS.PAUSED)
+    expect(wakeDecision({ ...expired, paused: true }).reason).toBe(WAKE_REASONS.PAUSED_MESSAGE)
     expect(wakeDecision({ ...expired, formatAlarm: true }).reason).toBe(WAKE_REASONS.ALARM)
     expect(wakeDecision({ ...expired, responderLive: true }).reason).toBe(WAKE_REASONS.RESPONDER_LIVE)
     expect(wakeDecision({ ...expired, claimHonoured: true }).reason).toBe(WAKE_REASONS.CLAIM_HELD)
@@ -186,7 +211,7 @@ describe('the dry run maps to exactly the same decisions', () => {
     [{ ...ok, ownerAlive: true }, 'skip', 'owner-live'],
     [{ ...ok, ownerAlive: true, deferralExpired: true }, 'spawn', 'defer-expired'],
     [{ ...ok, claimHonoured: true }, 'skip', 'claim-held'],
-    [{ ...ok, paused: true }, 'skip', 'paused'],
+    [{ ...ok, paused: true }, 'spawn', 'paused-message'],
     [{ ...ok, formatAlarm: true }, 'skip', 'alarm'],
     [{ ...ok, responderLive: true }, 'skip', 'responder-live'],
     [{ ...ok, accepted: false, dropReason: 'duplicate' }, 'skip', 'duplicate'],
@@ -359,15 +384,23 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
     expect(r.pid).toBe(null)
   })
 
-  it('stops a live one while the batch is paused, and starts none', () => {
+  it('keeps a live inbox listener through a pause, so the user can end it', () => {
     expect(
       watcherSupervision({
         paused: true,
         record,
         probe: probeOf({ 900: { exists: true, startedAt: record.pidStartedAt } }),
       }),
-    ).toEqual({ action: 'stop', reason: 'paused', pid: 900 })
-    expect(watcherSupervision({ paused: true, record: null, probe: probeOf({}) }).action).toBe('none')
+    ).toEqual({ action: 'none', reason: 'paused-listening', pid: 900 })
+  })
+
+  it('restarts only the zero-model inbox listener during a pause, not a responder', () => {
+    expect(watcherSupervision({ paused: true, record: null, probe: probeOf({}) })).toEqual({
+      action: 'start',
+      reason: 'paused-listening',
+      pid: null,
+    })
+    expect(buildResponderPrompt([])).toBe('')
   })
 
   // THE SAME COERCION, ONE LEVEL DEEPER (four-eyes confirmation pass,
@@ -387,9 +420,13 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
     }
   })
 
-  it('such a watcher is STOPPED on a pause rather than duplicated', () => {
+  it('such a watcher remains the sole listener during a pause', () => {
     const probe = probeOf({ 900: { exists: true, startedAt: now - 10_000 } })
-    expect(watcherSupervision({ paused: true, record: { pid: 900, pidStartedAt: null }, probe }).action).toBe('stop')
+    expect(watcherSupervision({ paused: true, record: { pid: 900, pidStartedAt: null }, probe })).toEqual({
+      action: 'none',
+      reason: 'paused-listening',
+      pid: 900,
+    })
   })
 
   it('but the leniency never extends to a pid the probe says is GONE', () => {
@@ -462,6 +499,13 @@ describe('the responder prompt', () => {
     expect(p).toMatch(/LIES NICHT/)
     expect(p).toContain('chat-reply.mjs')
     expect(p).toContain('Wie weit ist Punkt 400?')
+  })
+
+  it('the paused wake path cannot commission a point, agent or suite', () => {
+    const p = buildResponderPrompt([msg('weiter')])
+    expect(p).toContain('Faengt keinen Punkt an')
+    expect(p).toContain('starte keinen Agenten und keine Suite')
+    expect(p).toContain('delegiere nichts')
   })
 
   it('is ASCII only — the argv goes through a Windows spawn', () => {
