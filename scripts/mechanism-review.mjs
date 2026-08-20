@@ -106,8 +106,17 @@ export function readRecords(path = RECORDS_PATH) {
   let text = ''
   try {
     text = readFileSync(path, 'utf8')
-  } catch {
-    return []
+  } catch (e) {
+    // ABSENT IS AN EMPTY HISTORY; UNREADABLE IS NOT (cross-vendor review of
+    // point 780, round 3). EACCES, EISDIR and an I/O error all used to answer
+    // "no reviews recorded" — which a writer reads as a clean ledger and a gate
+    // reads as a ledger with nothing in it: two different wrong answers out of
+    // one silent catch. The flag is what keeps the gates from treating it as
+    // the environment error their fail-open catch waves through.
+    if (e && e.code === 'ENOENT') return []
+    const error = new Error(`cannot read the review ledger at ${path}: ${(e && e.message) || e}`)
+    error.ledgerUnreadable = true
+    throw error
   }
   const out = []
   for (const line of text.split(/\r?\n/)) {
