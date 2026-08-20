@@ -23,11 +23,19 @@ import { isMainModule } from './is-main.mjs'
 // this module for its gather step, and under the test transform import.meta.url
 // is not a file URL — resolving it at import time took the whole preflight down
 // (measured 20.08.2026).
-const CLAIM_PATH = process.env.BATCH_CLAIM_PATH || repoPath('.claude/batch-claim.json')
+/**
+ * Resolved per CALL, not once at import: a module-level constant freezes
+ * whatever `BATCH_CLAIM_PATH` happened to hold when the first importer loaded
+ * this file, which is the wrong answer for every later reader and untestable
+ * besides (cross-vendor review, 20.08.2026).
+ */
+export function claimPath() {
+  return process.env.BATCH_CLAIM_PATH || repoPath('.claude/batch-claim.json')
+}
 
 function readClaim() {
   try {
-    return JSON.parse(readFileSync(CLAIM_PATH, 'utf8'))
+    return JSON.parse(readFileSync(claimPath(), 'utf8'))
   } catch {
     // No claim file is the ordinary state: a withdrawn claim is a deleted file.
     return null
@@ -44,8 +52,21 @@ function readClaim() {
  */
 export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
   const standing = claim === undefined ? readClaim() : claim
-  if (!standing || !sessionId) {
-    return { applicable: false, why: 'no claim of this session stands, so nothing could be refused' }
+  if (!standing) {
+    return { applicable: false, why: 'no claim stands, so nothing could be refused' }
+  }
+  // A claim EXISTS but we do not know who is asking: that is not a clean skip.
+  // Reporting it as "not applicable" would tell the reader the guard is out of
+  // play when it may well fire, so it is reported as NOT JUDGED instead
+  // (cross-vendor review, 20.08.2026).
+  if (!sessionId) {
+    return {
+      applicable: false,
+      cause: 'not-judged',
+      why:
+        'a claim stands but this preflight was given no session id, so it cannot tell whether the ' +
+        'claim is this session\'s. Action: pass --session <id> to judge it.',
+    }
   }
   if (!claimStands({ claim: standing, sessionId })) {
     return { applicable: false, why: 'the standing claim belongs to another session' }
