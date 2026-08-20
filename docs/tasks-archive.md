@@ -20391,3 +20391,28 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — this is the guard that decides whether a commit may land, and two of the
   three findings let exactly the incident it was built for through.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 771. The claim guard was narrowed until it catches almost nothing (measured 20.08.2026,
+  10:50, on `main` at `fdd8c394`). Between 09:15 and 10:37 the guard landed at 08:29 was reworked
+  seven times — `a8f13c0d`, `19efc9d5`, `28c8e63d`, `c70f151c`, `72d832f0`, `25d1c3e7`, `0f025d89`,
+  `fdd8c394` — each round removing another way an innocent line could be refused. The two false
+  positives that started it are indeed gone. So is nearly everything else: `invitesClear` now
+  answers FALSE for »Mach bitte einen /clear und fang neu an.«, »Bitte clear die Session jetzt.«,
+  »Du kannst jetzt /clear machen.«, »Starte mit /clear neu.«, »Ein /clear wäre jetzt sinnvoll.«,
+  "Run /clear now." and "You can /clear now." Every pattern is anchored to the END of the sentence,
+  so only a line that literally stops at `/clear` matches — »Wenn du willst, mach jetzt /clear.«
+  is the one probe of nine that still fires. English imperatives are not covered at all.
+  This is the failure mode CLAUDE.md §7.2 names: a mechanism that is wrong is worse than none,
+  because the rule then COUNTS as enforced and nobody looks again.
+  FINAL STATE: the guard refuses a genuine invitation in the forms this project's replies actually
+  use — German and English, imperative or offer, with the token anywhere in the sentence — while
+  still passing a report ABOUT a past clear and a line that merely names the guard. Whatever cannot
+  be decided by shape is decided by the surrounding sentence, not by requiring the sentence to end
+  in the token.
+  VERIFIABLE: Vitest with a fixture table of BOTH kinds — every probe listed above with its
+  required verdict, refusals and passes in one table, so a later narrowing cannot silently drop a
+  refusal again. The table is the regression: it goes red the moment a round of tuning trades a
+  true positive for a false one.
+  Criticality: high — the guard governs the batch handover, and a handover lost to a guard that
+  does not fire is the incident it was built for.
+  Bundle: Session- & Repo-Hygiene.
