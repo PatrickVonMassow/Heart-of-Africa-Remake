@@ -9,10 +9,10 @@
 // the worktree stand-down and the fail-open promises.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { CONTEXT_TRIGGER_TOKENS } from './context-watermark-core.mjs'
+import { CONTEXT_REFUSAL_TOKENS, CONTEXT_TRIGGER_TOKENS } from './context-watermark-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SID = 'context-fence-test'
@@ -20,7 +20,21 @@ let repo
 
 const lockPath = () => resolve(repo, '.claude', 'batch-lock.json')
 const transcriptPath = () => resolve(repo, 'transcript.jsonl')
+const observationsPath = () => resolve(repo, '.claude', 'context-fence-observations.jsonl')
 const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value))
+
+// Point 758 made OBSERVATION the default mode, so a suite that wants the
+// REFUSING fence must ask for it — exactly as a re-arming session would.
+const ARMED = { HOA_CONTEXT_FENCE_MODE: 'armed' }
+
+/** The observation records written since the last reset, newest last. */
+const observations = () =>
+  existsSync(observationsPath())
+    ? readFileSync(observationsPath(), 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((l) => JSON.parse(l))
+    : []
 
 /** One JSONL transcript whose newest usage record reports `tokens` context. */
 const writeTranscript = (tokens) =>
@@ -35,11 +49,21 @@ const writeTranscript = (tokens) =>
     ].join('\n') + '\n',
   )
 
-function callGuard(toolName, toolInput = {}, { guardPath, sessionId = SID, transcript } = {}) {
+function callGuard(toolName, toolInput = {}, { guardPath, sessionId = SID, transcript, env = ARMED } = {}) {
   const r = spawnSync(process.execPath, [guardPath ?? resolve(repo, 'scripts', 'context-fence-guard.mjs')], {
     windowsHide: true,
     cwd: repo,
     encoding: 'utf8',
+    // The ambient environment may carry the launcher's own relief overrides
+    // (point 758) — neutralised here so the suite measures the code, not the
+    // machine it runs on.
+    env: {
+      ...process.env,
+      HOA_CONTEXT_FENCE_MODE: '',
+      HOA_CONTEXT_TRIGGER_TOKENS: '',
+      HOA_CONTEXT_REFUSAL_TOKENS: '',
+      ...env,
+    },
     input: JSON.stringify({
       session_id: sessionId,
       hook_event_name: 'PreToolUse',
@@ -59,6 +83,25 @@ function callGuard(toolName, toolInput = {}, { guardPath, sessionId = SID, trans
 
 const denial = (r) => (r.decision ? r.decision.hookSpecificOutput.permissionDecisionReason : '')
 
+/** The `--status` CLI, spawned with a deterministic environment. */
+const status = (env = {}) =>
+  spawnSync(
+    process.execPath,
+    [resolve(repo, 'scripts', 'context-fence-guard.mjs'), '--status', '--transcript', transcriptPath()],
+    {
+      windowsHide: true,
+      cwd: repo,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOA_CONTEXT_FENCE_MODE: '',
+        HOA_CONTEXT_TRIGGER_TOKENS: '',
+        HOA_CONTEXT_REFUSAL_TOKENS: '',
+        ...env,
+      },
+    },
+  )
+
 beforeAll(() => {
   repo = mkdtempSync(resolve(tmpdir(), 'hoa-context-fence-'))
   cpSync(SOURCE_SCRIPTS, resolve(repo, 'scripts'), {
@@ -74,10 +117,14 @@ afterAll(() => {
 
 beforeEach(() => {
   writeJson(lockPath(), { v: 2, sessionId: SID, claimedAt: Date.now(), pid: process.pid })
-  writeTranscript(434_440) // past the trigger
+  writeTranscript(434_440) // past both marks
+  rmSync(observationsPath(), { force: true })
 })
 
-describe('context-fence-guard (spawned)', () => {
+// Every case in this block runs the fence ARMED (see `callGuard`'s default):
+// it pins "armed, it refuses exactly as before". The DEFAULT — observation —
+// has its own block below.
+describe('context-fence-guard, ARMED (spawned)', () => {
   it('denies a starting call for the owner past the mark, with the measurement in the reason', () => {
     const r = callGuard('Agent', { prompt: 'build point 701' })
     expect(r.status, r.stderr).toBe(0)
@@ -134,10 +181,28 @@ describe('context-fence-guard (spawned)', () => {
     }
   })
 
-  it('allows everything below the mark', () => {
-    writeTranscript(CONTEXT_TRIGGER_TOKENS - 1)
+  it('allows everything below the REFUSAL mark — which is now lower than the handover one', () => {
+    writeTranscript(CONTEXT_REFUSAL_TOKENS - 1)
     expect(callGuard('Agent', {}).stdout.trim()).toBe('')
     expect(callGuard('Bash', { command: 'npm test' }).stdout.trim()).toBe('')
+    // …and it is the REFUSAL mark the fence judges against, not the handover
+    // one: a reading between the two denies an armed fence (that gap is where
+    // point 758 put the daylight between refusing and handing over).
+    writeTranscript(CONTEXT_TRIGGER_TOKENS - 1)
+    expect(denial(callGuard('Agent', {}))).toContain('WATERMARK')
+  })
+
+  it('the REFUSAL mark takes its own env override, independently of the handover one', () => {
+    writeTranscript(CONTEXT_REFUSAL_TOKENS + 1)
+    expect(denial(callGuard('Agent', {}))).toContain('WATERMARK')
+    // Widened past the reading: nothing is refused any more…
+    expect(
+      callGuard('Agent', {}, { env: { ...ARMED, HOA_CONTEXT_REFUSAL_TOKENS: '400000' } }).stdout.trim(),
+    ).toBe('')
+    // …while widening only the HANDOVER mark leaves the refusal where it was.
+    expect(
+      denial(callGuard('Agent', {}, { env: { ...ARMED, HOA_CONTEXT_TRIGGER_TOKENS: '400000' } })),
+    ).toContain('WATERMARK')
   })
 
   it('fails OPEN on an unreadable measurement — a missing transcript denies nothing', () => {
@@ -182,14 +247,118 @@ describe('context-fence-guard (spawned)', () => {
   })
 
   it('--status reports the measurement and the starting-call verdict', () => {
-    const r = spawnSync(
-      process.execPath,
-      [resolve(repo, 'scripts', 'context-fence-guard.mjs'), '--status', '--transcript', transcriptPath()],
-      { windowsHide: true, cwd: repo, encoding: 'utf8' },
-    )
+    const r = status(ARMED)
     expect(r.status, r.stderr).toBe(0)
     expect(r.stdout).toContain('"state": "past"')
     expect(r.stdout).toContain('verdict for a STARTING call')
     expect(r.stdout).toContain('DENY')
+    expect(r.stdout).toContain('fence mode: ARMED')
+    expect(r.stdout).toContain('"armed": true')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// OBSERVATION MODE — THE DEFAULT (point 758). A disarmed gate is dangerous
+// precisely because nobody notices it is disarmed, so what is pinned here is
+// both halves: it refuses NOTHING, and it goes on MEASURING and RECORDING.
+// ---------------------------------------------------------------------------
+describe('context-fence-guard, OBSERVING (spawned) — the default', () => {
+  const OBSERVE = { HOA_CONTEXT_FENCE_MODE: 'observe' }
+
+  it('is the mode a guard with NO environment override runs in', () => {
+    // The switch is the named constant, not the environment: with nothing set
+    // at all, the fence must already be disarmed.
+    const r = callGuard('Agent', { prompt: 'build point 757' }, { env: {} })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout.trim(), 'the DEFAULT fence must refuse nothing').toBe('')
+    expect(status({}).stdout).toContain('fence mode: OBSERVE')
+  })
+
+  it('refuses NOTHING that an armed fence would refuse — the authoring targets included', () => {
+    const starting = [
+      ['Agent', { prompt: 'build point 757' }],
+      ['Task', { prompt: 'build point 757' }],
+      ['Bash', { command: 'npm test' }],
+      ['Bash', { command: 'node scripts/author-sol.mjs --point 757' }],
+      ['Bash', { command: 'node scripts/review-sol.mjs --point 757' }],
+      ['Bash', { command: 'node scripts/verify/world.mjs' }],
+      // THE FILE SET THAT FORCED THIS POINT: the fence refused writes to every
+      // authoring target, which is exactly what the floor-cutting point must
+      // edit. Each of these must now go through.
+      ['Edit', { file_path: 'TASKS.md' }],
+      ['Write', { file_path: 'docs/tasks-archive.md' }],
+      ['Edit', { file_path: 'CLAUDE.md' }],
+      ['Edit', { file_path: 'design.md' }],
+      ['Write', { file_path: 'docs/some-note.md' }],
+      ['Bash', { command: 'echo "- [ ] 999. x" >> TASKS.md' }],
+    ]
+    for (const [tool, input] of starting) {
+      // Armed, each of these IS a refusal — that is what makes the pair a proof
+      // rather than a claim that the classifier stopped recognising them.
+      expect(denial(callGuard(tool, input)), `${tool} ${JSON.stringify(input)} armed`).toContain('WATERMARK')
+      const r = callGuard(tool, input, { env: OBSERVE })
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim(), `${tool} ${JSON.stringify(input)} must pass while observing`).toBe('')
+    }
+  })
+
+  it('STILL MEASURES AND STILL RECORDS — the series does not stop when the fence does', () => {
+    rmSync(observationsPath(), { force: true })
+    callGuard('Bash', { command: 'node scripts/author-sol.mjs --point 757' }, { env: OBSERVE })
+    callGuard('Edit', { file_path: 'TASKS.md' }, { env: OBSERVE })
+    const recs = observations()
+    expect(recs).toHaveLength(2)
+    for (const rec of recs) {
+      expect(rec.mode).toBe('observe')
+      expect(rec.refused).toBe(false)
+      // The MEASUREMENT is real — this is the reading point 747 recalibrates
+      // from, and it must not become a placeholder because nothing was refused.
+      expect(rec.tokens).toBe(434_440)
+      expect(rec.refusalWatermark).toBe(CONTEXT_REFUSAL_TOKENS)
+      expect(rec.handoverWatermark).toBe(CONTEXT_TRIGGER_TOKENS)
+      expect(rec.handoverState).toBe('past')
+      expect(rec.sessionId).toBe(SID)
+      expect(typeof rec.at).toBe('string')
+      expect(rec.what).toBeTruthy()
+    }
+    expect(recs[0].what).toContain('authoring run')
+    expect(recs[0].authoring).toBe(false)
+    expect(recs[1].what).toContain('work order')
+    expect(recs[1].authoring).toBe(true)
+  })
+
+  it('records a REFUSAL as refused when armed — the same record, one flag apart', () => {
+    rmSync(observationsPath(), { force: true })
+    expect(denial(callGuard('Agent', {}))).toContain('WATERMARK')
+    const [rec] = observations()
+    expect(rec.mode).toBe('armed')
+    expect(rec.refused).toBe(true)
+    expect(rec.tool).toBe('Agent')
+  })
+
+  it('records NOTHING for a finishing call or a reading below the mark', () => {
+    rmSync(observationsPath(), { force: true })
+    callGuard('Bash', { command: 'git push origin feat/x' }, { env: OBSERVE })
+    callGuard('Read', { file_path: 'TASKS.md' }, { env: OBSERVE })
+    expect(observations()).toEqual([])
+    writeTranscript(CONTEXT_REFUSAL_TOKENS - 1)
+    callGuard('Agent', {}, { env: OBSERVE })
+    expect(observations()).toEqual([])
+  })
+
+  it('--status says IN WORDS that the fence is disarmed, and names the handover mark that still binds', () => {
+    const r = status(OBSERVE)
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain('"mode": "observe"')
+    expect(r.stdout).toContain('"armed": false')
+    expect(r.stdout).toContain('THE FENCE IS DISARMED')
+    expect(r.stdout).toContain('refuses NOTHING')
+    // The verdict line must not read like an ordinary allow — the reader has to
+    // be able to see that an armed fence WOULD have denied this call.
+    expect(r.stdout).toContain('OBSERVED — an armed fence would DENY')
+    // The handover threshold stays in force in BOTH modes and says so.
+    expect(r.stdout).toContain('HANDOVER stays in force in BOTH modes')
+    expect(r.stdout).toContain(String(CONTEXT_TRIGGER_TOKENS))
+    expect(r.stdout).toContain('"handoverState": "past"')
   })
 })

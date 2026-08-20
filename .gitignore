@@ -133,6 +133,9 @@ scripts/.tile-cache
 # readings that must outlive the machine sit in the TRACKED
 # .claude/context-incidents-seed.jsonl.
 .claude/context-incidents.jsonl
+# What the DISARMED context fence would have refused (point 758). This
+# machine's session readings, like every other .claude runtime record.
+.claude/context-fence-observations.jsonl
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
 # The commissioning record (point 712): the overrides taken against the queue's
