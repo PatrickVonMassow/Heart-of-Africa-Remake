@@ -3,6 +3,7 @@
 // claims the batch.
 import { describe, expect, it } from 'vitest'
 import { CLEAR_INVITATION, claimStands, evaluate, invitesClear, withdrawCommand } from './clear-claim-guard-core.mjs'
+import { extractLastAssistantText } from './timestamp-guard-core.mjs'
 
 const SID = 'd5fcb9cf-2936-4743-9502-f504f08b8ac5'
 const claim = (over = {}) => ({ claimantSid: SID, releasedAt: null, ...over })
@@ -350,9 +351,10 @@ describe('the hook itself, run as the entry script', () => {
     const dir = mkdtempSync(join(tmpdir(), 'claimhook-'))
     const transcript = join(dir, 'transcript.jsonl')
     const claimFile = join(dir, 'claim.json')
-    writeFileSync(transcript, rows.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8')
+    const transcriptText = rows.map((r) => JSON.stringify(r)).join('\n') + '\n'
+    writeFileSync(transcript, transcriptText, 'utf8')
     writeFileSync(claimFile, JSON.stringify(claimBody), 'utf8')
-    return { transcript, claimFile }
+    return { transcript, transcriptText, claimFile }
   }
 
   const assistantRow = (text, timestamp) => ({
@@ -434,16 +436,17 @@ describe('the hook itself, run as the entry script', () => {
     expect(out).toBe('')
   })
 
-  it('does not judge while the final reply is still unflushed', async () => {
+  it('does not judge the stale text the extractor returns while the final reply is unflushed', async () => {
     // The transcript ENDS with a tool result, so the newest assistant text is the
     // previous reply — the refused one whose correction is being written now.
-    const { transcript, claimFile } = await fixture(
+    const { transcript, transcriptText, claimFile } = await fixture(
       [
         assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z'),
         { type: 'user', timestamp: '2026-08-20T09:00:01.000Z', message: { content: [{ type: 'tool_result', content: 'ok' }] } },
       ],
       { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
     )
+    expect(extractLastAssistantText(transcriptText)).toBe('Mach bitte `/clear`.')
     const { out } = await run({
       payload: { session_id: SID, transcript_path: transcript },
       claimFile,
