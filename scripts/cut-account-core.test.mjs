@@ -12,6 +12,7 @@ import {
   parseCutAccount,
   evaluateCutAccount,
   isExternalDestination,
+  userTreeRootOf,
   wiredGuards,
 } from './cut-account-core.mjs'
 
@@ -26,10 +27,21 @@ const MEMORY_PATH = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 
 // it can be trusted — a repository destination is asserted everywhere, an
 // external one only on a machine that carries the user-level tree — so a typo
 // is still caught in the batch, which is where these documents are read.
-const isExternal = (path) => isExternalDestination(path, ROOT)
 const fullPath = (path) =>
-  path.startsWith('~/') ? resolve(homedir(), path.slice(2)) : path.startsWith('/') ? path : resolve(ROOT, path)
-const USER_TREE_PRESENT = existsSync(resolve(homedir(), '.claude', 'projects'))
+  path === '~'
+    ? homedir()
+    : path.startsWith('~/')
+      ? resolve(homedir(), path.slice(2))
+      : path.startsWith('/')
+        ? path
+        : resolve(ROOT, path)
+// Absence is evidence only where the tree could have been. A destination inside
+// a `.claude` tree this machine does not carry is unjudgeable here; anything
+// else — including an absolute path naming no such tree — must exist.
+const judgeable = (path) => {
+  const tree = userTreeRootOf(path, homedir())
+  return !tree || existsSync(tree)
+}
 
 const line = (where, rule, account, dest) => `- \`${where}\` :: ${rule} :: ${account} -> ${dest}`
 
@@ -207,12 +219,56 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     expect(isExternalDestination('/home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md', ROOT)).toBe(true)
     // A sibling directory whose name merely starts with the root's is outside it.
     expect(isExternalDestination(`${ROOT}-other/docs/x.md`, ROOT)).toBe(true)
+    // …and a path that shares the prefix but climbs out of it resolves outside.
+    expect(isExternalDestination(`${ROOT}/../outside/x.md`, ROOT)).toBe(true)
+    expect(isExternalDestination('../outside/x.md', ROOT)).toBe(true)
+    expect(isExternalDestination('./docs/x.md', ROOT)).toBe(false)
+    expect(isExternalDestination(`${ROOT}//docs//x.md`, ROOT)).toBe(false)
+    expect(isExternalDestination(`${ROOT}/`, ROOT)).toBe(false)
     // Total on the empty and unusable cases, like the rest of this core.
     expect(isExternalDestination('', ROOT)).toBe(false)
     expect(isExternalDestination(undefined, ROOT)).toBe(false)
-    // Without a root nothing absolute can be placed, so it counts as external
-    // — the side that refuses to report a loss it cannot see.
+    // Without a root nothing can be placed, so it counts as external — the side
+    // that refuses to report a loss it cannot see.
     expect(isExternalDestination('/anywhere/at/all.md')).toBe(true)
+    // A root of `/` contains everything, so nothing is outside it.
+    expect(isExternalDestination('/anywhere/at/all.md', '/')).toBe(false)
+  })
+
+  it('names the user tree whose absence excuses a missing destination', () => {
+    const HOME = '/home/node'
+    expect(userTreeRootOf('~/.claude/projects/x/memory/a.md', HOME)).toBe('/home/node/.claude')
+    expect(userTreeRootOf('~', HOME)).toBe('/home/node/.claude')
+    expect(userTreeRootOf('/home/node/.claude/projects/-workspace-hoa-/memory/b.md', HOME)).toBe(
+      '/home/node/.claude',
+    )
+    // A different user's tree is still a tree, and its own root is what counts.
+    expect(userTreeRootOf('/home/runner/.claude/x.md', HOME)).toBe('/home/runner/.claude')
+    // No tree: absence is a real finding on any machine, so nothing excuses it.
+    expect(userTreeRootOf('/missing/file.md', HOME)).toBe('')
+    expect(userTreeRootOf('docs/batch-owner-runbook.md', HOME)).toBe('')
+    expect(userTreeRootOf('', HOME)).toBe('')
+    expect(userTreeRootOf(undefined, HOME)).toBe('')
+    // `.claude` must be a whole segment, not a prefix of one.
+    expect(userTreeRootOf('/home/node/.claudex/a.md', HOME)).toBe('')
+    // Without a home there is nothing to expand a `~` against.
+    expect(userTreeRootOf('~/.claude/a.md', '')).toBe('')
+  })
+
+  // The index lives in the user's home, so a runner without that tree cannot
+  // read it — a REFUSED READ, not a missed write. The shape of every hook
+  // destination IS judgeable anywhere, so it is judged here and the reachability
+  // case below adds the real check on every machine that carries the index,
+  // which is every machine that runs the batch.
+  it('keeps every moved memory-topic hook well formed even where the index cannot be read', () => {
+    const hooks = entries.filter(
+      (e) => e.source === 'MEMORY.md' && /\bhooks?\b/i.test(e.rule) && /\/memory\/[^/]+\.md$/.test(e.destination),
+    )
+    expect(hooks.length).toBeGreaterThan(0)
+    for (const hook of hooks) {
+      expect(hook.account).toBe('MOVED')
+      expect(hook.destination).toMatch(/^(?:~|\/)[^\s]*\/memory\/[a-z0-9-]+\.md$/)
+    }
   })
 
   it.skipIf(!existsSync(MEMORY_PATH))('keeps every moved memory-topic hook reachable from the index', () => {
@@ -233,11 +289,7 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     for (const e of entries) {
       if (e.account !== 'MOVED') continue
       const path = e.destination.split(/\s+§|\s+#/)[0].replace(/^`|`$/g, '').trim()
-      // An external destination counts as present where the user-level tree is
-      // absent: nothing here could tell a typo from a machine that simply has
-      // no home directory for it, and failing on the latter reports a defect
-      // that is not there.
-      const present = isExternal(path) && !USER_TREE_PRESENT ? true : existsSync(fullPath(path))
+      const present = judgeable(path) ? existsSync(fullPath(path)) : true
       if (present) files.add(path)
     }
     const verdict = evaluateCutAccount(entries, { files, guards: wiredGuards(settings) })

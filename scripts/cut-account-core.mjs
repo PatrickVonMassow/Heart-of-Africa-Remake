@@ -24,6 +24,11 @@
 //
 // Side-effect free: file reading and the exit code belong to the callers (the
 // Vitest case in cut-account-core.test.mjs). Pinned by that test.
+//
+// `node:path/posix` is pure — it touches no filesystem — so importing it does
+// not cost this core its side-effect freedom, and hand-rolled prefix arithmetic
+// was exactly what a review caught getting the sibling and `..` cases wrong.
+import { posix } from 'node:path'
 
 /** The three accounts a cut rule may carry, and nothing else. */
 export const ACCOUNTS = Object.freeze(['MOVED', 'COVERED', 'DROPPED'])
@@ -128,10 +133,32 @@ export function evaluateCutAccount(entries, known = {}) {
 export function isExternalDestination(path, root = '') {
   const p = String(path ?? '').trim()
   if (!p) return false
-  if (p.startsWith('~/') || p === '~') return true
-  if (!p.startsWith('/')) return false
-  const base = String(root ?? '').replace(/\/+$/, '')
-  return !base || !(p === base || p.startsWith(`${base}/`))
+  if (p === '~' || p.startsWith('~/')) return true
+  const base = String(root ?? '').trim()
+  // Without a root nothing can be placed, so the answer is the side that
+  // refuses to report a loss it cannot see.
+  if (!base) return true
+  // Compare NORMALIZED paths: `<root>/../outside/x.md` shares the root's prefix
+  // as a string while resolving outside it, and a sibling `<root>-other/` shares
+  // it too. Only `posix.normalize` plus the trailing separator tells them apart.
+  const clean = posix.normalize(base).replace(/(?!^)\/+$/, '')
+  const abs = posix.normalize(p.startsWith('/') ? p : posix.join(clean, p))
+  return !(abs === clean || abs.startsWith(clean === '/' ? '/' : `${clean}/`))
+}
+
+/**
+ * The user-level tree an EXTERNAL destination belongs to, or '' when it belongs
+ * to none. This is what decides whether absence is evidence: a destination
+ * inside a `.claude` tree that is not on this machine cannot be judged here,
+ * while `/missing/file.md` names no such tree and its absence is a real finding
+ * anywhere. Pure — the caller does the existence test.
+ */
+export function userTreeRootOf(path, home = '') {
+  const p = String(path ?? '').trim()
+  const h = String(home ?? '').trim().replace(/\/+$/, '')
+  if (p === '~' || p.startsWith('~/')) return h ? posix.join(h, '.claude') : ''
+  const m = /^(\/.*?\/\.claude)(?:\/|$)/.exec(posix.normalize(p))
+  return m ? m[1] : ''
 }
 
 /** Every guard basename actually wired into a hook chain of the settings object. */
