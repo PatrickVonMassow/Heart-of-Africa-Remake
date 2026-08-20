@@ -3394,11 +3394,20 @@ put it is the mistake this line exists to stop.
   the last render-file edit — with no new exemption. Every other `.claude/` state a
   worktree agent WRITES and the main session later READS is checked in the same pass
   and either moved to the common directory or documented as deliberately per-tree.
+  ONE SUCH SITE IS ALREADY MEASURED (20.08.2026, by the agent on point 758):
+  `scripts/finding.mjs` derives the carrier path from `REPO_ROOT` as well, so a finding
+  recorded inside a worktree lands in a worktree-scoped directory that no session reads
+  and that the worktree cleanup deletes with the directory — the agent's finding on the
+  CLAUDE.md follow-up was lost exactly that way and survived only through its closing
+  report. A delegated agent therefore has NO working channel for a finding except the
+  report, which is the one thing the carrier exists to replace. It moves to the common
+  directory with the ledger.
   VERIFIABLE: a Vitest case pins the resolution in both directions — with a `.git`
   FILE pointing at a worktree gitdir the ledger path comes out in the MAIN tree, with
   an ordinary `.git` directory it is unchanged (the case must fail against today's
-  code, or it proves nothing); and a run recorded from a worktree is found by
-  `coveringRun` in the main tree after that worktree is removed.
+  code, or it proves nothing); a run recorded from a worktree is found by
+  `coveringRun` in the main tree after that worktree is removed; and a finding recorded
+  from a worktree is listed by `finding.mjs --drain` in the main tree.
   Criticality: medium — no product defect, but it voids the evidence of every
   delegated render point silently, which pushes the session toward re-running or
   deferring what was already proven.
@@ -9642,6 +9651,13 @@ to land than a mechanism that needs a review.
   were segments of the command. The consequence lands exactly where it hurts most: at the fence,
   where the handover card is worth the most, that card cannot name the successor's way. The
   workaround was a rewording that avoids command text, which loses the one thing the card is for.
+  IT IS NOT THE FENCE'S DEFECT ALONE — the segmenter is shared, and a SECOND consumer shows the
+  same misreading (measured 20.08.2026, 02:06, on the session that resumed the batch): a
+  `board.mjs now --text-stdin` fed from a heredoc was refused by `board-first-guard`, which named
+  the heredoc's first PROSE line as the segment that changes state. The fix therefore belongs
+  where this point already puts it, in `scripts/command-classify-core.mjs`, and the tests must
+  cover BOTH consumers — a case scoped to `context-fence-guard` alone would pass while
+  `board-first-guard` still reads card prose as commands.
   FINAL STATE: the segmenter strips heredoc bodies before any classification. A redirection of
   the form `<<WORD`, `<<-WORD`, `<<'WORD'` or `<<"WORD"` consumes every following line up to its
   terminator (a tab-indented terminator for the `<<-` form), and those lines are removed from the
@@ -9659,5 +9675,39 @@ to land than a mechanism that needs a review.
   Criticality: medium — it cannot corrupt the repository, but it silently mis-reads quoted text
   as intent in the guard that governs what a session may still do, and its failure mode is a
   refusal nobody can distinguish from a real one. A guard change is a mechanism, so it needs the
+  other model's recorded review before it lands.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 759. The context fence's worktree stand-down never fires, so every delegated agent is
+  fenced against its PARENT session's context (measured 20.08.2026 by the agent on point 758).
+  `scripts/context-fence-guard.mjs` exits early when `isWorktreeCheckout(REPO_ROOT)` holds — the
+  stand-down that is supposed to keep the fence off subagents. But the harness runs the hook from
+  the MAIN checkout, so `REPO_ROOT` is always the main tree and that exit is unreachable. The
+  agent's tool calls carry the PARENT session's id, therefore match the owner lock, and are then
+  judged against the PARENT SESSION'S TRANSCRIPT — a reading that has nothing to do with the
+  agent's own context. The counter-check was taken: the guard's copy inside the worktree admits
+  exactly the payload the live hook had refused.
+  THE COST IS ON THE RECORD, from the day it was found: the agent could not start `node
+  scripts/author-sol.mjs` (refused at 112k–156k against the 110,000 mark), so Claude Opus 5
+  authored point 758 itself instead of GPT-5.6 Sol; and `review-sol.mjs` sits in the same
+  `START_SCRIPTS` set, so the cross-vendor review was unreachable from the worktree too. That is
+  the model policy and the four-eyes principle of CLAUDE.md §6 disabled at once, by a guard whose
+  stand-down was written precisely to prevent it, and it hits EVERY worktree agent.
+  IT IS MASKED, NOT FIXED, BY POINT 758: with the fence in its default observation mode nothing
+  is refused today, so this defect is invisible until the fence is re-armed. Re-arming is a
+  condition inside point 747, and this point is a PRECONDITION of it — arming the fence again
+  while the stand-down is unreachable restores the blockade in full.
+  FINAL STATE: the stand-down no longer hangs on `REPO_ROOT` but on the CALLING tree — the tool
+  call's working directory, and failing that the agent session's own identity — so a call made
+  from a worktree stands down while the owner session's own calls stay fenced. The fence never
+  judges one session's calls against another session's transcript: where the caller cannot be
+  identified, it stands down rather than fencing on the wrong reading, because a refusal taken
+  from a foreign measurement is worse than a missed one.
+  VERIFIABLE: Vitest over the pure core — an agent call whose working directory lies in
+  `.claude/worktrees/` is admitted while the identical payload from the owner session in the main
+  tree is refused (the case must fail against today's code, or it proves nothing); a call with no
+  identifiable tree stands down; and the armed-mode refusal of the owner session is unchanged.
+  Criticality: medium — it refuses nothing while the fence observes, but it silently voids the
+  model policy the moment the fence is armed. A guard change is a mechanism, so it needs the
   other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.
