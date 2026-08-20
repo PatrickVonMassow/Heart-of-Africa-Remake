@@ -94,6 +94,20 @@ export const DOC_BUDGETS = [
     maxLines: 70,
     maxWords: 620,
     why: 'the preamble only; the points below it may grow, its framing may not',
+    // A CAP PER POINT, not on the file (point 614). A line limit on the whole
+    // work order would punish appending, which is what the order is for — so the
+    // file below the preamble stays uncapped and every POINT carries a ceiling of
+    // its own. It bites exactly where the cost is: `point-brief.mjs` pays a point's
+    // spec IN FULL at every delegation, so the largest points are paid again at
+    // every hand-off, while the mean point costs a fraction of them.
+    // MEASURED FROM THE RESULT of the 20.08.2026 cut, the same way the CLAUDE.md
+    // ceiling was measured from the size point 555 reached — never chosen
+    // beforehand. A point that genuinely needs more raises this with its reason in
+    // the comment beside it; a longer retelling of what it already says does not.
+    perPoint: {
+      maxWords: 0, // set from the measurement in the same commit
+      why: 'point-brief.mjs pays a point spec IN FULL at every delegation',
+    },
   },
   {
     path: 'design.md',
@@ -170,6 +184,35 @@ export const DOC_BUDGETS = [
   },
 ]
 
+/**
+ * The work order's points, each with its word count — the checkbox line plus every
+ * line under it until the next checkbox. PURE.
+ *
+ * TICKED POINTS COUNT TOO while they are still in the file: a point is moved out to
+ * the archive at its tick, so anything still here is either open or waiting to be
+ * moved, and both are read by whoever loads the file.
+ */
+export function workOrderPoints(text) {
+  const lines = String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+  const START = /^- \[[ x~*]\] (\d+)\. /
+  const out = []
+  let cur = null
+  for (const line of lines) {
+    const m = START.exec(line)
+    if (m) {
+      if (cur) out.push(cur)
+      cur = { number: Number(m[1]), lines: [line] }
+    } else if (cur) cur.lines.push(line)
+  }
+  if (cur) out.push(cur)
+  return out.map((p) => ({
+    number: p.number,
+    words: p.lines.join(' ').split(/\s+/).filter(Boolean).length,
+  }))
+}
+
 /** Lines and words of `text`, optionally only up to `until`. */
 export function measure(text, until = null) {
   const lines = String(text ?? '')
@@ -210,6 +253,21 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         budget: budget.maxWords,
         why: budget.why,
       })
+    }
+    // The per-POINT ceiling. Measured over the whole file, not the `until` slice:
+    // the preamble budget above governs the framing, this one governs the points
+    // below it, and the two never overlap.
+    if (Number.isFinite(budget.perPoint?.maxWords) && budget.perPoint.maxWords > 0) {
+      for (const point of workOrderPoints(doc.text)) {
+        if (point.words <= budget.perPoint.maxWords) continue
+        findings.push({
+          path: budget.path,
+          kind: `point ${point.number} words`,
+          actual: point.words,
+          budget: budget.perPoint.maxWords,
+          why: budget.perPoint.why,
+        })
+      }
     }
     if (Number.isFinite(budget.maxEntryWords)) {
       const lines = String(doc.text).replace(/\r\n/g, '\n').split('\n')

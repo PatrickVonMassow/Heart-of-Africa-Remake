@@ -9,6 +9,7 @@ import {
   measure,
   evaluateDocBudgets,
   formatDocBudgetVerdict,
+  workOrderPoints,
 } from './doc-budget-core.mjs'
 import { docBudgetPath } from './doc-budget-guard.mjs'
 
@@ -116,5 +117,58 @@ describe('the real documents', () => {
   // criteria grow. A cut whose DESTINATION is uncapped buys nothing for long.
   it('budgets the destination of the §7.1 cut too', () => {
     expect(DOC_BUDGETS.map((b) => b.path)).toContain('docs/acceptance-criteria-detail.md')
+  })
+})
+
+describe('the per-point ceiling of the work order', () => {
+  const order = (...points) =>
+    ['# Work order', '', '## Checklist', '', ...points].join('\n')
+  // `- [ ] N.` is four whitespace-separated tokens, so the body carries the rest.
+  const point = (n, words) => `- [ ] ${n}. ${Array.from({ length: words - 4 }, (_, i) => 'w' + i).join(' ')}`
+  const budget = [
+    {
+      path: 'TASKS.md',
+      until: /^## Checklist/,
+      maxLines: 999,
+      maxWords: 9999,
+      why: 'preamble',
+      perPoint: { maxWords: 20, why: 'a brief pays a point spec in full at every delegation' },
+    },
+  ]
+
+  it('splits the file into points, attributing continuation lines to the point above', () => {
+    const points = workOrderPoints(order('- [ ] 7. one two', '  three four', '- [x] 8. five'))
+    expect(points.map((p) => p.number)).toEqual([7, 8])
+    expect(points[0].words).toBe(8) // four tokens of checkbox, then four words over two lines
+    // `- [x]` is ONE token where `- [ ]` is two, so a ticked point measures one lower.
+    // Irrelevant against a ceiling in the thousands, but it is what the tokenizer does.
+    expect(points[1].words).toBe(4)
+  })
+
+  it('is green when the largest point sits ON the ceiling', () => {
+    const text = order(point(11, 20), point(12, 9))
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(false)
+  })
+
+  it('goes RED one word over, and names the point', () => {
+    const text = order(point(11, 20), point(12, 21))
+    const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text }], budget)
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings.map((f) => f.kind)).toEqual(['point 12 words'])
+    expect(verdict.findings[0].actual).toBe(21)
+    expect(verdict.findings[0].budget).toBe(20)
+  })
+
+  it('judges nothing per point while the ceiling is unset — the mechanism ships before its number', () => {
+    const unset = [{ ...budget[0], perPoint: { maxWords: 0, why: 'not measured yet' } }]
+    const text = order(point(11, 500))
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], unset).block).toBe(false)
+  })
+
+  it('measures the WHOLE file per point, not only the part before the preamble marker', () => {
+    // The preamble budget stops at the Checklist heading; the point ceiling must not,
+    // or it would judge no point at all.
+    const text = order(point(11, 40))
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(true)
   })
 })
