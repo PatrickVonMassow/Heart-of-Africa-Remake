@@ -111,6 +111,12 @@ beforeAll(() => {
   git('config', 'user.email', 'g@test.local')
   git('config', 'user.name', 'guard hooks test')
   commit('baseline')
+  // Every real reader fails loud when this shared decision is absent. Keep the
+  // guard fixture explicit too, so its model-trailer cases reach the rule they test.
+  write(
+    '.claude/fable-switch.json',
+    JSON.stringify({ state: 'on', reason: 'exercise the full fixture allowlist', setBy: 'test', changedAt: 1 }),
+  )
 })
 
 afterAll(() => {

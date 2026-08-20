@@ -40,16 +40,13 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@058e29dc
- *  The fallback CHAIN is
- *  Opus 5 → Fable 5 → Opus 4.8, so the SESSION this launcher spawns is Opus 5.
- *  That is the spawn, not the whole policy: authoring and escalation are the
- *  decisions named in §6 and applied by scripts/author-routing-core.mjs, not by
- *  any `--model` flag here. The CLI
- *  takes a single --fallback-model, so Fable is wired as the first fallback; the
- *  model-guard Stop hook enforces the allowlist from inside either way. */
+import { servingFallbackModelId } from './fable-switch-core.mjs'
+
+/** Model policy (CLAUDE.md §6). rule:model-policy@4f8dd494
+ *  The session starts on Opus 5. Its one CLI fallback is the next member of the
+ *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
+ *  same allowlist from inside the spawned session. */
 export const SPAWN_MODEL = 'claude-opus-5[1m]'
-export const SPAWN_FALLBACK_MODEL = 'claude-fable-5'
 
 /**
  * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
@@ -264,8 +261,9 @@ export function standingAlertDue({ lastAt = null, now = Date.now(), intervalMs =
  * bare "Bash" allow does NOT blanket-approve novel command shapes in this harness,
  * and defaultMode "dontAsk" is the settings ceiling.
  */
-export function buildSpawnArgs({ prompt = RESUME_PROMPT, model = SPAWN_MODEL, fallbackModel = SPAWN_FALLBACK_MODEL } = {}) {
-  return ['-p', prompt, '--model', model, '--fallback-model', fallbackModel, '--dangerously-skip-permissions']
+export function buildSpawnArgs({ prompt = RESUME_PROMPT, model = SPAWN_MODEL, fallbackModel, fableState } = {}) {
+  const fallback = fallbackModel || servingFallbackModelId(fableState)
+  return ['-p', prompt, '--model', model, '--fallback-model', fallback, '--dangerously-skip-permissions']
 }
 
 /**

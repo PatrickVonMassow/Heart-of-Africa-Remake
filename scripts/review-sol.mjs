@@ -19,8 +19,8 @@
 // every command the reviewer would run (see formatReviewMaterial).
 //
 // WHEN SOL IS NOT AVAILABLE the command says so in ONE line, names the cause,
-// and hands the review to Fable 5 — and the record it prints then carries
-// Fable's name with an EMPTY verdict, so nothing can be recorded as reviewed
+// and hands the review to the first eligible Claude reviewer — and the record it
+// prints then carries that model's name with an EMPTY verdict, so nothing can be recorded as reviewed
 // that nobody reviewed. The decision logic is pure (review-sol-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
 //
@@ -50,6 +50,7 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -60,7 +61,6 @@ import {
   coverageDecision,
   decideReview,
   OUTCOME,
-  FALLBACK_CHAIN,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
@@ -763,7 +763,8 @@ export const usage = () =>
     'A commit written to answer a recorded finding is itself a new contribution by design:',
     'the confirming clean pass reviews it too. The convergence cost is accepted, not hidden.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
-    `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
+    'cannot be reached the review is HANDED OVER to the first eligible Claude model',
+    'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
     'that authored no part of the reviewed range — the recorded review always names the',
     'model that ACTUALLY ran, and none of them may review its own work.',
   ].join('\n')
@@ -808,6 +809,8 @@ if (isMainModule(import.meta.url)) {
     // exactly where every unavailable Sol lands: with a Claude reviewer that authored
     // none of the range, and with NO verdict, because nobody has reviewed it yet.
     const share = currentSetting()
+    const fableState = currentFableState()
+    if (!fableState.ok) throw new Error(fableState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
@@ -903,6 +906,7 @@ if (isMainModule(import.meta.url)) {
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
+        fableState,
       })
       // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
       // round). No round is spent here, but the record command printed for the
@@ -938,6 +942,7 @@ if (isMainModule(import.meta.url)) {
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
+        fableState,
       })
       // Same measurement, same reason: the role swap hands the WHOLE range on,
       // and a range no single round can hold must be handed on as its passes.
@@ -1013,10 +1018,10 @@ if (isMainModule(import.meta.url)) {
     // `ready` rests on this answer (escalation round): a clean exit with a
     // parseable verdict is not delivery evidence.
     const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
-    // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
-    // cannot review its own commit (see fallbackReviewerFor), and the record
+    // WHO AUTHORED IT decides who may review it if Sol is unavailable: no model
+    // can review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer

@@ -1,5 +1,5 @@
 // THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667).
-// rule:model-policy@058e29dc
+// rule:model-policy@4f8dd494
 //
 // WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
 // and wants the load moved BEFORE one of them is nearly spent. It began as a read-only

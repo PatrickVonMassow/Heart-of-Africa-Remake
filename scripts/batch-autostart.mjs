@@ -77,6 +77,7 @@ import {
   staleEtaLogLine,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
@@ -1171,7 +1172,9 @@ try {
   const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
-  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + suffix }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  const fableState = currentFableState()
+  if (!fableState.ok) throw new Error(fableState.problem)
+  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + suffix, fableState }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
   // ASYNCHRONOUSLY, so without this handler the one failure class the resolver
   // can still produce would take the tick down as an unhandled event instead of

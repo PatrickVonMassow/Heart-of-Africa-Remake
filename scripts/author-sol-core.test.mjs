@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { evaluateCommitTrailers, ALLOWED_TRAILERS } from './model-guard-core.mjs'
+import { evaluateCommitTrailers, allowedTrailers } from './model-guard-core.mjs'
 import {
   AUTHOR_TIMEOUT_MS,
   authoringCodexArgs,
@@ -34,7 +34,7 @@ const answered = parseAuthoringAnswer('DONE: built the thing\nGATES: test:unit, 
 describe('the commit trailer of the lane', () => {
   it('is the allowlist’s own spelling, and passes the commit-msg gate', () => {
     expect(SOL_TRAILER).toBe('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
-    expect(ALLOWED_TRAILERS).toContain(SOL_TRAILER)
+    expect(allowedTrailers()).toContain(SOL_TRAILER)
     expect(evaluateCommitTrailers(`Do a thing\n\n${SOL_TRAILER}\n`).block).toBe(false)
   })
 })

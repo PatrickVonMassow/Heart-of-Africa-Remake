@@ -27,12 +27,16 @@ import {
   parseArgs,
   parseModel,
   receiptBalances,
+  resolveMergePolicy,
   sameModel,
   validateMode,
   validatePass,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
 const SCRIPTS = [
   'mechanism-review-guard.mjs',
@@ -1614,6 +1618,26 @@ describe('validateRecord carries the mode', () => {
   it('accepts it once the mode is named', () => {
     expect(validateRecord({ ...good, mode: 'review' })).toEqual({ ok: true, errors: [] })
     expect(validateRecord({ ...good, ...counted }).ok, validateRecord({ ...good, ...counted }).errors).toBe(true)
+  })
+
+  it('derives a Sol merger and the weaker switch reason while Fable is off', () => {
+    const input = {
+      sha: 'a'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read both independent lists against the same invariants',
+      authoredBy: 'Claude Opus 5',
+      mode: 'blind-parallel',
+      accounting: counted.accounting,
+      fableState: FABLE_OFF,
+    }
+    expect(validateRecord(input).ok, validateRecord(input).errors).toBe(true)
+    expect(resolveMergePolicy({ ...input, authors: [input.model, input.authoredBy] })).toMatchObject({
+      mergedBy: 'GPT-5.6 Sol',
+      mergeFallback: expect.stringContaining('node scripts/fable-switch.mjs --status'),
+      errors: [],
+    })
+    expect(validateRecord({ ...input, mergedBy: 'Fable 5' }).ok).toBe(false)
   })
 
   it('refuses a blind-parallel record that names no merging model', () => {

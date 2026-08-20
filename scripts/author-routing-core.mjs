@@ -1,4 +1,4 @@
-// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@058e29dc
+// WHICH AUTHORING LANE A POINT GOES TO (point 667). rule:model-policy@4f8dd494
 //
 // The user pays two vendors, and authoring is the largest single item of the
 // spend, so it is split across both rather than sitting on one. It does NOT all
@@ -19,11 +19,9 @@
 //          the main session's job, so authoring it elsewhere buys nothing) —
 //          and only while nothing marks that point hard, because the user's
 //          18.08. ruling outranks this lane, not the other way round.
-//   fable  Fable 5 was the escalation described by CLAUDE.md §6, and that
-//          escalation is SUSPENDED since 20.08.2026: its weekly pool is the
-//          scarcest of the three and too little of it is left. The CUT now
-//          sends nothing there at all — a point's own Fable tag and the
-//          caller's override still can, and both are deliberate.
+//   fable  Fable 5 is the escalation described by CLAUDE.md §6 when the shared
+//          switch admits it. A point's tag, a caller override and the automatic
+//          boundary all consult that same decision.
 //
 // WHY A FUNCTION RATHER THAN A JUDGMENT CALL: the point says the cut is named,
 // not guessed. A dispatcher's taste is not reviewable and drifts with whoever
@@ -34,6 +32,8 @@
 // verdict so a dispatcher can see WHY and override with a tag in the point
 // itself. Side-effect free; the work-order reading belongs to
 // scripts/author-sol.mjs. Pinned by author-routing-core.test.mjs.
+
+import { fableIsOn, fableRefusalReason, requireState } from './fable-switch-core.mjs'
 
 /** The authoring lanes, in the order this file describes them. */
 export const LANES = Object.freeze(['sol', 'fable', 'opus'])
@@ -47,16 +47,6 @@ export const LANE_MODEL = Object.freeze({
 
 /** User decision 19.08.2026: Fable escalation begins at this many unsuccessful review rounds. */
 export const FABLE_ESCALATION_ROUNDS = 5
-
-/**
- * User decision 20.08.2026: the automatic escalation is SUSPENDED — too little
- * of the Fable pool is left to spend on authoring. The threshold above is kept
- * at its ruled value rather than raised to an unreachable number, because a
- * fake threshold reads as a live rule to the next reader and hides that this is
- * a suspension somebody has to lift. Both other doors into the lane stay open
- * and are deliberate: a point's own `Author lane: fable` and a caller override.
- */
-export const FABLE_ESCALATION_SUSPENDED = true
 
 /** The last Sol/Opus round pauses for a spec reading before Fable may take it. */
 export const SPEC_EXAMINATION_ROUND = FABLE_ESCALATION_ROUNDS - 1
@@ -433,39 +423,55 @@ function hits(markers, text) {
  *   reworkRounds completed reviews of this point whose verdict was not a pass
  *   override     a lane the caller insists on, beating even the tag
  *
- * Returns { lane, model, why, signals } — `why` is the ordered list of reasons,
- * first the deciding one. It NEVER throws and never answers nothing: an empty
- * input is a point with no signal against it, which is the mechanical case.
+ * Returns { lane, model, refused, why, signals } — `why` is the ordered list of
+ * reasons, first the deciding one. An unknown switch throws rather than choosing
+ * a direction; an unavailable explicitly requested Fable lane is a refusal.
  */
-export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0, override = '' } = {}) {
+export function authorLaneFor({ body = '', criticality = null, reworkRounds = 0, override = '', fableState } = {}) {
+  const state = requireState(fableState)
+  const fableOn = fableIsOn(state)
   const text = String(body ?? '')
   const tag = laneTagIn(text)
   const hard = hits(HARD_MARKERS, text)
   const verification = hits(VERIFICATION_MARKERS, text)
   const rounds = Number.isFinite(reworkRounds) ? Math.max(0, Math.trunc(reworkRounds)) : 0
   const signals = { tag, criticality: criticality ?? null, reworkRounds: rounds, hard, verification }
-  // A SUSPENDED ESCALATION SAYS SO WHERE IT WOULD HAVE FIRED. Silently routing
+  // A CLOSED ESCALATION SAYS SO WHERE IT WOULD HAVE FIRED. Silently routing
   // such a point onward would read as "the threshold was never reached".
-  const suspended =
-    FABLE_ESCALATION_SUSPENDED && rounds >= FABLE_ESCALATION_ROUNDS
+  const withheld =
+    !fableOn && rounds >= FABLE_ESCALATION_ROUNDS
       ? `${rounds} unsuccessful review rounds would have reached the §6 escalation threshold of ` +
-        `${FABLE_ESCALATION_ROUNDS}, but the Fable escalation is SUSPENDED (user 20.08.2026)`
+        `${FABLE_ESCALATION_ROUNDS}, but ${fableRefusalReason(state)}`
       : ''
   const decide = (lane, reason) => ({
     lane,
     model: LANE_MODEL[lane],
-    why: suspended ? [reason, suspended] : [reason],
+    refused: false,
+    why: withheld ? [reason, withheld] : [reason],
+    signals,
+  })
+  const refuseFable = (reason) => ({
+    lane: '',
+    model: '',
+    refused: true,
+    why: [reason, fableRefusalReason(state)],
     signals,
   })
 
   if (LANES.includes(String(override).toLowerCase())) {
-    return decide(String(override).toLowerCase(), `the caller asked for the ${override} lane explicitly`)
+    const lane = String(override).toLowerCase()
+    if (lane === 'fable' && !fableOn) return refuseFable(`the caller asked for the ${override} lane explicitly`)
+    return decide(lane, `the caller asked for the ${override} lane explicitly`)
   }
   // A FABLE TAG IS AN OPERATOR DECISION, not an automatic signal. It therefore
   // remains immediate while tags naming the ordinary lanes yield once the
   // recorded escalation boundary has actually been reached.
-  if (tag === 'fable') return decide(tag, 'the point itself carries `Author lane: fable`')
-  if (!FABLE_ESCALATION_SUSPENDED && rounds >= FABLE_ESCALATION_ROUNDS) {
+  if (tag === 'fable') {
+    return fableOn
+      ? decide(tag, 'the point itself carries `Author lane: fable`')
+      : refuseFable('the point itself carries `Author lane: fable`')
+  }
+  if (fableOn && rounds >= FABLE_ESCALATION_ROUNDS) {
     return decide(
       'fable',
       `${rounds} unsuccessful review rounds reached the §6 escalation threshold of ${FABLE_ESCALATION_ROUNDS}`,
@@ -503,7 +509,10 @@ export function formatLaneLine({ number = '', lane = '', why = [] } = {}) {
  */
 export function formatLaneReport(rows = []) {
   const list = Array.isArray(rows) ? rows : []
-  const counts = LANES.map((lane) => `${lane} ${list.filter((r) => r.lane === lane).length}`).join(' · ')
+  const reportLanes = [...LANES, 'blocked']
+  const counts = reportLanes
+    .map((lane) => `${lane} ${list.filter((r) => (lane === 'blocked' ? r.refused : r.lane === lane)).length}`)
+    .join(' · ')
   return [
     `author-routing: ${list.length} open point(s) — ${counts}`,
     ...list.map((row) => formatLaneLine(row)),

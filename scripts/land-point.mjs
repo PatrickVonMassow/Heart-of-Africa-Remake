@@ -33,6 +33,7 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { evaluateTasksArchive } from './tasks-archive-guard-core.mjs'
 import { openFingerprintOfTasks } from './board-currency-core.mjs'
 import { evaluateCommitTrailers } from './model-guard-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import {
   branchDeletionBlocker,
   formatCleanupNotes,
@@ -612,11 +613,16 @@ async function main(argv) {
       if (e.repair) console.error(`  repair: ${e.repair}`)
       return 2
     }
-    const trailers = evaluateCommitTrailers(message)
+    const fableState = currentFableState()
+    if (!fableState.ok) {
+      console.error(`land-point: ${fableState.problem}`)
+      return 2
+    }
+    const trailers = evaluateCommitTrailers(message, fableState)
     if (trailers.block) {
       console.error(
         `land-point: --model "${model}" is not an allowed authoring model (CLAUDE.md §6).\n` +
-          '  The chain is Opus 5 -> Fable 5 -> Opus 4.8; name the model actually running this landing.',
+          `  The serving chain is derived by node scripts/fable-switch.mjs --status; name the model actually running this landing.`,
       )
       return 2
     }

@@ -51,9 +51,11 @@ import {
   parseArgs,
   validatePass,
   validateRecord,
+  resolveMergePolicy,
   VERDICTS,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
 // import path for its callers.
@@ -213,6 +215,7 @@ export function buildRecord({
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
+  fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
   // resolve step used to answer `fatal: ambiguous argument '^{commit}'` from
@@ -315,6 +318,13 @@ export function buildRecord({
     source = 'computed'
   }
   const commit = resolve(sha)
+  const merge = resolveMergePolicy({
+    mode,
+    mergedBy,
+    mergeFallback,
+    authors: [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])],
+    fableState,
+  })
   const check = validateRecord({
     sha: commit.sha,
     model,
@@ -328,14 +338,14 @@ export function buildRecord({
     framing,
     authorFraming,
     specExamination,
-    mergedBy,
-    mergeFallback,
+    mergedBy: merge.mergedBy,
+    mergeFallback: merge.mergeFallback,
     accounting: receipt,
     pass,
     passFiles,
     passCommits,
   })
-  const errors = [...check.errors]
+  const errors = [...merge.errors, ...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block
   // the real one while the ledger LOOKED like it held the answer.
@@ -389,8 +399,8 @@ export function buildRecord({
       // — the merge is the one step where a finding can vanish, so the model
       // that wrote neither list does it and the record NAMES that model. Rows
       // written before this flag carry none, and read as unrecorded.
-      ...(String(mergedBy).trim() ? { mergedBy: String(mergedBy).trim() } : {}),
-      ...(String(mergeFallback).trim() ? { mergeFallback: String(mergeFallback).trim() } : {}),
+      ...(merge.mergedBy ? { mergedBy: merge.mergedBy } : {}),
+      ...(merge.mergeFallback ? { mergeFallback: merge.mergeFallback } : {}),
       // The count itself, so the ledger holds the receipt and not only the claim
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.
@@ -679,8 +689,8 @@ export const usage = () =>
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
-  `           --merged-by "<model>" --accounting "<the blind-merge summary line>" \\\n` +
-  `           [--merge-fallback "<which model was unavailable>"]           (blind-parallel)\n` +
+  `           [--merged-by "<switch-selected model>"] --accounting "<the blind-merge summary line>" \\\n` +
+  `           [--merge-fallback "<switch-generated reason>"]                (blind-parallel)\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
   `\n--mode names which half of the four-eyes principle this verdict covers ` +
   `(CLAUDE.md §6):\n` +
@@ -694,7 +704,8 @@ export const usage = () =>
   `       beside the review that followed it. Rounds zero and one have none.\n` +
   `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
   `       sound when the text survived the findings, amended when the work order changed.\n` +
-  `--merged-by names the model that folded the two lists into the union — the one that\n` +
+  `--merged-by names the model that folded the two lists into the union — selected by\n` +
+  `       node scripts/fable-switch.mjs --status, and checked when explicitly supplied — the one that\n` +
   `       wrote NEITHER of them, because a merge can lose a finding silently — and the\n` +
   `       COUNT says none did. Hand over the FILES and it is counted here:\n` +
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
@@ -799,7 +810,9 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    const built = buildRecord(parsed.values)
+    const fableState = parsed.values.mode === 'blind-parallel' ? currentFableState() : undefined
+    if (fableState && !fableState.ok) throw new Error(fableState.problem)
+    const built = buildRecord({ ...parsed.values, fableState })
     if (!built.ok) {
       console.error('mechanism-review: refusing to record this review.\n')
       for (const e of built.errors) console.error(`  · ${e}`)
