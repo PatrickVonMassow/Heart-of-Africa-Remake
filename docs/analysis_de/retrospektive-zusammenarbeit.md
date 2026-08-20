@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 08:25 · Quellen-Fingerprint: `2e6dd4768366…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 10:55 · Quellen-Fingerprint: `64d0aabd3914…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1403,13 +1403,13 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 84 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 66 Prozess-/Meta-TASKS-Punkte (davon 30 offen).
+Erfasste Quellen: 84 Feedback-/Projekt-Memories · 56 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 71 Prozess-/Meta-TASKS-Punkte (davon 35 offen).
 
-<!-- RETRO-FINGERPRINT: 2e6dd47683660d27086ece1f8c23fb69af6fc79aae6d5a7cec114f42fcae7dc4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T06:25:20.456Z -->
+<!-- RETRO-FINGERPRINT: 64d0aabd3914541fe5bc8d0616510e60d1a2c2b236724f103bb74dee5fe24359 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T08:55:14.804Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
