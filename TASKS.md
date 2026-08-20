@@ -7825,6 +7825,13 @@ Build order, chosen so no two parallel agents own the same file:
   i18n completeness case both languages already have, and the first-sighting entry test
   beside the other landmarks'. One bird's-eye screenshot at in-game zoom showing the
   site labelled where it belongs on the Nile.
+  THE ORDER CONDITION IS ALREADY MET (carried 20.08.2026 from the 10.08.2026 four-eyes
+  work-order analysis, not a fresh finding): the clause above makes the build wait on point
+  338, and 338 is ticked and archived. So the Giza decision exists and this point FOLLOWS it
+  rather than inventing an arrangement — 338 kept both records, derived their position from
+  ONE coordinate constant and let only the map point's label render, suppressed by the shared
+  id. Abu Simbel takes the same shape, and the one-place-one-label test above stays as
+  written; nothing blocks the build any more.
   DOCS in the same commit: `design.md` §4.4 (the landmark list is design content — this
   is a genuine addition and pays its measured words), CLAUDE.md §7.1 pt 25 where the
   eight are enumerated, and the evidence section.
@@ -7859,6 +7866,10 @@ Build order, chosen so no two parallel agents own the same file:
   never by an assumed radius.
   ORDER: point 381 (the torn seam at that very site) is FIXED FIRST — adding a
   neighbour to a horizon that is itself broken would build on sand.
+  THE ORDER CONDITION IS ALREADY MET (carried 20.08.2026 from the 10.08.2026 four-eyes
+  work-order analysis, not a fresh finding): the ORDER clause above makes this point wait on
+  point 381, and 381 is ticked and archived — the torn horizon at the Giza site is repaired.
+  This point is unblocked and builds on a horizon that holds.
   DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
   and CLAUDE.md §7.1 pt 31 with its evidence section.
 
