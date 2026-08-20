@@ -108,7 +108,7 @@ change) and 449 last, because the drill is what makes the others more than a cla
 
 - **184, 200, 203, 205, 207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.
-- **174, 224** — releases, gated on a full closing run rather than on a branch.
+- **174** — the release tag, gated on a full closing run rather than on a branch (224 stood here until the user withdrew it on 20.08.2026).
 - **635, 636, 637** — the release machinery the user asked for on 11.08.2026: the queue cut
   into release blocks, a block that closes and tags itself, and a board that can be
   rearranged by hand. Built under the assurance regime of 639.

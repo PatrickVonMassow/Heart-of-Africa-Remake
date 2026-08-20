@@ -7352,7 +7352,8 @@ later decisions wait on its readings, and the ladder (595) now precedes the land
 to land than a mechanism that needs a review.
 
 - [ ] 303. Code review of all changes since v0.1 — validate every test is still valid (user
-  24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
+  24.07.2026). QUEUE POSITION: first of the post-v0.1 review work — this stood as "the NEXT task after 224"
+  until the user withdrew 224 on 20.08.2026, and it must not point at an archived number. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
   ASSUMED pre-276 defaults — SSAO on, campfire shadows off — so they measured the wrong
   state; worst case is a check that stays GREEN while the feature is broken). Do a SYSTEMATIC
@@ -8084,6 +8085,10 @@ to land than a mechanism that needs a review.
   VERIFIABLE: two HTTP 200s with the expected build stamp, recorded in the closing
   evidence.
   Criticality: low — bookkeeping on a delivery that already happened.
+  WITHDRAWN BY THE USER, 20.08.2026: "Der Punkt 224 kann aus der Arbeitsliste raus. v0.2 ist
+  inzwischen völlig uninteressant geworden. Der Tag ist ausgeliefert, mehr ist da nicht mehr zu
+  tun." The two HTTP checks above were NOT performed and are NOT owed — the user withdrew the
+  work, he did not accept it as delivered. No later reader may re-derive them from this block.
 
 - [ ] 615. The not-run gate is disarmed by a comment, and the bootstrap skips its own
   LOCKFILE CHECK (four-eyes review of the landed point 573 by the second model,
@@ -9730,7 +9735,9 @@ to land than a mechanism that needs a review.
   `pending-queue-work-29-07` is genuinely spent (drained 30.07.2026; only its do-not-re-analyse
   record remains), `audit-205-decisions` is HALF spent (208 is archived done, but its "accepted
   as-is, do not fix" list is still live and must survive any compaction),
-  `queue-order-v02-bugfixes-only` is LIVE because point 224 is still open, and
+  `queue-order-v02-bugfixes-only` was LIVE while point 224 stood open, but the user retired
+  that ordering rule on 20.08.2026 and withdrew 224 with it, so the memory and its index line
+  are already deleted and nothing is owed for it here; and
   `release-order-communication-first` is LIVE because 633 and 174 are both still open.
   FINAL STATE: the two CLAUDE.md sentences are gone, each in a commit that names the user's
   ruling and its date, so a later reader does not restore them as an accidental deletion. The
