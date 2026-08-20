@@ -76,43 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 782. Answer the cross-vendor review of the morning's three guard mechanisms (GPT-5.6 Sol,
-  20.08.2026, verdict **do-not-merge** on `5ddfc4e..1615e5f`). The three mechanisms — the
-  clear-claim guard, its preflight registration, and the commit-time guard-registration check —
-  were authored by Claude and landed without a second pair of eyes; the review was run after the
-  fact and its findings are owed as work. Sol's fourth finding is NOT carried here: the excluded
-  deletions it names were already fixed by point 775, whose `STAGED_PATH_ARGS` drops the
-  `--diff-filter=ACMR` — verified at HEAD. Three stand.
-  1. A THIRD LIST DECIDES, AND NOTHING CHECKS IT. `evaluate` compares `.claude/settings.json`
-     against `GUARDS`, but `scripts/guard-preflight-core.test.mjs` keeps a hard-coded sorted list of
-     every expected guard id as a mandatory third copy. Registering a new hook in the settings AND in
-     `GUARDS` while forgetting that list passes the commit-time check and still takes the unit suite
-     red at pre-push — the exact committed-but-unpushable state this mechanism exists to prevent,
-     reached through the one door it does not watch.
-  2. THE PRE-COMMIT HOOK ASKS THE WORKING TREE, NOT THE INDEX. `scripts/git-hooks/pre-commit` guards
-     its own call with `[ -f scripts/guard-registration-guard.mjs ] || exit 0`. That reads the
-     WORKING TREE, while everything downstream judges the INDEX. In a partially staged tree where the
-     wrapper is removed from the working tree but still staged, the check exits 0 and the staged
-     wiring drift is never judged, although the wrapper is in the commit being made. The skip itself
-     is right — a branch predating the check must stay committable — only its subject is wrong.
-  3. THE WRAPPER PATH HAS NO TEST. Every case in `scripts/clear-claim-guard.test.mjs` drives the pure
-     core with a supplied `lastText`; nothing drives the wrapper's own reading of the transcript. That
-     is where `extractLastAssistantText` can return the PREVIOUS text block, so a corrected reply can
-     be refused again on the strength of the invitation it just removed. The age check added by the
-     earlier review covers only text older than the claim; the same-claim rereading is untested and
-     unproven. The flush race itself is filed as its own point — what is owed HERE is the coverage
-     that would show which half of it this guard actually suffers.
-  FINAL STATE: the expected-guard list has ONE home that the commit-time check reads, so no third
-  copy can disagree silently; the pre-commit skip asks the index it is about to judge; and the
-  wrapper's transcript reading is exercised by a test that fails when a stale reply is judged as the
-  current one.
-  VERIFIABLE: Vitest — a hook registered in the settings and in `GUARDS` but absent from the expected
-  list is a FINDING rather than a pass; a staged-but-working-tree-deleted wrapper is still judged; and
-  a wrapper case over a fixture transcript whose final reply is unflushed asserts which text is
-  judged. Plus the existing green cases stay green.
-  Criticality: high — two of the three let a commit reach the state the whole mechanism was built to
-  prevent, and the third leaves the deciding path unproven.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
