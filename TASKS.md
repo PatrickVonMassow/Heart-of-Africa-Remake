@@ -10413,3 +10413,36 @@ to land than a mechanism that needs a review.
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
 
+
+- [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
+  before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
+  `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
+  written by the landing machinery and carries NO trailer at all, which is the house convention on
+  `main` — every merge commit there is trailer-less. `planAuthorshipGroups` therefore reports its
+  contribution as `UNREVIEWABLE — authorship vendor is unknown`, and `scripts/review-sol.mjs` exits
+  4 with "no round can clear it" BEFORE it selects a pass. Measured on the real range
+  `74948c0e..ab0e2f5a`: 15 planned passes, of which 13 and 15 are the trailer-less merge commits
+  `049ccb6` and `3b3d129`, both touching only the append-only ledger
+  `.claude/mechanism-reviews.jsonl` — 26 of 28 file contributions plannable, and the whole plan
+  refused on account of the two.
+  THIS IS PRE-EXISTING AND WAS NOT CAUSED BY POINT 783: the identical two groups come out of
+  `main`'s own code, verified by running the same plan under both revisions. Point 783 improved the
+  refusal from a bare `NO ELIGIBLE REVIEWER` to a named reason, which is what its final state asked
+  for, and deliberately did not widen itself to remove the blockage.
+  WHY IT MATTERS: every landing adds one more trailer-less merge commit to the ledger file, so the
+  unnarrowed plan for `main` can only get worse, and the one way past it — narrowing with `--since`,
+  which point 783 has just made recordable — is not named anywhere the refusal can be read. A rule
+  whose only remaining exit is undocumented is a rule that will be waived.
+  FINAL STATE: a merge commit is not treated as an unattributable authorship contribution. Either it
+  carries the landing model's trailer, or the planner attributes a merge to the contributions it
+  merges rather than to its own empty author list — whichever is chosen, the two ledger merges above
+  stop poisoning the plan. And where a contribution genuinely has no eligible vendor, the refusal
+  names the reachable next step in as many words, including the `--since` narrowing that records a
+  bounded 1/1 pass.
+  VERIFIABLE: Vitest over the pure layer — a merge commit with no author trailer plans as a
+  reviewable contribution rather than an unreviewable one, and a genuinely unattributable
+  contribution still refuses, now with the narrowing named in its text. Plus the real repository:
+  the unnarrowed plan for `main` reaches a runnable pass instead of exit 4.
+  Criticality: medium — no product defect, but it is the same four-eyes gate closing on itself
+  again, one landing at a time.
+  Bundle: Session- & Repo-Hygiene.
