@@ -47,10 +47,14 @@ const fullPath = (path) => {
 // not a missed write: the two documents concerned are the user's and cannot be
 // checked in. The batch machine, which is where the account is read and where a
 // cut is made, carries the directory and checks every one of them.
-const judgeable = (path) => {
-  const tree = userTreeRootOf(path, homedir())
-  return !tree || existsSync(MEMORY_DIR)
+// Every `~` destination, not only those under `.claude`: `~/missing.md` is as
+// unreadable on a foreign machine as the rest, and gating it differently made
+// the code say something other than the residual above.
+const judgeableWith = (path, anchorPresent) => {
+  const p = String(path ?? '').trim()
+  return !(p === '~' || p.startsWith('~/')) || anchorPresent
 }
+const judgeable = (path) => judgeableWith(path, existsSync(MEMORY_DIR))
 
 const line = (where, rule, account, dest) => `- \`${where}\` :: ${rule} :: ${account} -> ${dest}`
 
@@ -281,6 +285,24 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     expect(accountDestinationFault('docs/./x.md', ROOT)).toMatch(/climbs through/)
     expect(accountDestinationFault('~/.claude/definitely-missing/..', ROOT)).toMatch(/climbs through/)
     expect(accountDestinationFault('', ROOT)).toMatch(/empty/)
+  })
+
+  it('judges by the fixed anchor, both when it is there and when it is not', () => {
+    // Present: everything is judged, so a misspelled component cannot excuse
+    // itself by naming a directory that happens not to exist.
+    expect(judgeableWith('~/.claude/projects/-workspace-hoa/memmory/x.md', true)).toBe(true)
+    expect(judgeableWith('~/missing.md', true)).toBe(true)
+    expect(judgeableWith('~', true)).toBe(true)
+    // Absent: no `~` destination at all is judged — exactly the stated residual,
+    // and no more than it.
+    expect(judgeableWith('~/.claude/projects/-workspace-hoa/memory/x.md', false)).toBe(false)
+    expect(judgeableWith('~/missing.md', false)).toBe(false)
+    expect(judgeableWith('~', false)).toBe(false)
+    // A repository destination is never excused, with or without the anchor.
+    expect(judgeableWith('docs/nowhere.md', false)).toBe(true)
+    expect(judgeableWith('docs/nowhere.md', true)).toBe(true)
+    expect(judgeableWith('', false)).toBe(true)
+    expect(judgeableWith(undefined, false)).toBe(true)
   })
 
   it('expands a destination the same way it classifies one', () => {
