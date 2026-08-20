@@ -1,4 +1,4 @@
-// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@058e29dc
+// THE OPENAI AUTHORING LANE, decided (point 667). Pure half. rule:model-policy@4f8dd494
 //
 // `scripts/review-sol.mjs` and `scripts/ask-sol.mjs` send Sol work it may only
 // READ. This lane sends it work it WRITES: a point, on its own branch, in its

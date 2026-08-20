@@ -42,7 +42,7 @@ export const BG_WAIT_CEILING_DEFAULT = '0'
 
 import { servingFallbackModelId } from './fable-switch-core.mjs'
 
-/** Model policy (CLAUDE.md §6). rule:model-policy@058e29dc
+/** Model policy (CLAUDE.md §6). rule:model-policy@4f8dd494
  *  The session starts on Opus 5. Its one CLI fallback is the next member of the
  *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
