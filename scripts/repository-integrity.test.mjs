@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, inject, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -8,8 +8,9 @@ import {
   protectRepository,
   repositoryState,
   repositoryStatePaths,
+  WIRED_KEY,
 } from './repository-integrity.mjs'
-import { repoPath } from './repo-paths.mjs'
+
 
 describe('unit-suite repository integrity guard', () => {
   let repo
@@ -104,8 +105,10 @@ describe('unit-suite repository integrity guard', () => {
 // enforcer firing on every suite as one that can never fire (20./21.08.2026). The
 // name states what it is; this case states that the runner really invokes it.
 describe('the runner invokes this module', () => {
-  it('stands in vitest.config.ts as globalSetup', () => {
-    const config = readFileSync(repoPath('vitest.config.ts'), 'utf8')
-    expect(config).toContain("globalSetup: ['./scripts/repository-integrity.mjs']")
+  it('really ran as globalSetup in THIS run — not merely named in a config file', () => {
+    // The proof comes from the setup itself: only a real invocation can have
+    // written this value, where a text search would also be satisfied by a
+    // commented-out line. Reading it back is what makes the wiring a measurement.
+    expect(inject(WIRED_KEY)).toBe(true)
   })
 })

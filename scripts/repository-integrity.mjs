@@ -131,6 +131,16 @@ export function protectRepository(root = process.cwd()) {
   return () => assertRepositoryUnchanged(before, repositoryState(paths))
 }
 
+/** ANNOUNCE THAT THE RUNNER REALLY CALLED THIS (GPT-5.6 Sol, review of aeedceb).
+ *  The wiring is a claim about the CONFIGURATION Vitest loaded, and neither a text
+ *  search nor a re-import can prove it: a commented-out line reads identically, and
+ *  the config cannot be imported inside the jsdom workers at all. So the setup says
+ *  so itself, through the one channel that only a real invocation can write —
+ *  `provide`, which the suite reads back with `inject`. A false all-clear about
+ *  wiring is the failure this whole family exists to prevent. */
+export const WIRED_KEY = 'repositoryIntegrityWired'
+
 export function setup(project) {
+  project?.provide?.(WIRED_KEY, true)
   return protectRepository(project?.config?.root ?? process.cwd())
 }
