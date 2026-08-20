@@ -10131,12 +10131,28 @@ to land than a mechanism that needs a review.
   recorded for that point — so an owner-authored point meets the same discipline as a commissioned
   one. It changes NO lane and touches no routing decision; the suspension stands untouched, and a
   later lifting of it must be a separate, deliberate act.
+  THE COUNT MUST ALSO BE ABLE TO SEE EVERY ROUND (carried over 20.08.2026 from point 753, which
+  measured the other half of this on 19.08.2026 at 21:06 and 21:33: the routing printed "0
+  unsuccessful review round(s)" and "round history: no unsuccessful reviews recorded" while point
+  751 stood in its THIRD do-not-merge round, and printed 1 one round later against four recorded
+  verdicts — a count that lags the rounds can never reach any threshold, so a point loops on one
+  author with nothing noticing). Where a verdict is WRITTEN and where the total is read are the
+  same record, keyed on something every recorded round carries: a review handed to a fallback
+  model, a review recorded from a worktree and a review of a RANGE rather than a single sha each
+  count, because each of them is a round the point did not pass. A verdict the count cannot key is
+  reported as UNKEYABLE at recording time, with the missing part named, rather than dropped
+  silently — a round that is invisible to the count is the defect, whatever the total is then used
+  for. What does NOT come with it is 753's fifth round crossing into the Fable lane: the user
+  suspended that escalation on 20.08.2026, and this point re-arms nothing.
   VERIFIABLE: Vitest over the pure core — recording an unsuccessful verdict returns the running
   total; the revision at the spec-examination round is refused until the examination is recorded
   and admitted afterwards; earlier rounds are not refused; a successful round resets nothing the
   current rule does not already reset; and NO case routes a point to another lane, with one case
   asserting explicitly that the suspended escalation stays suspended. One case replays point 761's
   five real verdicts and asserts the total is reported where nothing was reported.
+  A second replays point 751's recorded history and asserts the total equals the rounds actually
+  recorded, with a case per round shape — fallback model, worktree, range — and one asserting that
+  an unkeyable verdict is refused at recording time instead of silently uncounted.
   CAVEAT ON THE MEASUREMENT, stated because it is the standing one: both sources see only landed
   and recorded work, so a session that produced nothing recorded is invisible to it.
   RE-CUT 20.08.2026 BY TWO RULINGS IN ONE MESSAGE, and the ORDER of them decides what this point
