@@ -11,6 +11,8 @@ import {
   refAnchoring,
   ENFORCER_RE,
   RELATIVE_WIRING_ROLLOUT,
+  RUNNER_CONFIG_NAMES,
+  runnerWiredScripts,
 } from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
 
@@ -489,5 +491,44 @@ describe('robustness and message', () => {
     const msg = formatGuardHealth(auditGuardHealth({ ...healthy, wiredText: '' }).violations)
     expect(msg).toContain('node scripts/guard-health-guard.mjs --status')
     expect(msg).toContain('nie auslösen kann')
+  })
+})
+
+describe('runnerWiredScripts — what the TEST RUNNER invokes', () => {
+  it('reads the entries of globalSetup and setupFiles', () => {
+    expect(
+      runnerWiredScripts(`
+        export default { test: {
+          setupFiles: ['./src/test/setup.ts'],
+          globalSetup: ['./scripts/repository-integrity-guard.mjs'],
+        } }
+      `),
+    ).toEqual(['./scripts/repository-integrity-guard.mjs', './src/test/setup.ts'])
+  })
+
+  it('accepts the bare-string shape Vitest also allows', () => {
+    expect(runnerWiredScripts(`globalSetup: './scripts/x-guard.mjs',`)).toEqual(['./scripts/x-guard.mjs'])
+  })
+
+  it('does NOT count a name that only stands in a comment — a false all-clear is the worst outcome', () => {
+    expect(runnerWiredScripts(`// globalSetup: ['./scripts/x-guard.mjs'] — removed on purpose`)).toEqual([])
+    expect(
+      runnerWiredScripts(`
+        // once wired here: ./scripts/x-guard.mjs
+        export default { test: { globalSetup: ['./scripts/y-guard.mjs'] } }
+      `),
+    ).toEqual(['./scripts/y-guard.mjs'])
+  })
+
+  it('counts nothing when neither key is present, and never throws on junk', () => {
+    expect(runnerWiredScripts('export default {}')).toEqual([])
+    expect(runnerWiredScripts(undefined)).toEqual([])
+    expect(runnerWiredScripts('globalSetup: [')).toEqual([])
+  })
+
+  it('names the config files Vitest itself would pick, most specific first', () => {
+    expect(RUNNER_CONFIG_NAMES[0]).toBe('vitest.config.ts')
+    expect(RUNNER_CONFIG_NAMES).toContain('vitest.config.cts')
+    expect(RUNNER_CONFIG_NAMES).toContain('vitest.config.cjs')
   })
 })

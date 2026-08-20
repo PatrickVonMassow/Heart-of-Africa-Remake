@@ -8,7 +8,14 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { execSync } from 'node:child_process'
-import { anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
+import {
+  anchorCommand,
+  auditGuardHealth,
+  commandAnchoring,
+  formatGuardHealth,
+  RUNNER_CONFIG_NAMES,
+  runnerWiredScripts,
+} from './guard-health-core.mjs'
 import { parseHookTable } from './guard-inventory-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -29,7 +36,10 @@ const PAUSE = repoPath('.claude', 'batch-paused')
  * `repository-integrity-guard.mjs` is wired as Vitest `globalSetup` and reddens the
  * whole unit run when the live repository moves under it. Reading only the hook
  * sources called it `cannot-fire` while it was firing on every suite — the exact
- * false accusation the comment below warns a reader not to trust.
+ * false accusation the comment below warns a reader not to trust. What enters the
+ * blob is not the config TEXT but what `runnerWiredScripts` reads out of the ONE
+ * config the runner would load: a name in a comment or in a shadowed file is not
+ * an invocation, and a false all-clear is worse than the false accusation.
  *
  * TWO shapes, on purpose (point 438). The BLOB answers "is this enforcer named
  * anywhere at all", where a git hook counts exactly like a settings line. The
@@ -67,12 +77,20 @@ function wiringText() {
   } catch {
     /* no hooksPath configured — nothing to add */
   }
-  for (const config of ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.mjs', 'vitest.config.js']) {
+  // ONE config, the one the runner would load, and only the entries it actually
+  // invokes: concatenating every candidate would let a stale or shadowed file
+  // mark a dead guard as wired, and pasting the whole text would let a mention in
+  // a comment do it (GPT-5.6 Sol, review of 65022b1).
+  for (const name of RUNNER_CONFIG_NAMES) {
+    let raw
     try {
-      text += readFileSync(resolve(REPO_ROOT, config), 'utf8')
+      raw = readFileSync(resolve(REPO_ROOT, name), 'utf8')
     } catch {
-      /* this project uses one of these names, not all of them */
+      continue
     }
+    const invoked = runnerWiredScripts(raw)
+    if (invoked.length > 0) text += `\n${invoked.join('\n')}\n`
+    break
   }
   return { text, hooks }
 }
