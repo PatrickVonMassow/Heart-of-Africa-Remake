@@ -372,6 +372,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
+- **Der Helfer griff dorthin, wo es kein Zurück gibt.** Sein Auftrag war eng gefasst, doch er
+  fasste Dateien **außerhalb der Versionsverwaltung** an — geteilte Einstellungen, Notizen,
+  Konfiguration im Benutzerordner. Dort rettet dich kein `git`, und du merkst es erst, wenn
+  du vergleichen willst.
+  → *Prompt:* „Bevor irgendjemand etwas **außerhalb der Versionsverwaltung** anfasst: erst
+  eine Kopie anlegen. Benenne im Auftrag ausdrücklich, welche Pfade außerhalb liegen, und lass
+  dir am Ende **einzeln aufzählen**, was dort entstanden, geändert, umbenannt oder gelöscht
+  wurde — in der Sammelliste der Projektdateien geht es sonst unter."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -410,4 +419,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2fb806d0970478853d8ec9ba1772a01878425140dcf8a3fa33e18e1fac6b3887 -->
+<!-- GUIDE-FINGERPRINT: 3b4f6c49c934569fbb5589dae94bc7f4f4bd5ed5849917b9f9a3f2ce34b2e9ed -->

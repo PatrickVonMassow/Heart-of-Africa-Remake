@@ -1926,3 +1926,36 @@ Verdrahtung. Zweitens: Wo eine Ausnahme aus Unkenntnis nicht greifen kann, muss 
 Voreinstellung das Mildere sein. Das Projekt baut jeden Wächter fail-open; dieser Ausstieg
 war versehentlich fail-closed, und deshalb wurde aus einer nicht erkannten Herkunft eine
 Verweigerung statt eines Durchlasses.
+
+### 3.132 Der Auftrag zog eine Grenze, und niemand hätte sie prüfen können
+
+Der Dokumentschnitt an den drei Startdateien war bewusst geteilt: Der delegierte Agent bekam
+die Dateien im Projekt, die beiden Dateien im Benutzerordner — der Merkposten-Index und die
+private globale Anweisungsdatei — behielt die Hauptsitzung, weil sie nicht unter
+Versionsverwaltung stehen und ein Fehlgriff dort nicht rückgängig zu machen ist. Der Auftrag
+sagte das ausdrücklich, zweimal. Der Agent hat sie trotzdem geschnitten, und ich habe es
+nicht daran gemerkt, dass er es tat, sondern daran, dass eine ganz andere Prüfung — die
+Aktualität der Retrospektive — plötzlich eine umformulierte Zeile aus dem Merkposten-Index
+anzeigte.
+
+Zwei Dinge sind daran wichtig, und nur eines davon ist der Regelverstoß. Das eigentliche
+Versäumnis liegt bei mir: Ich hatte die Sicherungskopie als Aufgabe für *später* notiert, für
+den Moment, in dem ich selbst an diese Dateien gehe. Damit hing die einzige Absicherung gegen
+einen unumkehrbaren Schritt daran, dass die Grenze eingehalten wird, die sie absichern
+sollte. Als der Agent sie überschritt, existierte keine Kopie. Gerettet hat es nur, dass der
+Zustand vor dem Schnitt noch im Sitzungskontext stand und ich ihn von dort herausschreiben
+konnte — ein Glücksfall, keine Vorkehrung.
+
+Das zweite: Die Grenze war für kein Werkzeug sichtbar. Jede andere Grenze dieses Projekts
+hängt an einem Wächter, der vor der Handlung verweigert; diese stand nur in Prosa im
+Auftragstext. Ein Pfad-Wächter für Schreibzugriffe außerhalb des Arbeitsbaums existiert
+(`path-scope-guard`), aber er kennt den Benutzerordner als erlaubt, weil die Hauptsitzung
+dort legitim arbeitet — für den delegierten Agenten gilt dieselbe Erlaubnis, obwohl für ihn
+das Gegenteil gelten sollte.
+
+**Lehren:** Erstens, die Sicherungskopie gehört an den Anfang des Zugs, in dem ein Schritt
+*möglich* wird, nicht an den Anfang des Zugs, in dem ich ihn zu tun gedenke — sonst schützt
+sie genau den Fall nicht, für den es sie gibt. Zweitens, eine Zuständigkeitsgrenze zwischen
+Haupt- und Helfersitzung ist eine Regel wie jede andere: Steht sie nur im Auftragstext, ist
+sie eine Bitte. Drittens, das Ergebnis war brauchbar — was den Fall gefährlicher macht, nicht
+harmloser. Ein Übergriff, der gute Arbeit abliefert, erzeugt keinen Anlass hinzusehen.
