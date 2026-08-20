@@ -1351,6 +1351,23 @@ put it is the mistake this line exists to stop.
     beat the escalation boundary, so the next case does not wait for a mechanism to be built.
     This is its own gap beside the monotone counter, and it is why nothing can take 713 off the
     scarcest model until this point ships.
+  RE-CUT 20.08.2026: THE ESCALATION IS SUSPENDED, WHICH TAKES THIS POINT'S TRIGGER AWAY. The
+  user suspended the automatic Fable escalation on 20.08.2026 (`FABLE_ESCALATION_SUSPENDED` in
+  `scripts/author-routing-core.mjs`, commit 5631247f), and CLAUDE.md §6 now names Fable as an
+  authoring lane only where a point's lane tag does. Two halves above are therefore ANSWERED
+  rather than owed, and are struck as work: the operator override, because with the escalation
+  branch skipped `if (tag)` decides again, so an explicit `Author lane:` beats what was the
+  boundary; and the case that named it, because point 713 is off that lane already. MEASURED
+  20.08.2026: `node scripts/author-sol.mjs --routing --point 713` answers `point 713 → sol` at 18
+  unsuccessful rounds and prints that the threshold "would have reached the §6 escalation
+  threshold of 5, but the Fable escalation is SUSPENDED", where the same command answered
+  `→ fable` on 19.08. Point 767 counts the rounds where they are RECORDED and changes no lane, so
+  nothing there contradicts this. WHAT SURVIVES, unchanged: the round-threshold DECISION — re-cut
+  smaller, staff differently, deliberately continue — which is lane-independent and still
+  missing; the token-based spend measurement, which is what made a 58 %-of-a-week spend on one
+  unlanded point visible where the commit trailers reported zero; and the trend read, which is
+  what this point BUILDS if the suspension is ever lifted, with no live trigger while it stands.
+  This point re-arms nothing.
   VERIFIABLE: Vitest over the pure routing decision — a point with a flat do-not-merge trend
   stays escalated, a point whose recorded verdicts improve falls back to the cheaper lane, a
   point at the threshold returns the decision with all three answers and never an abort, a
