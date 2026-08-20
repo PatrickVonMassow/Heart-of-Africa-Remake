@@ -99,8 +99,22 @@ put it is the mistake this line exists to stop.
   VERIFIABLE: Vitest over the pure cores — the text `--prepare` composes for a given next point
   passes the same predicate `board.mjs none` applies, asserted as one property over several
   next-point numbers so the two cannot drift apart again; plus a case that the topic guard accepts
-  the forward reference on the unnumbered card.
-  RELATED: point 434 (7) is where the verbatim card text came from.
+  the forward reference on the unnumbered card; plus, for BOTH dictated forms, a case that the text
+  passes the conciseness budget and still matches every fragment `--commit` asserts.
+  ALSO COVERED — POINT 787 IS THE SAME WALL FILED FROM THE OTHER SIDE AND FOLDS INTO THIS POINT.
+  It measured two further gates on the same dictated text, and they are part of "one rule":
+  `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while the
+  dictated CLAIM form (the reserved-for-a-claiming-window variant) is 103 words in one block — so
+  the prescribed text is refused a second time, for an unrelated reason; and `--commit` afterwards
+  demands the card back, matched against EXACT fragments in `cardProofFragments` — `Der Punkt ist
+  abgeschlossen.` plus, for the claimed-window form, the literal `Der Stapel geht NICHT an eine
+  frische Sitzung` with that capitalisation — so shortening the text to fit the word budget makes
+  the boundary refuse its own handover with "THE BOARD DOES NOT CARRY THE HANDOVER CARD".
+  FINAL STATE therefore covers BOTH forms: what `--prepare` prints is accepted, as printed, by the
+  publish gate, the topic guard and the conciseness guard, and is still matched by the proof
+  fragments `--commit` asserts.
+  RELATED: point 434 (7) is where the verbatim card text came from; point 787 is the duplicate
+  filing this point supersedes.
   Criticality: medium — no product defect, but it taxes every single session boundary, and the
   instruction it contradicts is the one that says not to re-write the text.
   Bundle: Chat & Tafel.
