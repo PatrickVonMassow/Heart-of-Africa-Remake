@@ -51,7 +51,50 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups[0].reviewer).toBe('')
+    expect(plan.groups[0].reviewerVendor).toBe('')
+    expect(plan.groups[0].unreviewableReason).toMatch(/every configured reviewer vendor authored part/)
     expect(plan.unreviewable).toEqual([plan.groups[0]])
+  })
+
+  it('reports a contribution co-authored by both vendors as unreviewable', () => {
+    const plan = planAuthorshipGroups({
+      commits: [
+        {
+          sha: sha('a'),
+          authorModels: ['GPT-5.6 Sol', 'Claude Opus 5'],
+          files: ['scripts/shared-guard.mjs'],
+        },
+      ],
+    })
+    expect(plan.groups[0]).toMatchObject({
+      reviewer: '',
+      reviewerVendor: '',
+      unreviewableReason: expect.stringMatching(/every configured reviewer vendor authored part/),
+    })
+    expect(plan.unreviewable).toEqual([plan.groups[0]])
+  })
+
+  it('splits a mixed-authorship range and names the eligible vendor for each part', () => {
+    const plan = planAuthorshipGroups({
+      commits: [
+        commit('a', 'Claude Opus 5', ['scripts/claude-guard.mjs']),
+        commit('b', 'GPT-5.6 Sol', ['scripts/sol-guard.mjs']),
+      ],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({
+        vendor: 'anthropic',
+        reviewer: 'GPT-5.6 Sol',
+        reviewerVendor: 'openai',
+        files: ['scripts/claude-guard.mjs'],
+      }),
+      expect.objectContaining({
+        vendor: 'openai',
+        reviewer: 'Opus 5',
+        reviewerVendor: 'anthropic',
+        files: ['scripts/sol-guard.mjs'],
+      }),
+    ])
   })
 
   it('names missing authorship as unreviewable instead of guessing a second model', () => {
@@ -60,6 +103,8 @@ describe('authorship-cut mechanism review planning', () => {
       vendor: 'unknown',
       authors: [],
       reviewer: '',
+      reviewerVendor: '',
+      unreviewableReason: expect.stringMatching(/authorship vendor is unknown/),
       files: ['unknown-guard.mjs'],
     })
     expect(plan.unreviewable).toEqual([plan.groups[0]])
@@ -100,6 +145,35 @@ describe('per-contribution review baseline', () => {
     expect(result.outstanding.map((c) => [c.sha, c.file])).toEqual([
       [sha('b'), 'b'],
       [sha('b'), 'shared'],
+    ])
+  })
+
+  it('clears a bounded one-pass scope and no contribution outside it', () => {
+    const before = commit('a', 'Claude Opus 5', ['shared', 'before'])
+    const inside = commit('b', 'Claude Opus 5', ['shared', 'inside'])
+    const after = commit('c', 'Claude Opus 5', ['shared', 'after'])
+    const result = outstandingContributions({
+      commits: [before, inside, after],
+      recordUsable: usable,
+      records: [
+        {
+          sha: after.sha,
+          model: 'GPT-5.6 Sol',
+          verdict: 'merge',
+          containedShas: [before.sha, inside.sha, after.sha],
+          pass: { index: 1, total: 1, files: ['shared', 'inside'], commits: [inside.sha] },
+        },
+      ],
+    })
+    expect(result.covered.map((c) => [c.sha, c.file])).toEqual([
+      [inside.sha, 'shared'],
+      [inside.sha, 'inside'],
+    ])
+    expect(result.outstanding.map((c) => [c.sha, c.file])).toEqual([
+      [before.sha, 'shared'],
+      [before.sha, 'before'],
+      [after.sha, 'shared'],
+      [after.sha, 'after'],
     ])
   })
 

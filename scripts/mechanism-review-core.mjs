@@ -878,9 +878,10 @@ export function validateMode({ mode, framing } = {}) {
 /**
  * Is the PASS this record claims a usable one, and does it say what it read?
  *
- * A pass record is the answer to a range no single review round can hold (point
- * 714): the material is cut through the FILE SET, each pass is reviewed on its
- * own, and the range is cleared only once every pass is on record. So a pass
+ * A pass record is either a bounded one-round scope or the answer to a range no
+ * single review round can hold (points 783 and 714): the material is cut through
+ * the FILE SET, each pass is reviewed on its own, and the range is cleared only
+ * once every contribution (and, for a split, every pass) is on record. So a pass
  * MUST name its files — a verdict that covers "one of three passes" without
  * saying which files it read is a coverage claim nobody can check — and the two
  * flags come as a pair, because either alone describes half a composition.
@@ -940,6 +941,11 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
   const commits = commitList ? commitList.split(',') : []
+  if (parsed.ok && parsed.total === 1 && !hasCommits) {
+    errors.push(
+      '--pass 1/1 is a scoped review and needs --pass-commits: without contribution boundaries it would claim the whole range',
+    )
+  }
   if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
     errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
   }
@@ -1407,11 +1413,15 @@ export function evaluateMechanismReview({
 }
 
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
-export function formatMechanismReviewVerdict(verdict) {
+export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } = {}) {
   if (!verdict?.block) return ''
+  const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
+  const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
   const lines = [
-    'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
-      'second model has recorded a review of it.',
+    unreviewable.length
+      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions with no eligible reviewer vendor.'
+      : 'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
+        'second model has recorded a review of it.',
     '',
   ]
   for (const f of verdict.findings) {
@@ -1500,17 +1510,50 @@ export function formatMechanismReviewVerdict(verdict) {
           : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
     )
   }
-  lines.push(
-    '',
-    'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
-    'nobody looks again. Have the OTHER model review the change — plan and result — and',
-    'record what it said:',
-    '',
-    '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
-    '',
-    'One record covers every mechanism commit it contains, so reviewing the branch head is',
-    'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
-  )
+  if (unreviewable.length) {
+    lines.push('', 'UNREVIEWABLE contributions (none may be treated as an ordinary missing review):')
+    for (const group of unreviewable) {
+      lines.push(
+        `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
+          `${group.unreviewableReason || 'no configured reviewer vendor is eligible'}`,
+      )
+    }
+    lines.push(
+      '',
+      'No record by the configured reviewer chain can clear those contributions. Inspect the',
+      'authorship split with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else if (groups.length > 1) {
+    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these contribution groups:')
+    for (const group of groups) {
+      lines.push(
+        `  · ${group.vendor || 'unknown'}-authored ${group.kind === 'commit' ? `commit ${(group.commits ?? [''])[0].slice(0, 7)}` : 'files'} ` +
+          `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
+          `${(group.files ?? []).join(', ') || '<files unknown>'}`,
+      )
+    }
+    lines.push(
+      '',
+      'Ask the planner for the runnable pass commands; each recorded pass clears only its',
+      'listed author contribution, so the two vendors accumulate coverage without self-review:',
+      '',
+      `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
+      '',
+      'Inspect the remaining contribution debt with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else {
+    lines.push(
+      '',
+      'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
+      'nobody looks again. Have the OTHER model review the change — plan and result — and',
+      'record what it said:',
+      '',
+      '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
+      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+      '',
+      'One record covers every mechanism commit it contains, so reviewing the branch head is',
+      'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  }
   return lines.join('\n')
 }

@@ -404,6 +404,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       records,
       sessionId,
       fence: guardDuty({ sessionId }),
+      authorshipPlan,
     },
     commits,
     debt,
@@ -581,11 +582,16 @@ if (isMainModule(import.meta.url)) {
       for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
         console.log(
           `  ${(group.authorshipKind ?? group.kind) === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor ?? 'authored'} files`} → ` +
-            `${group.reviewer || 'NO ELIGIBLE REVIEWER'}: ${group.files.map((f) => quotePassFile(f)).join(', ')}`,
+            `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
+            `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      else console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      else console.log(
+        verdict.block
+          ? `\n${formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan })}`
+          : '\nGATE CLEAR',
+      )
       process.exit(0)
     }
 
@@ -598,7 +604,10 @@ if (isMainModule(import.meta.url)) {
     }
     if (outcome.action === 'block') {
       process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatMechanismReviewVerdict(verdict) }),
+        JSON.stringify({
+          decision: 'block',
+          reason: formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan }),
+        }),
       )
       process.exit(0)
     }

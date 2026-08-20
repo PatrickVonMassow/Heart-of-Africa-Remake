@@ -585,6 +585,21 @@ describe('the record the command prints', () => {
     expect(report).toMatch(/NOT cleared until every pass 1\.\.3 is recorded/)
   })
 
+  it('prints a bounded one-round record as scoped contribution coverage', () => {
+    const commit = 'b'.repeat(40)
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], commits: [commit] },
+    })
+    expect(report).toContain('--pass 1/1')
+    expect(report).toContain(`--pass-commits "${commit}"`)
+    expect(report).toContain('SCOPED PASS')
+    expect(report).toContain('clears only the listed commit/file contributions')
+    expect(report).not.toContain('range too large')
+  })
+
   it('sends the caller to the LEDGER for the remainder, never to a guessed next number', () => {
     // Round-3 pass 6 kept the warning on every pass; round-4 pass 6 removed
     // the numeric hint entirely — passes run in any order, so "next: k+1"

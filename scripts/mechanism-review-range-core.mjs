@@ -7,6 +7,10 @@
 import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
+export const NO_ELIGIBLE_REVIEWER_REASON =
+  'every configured reviewer vendor authored part of this contribution'
+export const UNKNOWN_AUTHOR_REVIEWER_REASON =
+  'authorship vendor is unknown, so no reviewer can prove cross-vendor independence'
 
 const uniq = (xs) => [
   ...new Set((xs ?? []).filter((value) => value !== null && value !== undefined && String(value)).map(String)),
@@ -88,14 +92,34 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // historical commit must become an explicit unreviewable pass, not an
   // assignment made from absence.
   if (!writtenBy.length) return ''
-  const vendors = new Set(writtenBy.map(vendorOf).filter((v) => v !== 'unknown'))
+  if (writtenBy.some((author) => vendorOf(author) === 'unknown')) return ''
+  const vendors = new Set(writtenBy.map(vendorOf))
+  // Cross-VENDOR means the candidate's vendor authored NONE of the group. A
+  // commit co-authored by both vendors has no eligible reviewer in this chain,
+  // even when a different model at one of those vendors did not personally
+  // author it. Calling that model eligible would reduce four eyes to a model-id
+  // distinction exactly where the repository rule requires vendor separation.
   return (
     (candidates ?? []).find((candidate) => {
       if (writtenBy.some((author) => sameModel(candidate, author))) return false
       const candidateVendor = vendorOf(candidate)
-      return vendors.size !== 1 || !vendors.has(candidateVendor)
+      return candidateVendor !== 'unknown' && !vendors.has(candidateVendor)
     }) ?? ''
   )
+}
+
+const reviewerFields = (authors, candidates) => {
+  const reviewer = eligibleReviewer(authors, candidates)
+  const writtenBy = uniq(authors)
+  const unknownAuthorship = !writtenBy.length || writtenBy.some((author) => vendorOf(author) === 'unknown')
+  const reason = unknownAuthorship
+    ? UNKNOWN_AUTHOR_REVIEWER_REASON
+    : (candidates ?? []).length
+      ? NO_ELIGIBLE_REVIEWER_REASON
+      : 'no reviewer is configured for this contribution'
+  return reviewer
+    ? { reviewer, reviewerVendor: vendorOf(reviewer) }
+    : { reviewer: '', reviewerVendor: '', unreviewableReason: reason }
 }
 
 /** Every changed (commit, file) pair, oldest first and byte-exact by path. */
@@ -154,7 +178,7 @@ export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDI
       authors,
       files: uniq(changes.map((c) => c.file)),
       commits: uniq(changes.map((c) => c.sha)),
-      reviewer: eligibleReviewer(authors, candidates),
+      ...reviewerFields(authors, candidates),
     })
   }
 
@@ -170,7 +194,7 @@ export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDI
       authors,
       files,
       commits: [String(commit.sha)],
-      reviewer: eligibleReviewer(authors, candidates),
+      ...reviewerFields(authors, candidates),
     })
   }
 

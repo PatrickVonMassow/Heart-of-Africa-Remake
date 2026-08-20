@@ -359,6 +359,8 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
         authors: group.authors,
         vendor: group.vendor,
         reviewer: group.reviewer,
+        reviewerVendor: group.reviewerVendor,
+        unreviewableReason: group.unreviewableReason,
         authorshipKind: group.kind,
         rangeBase,
         rangeHead,
@@ -397,14 +399,16 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   }
   for (const pass of plan.passes ?? []) {
     lines.push(
-      `  pass ${pass.index}/${pass.total} → ${pass.reviewer || 'NO ELIGIBLE REVIEWER'}; ` +
+      `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
         `${pass.size} characters; commits ${pass.commits.map((commit) => commit.slice(0, 7)).join(', ')}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
       `    node scripts/review-sol.mjs --sha ${sha} --brief "<what to judge>" --pass ${pass.index}`,
     )
   }
   for (const group of plan.unreviewable ?? []) {
-    lines.push(`  CANNOT ASSIGN: ${group.files.map(quotePassFile).join(', ')} — every candidate authored this group`)
+    lines.push(
+      `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
+    )
   }
   lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
@@ -752,6 +756,8 @@ export const usage = () =>
     'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
     'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
     'commit ships the current content of the files it touches.',
+    'An explicit --since that narrows a fitting range records one scoped 1/1 pass whose',
+    'commit/file contribution lists clear exactly what that round read and nothing earlier.',
     'Recorded scoped passes remain cleared at their exact commit/file contributions; later',
     'plans owe only new contributions. No carry record or carry planning flag is needed.',
     'A commit written to answer a recorded finding is itself a new contribution by design:',
@@ -862,7 +868,9 @@ if (isMainModule(import.meta.url)) {
     const plan = buildAuthorshipPassPlan({ sha: full, base })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
     if (plan.unreviewable.length) {
-      console.error('review-sol: at least one pass has no eligible non-author reviewer; no round can clear it.')
+      console.error(
+        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; no round can clear it.',
+      )
       process.exit(4)
     }
     if (plan.passes.length > MAX_PASS_TOTAL) {
@@ -881,7 +889,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     const selected = plan.fits ? plan.passes[0] : selection.pass
-    const pass = plan.fits ? null : selected
+    // A FITTING BUT NARROWED RANGE IS ONE SCOPED PASS. Its commit/file lists
+    // are the exact boundary the old pass-less record could not express: the
+    // gate credits those contributions and no ancestor the round did not read.
+    // A full branch-range review stays pass-less for ledger compatibility.
+    const pass = plan.fits ? (partialFor(base) ? selected : null) : selected
     const rangeAuthors = selected
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
@@ -964,12 +976,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
-    // What a record at this sha would CLEAR: everything back to where the branch
-    // left `main`. A narrower review is allowed, but it may not be recorded.
-    // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
-    // sha with no merge base against `main` used to leave this empty, which
-    // switched the check OFF and printed a record for a range nobody bounded.
-    // The decision itself is pure and tested (coverageDecision).
+    // A narrowed one-round review records its explicit contribution scope above;
+    // a pass-less record still requires whole-branch coverage. FAILING TO
+    // ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a sha with no
+    // merge base against `main` used to leave this empty, which switched the
+    // check off and printed a record for a range nobody bounded.
     const partial = pass ? null : partialFor(base)
     const range = selected.sourceRange
     const assembly = assemblePass(range, selected, plan)

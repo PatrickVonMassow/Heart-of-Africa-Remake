@@ -700,13 +700,14 @@ export const usage = () =>
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
   `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
   `       it prints as --accounting "<summary>".\n` +
-  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE pass of a range whose material no\n` +
-  `       single review round can hold. The passes cut through the FILE SET, and the gate\n` +
+  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded contribution scope, or one\n` +
+  `       pass of a range whose material no single review round can hold. The passes cut\n` +
+  `       through the FILE SET, and the gate\n` +
   `       clears the range only once EVERY pass of the same total is recorded — a pass on\n` +
   `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
-  `       An authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
+  `       A scoped or authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
   `       file is credited only at the commit boundaries this reviewer actually read.\n` +
   `       A commit written to answer a finding is still a NEW contribution by design: the\n` +
   `       confirming clean pass must review and record it. This convergence cost is accepted.\n` +

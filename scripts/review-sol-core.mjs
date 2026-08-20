@@ -900,15 +900,22 @@ export function formatReviewReport({
   // fell silent on unrecorded ones. This formatter is pure and cannot read
   // the ledger, so it points at the listing that can.
   const passWarning = pass
-    ? [
+    ? Number(pass.total) === 1
+      ? [
+          '',
+          '  This SCOPED record clears only the listed commit/file contributions; work outside them remains owed.',
+        ]
+      : [
         '',
         `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
           'node scripts/mechanism-review.mjs --list shows which already are.',
-      ]
+        ]
     : []
   if (!decision.fellBack) {
     const scope = pass
-      ? ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
+      ? Number(pass.total) === 1
+        ? ` (SCOPED PASS — ${(pass.files ?? []).length} file(s), ${(pass.commits ?? []).length} commit contribution(s))`
+        : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [
       `review-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) reviewed ${String(sha).slice(0, 7)} → ${decision.verdict}${scope}`,
