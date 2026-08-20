@@ -9790,36 +9790,6 @@ to land than a mechanism that needs a review.
   Bundle: Modell & Wächter.
 
 
-- [ ] 731. The boundary prints a handover text the board gate refuses (measured 19.08.2026 at the
-  point 701 boundary). `scripts/batch-boundary.mjs --prepare` prints the handover card verbatim
-  with the instruction to "take this text verbatim rather than writing it again" — the reason it
-  exists is that a rewritten card drifts. That text names NO point number, and `board.mjs none`
-  plus the publish gate REFUSE a handover card whose reason does not name the point the batch
-  picks up next. So the verbatim paste is rejected and every boundary rewrites it by hand, which
-  is exactly the drift the verbatim rule prevents; two mechanisms built for the same card
-  disagree about what it must contain.
-  FINAL STATE:
-  - THE PRINTED TEXT SATISFIES THE GATE IT IS PRINTED FOR. `batch-boundary.mjs --prepare` reads
-    the head of the open work order the same way the board's queue does and names that point in
-    the handover text it prints, so the paste passes the publish gate unedited. Where no open
-    point remains, it prints the wording the gate accepts for that case rather than a number that
-    does not exist.
-  - THE TEMPLATE NAMES EVERY STEP THE CARD NEEDS (measured 19.08.2026, 17:27, at a watermark
-    handover). `board.mjs none` additionally refuses the card while a now-card stands, so the
-    point has to be sent back to the queue first — three steps the printed template does not
-    mention, at the most expensive place in the session: its end, above the watermark, where
-    nothing new may begin. The printed handover therefore names sending the now-card back as its
-    first step, and the way through is the template's, not a lucky combination of two texts.
-  - THE AGREEMENT IS PINNED, NOT COINCIDENTAL. The gate's requirement and the boundary's text are
-    checked against each other, so a later change to either side fails a test instead of
-    surfacing at the next handover.
-  VERIFIABLE: Vitest over the pure text builder — the produced handover reason satisfies the same
-  predicate the publish gate applies, with a case for an empty queue and a case that FAILS if the
-  point number is dropped from the text.
-  Criticality: low — it costs one hand-rewrite per session boundary and risks the drift the
-  verbatim rule was built to stop, but nothing is lost.
-  Bundle: Chat & Tafel.
-
 - [ ] 741. A carrier entry carries its writer's situation as though it were the finding's own
   (measured 19.08.2026, 18:47). The entry of 16:38 closed with "blocked until the batch is taken
   over (a claim stands, fb439a94 holds the lock)". Re-measured, that is not true any more and was
