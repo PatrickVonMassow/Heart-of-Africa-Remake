@@ -200,6 +200,29 @@ put it is the mistake this line exists to stop.
   Criticality: medium — no product defect, but the loss is final and goes unnoticed.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 799. `watcherSupervision` can no longer return `stop`, but the launcher still handles it and the
+  docstring still promises it (found 20.08.2026 while reviewing point 793).
+  WHAT WAS MEASURED. Point 793 removed the single `action: 'stop'` return from `watcherSupervision`
+  (`scripts/chat-watcher-core.mjs`): a paused batch now keeps its inbox listener, because user mail
+  is the one input that can end the pause. Two leftovers of the old shape stayed behind. The
+  docstring above the function still states `Returns { action: 'start' | 'stop' | 'none', reason,
+  pid }`, and `scripts/batch-autostart.mjs` still carries an `else if (sup.action === 'stop')` branch
+  that kills `sup.pid` — a branch no input can now reach.
+  WHY IT MATTERS: nothing misbehaves today, and that is the whole risk. The comments in this
+  repository are load-bearing: the next reader of the supervision protocol is told a stop exists,
+  goes looking for the case that produces it, and finds the launcher apparently proving him right.
+  A dead branch that kills a pid is also the wrong thing to reanimate by accident.
+  FINAL STATE: the documented union matches what the function can return. Either the union narrows
+  to `'start' | 'none'` and the launcher's stop branch goes with it, or the stop path is stated in
+  the docstring as deliberately held in reserve, naming who would produce it.
+  VERIFIABLE: Vitest over the pure core — no input to `watcherSupervision` yields `stop` (the paused,
+  alive, missing-record and stranger-pid cases together), and the launcher handles exactly the
+  actions the function documents.
+  RELATED: point 793 is the change that created it; the review that found it is recorded in
+  `.claude/mechanism-reviews.jsonl` against `9db2216`.
+  Criticality: low — no behaviour is wrong; the cost is a misleading protocol for the next reader.
+  Bundle: Chat & Tafel.
+
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
