@@ -287,12 +287,13 @@ coverage map live in `scripts/verify/README.md`.
   with pushed checkpoints is transferred at the commit and ADOPTED by the
   successor (`batch-in-flight.mjs --adopt`); unpushed work drains first, but a
   RUNNING verify transfers via its run record. Past
-  the 82k CONTEXT TRIGGER (150k CEILING; `context-watermark.mjs`) the
-  same handover fires with `--context`, and the board card says so; a
-  PreToolUse fence (`context-fence-guard.mjs`, point 700) then DENIES starting
-  new work — agents, browser suites, authoring points/docs/memories (findings
-  go to the carrier) — while finishing, reads and the boundary stay allowed,
-  and every boundary marker records the context it was taken at. The guard
+  the 122k HANDOVER MARK (150k CEILING; `context-watermark.mjs`) the same
+  handover fires with `--context`, and the board card says so. The PreToolUse
+  fence (`context-fence-guard.mjs`, point 758) denies new work — agents, suites,
+  authoring points/docs/memories (findings → carrier) — at its 110k REFUSAL
+  MARK, but is DISARMED by default (`observe`: measures, refuses nothing) until
+  747 re-arms it; finishing, reads and the boundary stay allowed, and every
+  marker records its context. The guard
   enforces all three against an armed launcher (`batch-launcher.mjs --start` on
   Linux, the `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED
   OVER so it spawns the successor.

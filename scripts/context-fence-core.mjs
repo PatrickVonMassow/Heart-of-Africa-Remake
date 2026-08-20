@@ -43,6 +43,7 @@ import {
   segmentInvokesPathWhere,
   segmentInvokesScript,
 } from './command-classify-core.mjs'
+import { CONTEXT_FENCE_MODE_DEFAULT, normalizeFenceMode } from './context-watermark-core.mjs'
 
 /** The one command that ends the session — every refusal names it. */
 export const FENCE_END_COMMAND = 'node scripts/batch-boundary.mjs --prepare --context'
@@ -897,9 +898,21 @@ export function fenceRefusal({ tokens, watermark, what, authoring = false, clear
  * THE VERDICT for one PreToolUse call. PURE.
  *
  * `state`/`tokens`/`watermark` come from a real watermark reading
- * (`watermarkDecision`): only a measured 'past' can deny — 'below' allows all,
- * and 'unreadable' fails OPEN (never a deny on an assumption).
- * Returns { block, reason }.
+ * (`watermarkDecision`) taken against the REFUSAL threshold: only a measured
+ * 'past' can deny — 'below' allows all, and 'unreadable' fails OPEN (never a
+ * deny on an assumption).
+ *
+ * `mode` is the named fence mode (`CONTEXT_FENCE_MODES`), DEFAULT 'observe'
+ * (point 758): observation measures and classifies exactly as before and
+ * REFUSES NOTHING. The classification still runs in that mode on purpose —
+ * `observed` is what the caller records, so the series point 747 recalibrates
+ * from keeps growing while the fence is disarmed. An omitted mode is the
+ * default rather than 'armed': a caller that has not been wired to the switch
+ * must not refuse.
+ *
+ * Returns { block, reason, mode, observed, what, authoring } — `observed` is
+ * true exactly when the call WOULD be refused by an armed fence, whether or not
+ * this verdict refuses it.
  */
 export function contextFenceDecision({
   state,
@@ -910,11 +923,17 @@ export function contextFenceDecision({
   filePath,
   resolvePath,
   isDirectory,
+  mode = CONTEXT_FENCE_MODE_DEFAULT,
 } = {}) {
-  if (state !== 'past') return { block: false, reason: null }
+  const inMode = normalizeFenceMode(mode)
+  const idle = { block: false, reason: null, mode: inMode, observed: false, what: null, authoring: false }
+  if (state !== 'past') return idle
   const call = classifyFenceCall({ toolName, command, filePath, resolvePath, isDirectory })
-  if (!call.starts) return { block: false, reason: null }
+  if (!call.starts) return idle
+  const observed = { ...idle, observed: true, what: call.what, authoring: call.authoring }
+  if (inMode !== 'armed') return observed
   return {
+    ...observed,
     block: true,
     reason: fenceRefusal({
       tokens,

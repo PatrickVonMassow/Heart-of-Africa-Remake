@@ -13,13 +13,54 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
-import { CONTEXT_TRIGGER_TOKENS, parseContextTokens, watermarkDecision } from './context-watermark-core.mjs'
+import {
+  CONTEXT_REFUSAL_TOKENS,
+  CONTEXT_TRIGGER_TOKENS,
+  normalizeFenceMode,
+  parseContextTokens,
+  watermarkDecision,
+} from './context-watermark-core.mjs'
 
-/** The calibratable trigger, HOA_CONTEXT_TRIGGER_TOKENS. Read here (not in the
- *  core) so the decision function stays pure. */
+/** One positive-number env override, or the named default. A blank, zero,
+ *  negative or unparsable value is NOT an override — it falls back, so a typo
+ *  cannot silently disable a threshold. */
+const overrideTokens = (raw, fallback) => {
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+/** THE HANDOVER THRESHOLD in force, `HOA_CONTEXT_TRIGGER_TOKENS` honoured.
+ *  Read here (not in the core) so the decision function stays pure. This is the
+ *  number the boundary and the Stop-chain watermark fire on. */
 export function triggerTokens(env = process.env) {
-  const raw = Number(env.HOA_CONTEXT_TRIGGER_TOKENS)
-  return Number.isFinite(raw) && raw > 0 ? raw : CONTEXT_TRIGGER_TOKENS
+  return overrideTokens(env.HOA_CONTEXT_TRIGGER_TOKENS, CONTEXT_TRIGGER_TOKENS)
+}
+
+/**
+ * THE REFUSAL THRESHOLD in force — the context fence's own mark, split from the
+ * handover one by point 758.
+ *
+ * TWO OVERRIDES, IN ORDER. `HOA_CONTEXT_REFUSAL_TOKENS` is the specific one and
+ * wins. Failing that, `HOA_CONTEXT_TRIGGER_TOKENS` applies HERE TOO — that is
+ * point 758's IMMEDIATE RELIEF, the one variable a launcher sets wide so
+ * sessions stop being stranded, and it was named before the two thresholds were
+ * separate. If the relief variable stopped reaching the fence at the moment the
+ * split landed, a launcher that sets it would silently relieve only the
+ * handover while an armed fence went on refusing at 110,000 — the exact
+ * stranding the clause exists to end. So the general relief still covers both,
+ * and a session that wants to move ONLY the refusal mark says so specifically.
+ */
+export function refusalTokens(env = process.env) {
+  return overrideTokens(
+    env.HOA_CONTEXT_REFUSAL_TOKENS,
+    overrideTokens(env.HOA_CONTEXT_TRIGGER_TOKENS, CONTEXT_REFUSAL_TOKENS),
+  )
+}
+
+/** THE FENCE MODE in force, `HOA_CONTEXT_FENCE_MODE` honoured. Defaults to
+ *  observation: the fence records, it does not refuse (point 758). */
+export function fenceMode(env = process.env) {
+  return normalizeFenceMode(env.HOA_CONTEXT_FENCE_MODE)
 }
 
 /** How much of the transcript tail is read. The newest usage record sits within
@@ -98,12 +139,18 @@ const fstatOf = (path) => {
  * payload field) wins; otherwise the transcript is located. Returns the core's
  * { state, tokens, watermark, alert } plus { transcript } naming what was read
  * — 'unreadable' when no file or no usage record was found, never a guess.
+ *
+ * `watermark` lets a caller judge the SAME reading against its own threshold:
+ * since point 758 the fence's refusal mark and the handover mark are different
+ * numbers, and the fence passes `refusalTokens()` here. Omitted, the handover
+ * threshold applies, which is what every other consumer means.
  */
-export function gatherWatermark({ transcriptPath = '', sid = '', env = process.env } = {}) {
+export function gatherWatermark({ transcriptPath = '', sid = '', env = process.env, watermark } = {}) {
   const path = String(transcriptPath ?? '').trim() || locateTranscript({ sid })
   const tail = path ? readTail(path) : null
   const reading = tail === null ? null : parseContextTokens(tail)
-  return { ...watermarkDecision({ reading, watermark: triggerTokens(env) }), transcript: path ?? null }
+  const mark = Number.isFinite(watermark) && watermark > 0 ? watermark : triggerTokens(env)
+  return { ...watermarkDecision({ reading, watermark: mark }), transcript: path ?? null }
 }
 
 // --- CLI -----------------------------------------------------------------------

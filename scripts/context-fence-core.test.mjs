@@ -14,7 +14,11 @@ import {
 
 const PAST = { state: 'past', tokens: 434_440, watermark: 150_000 }
 
-const decide = (call, reading = PAST) => contextFenceDecision({ ...reading, ...call })
+// Point 758 split the fence into two named modes and made OBSERVATION the
+// default. Everything below pins the ARMED behaviour — the spec's "armed, it
+// refuses exactly as before" — so each case says `armed` explicitly; the
+// default mode is pinned in its own block at the end of this file.
+const decide = (call, reading = PAST) => contextFenceDecision({ mode: 'armed', ...reading, ...call })
 
 describe('over the mark, a STARTING call is denied — naming the mark', () => {
   const starts = [
@@ -739,5 +743,110 @@ describe("the fence's claim is BOUNDED — a constructed escape is outside it (r
   it('an ln that has nothing to do with the verify tree stays allowed', () => {
     expect(decide({ toolName: 'Bash', command: 'ln -s ../hoa/docs docs-link' }).block).toBe(false)
     expect(decide({ toolName: 'Bash', command: 'ln -s scripts/verify-tools tools-link' }).block).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE TWO MODES (point 758). The fence was disarmed because it refused writes
+// to every authoring target — exactly the file set the consumption-reducing
+// points must edit — and three fresh sessions in a row were stopped above the
+// mark before beginning any work. The danger of a disarmed gate is that nobody
+// notices it is disarmed, so BOTH directions are pinned here: observation
+// refuses NOTHING but still OBSERVES everything, and armed refuses exactly what
+// it refused before. A test that covered only the armed path would let the
+// observation mode silently stop recording.
+// ---------------------------------------------------------------------------
+describe('the fence MODE decides whether an observation becomes a refusal', () => {
+  const STARTING_CALLS = [
+    ['an agent spawn', { toolName: 'Agent' }],
+    ['a delegated authoring run', { toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 758' }],
+    ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --point 758' }],
+    ['the LARGE regression', { toolName: 'Bash', command: 'npm test' }],
+    ['a direct suite call', { toolName: 'Bash', command: 'node scripts/verify/world.mjs' }],
+    ['authoring the work order', { toolName: 'Edit', filePath: 'TASKS.md' }],
+    ['authoring the archive', { toolName: 'Write', filePath: 'docs/tasks-archive.md' }],
+    ['authoring a document section', { toolName: 'Edit', filePath: 'CLAUDE.md' }],
+    ['authoring design.md', { toolName: 'Edit', filePath: 'design.md' }],
+    ['authoring a memory', { toolName: 'Write', filePath: 'memory/whatever.md' }],
+  ]
+
+  it('OBSERVATION MODE — the DEFAULT — refuses nothing at all', () => {
+    for (const [label, call] of STARTING_CALLS) {
+      // Named explicitly, and by OMISSION: a caller not yet wired to the switch
+      // must not refuse either, which is why the pure default is 'observe'.
+      for (const mode of [{ mode: 'observe' }, {}]) {
+        const v = contextFenceDecision({ ...PAST, ...call, ...mode })
+        expect(v.block, `${label} must not be refused in observation mode`).toBe(false)
+        expect(v.reason, label).toBeNull()
+        expect(v.mode, label).toBe('observe')
+      }
+    }
+  })
+
+  it('…but it still OBSERVES every one of them — the record 747 recalibrates from does not stop', () => {
+    for (const [label, call] of STARTING_CALLS) {
+      const v = contextFenceDecision({ ...PAST, ...call })
+      expect(v.observed, `${label} must still be observed`).toBe(true)
+      expect(typeof v.what, label).toBe('string')
+      expect(v.what, label).toBeTruthy()
+    }
+    // The authoring flag survives too — it is what tells the record whether the
+    // call was a document write rather than a suite or an agent.
+    expect(contextFenceDecision({ ...PAST, toolName: 'Edit', filePath: 'TASKS.md' }).authoring).toBe(true)
+    expect(contextFenceDecision({ ...PAST, toolName: 'Agent' }).authoring).toBe(false)
+  })
+
+  it('ARMED MODE refuses exactly as before, reason and all', () => {
+    for (const [label, call] of STARTING_CALLS) {
+      const v = contextFenceDecision({ ...PAST, ...call, mode: 'armed' })
+      expect(v.block, `${label} must be refused by an armed fence`).toBe(true)
+      expect(v.observed, label).toBe(true)
+      expect(v.reason, label).toContain('434440')
+      expect(v.reason, label).toContain(FENCE_END_COMMAND)
+    }
+  })
+
+  it('a FINISHING call is neither refused nor observed, in either mode', () => {
+    for (const mode of ['observe', 'armed']) {
+      for (const call of [
+        { toolName: 'Bash', command: 'git commit -m "finish"' },
+        { toolName: 'Bash', command: 'git push origin feat/x' },
+        { toolName: 'Bash', command: 'npm run test:unit' },
+        { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs --prepare --context' },
+        { toolName: 'Read', filePath: 'TASKS.md' },
+        { toolName: 'Edit', filePath: 'src/world/world.ts' },
+      ]) {
+        const where = `${mode}: ${call.command ?? call.filePath}`
+        const v = contextFenceDecision({ ...PAST, ...call, mode })
+        expect(v.block, where).toBe(false)
+        expect(v.observed, where).toBe(false)
+      }
+    }
+  })
+
+  it('BELOW the mark and on an UNREADABLE one, nothing is observed and nothing is refused — armed included', () => {
+    for (const mode of ['observe', 'armed']) {
+      for (const reading of [
+        { state: 'below', tokens: 10_000, watermark: 110_000 },
+        { state: 'unreadable', tokens: null, watermark: 110_000 },
+      ]) {
+        const where = `${mode}/${reading.state}`
+        const v = contextFenceDecision({ ...reading, toolName: 'Agent', mode })
+        expect(v.block, where).toBe(false)
+        expect(v.observed, where).toBe(false)
+        expect(v.mode, where).toBe(mode)
+      }
+    }
+  })
+
+  it('an unrecognised mode falls back to the DEFAULT — a typo must never arm the fence silently', () => {
+    for (const bogus of ['on', 'true', 'ARMED ', '', null, undefined, 42, {}]) {
+      // 'ARMED ' is the deliberate near-miss: normalisation trims and
+      // lowercases, so it IS a real spelling of armed and must arm.
+      const expected = String(bogus ?? '').trim().toLowerCase() === 'armed'
+      const v = contextFenceDecision({ ...PAST, toolName: 'Agent', mode: bogus })
+      expect(v.block, `mode ${JSON.stringify(bogus)}`).toBe(expected)
+      expect(v.mode, `mode ${JSON.stringify(bogus)}`).toBe(expected ? 'armed' : 'observe')
+    }
   })
 })

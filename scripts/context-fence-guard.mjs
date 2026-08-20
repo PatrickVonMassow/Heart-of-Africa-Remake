@@ -20,6 +20,24 @@
 //      fence ends a session, it never idles one. Any internal error → ALLOW.
 //   2. `--status`: the current measurement and what a starting call would get.
 //
+// OBSERVATION MODE IS THE DEFAULT (point 758, user 20.08.2026). The fence is
+// DISARMED: it still measures, still classifies, and RECORDS every call it
+// would have refused to `.claude/context-fence-observations.jsonl` — but it
+// refuses nothing. The switch is the single named value
+// `CONTEXT_FENCE_MODE_DEFAULT` in context-watermark-core.mjs ('observe' |
+// 'armed'), overridable per session with `HOA_CONTEXT_FENCE_MODE`. It is a
+// MODE and not a threshold pushed out of reach on purpose: `--status` prints
+// the mode first and says in words that a disarmed fence refuses nothing, so
+// nobody can mistake it for an armed one that happens never to fire.
+//
+// THE TWO THRESHOLDS ARE SEPARATE since 758. This guard judges against the
+// REFUSAL threshold (`refusalTokens`); the HANDOVER threshold
+// (`triggerTokens`) is a different, higher number that the boundary and the
+// Stop-chain watermark fire on, and it stays in force in both modes — the
+// session still ends at the watermark, it is simply no longer forbidden work
+// well before the ceiling. The observation record carries both readings, which
+// is the series point 747 recalibrates from.
+//
 // WHO IT BINDS: only the batch lock's OWNER. A session that does not own
 // `.claude/batch-lock.json` has no batch to hand over and no `--prepare
 // --context` it could run, so fencing it would trap it — it passes. A paused
@@ -32,15 +50,43 @@
 // repeating the suite start is exactly what the measured session of 17.08.2026
 // did for another hour. It cannot trap: the allowed set contains the whole
 // exit (finish, board, boundary, end).
-import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { isWorktreeCheckout } from './board-first-core.mjs'
-import { gatherWatermark } from './context-watermark.mjs'
+import { fenceMode, gatherWatermark, refusalTokens, triggerTokens } from './context-watermark.mjs'
+import { watermarkDecision } from './context-watermark-core.mjs'
 import { contextFenceDecision, resolveThroughAncestors } from './context-fence-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/** WHERE OBSERVATION MODE WRITES (point 758). Git-ignored like every other
+ *  .claude runtime record — these are THIS machine's session readings. One
+ *  JSON object per line, appended; nothing reads it automatically. It is
+ *  DELIBERATELY not `.claude/context-incidents.jsonl`: that series records
+ *  BOUNDARY overshoots (point 742) and mixing a second record kind into it
+ *  would corrupt exactly the reading point 747 needs. */
+const OBSERVATIONS = resolve(REPO_ROOT, '.claude', 'context-fence-observations.jsonl')
+
+/**
+ * Record one call the fence WOULD have refused. Best-effort by construction:
+ * a guard that threw while recording would trap the session, which is the one
+ * thing this fence must never do, so every failure is swallowed.
+ */
+function recordObservation(record) {
+  try {
+    appendFileSync(OBSERVATIONS, `${JSON.stringify(record)}\n`)
+  } catch {
+    /* the measurement is worth more than the record; never trap the session */
+  }
+}
+
+/** The handover state for the SAME reading, judged against the (higher)
+ *  handover threshold — so the observation says whether the session was merely
+ *  past the refusal mark or genuinely due to hand over. */
+const handoverStateOf = (tokens) =>
+  watermarkDecision({ reading: tokens === null ? null : { tokens }, watermark: triggerTokens() })
 
 // The verify-prefix rule judges SYMLINK spellings on their resolved target
 // (Sol round 4: `verify-link -> scripts/verify` passed the lexical rule while
@@ -78,12 +124,50 @@ if (process.argv.includes('--status')) {
   const argv = process.argv.slice(2)
   const tIdx = argv.indexOf('--transcript')
   const sid = readOwnerLock()?.sessionId ?? ''
-  const wm = gatherWatermark({ transcriptPath: tIdx >= 0 ? argv[tIdx + 1] ?? '' : '', sid })
-  const starting = contextFenceDecision({ ...wm, toolName: 'Agent', resolvePath: resolveRealPath })
-  console.log(JSON.stringify({ ownerSessionId: sid || null, ...wm }, null, 2))
+  const mode = fenceMode()
+  const wm = gatherWatermark({
+    transcriptPath: tIdx >= 0 ? argv[tIdx + 1] ?? '' : '',
+    sid,
+    watermark: refusalTokens(),
+  })
+  const handover = handoverStateOf(wm.tokens)
+  const starting = contextFenceDecision({
+    ...wm,
+    mode,
+    toolName: 'Agent',
+    resolvePath: resolveRealPath,
+  })
+  console.log(
+    JSON.stringify(
+      {
+        ownerSessionId: sid || null,
+        mode,
+        armed: mode === 'armed',
+        ...wm,
+        handoverWatermark: handover.watermark,
+        handoverState: handover.state,
+      },
+      null,
+      2,
+    ),
+  )
+  // THE MODE IS SAID IN WORDS, not left to be inferred from a threshold: a
+  // disabled gate must be visible as disabled (point 758).
+  console.log(
+    mode === 'armed'
+      ? `\nfence mode: ARMED — a starting call past ${wm.watermark} tokens is REFUSED.`
+      : `\nfence mode: OBSERVE — THE FENCE IS DISARMED and refuses NOTHING. It measures against the ` +
+          `${wm.watermark}-token refusal mark and records what it would have refused to ` +
+          `.claude/context-fence-observations.jsonl. Re-arming is point 747's decision; ` +
+          `HOA_CONTEXT_FENCE_MODE=armed arms this session alone.`,
+  )
+  console.log(
+    `\nHANDOVER stays in force in BOTH modes: the boundary fires at ${handover.watermark} tokens ` +
+      `(currently ${handover.state}).`,
+  )
   console.log(
     `verdict for a STARTING call (agent spawn, browser suite, work-order/doc/memory authoring): ${
-      starting.block ? 'DENY' : 'allow'
+      starting.block ? 'DENY' : starting.observed ? 'allow (OBSERVED — an armed fence would DENY)' : 'allow'
     }`,
   )
   if (starting.block) console.log(starting.reason)
@@ -110,15 +194,40 @@ try {
   const sid = payload.session_id || ''
   const lock = readOwnerLock()
   if (!sid || !lock || lock.sessionId !== sid) process.exit(0) // not the batch owner → no fence
-  const wm = gatherWatermark({ transcriptPath: payload.transcript_path || '', sid })
+  // THE MEASUREMENT HAPPENS IN BOTH MODES — that is what observation mode IS.
+  // Judged against the REFUSAL threshold; the handover one is read beside it so
+  // the record carries both.
+  const mode = fenceMode()
+  const wm = gatherWatermark({
+    transcriptPath: payload.transcript_path || '',
+    sid,
+    watermark: refusalTokens(),
+  })
   const input = payload.tool_input ?? {}
   const verdict = contextFenceDecision({
     ...wm,
+    mode,
     toolName: payload.tool_name,
     command: input.command,
     filePath: input.file_path ?? input.notebook_path,
     resolvePath: resolveRealPath,
   })
+  if (verdict.observed) {
+    const handover = handoverStateOf(wm.tokens)
+    recordObservation({
+      at: new Date().toISOString(),
+      sessionId: sid,
+      mode,
+      refused: verdict.block,
+      tokens: wm.tokens,
+      refusalWatermark: wm.watermark,
+      handoverWatermark: handover.watermark,
+      handoverState: handover.state,
+      tool: payload.tool_name ?? null,
+      what: verdict.what,
+      authoring: verdict.authoring,
+    })
+  }
   if (verdict.block) {
     process.stdout.write(
       JSON.stringify({

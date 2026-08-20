@@ -371,7 +371,7 @@ How it works:
    later mutation is DENIED loudly (`--clear` is the deliberate way back; the
    user's own prompt still withdraws). Both refuse unless the work order
    confirms the point closed and the launcher is armed, so the session finds out
-   at the boundary rather than at a blocked turn end. The 82k CONTEXT TRIGGER
+   at the boundary rather than at a blocked turn end. The 122k HANDOVER MARK
    (150k CEILING) closes the third defeat: once measured context reaches it
    (`scripts/context-watermark.mjs`, read from the session's own transcript — an
    unobtainable reading fails loudly, never silently) the guard demands the same
@@ -380,7 +380,10 @@ How it works:
    the turn, not only at its end: a PreToolUse fence
    (`scripts/context-fence-guard.mjs`, pure core `context-fence-core.mjs`)
    measures the owner's context on every state-changing call and DENIES the
-   ones that would START a new unit of work past the mark — spawning a
+   ones that would START a new unit of work past its OWN, lower 110k REFUSAL
+   MARK (split from the handover mark by point 758: ending late is cheap, the
+   boundary still fits; refusing early forbids work a session could still do) —
+   spawning a
    delegated agent, starting a browser verify run (`npm test`, `test:small`,
    `test:large`, `run-all`/`run-logged`), delegating an author, and AUTHORING a
    work-order point, a memory or a doc section, whose refusal names the
@@ -392,6 +395,16 @@ How it works:
    and a worktree-isolated agent (whose calls carry the parent's session id
    while its own context is small), and it fails OPEN on an unreadable
    measurement — a fence may end a session early at worst, never trap one.
+   SINCE POINT 758 IT IS DISARMED BY DEFAULT, and visibly so: the mode is a
+   named switch (`CONTEXT_FENCE_MODES`, overridable with
+   `HOA_CONTEXT_FENCE_MODE`), and in the default `observe` mode the fence still
+   measures and records what it WOULD have refused
+   (`.claude/context-fence-observations.jsonl`, deliberately apart from the
+   incident series of point 742) but refuses nothing — the limits arrived
+   BEFORE the points that cut the consumption, so they stranded three fresh
+   sessions above the mark before any work of their own and forbade the very
+   documents the cutting points must edit. Re-arming is not automatic: it is a
+   condition inside point 747, once the start floor has been measured anew.
    EVERY boundary marker, point or context, additionally RECORDS the context
    reading it was taken at (`tokens`/`watermark` on the marker; null when
    honestly unmeasurable), and a commit further past the mark than the stated
