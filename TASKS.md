@@ -77,6 +77,79 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 801. THE UNIT SUITE DESTROYS THE REPOSITORY IT IS RUN IN — it force-moved `refs/heads/main`
+  to a fixture commit, set `core.bare=true` on the live checkout, and left fifteen fixture branches
+  behind (measured 20.08.2026, 23:48–23:56, on the machine running the batch).
+  THIS RANKS FIRST, AHEAD OF THE COMMUNICATION MECHANIC AND EVERYTHING ELSE: the pre-push gate runs
+  `npm run test:unit`, so EVERY push re-runs the damage, and the batch cannot land a single point
+  safely until it is fixed. It is the only defect on the list that eats the repository.
+  WHAT WAS MEASURED, in one `npm run test:unit` from `/workspace/hoa`:
+  · `.git/config` gained `core.bare=true`, after which `git status` in the live checkout answered
+    "fatal: this operation must be run in a work tree" and every guard reading the tree was blind;
+  · `refs/heads/main` was force-moved off the session's own HEAD — the reflog records
+    `branch: Reset to feat/800-boundary-card-one-rule` by `test <test@example.invalid>`, the
+    signature of a `git worktree add -B`/`branch -f` against the REAL repository — and twelve
+    fixture commits by `guard hooks test <g@test.local>` were then committed on top of `main`
+    ("add a fifth demo guard", "unrelated trunk work", …);
+  · the branch of the point being worked, `feat/800-boundary-card-one-rule`, was reset to a fixture
+    commit under a live worktree, and its worktree index came back with `.claude/agents/
+    trivial-task.md` deleted;
+  · fifteen fixture branches remain in the live repository — `clean-side`, `side`, `feat/x`,
+    `feat/403-x`, `feat/500-x`, `feat/608-x`, `feat/712-test`, `feat/900-something`,
+    `feat/agent-1`, `feat/fresh-tree`, `feat/gone`, `feat/live`, `feat/branch-bulk-gap-range`,
+    `feat/main-advanced-gap-range`, `worktree-agent-a5053e7f881a93e5b` — traced by name to
+    `scripts/guard-hooks.test.mjs`, `scripts/criticality-review-guard.test.mjs`,
+    `scripts/batch-in-flight-core.test.mjs` and `scripts/batch-doctor-states.test.mjs`. Their
+    commit dates say this has been happening all of 20.08.2026, unnoticed.
+  ONLY THE FULL SUITE DOES IT. Each suspect file run ALONE leaves the repository byte-identical
+  (`git for-each-ref` before/after, `core.bare` unchanged) — measured for `guard-hooks.test.mjs`
+  and `criticality-review-guard.test.mjs`. It is an interference under parallel load, and it is
+  therefore invisible to the ordinary "run the one file again" reflex. It also disguises itself:
+  the two red pre-push runs of 23:47 blamed `land-point-runner`, `worktree-cleanup-core`,
+  `closing-guard` and `mechanism-review-cli` with `Cannot find module …/scripts/commit-scope-guard.mjs`
+  in a `/tmp` fixture — the temp repositories had picked up the LIVE repository's
+  `core.hooksPath=scripts/git-hooks`. The next run failed somewhere else entirely. A rotating red
+  whose files change every run is the SYMPTOM here, not host load.
+  WHY IT IS NOT MERELY UNTIDY: the recovery only worked because the damage was refs and config,
+  not the working tree. The same escape reaching `git worktree remove`, `git clean` or
+  `reset --hard` takes uncommitted agent work with it — the loss CLAUDE.md's own commit-early rule
+  exists to prevent — and `git worktree` calls against the live repository are demonstrably in
+  reach, since one of them moved `main`.
+  FINAL STATE: the unit suite cannot touch the repository it runs in, and that is PROVEN rather
+  than reviewed. Every fixture git repository is created and used under a temp root; no test and no
+  script it spawns resolves the live repository when its fixture root is set; and a guard in the
+  suite itself FAILS the run if `git for-each-ref`, `.git/config` or `HEAD` of the live checkout
+  differ between the start and the end of `npm run test:unit`. Fixture temp repositories are
+  created with the live `core.hooksPath` neutralised, so a fixture commit can never execute this
+  repository's hooks.
+  VERIFIABLE: a full `npm run test:unit` from a clean checkout leaves `git for-each-ref`,
+  `.git/config` and `.git/HEAD` byte-identical, asserted by the suite's own guard rather than by
+  hand; plus a Vitest case per escaped test file that its fixture git calls carry an explicit
+  fixture root; plus a regression case that a fixture commit does not run the live hook path.
+  THE MECHANISM IS NAMED, AND IT IS NOT A RACE. The live `.git/worktrees/` held TWO registrations
+  pointing into `/tmp` — `wt -> /tmp/hoa-wt-expect-JEWNDI/wt/.git` and
+  `agent-live -> /tmp/hoa-doctor-states-UQO7N1/main/.claude/worktrees/agent-live/.git` — so
+  `git worktree add` had run against the LIVE repository with a FIXTURE path. That is the whole
+  escape: a test hands its fixture root to the script under test as a working directory, but the
+  script resolves its own root from `import.meta.url` (`scripts/closing-guard.mjs`,
+  `scripts/worktree-reminder.mjs`, `scripts/guard-inventory.mjs`, `scripts/dashboard-sync.mjs`,
+  `scripts/guard-health-guard.mjs`, `scripts/push-arrival-guard.mjs`, `scripts/batch-resume-hook.mjs`
+  and the shared `scripts/repo-paths.mjs` all do), which is always `/workspace/hoa` — so every git
+  call it makes lands in the live repository no matter what cwd the test set. `git worktree add -B`
+  is what force-moved `main` (the reflog's `branch: Reset to …` is that command's own wording), and
+  the fixture worktree the live repository then owned is why `core.bare` and the stray branches
+  appeared. It only LOOKS load-dependent: a single file run alone escapes too, but its assertions
+  happen to pass, so nothing reports it.
+  THE FIX THEREFORE HAS A SHAPE: a script must take its repository root from the environment it is
+  GIVEN — an explicit root argument or cwd — and fall back to `import.meta.url` only when nothing
+  was given. The four-eyes review of that cut belongs with the other vendor before it is written,
+  because it touches every guard's root resolution at once.
+  RELATED: the leaked branches must be removed from the live repository as part of the fix, and
+  the recovery of 20.08.2026 (core.bare reset to false, `main` and `feat/800-boundary-card-one-rule`
+  restored to `3e529c24`) is already done.
+  Criticality: HIGH — it is the only open defect that can destroy work, and it fires on every push.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 800. The boundary hands out a handover text "verbatim", and the board's own publish gate
   refuses exactly that text — at every point boundary (measured 20.08.2026, 23:32, closing 793).
   WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare 793` printed the gap-card text and
