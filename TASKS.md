@@ -4587,6 +4587,15 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: Vitest — an unasserted run never covers, an asserted one does, and
   the options default survives `null`; `scripts/closing-guard-core.mjs` carries the
   core-level step and `--status` lists it.
+  RE-MEASURED 20.08.2026 (work-order review), because it was read elsewhere as delivered
+  by the backend-verification work: it is not. Clause 1 STANDS — `runVerdict` in
+  `scripts/render-verify-core.mjs` still returns `covers: true` on `Number(run.exit) === 0`
+  alone, and `coveringRun` only ever filters on `featureLevel` when a caller passes one, so
+  the `"asserted": true` the recorder already writes into every run of
+  `.claude/render-verify-state.json` is data no gate reads. Clause 3 stands too: no
+  core-level step appears in `CLOSING_STEPS`. Struck from clause 2 is only its behaviour
+  half — the options are destructured as `options ?? {}`, so `null` no longer throws; what
+  is left of it is the Vitest pin, which covers `undefined` and not `null` today.
 
 - [ ] 518. The shutter judges its aim before the wait and never re-judges (found
   05.08.2026 while closing point 489). `captureFrame` checks that the frame's
