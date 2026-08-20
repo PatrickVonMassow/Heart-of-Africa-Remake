@@ -10133,6 +10133,10 @@ to land than a mechanism that needs a review.
   `heldByOtherLiveOwner('')` is `true`, so the status path evaluates with an EMPTY session id and
   concludes the owner is somebody else. The Stop-chain path is unaffected — it passes the real id
   and fires correctly.
+  IT IS NOT ONE GUARD. `node scripts/mechanism-review-guard.mjs --status` answers the owning
+  session with »stands down: another live session owns the batch lock« in the same breath, so the
+  defect sits in the shared status path rather than in either guard. Every `--status` reader has to
+  be checked for it, and the fix belongs where the session id is resolved, not in one caller.
   WHY IT IS NOT COSMETIC: `--status` is what CLAUDE.md §7.2 and point 614 name as the way to READ
   the bundle coverage. Asked by the very session that owns the batch, it answers with a stand-down
   instead of the count, so the reading a point is verified against cannot be taken at all.
