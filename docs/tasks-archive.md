@@ -19748,3 +19748,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the release branch's picture gate: while it stands, every turn either
   blocks or waves reds through with a deferral, which is how a real regression slips past.
   Bundle: Werkzeug.
+
+- [x] 500. The leave capture bakes a terrainless band on a slow host
+  (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
+  check on the maasai-village leave capture reads the bottom quarter of the
+  panorama backdrop as opaque 0.000 — the captured band carries no terrain at
+  all. This is NOT the fixed-wait class the triage closed: the capture fires as
+  the travel scene MOUNTS, so no amount of waiting afterwards can change what it
+  photographed. The cause named by the reading is `panoramaCaptureReady`, which
+  gates on terrain chunks being COMMITTED rather than on their being DRAWABLE —
+  on the fast Windows host the two coincide, on this one they do not.
+  FINAL STATE:
+  1. The capture gate holds until the surrounding terrain actually RENDERS, not
+     until its chunks exist. The condition is read from what the renderer draws,
+     never from a chunk count or a wall-clock allowance.
+  2. Point 227's grey-horizon symptom cannot return on a slow host: the check
+     that caught this stays, and is not weakened.
+  3. A capture that would still be unready at its deadline says so — a black or
+     terrainless band is never written silently.
+  VERIFIABLE: the `polish` leave-capture check passes three consecutive runs on
+  the container host, and the same run on the WebGPU (software) lane; the
+  captured band is inspected as a PICTURE once, not only as a number.
