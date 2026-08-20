@@ -48,6 +48,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
+| 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1313,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 20.08.2026, 06:19 · Quellen-Fingerprint: `4069e9676eb4…`
+Zuletzt aktualisiert: Donnerstag, 20.08.2026, 07:48 · Quellen-Fingerprint: `caf65cf18990…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1321,6 +1322,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Problemklasse (Memory) | Anläufe | Schwere (heuristisch) | Maßnahme (Guard-Treffer) | Status |
 |---|---|---|---|---|
 | Always use background-wait time for prep on upcoming tickets — autonomously, guaranteed by a mechanism, never on a reminder | 1 | niedrig | prep-arm-hook.mjs, prep-guard.mjs | ✔ Mechanismus |
+| An analysis over a moving set is run only when it is executed immediately in the same run — never produced and parked | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | OFFEN, attended-only: Punkt 542 scharfschalten — vier gebaute Guards hängen in keiner Hook-Kette | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
@@ -1373,7 +1375,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
-| Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 2 | mittel | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
@@ -1387,7 +1388,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | batch-doctor-states.mjs, tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 6 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1406,10 +1406,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 65 Prozess-/Meta-TASKS-Punkte (davon 29 offen).
+Erfasste Quellen: 84 Feedback-/Projekt-Memories · 54 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 65 Prozess-/Meta-TASKS-Punkte (davon 29 offen).
 
-<!-- RETRO-FINGERPRINT: 4069e9676eb458e48b4c8e08d77527d8829870c292bf527489829791503d1c49 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T04:19:33.283Z -->
+<!-- RETRO-FINGERPRINT: caf65cf18990e23abf1288165dc4a1e4207aa28e9e4fa22973ecf59a35d14d05 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-20T05:48:03.073Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -1999,3 +1999,43 @@ der eigenen Einschränkung. Drittens, beide Male hat nicht das Messen den Fehler
 sondern das Aufschreiben und das Gegenlesen durch ein Modell, das die Zahl nicht erzeugt
 hatte — ein Argument für den Cross-Vendor-Review genau dort, wo das Ergebnis am solidesten
 aussieht.
+
+### 3.134 Gestrichen, weil ein Wächter es angeblich abdeckt — geprüft hat das niemand
+
+Der Dokumentschnitt vom 19./20.08. hat Regeln nicht nur verschoben und verworfen, sondern
+eine dritte Kategorie geführt: *deckt ein Wächter ab*. Der Gedanke ist richtig — eine Regel,
+die ein Mechanismus erzwingt, muss nicht zusätzlich als Text mitgeschleppt werden, und genau
+das ist die Kernthese dieses Dokuments in ihrer nützlichsten Form. Falsch war die Ausführung:
+Für keinen einzigen dieser Einträge wurde nachgesehen, was der genannte Wächter tatsächlich
+prüft.
+
+Aufgefallen ist es an der Kopfzeile. Ein Punkt hatte die Kontextanzeige in jede Antwort
+gebracht; der Haken liefert die Zahl bis heute jede Runde. Die Anweisung, sie zu benutzen,
+stand in einer Merkdatei, deren Indexzeile als »deckt der Zeitstempel-Wächter ab« gestrichen
+wurde. Der Wächter prüft aber ausschließlich den Zeitstempel, und zwar nachweislich absichtlich
+ohne Endverankerung, damit ein Zusatz dahinter ihn nicht auslöst. Er kann das Fehlen des
+Zusatzes gar nicht bemerken. Sechs Antworten trugen danach den Stempel und keine die Zahl,
+während der Haken sie sechsmal geliefert hatte. Gefunden hat es der Nutzer, nicht wir: »Dann
+war es da und mit dem nächsten clear wieder weg.«
+
+Der Einzelfall ist billig zu heilen — die Indexzeile ist wieder da. Teuer ist die Klasse.
+Dieselbe Begründung trägt eine ganze Reihe weiterer Streichungen, allein an einer Stelle sechs
+Stück, und keine davon ist gegen ihren Wächter gehalten worden. Wir wissen deshalb bis zur
+Nachprüfung nicht, wie viele lebende Regeln der Schnitt entfernt hat. Das ist etwas anderes
+als §3.88, wo eine Regel eine Reichweite behauptete, die ihr Mechanismus nicht hatte: Dort
+stand die Regel noch da und log über sich selbst. Hier ist sie fort, und was von ihr übrig
+bleibt, ist eine Behauptung in einem Protokoll.
+
+Bemerkenswert ist auch, wie das Loch entstand: Nur der Index wird pro Sitzung geladen, die
+Merkdatei selbst blieb unversehrt und vollständig richtig. Es gab also keinen Moment, in dem
+etwas offensichtlich kaputt aussah — die Regel existierte weiter, sie wurde nur nie mehr
+gelesen. Ein Verlust, der sich als vollständiger Bestand tarnt, ist die schwerste Form.
+
+**Lehren:** Erstens, »ein Wächter deckt das ab« ist eine Messung, keine Einschätzung: Sie
+verlangt einen Blick in die Zusicherung des Wächters, und wo die Zusicherung schmaler ist als
+die Regel, wird entweder der Wächter verbreitert oder die Regel bleibt stehen. Zweitens, wer
+eine Regel aus dem geladenen Index nimmt, entfernt sie faktisch, auch wenn die Quelldatei
+liegen bleibt — die Streichung ist an der Wirkung zu bemessen, nicht am Dateibestand.
+Drittens, eine Streichkategorie, die auf einer Behauptung beruht, braucht einen Testfall, der
+die Behauptung nachrechnet; ohne den ist ein Schnitt kein Aufräumen, sondern ein Verlust mit
+Protokoll.
