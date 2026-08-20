@@ -76,37 +76,6 @@ proof text that signs it off, and the bugs that keep the user from ever reaching
 then point 633 (the closing run), then point 174 (the tag). A newly appended point of that
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
-- [ ] 761. The owner session's own floor after the document cut is still unmeasured
-  (20.08.2026, closing point 757). The cut landed and is measured where it can be counted:
-  `CLAUDE.md` fell from 786 lines / 6,585 words / 46,854 B to 332 / 2,091 / 17,255 B,
-  `MEMORY.md` from 16,801 B and 88 index lines to 5,575 B and 41, and the global `CLAUDE.md`
-  from 5,093 B to a 236 B stub. One token figure is measured too, but not the one the point
-  claims: the 39,537 recorded in `docs/document-cut-757.md` is a real reading — first assistant
-  message of transcript `ffafb607-4609-4d8c-8ac9-49fc0bd74ea4`, `2 + 21,417 + 18,118` — taken
-  from a delegated SUBAGENT in an agent worktree. The 57,970 it is set against came from a batch
-  OWNER session. A subagent carries neither the SessionStart batch-resume output nor the owner
-  runbook this very cut newly serves to the lock holder, so the two floors differ by construction
-  and their difference overstates what an owner session saves. The account already says so; what
-  is missing is the owner-side reading, which only a session started after the cut can take.
-  FINAL STATE: the first batch-owner session running on the cut documents reads its OWN first
-  assistant response from its transcript (`input_tokens + cache_read_input_tokens +
-  cache_creation_input_tokens`) and records it in `docs/document-cut-757.md` beside the pre-cut
-  57,970, with the date, the transcript path and the three summands, so a later reader can
-  re-derive it. The subagent reading stays where it is, labelled as the subagent floor: the gap
-  between the two is the useful number, because it is what the SessionStart hook and the owner
-  runbook cost, and nothing else measures that. If the owner floor misses the 55-57k target the
-  point 757 set, the shortfall is NAMED against its sources (harness system prompt, tool schemas,
-  SessionStart hook output, owner runbook) rather than written off.
-  VERIFIABLE: `docs/document-cut-757.md` carries both floors after the cut — owner and subagent
-  — each with its date, transcript path and three summands, and the owner-minus-subagent gap
-  stated once in words; and the doc-budget ceilings for `CLAUDE.md`, `MEMORY.md` and the global
-  file are confirmed against the landed files rather than the pre-merge ones.
-  Criticality: low — it writes down numbers and corrects a document; nothing it touches can break
-  the build. But it is the step that turns point 757's headline claim into a measurement of the
-  thing actually claimed, and a saving compared across two different session kinds is exactly the
-  sort of number this project has been burned by.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 762. Two document budgets have zero headroom, so the next memory blocks the guard
   (measured 20.08.2026, point 761). Confirming point 757's ceilings against the LANDED files
   found two of the three budgets in `scripts/doc-budget-core.mjs` with nothing to spare:
