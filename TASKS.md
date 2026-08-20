@@ -9882,29 +9882,33 @@ to land than a mechanism that needs a review.
   authors and revises IN PLACE never passes the switch at all, so its round count climbs past five
   with no moment at which the lane could change. The rule as built covers delegated points; the
   batch's own work, which is most of it, sits outside it.
-  FINAL STATE: the round count is checked where the rounds are RECORDED. `scripts/mechanism-review.mjs`
-  reads the point's history as it writes each verdict and refuses the next IN-PLACE revision once
-  the threshold is passed, naming the lane the point must move to — so an owner-authored point
-  meets the same rule as a commissioned one. If that is judged wrong, the alternative is honest and
-  explicit: `CLAUDE.md` §6 and the routing module both say the escalation applies to commissions
-  alone, and the batch's own points are stated as exempt. What may not stand is a rule written as
-  general whose only enforcement point most work never reaches.
-  VERIFIABLE: Vitest over the pure core — a point with five recorded unsuccessful rounds refuses a
-  sixth in-place revision with a message naming the required lane; four rounds do not; a
-  successful round resets nothing that the current rule does not already reset; and a commissioned
-  point keeps behaving exactly as it does today. One case replays point 761's five real verdicts
-  and asserts the refusal fires where it did not.
+  FINAL STATE: the round count is read where the rounds are RECORDED. `scripts/mechanism-review.mjs`
+  reads the point's history as it writes each verdict, reports the running total in its own output,
+  and refuses the next IN-PLACE revision at `SPEC_EXAMINATION_ROUND` until a spec examination is
+  recorded for that point — so an owner-authored point meets the same discipline as a commissioned
+  one. It changes NO lane and touches no routing decision; the suspension stands untouched, and a
+  later lifting of it must be a separate, deliberate act.
+  VERIFIABLE: Vitest over the pure core — recording an unsuccessful verdict returns the running
+  total; the revision at the spec-examination round is refused until the examination is recorded
+  and admitted afterwards; earlier rounds are not refused; a successful round resets nothing the
+  current rule does not already reset; and NO case routes a point to another lane, with one case
+  asserting explicitly that the suspended escalation stays suspended. One case replays point 761's
+  five real verdicts and asserts the total is reported where nothing was reported.
   CAVEAT ON THE MEASUREMENT, stated because it is the standing one: both sources see only landed
   and recorded work, so a session that produced nothing recorded is invisible to it.
-  LIKELY MOOT BEFORE IT WAS FILED — READ THIS FIRST. Minutes after this point was written, the
-  claiming session was found editing `CLAUDE.md` §6 and `scripts/author-routing-core.mjs` in the
-  shared working tree, uncommitted, to record a user ruling of 20.08.2026: Fable's escalation is
-  SUSPENDED, and only a point's own lane tag sends work there. If that lands, there is nothing
-  left for a threshold to escalate TO, and this point should be FOLDED rather than built — its
-  measurement stays valuable (an escalation rule that never once fired, and why), so fold it into
-  whichever point carries the suspension and keep the measured reason in the archive line. Only if
-  the escalation is ever restored does the defect below matter again. Decide that first; do not
-  build the refusal into a lane that no longer exists.
+  RE-CUT 20.08.2026 BY TWO RULINGS IN ONE MESSAGE, and the ORDER of them decides what this point
+  may do. The user SUSPENDED the Fable escalation (landed as `FABLE_ESCALATION_SUSPENDED` in
+  `scripts/author-routing-core.mjs`, commit 5631247f) — so counting at the source no longer has a
+  lane change to trigger, and this point MUST NOT quietly re-arm the escalation he just switched
+  off. In the same message he ruled the counting itself stays: »Die Zählung soll direkt dort
+  greifen, wo die Runden entstehen.«
+  WHAT IS LEFT IS REAL BUT SMALLER. The count moves into the path that WRITES the rounds,
+  `scripts/mechanism-review.mjs`: recording an unsuccessful verdict reports the running total for
+  that point, refuses the next in-place revision at `SPEC_EXAMINATION_ROUND` until the spec
+  examination has been recorded, and carries the decorrelating framing on every further attempt.
+  No lane changes. The value is that the number becomes VISIBLE to whoever is about to try again —
+  which is exactly what was missing when point 761 crossed five rounds this morning with nothing
+  noticing.
   Criticality: medium — no product defect, but it is an escalation rule that has never once
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
