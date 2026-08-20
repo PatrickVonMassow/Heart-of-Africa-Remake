@@ -3422,10 +3422,51 @@ put it is the mistake this line exists to stop.
   commit at 05:50 on a quiet one; the water rim's "handover zone" red once at 05:36 and green
   on its own retry. Each must come out of the sweep classified — repaired as a state check,
   or declared timing and reported UNMEASURED under load.
+  THE INVENTORY THE SWEEP STARTS FROM IS ALREADY COUNTED (carried over from point 200 on
+  20.08.2026, which measured it as Pillar-2 group E): 26 wall-clock/radius sites — 20 in
+  `enrichments`, plus `polish` 270, `settings` 183/277, `flow` 242, `voice` 56, `touch` 75 — and
+  the two patterns are named per site: a render-loop behaviour polled on the SIM clock
+  (`__pollSim`/`__sleepSim`/`simTime`) or on the check's OWN condition rather than on a fixed wall
+  wait, and "in view / beyond the ring" judged by `__camera.onScreen`/ndc projection rather than by
+  an assumed radius — a check that TESTS a radius feature keeps its radius and says so. Some of the
+  26 were fixed case by case since 21.07., which is the very drift this point exists to end: each
+  site is verified against HEAD before it is touched, each touched suite is run after its change
+  (both backends for the WebGPU-lane suites, `touch`/`voice` WebGL only), and the sweep's report
+  states how many of the 26 were already closed and by what. The fixed 1500 ms wait of point 521
+  is a member of this list and is fixed there.
+  A LANE THAT CANNOT ANSWER A CHECK SAYS SO, WITH ITS MEASURED RATE (folded in from point 506 on
+  20.08.2026). That point's four reds were taken on a SOFTWARE WebGPU lane drawing roughly one
+  frame per second, and that premise is dead here: `node scripts/verify/backend-lane-check.mjs`,
+  re-measured 20.08.2026, shows BOTH lanes hardware-backed on a real GPU, WebGPU running in
+  COMPATIBILITY mode rather than core. The mechanism survives it intact, and it is how kind 2 above
+  gets reported in practice:
+  - the run MEASURES the lane's delivered frame rate once, from the running page, and prints it in
+    the run header, so every verdict below NAMES the lane it was taken on instead of assuming one;
+  - a check whose subject is a RATE or a wall-clock budget (stance intervals per walk, a settle
+    deadline, a fixed-frame benchmark route) DECLARES the throughput it needs; below that figure it
+    SKIPS, naming the measured rate and that the lane cannot answer it, and it never reds and never
+    passes silently. That is the measured-nothing signature this removes: a check reporting a rule
+    as broken while its own reading says the rule held (`"ok":true` beside `anyMoved:false`) reads
+    as a product defect and is the worst red there is;
+  - NO product threshold moves for it — on a lane that meets the throughput the identical check
+    runs unchanged and must still fail on a real regression;
+  - the skips are COUNTED in the run summary, so a lane that skips half a suite can never be
+    mistaken for a green both-backend verification: what the §7.2 both-backend rule counts is what
+    actually RAN.
+  The checks that failed this way while the lane WAS software name the class the declaration has
+  to cover: `polish`'s goat planted foot (1 usable stance interval where it needs 3) and its dry
+  settlement-season settle (read after 60176 ms), `settings`' footstep surface class, the
+  fixed-frame `benchmark` route (`waitForFunction: Timeout 300000ms exceeded`), and `collision`'s
+  door transition and unstuck window. A lane can also HANG instead of skipping — 27 minutes with
+  no frame written, killed by hand — and while it does, a figure or settlement point has no second
+  backend at all: that merge owes a loud deferral, never a silent single-backend picture.
+
   VERIFIABLE: the sweep names every site it changed and every one it deliberately left,
   with which kind it is; the gate fails on a re-introduced two-round-trip comparison and
   passes on the fixed shape; and the throttle probe of point 640 shows 0/8 skew for each
   repaired state check that previously skewed.
+  A Vitest case pins the pure skip decision — needed against measured throughput — in both
+  directions, including that a lane which meets the throughput never skips.
   Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
   door point 640 closes from the other side.
 
@@ -4997,6 +5038,15 @@ Build order, chosen so no two parallel agents own the same file:
   fold the result into the final-closing 3× flake-free gate — this point IS
   the systematic version of the one-off de-flakes done so far (some findings
   may already be partly fixed, e.g. settings 277: verify against HEAD first).
+  NARROWED 20.08.2026: the systematic SWEEP is no longer this point's job. The inventory of the
+  26 sites and both patterns moved to point 642, which owns the sweep, the state-versus-timing
+  classification and the gate that keeps the pattern out, and which is the later user instruction
+  on exactly this subject; two points demanding one sweep is how it gets done twice or not at all.
+  Struck here is the headline mandate "fix the 26 findings". What STAYS is everything this point
+  measured that 642 does not carry: the rotating single failure of `enrichments` with its named
+  sites and their causes, the DECISION between root-causing the four staging settles and charging
+  them in the ledger, the dead ends recorded below so they are not repeated, the tripwire's
+  one-frame tolerance, and the owed quiet-machine reading of the dressing streamer.
   PROGRESS 21.07.2026: converted the six named non-enrichments waits (commit
   7ed3c56) + six enrichments family/predator/scavenge/rescue STAGING settles to
   __sleepSim (5127afa, af4533f) — all touched suites green.
