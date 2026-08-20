@@ -20,9 +20,16 @@ const SETTINGS = repoPath('.claude', 'settings.json')
 const PAUSE = repoPath('.claude', 'batch-paused')
 
 /**
- * Everything that could invoke an enforcer: the hook settings plus the contents
- * of an ACTIVE git hooks directory. An inactive hooks path contributes nothing —
- * which is the point, since that is exactly how a gate script ends up dead.
+ * Everything that could invoke an enforcer: the hook settings, the contents of an
+ * ACTIVE git hooks directory, and the test runner's own configuration. An inactive
+ * hooks path contributes nothing — which is the point, since that is exactly how a
+ * gate script ends up dead.
+ *
+ * THE RUNNER COUNTS AS A CALLER (20.08.2026). Not every enforcer is a hook:
+ * `repository-integrity-guard.mjs` is wired as Vitest `globalSetup` and reddens the
+ * whole unit run when the live repository moves under it. Reading only the hook
+ * sources called it `cannot-fire` while it was firing on every suite — the exact
+ * false accusation the comment below warns a reader not to trust.
  *
  * TWO shapes, on purpose (point 438). The BLOB answers "is this enforcer named
  * anywhere at all", where a git hook counts exactly like a settings line. The
@@ -59,6 +66,13 @@ function wiringText() {
     }
   } catch {
     /* no hooksPath configured — nothing to add */
+  }
+  for (const config of ['vitest.config.ts', 'vitest.config.mts', 'vitest.config.mjs', 'vitest.config.js']) {
+    try {
+      text += readFileSync(resolve(REPO_ROOT, config), 'utf8')
+    } catch {
+      /* this project uses one of these names, not all of them */
+    }
   }
   return { text, hooks }
 }
