@@ -371,10 +371,10 @@ function shutdown(why, code = 0) {
   try {
     if (state.childTimer) clearTimeout(state.childTimer)
     if (state.sweepTimer) clearInterval(state.sweepTimer)
-    // A responder is OURS, so an orderly stop takes it with us: the launcher
-    // stops this process precisely when the batch is paused, and leaving a
-    // headless session behind under a claim nobody holds any more is the exact
-    // orphan the pause is meant to prevent.
+    // A responder is OURS, so an orderly stop takes it with us. The launcher
+    // keeps this process through a batch pause so user mail can end that pause;
+    // any other shutdown still must not leave a headless session under a claim
+    // nobody holds any more.
     if (state.child) {
       try {
         process.kill(state.child.pid)

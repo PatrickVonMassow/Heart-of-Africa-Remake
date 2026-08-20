@@ -452,14 +452,14 @@ if (pause.state === 'retry') {
 //
 // IT GETS NO TRIGGER OF ITS OWN. The launcher already runs every
 // few minutes, at boot included, and is the one thing here that runs when
-// nothing else does — so start-at-boot, restart-after-crash and stop-on-pause
-// are three readings of the SAME line rather than three mechanisms. The decision
-// is pure (`watcherSupervision`); liveness is by pid AND start time, so a
-// recycled pid is never mistaken for the watcher and never killed as one.
+// nothing else does — so start-at-boot, restart-after-crash and listening through
+// a pause are three readings of the SAME line rather than three mechanisms. The
+// decision is pure (`watcherSupervision`); liveness is by pid AND start time, so
+// a recycled pid is never mistaken for the watcher and never killed as one.
 //
-// IT RUNS BEFORE THE PAUSE GUARD because the pause is half its job: the guard
-// below exits the tick, and the watcher would then keep answering messages on a
-// batch the user has stopped.
+// IT RUNS BEFORE THE PAUSE GUARD because user mail is the one input that can end
+// a deliberate pause. The watcher itself costs no model and starts no batch
+// work; its decision gate admits only verified mail to a bounded responder.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
   const sup = watcherSupervision({ paused: batchParked, record: rec, probe: probePid })
