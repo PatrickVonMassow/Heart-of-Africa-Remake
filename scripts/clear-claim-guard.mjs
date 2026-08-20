@@ -119,11 +119,16 @@ export function replyNotFlushed(transcript) {
     // An unparseable tail is a partial write: the flush is in progress.
     return true
   }
-  const isAssistantText =
-    last && last.type === 'assistant' && last.message && Array.isArray(last.message.content)
-      ? last.message.content.some((part) => part && part.type === 'text')
-      : false
-  return !isAssistantText
+  if (!last || last.type !== 'assistant' || !last.message || !Array.isArray(last.message.content)) {
+    return true
+  }
+  const parts = last.message.content
+  const hasText = parts.some((part) => part && part.type === 'text')
+  // A row that carries text AND a tool call is NARRATION before the call, never
+  // the final reply — the very shape that makes the extractor return an older
+  // block (cross-vendor review, 20.08.2026).
+  const hasToolUse = parts.some((part) => part && part.type === 'tool_use')
+  return !hasText || hasToolUse
 }
 
 export function textPredatesClaim(transcript, claim) {

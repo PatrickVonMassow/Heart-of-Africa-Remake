@@ -113,6 +113,9 @@ describe('invitesClear — what counts as asking the user to end the session', (
       '`Starte eine neue Sitzung` ist der Positivfall.',
       'Starte den Test für eine neue Sitzung.',
       'Positivfixture:\n```\n/clear\n```',
+      '`Mach bitte /clear`',
+      '- `Mach bitte /clear`',
+      'Start a new session fixture in the test suite.',
     ]) {
       expect(invitesClear(text), text).toBe(false)
     }
@@ -382,6 +385,30 @@ describe('the hook itself, run as the entry script', () => {
     })
     expect(other.out).toBe('')
     expect(other.status).toBe(0)
+  })
+
+  it('does not judge a narration row that carries a tool call beside its text', async () => {
+    const { transcript, claimFile } = await fixture(
+      [
+        assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z'),
+        {
+          type: 'assistant',
+          timestamp: '2026-08-20T09:00:01.000Z',
+          message: {
+            content: [
+              { type: 'text', text: 'Jetzt die Änderung.' },
+              { type: 'tool_use', id: 't1', name: 'Bash', input: {} },
+            ],
+          },
+        },
+      ],
+      { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
+    )
+    const { out } = await run({
+      payload: { session_id: SID, transcript_path: transcript },
+      claimFile,
+    })
+    expect(out).toBe('')
   })
 
   it('does not judge while the final reply is still unflushed', async () => {

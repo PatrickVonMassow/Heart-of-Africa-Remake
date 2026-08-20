@@ -95,7 +95,10 @@ export const CLEAR_INVITATION = Object.freeze([
   // English keeps no end constraint: a trailing prepositional phrase is ordinary
   // there ("… for the rest"), and the quoted-fixture case it would guard against
   // is already handled by stripping quotations and fenced code.
-  /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b/i,
+  // "session" must END the order or be followed by a preposition. Without that,
+  // "Start a new session fixture in the test suite" — an order about something
+  // else entirely — matched (cross-vendor review, 20.08.2026).
+  /^(?:please\s+)?start(?:\s+a)?\s+(?:new|fresh)\s+session\b(?=[\s.!?,;]*$|\s+(?:for|to|with|in|on|after|before|once|when|now|please)\b)/i,
 ])
 
 /**
@@ -122,6 +125,12 @@ function withoutQuotations(text) {
     .replace(/„[^“\n]*“/g, ' ')
     .replace(/»[^«\n]*«/g, ' ')
     .replace(/"[^"\n]*"/g, ' ')
+    // A backticked span that IS the whole line is a fixture being shown, not an
+    // order being given: "`Mach bitte /clear`" on its own, or as a list item.
+    // Only inline code INSIDE a sentence is unwrapped, because this project
+    // writes the command in backticks while asking for it (cross-vendor review,
+    // 20.08.2026).
+    .replace(/^(?:[-*•]\s*|\d+\.\s*)?`[^`\n]*`\s*$/gm, ' ')
     .replace(/`([^`\n]*)`/g, '$1')
 }
 
