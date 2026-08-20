@@ -104,10 +104,22 @@ put it is the mistake this line exists to stop.
   instead of stalling. The global stub is settled the same way in the same commit. Point 761
   deliberately did not raise either ceiling, because raising a budget needs a written
   justification and that justification is a decision, not a measurement.
+  THE PIN COSTS A RED RUN PER MEMORY (measured 20.08.2026, at point 761's boundary). The unit
+  case `cut-account-core.test.mjs` "quotes the landed line and word counts the guard tokenizer
+  reports" reads the LIVE `MEMORY.md` and requires the ceilings table in
+  `docs/document-cut-757.md` to match it. `MEMORY.md` lives outside the repository and gains a
+  line per memory written, so the case went red within two hours of landing — a session deleted
+  the ruled time-tracking entry and wrote a new one, 710 words became 708, and the table said
+  710. It was restated to the live reading, but the coupling stands: a test that pins a document
+  to a file no commit controls goes red on work that is entirely correct, and the next reader
+  cannot tell that from a real defect. Settle it with the budget decision — either the table
+  states a merge-day reading and the case stops measuring the live file, or the case keeps
+  measuring and the table is generated rather than hand-written.
   VERIFIABLE: every cut document has stated headroom for at least one further entry of its own
   kind, or the guard's refusal text names the entry to remove; a unit case adds an entry to each
   document at its landed size and asserts the guard's answer is the decided one rather than a
-  bare block.
+  bare block; and writing one further memory leaves the whole unit suite green without any hand
+  edit to a document table.
   Criticality: medium — nothing is red today, but it fires on the next memory written, and it
   fires inside the guard that is supposed to protect the very document being edited.
   Bundle: Session- & Repo-Hygiene.
