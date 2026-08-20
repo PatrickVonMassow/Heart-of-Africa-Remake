@@ -1616,6 +1616,12 @@ put it is the mistake this line exists to stop.
     violation") fails with `dup-in-section` only when the unnumbered card stands ALONE, and under this
     rule a numbered card always stands there while work is in flight. Point 700's clause is answered
     here rather than decided twice, and is struck from its spec in the commit that lands this.
+    The permission is bounded (recorded 20.08.2026): an unnumbered card is legitimate only while it
+    belongs to the session that HOLDS the batch lock. A card left behind by a session that died or
+    lost the batch is the separate defect of point 465 — orphan detection by session and by the
+    owner's `acquiredAt`, and the end-time estimate a now-card must carry — which this point neither
+    covers nor supersedes, and this rule may not be built so that it readmits the card that one
+    removes.
   - WHICH now-card the focus points at is decided, not left to insertion order. Measured 17.08.2026,
     with two legitimate now-cards standing (700 and 697): `board.mjs now` PREPENDS, while the focus
     reconciliation reads the FIRST card in the section — so opening a second strand silently moved the
