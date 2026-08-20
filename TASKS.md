@@ -5652,7 +5652,18 @@ Build order, chosen so no two parallel agents own the same file:
   rejected options that is not to be re-analysed, with the deletion instruction removed.
   VERIFIABLE: no runtime invariant — this is corpus hygiene. The proof is that neither memory
   names a mechanism the tree does not have; check each claim against the code that owns it.
-  Criticality: low, frequency HIGH (both texts load every session).
+  RE-MEASURED 20.08.2026 (work-order review). Struck from (a) is everything it measured:
+  `chat-timestamp` was rewritten on 20.08.2026, stands at 5.2 KB rather than 7.7, cites no
+  line numbers, names the live layers, and its index line stands in `MEMORY.md` — so the
+  reading elsewhere that the entry had been cut is wrong too. (a) SURVIVES for one
+  sentence that the rewrite left behind and the same morning overtook: the memory still
+  says `TIMESTAMP_RE` carries no `$` and a suffix therefore cannot trip the guard, while
+  `scripts/timestamp-guard-core.mjs` now enforces `HEADER_SUFFIX_RE` as well. (b) stands
+  untouched — the `pending-queue-work-29-07` index line still orders the deletion of the
+  file it describes. Two rewrites in three weeks and a fresh stale claim after each is the
+  argument for checking a memory's mechanism claims against the code, not for one fix.
+  Criticality: low, frequency HIGH — the index lines load every session, and a topic file
+  whenever a session opens it.
 
 - [ ] 607. The evidence for criterion 20 names a control count that is two dozen short
   (found while delivering point 605). `docs/acceptance-evidence.md` §20 states that the
