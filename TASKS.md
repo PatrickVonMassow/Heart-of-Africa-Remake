@@ -2211,7 +2211,11 @@ put it is the mistake this line exists to stop.
        The words therefore appear once per cycle detached from the two rocks.
      - Corroboration the world already offers: the river visibly flows, so the two
        words correlate with the current for a player who watches the water.
-  5. NOTHING IS STAGED. There is no situation catalogue any more. Every utterance
+  5. IT MUST READ AS A GAME, WHICH IS WHAT THE OLD ROUND STOPPED DOING (the user, 13.08.2026:
+     »Ich erkenne da kein Fangspiel … Das Herumschicken wirkt wie zum Selbstzweck eingeführt«).
+     A player watching must be able to read the rule without a word of explanation: who chases,
+     who is caught, and what a caught child does next. NOTHING IS STAGED. There is no situation
+     catalogue any more. Every utterance
      falls at a fixed point of the round — the opening call, the direction
      announcement, the arrival, the catcher's tap, the parting call — and not one
      of them takes a child out of the game or slows it.
@@ -2307,6 +2311,9 @@ put it is the mistake this line exists to stop.
   reduces a playing child's pace; a tagged child holds the posture and only moves
   between runs. A browser section judges the picture: both rocks in frame from the
   start line, and a player standing in the lane is walked around while play goes on.
+  The same section REPORTS, over a minute of play, the fraction of clock in which the round is
+  actually running and the number of tags in it, and FAILS when the round is not recognisable as a
+  game by those numbers — the measured form of the complaint this rebuild answers.
   Constraints:
   - Depends on the five-concept lexicon (the vocabulary point).
   - The old tag round (chaser, flight, role handover) is NOT deleted — it moves to
@@ -2319,6 +2326,7 @@ put it is the mistake this line exists to stop.
   Nutzer, 13.08.2026 22:24: »Am Fluss gibt es am einen Ende und am anderen einen großen Felsen. Die Kinder spielen "Wer hat Angst vorm weißen Hai?" … Schaffen es, rufen sie beim Ankommen ROCK. Bevor sie losrennen, kündigen sie ihre Richtung an: flussaufwärts oder flussabwärts … Wer erwischt wurde, bleibt stehen. Dann beginnt eine neue Runde mit Seitentausch und die vorher vom Fänger erwischten Spieler gehören jetzt zu seinem Team.«
   Nutzer, 13.08.2026 22:36: »Die Kinder spielen nicht permanent … Irgendwann ruft eines RIVER und zeigt auf den Fluss. Dann laufen alle dort hin und spielen das Spiel. Das Kind, das RIVER gerufen hat, ist dann zu Beginn der Fänger.«
   Nutzer, 13.08.2026 23:11: »Man sollte meinen, dass die Kinder etwas Angst/Respekt vor mir als fremder Erwachsener haben, anstatt mich fast umzurennen.«
+  Nutzer, 13.08.2026 20:51: »Beim Kinderspiel kann ich auch nichts lernen. Ich erkenne da kein Fangspiel. Für mich laufen die Kinder mehr oder weniger zufällig hin und her (wenn sie mal nicht festhängen) und werfen mit Anweisungen um sich, die dem Spiel nicht dienlich sind. Ursprünglich war es mal ein Fangspiel, bei dem einer die anderen fangen muss und der Gefangene dadurch zum Fänger wird. Durch die ganzen neuen Situationen, die zur Erklärung der Kommunikationskonzepte COME, THERE, FOLLOW, usw. hinzugekommen sind, ist das Kinderspiel völlig verwässert. Das Herumschicken wirkt wie zum Selbstzweck eingeführt und macht das Fangspiel nicht mehr erkennbar.«
   Refs: src/scenes/place/tagGame.ts, src/scenes/place/childSituations.ts, src/scenes/place/PlaceLife.tsx, src/scenes/place/lifeSpots.ts, src/scenes/place/layout.ts, src/config/balance.ts
   Bundle: Dorfleben.
 
