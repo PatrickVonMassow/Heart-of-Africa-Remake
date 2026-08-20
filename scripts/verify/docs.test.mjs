@@ -86,10 +86,11 @@ describe('checkPointers — a pointer into a section that IS there', () => {
     })
   })
 
-  it('leaves a criterion without a pointer alone — no dangling pointer is demanded', () => {
-    // Criteria 1 and 3 carry no `Evidence:` line, and the evidence document has
-    // no section for them: a criterion whose condition is already one short
-    // statement needs neither (CLAUDE.md §7.1 nos. 1, 11, 18).
+  it('does not invent a target section for a criterion omitted from this synthetic family', () => {
+    // Criteria 1 and 3 carry no `Evidence:` line in this miniature, and its
+    // synthetic evidence document has no section for them. `checkPointers`
+    // judges the pointers and target sections it receives; `pointerRules`
+    // separately refuses the disappearance of the whole family.
     const evidenceDoc = ['# evidence', '', '## 2. Two perspectives.', '', 'the proof chain', ''].join('\n')
     expect(checkPointers(section, evidenceDoc, 'Evidence', 'docs/acceptance-evidence.md')).toEqual({
       pointerCount: 1,
