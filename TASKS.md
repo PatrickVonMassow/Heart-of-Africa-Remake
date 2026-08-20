@@ -3972,6 +3972,13 @@ put it is the mistake this line exists to stop.
   read a real repository path — `.claude/`, a git-ignored path, an absolute path into the
   checkout. Existing offenders are either fixed or listed in an explicit, justified allowlist,
   so the gate starts green and cannot be "fixed" by growing that list silently.
+  ONE SHAPE THE GATE MUST CATCH BY NAME (charged here 20.08.2026 from its measured
+  instance, point 773): a root DERIVED at run time — `realpathSync(ROOT)`,
+  `git rev-parse --show-toplevel`, `import.meta.url` walked up to a checkout — is a
+  real repository path just as an absolute literal is, and it is the worse kind,
+  because the case then measures WHICH checkout it ran in and is green in the main
+  tree while red in every worktree. `scripts/cut-account-core.test.mjs` is the
+  standing example, and it stays 773's to fix; the gate is what stops the next one.
   VERIFIABLE: the gate's own tests (a compliant file passes, each forbidden shape fails, an
   allowlisted file passes with its reason present); `npm run test:unit` stays green.
   THE SAME CLASS FROM THE OTHER SIDE (measured 10.08.2026): `scripts/worktree-bootstrap.mjs`
