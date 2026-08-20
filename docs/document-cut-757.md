@@ -26,9 +26,13 @@ SessionStart batch-resume output nor the owner runbook this cut newly serves to
 the lock holder.
 
 The useful number is the gap between them: an owner session pays four thousand
-and seventy-eight tokens more than a subagent for the same documents, and that
-difference is what the SessionStart hook output and the owner runbook cost,
-because nothing else separates the two.
+and seventy-eight tokens more than a subagent for the same documents. The
+SessionStart hook output and the owner runbook are the largest known part of
+that gap and the only part this cut changed — but they are not established as
+all of it. The two sessions also differ in their first prompt and their working
+directory, and nothing here compares their harness build or tool schemas, so the
+gap is an upper bound on what the hook and the runbook cost, not a measurement
+of it.
 
 ## What the cut actually saved
 

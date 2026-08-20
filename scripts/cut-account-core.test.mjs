@@ -15,6 +15,7 @@ import {
   sessionKindOf,
   berlinDateOf,
   CUT_LANDED_AT,
+  CUT_COMMIT,
   evaluateCutAccount,
   accountDestinationFault,
   expandDestination,
@@ -23,6 +24,7 @@ import {
   wiredGuards,
 } from './cut-account-core.mjs'
 import { DOC_BUDGETS, measure } from './doc-budget-core.mjs'
+import { execFileSync } from 'node:child_process'
 
 const ROOT = resolve(process.cwd())
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
@@ -509,11 +511,29 @@ describe('docs/document-cut-757.md — the measured floors', () => {
     }
   })
 
-  // AFFIRMATIVE KIND, not a substring. Review 22d3eaa rejected the prompt marker
-  // on its own: it accepted any text mentioning batch-resume as an owner. `cwd`
-  // decides — a delegated author runs in an isolation worktree, the owner in the
-  // main checkout — and the prompt corroborates. Disagreement fails the case
-  // rather than picking a winner.
+  // THE USAGE ROW IS THE EVIDENCE. Every check below reads the SAME row the floor
+  // was taken from, because evidence spliced together out of several rows —
+  // usage here, a timestamp there, a session id somewhere else — is exactly what
+  // a fabricated transcript looks like (review 5d09ed4).
+  const usageRowOf = (r) =>
+    jsonl(fullPath(r.transcript)).find((o) => o?.type === 'assistant' && o?.message?.usage)
+
+  // Timestamps are compared as INSTANTS, never as strings: these files mix `Z`
+  // with `+02:00`, and a lexicographic sort put a stale local-offset stamp after
+  // a fresh UTC one, hiding the very row the check exists to catch.
+  const earliestInstant = (r) => {
+    const times = jsonl(fullPath(r.transcript))
+      .map((o) => o?.timestamp)
+      .filter(Boolean)
+      .map((t) => new Date(t).getTime())
+      .filter((n) => !Number.isNaN(n))
+    return times.length ? Math.min(...times) : null
+  }
+
+  // AFFIRMATIVE KIND. `cwd` must BE the repository root or lie inside its
+  // worktree directory — anything else is an unknown tree, not "the main
+  // checkout" — and the prompt must agree. Disagreement fails rather than
+  // picking a winner.
   it('takes each floor from a transcript of the kind it claims', () => {
     if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
@@ -521,47 +541,41 @@ describe('docs/document-cut-757.md — the measured floors', () => {
       expect(first, `no user message with a cwd in ${r.transcript}`).toBeTruthy()
       const c = first.message.content
       const prompt = typeof c === 'string' ? c : c.map((x) => x.text ?? '').join('\n')
-      const kind = sessionKindOf({ cwd: first.cwd, prompt })
-      expect(kind, `cwd and prompt disagree about ${r.transcript}`).not.toBeNull()
+      const kind = sessionKindOf({ cwd: first.cwd, prompt, root: ROOT })
+      expect(kind, `cwd and prompt disagree, or the tree is neither, for ${r.transcript}`).not.toBeNull()
       expect(kind, `${r.transcript} is not an ${r.kind} transcript`).toBe(r.kind)
     }
   })
 
-  // FRESHNESS. A floor evidences the cut only if its session began after the cut
-  // landed. Review 22d3eaa found the earlier case checking the written date's
-  // FORMAT and nothing else, which leaves a stale transcript passing.
-  const stampsOf = (r) =>
-    jsonl(fullPath(r.transcript))
-      .map((o) => o?.timestamp)
-      .filter(Boolean)
-      .sort()
-
   it('takes each floor from a session that began after the cut landed', () => {
     if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
-      const stamps = stampsOf(r)
-      expect(stamps.length, `no timestamps in ${r.transcript}`).toBeGreaterThan(0)
+      const earliest = earliestInstant(r)
+      expect(earliest, `no usable timestamps in ${r.transcript}`).not.toBeNull()
       expect(
-        new Date(stamps[0]).getTime(),
+        earliest,
         `${r.transcript} predates the cut — it cannot measure it`,
       ).toBeGreaterThan(new Date(CUT_LANDED_AT).getTime())
     }
   })
 
-  it('writes each floor under the date its transcript actually carries', () => {
+  it('writes each floor under the date the row it was read from carries', () => {
     if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
-      expect(berlinDateOf(stampsOf(r)[0]), `the date written for the ${r.kind} floor`).toBe(r.date)
+      const row = usageRowOf(r)
+      expect(row?.timestamp, `the usage row of ${r.transcript} carries no timestamp`).toBeTruthy()
+      expect(berlinDateOf(row.timestamp), `the date written for the ${r.kind} floor`).toBe(r.date)
     }
   })
 
-  // A copied file is still the wrong evidence: the id inside must be the name.
-  it('names each transcript by the session recorded inside it', () => {
+  // A copied or spliced file is still the wrong evidence: the id on the row the
+  // figure came from must be the id in the filename.
+  it('names each transcript by the session its usage row records', () => {
     if (!existsSync(MEMORY_DIR)) return // refused read: not the batch machine
     for (const r of readings) {
       const id = r.transcript.split('/').pop().replace(/\.jsonl$/, '')
-      const row = jsonl(fullPath(r.transcript)).find((o) => o?.sessionId)
-      expect(row?.sessionId, `${r.transcript} records a different session id`).toBe(id)
+      const row = usageRowOf(r)
+      expect(row?.sessionId, `the usage row of ${r.transcript} records a different session`).toBe(id)
     }
   })
 
@@ -623,29 +637,61 @@ describe('docs/document-cut-757.md — the ceilings table', () => {
 })
 
 describe('sessionKindOf', () => {
-  const MAIN = '/workspace/hoa'
+  const ROOT_DIR = '/workspace/hoa'
   const TREE = '/workspace/hoa/.claude/worktrees/agent-a1b2'
+  const RESUME = '[batch-resume] TASKS.md has 226 open point(s)'
 
-  it('agrees on an owner: main checkout and a batch-resume prompt', () => {
-    expect(sessionKindOf({ cwd: MAIN, prompt: 'Autonome Batch-Wiederaufnahme (…)' })).toBe('owner')
-    expect(sessionKindOf({ cwd: MAIN, prompt: '[batch-resume] TASKS.md has 226 open' })).toBe(
-      'owner',
-    )
+  it('agrees on an owner: the repository root and a batch-resume prompt', () => {
+    expect(sessionKindOf({ cwd: ROOT_DIR, prompt: 'Autonome Batch-Wiederaufnahme (…)', root: ROOT_DIR })).toBe('owner')
+    expect(sessionKindOf({ cwd: ROOT_DIR, prompt: RESUME, root: ROOT_DIR })).toBe('owner')
   })
 
-  it('agrees on a subagent: isolation worktree and an ordinary prompt', () => {
-    expect(sessionKindOf({ cwd: TREE, prompt: 'This is a measurement probe.' })).toBe('subagent')
+  it('agrees on a subagent: an isolation worktree and an ordinary prompt', () => {
+    expect(sessionKindOf({ cwd: TREE, prompt: 'A measurement probe.', root: ROOT_DIR })).toBe('subagent')
   })
 
-  // The attack the review named: a delegated transcript that merely discusses
-  // batch resume must NOT be usable as the owner floor.
-  it('refuses to guess when the worktree and the prompt disagree', () => {
-    expect(sessionKindOf({ cwd: TREE, prompt: '[batch-resume] quoted in a brief' })).toBeNull()
-    expect(sessionKindOf({ cwd: MAIN, prompt: 'a probe with no resume prompt' })).toBeNull()
+  // The attack of review 22d3eaa: a delegated transcript that merely quotes the
+  // resume prompt must not be usable as the owner floor.
+  it('refuses to guess when the tree and the prompt disagree', () => {
+    expect(sessionKindOf({ cwd: TREE, prompt: RESUME, root: ROOT_DIR })).toBeNull()
+    expect(sessionKindOf({ cwd: ROOT_DIR, prompt: 'no resume prompt here', root: ROOT_DIR })).toBeNull()
+  })
+
+  // The attack of review 5d09ed4: "not a worktree" is not "the main checkout".
+  // An unrelated directory is an UNKNOWN tree and decides nothing.
+  it('refuses a directory that is neither the root nor one of its worktrees', () => {
+    expect(sessionKindOf({ cwd: '/tmp/fake', prompt: RESUME, root: ROOT_DIR })).toBeNull()
+    expect(sessionKindOf({ cwd: '/workspace/hoa-other', prompt: RESUME, root: ROOT_DIR })).toBeNull()
+    expect(sessionKindOf({ cwd: '/workspace', prompt: RESUME, root: ROOT_DIR })).toBeNull()
+  })
+
+  it('is unmoved by a trailing slash or a redundant path segment', () => {
+    expect(sessionKindOf({ cwd: '/workspace/hoa/', prompt: RESUME, root: ROOT_DIR })).toBe('owner')
+    expect(sessionKindOf({ cwd: '/workspace/./hoa', prompt: RESUME, root: ROOT_DIR })).toBe('owner')
   })
 
   it('is total on missing input', () => {
-    expect(sessionKindOf()).toBeNull() // main-tree guess vs subagent prompt
-    expect(sessionKindOf({ cwd: TREE })).toBe('subagent')
+    expect(sessionKindOf()).toBeNull()
+    expect(sessionKindOf({ cwd: TREE })).toBeNull() // no root: no tree can be judged
+    expect(sessionKindOf({ cwd: TREE, root: ROOT_DIR })).toBe('subagent')
+  })
+})
+
+// THE CUTOFF IS BOUND TO ITS COMMIT. Self-declared, it could be moved backwards
+// to let stale evidence through with the suite still green (review 5d09ed4).
+describe('CUT_LANDED_AT', () => {
+  it('is the committer date of the commit that landed the cut', () => {
+    let iso
+    try {
+      iso = execFileSync('git', ['log', '-1', '--format=%cI', CUT_COMMIT], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      }).trim()
+    } catch {
+      return // refused read: a shallow clone cannot see the commit
+    }
+    expect(new Date(CUT_LANDED_AT).getTime()).toBe(new Date(iso).getTime())
   })
 })

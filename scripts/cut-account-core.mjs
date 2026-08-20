@@ -280,15 +280,24 @@ export function parseFloorReadings(text) {
 }
 
 /**
- * When point 757's cut landed on `main` — commit 79b6e4f, "Cut the always-loaded
- * document floor". A floor reading only evidences the cut if the session that
- * produced it began AFTER this instant; a date written by hand cannot show that,
- * and a stale transcript is exactly what checking the date's FORMAT lets through.
+ * The commit that landed point 757's cut, and its committer date. A floor reading
+ * only evidences the cut if the session that produced it began AFTER this
+ * instant; a date written by hand cannot show that, and checking the date's
+ * FORMAT — all the first version did — lets a stale transcript through.
+ *
+ * The constant is BOUND to the commit by its own test, which resolves
+ * `CUT_COMMIT` in the repository and fails if the two disagree. Without that
+ * binding the cutoff is self-declared and moving it backwards would make stale
+ * evidence pass while the suite stayed green (review 5d09ed4). A committer date
+ * is not literally the moment the ref moved, but it is the latest instant the
+ * content provably existed at, so a transcript older than it cannot have seen
+ * the cut — which is the only direction this check is used in.
  */
+export const CUT_COMMIT = '79b6e4f'
 export const CUT_LANDED_AT = '2026-08-20T02:18:59Z'
 
 /** Where a delegated author works, by this project's own isolation rule. */
-const WORKTREE_SEGMENT = '/.claude/worktrees/'
+const WORKTREE_DIR = '.claude/worktrees'
 
 /**
  * The batch-resume prompt the SessionStart path injects into the session holding
@@ -296,24 +305,44 @@ const WORKTREE_SEGMENT = '/.claude/worktrees/'
  */
 const OWNER_PROMPT_MARKERS = [/Batch-Wiederaufnahme/, /\[batch-resume\]/]
 
+const normalize = (p) => posix.normalize(String(p ?? '')).replace(/\/+$/, '')
+
+/**
+ * Which tree a working directory is, judged against the repository ROOT rather
+ * than against a substring.
+ *
+ * The substring form was rejected on review (5d09ed4): it read every path
+ * WITHOUT `/.claude/worktrees/` as the main checkout, so `/tmp/fake` passed as
+ * the owner's tree. A path that is neither the root nor inside the root's
+ * worktree directory is now neither — it is `null`, an unknown tree.
+ */
+function treeKindOf(cwd, root) {
+  const dir = normalize(cwd)
+  const base = normalize(root)
+  if (!dir || !base) return null
+  if (dir === base) return 'owner'
+  if (dir.startsWith(`${base}/${WORKTREE_DIR}/`)) return 'subagent'
+  return null
+}
+
 /**
  * Classify a transcript by TWO independent signals and require them to agree.
  *
- * `cwd` is the affirmative one: a delegated author runs in an isolation worktree
- * and the batch owner in the main checkout, which is structure rather than
- * wording. The prompt marker corroborates.
+ * The working directory is the affirmative one — a delegated author runs inside
+ * the repository's worktree directory, the batch owner in the repository root —
+ * and the prompt marker corroborates. Neither is trusted alone: the prompt by
+ * itself let any text mentioning batch-resume pass as an owner (review 22d3eaa),
+ * and a bare "not a worktree" test let any unrelated directory pass as the root
+ * (review 5d09ed4).
  *
- * The prompt ALONE was rejected on review (22d3eaa) and rightly: any text merely
- * mentioning batch-resume passed as an owner, and an owner transcript that
- * happened not to quote it passed as a subagent. Neither signal is trusted alone
- * now.
- *
- * Returns 'owner', 'subagent', or null when the two CONTRADICT each other. null
- * is not a third kind — it is a refusal to guess, and a caller that treats it as
- * a kind has put the defect back.
+ * Returns 'owner', 'subagent', or null — when the signals CONTRADICT each other,
+ * and equally when the directory is neither tree. null is not a third kind; it
+ * is a refusal to guess, and a caller that treats it as one has put the defect
+ * back.
  */
-export function sessionKindOf({ cwd, prompt } = {}) {
-  const byTree = String(cwd ?? '').includes(WORKTREE_SEGMENT) ? 'subagent' : 'owner'
+export function sessionKindOf({ cwd, prompt, root } = {}) {
+  const byTree = treeKindOf(cwd, root)
+  if (byTree === null) return null
   const byPrompt = OWNER_PROMPT_MARKERS.some((re) => re.test(String(prompt ?? '')))
     ? 'owner'
     : 'subagent'
