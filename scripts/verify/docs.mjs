@@ -45,8 +45,8 @@ export function pointerRe(keyword, doc) {
 
 /**
  * Judge one pointer family of §7.1 against the document it points into.
- * Returns { misdirected, unresolved, orphans } — each an array of readable
- * strings/numbers, all empty when the family is sound:
+ * Returns the number of pointers judged plus three arrays of readable
+ * strings/numbers, all empty when a non-empty family is sound:
  *   misdirected — a pointer standing under a criterion it does not name,
  *   unresolved  — a pointer naming a section the target document lacks,
  *   orphans     — a section in the target document that NO POINTER names.
@@ -73,10 +73,40 @@ export function checkPointers(section, target, keyword, doc) {
     if (at !== current) misdirected.push(`§${at} under criterion ${current}`)
   }
   return {
+    pointerCount: pointers.length,
     misdirected,
     unresolved: pointers.filter((n) => !sections.includes(n)),
     orphans: sections.filter((n) => !pointers.includes(n)),
   }
+}
+
+/**
+ * Turn one family's pointer judgment into the three CLI rules. Keeping this
+ * layer pure makes the fail-closed zero-pointer verdict directly testable: no
+ * rule may turn green merely because its subject disappeared.
+ */
+export function pointerRules(kind, doc, verdict) {
+  const count = verdict.pointerCount
+  const judged = `${count} ${kind} pointer${count === 1 ? '' : 's'} judged`
+  const hasPointers = count > 0
+  const noMatch = hasPointers ? '' : 'no pointers matched'
+  return [
+    {
+      name: `every ${kind} pointer names its own criterion (${judged})`,
+      ok: hasPointers && verdict.misdirected.length === 0,
+      detail: verdict.misdirected.join(', ') || noMatch,
+    },
+    {
+      name: `every ${kind} pointer has a section in ${doc} (${judged})`,
+      ok: hasPointers && verdict.unresolved.length === 0,
+      detail: verdict.unresolved.join(', ') || (hasPointers ? 'all present' : noMatch),
+    },
+    {
+      name: `no orphaned ${kind} section that no criterion points at (${judged})`,
+      ok: hasPointers && verdict.orphans.length === 0,
+      detail: verdict.orphans.join(', ') || (hasPointers ? 'none' : noMatch),
+    },
+  ]
 }
 
 function main() {
@@ -117,17 +147,7 @@ function main() {
   for (const f of families) {
     const target = readFileSync(root + f.doc, 'utf8')
     const v = checkPointers(section, target, f.keyword, f.doc)
-    check(`every ${f.kind} pointer names its own criterion`, v.misdirected.length === 0, v.misdirected.join(', '))
-    check(
-      `every pointer has a section in ${f.doc}`,
-      v.unresolved.length === 0,
-      v.unresolved.join(', ') || 'all present',
-    )
-    check(
-      `no orphaned ${f.kind} section that no criterion points at`,
-      v.orphans.length === 0,
-      v.orphans.join(', ') || 'none',
-    )
+    for (const rule of pointerRules(f.kind, f.doc, v)) check(rule.name, rule.ok, rule.detail)
   }
 
   console.log('console errors: 0')

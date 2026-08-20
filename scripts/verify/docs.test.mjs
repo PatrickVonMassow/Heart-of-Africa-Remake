@@ -5,7 +5,7 @@
 // three ways a moved criterion can rot. The live documents are checked by the
 // suite (`node scripts/verify/docs.mjs`); what is pinned here is the judgment.
 import { describe, it, expect } from 'vitest'
-import { checkPointers, criteriaSection, criterionNumbers, pointerRe, sectionNumbers } from './docs.mjs'
+import { checkPointers, criteriaSection, criterionNumbers, pointerRe, pointerRules, sectionNumbers } from './docs.mjs'
 
 const DETAIL = 'docs/acceptance-criteria-detail.md'
 
@@ -79,6 +79,7 @@ describe('pointerRe', () => {
 describe('checkPointers — a pointer into a section that IS there', () => {
   it('finds nothing to report', () => {
     expect(checkPointers(section, detailDoc, 'Detail', DETAIL)).toEqual({
+      pointerCount: 2,
       misdirected: [],
       unresolved: [],
       orphans: [],
@@ -91,6 +92,7 @@ describe('checkPointers — a pointer into a section that IS there', () => {
     // statement needs neither (CLAUDE.md §7.1 nos. 1, 11, 18).
     const evidenceDoc = ['# evidence', '', '## 2. Two perspectives.', '', 'the proof chain', ''].join('\n')
     expect(checkPointers(section, evidenceDoc, 'Evidence', 'docs/acceptance-evidence.md')).toEqual({
+      pointerCount: 1,
       misdirected: [],
       unresolved: [],
       orphans: [],
@@ -142,9 +144,28 @@ describe('checkPointers — an ORPHANED section', () => {
 
   it('is total on junk input', () => {
     expect(checkPointers(null, null, 'Detail', DETAIL)).toEqual({
+      pointerCount: 0,
       misdirected: [],
       unresolved: [],
       orphans: [],
     })
+  })
+})
+
+describe('pointerRules — the number judged is part of the verdict', () => {
+  it('makes a zero-pointer family three findings instead of three vacuous passes', () => {
+    const verdict = checkPointers(section.replaceAll(/\s+Detail:.*\n/g, '\n'), '', 'Detail', DETAIL)
+    const rules = pointerRules('detail', DETAIL, verdict)
+
+    expect(rules.map(({ ok }) => ok)).toEqual([false, false, false])
+    expect(rules.every(({ name }) => name.includes('(0 detail pointers judged)'))).toBe(true)
+    expect(rules.every(({ detail }) => detail === 'no pointers matched')).toBe(true)
+  })
+
+  it('states the non-zero pointer count on every passing rule', () => {
+    const rules = pointerRules('detail', DETAIL, checkPointers(section, detailDoc, 'Detail', DETAIL))
+
+    expect(rules.map(({ ok }) => ok)).toEqual([true, true, true])
+    expect(rules.every(({ name }) => name.includes('(2 detail pointers judged)'))).toBe(true)
   })
 })
