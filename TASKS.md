@@ -9519,31 +9519,6 @@ to land than a mechanism that needs a review.
   children red closes by a NAMED cause instead of by a retry (point 640).
   Bundle: Dorfleben.
 
-- [ ] 695. The render gate is blocked by reds nobody can read (measured 14.08.2026, 04:20, on
-  main at b4c0bc36, while closing point 666). `render-verify-guard` counts ELEVEN recorded runs
-  in its window that failed with nothing to explain them, and they belong to no work this session
-  did: `settings` on WebGPU (13.08.2026, 15:24 and 23:19-23:22, 18-19 reds each), `collision` on
-  WebGPU (3 reds), `flow` on WebGPU ("the run ended in a crash, not in its own report") and
-  `settings` on WebGL 2. Four of them carry a red that reads "103 further result line(s) exceeded
-  the capture cap — this run's reds were NOT all read". THAT ONE IS THE MECHANISM'S OWN HOLE: a
-  run whose reds were never all read can NEVER be charged, because a charge matches a red's
-  printed name and the names do not exist — so way (2) and way (3) of point 640 are both closed
-  for it, and only the loud deferral is left. It was deferred on 14.08.2026 to land point 666,
-  which is the valve working as designed and no closing at all.
-  FINAL STATE: the capture cap no longer produces an uncloseable red — a run that exceeds it
-  records enough of EVERY red to be chargeable (or refuses to record a verdict at all, which is
-  honest), and the eleven recorded reds above are each closed the way point 640 demands: cause
-  named and fixed, charged to the open point that owns it, or filed as its own point. The reds
-  that are real product defects (the WebGPU async render-pipeline console error, the TRAA/MSAA
-  path, the first-person ground micro-detail — the last already owned by point 603) are named
-  with the point that owns each.
-  VERIFIABLE: a Vitest case over the recorder proving a run past the cap still carries a
-  chargeable name for every red it reports, plus `node scripts/render-verify-guard.mjs --status`
-  showing no unexplained run in the window on a quiet machine.
-  Criticality: high — it is the release branch's picture gate: while it stands, every turn either
-  blocks or waves reds through with a deferral, which is how a real regression slips past.
-  Bundle: Werkzeug.
-
 - [ ] 696. A handed-over session kept writing, and the successor was told it was dead (measured
   14.08.2026, 07:00-07:05, while resuming point 687). The SessionStart hook told the incoming
   session "the previous owner was provably dead" and handed it the batch lock at 06:56. The
