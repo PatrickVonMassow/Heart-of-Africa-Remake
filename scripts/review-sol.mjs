@@ -359,6 +359,8 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
         authors: group.authors,
         vendor: group.vendor,
         reviewer: group.reviewer,
+        reviewerVendor: group.reviewerVendor,
+        unreviewableReason: group.unreviewableReason,
         authorshipKind: group.kind,
         rangeBase,
         rangeHead,
@@ -397,14 +399,16 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   }
   for (const pass of plan.passes ?? []) {
     lines.push(
-      `  pass ${pass.index}/${pass.total} → ${pass.reviewer || 'NO ELIGIBLE REVIEWER'}; ` +
+      `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
         `${pass.size} characters; commits ${pass.commits.map((commit) => commit.slice(0, 7)).join(', ')}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
       `    node scripts/review-sol.mjs --sha ${sha} --brief "<what to judge>" --pass ${pass.index}`,
     )
   }
   for (const group of plan.unreviewable ?? []) {
-    lines.push(`  CANNOT ASSIGN: ${group.files.map(quotePassFile).join(', ')} — every candidate authored this group`)
+    lines.push(
+      `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
+    )
   }
   lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
@@ -864,7 +868,9 @@ if (isMainModule(import.meta.url)) {
     const plan = buildAuthorshipPassPlan({ sha: full, base })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
     if (plan.unreviewable.length) {
-      console.error('review-sol: at least one pass has no eligible non-author reviewer; no round can clear it.')
+      console.error(
+        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; no round can clear it.',
+      )
       process.exit(4)
     }
     if (plan.passes.length > MAX_PASS_TOTAL) {

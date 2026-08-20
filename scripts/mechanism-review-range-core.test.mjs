@@ -51,7 +51,50 @@ describe('authorship-cut mechanism review planning', () => {
       ],
     })
     expect(plan.groups[0].reviewer).toBe('')
+    expect(plan.groups[0].reviewerVendor).toBe('')
+    expect(plan.groups[0].unreviewableReason).toMatch(/every configured reviewer vendor authored part/)
     expect(plan.unreviewable).toEqual([plan.groups[0]])
+  })
+
+  it('reports a contribution co-authored by both vendors as unreviewable', () => {
+    const plan = planAuthorshipGroups({
+      commits: [
+        {
+          sha: sha('a'),
+          authorModels: ['GPT-5.6 Sol', 'Claude Opus 5'],
+          files: ['scripts/shared-guard.mjs'],
+        },
+      ],
+    })
+    expect(plan.groups[0]).toMatchObject({
+      reviewer: '',
+      reviewerVendor: '',
+      unreviewableReason: expect.stringMatching(/every configured reviewer vendor authored part/),
+    })
+    expect(plan.unreviewable).toEqual([plan.groups[0]])
+  })
+
+  it('splits a mixed-authorship range and names the eligible vendor for each part', () => {
+    const plan = planAuthorshipGroups({
+      commits: [
+        commit('a', 'Claude Opus 5', ['scripts/claude-guard.mjs']),
+        commit('b', 'GPT-5.6 Sol', ['scripts/sol-guard.mjs']),
+      ],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({
+        vendor: 'anthropic',
+        reviewer: 'GPT-5.6 Sol',
+        reviewerVendor: 'openai',
+        files: ['scripts/claude-guard.mjs'],
+      }),
+      expect.objectContaining({
+        vendor: 'openai',
+        reviewer: 'Opus 5',
+        reviewerVendor: 'anthropic',
+        files: ['scripts/sol-guard.mjs'],
+      }),
+    ])
   })
 
   it('names missing authorship as unreviewable instead of guessing a second model', () => {
@@ -60,6 +103,8 @@ describe('authorship-cut mechanism review planning', () => {
       vendor: 'unknown',
       authors: [],
       reviewer: '',
+      reviewerVendor: '',
+      unreviewableReason: expect.stringMatching(/authorship vendor is unknown/),
       files: ['unknown-guard.mjs'],
     })
     expect(plan.unreviewable).toEqual([plan.groups[0]])

@@ -201,7 +201,9 @@ export const GUARDS = [
       const verdict = evaluateMechanismReview(inputs)
       return {
         block: verdict.block,
-        reason: verdict.deferred ? verdict.reason : formatMechanismReviewVerdict(verdict),
+        reason: verdict.deferred
+          ? verdict.reason
+          : formatMechanismReviewVerdict(verdict, { authorshipPlan: inputs.authorshipPlan }),
       }
     },
   },

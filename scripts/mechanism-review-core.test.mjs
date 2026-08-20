@@ -385,6 +385,53 @@ describe('evaluateMechanismReview', () => {
     expect(text).toMatch(/mechanism-review\.mjs --record/)
   })
 
+  it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {
+    const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [commit()], records: [] })
+    const text = formatMechanismReviewVerdict(v, {
+      authorshipPlan: {
+        unreviewable: [
+          {
+            files: ['scripts/pre-push-gate-core.mjs'],
+            unreviewableReason: 'every configured reviewer vendor authored part of this contribution',
+          },
+        ],
+      },
+    })
+    expect(text).toContain('UNREVIEWABLE')
+    expect(text).toContain('every configured reviewer vendor authored part')
+    expect(text).not.toContain('Have the OTHER model review')
+  })
+
+  it('reports mixed authorship as separately reviewable vendor groups', () => {
+    const v = evaluateMechanismReview({ baseline: 'b', head: 'h'.repeat(40), pendingCommits: [commit()], records: [] })
+    const text = formatMechanismReviewVerdict(v, {
+      authorshipPlan: {
+        groups: [
+          {
+            kind: 'files',
+            vendor: 'anthropic',
+            reviewer: 'GPT-5.6 Sol',
+            reviewerVendor: 'openai',
+            files: ['scripts/claude-guard.mjs'],
+          },
+          {
+            kind: 'files',
+            vendor: 'openai',
+            reviewer: 'Opus 5',
+            reviewerVendor: 'anthropic',
+            files: ['scripts/sol-guard.mjs'],
+          },
+        ],
+        unreviewable: [],
+      },
+    })
+    expect(text).toContain('MIXES AUTHORSHIP')
+    expect(text).toContain('anthropic-authored files → openai reviewer GPT-5.6 Sol')
+    expect(text).toContain('openai-authored files → anthropic reviewer Opus 5')
+    expect(text).toContain('review-sol.mjs --sha hhhhhhh')
+    expect(text).not.toContain('reviewing the branch head is enough')
+  })
+
   it('hands a pending cross-vendor review to the successor after the context fence closes', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',

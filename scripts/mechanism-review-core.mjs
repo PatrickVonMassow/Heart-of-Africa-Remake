@@ -1405,11 +1405,15 @@ export function evaluateMechanismReview({
 }
 
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
-export function formatMechanismReviewVerdict(verdict) {
+export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } = {}) {
   if (!verdict?.block) return ''
+  const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
+  const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
   const lines = [
-    'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
-      'second model has recorded a review of it.',
+    unreviewable.length
+      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions with no eligible reviewer vendor.'
+      : 'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
+        'second model has recorded a review of it.',
     '',
   ]
   for (const f of verdict.findings) {
@@ -1498,17 +1502,50 @@ export function formatMechanismReviewVerdict(verdict) {
           : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
     )
   }
-  lines.push(
-    '',
-    'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
-    'nobody looks again. Have the OTHER model review the change — plan and result — and',
-    'record what it said:',
-    '',
-    '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
-    '',
-    'One record covers every mechanism commit it contains, so reviewing the branch head is',
-    'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
-  )
+  if (unreviewable.length) {
+    lines.push('', 'UNREVIEWABLE contributions (none may be treated as an ordinary missing review):')
+    for (const group of unreviewable) {
+      lines.push(
+        `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
+          `${group.unreviewableReason || 'no configured reviewer vendor is eligible'}`,
+      )
+    }
+    lines.push(
+      '',
+      'No record by the configured reviewer chain can clear those contributions. Inspect the',
+      'authorship split with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else if (groups.length > 1) {
+    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these contribution groups:')
+    for (const group of groups) {
+      lines.push(
+        `  · ${group.vendor || 'unknown'}-authored ${group.kind === 'commit' ? `commit ${(group.commits ?? [''])[0].slice(0, 7)}` : 'files'} ` +
+          `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
+          `${(group.files ?? []).join(', ') || '<files unknown>'}`,
+      )
+    }
+    lines.push(
+      '',
+      'Ask the planner for the runnable pass commands; each recorded pass clears only its',
+      'listed author contribution, so the two vendors accumulate coverage without self-review:',
+      '',
+      `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
+      '',
+      'Inspect the remaining contribution debt with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else {
+    lines.push(
+      '',
+      'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
+      'nobody looks again. Have the OTHER model review the change — plan and result — and',
+      'record what it said:',
+      '',
+      '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
+      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+      '',
+      'One record covers every mechanism commit it contains, so reviewing the branch head is',
+      'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  }
   return lines.join('\n')
 }
