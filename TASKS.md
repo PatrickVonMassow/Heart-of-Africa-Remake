@@ -545,6 +545,24 @@ put it is the mistake this line exists to stop.
   ceiling to what you achieved"), so headroom cannot be banked and each document can only ratchet
   down. The slack is an absolute word count per document, never a percentage, or ordinary editing
   thrashes against it.
+  THE SECOND QUESTION THE BLIND RUN ANSWERS, carried 20.08.2026 from the split proposal that
+  preceded this point: a delegated author receives this file WHOLE and never touches the 32
+  acceptance criteria, the batch handover, the board rules, the model policy or the release
+  mechanics. So each half's keep/drop list also marks every SURVIVING line agent-facing or
+  session-only, and the merge counts what is left session-only. A split into an agent-facing core
+  and a session part is then built ONLY if that remainder still pays AFTER the cut — the earlier
+  proposal was justified by a 61.6-KB file with a ~19-KB agent core, while the whole document today
+  is 2,091 words, so the saving is measured again rather than assumed. If it is built: neither half
+  is a summary of the other, every rule lives in exactly one of them and nothing is dropped; the
+  point brief (`scripts/point-brief.mjs`) is the mechanism that delivers the core, so a builder gets
+  brief plus core; and the session part stays the full authority for a session that owns the batch,
+  so nothing about the batch, the board or a release becomes less binding.
+  A RULE THAT MOVES KEEPS ITS ENFORCEMENT, split or no split: every guard, hook or test that reads
+  `CLAUDE.md` by section is updated in the same commit, and the doc-budget entries follow what was
+  moved.
+  VERIFIABLE if the split is built: a delegated agent's prompt carries the core and not the session
+  part, `scripts/point-brief.mjs` names which document it assumes, and a test sweeps the section
+  headings so every rule of the old file is findable in exactly one half and in no two.
   VERIFIABLE: the blind-parallel run is recorded through `scripts/blind-merge.mjs` with every id
   counted, and `scripts/mechanism-review.mjs --record … --mode blind-parallel --merged-by "<model>"`
   names the merging model — a same-model fallback is recorded as weaker. Vitest in both directions
