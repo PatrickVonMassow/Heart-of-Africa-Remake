@@ -9695,3 +9695,47 @@ to land than a mechanism that needs a review.
   refusal nobody can distinguish from a real one. A guard change is a mechanism, so it needs the
   other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 763. Three of the five ruled document cuts are still standing in the documents
+  (user ruling 20.08.2026, answering the board card "Dokumentschnitt: fünf Regeln, die nur du
+  streichen kannst"; carried into the batch by the findings carrier, target point 757 which is
+  already archived, so the ruling has no open point to land in). The user answered ALL FIVE
+  held entries with "they may go". Two are already settled: U65 — the global
+  `~/.claude/CLAUDE.md` — was deleted by session d5fcb9cf on 20.08.2026 (measured today: the
+  file is gone, backup at `local/global-CLAUDE-before-deletion-20-08-2026.md`), and U48 — the
+  `[*]`/`[~]` time-tracking states — is already filed in full as OPEN point 559 and must not be
+  duplicated here. The remaining three have no owner:
+  (1) U6 — CLAUDE.md §3 still carries "If WebGPU gets stuck during the run, fall back to plain
+  WebGL and record an open item instead of blocking the run." It contradicts what has long been
+  binding: both backends are verified every LARGE round, and a stuck WebGPU is a defect to fix,
+  not an escape hatch.
+  (2) U45 part 1 — CLAUDE.md §9 still reminds the closing to confirm
+  `docs/graphics-detail-levels.md` against `QUALITY_PRESETS`. `qualityDoc.test.ts` proves that
+  on every unit run; the sentence is the user's explicit belt-and-braces and he has now released
+  it.
+  (3) U55 — CAVEAT, and this is the part a naive execution gets wrong. The card's premise (four
+  spent checkpoint memories) does not hold for all four, and the user has been told so:
+  `pending-queue-work-29-07` is genuinely spent (drained 30.07.2026; only its do-not-re-analyse
+  record remains), `audit-205-decisions` is HALF spent (208 is archived done, but its "accepted
+  as-is, do not fix" list is still live and must survive any compaction),
+  `queue-order-v02-bugfixes-only` is LIVE because point 224 is still open, and
+  `release-order-communication-first` is LIVE because 633 and 174 are both still open.
+  FINAL STATE: the two CLAUDE.md sentences are gone, each in a commit that names the user's
+  ruling and its date, so a later reader does not restore them as an accidental deletion. The
+  four memories are handled INDIVIDUALLY under the caveat: the spent one is deleted with its
+  `MEMORY.md` index line, the half-spent one is compacted down to the still-live "accepted
+  as-is" list under a description that says so, and the two LIVE ones are left untouched with a
+  one-line note of what keeps them alive (the open point that has to close first). No live rule
+  is deleted on a ruling that assumed it was spent. The board card
+  "Dokumentschnitt: fünf Regeln, die nur du streichen kannst" is removed from
+  "Von dir zu klären" in the same turn, because the question is answered and executed.
+  VERIFIABLE: a repository search finds neither the WebGPU fallback sentence nor the
+  graphics-detail-levels closing reminder anywhere in CLAUDE.md; `qualityDoc.test.ts` still
+  passes, so the removed reminder lost no coverage; `MEMORY.md` holds exactly one line per
+  surviving memory and no line for a deleted one, and the doc-budget guard stays green (the
+  change only shortens); the two live memories are byte-identical to their pre-change state
+  except for the added liveness note; and `npm run test:unit` plus `npm run lint` are green.
+  Criticality: low — documentation and memory hygiene. It matters because a rule the user has
+  explicitly released keeps binding every session that reads it, and because the naive
+  execution of this very card would delete two rules that are still in force.
+  Bundle: Session- & Repo-Hygiene.
