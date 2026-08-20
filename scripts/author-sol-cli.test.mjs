@@ -5,6 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { ledgerSnapshot, recordAuthoringCommission, restoreLedger } from './author-sol.mjs'
+import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
 const script = resolve(root, 'scripts', 'author-sol.mjs')
@@ -19,12 +20,20 @@ function ledger(rows) {
   return path
 }
 
+function fableFile() {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-author-fable-'))
+  dirs.push(dir)
+  const path = join(dir, 'fable-switch.json')
+  writeFileSync(path, JSON.stringify(writeFableState('off', { why: 'test decision', by: 'test', now: 1 })))
+  return path
+}
+
 function route(records, extra = []) {
   return spawnSync(process.execPath, [script, '--routing', '--point', point, ...extra], {
     cwd: root,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records },
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
   })
 }
 
@@ -35,7 +44,7 @@ function examine(records) {
     cwd,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records },
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
   })
 }
 
@@ -282,7 +291,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     expect(result.stdout).toContain('review record: 0 unsuccessful round(s)')
   })
 
-  it('derives N non-passing reviews and holds the lane while the escalation is suspended', () => {
+  it('derives N non-passing reviews and holds the lane while the switch refuses Fable', () => {
     const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, (_, round) => ({
       point: Number(point),
       mode: 'review',
@@ -300,7 +309,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`point ${point} → sol`)
-    expect(result.stdout).toContain('but the Fable escalation is SUSPENDED')
+    expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
     expect(result.stdout).toContain(
       `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
     )
@@ -338,9 +347,9 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
   it('accepts an explicit numeric override for history outside the ledger', () => {
     const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
-    // The override still carries the count; only the lane change is suspended.
+    // The override still carries the count; only the lane change is withheld.
     expect(result.stdout).toContain(`point ${point} → sol`)
-    expect(result.stdout).toContain('but the Fable escalation is SUSPENDED')
+    expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
   })
 
   it('turns the override immediately before the threshold into the examination step', () => {

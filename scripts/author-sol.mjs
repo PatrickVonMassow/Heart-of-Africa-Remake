@@ -40,6 +40,7 @@ import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import {
   AUTHOR_TIMEOUT_MS,
   authoringCodexArgs,
@@ -215,7 +216,7 @@ export function recordAuthoringCommission({
 }
 
 /** The lane a point belongs to, with the reasons that decided it. */
-export function laneFor(number, { override = '', reworkRounds, records } = {}) {
+export function laneFor(number, { override = '', reworkRounds, records, fableState = currentFableState() } = {}) {
   const body = pointBody(number)
   const rows = records ?? readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
   const roundHistory = authorRoundHistory(rows, number)
@@ -223,7 +224,7 @@ export function laneFor(number, { override = '', reworkRounds, records } = {}) {
   return {
     body,
     roundHistory,
-    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds }),
+    ...authorLaneFor({ body, criticality: criticalityOf(body).level, override, reworkRounds: rounds, fableState }),
   }
 }
 
@@ -453,6 +454,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     const roundsOverride = argv.includes('--rounds') ? roundsValue : undefined
+    const fableState = currentFableState()
 
     // THE ROUTING REPORT: read-only, no allowance spent, no state touched.
     if (argv.includes('--routing')) {
@@ -467,7 +469,7 @@ if (isMainModule(import.meta.url)) {
           .map((b) => {
             const roundHistory = authorRoundHistory(records, b.n)
             const reworkRounds = roundHistory.freshRounds
-            const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds })
+            const decided = authorLaneFor({ body: b.body, criticality: criticalityOf(b.body).level, reworkRounds, fableState })
             return {
               number: b.n,
               ...decided,
@@ -487,9 +489,9 @@ if (isMainModule(import.meta.url)) {
         process.exit(2)
       }
       const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-      const decided = laneFor(number, { reworkRounds: roundsOverride, records })
+      const decided = laneFor(number, { reworkRounds: roundsOverride, records, fableState })
       if (!decided.body) console.error(`author-sol: point ${number} is not in the OPEN work order — routing what is known.`)
-      console.log(`author-sol: point ${number} → ${decided.lane} (${LANE_MODEL[decided.lane]})`)
+      console.log(`author-sol: point ${number} → ${decided.lane || 'blocked'} (${decided.model || 'no model'})`)
       console.log(formatAuthorRoundHistory(decided.roundHistory))
       const step = nextAuthoringStep({ records, point: number, reworkRounds: roundsOverride })
       console.log(`  next step: ${step.kind} — ${step.reason}`)
@@ -508,7 +510,7 @@ if (isMainModule(import.meta.url)) {
     // writable feature worktree: the examiner changes no code, starts no author
     // and needs neither the point's branch nor a clean checkout.
     const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
-    const decided = laneFor(point, { reworkRounds: roundsOverride, records })
+    const decided = laneFor(point, { reworkRounds: roundsOverride, records, fableState })
     const authoringStep = nextAuthoringStep({ records, point, reworkRounds: roundsOverride })
     const readFindings = () => {
       const findingsFile = flag('--findings')

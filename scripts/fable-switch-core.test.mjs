@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FABLE_MODEL,
   SOL_MODEL,
+  fableRefusalReason,
   fableIsOn,
   isSwitchFallbackReason,
   mergeFallbackReason,
@@ -72,5 +73,12 @@ describe('decisions derived from the state', () => {
     expect(isSwitchFallbackReason(reason)).toBe(true)
     expect(isSwitchFallbackReason('Fable 5 was there')).toBe(false)
     expect(mergeFallbackReason(on())).toBe('')
+  })
+
+  it('generates the route refusal from the same record', () => {
+    expect(fableRefusalReason(off())).toBe(
+      'Fable 5 is refused because the recorded Fable switch is OFF (node scripts/fable-switch.mjs --status): not enough volume left',
+    )
+    expect(fableRefusalReason(on())).toBe('')
   })
 })

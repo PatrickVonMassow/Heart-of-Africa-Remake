@@ -107,6 +107,16 @@ export function mergeFallbackReason(value) {
   return `${FABLE_MODEL} is switched off by the recorded Fable switch (${SWITCH_COMMAND} --status): ${state.reason}`
 }
 
+/** The shared refusal text for every route that would otherwise spend Fable. */
+export function fableRefusalReason(value) {
+  const state = requireState(value)
+  if (state.state === 'on') return ''
+  return (
+    `${FABLE_MODEL} is refused because the recorded Fable switch is ${state.state.toUpperCase()} ` +
+    `(${SWITCH_COMMAND} --status): ${state.reason}`
+  )
+}
+
 /** Recognise only the form emitted above; ordinary fallback claims keep the outage rule. */
 export function isSwitchFallbackReason(reason) {
   const text = String(reason ?? '').trim()
