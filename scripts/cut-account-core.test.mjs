@@ -4,6 +4,7 @@
 // really wired hook chains, not only against synthetic input.
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import {
   ACCOUNTS,
@@ -174,13 +175,28 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     for (const e of entries) expect(ACCOUNTS).toContain(e.account)
   })
 
+  it('accounts for every executed union entry and only omits ruled-out cuts', () => {
+    const union = JSON.parse(readFileSync(resolve(ROOT, 'docs/blind-757/union.json'), 'utf8'))
+    const whollyWaiting = new Set(['U6', 'U48', 'U55', 'U65'])
+    const executed = new Set(union.entries.filter((e) => !whollyWaiting.has(e.id)).map((e) => e.id))
+    // U45 remains because its freeze half executes while its graphics-detail
+    // half waits for the user.
+    const accounted = new Set(entries.flatMap((e) => e.rule.match(/\bU\d+\b/g) ?? []))
+    expect([...accounted].sort()).toEqual([...executed].sort())
+  })
+
   it('has a real destination behind every account', () => {
     const settings = JSON.parse(readFileSync(resolve(ROOT, '.claude/settings.json'), 'utf8'))
     const files = new Set()
     for (const e of entries) {
       if (e.account !== 'MOVED') continue
       const path = e.destination.split(/\s+§|\s+#/)[0].replace(/^`|`$/g, '').trim()
-      if (existsSync(resolve(ROOT, path))) files.add(path)
+      const full = path.startsWith('~/')
+        ? resolve(homedir(), path.slice(2))
+        : path.startsWith('/')
+          ? path
+          : resolve(ROOT, path)
+      if (existsSync(full)) files.add(path)
     }
     const verdict = evaluateCutAccount(entries, { files, guards: wiredGuards(settings) })
     expect(verdict.findings.map((f) => f.why)).toEqual([])

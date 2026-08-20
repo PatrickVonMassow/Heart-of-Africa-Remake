@@ -59,8 +59,8 @@ turn's last action a batch action. The launcher and repair path are described in
 
 `scripts/author-routing-core.mjs` owns the routing cut. GPT-5.6 Sol authors the
 hard, complex, error-prone, and high-criticality points; Opus 5 authors work
-whose verification is itself the task. Fable 5 is the escalation after five
-unsuccessful review rounds. Review is cross-vendor through
+whose verification is itself the task. Fable 5 follows the escalation threshold
+stated only in `CLAUDE.md` §6. Review is cross-vendor through
 `scripts/review-sol.mjs` for Claude-authored work and Claude for Sol-authored
 work. Serving fallback order is Opus 5, Fable 5, then Opus 4.8; a different
 serving model pauses the batch.
@@ -85,6 +85,10 @@ is `CLOSING_STEPS` in `scripts/closing-guard-core.mjs` and is driven with
 
 ## Board and owner-only operating hooks
 
+- Drain waiting findings from
+  `/home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md`
+  into the work order, then run
+  `node scripts/finding.mjs --drained "<title>"`.
 - Use `scripts/board.mjs` serially; concurrent calls race on the dashboard file.
   The canonical source is `.batch-dashboard.html` at the repository root and
   `scripts/board-publish.mjs` publishes it to Pages. Its four-section structure

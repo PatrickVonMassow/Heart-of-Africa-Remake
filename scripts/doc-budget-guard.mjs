@@ -6,6 +6,7 @@
 // documents are edited during pauses, which is exactly when a check that sleeps
 // would miss the growth. Fail-OPEN on an internal error.
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 import { DOC_BUDGETS, evaluateDocBudgets, formatDocBudgetVerdict } from './doc-budget-core.mjs'
 import { TASKS_PATH } from './tasks-source.mjs'
@@ -13,11 +14,19 @@ import { isMainModule } from './is-main.mjs'
 
 const REPO_ROOT = resolve(TASKS_PATH, '..')
 
+export function docBudgetPath(budget, { repoRoot = REPO_ROOT, home = homedir() } = {}) {
+  if (budget?.location === 'project-memory') {
+    return resolve(home, '.claude', 'projects', '-workspace-hoa', 'memory', 'MEMORY.md')
+  }
+  if (budget?.location === 'user-global') return resolve(home, '.claude', 'CLAUDE.md')
+  return resolve(repoRoot, budget?.path ?? '')
+}
+
 /** The guard's I/O half, shared with the preflight (point 365 D). */
 export function gatherDocBudgetInputs() {
-  const docs = DOC_BUDGETS.map(({ path }) => {
-    const full = resolve(REPO_ROOT, path)
-    return { path, text: existsSync(full) ? readFileSync(full, 'utf8') : null }
+  const docs = DOC_BUDGETS.map((budget) => {
+    const full = docBudgetPath(budget)
+    return { path: budget.path, text: existsSync(full) ? readFileSync(full, 'utf8') : null }
   })
   return { applicable: true, inputs: { docs } }
 }
