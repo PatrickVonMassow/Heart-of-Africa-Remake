@@ -8350,12 +8350,17 @@ to land than a mechanism that needs a review.
   finder. These join 203/204/205 as the pre-tag quality framework.
 
 - [ ] 184. Pre-tag hardening — a much stronger, systematic quality pass to reach a
-  high-confidence bug-free state before the final closing run and the v0.2 tag.
+  high-confidence bug-free state.
   User decision 19.07.2026, after a cluster of elementary-functionality bugs kept
   surfacing in play (178 vultures pop in; 179 a lion tunnels through parent + calf;
   180 elephants wedge at a shore; 181 skyline fauna float; 183 animals pop into the
-  frame while driving) DESPITE point 173's quality push. Runs AFTER the individual
-  fixes 178-183 and hunts what remains.
+  frame while driving) DESPITE point 173's quality push.
+  STRUCK 20.08.2026 — THE GATE AND THE POSITION, not the method. This was written as
+  pre-tag hardening running after 178-183 and gating the v0.2 tag; 178 to 183 are all
+  archived done, `v0.2` is a shipped and frozen tag (point 663 treats it as frozen),
+  and the release in preparation is `v0.3` (point 174). So the point no longer sits
+  before a tag and gates nothing: it is a systematic hardening method that belongs to
+  the current release's closing, and point 203 carries its extension.
   EXECUTION (user-approved 19.07.2026): run 184 with ULTRACODE (multi-agent
   Workflow orchestration) on OPUS 4.8, effort HIGH — xhigh for the design/audit
   phase (the invariant-harness architecture and the five-class sweeps), high for
@@ -8423,13 +8428,14 @@ to land than a mechanism that needs a review.
   instead of projection/sim-clock. Each confirmed finding is fixed and covered by a
   Pillar-1 invariant or a pure test; a non-trivial one may become its own TASKS
   point + atomic commit; small ones fixed inline. LOG every finding.
-  MODEL MIX (user decision, 20.07.2026): run the audit sweeps with a MIX of Opus 4.8
-  AND Fable 5 agents (Workflow `opts.model: 'opus'` / `'fable'`) — NOT for a proven
-  Fable capability edge (unverified, its name hints at a different specialisation) but
-  for MODEL DIVERSITY: the code was written mostly by Opus, so a different-model auditor
-  carries different blind spots and catches what the author-model is systematically
-  blind to. Distribute the five sweeps (A-E) across both models; where budget allows,
-  double-cover a sweep with one agent of each so the two lenses overlap on the same area.
+  MODEL DIVERSITY IN THE SWEEPS (user decision 20.07.2026; its model NAMES struck
+  20.08.2026): the reason stands — the code was written mostly by one model, so a
+  different-model auditor carries different blind spots and catches what the
+  author-model is systematically blind to, and where budget allows a sweep is
+  double-covered so two lenses overlap on the same area. The named mix of Opus 4.8 and
+  Fable 5 agents is gone: CLAUDE.md §6 now routes authoring to Sol and Opus 5, gives
+  Fable 5 only lane-tagged points and the first serving fallback, and leaves Opus 4.8
+  as a serving fallback alone. Distribute the five sweeps (A-E) cross-vendor under §6.
   PILLAR 3 — an AUTOMATED WEBGPU LANE (the headless-WebGPU breakthrough,
   19.07.2026 — this replaces the old "manual checklist because headless can't do
   WebGPU"). PROVEN: WebGPU IS testable headless AND autonomously — launch SYSTEM
@@ -8601,6 +8607,15 @@ to land than a mechanism that needs a review.
   suites proven green AND flake-free on WebGPU; measure the per-launch cold-load
   cost. Updates CLAUDE §5, scripts/verify/run-all.mjs and scripts/verify/README.md;
   the suite→tier map is unchanged — each tier gains a backend dimension.
+  THE TIER DESIGN ABOVE IS DELIVERED AND IS STRUCK FROM WHAT REMAINS (verified
+  20.08.2026): `scripts/verify/tiers.mjs` carries `DEFAULT_BACKEND = 'webgpu'` with
+  `laneFor`/`WEBGL_ONLY_SUITES`, `run-all.mjs` re-invokes itself per planned backend
+  pass through `planBackends`, and CLAUDE.md §7.2 states the everyday WebGPU lane, the
+  complete WebGL 2 lane on LARGE and the touch/voice routing to WebGL 2 as settled
+  rules — so Pillar-3 items (iii) tier wiring, (iv) default flip and the touch/voice
+  question PROGRESS 6 left for the user are all closed. What is still open in Pillar 3
+  is only the three deeper findings: (c) handwriting click-to-finish, (d) the collision
+  operable chief-hut latch and (e) the polish capture-persistence.
   ACCEPTANCE: (1) the invariant suite (Pillar 1) exists, covers I1-I7 across the
   WHOLE standard-mode zoom range (0.25-0.5, both ends, NEVER a debug zoom — the
   user's binding 19.07.2026 addition specifically for 184), and is GREEN across at
@@ -8611,11 +8626,11 @@ to land than a mechanism that needs a review.
   screenshots on the REAL WebGPU backend (isWebGPUBackend asserted, no silent
   fallback) and is green, with any residual manual-only item named; (5) a written
   summary of what was
-  audited, found, fixed and the residual risk. Only THEN the final closing run,
-  then the v0.2 tag (174). Docs: quality/process point; adds a CLAUDE 7.1 verifiable
-  line for the new invariant suite and updates the CLAUDE 5/7.2 test architecture;
-  the 172/177 disciplines. (Requested 19.07.2026 — "be significantly more
-  thorough"; gates v0.2 together with 178-183.)
+  audited, found, fixed and the residual risk. Docs: quality/process point; adds a
+  CLAUDE 7.1 verifiable line for the new invariant suite and updates the CLAUDE 5/7.2
+  test architecture; the 172/177 disciplines. (Requested 19.07.2026 — "be
+  significantly more thorough". The "only THEN the v0.2 tag" ordering was struck
+  20.08.2026 with the gate above.)
   PILLAR-2 FINDING LOG (read phase complete, harvested 20.07.2026; full "why"
   texts in the workflow journal wf_716721d3-a95). 51 deduped findings; the
   agent-verify phase was stopped on the user's token concern — each finding is
