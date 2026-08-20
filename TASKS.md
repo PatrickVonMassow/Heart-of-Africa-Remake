@@ -7668,21 +7668,30 @@ Build order, chosen so no two parallel agents own the same file:
   DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
   and CLAUDE.md §7.1 pt 31 with its evidence section.
 
-- [ ] 384. Rain that touches the world — wet ground, impacts, lit drops (user 27.07.2026,
+- [ ] 384. Rain that touches the world — wet roofs and walls, impacts, lit drops (user 27.07.2026,
   after looking at the settlement rain on the deployed build: "the rain is simply painted
   over the picture — it has no effect on the optics at all"). Measured against the code,
   that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
   quads in an UNLIT `MeshBasicNodeMaterial` of one constant colour (0.66/0.72/0.8), fog
   off, depth-write off, inside a 15-unit column centred on the eye. The streaks do stand
-  in the world and are occluded by huts — but nothing else in the scene knows it is
-  raining. This point closes that gap with the three cheapest steps, in the order of
-  effect per cost; point 385 carries the two dearer ones.
-  (1) WET SURFACES — the biggest gain for the least work, and it needs no new particle.
-  A single scene-wide wetness value (the place's own `rainAmount`, already computed)
-  drives the existing materials: roughness down, albedo slightly darkened, specular
-  response up, so ground, roofs and walls go dark and glossy and the village fire
-  reflects in the wet earth. Sheltered ground is EXEMPT — work-order point 353 owns that
-  rule; this point must not fight it, so read it first and drive both from one value.
+  in the world and are occluded by huts. This point closes the remaining gap with the
+  cheapest steps, in the order of effect per cost; point 385 carries the two dearer ones.
+  STRUCK 20.08.2026 — "NOTHING ELSE IN THE SCENE KNOWS IT IS RAINING" IS NO LONGER TRUE,
+  and neither is the ground half of step (1). Verified in the code today: point 225's
+  `GROUND_WET_U` uniform in `src/render/seasonTint.ts` drives `wetGroundColor` (albedo
+  down 40 % at full soak) and `wetGroundRoughness` (roughness down 55 %), BOTH ground
+  materials read it — the travel terrain in `TravelScene.tsx` and the settlement ground
+  in `materials.ts` — and `PlaceScene.tsx` feeds it each frame from
+  `groundWetnessFactor`. The same scene also computes `skyOvercastParams` and calls
+  `setSkyOvercast` every frame, and the village fire already dims with the live wetness.
+  So the wet EARTH, its specular sheen and the overcast sky are built; what this point
+  still owes is everything above the ground.
+  (1) WET SURFACES ABOVE THE GROUND — roofs, walls and the rest of the built fabric take
+  the same wetness the earth already takes: roughness down, albedo slightly darkened,
+  specular response up, so the village fire reflects off wet thatch and daub and not only
+  off wet earth. It is driven from the SAME single value, never a second one. Sheltered
+  ground is EXEMPT — work-order point 353 owns that rule and is the spatial refinement of
+  the effect that now exists; this point must not fight it, so read it first.
   (2) THE RAIN REACHES THE GROUND, AND ARRIVES. Today the column is a fixed box around
   the head and drops recycle at its lower edge — which is why the player sees them stop
   in mid-air. A drop ends at the GROUND under it (the terrain/settlement height at its
@@ -7700,8 +7709,9 @@ Build order, chosen so no two parallel agents own the same file:
   lit drops are medium/high.
   BOTH BACKENDS, ONE PATH: TSL only, no WebGPU-only branch (CLAUDE.md §3) — the
   reverted TRAA attempt is the precedent for what a second code path costs.
-  VERIFIABLE: pure Vitest on the wetness mapping (dry → today's values, wet → the
-  darkened/glossier set, sheltered ground unchanged) and on the impact placement (a
+  VERIFIABLE: pure Vitest on the wetness mapping for the built fabric (dry → today's
+  values, wet → the darkened/glossier set, read from the same uniform the ground
+  materials already read) and on the impact placement (a
   drop's end equals the ground height under it, never the column's lower edge); the
   quality-preset completeness and doc-sync gates green; live, one first-person frame in
   the rain on BOTH backends showing wet ground and drops that arrive, judged by the
