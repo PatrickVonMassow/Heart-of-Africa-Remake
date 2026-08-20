@@ -151,9 +151,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
   das Bild entstand vor der fertigen Szene.
-  → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
-  Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
-  die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
+  → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
+  unter einer erreichbaren Bedingung geprüft wurde — und das Bild entsteht erst, wenn die
+  Darstellung steht." *(≈ 1,5x.)* *(Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
@@ -168,14 +168,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
   verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
-  echte Treffer noch da. Die Fälle erfindet das **andere Modell**, an der Mechanik gemessen statt
-  an Testnamen." *(Kosten ≈ 1,3x.)*
+  echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
   die das Werkzeug liest; oder der Schutz wirkt — nur fragt ihn ein zweiter Weg nie.
-  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, eine
-  Fähigkeit, wo jemand greift, eine Zutrittsbedingung **dort, wo zugetreten wird**. Der Test heißt
-  ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der
+  Test heißt ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -236,10 +234,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
   Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt.
-  → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** und zieh bei Kritischem **ein
-  anderes Modell** hinzu. Beim **Finden** blind parallel: gleiche Vorgabe, je ein vollständiges
-  Ergebnis; beim **Beurteilen** Gegenlesen, aber **erst das Ergebnis, dann die
-  Begründung**." *(≈ 2x)*
+  → *Prompt:* „Zieh bei Kritischem **ein anderes Modell** hinzu. Beim **Finden** blind parallel,
+  beim **Beurteilen** Gegenlesen — **erst das Ergebnis, dann die Begründung**." *(≈ 2x)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft, nicht
@@ -253,16 +249,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
-  zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
-  nichts beweisen kann.
+  zweites Modell kosten ein Vielfaches — pauschal gefordert auch dort, wo sie nichts beweisen.
   → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung wirklich abweichen kann,
   und schreib die Grenze samt Begründung in den prüfenden Code."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze**. Blockiert sie eine Ergänzung: kürzen, **zusammenführen**, auslagern — anheben
-  ist das **letzte** Mittel. Der Commit, der eine Prüfung einführt, streicht ihren Merktext."
+  Obergrenze**. Blockiert sie: kürzen, **zusammenführen**, auslagern — anheben ist das
+  **letzte** Mittel."
 
 - **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende
   passiert trotzdem nichts — dazwischen hat niemand nachgesehen.
@@ -372,14 +367,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, den sie gerade gebaut hat.** Ein frisch gelandeter
-  Prüfmechanismus feuert als Erstes gegen die eigene Arbeit — und die nächsten Stunden gehen
-  für seine Nachbesserung drauf. Von innen sieht das aus wie Fortschritt, denn es wird ja
-  gemessen, gefixt und committet.
-  → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es mir beim
-  dritten Mal. Frag dich vor jedem solchen Commit: **wäre er auch nötig, wenn dieser Wächter
-  heute nicht gelandet wäre?** Wenn nicht, geht er in einen eigenen Punkt und die
-  Warteschlange läuft weiter."
+- **Die KI repariert den Wächter, den sie gerade gebaut hat.** Er feuert zuerst gegen ihre
+  eigene Arbeit, und die Schleife sieht von innen wie Fortschritt aus.
+  → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es beim
+  dritten Mal: **wäre dieser Commit auch ohne den neuen Wächter nötig?**"
 
 ---
 
@@ -396,9 +387,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt nicht dein Kontingent,
-   sondern der **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr Fremdstoff sein
-   Kontext aufnimmt, desto schlechter urteilt er. Verlass dich nie auf „nur lesen".
+3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt der **Haupt-Agent**: bei
+   ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter
+   urteilt er. Verlass dich nie auf „nur lesen".
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
    > Arbeitskopie und führe sie erst nach `main`, wenn sie verifiziert ist — auch ein nur
    > lesender Helfer bekommt eine eigene. Teile parallele Aufgaben so auf, dass sie **nicht
