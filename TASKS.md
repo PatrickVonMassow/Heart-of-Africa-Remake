@@ -128,6 +128,14 @@ put it is the mistake this line exists to stop.
   there: `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while
   the dictated claim text is 103 words in one block — so the same prescribed text is refused twice
   over, for two unrelated reasons, and the session rewrites it a second time.
+  AND THE REWRITE IS WHAT MAKES IT BITE. `--commit` afterwards demands the card back, matched
+  against EXACT fragments in `cardProofFragments` — `Der Punkt ist abgeschlossen.` plus, for the
+  claimed-window form, the literal `Der Stapel geht NICHT an eine frische Sitzung` with that
+  capitalisation. Shortening the dictated text to fit the 90-word budget dropped the capital, and
+  the boundary then refused its own handover with "THE BOARD DOES NOT CARRY THE HANDOVER CARD".
+  So the three gates are jointly satisfiable only by a session that has read the matcher's source
+  and knows which words are load-bearing — which is exactly what "take this text verbatim" was
+  supposed to spare it.
   FINAL STATE: one rule owns the handover card's shape. Either `batch-boundary` composes the next
   point into the text it dictates — it already reads the work order and knows which point comes
   next — or the publish gate accepts an unnumbered handover card and the topic guard is taught that
@@ -138,8 +146,9 @@ put it is the mistake this line exists to stop.
   the publish gate's pure check and passes, in the ordinary form AND in the claimed-window form; a
   case asserts the dictated text names the next open point when the chosen fix is the composing
   one, or that an unnumbered handover card is accepted when it is the gate; one asserts the
-  dictated text stays inside the conciseness budget in both forms; and the topic guard still
-  rejects a foreign point reference in every OTHER card.
+  dictated text stays inside the conciseness budget in both forms AND still carries every fragment
+  `cardProofFragments` matches, so a card that passes the budget cannot fail the boundary's own
+  proof; and the topic guard still rejects a foreign point reference in every OTHER card.
   Criticality: medium — no product defect, but it taxes every point boundary of every session, and
   it makes the one card the user reads on his phone hand-written instead of dictated.
   Bundle: Session- & Repo-Hygiene.
