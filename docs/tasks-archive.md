@@ -19769,3 +19769,23 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: the `polish` leave-capture check passes three consecutive runs on
   the container host, and the same run on the WebGPU (software) lane; the
   captured band is inspected as a PICTURE once, not only as a number.
+
+- [x] 501. The compass probe pillar never reaches the panorama band
+  (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
+  orientation check reads west 0 px / east 0 px for its DEV probe pillar, while
+  the water fractions of the SAME capture became non-zero once the scene was
+  built — so the capture happens, but the pillar is not in it. The unverified
+  suspicion the triage recorded: `hasPanoramaCapture` short-circuits a
+  re-capture, so the check's `delete window.__placePanorama` clears the hook but
+  not the cached capture, and the pillar is added to a capture that is never
+  taken again.
+  FINAL STATE:
+  1. The suspicion is CONFIRMED OR REFUTED first, at the code, before anything
+     is changed — a fix built on the wrong cause is the more expensive mistake.
+  2. Either the probe reliably enters the capture it is set up for, or the
+     orientation is measured another way that does not depend on injecting
+     geometry into a cached capture. Whichever is chosen is written down with
+     its reason.
+  VERIFIABLE: the `polish` compass check passes three consecutive runs and fails
+  when the panorama orientation is deliberately inverted — a check that cannot
+  fail proves nothing.
