@@ -171,10 +171,14 @@
     "785": {
       "at": "2026-08-20T15:51:25.029Z",
       "why": "Last is right: it improves what the header REPORTS, while 764 first has to make the suffix mandatory at all — until that lands there is nothing requiring a truer value, and both edit the same header path, so they must not run in parallel anyway."
+    },
+    "786": {
+      "at": "2026-08-20T16:16:13.001Z",
+      "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first."
     }
   },
   "settled": {
-    "at": "2026-08-20T15:51:25.030Z",
+    "at": "2026-08-20T16:16:13.002Z",
     "points": [
       174,
       184,
@@ -400,7 +404,8 @@
       779,
       781,
       784,
-      785
+      785,
+      786
     ]
   }
 }

@@ -10422,3 +10422,37 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but the header is the user's only continuous view of
   the batch's dominant cost, and it lies precisely at the two moments the cost is least visible.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 786. A tick is not a delivery, and nothing in the work order tells the two apart — so every
+  throughput statement we make is wrong by roughly a factor of three (measured 20.08.2026 over
+  `git log -p` on `docs/tasks-archive.md`, window from 05:50). In those twelve hours 25 points were
+  ticked and archived. Eight were DELIVERED — carried by a commit titled `Move the finished point`,
+  seven of them merged through a `feat/` branch. Seventeen were FOLDED into another point, carried
+  by `Move a folded point`. Both leave `[x]` in `TASKS.md` and both move the block verbatim into
+  the archive, so the distinction survives in exactly one place: the commit subject.
+  WHY IT IS A DEFECT AND NOT A CURIOSITY. The user asked precisely this at point 522, and the
+  answer available to him was a tick count. A folding round removed seventeen open points in
+  seventy-eight minutes; read as throughput that is a record day, read honestly it is a re-cut of
+  the same work. The queue length moves for both reasons and therefore measures neither. The same
+  hour produced the second half of the error: a twelve-hour average of 1.5 h per point contained a
+  6 h 59 gap between two landings, while the seven landings that bracket it ran at about 28
+  minutes each — an average over a window that holds a hole reports neither the pace nor the
+  pause. Per-point cost measured by `scripts/measure-point-cost.mjs` spans 18M to 125M tokens the
+  same day, so a mean carries none of the heavy points either.
+  IT IS ALSO A REPEAT QUESTION WITH NO COMMAND (memory `forensics-need-a-command`): the answer was
+  reconstructed by hand from `git log -p` twice in one day, which is exactly the context dump that
+  rule exists to prevent.
+  FINAL STATE: one project command reports throughput from the archive's own history, split into
+  delivered and folded, per day and over a named window, and states the working-day figure rather
+  than a wall-clock average across idle time. It names the spread beside the mean wherever it
+  reports cost, so a single heavy point cannot hide inside it. Anything in the repository that
+  states a throughput or a queue-drain estimate is derived from that command rather than counted
+  by hand, and the board's own figures come from the same source.
+  VERIFIABLE: Vitest over the pure core — a fixture history of `Move the finished point` and
+  `Move a folded point` subjects yields the two counts separately and never sums them; a window
+  containing a multi-hour gap reports the working-day rate and names the gap rather than averaging
+  across it; a cost set spanning an order of magnitude reports the spread beside the mean; and a
+  replay of the real 20.08.2026 window returns 8 delivered against 17 folded.
+  Criticality: medium — no product defect, but every pace and queue statement the user reads is
+  built on the number this conflates, and he has already had to ask twice.
+  Bundle: Session- & Repo-Hygiene.
