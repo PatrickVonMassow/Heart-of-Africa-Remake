@@ -197,10 +197,27 @@ export function workOrderPoints(text) {
     .replace(/\r\n/g, '\n')
     .split('\n')
   const START = /^- \[[ x~*]\] (\d+)\. /
+  // A CHECKBOX INSIDE A FENCE IS NOT A POINT (cross-vendor review, 20.08.2026).
+  // Points quote the work order's own shape — a specimen line in a fenced block, a
+  // remedy printed as an example. Splitting on those would cut ONE oversized point
+  // into several compliant fragments, which is evasion rather than measurement, and
+  // the ceiling would report green on the very point it exists for. The fence is
+  // tracked exactly as CommonMark opens and closes one: three or more backticks or
+  // tildes at column zero, closed only by the same character.
+  const FENCE = /^(`{3,}|~{3,})/
   const out = []
   let cur = null
+  let fence = null
   for (const line of lines) {
-    const m = START.exec(line)
+    const f = FENCE.exec(line)
+    if (f) {
+      const marker = f[1][0]
+      if (fence === null) fence = marker
+      else if (fence === marker) fence = null
+      if (cur) cur.lines.push(line)
+      continue
+    }
+    const m = fence === null ? START.exec(line) : null
     if (m) {
       if (cur) out.push(cur)
       cur = { number: Number(m[1]), lines: [line] }
@@ -257,14 +274,29 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
     // The per-POINT ceiling. Measured over the whole file, not the `until` slice:
     // the preamble budget above governs the framing, this one governs the points
     // below it, and the two never overlap.
-    if (Number.isFinite(budget.perPoint?.maxWords) && budget.perPoint.maxWords > 0) {
+    // AN INVALID CEILING IS A REFUSAL, NOT A PASS (cross-vendor review, 20.08.2026).
+    // `0` is the ONE sentinel that means "measured later, judging nothing yet"; every
+    // other unusable value — a negative, a string, NaN, a typo — used to fail open and
+    // disable the ceiling silently, which is the failure this whole guard exists to
+    // prevent one layer up.
+    const cap = budget.perPoint?.maxWords
+    if (cap !== undefined && !(Number.isInteger(cap) && cap >= 0)) {
+      findings.push({
+        path: budget.path,
+        kind: 'per-point ceiling is not a whole number of words',
+        actual: String(cap),
+        budget: 'a non-negative integer (0 = not measured yet)',
+        why: 'an unusable ceiling must refuse rather than switch the check off',
+      })
+    }
+    if (Number.isInteger(cap) && cap > 0) {
       for (const point of workOrderPoints(doc.text)) {
-        if (point.words <= budget.perPoint.maxWords) continue
+        if (point.words <= cap) continue
         findings.push({
           path: budget.path,
           kind: `point ${point.number} words`,
           actual: point.words,
-          budget: budget.perPoint.maxWords,
+          budget: cap,
           why: budget.perPoint.why,
         })
       }

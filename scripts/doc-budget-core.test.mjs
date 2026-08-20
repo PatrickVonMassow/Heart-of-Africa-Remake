@@ -165,6 +165,38 @@ describe('the per-point ceiling of the work order', () => {
     expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], unset).block).toBe(false)
   })
 
+  it('does not split on a checkbox line inside a fenced block — that is evasion, not a point', () => {
+    // A point that quotes the work order's own shape must stay ONE point, or an
+    // oversized one could be cut into compliant fragments by quoting itself.
+    const text = order(
+      '- [ ] 11. ' + Array.from({ length: 12 }, (_, i) => 'w' + i).join(' '),
+      '  It prints this remedy:',
+      '  \`\`\`',
+      '  - [ ] 99. a specimen line that only looks like a point',
+      '  \`\`\`',
+      '  and then says one more thing here',
+    )
+    const points = workOrderPoints(text)
+    expect(points.map((p) => p.number)).toEqual([11])
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(true)
+  })
+
+  it('closes a fence only with its own marker, so a tilde never ends a backtick block', () => {
+    const points = workOrderPoints(
+      order('- [ ] 11. one', '\`\`\`', '~~~', '- [ ] 12. still inside the backtick fence', '\`\`\`', '- [ ] 13. out'),
+    )
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('REFUSES a ceiling that is not a whole number of words instead of switching itself off', () => {
+    for (const bad of [-1, 12.5, '20', Number.NaN]) {
+      const broken = [{ ...budget[0], perPoint: { maxWords: bad, why: 'typo' } }]
+      const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 5)) }], broken)
+      expect(verdict.block, `${String(bad)} must refuse`).toBe(true)
+      expect(verdict.findings[0].kind).toBe('per-point ceiling is not a whole number of words')
+    }
+  })
+
   it('measures the WHOLE file per point, not only the part before the preamble marker', () => {
     // The preamble budget stops at the Checklist heading; the point ceiling must not,
     // or it would judge no point at all.
