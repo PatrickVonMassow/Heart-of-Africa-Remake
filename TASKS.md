@@ -582,17 +582,28 @@ put it is the mistake this line exists to stop.
   A guard change is a mechanism, so it needs the other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 762. Two document budgets have zero headroom, so the next memory blocks the guard
+- [ ] 762. The memory index has no line of headroom, so the next memory blocks the guard
   (measured 20.08.2026, point 761). Confirming point 757's ceilings against the LANDED files
-  found two of the three budgets in `scripts/doc-budget-core.mjs` with nothing to spare:
-  `MEMORY.md` measures 46 lines / 710 words against `maxLines` 47 / `maxWords` 710, and the
-  global `CLAUDE.md` stub measures 6 lines against `maxLines` 6. `doc-budget-guard` compares
-  with `<=`, so both hold TODAY and nothing is red. The defect is what happens next: `MEMORY.md`
-  is designed to gain one index line per new memory, and at zero word headroom the very next
+  found the budgets in `scripts/doc-budget-core.mjs` with nothing to spare. `doc-budget-guard`
+  compares with `<=`, so nothing is red TODAY. The defect is what happens next: `MEMORY.md`
+  is designed to gain one index line per new memory, and with no line to spare the very next
   memory trips the guard and blocks the turn that writes it — a guard that fires on its own
   document's intended growth. The ceilings were set from PRE-MERGE readings (the code comments
   still said 45 / 700 and five lines until point 761 corrected them), so this is not drift but a
   budget never confirmed against what actually landed.
+  RE-MEASURED 20.08.2026, AND THE TRAP HAS MOVED FROM THE WORDS TO THE LINES. `MEMORY.md`
+  now reads 47 lines / 708 words by the guard's own tokenizer against `maxLines` 47 /
+  `maxWords` 710 — so the "46 lines / 710 words" this point was written against is struck, and
+  the zero headroom it names now sits on the LINE ceiling, which is exactly the axis one new
+  memory spends. The defect is unchanged and sharper.
+  THE GLOBAL STUB IS STRUCK ENTIRELY: it was never the second zero-headroom budget, because the
+  file it measures no longer exists. Verified today — `~/.claude/CLAUDE.md` is absent, its
+  backup stands at `local/global-CLAUDE-before-deletion-20-08-2026.md`, and point 763 records
+  the deletion by session d5fcb9cf on 20.08.2026. WHAT TOOK ITS PLACE AS THE SECOND HALF OF THE
+  FIX: `scripts/doc-budget-core.mjs` still carries a `global-CLAUDE.md` budget entry
+  (`location: 'user-global'`, `maxLines` 6, `maxWords` 36) with its own rationale comment, for
+  a document nothing reads any more. A budget over a deleted file is a rule nobody can trip and
+  nobody can check; it goes with the same decision.
   IT IS NOT ONLY THE CUT DOCUMENTS (measured 20.08.2026, same session). The beginner guide
   `docs/analysis_de/vibe-coding-anleitung.md` stood at EXACTLY its word budget — 3,677 of 3,677
   in `scripts/guide-brevity-guard.mjs` — so adding one pitfall of house-normal length (~55 words)
@@ -602,12 +613,14 @@ put it is the mistake this line exists to stop.
   to sit, not by the guide being full of the wrong things. Four documents now, all at or within a
   word of their ceiling, which says the ceilings were set by measuring the file and writing the
   number down rather than by deciding what the file is allowed to be.
-  FINAL STATE: the two budgets carry a DECIDED shape rather than an accident of the merge. Either
+  FINAL STATE: the `MEMORY.md` budget carries a DECIDED shape rather than an accident of the
+  merge. Either
   `MEMORY.md` gets a stated growth allowance — its purpose is one hook line per topic, so a
   ceiling with no room for one is the wrong shape, and the allowance is written as the
   justification the budget module requires — or the ceiling stays tight and
   `doc-budget-guard`'s refusal names which entry has to go, so the turn that hits it can act
-  instead of stalling. The global stub is settled the same way in the same commit. Point 761
+  instead of stalling. The dead `global-CLAUDE.md` entry is removed in the same commit, with the
+  deletion it follows named in the commit message so a later reader does not restore it. Point 761
   deliberately did not raise either ceiling, because raising a budget needs a written
   justification and that justification is a decision, not a measurement.
   THE PIN COSTS A RED RUN PER MEMORY (measured 20.08.2026, at point 761's boundary). The unit
@@ -618,11 +631,14 @@ put it is the mistake this line exists to stop.
   the ruled time-tracking entry and wrote a new one, 710 words became 708, and the table said
   710. It was restated to the live reading, but the coupling stands: a test that pins a document
   to a file no commit controls goes red on work that is entirely correct, and the next reader
-  cannot tell that from a real defect. Settle it with the budget decision — either the table
+  cannot tell that from a real defect. (Re-checked 20.08.2026: the table and the live file agree
+  at 47 lines / 708 words, so the case is green at this moment — which is the point, since
+  nothing but luck keeps it there.) Settle it with the budget decision — either the table
   states a merge-day reading and the case stops measuring the live file, or the case keeps
   measuring and the table is generated rather than hand-written.
   VERIFIABLE: every cut document has stated headroom for at least one further entry of its own
-  kind, or the guard's refusal text names the entry to remove; a unit case adds an entry to each
+  kind, or the guard's refusal text names the entry to remove; `DOC_BUDGETS` carries no entry for
+  a document that no longer exists; a unit case adds an entry to each
   document at its landed size and asserts the guard's answer is the decided one rather than a
   bare block; and writing one further memory leaves the whole unit suite green without any hand
   edit to a document table.
