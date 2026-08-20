@@ -118,6 +118,22 @@ export function evaluateCutAccount(entries, known = {}) {
   return { block: findings.length > 0, findings }
 }
 
+/**
+ * Does this destination lie OUTSIDE the repository? Two of the three cut
+ * documents live in the user's home, so a caller running on a machine without
+ * that tree — a CI runner has no `~/.claude` — cannot judge whether such a
+ * destination exists, and must not read its absence as a lost rule. A
+ * repository-relative destination is always judgeable and never external.
+ */
+export function isExternalDestination(path, root = '') {
+  const p = String(path ?? '').trim()
+  if (!p) return false
+  if (p.startsWith('~/') || p === '~') return true
+  if (!p.startsWith('/')) return false
+  const base = String(root ?? '').replace(/\/+$/, '')
+  return !base || !(p === base || p.startsWith(`${base}/`))
+}
+
 /** Every guard basename actually wired into a hook chain of the settings object. */
 export function wiredGuards(settings) {
   const names = new Set()

@@ -11,12 +11,25 @@ import {
   CUT_SOURCES,
   parseCutAccount,
   evaluateCutAccount,
+  isExternalDestination,
   wiredGuards,
 } from './cut-account-core.mjs'
 
 const ROOT = resolve(process.cwd())
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
 const MEMORY_PATH = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory', 'MEMORY.md')
+
+// Two of the three cut documents live in the USER's home, outside any checkout,
+// so a CI runner has no `~/.claude` at all and cannot see a destination that
+// points there. Judging those against the filesystem made this suite pass here
+// and fail on the runner. The split below keeps the strict check exactly where
+// it can be trusted — a repository destination is asserted everywhere, an
+// external one only on a machine that carries the user-level tree — so a typo
+// is still caught in the batch, which is where these documents are read.
+const isExternal = (path) => isExternalDestination(path, ROOT)
+const fullPath = (path) =>
+  path.startsWith('~/') ? resolve(homedir(), path.slice(2)) : path.startsWith('/') ? path : resolve(ROOT, path)
+const USER_TREE_PRESENT = existsSync(resolve(homedir(), '.claude', 'projects'))
 
 const line = (where, rule, account, dest) => `- \`${where}\` :: ${rule} :: ${account} -> ${dest}`
 
@@ -186,7 +199,23 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     expect([...accounted].sort()).toEqual([...executed].sort())
   })
 
-  it('keeps every moved memory-topic hook reachable from the index', () => {
+  it('separates a destination this checkout can judge from one it cannot', () => {
+    expect(isExternalDestination('docs/batch-owner-runbook.md', ROOT)).toBe(false)
+    expect(isExternalDestination(`${ROOT}/docs/tts-architecture.md`, ROOT)).toBe(false)
+    expect(isExternalDestination(ROOT, ROOT)).toBe(false)
+    expect(isExternalDestination('~/.claude/projects/-workspace-hoa/memory/fable-sparingly.md', ROOT)).toBe(true)
+    expect(isExternalDestination('/home/node/.claude/projects/-workspace-hoa-/memory/findings-carrier.md', ROOT)).toBe(true)
+    // A sibling directory whose name merely starts with the root's is outside it.
+    expect(isExternalDestination(`${ROOT}-other/docs/x.md`, ROOT)).toBe(true)
+    // Total on the empty and unusable cases, like the rest of this core.
+    expect(isExternalDestination('', ROOT)).toBe(false)
+    expect(isExternalDestination(undefined, ROOT)).toBe(false)
+    // Without a root nothing absolute can be placed, so it counts as external
+    // — the side that refuses to report a loss it cannot see.
+    expect(isExternalDestination('/anywhere/at/all.md')).toBe(true)
+  })
+
+  it.skipIf(!existsSync(MEMORY_PATH))('keeps every moved memory-topic hook reachable from the index', () => {
     const memory = readFileSync(MEMORY_PATH, 'utf8')
     const hooks = entries.filter(
       (e) => e.source === 'MEMORY.md' && /\bhooks?\b/i.test(e.rule) && /\/memory\/[^/]+\.md$/.test(e.destination),
@@ -204,12 +233,12 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     for (const e of entries) {
       if (e.account !== 'MOVED') continue
       const path = e.destination.split(/\s+§|\s+#/)[0].replace(/^`|`$/g, '').trim()
-      const full = path.startsWith('~/')
-        ? resolve(homedir(), path.slice(2))
-        : path.startsWith('/')
-          ? path
-          : resolve(ROOT, path)
-      if (existsSync(full)) files.add(path)
+      // An external destination counts as present where the user-level tree is
+      // absent: nothing here could tell a typo from a machine that simply has
+      // no home directory for it, and failing on the latter reports a defect
+      // that is not there.
+      const present = isExternal(path) && !USER_TREE_PRESENT ? true : existsSync(fullPath(path))
+      if (present) files.add(path)
     }
     const verdict = evaluateCutAccount(entries, { files, guards: wiredGuards(settings) })
     expect(verdict.findings.map((f) => f.why)).toEqual([])
