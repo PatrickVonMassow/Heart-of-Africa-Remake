@@ -57,10 +57,18 @@ describe('the two readers', () => {
 })
 
 describe('pointerRe', () => {
-  it('matches its own family and not the other one', () => {
+  it.each([
+    ['Detail', DETAIL],
+    ['Evidence', 'docs/acceptance-evidence.md'],
+  ])('matches bare and backticked %s paths', (keyword, doc) => {
+    const pointer = pointerRe(keyword, doc)
+    expect(`   ${keyword}: ${doc} §12.`.match(pointer)[1]).toBe('12')
+    expect(`   ${keyword}: \`${doc}\` §12.`.match(pointer)[1]).toBe('12')
+  })
+
+  it('does not cross pointer families', () => {
     const detail = pointerRe('Detail', DETAIL)
-    expect(`   Detail: ${DETAIL} §12.`.match(detail)[1]).toBe('12')
-    expect(detail.test('   Evidence: docs/acceptance-evidence.md §12.')).toBe(false)
+    expect(detail.test('   Evidence: `docs/acceptance-evidence.md` §12.')).toBe(false)
   })
 
   it('takes the document path literally — the dots are not wildcards', () => {

@@ -37,9 +37,10 @@ export function sectionNumbers(doc) {
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** `Evidence: docs/acceptance-evidence.md §12.` and its `Detail:` twin. */
+/** A bare or backticked `Evidence: docs/… §12.` and its `Detail:` twin. */
 export function pointerRe(keyword, doc) {
-  return new RegExp(`${escapeRe(keyword)}: ${escapeRe(doc)} §(\\d+)\\.`)
+  const path = escapeRe(doc)
+  return new RegExp(`${escapeRe(keyword)}: (?:${path}|\`${path}\`) §(\\d+)\\.`)
 }
 
 /**
