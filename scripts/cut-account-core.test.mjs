@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import {
   ACCOUNTS,
   CUT_SOURCES,
@@ -34,12 +34,16 @@ const fullPath = (path) => {
   const expanded = expandDestination(path, homedir())
   return expanded.startsWith('/') ? expanded : resolve(ROOT, expanded)
 }
-// Absence is evidence only where the tree could have been. A destination inside
-// a `.claude` tree this machine does not carry is unjudgeable here; anything
-// else — including an absolute path naming no such tree — must exist.
+// Absence is evidence only where the file could have been — which is its own
+// PARENT DIRECTORY, not the user tree in general. Keying on `~/.claude` made the
+// same missing destination a finding on a machine with an unrelated, partly
+// populated home and an excuse on one without it. Where the directory exists the
+// file is genuinely missing and must be reported; where it does not, this
+// machine was never going to carry it. Anything outside the user tree —
+// including a repository path — is judged unconditionally.
 const judgeable = (path) => {
   const tree = userTreeRootOf(path, homedir())
-  return !tree || existsSync(tree)
+  return !tree || existsSync(dirname(fullPath(path)))
 }
 
 const line = (where, rule, account, dest) => `- \`${where}\` :: ${rule} :: ${account} -> ${dest}`
