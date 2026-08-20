@@ -20566,3 +20566,56 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product defect, but it taxes every delegated mechanism author with a red
   suite that is not theirs.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 788. Whether Fable is used at all is a decision in one place, flipped by one command, and
+  while it stands off nothing routes there (user instruction 20.08.2026, flipped in the same
+  breath: OFF, not enough volume left).
+  WHAT EXISTS AND WHAT IS MISSING, measured against the code on `main` at 07f1ee1e. The decision
+  is a hand-set constant today: `FABLE_ESCALATION_SUSPENDED = true` in
+  `scripts/author-routing-core.mjs` suspends the AUTOMATIC escalation and nothing else. A point's
+  own `Author lane: fable` tag still routes work there, Fable still stands in the serving chain
+  the session briefing dictates (`scripts/batch-resume-hook.mjs`), in `ALLOWED_TRAILERS` and
+  `ALLOWED_MODELS_PHRASE` of the commit gate (`scripts/model-guard-core.mjs`), and as the merging
+  model of a blind-parallel stage (`scripts/blind-merge.mjs`). Flipping the decision back means
+  editing five files, and no command answers which way it currently stands — the defect the
+  suspension flag was already reviewed for.
+  FINAL STATE:
+  1. ONE place holds the state: `scripts/fable-switch-core.mjs` (pure) with the CLI
+     `scripts/fable-switch.mjs --status | --on --why "…" | --off --why "…"`, modelled on the share
+     switch, its file in the MAIN checkout so a delegated worktree reads the same state. It is
+     flipped only on the user's instruction, and the record names the state, the reason and who
+     set it.
+  2. An ABSENT or unreadable state file is read as neither on nor off: the readers fail loud and
+     name the command, because a silently-off switch and a silently-on one are both invisible
+     decisions.
+  3. Five readers DERIVE the fact rather than copy it. Authoring: the `fable` lane is refused
+     while the switch is off even where a point's own tag names it, and the refusal names the
+     switch. Serving: Fable becomes a forbidden serving model exactly as Sonnet and Haiku are —
+     the batch pauses with an alert — and its `Co-Authored-By` trailer is refused, with both
+     refusal texts generated from the switch so they cannot drift from the rule. The session
+     briefing builds its serving chain from the switch instead of naming three models by hand.
+     The four-eyes merge takes its merging model from the switch: Fable while on, GPT-5.6 Sol
+     while off, read by `scripts/blind-merge.mjs` and `scripts/mechanism-review.mjs --merged-by`.
+     CLAUDE.md §6 keeps one sentence that points at the command and states no state.
+  4. Sol is then also one of the two blind authors, so `validateMerger` admits that merge
+     DELIBERATELY as the same-model fallback §6 already knows: recorded as WEAKER, with the
+     switch as its stated reason, and the merge prompt decorrelated from the framing of Sol's own
+     half. Today that path demands the other model be named UNAVAILABLE, which a switched-off
+     model is not — it is a decision, not an outage — so the switch reason is admitted as its own
+     checkable form without weakening the absence rule for genuine outages.
+  5. No tracked document states the switch's STATE in prose. The existing single-statement test
+     for the escalation boundary grows the second sweep that enforces it, and the constant that
+     used to carry the suspension is gone rather than left standing beside its replacement.
+  6. The switch stands OFF when the point lands.
+  VERIFIABLE: Vitest over the pure core — absent, unreadable and garbled state files each fail
+  loud rather than default to a direction; the authoring cut refuses the `fable` lane while off,
+  tag and all, and names the switch; the serving allowlist and its refusal text drop Fable while
+  off and carry it while on; `mergerModel()` returns Sol while off and Fable while on;
+  `validateMerger` accepts a Sol-merged Sol/Opus stage on the switch reason while still refusing
+  a bare "the other model was there" claim; and the prose sweep finds the state stated in no
+  tracked file. Plus the CLI on the real checkout: `--status` names the state, the reason and the
+  setter, and a flip is visible to every reader in the same run.
+  Criticality: high — the user's decision is enforced nowhere: a lane tag, the serving fallback
+  and the merging role all still route to a pool the user has switched off, and each of those
+  spends an allowance that is gone.
+  Bundle: Modell & Wächter.
