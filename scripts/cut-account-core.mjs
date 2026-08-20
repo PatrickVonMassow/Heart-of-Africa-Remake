@@ -233,3 +233,139 @@ export function wiredGuards(settings) {
   }
   return names
 }
+
+/** The two session kinds whose document floor this account records. */
+export const FLOOR_KINDS = Object.freeze(['owner', 'subagent'])
+
+/**
+ * One floor reading, as the document writes it:
+ *
+ *   FLOOR <kind> :: <date> :: `<transcript path>` :: `<a> + <b> + <c> = <sum>`
+ *
+ * The reading may wrap after any `::`, which is why the shape is matched against
+ * the paragraph rather than a single line. The three summands are
+ * `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens` of
+ * the FIRST assistant message, and they are carried instead of the total alone
+ * so a later reader can re-derive the number from the named transcript rather
+ * than trust it. A sum that does not add up is the one failure this parser
+ * cannot excuse: it is what a copied-over figure looks like.
+ */
+const FLOOR_RE =
+  /FLOOR\s+([a-z]+)\s*::\s*([\d.]+)\s*::\s*`([^`]+)`\s*::\s*`\s*([\d,]+)\s*\+\s*([\d,]+)\s*\+\s*([\d,]+)\s*=\s*([\d,]+)\s*`/g
+
+const num = (s) => Number(String(s).replace(/,/g, ''))
+
+/**
+ * Parse the floor readings out of the account document. Each carries its kind,
+ * date, transcript path, three summands and stated total, plus whether the
+ * summands actually add to that total.
+ */
+export function parseFloorReadings(text) {
+  const readings = []
+  for (const m of String(text ?? '').matchAll(FLOOR_RE)) {
+    const [, kind, date, transcript, a, b, c] = m
+    const summands = [num(a), num(b), num(c)]
+    const stated = num(m[7])
+    readings.push({
+      kind,
+      date,
+      transcript,
+      summands,
+      stated,
+      total: summands.reduce((x, y) => x + y, 0),
+      adds: summands.reduce((x, y) => x + y, 0) === stated,
+    })
+  }
+  return readings
+}
+
+/**
+ * The commit that landed point 757's cut, and its committer date.
+ *
+ * WHAT THIS BOUNDS, precisely, because the earlier comment overstated it: a
+ * committer date is metadata the committer writes, so it is neither the moment
+ * the commit was created nor the moment `main` came to contain it. What the
+ * check uses it for is one direction only — a transcript that began BEFORE this
+ * instant cannot have run on the cut documents — and for that it is sound as
+ * long as the date is not backdated. It is bound to `CUT_COMMIT` by its own
+ * test, so it cannot be quietly moved backwards to admit stale evidence
+ * (review 5d09ed4).
+ *
+ * RESIDUAL, named rather than papered over: if the commit were backdated, or if
+ * it sat unmerged for a while, a transcript between the real landing and this
+ * timestamp would pass. Nothing in a git checkout records when a ref moved —
+ * the reflog is local and not durable — so this cannot be closed from here. The
+ * two readings the account carries are about ninety minutes clear of it, so the
+ * residual does not touch them.
+ */
+export const CUT_COMMIT = '79b6e4f'
+export const CUT_LANDED_AT = '2026-08-20T02:18:59Z'
+
+/** Where a delegated author works, by this project's own isolation rule. */
+const WORKTREE_DIR = '.claude/worktrees'
+
+/**
+ * The batch-resume prompt the SessionStart path injects into the session holding
+ * the batch lock, in either form it is printed in.
+ */
+const OWNER_PROMPT_MARKERS = [/Batch-Wiederaufnahme/, /\[batch-resume\]/]
+
+const normalize = (p) => posix.normalize(String(p ?? '')).replace(/\/+$/, '')
+
+/**
+ * Which tree a working directory is, judged against the repository ROOT rather
+ * than against a substring.
+ *
+ * The substring form was rejected on review (5d09ed4): it read every path
+ * WITHOUT `/.claude/worktrees/` as the main checkout, so `/tmp/fake` passed as
+ * the owner's tree. A path that is neither the root nor inside the root's
+ * worktree directory is now neither — it is `null`, an unknown tree.
+ */
+function treeKindOf(cwd, root) {
+  const dir = normalize(cwd)
+  const base = normalize(root)
+  // ABSOLUTE ONLY. Two matching relative paths are not evidence of the same
+  // directory — `a` and `a` resolve against whatever happened to be the working
+  // directory — and accepting them made the owner verdict depend on where the
+  // caller stood (review 82e9ae0).
+  if (!dir.startsWith('/') || !base.startsWith('/')) return null
+  if (dir === base) return 'owner'
+  if (dir.startsWith(`${base}/${WORKTREE_DIR}/`)) return 'subagent'
+  return null
+}
+
+/**
+ * Classify a transcript by TWO independent signals and require them to agree.
+ *
+ * The working directory is the affirmative one — a delegated author runs inside
+ * the repository's worktree directory, the batch owner in the repository root —
+ * and the prompt marker corroborates. Neither is trusted alone: the prompt by
+ * itself let any text mentioning batch-resume pass as an owner (review 22d3eaa),
+ * and a bare "not a worktree" test let any unrelated directory pass as the root
+ * (review 5d09ed4).
+ *
+ * Returns 'owner', 'subagent', or null — when the signals CONTRADICT each other,
+ * and equally when the directory is neither tree. null is not a third kind; it
+ * is a refusal to guess, and a caller that treats it as one has put the defect
+ * back.
+ */
+export function sessionKindOf({ cwd, prompt, root } = {}) {
+  const byTree = treeKindOf(cwd, root)
+  if (byTree === null) return null
+  const byPrompt = OWNER_PROMPT_MARKERS.some((re) => re.test(String(prompt ?? '')))
+    ? 'owner'
+    : 'subagent'
+  return byTree === byPrompt ? byTree : null
+}
+
+/** The Berlin calendar date of an ISO instant, in the form the account writes. */
+export function berlinDateOf(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Europe/Berlin',
+  }).format(d)
+}
