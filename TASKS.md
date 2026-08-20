@@ -9726,9 +9726,10 @@ to land than a mechanism that needs a review.
   `MEMORY.md` index line, the half-spent one is compacted down to the still-live "accepted
   as-is" list under a description that says so, and the two LIVE ones are left untouched with a
   one-line note of what keeps them alive (the open point that has to close first). No live rule
-  is deleted on a ruling that assumed it was spent. The board card
-  "Dokumentschnitt: fünf Regeln, die nur du streichen kannst" is removed from
-  "Von dir zu klären" in the same turn, because the question is answered and executed.
+  is deleted on a ruling that assumed it was spent. (The answered board card
+  "Dokumentschnitt: fünf Regeln, die nur du streichen kannst" was already taken off
+  "Von dir zu klären" on 20.08.2026 — a decided question does not wait there for its point
+  to land.)
   VERIFIABLE: a repository search finds neither the WebGPU fallback sentence nor the
   graphics-detail-levels closing reminder anywhere in CLAUDE.md; `qualityDoc.test.ts` still
   passes, so the removed reminder lost no coverage; `MEMORY.md` holds exactly one line per
