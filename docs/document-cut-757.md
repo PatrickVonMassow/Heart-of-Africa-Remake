@@ -6,10 +6,10 @@ The five entries awaiting the user's ruling — U6, U45 part 1, U48, U55 and U65
 — remain unchanged in substance and are therefore not cut entries below.
 
 The freshly cleared interactive-session floor measured 57,970 tokens before
-and 39,867 after against the 55–57k target. The after record is the first
-assistant message of transcript `c20e6534-94f0-4773-bb57-f058bdf32cec`:
-`input_tokens 2 + cache_read_input_tokens 0 + cache_creation_input_tokens
-39,865`. The harness and tool schemas still dominate; this is a recurring
+and 39,537 after against the 55–57k target. The after record is the first
+assistant message of transcript `ffafb607-4609-4d8c-8ac9-49fc0bd74ea4`:
+`input_tokens 2 + cache_read_input_tokens 21,417 + cache_creation_input_tokens
+18,118`. The harness and tool schemas still dominate; this is a recurring
 document saving, not a different order of magnitude.
 
 - `CLAUDE.md §1` :: U1 duplicate design-authority sentence :: DROPPED -> user ruling 20.08.2026: merge duplicate statements in place

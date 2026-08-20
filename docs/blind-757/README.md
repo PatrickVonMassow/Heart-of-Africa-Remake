@@ -17,10 +17,10 @@ neither list.
 The floor this stage exists to lower, measured from session transcripts
 (`input_tokens + cache_read + cache_creation` of the FIRST assistant response of a freshly
 cleared session): **57,970 tokens before**, and 57.9k–58.1k across the ten preceding
-sessions. The execution target was 55–57k. **After: 39,867 tokens** (`2 + 0 + 39,865`),
+sessions. The execution target was 55–57k. **After: 39,537 tokens** (`2 + 21,417 + 18,118`),
 from the first assistant record in fresh interactive session
-`c20e6534-94f0-4773-bb57-f058bdf32cec`, with ordinary tools and the cut memory index
-loaded. That is 18,103 tokens lower. The saving exceeded the 4–6k forecast because the
+`ffafb607-4609-4d8c-8ac9-49fc0bd74ea4`, with ordinary tools and the final cut memory index
+loaded. That is 18,433 tokens lower. The saving exceeded the 4–6k forecast because the
 counted merge removed substantially more repeated detail than its conservative estimate;
 it does not change the order of magnitude or the conclusion that the harness system prompt
 and tool schemas dominate the remaining floor.
