@@ -35,7 +35,7 @@ import {
 } from './author-routing-core.mjs'
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
-import { appendRecord, readRecords, recordsPathFor } from './mechanism-review.mjs'
+import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
 import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -98,7 +98,14 @@ export function ledgerSnapshot(path, { cwd = process.cwd(), git: run = git } = {
   let bytes = null
   try {
     bytes = readFileSync(path)
-  } catch {
+  } catch (e) {
+    // ONLY "IT IS NOT THERE" MEANS ABSENT (cross-vendor review, round 2): any
+    // other read failure was being recorded as "there was no file", and the undo
+    // would then DELETE a ledger it had simply failed to read. Refuse instead —
+    // a commission is cheap to repeat, an erased append-only record is not.
+    if (!e || e.code !== 'ENOENT') {
+      throw new Error(`cannot read the ledger at ${path}: ${(e && e.message) || e}`)
+    }
     bytes = null
   }
   const staged = (run(['ls-files', '--stage', '--', path], { cwd }) ?? '').trim()
@@ -113,7 +120,11 @@ export function restoreLedger(snapshot, { git: run = git } = {}) {
   if (bytes === null || bytes === undefined) rmSync(path, { force: true })
   else writeFileSync(path, bytes)
 
-  const top = run(['rev-parse', '--show-toplevel'], { cwd })
+  // gitToplevel, NOT the local git helper (cross-vendor review, round 2): that
+  // one trims, so a checkout whose path ends in whitespace would name a
+  // different directory here and the index entry would be removed by a name
+  // that is not the one git holds.
+  const top = gitToplevel(cwd)
   if (staged) {
     // "<mode> <blob> <stage>\t<name>" — the name git itself uses for the entry.
     const [meta, name] = staged.split('\t')

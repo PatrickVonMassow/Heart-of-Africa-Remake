@@ -217,6 +217,44 @@ describe('author-sol records a commission before dispatch', () => {
     expect(git(repo, 'status', '--porcelain')).toBe('')
   })
 
+  it('unstages by the name git really holds, in a checkout whose path ends in a space', () => {
+    // Round 2 of the cross-vendor review: the undo asked for the toplevel
+    // through a helper that TRIMS, so in such a checkout it computed a
+    // different name and left the staged ledger behind.
+    const outer = mkdtempSync(join(tmpdir(), 'hoa-ledger-space-'))
+    dirs.push(outer)
+    const repo = join(outer, 'checkout ')
+    mkdirSync(repo, { recursive: true })
+    git(repo, 'init', '-q', '-b', 'main')
+    git(repo, 'config', 'user.email', 'test@example.invalid')
+    git(repo, 'config', 'user.name', 'Test')
+    writeFileSync(join(repo, 'seed.txt'), 'seed\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-q', '-m', 'seed')
+
+    const ledger = join(repo, '.claude', 'mechanism-reviews.jsonl')
+    mkdirSync(dirname(ledger), { recursive: true })
+    const before = ledgerSnapshot(ledger, { cwd: repo })
+    expect(before.bytes).toBe(null)
+
+    writeFileSync(ledger, `${JSON.stringify({ sha: 'e'.repeat(40) })}\n`)
+    git(repo, 'add', '--', ledger)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toContain('mechanism-reviews.jsonl')
+
+    restoreLedger(before)
+    expect(existsSync(ledger)).toBe(false)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toBe('')
+  })
+
+  it('refuses the transaction when the ledger cannot be read at all', () => {
+    // …rather than calling it absent and letting the undo delete it. A
+    // directory in the ledger's place is an unreadable file that is NOT missing.
+    const repo = gitRepo()
+    const ledger = join(repo, '.claude', 'mechanism-reviews.jsonl')
+    mkdirSync(ledger, { recursive: true })
+    expect(() => ledgerSnapshot(ledger, { cwd: repo })).toThrow(/cannot read the ledger/)
+  })
+
   it('refuses to rewrite the framing already recorded for a round', () => {
     const prior = {
       kind: AUTHORING_COMMISSION_KIND,

@@ -67,13 +67,16 @@ export const reviewFileSetKey = (files = []) => JSON.stringify([...(files ?? [])
  *  the very assumption this lookup exists to replace, and a missing checkout is
  *  an answer here, not a failure.
  *
- *  Only git's TERMINATING LINE BREAK is stripped (cross-vendor review, pass 2):
- *  a POSIX directory may end in a space, and trimming would then name a path
- *  that is not the checkout. */
+ *  Only git's TERMINATING LINE BREAK is stripped (cross-vendor review, rounds 1
+ *  and 2): a POSIX directory may end in a space — trimming would then name a
+ *  path that is not the checkout — and it may legitimately end in a CARRIAGE
+ *  RETURN, which is why `\r` is only stripped where it is really part of the
+ *  platform's line ending and cannot occur inside a path. */
 export function gitToplevel(cwd = process.cwd()) {
   const res = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', windowsHide: true })
   if (res.status !== 0 || res.error) return ''
-  return (res.stdout ?? '').replace(/\r?\n$/, '')
+  const out = (res.stdout ?? '').replace(/\n$/, '')
+  return process.platform === 'win32' ? out.replace(/\r$/, '') : out
 }
 
 /** The tracked ledger of the checkout this command RUNS IN, or `null` outside
