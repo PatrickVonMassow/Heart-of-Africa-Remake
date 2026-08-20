@@ -1996,6 +1996,9 @@ put it is the mistake this line exists to stop.
   reported; a name left in the rollout after its line was anchored is reported as a stale record; the
   defaulted form counts as anchored and a malformed default does not; and `RELATIVE_WIRING_ROLLOUT`
   being empty leaves the audit clean.
+  The two git hooks are never accused, and an unreadable settings file ALLOWS, fail-open like
+  every guard here. Live: a new session started from a cwd outside the repository root shows a
+  rewired hook firing where the relative form died with `Cannot find module`.
   NOTE ON EXECUTION: `.claude/settings.json` is a protected path whose edits prompt, so the remaining
   rewiring needs attended sessions and cannot be delegated to a headless batch run.
   ATTENDED-GATED (18.08.2026, point 723's counted union U10, a declared refinement of the user's
@@ -3476,6 +3479,9 @@ put it is the mistake this line exists to stop.
   repaired state check that previously skewed.
   A Vitest case pins the pure skip decision — needed against measured throughput — in both
   directions, including that a lane which meets the throughput never skips.
+  Live, in the surviving lanes' terms: a run on a lane that cannot meet a check's declared
+  throughput ends GREEN with exactly that check reported as a lane skip naming the measured rate,
+  while the lane that meets it runs the same check for real.
   Criticality: HIGH — a suite that can fail from load makes every red arguable, which is the
   door point 640 closes from the other side.
 
@@ -10168,7 +10174,8 @@ to land than a mechanism that needs a review.
   five real verdicts and asserts the total is reported where nothing was reported.
   A second replays point 751's recorded history and asserts the total equals the rounds actually
   recorded, with a case per round shape — fallback model, worktree, range — and one asserting that
-  an unkeyable verdict is refused at recording time instead of silently uncounted.
+  an unkeyable verdict is refused at recording time instead of silently uncounted. A clean
+  verdict counts as no round at all.
   CAVEAT ON THE MEASUREMENT, stated because it is the standing one: both sources see only landed
   and recorded work, so a session that produced nothing recorded is invisible to it.
   RE-CUT 20.08.2026 BY TWO RULINGS IN ONE MESSAGE, and the ORDER of them decides what this point
