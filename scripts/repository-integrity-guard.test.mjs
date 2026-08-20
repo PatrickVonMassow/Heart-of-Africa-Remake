@@ -60,6 +60,25 @@ describe('unit-suite repository integrity guard', () => {
     expect(verify).not.toThrow()
   })
 
+  it('does not blame the suite for a ref change that could come from another worktree', () => {
+    const verify = protectRepository(repo)
+    const oldObject = runGit('rev-parse', 'main')
+    const newObject = runGit('commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'concurrent commit')
+    runGit('update-ref', 'refs/heads/main', newObject, oldObject)
+
+    let failure
+    try {
+      verify()
+    } catch (error) {
+      failure = error
+    }
+    expect(failure?.message).toContain('LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN')
+    expect(failure?.message).toContain(
+      'a legitimate commit or branch operation in another worktree during the run produces the same result',
+    )
+    expect(failure?.message).not.toContain('UNIT SUITE MUTATED')
+  })
+
   it('fails when the shared repository config changes', () => {
     const paths = repositoryStatePaths(repo)
     const verify = protectRepository(repo)

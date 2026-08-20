@@ -117,8 +117,10 @@ export function assertRepositoryUnchanged(before, after) {
   }
   if (details.length === 0) return
   throw new Error(
-    `UNIT SUITE MUTATED ITS LIVE REPOSITORY: ${details.join('; ')}. ` +
-      'Do not trust this run; inspect and restore the repository before continuing.',
+    `LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN: ${details.join('; ')}. ` +
+      'This may be test leakage, but a legitimate commit or branch operation in another worktree ' +
+      'during the run produces the same result. Inspect the named changes and concurrent activity ' +
+      'before deciding whether any restoration is needed.',
   )
 }
 
