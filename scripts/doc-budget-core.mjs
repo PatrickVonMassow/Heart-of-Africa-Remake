@@ -38,10 +38,10 @@ export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
     // LOWERED after the 20.08.2026 three-document cut: 786 lines / 6585 words
-    // became 332 / 2091 by this guard's tokenizer. Guard mechanics, owner operation and why-history now
+    // became 333 / 2095 by this guard's tokenizer after the Fable-switch pointer. Guard mechanics, owner operation and why-history now
     // live at their named destinations; §7.1 keeps one condition per criterion.
-    // Two lines and seven words are the same sentence-sized margin used by the
-    // previous cut. Leaving the former ceiling would invite all 4497 words back.
+    // The line margin remains; the word ceiling is now exact. Leaving the former
+    // ceiling would invite all 4493 words back.
     maxLines: 334,
     maxWords: 2095,
     why: 'loaded at every session start — the most expensive document in the project',
