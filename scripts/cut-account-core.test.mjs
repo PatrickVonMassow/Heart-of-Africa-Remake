@@ -20,7 +20,8 @@ import {
 
 const ROOT = resolve(process.cwd())
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
-const MEMORY_PATH = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory', 'MEMORY.md')
+const MEMORY_DIR = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory')
+const MEMORY_PATH = resolve(MEMORY_DIR, 'MEMORY.md')
 
 // Two of the three cut documents live in the USER's home, outside any checkout,
 // so a CI runner has no `~/.claude` at all and cannot see a destination that
@@ -263,7 +264,12 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     // Absolute stays a fault even when it names THIS checkout: accepting it
     // would pass here and fail wherever the root differs.
     expect(accountDestinationFault(`${ROOT}/docs/x.md`, ROOT)).toMatch(/names a machine/)
-    expect(accountDestinationFault('../outside/x.md', ROOT)).toMatch(/outside the repository/)
+    expect(accountDestinationFault('../outside/x.md', ROOT)).toMatch(/climbs through/)
+    // A climbing segment collapses before the filesystem sees it, so the file it
+    // names is never tested — `docs/missing.md/..` asks about `docs`.
+    expect(accountDestinationFault('docs/definitely-missing.md/..', ROOT)).toMatch(/climbs through/)
+    expect(accountDestinationFault('docs/./x.md', ROOT)).toMatch(/climbs through/)
+    expect(accountDestinationFault('~/.claude/definitely-missing/..', ROOT)).toMatch(/climbs through/)
     expect(accountDestinationFault('', ROOT)).toMatch(/empty/)
   })
 
@@ -312,15 +318,16 @@ describe('docs/document-cut-757.md — the shipped account', () => {
     }
   })
 
-  // A missing index may only excuse this case where the index CANNOT be there.
-  // Skipping on the file's own absence also skipped on a machine that carries
-  // the user tree under a different project key — exactly where a moved hook
-  // would silently stop being reachable.
-  it('is only unable to read the memory index where there is no user tree at all', () => {
-    if (!existsSync(MEMORY_PATH)) expect(existsSync(resolve(homedir(), '.claude'))).toBe(false)
+  // A missing index may only excuse this case where the index CANNOT be there —
+  // that is, where the memory DIRECTORY itself is absent. Keying the skip on the
+  // index file let a directory that exists without its index skip too, which is
+  // precisely the loss worth catching; keying it on `~/.claude` in general made
+  // an unrelated, partly populated home fail for no reason.
+  it('is only unable to read the memory index where the memory directory is absent', () => {
+    if (!existsSync(MEMORY_PATH)) expect(existsSync(MEMORY_DIR)).toBe(false)
   })
 
-  it.skipIf(!existsSync(MEMORY_PATH))('keeps every moved memory-topic hook reachable from the index', () => {
+  it.skipIf(!existsSync(MEMORY_DIR))('keeps every moved memory-topic hook reachable from the index', () => {
     const memory = readFileSync(MEMORY_PATH, 'utf8')
     const hooks = memoryHooks().filter((e) => /\/memory\/[^/]+\.md$/.test(e.destination))
     expect(hooks.length).toBeGreaterThan(0)

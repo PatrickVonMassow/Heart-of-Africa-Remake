@@ -180,6 +180,13 @@ export function userTreeRootOf(path, home = '') {
 export function accountDestinationFault(path, root = '') {
   const p = String(path ?? '').trim()
   if (!p) return 'the destination is empty'
+  // Asked FIRST, and of every form: a `.` or `..` segment collapses before
+  // anything reaches the filesystem, so `docs/definitely-missing.md/..` tests
+  // the existence of `docs` and says nothing about the file it names. An
+  // account destination is a place, and a place is written plainly.
+  if (p.split('/').some((seg) => seg === '.' || seg === '..')) {
+    return 'the destination climbs through `.` or `..`, which hides the component it names — write it plainly'
+  }
   if (p === '~' || p.startsWith('~/')) return ''
   // Absolute means absolute, INCLUDING one that happens to name this checkout:
   // it reads as valid here and as a fault wherever the root differs, which is
