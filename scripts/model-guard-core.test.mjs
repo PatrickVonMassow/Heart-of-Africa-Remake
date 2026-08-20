@@ -5,6 +5,7 @@ import {
   classifyTrailer,
   coAuthorTrailers,
   evaluateCommitTrailers,
+  fableStateAtCommit,
   formatCommitTrailerVerdict,
   findForbiddenCommits,
   findUnidentifiedCommits,
@@ -22,6 +23,9 @@ import {
 import { readState, writeState } from './fable-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
+const SWITCH_AT = Date.parse('2026-08-20T17:34:12.107Z')
+const switchState = (state) =>
+  readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: SWITCH_AT })))
 
 const T0 = Date.parse('2026-07-24T22:00:00Z')
 const line = (sha, iso, trailer) => `${sha}|${iso}|${trailer}`
@@ -123,8 +127,69 @@ describe('the serving allowlist follows the Fable switch', () => {
     const hits = findForbiddenCommits(log, T0, FABLE_OFF)
     expect(hits).toHaveLength(1)
     const text = formatForbiddenReason(hits, { fableState: FABLE_OFF })
-    expect(text).toContain('Fable, Sonnet and Haiku')
+    expect(text).toContain('Fable 5 may author only while its recorded policy is ON')
     expect(text).toContain('node scripts/fable-switch.mjs --status')
+  })
+})
+
+describe('the historical guard uses the policy at each commit\'s own time', () => {
+  const fableTrailer = 'Claude Fable 5 <noreply@anthropic.com>'
+  const before = SWITCH_AT - 1
+  const after = SWITCH_AT + 1
+  const datedLine = (sha, when, trailer) => line(sha, new Date(when).toISOString(), trailer)
+
+  it('allows Fable before an OFF flip and refuses it from the flip onward', () => {
+    const off = switchState('off')
+    const log = [
+      datedLine('1111111', before, fableTrailer),
+      datedLine('2222222', SWITCH_AT, fableTrailer),
+      datedLine('3333333', after, fableTrailer),
+    ].join('\n')
+
+    expect(findForbiddenCommits(log, T0, off).map((hit) => hit.sha)).toEqual(['2222222', '3333333'])
+    expect(fableStateAtCommit(before, off).state).toBe('on')
+    expect(fableStateAtCommit(SWITCH_AT, off).state).toBe('off')
+  })
+
+  it('refuses Fable under the previous OFF policy before an ON flip, then allows it', () => {
+    const on = switchState('on')
+    const log = [datedLine('1111111', before, fableTrailer), datedLine('2222222', after, fableTrailer)].join('\n')
+
+    expect(findForbiddenCommits(log, T0, on).map((hit) => hit.sha)).toEqual(['1111111'])
+  })
+
+  it('never changes Sonnet or Haiku verdicts in either switch direction', () => {
+    const log = [
+      datedLine('1111111', before, 'Claude Sonnet 5 <noreply@anthropic.com>'),
+      datedLine('2222222', after, 'Claude Haiku 4.5 <noreply@anthropic.com>'),
+    ].join('\n')
+
+    for (const state of [switchState('off'), switchState('on')]) {
+      expect(findForbiddenCommits(log, T0, state).map((hit) => hit.sha)).toEqual(['1111111', '2222222'])
+    }
+  })
+
+  it('refuses loudly when the switch state is unreadable, even with no parseable commits', () => {
+    const unreadable = readState('{')
+    expect(() => findForbiddenCommits('', T0, unreadable)).toThrow(/not valid JSON/)
+    expect(() => findForbiddenCommits(datedLine('1111111', before, fableTrailer), T0, unreadable)).toThrow(
+      /not valid JSON/,
+    )
+  })
+
+  it('names a post-flip emergency and a historical previous-policy breach differently', () => {
+    const off = switchState('off')
+    const afterHit = findForbiddenCommits(datedLine('2222222', after, fableTrailer), T0, off)
+    const emergency = formatForbiddenReason(afterHit, { fableState: off })
+    expect(emergency).toContain('after the Fable switch changed to OFF')
+    expect(emergency).toContain('post-switch OFF policy')
+
+    const on = switchState('on')
+    const beforeHit = findForbiddenCommits(datedLine('1111111', before, fableTrailer), T0, on)
+    const history = formatForbiddenReason(beforeHit, { fableState: on })
+    expect(history).toContain('before the Fable switch changed to ON')
+    expect(history).toContain('historical')
+    expect(history).toContain('previous OFF policy')
   })
 })
 
