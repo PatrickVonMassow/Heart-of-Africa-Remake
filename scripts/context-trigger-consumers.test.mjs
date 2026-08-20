@@ -55,4 +55,23 @@ describe('the handover/refusal/ceiling consumer split', () => {
       `1 TOKENS PAST THE ${ceiling} CEILING`,
     )
   })
+
+  it('THE IMMEDIATE RELIEF reaches the boundary — it takes its threshold from the same env variable', () => {
+    // batch-boundary decides "has the context passed the watermark?" through
+    // gatherWatermark with no override, so HOA_CONTEXT_TRIGGER_TOKENS set wide
+    // in the launcher environment moves the mark the boundary fires on. This is
+    // point 758's relief clause, pinned at the consumer rather than assumed.
+    const transcriptPath = fileURLToPath(import.meta.url)
+    expect(
+      gatherWatermark({ transcriptPath, env: { HOA_CONTEXT_TRIGGER_TOKENS: '400000' } }).watermark,
+    ).toBe(400_000)
+    // A reading that would be 'past' at the default is 'below' once relieved.
+    expect(watermarkDecision({ reading: { tokens: 130_000 } }).state).toBe('past')
+    expect(
+      watermarkDecision({
+        reading: { tokens: 130_000 },
+        watermark: triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '400000' }),
+      }).state,
+    ).toBe('below')
+  })
 })

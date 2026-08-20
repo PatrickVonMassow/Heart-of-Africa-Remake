@@ -199,10 +199,16 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     expect(
       callGuard('Agent', {}, { env: { ...ARMED, HOA_CONTEXT_REFUSAL_TOKENS: '400000' } }).stdout.trim(),
     ).toBe('')
-    // …while widening only the HANDOVER mark leaves the refusal where it was.
+  })
+
+  it('THE IMMEDIATE RELIEF reaches the guard: HOA_CONTEXT_TRIGGER_TOKENS set wide stops it refusing', () => {
+    // Point 758's stopgap, verified at the guard the launcher actually fences:
+    // the one variable set wide must open the window even with the fence armed.
+    writeTranscript(CONTEXT_REFUSAL_TOKENS + 1)
+    expect(denial(callGuard('Agent', {}))).toContain('WATERMARK')
     expect(
-      denial(callGuard('Agent', {}, { env: { ...ARMED, HOA_CONTEXT_TRIGGER_TOKENS: '400000' } })),
-    ).toContain('WATERMARK')
+      callGuard('Agent', {}, { env: { ...ARMED, HOA_CONTEXT_TRIGGER_TOKENS: '400000' } }).stdout.trim(),
+    ).toBe('')
   })
 
   it('fails OPEN on an unreadable measurement — a missing transcript denies nothing', () => {

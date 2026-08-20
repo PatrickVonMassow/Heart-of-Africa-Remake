@@ -166,10 +166,22 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
     expect(refusalTokens({})).toBe(CONTEXT_REFUSAL_TOKENS)
     expect(refusalTokens({ HOA_CONTEXT_REFUSAL_TOKENS: '95000' })).toBe(95_000)
     expect(refusalTokens({ HOA_CONTEXT_REFUSAL_TOKENS: 'nope' })).toBe(CONTEXT_REFUSAL_TOKENS)
-    // The two overrides are INDEPENDENT: widening the handover mark must not
-    // drag the refusal mark with it, nor the other way round.
-    expect(refusalTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '400000' })).toBe(CONTEXT_REFUSAL_TOKENS)
+    // The handover mark is never dragged by the refusal one: the specific
+    // variable moves the specific threshold and nothing else.
     expect(triggerTokens({ HOA_CONTEXT_REFUSAL_TOKENS: '10' })).toBe(CONTEXT_TRIGGER_TOKENS)
+  })
+
+  it('the RELIEF variable reaches the fence too — the split must not quietly break the stopgap', () => {
+    // HOA_CONTEXT_TRIGGER_TOKENS is the one variable the launcher sets wide so
+    // sessions stop being stranded, and it was named before the thresholds were
+    // separate. It must still relieve BOTH, or an armed fence would go on
+    // refusing at 110,000 while the launcher believed it had opened the window.
+    expect(refusalTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '400000' })).toBe(400_000)
+    expect(triggerTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '400000' })).toBe(400_000)
+    // …and the specific variable still wins where both are set.
+    expect(
+      refusalTokens({ HOA_CONTEXT_TRIGGER_TOKENS: '400000', HOA_CONTEXT_REFUSAL_TOKENS: '95000' }),
+    ).toBe(95_000)
   })
 })
 

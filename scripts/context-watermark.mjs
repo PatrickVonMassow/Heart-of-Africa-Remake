@@ -36,10 +36,25 @@ export function triggerTokens(env = process.env) {
   return overrideTokens(env.HOA_CONTEXT_TRIGGER_TOKENS, CONTEXT_TRIGGER_TOKENS)
 }
 
-/** THE REFUSAL THRESHOLD in force, `HOA_CONTEXT_REFUSAL_TOKENS` honoured — the
- *  context fence's own mark, split from the handover one by point 758. */
+/**
+ * THE REFUSAL THRESHOLD in force — the context fence's own mark, split from the
+ * handover one by point 758.
+ *
+ * TWO OVERRIDES, IN ORDER. `HOA_CONTEXT_REFUSAL_TOKENS` is the specific one and
+ * wins. Failing that, `HOA_CONTEXT_TRIGGER_TOKENS` applies HERE TOO — that is
+ * point 758's IMMEDIATE RELIEF, the one variable a launcher sets wide so
+ * sessions stop being stranded, and it was named before the two thresholds were
+ * separate. If the relief variable stopped reaching the fence at the moment the
+ * split landed, a launcher that sets it would silently relieve only the
+ * handover while an armed fence went on refusing at 110,000 — the exact
+ * stranding the clause exists to end. So the general relief still covers both,
+ * and a session that wants to move ONLY the refusal mark says so specifically.
+ */
 export function refusalTokens(env = process.env) {
-  return overrideTokens(env.HOA_CONTEXT_REFUSAL_TOKENS, CONTEXT_REFUSAL_TOKENS)
+  return overrideTokens(
+    env.HOA_CONTEXT_REFUSAL_TOKENS,
+    overrideTokens(env.HOA_CONTEXT_TRIGGER_TOKENS, CONTEXT_REFUSAL_TOKENS),
+  )
 }
 
 /** THE FENCE MODE in force, `HOA_CONTEXT_FENCE_MODE` honoured. Defaults to
