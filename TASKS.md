@@ -198,6 +198,33 @@ put it is the mistake this line exists to stop.
   cost and the user is currently the mechanism that catches it.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 798. The doctor's quarantine says nothing about having swept away a finished finding, and its
+  verdict still reads "consistent" (measured 20.08.2026, 22:22, at the session restart).
+  WHAT WAS MEASURED. The SessionStart hook reported the tree as unclean and demanded
+  `node scripts/batch-doctor.mjs --repair`, with the instruction to follow its verdict. The repair
+  found two uncommitted files — `TASKS.md` and `docs/work-packages.md` — classified them as
+  "uncommitted concurrent edits", moved them into a stash, and closed with
+  "VERDICT: consistent — the batch may continue". What it swept away was not a half state: it was
+  the fully written finding 797 together with its bundle line, appended by the interrupted
+  predecessor and never committed.
+  WHY IT MATTERS: "consistent" reads as an all-clear, and the hook tells the session to take it at
+  its word. A session that does works on, and the finding sits in a stash nobody looks at again.
+  Here it survived only because the stash diff was read before any work began. That is the class of
+  point 796 — a finished delivery reported as a non-delivery, and whoever believes the report throws
+  it away.
+  FINAL STATE: the quarantine says WHAT it swept away as soon as the content is recognisably a
+  delivery — a new work-order point, an archive entry, a bundle line — and that case appears in the
+  VERDICT itself rather than only in a log line above it. "consistent" may not stand while a
+  quarantined block holds an appended point; a named "quarantined, read the stash" belongs there.
+  VERIFIABLE: pure cases over the quarantine path — a stash body carrying a new `- [ ] <N>.` block is
+  named in the verdict and one without it is not; and the verdict does not stay at "consistent" once
+  such a block was named.
+  RELATED: point 796 is the same class one step earlier — the authoring run that reported nothing
+  written over 118 finished lines. Both are about a report that turns a delivery into a
+  non-delivery, so they are read together.
+  Criticality: medium — no product defect, but the loss is final and goes unnoticed.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
