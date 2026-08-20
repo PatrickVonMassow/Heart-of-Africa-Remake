@@ -9896,6 +9896,15 @@ to land than a mechanism that needs a review.
   and asserts the refusal fires where it did not.
   CAVEAT ON THE MEASUREMENT, stated because it is the standing one: both sources see only landed
   and recorded work, so a session that produced nothing recorded is invisible to it.
+  LIKELY MOOT BEFORE IT WAS FILED — READ THIS FIRST. Minutes after this point was written, the
+  claiming session was found editing `CLAUDE.md` §6 and `scripts/author-routing-core.mjs` in the
+  shared working tree, uncommitted, to record a user ruling of 20.08.2026: Fable's escalation is
+  SUSPENDED, and only a point's own lane tag sends work there. If that lands, there is nothing
+  left for a threshold to escalate TO, and this point should be FOLDED rather than built — its
+  measurement stays valuable (an escalation rule that never once fired, and why), so fold it into
+  whichever point carries the suspension and keep the measured reason in the archive line. Only if
+  the escalation is ever restored does the defect below matter again. Decide that first; do not
+  build the refusal into a lane that no longer exists.
   Criticality: medium — no product defect, but it is an escalation rule that has never once
   escalated, and the point that proved it is the one that landed this morning.
   Bundle: Session- & Repo-Hygiene.
