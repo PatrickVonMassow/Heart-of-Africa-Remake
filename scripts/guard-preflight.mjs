@@ -87,6 +87,7 @@ import { evaluate as dashboardSyncEvaluate } from './dashboard-sync-core.mjs'
 import { gatherCiStatusInputs } from './ci-status-guard.mjs'
 import { timestampReplyCondition } from './timestamp-guard-core.mjs'
 import { gatherDecisionCardCondition } from './decision-card-guard.mjs'
+import { gatherClearClaimCondition } from './clear-claim-guard.mjs'
 import { decideBatchProgress, gatherBatchProgressInputs } from './batch-progress-guard.mjs'
 import { commissionVerdict, gatherCommissionInputs } from './commission-guard.mjs'
 
@@ -371,6 +372,11 @@ export const GUARDS = [
   {
     id: 'decision-card-guard',
     gather: gatherDecisionCardCondition,
+    decide: () => ({ block: false }),
+  },
+  {
+    id: 'clear-claim-guard',
+    gather: gatherClearClaimCondition,
     decide: () => ({ block: false }),
   },
   {

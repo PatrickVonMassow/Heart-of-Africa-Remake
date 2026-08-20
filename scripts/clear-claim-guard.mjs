@@ -14,13 +14,16 @@
 // block, never a false one, and the claim state — the half that actually
 // matters — is read live from disk.
 import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { extractLastAssistantText } from './timestamp-guard-core.mjs'
-import { evaluate } from './clear-claim-guard-core.mjs'
+import { claimStands, evaluate, withdrawCommand } from './clear-claim-guard-core.mjs'
+import { repoPath } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
 
-const CLAIM_PATH =
-  process.env.BATCH_CLAIM_PATH ||
-  fileURLToPath(new URL('../.claude/batch-claim.json', import.meta.url))
+// `repoPath` rather than a URL relative to import.meta: the preflight imports
+// this module for its gather step, and under the test transform import.meta.url
+// is not a file URL — resolving it at import time took the whole preflight down
+// (measured 20.08.2026).
+const CLAIM_PATH = process.env.BATCH_CLAIM_PATH || repoPath('.claude/batch-claim.json')
 
 function readClaim() {
   try {
@@ -28,6 +31,31 @@ function readClaim() {
   } catch {
     // No claim file is the ordinary state: a withdrawn claim is a deleted file.
     return null
+  }
+}
+
+/**
+ * PREFLIGHT gather. This guard judges the not-yet-written reply, exactly as the
+ * timestamp and decision-card guards do, so it reports a CONDITION rather than a
+ * verdict: the preflight cannot know whether the reply will invite a `/clear`.
+ * What it CAN read is the half that decides whether the condition applies at all
+ * — whether a claim of THIS session stands — so the report says which of the two
+ * states the turn is in instead of staying silent about a wired Stop hook.
+ */
+export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
+  const standing = claim === undefined ? readClaim() : claim
+  if (!standing || !sessionId) {
+    return { applicable: false, why: 'no claim of this session stands, so nothing could be refused' }
+  }
+  if (!claimStands({ claim: standing, sessionId })) {
+    return { applicable: false, why: 'the standing claim belongs to another session' }
+  }
+  return {
+    applicable: true,
+    condition: true,
+    why:
+      'This session still CLAIMS the batch, so the not-yet-written reply may not invite a `/clear`. ' +
+      `Action: either compose it without that invitation, or withdraw the claim first — ${withdrawCommand(sessionId)}.`,
   }
 }
 
@@ -55,10 +83,16 @@ function main() {
   if (verdict) process.stdout.write(JSON.stringify(verdict) + '\n')
 }
 
-try {
-  main()
-} catch {
-  // A guard that cannot run must not stop unrelated work: see the fail
-  // direction above. The state it watches is re-read every turn, so a
-  // transient failure costs at most one unguarded turn.
+// Only as the entry script. `main()` reads stdin, so running it on IMPORT makes
+// every importer block on a pipe that will never be written — which is exactly
+// what happened when the preflight took this module in for its gather step
+// (measured 20.08.2026).
+if (isMainModule(import.meta.url)) {
+  try {
+    main()
+  } catch {
+    // A guard that cannot run must not stop unrelated work: see the fail
+    // direction above. The state it watches is re-read every turn, so a
+    // transient failure costs at most one unguarded turn.
+  }
 }
