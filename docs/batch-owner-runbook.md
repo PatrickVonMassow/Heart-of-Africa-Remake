@@ -55,6 +55,50 @@ message interrupts the batch rather than ending it: answer it, then make the
 turn's last action a batch action. The launcher and repair path are described in
 `docs/batch-autonomy.md`.
 
+## Standstill journal and report
+
+Run `node scripts/batch-standstill-report.mjs --since 14d` from any checkout to
+measure the batch without taking its lock. `--until <UTC>`, `--repo <main
+checkout>`, `--ref <first-parent ref>`, `--threshold-min <N>`, and `--json` narrow
+or machine-read the same report. The default threshold is 20 minutes: it keeps
+the measured four-day baseline comparable and is five minutes beyond one normal
+15-minute launcher tick, so scheduler jitter alone does not become a reported
+stall.
+
+The command declares every path it read: first-parent commit times, autostart log
+and last-start record, boundary and pause markers, boundary log, verification run records, session
+transcripts, and `.claude/batch-activity.jsonl`. Linked worktrees append to that
+one journal in the main checkout. Each line carries a fenced sequence, UTC time,
+event, session/point, pid plus process start, ownership generation, cause, and
+evidence. The journal is telemetry, not a guard: a failed append never blocks a
+tool, handover, or spawn.
+
+Classification precedence is blocked by user → quota → environment → named
+verification → advancing delegated work → completed foreground tool activity →
+named CI wait → writer veto → handover → idle owner → no worker → unknown. The
+order is applied after splitting at every event boundary, so every millisecond
+has one class and no overlap. Meanings:
+
+- Foreground work requires a timestamped session-linked tool call; a transcript
+  line, heartbeat, or living process alone is not work.
+- Delegated work requires a bounded declaration with a matching live process or
+  advancing branch, worktree, or output log. Verification additionally names the
+  command, progress lease, and terminal receipt. CI wait names ref, SHA,
+  workflow, run id, observations, and terminal result.
+- Handover runs from the committed boundary or worker exit to successor claim.
+  User, quota, environment, and writer-veto blocks retain their measured cause;
+  a writer veto records the writer identity, generation where known, last fenced
+  operation, and exact blocking interval.
+- No-worker standstill requires explicit process loss or a launcher skip with no
+  owner. Idle-owner standstill requires an owner interval with no higher-ranked
+  work evidence.
+- Missing, contradictory, torn, or pre-journal evidence is `unknown`. Commit
+  gaps, heartbeats, and live pids create boundaries or liveness only; they never
+  promote unknown time into work.
+
+The first historical run and the reproducible 21 August/four-day fixtures are in
+`docs/standstill-analysis-809.md`.
+
 ## Authoring and four eyes
 
 `scripts/author-routing-core.mjs` owns the routing cut. GPT-5.6 Sol authors the
