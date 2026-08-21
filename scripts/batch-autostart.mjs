@@ -144,13 +144,14 @@ const recentActivityRecords = () => {
     const fd = openSync(path, 'r')
     try {
       const buffer = Buffer.alloc(length)
-      readSync(fd, buffer, 0, length, size - length)
+      const bytesRead = readSync(fd, buffer, 0, length, size - length)
+      if (bytesRead !== length) return null
       return parseActivityJournal(buffer.toString('utf8')).records
     } finally {
       closeSync(fd)
     }
   } catch {
-    return []
+    return null
   }
 }
 const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }

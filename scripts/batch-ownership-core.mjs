@@ -250,13 +250,27 @@ export function ownerActivityDecision({ lock = null, work = null, records = [], 
       reason: 'no-owner',
     }
   }
+  // The journal is telemetry, never a takeover guard. `null` means its reader
+  // could not establish a complete snapshot (missing, unreadable, or short read),
+  // which is categorically different from a successfully read journal containing
+  // no attributable records. Without that evidence the launcher may not advance
+  // the unchanged-interval counter in the unsafe direction.
+  if (!Array.isArray(records)) {
+    return {
+      stalled: false,
+      progressAt: null,
+      unchangedIntervals: 0,
+      state: null,
+      reason: 'activity-unassessable',
+    }
+  }
   const attributed = (record) => {
     if (!record || !OWNER_PROGRESS_EVENTS.has(record.event)) return false
     if (record.session && record.session !== sessionId) return false
     if (Number.isSafeInteger(record.generation) && generation !== null && record.generation !== generation) return false
     return record.session === sessionId || (generation !== null && record.generation === generation)
   }
-  const journalAt = (Array.isArray(records) ? records : [])
+  const journalAt = records
     .filter(attributed)
     .reduce((latest, record) => Math.max(latest, Number.isFinite(record.atMs) ? record.atMs : 0), 0)
   const outputAt = (Array.isArray(work?.items) ? work.items : [])

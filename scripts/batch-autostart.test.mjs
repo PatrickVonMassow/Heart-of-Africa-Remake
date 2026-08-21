@@ -125,6 +125,9 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/state\.ownerActivity\s*=\s*ownerActivity\.state/)
     expect(source).toMatch(/assessOwner\([^\n]+activity:\s*ownerActivity/)
     expect(source).toMatch(/ACTIVITY_TAIL_BYTES/)
+    const reader = source.match(/const recentActivityRecords = \(\) => \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(reader).toMatch(/bytesRead\s*!==\s*length[^\n]+return null/)
+    expect(reader).toMatch(/catch\s*\{\s*return null\s*\}/)
   })
 
   // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes

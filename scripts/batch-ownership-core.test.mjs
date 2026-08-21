@@ -155,6 +155,25 @@ describe('ownerActivityDecision — a heartbeat is not progress', () => {
     expect(result).toMatchObject({ progressAt: null, stalled: false, reason: 'no-progress-observed' })
   })
 
+  it('cannot assess a stall when the activity journal could not be read', () => {
+    const baseline = ownerActivityDecision({ lock: owner, records: [foreground] })
+    const first = ownerActivityDecision({
+      lock: owner,
+      records: null,
+      previous: { ...baseline.state, unchangedIntervals: 1 },
+    })
+    const second = ownerActivityDecision({ lock: owner, records: null, previous: first.state })
+
+    expect(first).toEqual({
+      stalled: false,
+      progressAt: null,
+      unchangedIntervals: 0,
+      state: null,
+      reason: 'activity-unassessable',
+    })
+    expect(second).toEqual(first)
+  })
+
   it('lets a stalled verdict outrank a fresh heartbeat, except while paused', () => {
     const activity = { stalled: true, unchangedIntervals: 2 }
     expect(ownershipVerdict({ lock: owner, now: NOW + 1, activity, corroboration: live })).toMatchObject({
