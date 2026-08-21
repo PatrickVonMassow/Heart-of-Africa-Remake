@@ -93,6 +93,48 @@ describe('classifyRuns', () => {
     expect(classifyRuns([run({ conclusion: 'timed_out' })], HEAD).state).toBe('failed')
   })
 
+  // THE BRANCHING FALSE RED (measured 21.08.2026). Creating feat/<point> at
+  // main's tip pushes main's sha a second time; GitHub starts a second "CI" run
+  // for it, and the author's first commit cancels that run through
+  // `concurrency: cancel-in-progress`. The cancellation is NEWER than main's own
+  // concluded run, so "newest id wins" reported origin/main RED against a sha
+  // whose CI had SUCCEEDED — and demanded a fixing push no code could supply.
+  it('lets a concluded run outrank a newer cancellation on the same sha', () => {
+    const green = run({ databaseId: 10, conclusion: 'success' })
+    const supersededByBranch = run({ databaseId: 11, conclusion: 'cancelled' })
+    expect(classifyRuns([green, supersededByBranch], HEAD).state).toBe('success')
+    expect(failedRuns([green, supersededByBranch], HEAD)).toEqual([])
+    expect(recoveredWorkflows([green, supersededByBranch], HEAD)).toEqual(['CI'])
+  })
+
+  // A cancellation is only noise when something else JUDGED. Alone it still
+  // demands attention, and it must never bury a genuine red standing behind it.
+  it('keeps a lone cancellation red, and never hides a real failure', () => {
+    expect(classifyRuns([run({ conclusion: 'cancelled' })], HEAD).state).toBe('failed')
+    const red = run({ databaseId: 10, conclusion: 'failure' })
+    const newerCancel = run({ databaseId: 11, conclusion: 'cancelled' })
+    const c = classifyRuns([red, newerCancel], HEAD)
+    expect(c.state).toBe('failed')
+    expect(c.conclusion).toBe('failure')
+  })
+
+  // The rule is per workflow: a green "CI" says nothing about a cancelled
+  // "Deploy to GitHub Pages" that reached no other verdict.
+  it('does not let one workflow\'s verdict excuse another\'s cancellation', () => {
+    const ciGreen = run({ databaseId: 10, conclusion: 'success', workflowName: 'CI' })
+    const deployCancelled = run({ databaseId: 11, conclusion: 'cancelled', workflowName: 'Deploy to GitHub Pages' })
+    const c = classifyRuns([ciGreen, deployCancelled], HEAD)
+    expect(c.state).toBe('failed')
+    expect(c.workflowName).toBe('Deploy to GitHub Pages')
+  })
+
+  // An unfinished run has reached no verdict either, so it cannot excuse one.
+  it('does not let a still-running run excuse a cancellation', () => {
+    const running = run({ databaseId: 10, status: 'in_progress', conclusion: null })
+    const cancelled = run({ databaseId: 11, conclusion: 'cancelled' })
+    expect(classifyRuns([running, cancelled], HEAD).state).toBe('failed')
+  })
+
   it('classifies an unfinished run as pending', () => {
     expect(classifyRuns([run({ status: 'in_progress', conclusion: null })], HEAD).state).toBe('pending')
     expect(classifyRuns([run({ status: 'queued', conclusion: null })], HEAD).state).toBe('pending')
@@ -523,10 +565,22 @@ describe('sweepTargets', () => {
     expect(got.decision).toContain('NOT yet concluded')
     expect(got.decision).toContain('origin/feat/x')
     expect(got.failedOpen).toEqual([])
+    expect(got.observations).toEqual([
+      expect.objectContaining({
+        target: branchTarget,
+        classification: expect.objectContaining({ state: 'pending' }),
+        firstSeenAt: branchTarget.at,
+        observedAt: NOW,
+        verdict: 'wait',
+      }),
+    ])
     // …and the wait is re-read from the cache without a second API call.
     const again = await sweep({ targets: [branchTarget], cache: got.cache, runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
     expect(again.asked).toEqual([])
     expect(again.decision).toContain('NOT yet concluded')
+    expect(again.observations).toEqual([
+      expect.objectContaining({ previousState: 'pending', verdict: 'wait' }),
+    ])
   })
 
   it('the wait has a CEILING — past it the guard fails open, says so, and KEEPS asking', async () => {

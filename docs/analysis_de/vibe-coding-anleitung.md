@@ -152,8 +152,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
   das Bild entstand vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
-  unter einer erreichbaren Bedingung geprüft wurde — und das Bild entsteht erst, wenn die
-  Darstellung steht." *(≈ 1,5x.)* *(Sieht das für einen Menschen richtig aus?)*
+  unter einer erreichbaren Bedingung geprüft wurde." *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
@@ -195,11 +194,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
-  ist nur dort grün, wo er lief — das Werkzeug nur dort, wo es geschrieben wurde.
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last, oder er
+  ist nur dort grün, wo er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen nach gemessener Last.
-  Vor dem Abgeben: ‚auch im **Hauptstand** grün — und einmal **von dem Ort aus** geprüft, an dem es
-  wirklich läuft?'"
+  Vor dem Abgeben: ‚auch im **Hauptstand** grün, und **von dem Ort aus** geprüft, an dem es läuft?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -210,12 +208,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim
   Start, was **lokal fertig, aber nirgends angekommen** ist."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
-  und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird geglaubt, deckt
-  nur einen Teil.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
+  Satz: Sie feuert, wird geglaubt, deckt nur einen Teil.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den
-  Satz**." *(einmalig hoch)*
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den Satz**."
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -270,8 +266,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
-  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
-  Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
+  Auch eine *geteilte* Funktion antwortet zweimal, wenn jede Aufrufstelle ihre Eingaben selbst baut.
+  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert. Lass alle
+  **Aufrufstellen** dieselbe Frage einmal beantworten; mach den Eingang zur **Pflicht**, statt
+  einen Vorgabewert still entscheiden zu lassen."
 
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das immer
@@ -289,9 +287,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei **zwei Hälften**, deren
   zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede Seite korrektes Verhalten.
-  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** bei jedem Start.
-  Prüf die Erholung mit Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo
-  es sollte?'"
+  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** beim **Start des
+  Nachfolgers** — nie am Ende des Vorgängers, der ja gerade ausfällt. Prüf die Erholung mit
+  Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo es sollte?'"
 
 - **Was außerhalb des Repositorys liegt, kommt nicht mit — und geht nicht zurück.** Das Projekt
   zieht um, die Mechanik nicht; wer dort etwas ändert, hat kein `git`.
@@ -303,16 +301,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Die Reihenfolge, aus der gearbeitet
-  wird, steht woanders — und die Nachfolge-Sitzung kennt deinen Chat nicht.
-  → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
-  fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
-  schneller fertig macht, kommt mit nach vorn."
+- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.** Die
+  nächste Sitzung kennt deinen Chat nicht, der alte Bestand bleibt liegen.
+  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander,
+  schlägt eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit
+  dem **Altbestand** geschieht: nachräumen oder liegen lassen."
 
-- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du gern einen
+- **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
-  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob der Weg trägt. Fehlt
-  wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob er trägt. Fehlt eine
+  Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu.
@@ -375,10 +373,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, den sie gerade gebaut hat.** Er feuert zuerst gegen ihre
-  eigene Arbeit, und die Schleife sieht von innen wie Fortschritt aus.
-  → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es beim
-  dritten Mal: **wäre dieser Commit auch ohne den neuen Wächter nötig?**"
+- **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
+  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt.
+  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
+  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
   Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
@@ -428,4 +426,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 04c677f1f0d91d6446b82bf6dbc6388f35ebff6f8a97838b8661f343d3052ef7 -->
+<!-- GUIDE-FINGERPRINT: 21bea3a47ead4d4bce726e3fd34f113131d3671689e6c92b25c82c42d98d86c8 -->

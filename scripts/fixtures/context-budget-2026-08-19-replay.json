@@ -1,0 +1,103 @@
+{
+  "v": 1,
+  "source": {
+    "sessionId": "63489989-2725-4d31-9914-c9dac17b4280",
+    "date": "2026-08-19",
+    "handoverTokens": 311039,
+    "note": "Reduced from the real transcript: prose and payload bodies are omitted, while tool names, admission-relevant paths, command shapes, readings, ordering, parallel calls and the recorded handover reading are preserved."
+  },
+  "series": {
+    "byKind": [
+      { "kind": "read", "calls": 55, "p": 10956 },
+      { "kind": "agent", "calls": 5, "p": 5910 },
+      { "kind": "other", "calls": 17, "p": 3513 },
+      { "kind": "write", "calls": 141, "p": 2279 },
+      { "kind": "bash", "calls": 2869, "p": 2129 },
+      { "kind": "browser-suite", "calls": 12, "p": 1232 }
+    ]
+  },
+  "calls": [
+    {
+      "sourceCall": 35,
+      "at": "2026-08-19T12:58:13.281Z",
+      "tokens": 117035,
+      "operations": [
+        { "id": "35.1", "toolName": "Bash", "toolInput": { "command": "node scripts/finding.mjs --help" } },
+        { "id": "35.2", "toolName": "Bash", "toolInput": { "command": "node -e \"console.log('point cost ledger shape')\"" } }
+      ]
+    },
+    {
+      "sourceCall": 36,
+      "at": "2026-08-19T12:58:27.408Z",
+      "tokens": 119833,
+      "operations": [
+        { "id": "36.1", "toolName": "Bash", "toolInput": { "command": "node scripts/measure-point-cost.mjs --help" } },
+        { "id": "36.2", "toolName": "Bash", "toolInput": { "command": "node scripts/finding.mjs --requests" } }
+      ]
+    },
+    {
+      "sourceCall": 128,
+      "at": "2026-08-19T13:51:04.389Z",
+      "tokens": 235029,
+      "operations": [
+        { "id": "128.1", "toolName": "Read", "toolInput": { "file_path": "tasks/worker.output" } }
+      ]
+    },
+    {
+      "sourceCall": 135,
+      "at": "2026-08-19T13:52:33.704Z",
+      "tokens": 242626,
+      "operations": [
+        { "id": "135.1", "exit": true, "toolName": "Bash", "toolInput": { "command": "git add TASKS.md .claude/queue-rank.json && git commit -m done && git log --oneline -1" } }
+      ]
+    },
+    {
+      "sourceCall": 141,
+      "at": "2026-08-19T13:53:36.673Z",
+      "tokens": 245640,
+      "operations": [
+        { "id": "141.1", "toolName": "Edit", "toolInput": { "file_path": "docs/analysis_de/vibe-coding-anleitung.md" } }
+      ]
+    },
+    {
+      "sourceCall": 182,
+      "at": "2026-08-19T14:04:28.191Z",
+      "tokens": 287344,
+      "operations": [
+        { "id": "182.1", "exit": true, "toolName": "Bash", "toolInput": { "command": "git push origin main 2>&1 | tail -4; echo \"ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null)\"" } }
+      ]
+    },
+    {
+      "sourceCall": 201,
+      "at": "2026-08-19T14:07:07.588Z",
+      "tokens": 296897,
+      "operations": [
+        { "id": "201.1", "exit": true, "toolName": "Bash", "toolInput": { "command": "node scripts/board.mjs none --text-stdin" } }
+      ]
+    },
+    {
+      "sourceCall": 216,
+      "at": "2026-08-19T14:11:26.190Z",
+      "tokens": 305046,
+      "operations": [
+        { "id": "216.1", "exit": true, "toolName": "Bash", "toolInput": { "command": "node scripts/board-publish.mjs 2>&1 | tail -3" } }
+      ]
+    },
+    {
+      "sourceCall": 229,
+      "at": "2026-08-19T14:13:06.804Z",
+      "tokens": 309665,
+      "operations": [
+        { "id": "229.1", "exit": true, "toolName": "Bash", "toolInput": { "command": "node scripts/batch-boundary.mjs --commit --context --transcript source.jsonl 2>&1 | tail -8" } }
+      ]
+    },
+    {
+      "sourceCall": 231,
+      "at": "2026-08-19T14:13:30.561Z",
+      "tokens": 311039,
+      "operations": [
+        { "id": "231.1", "exit": true, "toolName": "Bash", "toolInput": { "command": "node scripts/board-publish.mjs 2>&1 | tail -2 && node scripts/batch-boundary.mjs --commit --context --transcript source.jsonl 2>&1 | tail -6" } }
+      ]
+    }
+  ]
+}

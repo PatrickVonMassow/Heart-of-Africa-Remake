@@ -31,6 +31,7 @@ import {
   berlinMinuteOfDay,
   boardCarriesCard,
   cardProofFragments,
+  claimantCardIdentity,
   cardRegions,
   cardStampIsCurrent,
   CARD_PROOF_WINDOW,
@@ -43,7 +44,8 @@ import {
   BOUNDARY_CAUSES,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
-import { NO_CURRENT_WORK_TITLE } from './board-core.mjs'
+import { namesFollowOnWork, toNoCurrentWork } from './board-core.mjs'
+import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import {
   evaluate as evaluateTopic,
   knownPoints,
@@ -53,13 +55,31 @@ import { markHandover, progressGuardDecision, readOwnerLock } from './batch-sing
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
+import {
+  boundaryHandover,
+  clearBoundary,
+  commitSealedBoundary,
+  handoverAndRequest,
+  requestImmediateSuccessor,
+  successorRequestFailureLine,
+  standingCards,
+} from './batch-boundary.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
 import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
+const NEXT_POINT = 744
+const CURRENT_CLAIM = { sessionId: 'ecc312cf-current', pid: 2_156_063 }
+const cardText = (opts = {}) =>
+  boundaryCardText({
+    nextPoint: NEXT_POINT,
+    ...(opts.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+      ? claimantCardIdentity(CURRENT_CLAIM)
+      : {}),
+    ...opts,
+  })
 // A marker as `--commit` writes it — SEALED. The unphased shape the retired
 // one-shot form wrote is no longer a boundary claim (Sol's review of abdde93),
 // and the case below pins that.
@@ -587,12 +607,14 @@ describe('the boundary card names where the batch actually goes', () => {
   it('WITH an honoured claim: the claiming window, and the launcher skips the spawn', () => {
     const where = boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' })
     expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'session-window-1' })
-    const text = boundaryCardText({ point: 434, ...where })
+    const text = cardText({ ...where, claimantPid: CURRENT_CLAIM.pid })
     expect(text).toContain('Der Punkt ist abgeschlossen.')
     expect(text).toContain('NICHT an eine frische Sitzung')
-    expect(text).toContain('Fenster session-window-1 hat ihn beansprucht')
+    expect(text).toContain(`PID ${CURRENT_CLAIM.pid}`)
+    expect(text).toContain('aktuelle Sitzung session-window-1')
+    expect(text).toContain(`Punkt ${NEXT_POINT}`)
+    expect(text).toContain('node scripts/batch-claim.mjs --session session-window-1')
     expect(text).toContain('Launcher hält den Start deshalb zurück')
-    expect(text).toContain('--session session-window-1')
     // The sentence the incident was made of must not appear in this state.
     expect(text).not.toContain('nächsten Punkt der Warteschlange')
   })
@@ -600,9 +622,9 @@ describe('the boundary card names where the batch actually goes', () => {
   it('WITHOUT a claim: a fresh session, which takes the next queued point', () => {
     const where = boundaryDestination({})
     expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, claimantSid: null })
-    const text = boundaryCardText({ point: 434, ...where })
+    const text = cardText(where)
     expect(text).toContain('Ich übergebe an eine frische Sitzung')
-    expect(text).toContain('nächsten Punkt der Warteschlange')
+    expect(text).toContain(`Punkt ${NEXT_POINT} als nächsten offenen Punkt der Warteschlange`)
     expect(text).toContain('Kein Fenster hat den Stapel beansprucht')
   })
 
@@ -617,33 +639,102 @@ describe('the boundary card names where the batch actually goes', () => {
     )
   })
 
-  it('is total, and never prints a point number at all', () => {
-    for (const point of [undefined, 'vier', 0, 434]) {
-      expect(boundaryCardText({ point }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+  it('refuses to dictate a card without a valid first open point', () => {
+    for (const nextPoint of [undefined, 'vier', 0, -1, 1_000_000]) {
+      expect(() => boundaryCardText({ nextPoint })).toThrow(/nextPoint must name the first open/)
     }
   })
 
-  // POINT 439: two sanctioned mechanisms used to contradict each other. This text
-  // is prescribed for VERBATIM use in the gap card `done <n> --none` writes — a
-  // card that owns no point number, so the topic guard read every "Punkt N" in it
-  // as a reference to a foreign point and blocked the turn end. The loser was
-  // always the boundary: the block costs a turn, and every remedy command counts
-  // as work and deletes the marker, so the handover had to be re-taken.
-  it('AGREES WITH THE TOPIC GUARD: the prescribed text passes in the card it is written into', () => {
-    const tasks = '- [ ] 434. Etwas Offenes.\n- [ ] 439. Noch etwas.\n- [x] 400. Erledigt.\n'
-    const gapCard = (text) =>
-      '<h2>Woran ich gerade arbeite</h2>\n' +
-      `<details class="now"><summary><span class="t">${NO_CURRENT_WORK_TITLE}</span></summary>` +
-      `<div class="body"><p><span class="stamp">Stand 21:10</span> ${text}</p></div></details>\n` +
-      '<h2>Erledigt</h2>\n'
-    for (const where of [
-      boundaryDestination({}),
-      boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' }),
+  it('dictates the canonical finished-batch card when the work order has no open point', () => {
+    const handover = boundaryHandover({ sid: 'x', tasksText: '# no open points\n' })
+    expect(handover.nextPoint).toBe(null)
+    expect(handover.card).toContain(
+      'Der Arbeitsauftrag enthält keinen offenen Punkt; der Stapel ist abgeschlossen.',
+    )
+    expect(namesFollowOnWork(handover.card)).toBe(true)
+  })
+
+  // POINT 800: the dictated text and every gate that consumes it are one
+  // contract. This is a property over several possible queue heads, for both
+  // destinations, so the composer cannot drift back to a nameless card.
+  it('dictates text accepted by the none writer, topic guard, conciseness guard and commit proof', () => {
+    const section = (name) => `<details class="sect"><summary><h2>${name}</h2></summary>\n</details>\n`
+    const emptyBoard =
+      `<main>\n${section('Woran ich gerade arbeite')}${section('Von dir zu klären')}` +
+      `${section('Warteschlange')}${section('Erledigt')}</main>\n`
+    for (const nextPoint of [1, 54, 800, 10_000]) {
+      const tasks = `- [ ] ${nextPoint}. Nächster Punkt.\n- [x] 400. Erledigt.\n`
+      for (const destination of [
+        BOUNDARY_DESTINATIONS.FRESH_SESSION,
+        BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      ]) {
+        const text = boundaryCardText({
+          destination,
+          nextPoint,
+          ...(destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+            ? claimantCardIdentity(CURRENT_CLAIM)
+            : {}),
+        })
+        expect(namesFollowOnWork(text)).toBe(true)
+        const card = toNoCurrentWork(emptyBoard, text, { stamp: '21:10' })
+        expect(topicViolations(card, knownPoints(tasks))).toEqual([])
+        expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
+        expect(concisenessOffenders(card)).toEqual([])
+        expect(boardCarriesCard(card, cardProofFragments({ destination }))).toMatchObject({ carries: true })
+        for (const fragment of cardProofFragments({ destination })) expect(text).toContain(fragment)
+      }
+    }
+  })
+
+  it('dictates an empty-queue form accepted by every card gate for either destination', () => {
+    const section = (name) => `<details class="sect"><summary><h2>${name}</h2></summary>\n</details>\n`
+    const emptyBoard =
+      `<main>\n${section('Woran ich gerade arbeite')}${section('Von dir zu klären')}` +
+      `${section('Warteschlange')}${section('Erledigt')}</main>\n`
+    const tasks = '# no open points\n'
+    for (const destination of [
+      BOUNDARY_DESTINATIONS.FRESH_SESSION,
+      BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
     ]) {
-      const card = gapCard(boundaryCardText({ point: 434, ...where }))
+      const text = boundaryCardText({
+        destination,
+        nextPoint: null,
+        ...(destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+          ? claimantCardIdentity(CURRENT_CLAIM)
+          : {}),
+      })
+      expect(namesFollowOnWork(text)).toBe(true)
+      const card = toNoCurrentWork(emptyBoard, text, { stamp: '21:10' })
       expect(topicViolations(card, knownPoints(tasks))).toEqual([])
       expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
+      expect(concisenessOffenders(card)).toEqual([])
+      expect(boardCarriesCard(card, cardProofFragments({ destination }))).toMatchObject({ carries: true })
     }
+  })
+
+  // POINT 790: a `/clear` changes the session id, not the window pid. Only the
+  // CURRENT claim record feeds the card, and both identifiers appear together.
+  it('identifies the current claimant record and never a stale session from the same window', () => {
+    const previousSid = 'c0ad5041-before-clear'
+    const current = { sessionId: 'ecc312cf-after-clear', pid: CURRENT_CLAIM.pid }
+    const text = boundaryCardText({
+      destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      nextPoint: NEXT_POINT,
+      ...claimantCardIdentity(current),
+    })
+    expect(text).toContain(`PID ${current.pid} (aktuelle Sitzung ${current.sessionId})`)
+    expect(text).not.toContain(previousSid)
+  })
+
+  it('keeps the current claimant session when its pid is unavailable', () => {
+    const text = boundaryCardText({
+      destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      claimantSid: 'abc-123',
+      claimantPid: null,
+      nextPoint: NEXT_POINT,
+    })
+    expect(text).toContain('Fenster der aktuellen Sitzung abc-123 (PID unbekannt)')
+    expect(text).toContain(`Punkt ${NEXT_POINT}`)
   })
 
   // POINT 470: the printed instruction must be a command that WORKS. Printing
@@ -666,10 +757,10 @@ describe('the boundary card names where the batch actually goes', () => {
   })
 
   it('INDEPENDENCE: the card is decided with no lock, no launcher probe and no work order', () => {
-    // Nothing but the claim verdict reaches this decision, so a stale or missing
-    // input from any other layer cannot silence it or make it lie.
-    expect(boundaryCardText({ point: 1, ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }) })).toContain(
-      'Fenster s hat ihn beansprucht',
+    // The already-gathered queue head and claim record are plain inputs; the
+    // composer performs no I/O and cannot substitute a remembered identity.
+    expect(cardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), claimantPid: 42 })).toContain(
+      'PID 42 (aktuelle Sitzung s)',
     )
   })
 })
@@ -1186,17 +1277,85 @@ describe('commitSealedBoundary — the marker and ownership handover are one com
   })
 })
 
+describe('boundary immediate successor request', () => {
+  it('invokes the shared launcher synchronously with the handed-over generation', () => {
+    let call = null
+    const result = requestImmediateSuccessor({
+      generation: 17,
+      run: (file, args, options) => { call = { file, args, options } },
+    })
+    expect(result).toEqual({ requested: true, reason: 'requested', generation: 17 })
+    expect(call.file).toBe(process.execPath)
+    expect(call.args).toEqual(expect.arrayContaining([
+      expect.stringMatching(/batch-autostart\.mjs$/), '--immediate', '--cause', 'boundary', '--generation', '17',
+    ]))
+    expect(call.options).toMatchObject({ windowsHide: true, timeout: 180_000 })
+  })
+
+  it('marks first, reads that generation, and requests before returning', () => {
+    const order = []
+    const result = handoverAndRequest({
+      sid: SID,
+      point: 811,
+      mark: (sid, { point }) => (order.push(`mark:${sid}:${point}`), { handed: true, reason: 'ok' }),
+      readLock: () => (order.push('read'), { sessionId: SID, fence: 23, handedOver: true }),
+      request: ({ generation, cause }) => (order.push(`request:${cause}:${generation}`), { requested: true }),
+    })
+    expect(order).toEqual([`mark:${SID}:811`, 'read', 'request:boundary:23'])
+    expect(result).toMatchObject({ handed: true, successor: { requested: true } })
+  })
+
+  it('keeps the handover successful when the eager request fails and names the watchdog fallback', () => {
+    const noGeneration = handoverAndRequest({
+      sid: SID,
+      mark: () => ({ handed: true, reason: 'ok' }),
+      readLock: () => ({ sessionId: SID }),
+      request: ({ generation }) => requestImmediateSuccessor({ generation, run: () => {} }),
+    })
+    expect(noGeneration).toMatchObject({
+      handed: true,
+      reason: 'ok',
+      successorFailure: 'handover-generation-unreadable',
+      successor: { requested: false, reason: 'handover-generation-unreadable' },
+    })
+    expect(successorRequestFailureLine(noGeneration)).toBe(
+      'the immediate successor request failed (handover-generation-unreadable); the 900-second watchdog remains armed',
+    )
+
+    const failed = handoverAndRequest({
+      sid: SID,
+      mark: () => ({ handed: true, reason: 'ok' }),
+      readLock: () => ({ sessionId: SID, fence: 24 }),
+      request: () => ({ requested: false, reason: 'request-failed', error: new Error('launcher unavailable') }),
+    })
+    expect(failed).toMatchObject({ handed: true, reason: 'ok', successorFailure: 'request-failed' })
+    expect(failed.successor.error.message).toBe('launcher unavailable')
+
+    // `commitSealedBoundary` is the CLI's exit-1 boundary: only a failed mark
+    // may cross it. A failed optimization leaves the already-written boundary
+    // successful so the watchdog can recover it.
+    expect(() => commitSealedBoundary({
+      marker: { v: 2, cause: 'point' },
+      write: () => {},
+      handover: () => failed,
+    })).not.toThrow()
+    expect(successorRequestFailureLine(failed)).toBe(
+      'the immediate successor request failed (request-failed); the 900-second watchdog remains armed',
+    )
+  })
+})
+
 describe('boundaryCardText — the watermark variant says WHY (point 675)', () => {
   it('a context boundary names the watermark, not a closed point', () => {
-    const text = boundaryCardText({ ...boundaryDestination({}), cause: 'context' })
+    const text = cardText({ ...boundaryDestination({}), cause: 'context' })
     expect(text).toContain('Wasserstandsmarke')
     expect(text).not.toContain('Der Punkt ist abgeschlossen')
   })
 
   it('the point variant is untouched, and the claiming-window variant carries the head too', () => {
-    expect(boundaryCardText({ ...boundaryDestination({}) })).toContain('Der Punkt ist abgeschlossen')
+    expect(cardText({ ...boundaryDestination({}) })).toContain('Der Punkt ist abgeschlossen')
     expect(
-      boundaryCardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), cause: 'context' }),
+      cardText({ ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }), cause: 'context' }),
     ).toContain('Wasserstandsmarke')
   })
 })
@@ -1288,7 +1447,7 @@ describe('unpreparedRefusal — --commit refuses what --prepare never prepared (
       expect(standingCards({ cause, destination, path })).toEqual({ readable: true, cards: [] })
       writeFileSync(
         path,
-        `<details class="card"><p>${boundaryCardText({ destination, cause })}</p></details>`,
+        `<details class="card"><p>${cardText({ destination, cause })}</p></details>`,
       )
       const seen = standingCards({ cause, destination, path })
       expect(seen.readable).toBe(true)
@@ -1449,7 +1608,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
   it('proves each real card by fragments that are actually in it — for both causes and both destinations', () => {
     for (const cause of [BOUNDARY_CAUSES.CONTEXT, BOUNDARY_CAUSES.POINT]) {
       for (const destination of [BOUNDARY_DESTINATIONS.FRESH_SESSION, BOUNDARY_DESTINATIONS.CLAIMING_WINDOW]) {
-        const card = boundaryCardText({ destination, claimantSid: 'window-7', cause })
+        const card = cardText({ destination, claimantSid: 'window-7', cause })
         const proof = boardCarriesCard(`<div><p>${card}</p></div>`, cardProofFragments({ cause, destination }))
         expect(proof).toEqual({ carries: true, verifiable: true, missing: [] })
       }
@@ -1464,7 +1623,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
   })
 
   it('refuses the WRONG card, and the wrong destination', () => {
-    const pointCard = boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT })
+    const pointCard = cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.POINT })
     // A point card is no watermark card: it claims a closure that never happened.
     const asContext = boardCarriesCard(
       pointCard,
@@ -1488,7 +1647,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     // manufactured between them. No card on this board is a watermark handover
     // to a claiming window, and the proof must not add the two together.
     const card = (cause, destination) =>
-      `<details class="card"><summary>Übergabe</summary><p>${boundaryCardText({ destination, claimantSid: 'window-7', cause })}</p></details>`
+      `<details class="card"><summary>Übergabe</summary><p>${cardText({ destination, claimantSid: 'window-7', cause })}</p></details>`
     const board =
       `<details class="sect"><summary><h2>Aktuell</h2></summary>` +
       card(BOUNDARY_CAUSES.CONTEXT, BOUNDARY_DESTINATIONS.FRESH_SESSION) +
@@ -1523,9 +1682,9 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
 
   it('falls back to one card\'s length on a board with no card markup', () => {
     const plain =
-      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
+      cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT }) +
       '\n'.padEnd(CARD_PROOF_WINDOW, '.') +
-      boundaryCardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'w', cause: BOUNDARY_CAUSES.POINT })
+      cardText({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'w', cause: BOUNDARY_CAUSES.POINT })
     expect(
       boardCarriesCard(
         plain,
@@ -1542,7 +1701,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
 
   const stamped = (hhmm) =>
     `<details class="card"><summary>Übergabe</summary><p><span class="stamp">Stand ${hhmm}</span> ` +
-    `${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+    `${cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
   const frags = cardProofFragments({
     cause: BOUNDARY_CAUSES.CONTEXT,
     destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,
@@ -1646,7 +1805,7 @@ describe('markerFresh / boardCarriesCard — a forged stamp, an unannounced hand
     // there, because a boundary check may not trap a session on a format change.
     expect(cardStampIsCurrent('<p>no stamp here</p>', { sinceMs: prepared, boardStamps: false })).toBe(true)
     const card =
-      `<details class="card"><p>${boundaryCardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
+      `<details class="card"><p>${cardText({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, cause: BOUNDARY_CAUSES.CONTEXT })}</p></details>`
     const frags = cardProofFragments({
       cause: BOUNDARY_CAUSES.CONTEXT,
       destination: BOUNDARY_DESTINATIONS.FRESH_SESSION,

@@ -45,7 +45,7 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(imports[0]).toMatch(/\bbuildSpawnOptions\b/)
   })
 
-  it('CALLS them at the one spawn site — a re-inlined call would drop the env fix', () => {
+  it('CALLS them at the Claude spawn site — a re-inlined call would drop the env fix', () => {
     // Every statement that launches an executable BY PATH: an optional member
     // prefix, one of the launching functions, then an identifier argument. The
     // first version of this counted bare `spawn(` only, so `cp.spawn(…)` or
@@ -55,9 +55,10 @@ describe('the launcher uses the pure spawn builders', () => {
     // literal, so the legitimate git calls are not caught either.
     const LAUNCHES = /(?:^|[^\w.])(?:[A-Za-z_$][\w$]*\.)?(?:spawnSync|spawn|execFileSync|execFile|fork)\s*\(\s*[A-Za-z_$][\w$]*\s*,/
     const spawnSites = codeLines.filter((l) => LAUNCHES.test(l))
-    expect(spawnSites, 'the launcher must have exactly one process-launching site').toHaveLength(1)
-    expect(spawnSites[0]).toMatch(/buildSpawnArgs\(/)
-    expect(spawnSites[0]).toMatch(/buildSpawnOptions\(/)
+    const claudeSites = spawnSites.filter((line) => /buildSpawnArgs\(/.test(line) || /buildSpawnOptions\(/.test(line))
+    expect(claudeSites, 'the launcher must have exactly one Claude process-launching site').toHaveLength(1)
+    expect(claudeSites[0]).toMatch(/buildSpawnArgs\(/)
+    expect(claudeSites[0]).toMatch(/buildSpawnOptions\(/)
   })
 
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
@@ -76,24 +77,34 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/reapableSpawns\(/)
   })
 
+  it('attributes spawn progress to the recorded child identity', () => {
+    expect(source).toMatch(
+      /spawnProgressed\(\{[\s\S]{0,250}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,180}?lastSpawn:\s*previousSpawn/,
+    )
+  })
+
   it('wires process liveness into both persisted start records', () => {
     expect(source).toMatch(
-      /launcherStartDecision\(\{[\s\S]{0,300}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
+      /successorStartDecision\(\{[\s\S]{0,500}?batchWriters[\s\S]{0,200}?previousBatchWriters[\s\S]{0,200}?fenceState[\s\S]{0,200}?probePid/,
     )
     const records = source.match(/launcherStartRecord\(\{/g) ?? []
-    expect(records, 'both the pre-spawn and pid-bound records carry measured evidence').toHaveLength(2)
+    expect(records, 'the refusal, pre-spawn and pid-bound records carry measured evidence').toHaveLength(3)
     expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
   })
 
-  it('repeats and escalates an inactive-lock writer veto instead of silently stopping', () => {
-    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)?.[0] ?? ''
+  it('recovers an inactive-lock writer veto after two unchanged decisions', () => {
+    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?if \(!writerRecovered\) \{[\s\S]*?process\.exit\(0\)/)?.[0] ?? ''
     expect(vetoBranch).toMatch(/writer-veto#/)
     expect(vetoBranch).toMatch(/verdictRepeat\(/)
     expect(vetoBranch).toMatch(/writerVetoSince/)
-    expect(vetoBranch).toMatch(/await notify\(/)
+    expect(vetoBranch).toMatch(/revokeWriterFence\(/)
+    expect(vetoBranch).toMatch(/retireBatchWriter\(/)
+    expect(vetoBranch).toMatch(/successorStartDecision\(/)
+    expect(vetoBranch).toMatch(/RECOVERED:/)
     expect(vetoBranch).toMatch(/writer\.sessionId/)
     expect(vetoBranch).toMatch(/writer\.pid/)
     expect(vetoBranch).toMatch(/blockedMinutes/)
+    expect(vetoBranch).toMatch(/blockedUntil:\s*now \+ LAUNCHER_TICK_MS/)
   })
 
   // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
@@ -107,6 +118,16 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(code, 'the guard’s 45-minute window makes the stall verdict unreachable').not.toMatch(
       /maxAgeMs:\s*IN_FLIGHT_MAX_AGE_MS/,
     )
+  })
+
+  it('assesses two decision intervals from real owner activity, not heartbeat freshness', () => {
+    expect(source).toMatch(/ownerActivityDecision\(\{[\s\S]{0,220}?records:\s*recentActivityRecords\(\)[\s\S]{0,160}?previous:\s*state\.ownerActivity/)
+    expect(source).toMatch(/state\.ownerActivity\s*=\s*ownerActivity\.state/)
+    expect(source).toMatch(/assessOwner\([^\n]+activity:\s*ownerActivity/)
+    expect(source).toMatch(/ACTIVITY_TAIL_BYTES/)
+    const reader = source.match(/const recentActivityRecords = \(\) => \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(reader).toMatch(/bytesRead\s*!==\s*length[^\n]+return null/)
+    expect(reader).toMatch(/catch\s*\{\s*return null\s*\}/)
   })
 
   // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes
@@ -146,6 +167,45 @@ describe('the launcher uses the pure spawn builders', () => {
       expect(l, 'an early exit that skips the state write').not.toMatch(/process\.exit\(/)
     }
     expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
+  })
+})
+
+describe('immediate handover and supervised exit are runtime transports', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const code = source.split('\n').filter((line) => !line.trimStart().startsWith('//')).join('\n')
+
+  it('routes immediate, supervised-exit and watchdog starts through the one pure decision', () => {
+    expect(code).toMatch(/const immediate = argv\.includes\('--immediate'\)/)
+    expect(code).toMatch(/--cause', exitTrigger\.kind/)
+    expect(code).toMatch(/successorStartDecision\(\{[\s\S]*?trigger,[\s\S]*?spawnToken,[\s\S]*?lock,[\s\S]*?assessment,/)
+    expect(code).toMatch(/triggerKind[\s\S]*SUCCESSOR_TRIGGERS\.WATCHDOG/)
+  })
+
+  it('lets only the boundary cause bypass the spawn backoff', () => {
+    expect(code).toMatch(/shouldWaitForSpawnBackoff\(\{ triggerKind, lastSpawnAt: lastSpawn\?\.at, now, backoffMs \}\)/)
+    expect(code).not.toMatch(/if \(!immediate && lastSpawn/)
+  })
+
+  it('puts the generation and token reservation inside the atomic acquire', () => {
+    const acquire = code.match(/const acq = acquire\(launcherSid, \{[\s\S]*?\n\}\)\nif \(acq/)?.[0] ?? ''
+    expect(acquire).toMatch(/expected:/)
+    expect(acquire).toMatch(/fence: trigger\.generation/)
+    expect(acquire).toMatch(/\.\.\.startDecision\.reservation/)
+  })
+
+  it('supervises the exact child identity and requests immediately when it disappears', () => {
+    expect(code).toMatch(/if \(argv\[0\] === '--supervise'\)/)
+    expect(code).toMatch(/Math\.abs\(seen\.startedAt - childStartedAt\) <= 2000/)
+    expect(code).toMatch(/while \(sameChildAlive\(\)\)/)
+    expect(code).toMatch(/supervisedExitTrigger\(records, \{ childStartedAt \}\)/)
+    expect(code).toMatch(/'--immediate', '--cause', exitTrigger\.kind/)
+    expect(code).toMatch(/startChildSupervisor\(\{ pid: child\.pid, pidStartedAt: childStartedAt, token: spawnToken \}\)/)
+  })
+
+  it('lets a periodic watchdog replace a missing supervisor without starting a second owner', () => {
+    expect(code).toMatch(/supervisorRestartDecision\(\{ lastSpawn: last, lock, childProbe, supervisorProbe \}\)/)
+    expect(code).toMatch(/if \(repair\.restart\)/)
+    expect(code).toMatch(/supervisorRestartedAt: now/)
   })
 })
 

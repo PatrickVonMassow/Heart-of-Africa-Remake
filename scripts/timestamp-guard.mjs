@@ -19,7 +19,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { berlinStamp, evaluate, extractLastAssistantText } from './timestamp-guard-core.mjs'
+import { berlinStamp, evaluate, inspectLastAssistantText } from './timestamp-guard-core.mjs'
 import { shortAckDemand } from './closing-reply-core.mjs'
 import { contextLevelSuffix } from './dashboard-reminder-core.mjs'
 import { parseContextTokens } from './context-watermark-core.mjs'
@@ -122,14 +122,21 @@ function main() {
     return
   }
 
-  let lastText
+  let inspected
   try {
-    lastText = extractLastAssistantText(readFileSync(transcriptPath, 'utf8'))
+    inspected = inspectLastAssistantText(readFileSync(transcriptPath, 'utf8'))
   } catch (e) {
     blockUnverifiable(sessionId, `transcript unreadable: ${e && e.message}`, suffix)
     return
   }
-  if (lastText === null) {
+  if (inspected.text === null && inspected.hasToolResultBoundary) {
+    // The tool completed, but no later assistant text is visible yet. Stop can
+    // arrive before the final reply row is flushed; there is no final answer to
+    // judge, and narration from before the result is explicitly out of scope.
+    writeState({ sessionId, failures: 0 })
+    return
+  }
+  if (inspected.text === null) {
     blockUnverifiable(sessionId, 'no assistant reply text found in the transcript', suffix)
     return
   }
@@ -138,7 +145,7 @@ function main() {
   // blocks unconditionally on every violation (the fix is always in the
   // assistant's power: prepend the stamp handed over in the reason).
   writeState({ sessionId, failures: 0 })
-  const verdict = evaluate({ lastText, headerSuffix: suffix, enforceSuffix: real })
+  const verdict = evaluate({ lastText: inspected.text, headerSuffix: suffix, enforceSuffix: real })
   if (verdict) process.stdout.write(JSON.stringify(verdict) + '\n')
 }
 

@@ -9,13 +9,10 @@
 // that have nothing to do with the batch.
 //
 // It reuses `extractLastAssistantText` rather than copying the transcript rule.
-// That helper can return the PREVIOUS text block when the final reply has not
-// been flushed yet (filed 20.08.2026 as its own point). That is usually a missed
-// block and therefore cheap — but not always: a reply written BEFORE the claim
-// existed, carrying an invitation that was correct at the time, would be judged
-// against a claim acquired afterwards and falsely refuse a turn that never asked
-// for anything (cross-vendor review, 20.08.2026). So text older than the claim is
-// not judged at all.
+// That shared helper now discards every text candidate before the last tool
+// result, so narration cannot be mistaken for a final reply. The timestamp
+// check below remains necessary for a text-only reply written before the claim
+// existed: it was correct when sent and must not be judged against a later claim.
 import { existsSync, readFileSync } from 'node:fs'
 import { extractLastAssistantText } from './timestamp-guard-core.mjs'
 import { claimStands, evaluate, withdrawCommand } from './clear-claim-guard-core.mjs'
@@ -98,13 +95,9 @@ export function gatherClearClaimCondition({ sessionId = '', claim } = {}) {
  * Is the newest assistant text the FINAL reply, or an earlier one still waiting
  * for the flush?
  *
- * The timestamp check below only catches text older than the CLAIM. It does not
- * catch the other race: a previous post-claim reply that was refused, whose
- * correction has not been written yet — the extractor returns the old
- * invitation, its timestamp is newer than the claim, and the guard refuses the
- * correction for a fault it no longer contains (cross-vendor review,
- * 20.08.2026). The condition that separates the two is simple: if the transcript
- * does not END with the assistant text row, the final reply is not in it yet.
+ * The shared extractor also rejects text before the last tool result. This
+ * wrapper-level shape check remains useful for narration-with-tool-use before a
+ * result has arrived, and for a partial transcript tail.
  */
 export function replyNotFlushed(transcript) {
   const rows = String(transcript ?? '')

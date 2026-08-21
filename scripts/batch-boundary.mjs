@@ -44,6 +44,7 @@ import {
   boundaryCardCommand,
   cardProofFragments,
   cardRegions,
+  claimantCardIdentity,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
@@ -63,6 +64,7 @@ import { noteBoundaryIncident } from './context-incidents.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
+import { parseTasks } from './dashboard-guard-core.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -479,7 +481,10 @@ export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) }
   }
 }
 
-export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}) {
+export function boundaryHandover({
+  sid = readOwnerLock()?.sessionId ?? '',
+  tasksText = readTasksOpen(TASKS_PATH),
+} = {}) {
   let claim = { honour: false, claimantSid: null }
   try {
     claim = gatherClaim(sid, { ownerLock: readOwnerLock() })
@@ -494,9 +499,71 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
     claimHonoured: reservationDecision({ assessment: claim }).acquire === false,
     claimantSid: claim.claimantSid,
   })
-  // The card takes NO point number (point 439): it goes into the unnumbered gap
-  // card, where the topic guard reads every point reference as a foreign one.
-  return { ...where, card: boundaryCardText(where) }
+  // The CARD owns no point chip, but its prose names the first open point or the
+  // canonical fact that none remains: that is the publish gate's required
+  // handover destination. State-card titles are the topic guard's narrow
+  // exemption, so the forward reference is legal when one exists.
+  const nextPoint = parseTasks(tasksText).open[0] ?? null
+  const claimant = claimantCardIdentity(claim.claim)
+  const cardInput = { ...where, ...claimant, nextPoint }
+  return { ...cardInput, card: boundaryCardText(cardInput) }
+}
+
+/** Ask the shared launcher decision to start the successor now. The launcher is
+ * still the only spawner; this is merely an event transport into that door. */
+export function requestImmediateSuccessor({ generation, cause = 'boundary', run = execFileSync } = {}) {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    return { requested: false, reason: 'handover-generation-unreadable' }
+  }
+  try {
+    run(
+      process.execPath,
+      [repoPath('scripts/batch-autostart.mjs'), '--immediate', '--cause', cause, '--generation', String(generation)],
+      {
+        cwd: repoPath('.'),
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 180_000,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+    return { requested: true, reason: 'requested', generation }
+  } catch (error) {
+    return { requested: false, reason: 'request-failed', generation, error }
+  }
+}
+
+/** Mark this generation handed over, then synchronously place its immediate
+ * request before the boundary command returns. */
+export function handoverAndRequest({
+  sid,
+  point = null,
+  mark = markHandover,
+  readLock = readOwnerLock,
+  request = requestImmediateSuccessor,
+} = {}) {
+  const handed = mark(sid, { point })
+  if (!handed?.handed) return handed
+  const lock = readLock()
+  const generation = lock?.sessionId === sid && Number.isSafeInteger(lock?.fence) ? lock.fence : null
+  const successor = request({ generation, cause: 'boundary' })
+  if (!successor?.requested) {
+    return {
+      ...handed,
+      successor,
+      successorFailure: successor?.reason ?? 'unknown request failure',
+    }
+  }
+  return { ...handed, successor }
+}
+
+/** A failed eager request does not undo the durable handover. Tell the closing
+ * session which recovery path remains without turning the boundary into an
+ * error or inviting an impossible retry. */
+export function successorRequestFailureLine(result) {
+  if (result?.handed !== true || result?.successor?.requested !== false) return ''
+  const reason = result.successorFailure ?? result.successor.reason ?? 'unknown request failure'
+  return `the immediate successor request failed (${reason}); the 900-second watchdog remains armed`
 }
 
 /**
@@ -653,6 +720,8 @@ if (isMain) {
       const card = boundaryCardText({
         destination: handover.destination,
         claimantSid: handover.claimantSid,
+        claimantPid: handover.claimantPid,
+        nextPoint: handover.nextPoint,
         cause: BOUNDARY_CAUSES.CONTEXT,
       })
       const cardBlock =
@@ -714,10 +783,11 @@ if (isMain) {
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
       let transferred = null
+      let handoverResult = null
       try {
         transferred = commitSealedBoundary({
           transfer,
-          handover: () => markHandover(sid, { point: null }),
+          handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -760,6 +830,8 @@ if (isMain) {
               'with `node scripts/batch-in-flight.mjs --adopt`.'
             : ''),
       )
+      const successorFailureLine = successorRequestFailureLine(handoverResult)
+      if (successorFailureLine) console.log(successorFailureLine)
       // The distance is a NUMBER somebody reads, not a claim (point 700): a
       // commit further past the ceiling than the stated margin owes the
       // closing report a sentence. Admission above used the trigger; overshoot
@@ -826,8 +898,9 @@ if (isMain) {
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
     const cardBlock =
       'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-      'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
-      'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
+      'verbatim rather than writing it again. It names the next open point, or says that none remains, on ' +
+      'purpose: the unnumbered gap card owes that destination to its reader, and the topic guard exempts ' +
+      'that state card by title.\n\n' +
       `${handover.card}\n\n` +
       // The command is CHOSEN from the board's real state (point 470), never
       // assumed: an instruction that does not work is what sent sessions to
@@ -909,10 +982,11 @@ if (isMain) {
     // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
     // `commitSealedBoundary` pins the order.
     let transferred = null
+    let handoverResult = null
     try {
       transferred = commitSealedBoundary({
         transfer,
-        handover: () => markHandover(sid, { point }),
+        handover: () => (handoverResult = handoverAndRequest({ sid, point })),
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,
@@ -953,6 +1027,8 @@ if (isMain) {
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
+    const successorFailureLine = successorRequestFailureLine(handoverResult)
+    if (successorFailureLine) console.log(successorFailureLine)
     // Point 700: a boundary further past the ceiling than the stated margin —
     // or one whose context could not be measured — owes the closing report a
     // line. The trigger in wmPoint is for admission, not this overshoot record.
