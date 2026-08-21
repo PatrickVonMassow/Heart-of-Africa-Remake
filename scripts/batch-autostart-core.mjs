@@ -542,6 +542,10 @@ export function successorStartDecision({
     ? trigger.predecessorToken
     : null
   const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
+  const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
+  const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
+    ? new Date(ciWaitDeadline).toISOString()
+    : 'its recorded interaction deadline'
   const evidence = {
     trigger: {
       kind: kind || null,
@@ -557,7 +561,9 @@ export function successorStartDecision({
           terminal: ciWait.terminal === true,
           observerAlive: ciWait.observerAlive === true,
           repair: ciWait.repair === true,
+          deadline: ciWaitDeadline,
           deadlineReached: ciWait.deadlineReached === true,
+          vetoActive: ciWait.pending === true && ciWait.deadlineReached !== true,
           identity: ciWait.identity ?? null,
           wakeToken: ciWait.wakeToken ?? null,
           result: ciWait.result ?? null,
@@ -584,14 +590,14 @@ export function successorStartDecision({
   if (openPoints === 0) return refuse('batch-complete', 'the work order has no open successor')
   if (claimReserved === true) return refuse('claim-reserved', 'an honoured user claim reserves the next ownership')
 
-  // An unfinished run owns the empty interval after its worker exits. Child
-  // exit and watchdog notifications must not manufacture replacement workers
-  // which can do nothing but encounter the same Stop. The durable observer is
-  // the transport; only its matching terminal token opens this door again.
-  if (ciWait?.visible === true && ciWait.pending === true) {
+  // An unfinished run temporarily owns the empty interval after its worker
+  // exits. The same interaction deadline which makes Stop fail open also bounds
+  // this veto: observation continues after it, but the batch may recover rather
+  // than idle forever behind an unreachable run.
+  if (ciWait?.visible === true && ciWait.pending === true && ciWait.deadlineReached !== true) {
     return refuse(
       'ci-wait-pending',
-      `CI run ${ciWait.identity ?? 'unknown'} is still under durable observation` +
+      `CI run ${ciWait.identity ?? 'unknown'} is still under durable observation and remains a successor veto until ${ciWaitDeadlineLabel}` +
         (ciWait.repair === true ? '; its observer must be repaired before a successor starts' : ''),
     )
   }

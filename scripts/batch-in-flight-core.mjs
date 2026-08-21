@@ -101,7 +101,7 @@ export const LAUNCHER_WORK_MAX_AGE_MS = 4 * 60 * 60 * 1000
  * repair action, never make the wait disappear. PURE.
  */
 export function assessCiWait({ wait, now = Date.now(), probePid = () => null } = {}) {
-  const empty = (reason) => ({ visible: false, pending: false, terminal: false, observerAlive: false, repair: false, deadlineReached: false, reason })
+  const empty = (reason) => ({ visible: false, pending: false, terminal: false, observerAlive: false, repair: false, deadline: null, deadlineReached: false, reason })
   try {
     if (!wait || typeof wait !== 'object') return empty('no-wait')
     const required = ['identity', 'ref', 'sha', 'workflow', 'wakeToken']
@@ -127,6 +127,7 @@ export function assessCiWait({ wait, now = Date.now(), probePid = () => null } =
       terminal,
       observerAlive,
       repair: pending && !observerAlive,
+      deadline: wait.deadline,
       deadlineReached: Number(now) >= wait.deadline,
       reason: pending ? (observerAlive ? 'observing' : 'observer-missing') : `terminal-${wait.state}`,
       identity: wait.identity,

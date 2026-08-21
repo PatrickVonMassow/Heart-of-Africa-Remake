@@ -1857,6 +1857,7 @@ describe('durable CI wait assessment', () => {
       pending: true,
       observerAlive: false,
       repair: true,
+      deadline: NOW + 60_000,
       deadlineReached: false,
       reason: 'observer-missing',
     })
@@ -1864,6 +1865,7 @@ describe('durable CI wait assessment', () => {
       visible: true,
       pending: true,
       repair: true,
+      deadline: NOW - 1,
       deadlineReached: true,
     })
   })

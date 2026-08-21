@@ -302,15 +302,53 @@ describe('the immediate successor decision — one door for every transport', ()
       terminal: false,
       observerAlive: false,
       repair: true,
+      deadline: NOW + 60_000,
+      deadlineReached: false,
       identity: 'origin/feat/x:abc:CI:42',
       wakeToken: 'wake-1',
     }
     expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT }, ciWait })).toMatchObject({
       start: false,
       code: 'ci-wait-pending',
-      evidence: { ciWait: { repair: true } },
+      reason: `CI run origin/feat/x:abc:CI:42 is still under durable observation and remains a successor veto until ${new Date(NOW + 60_000).toISOString()}; its observer must be repaired before a successor starts`,
+      evidence: { ciWait: { repair: true, deadline: NOW + 60_000, deadlineReached: false, vetoActive: true } },
     })
     expect(start({ ciWait })).toMatchObject({ start: false, code: 'ci-wait-pending' })
+  })
+
+  it.each([
+    ['child exit', { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT }, null],
+    ['watchdog', { kind: SUCCESSOR_TRIGGERS.WATCHDOG }, null],
+    [
+      'boundary',
+      { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      { sessionId: 'old', kind: 'session', fence: 17, handedOver: true },
+    ],
+  ])('lets %s recover after the CI wait deadline while observation remains visible', (_label, trigger, lock) => {
+    const ciWait = {
+      visible: true,
+      pending: true,
+      terminal: false,
+      observerAlive: true,
+      repair: false,
+      deadline: NOW - 24 * 60 * 60 * 1000,
+      deadlineReached: true,
+      identity: 'refs/heads/main:abc:CI:99',
+      wakeToken: 'wake-1',
+    }
+    expect(start({ trigger, lock, assessment: { alive: false, reason: 'inactive' }, ciWait })).toMatchObject({
+      start: true,
+      code: 'start',
+      evidence: {
+        ciWait: {
+          pending: true,
+          observerAlive: true,
+          deadline: NOW - 24 * 60 * 60 * 1000,
+          deadlineReached: true,
+          vetoActive: false,
+        },
+      },
+    })
   })
 
   it('returns precise evidence for every policy refusal', () => {
