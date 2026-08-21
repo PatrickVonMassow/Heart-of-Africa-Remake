@@ -10685,25 +10685,3 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 804. The boundary hands out a handover text its own board gate refuses (measured 21.08.2026,
-  05:35, at the point-796 boundary). `node scripts/batch-boundary.mjs --prepare <N>` prints the
-  handover card's text to be taken VERBATIM and states that it names NO point number ON PURPOSE, so
-  the topic guard reads no foreign reference in the unnumbered gap card. Piping exactly that text
-  into `node scripts/board.mjs none --text-stdin` is REFUSED by the publish gate: "the handover card
-  is the one card without a number, so its reason must NAME the point the batch picks up next … The
-  publish gate refuses a handover card that names none."
-  WHY IT MATTERS: the two mechanisms state opposite requirements for the same card, and the one that
-  hands out the text is the one that loses at the gate. A session that follows `--prepare` literally
-  cannot write the card at all; this boundary only got through because an earlier card already named
-  the successor point. It is read at the end of a session, under the boundary's own pressure to make
-  the commit the last repository action, which is the worst moment to debug a contradiction.
-  FINAL STATE: the two agree. Either `--prepare` names the next open point in the text it hands out
-  — it can read the work order — or the publish gate stops demanding the name. Whichever side moves,
-  the text `--prepare` prints passes `board.mjs none` unchanged.
-  VERIFIABLE: a pure test that feeds the text `--prepare` produces for a landed point into the
-  publish gate's card check and asserts it is ACCEPTED; plus a test pinning whichever rule survives,
-  so the next change to one side cannot silently re-open the gap.
-  Criticality: medium — no product defect, and the boundary itself still completes, but it costs the
-  closing turn of every session a refused command until one side moves.
-  Bundle: Session- & Repo-Hygiene.
