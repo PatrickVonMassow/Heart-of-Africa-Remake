@@ -77,6 +77,85 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 809. The batch stands still between points, and no command can say which standstill was
+  work (measured 21.08.2026; the user ruled the same day that this point goes to the very FRONT
+  of the queue, ahead of 517, 744 and 752, so the tickets standing before the communication
+  mechanic are finished quickly: "Ich will, dass die Queue schnell abgearbeitet werden kann,
+  damit schnell die Tickets erledigt werden, die vor der Kommunikationsmechanik stehen").
+  WHAT WAS MEASURED. Over the last four days main took 588 commits, and between consecutive
+  commits there are 65 gaps of 20 minutes or more, together 48.8 hours of a roughly 96-hour wall
+  clock. Nothing in the repository can say which of those hours were real work (a browser suite, a
+  delegated author, a long verification) and which were standstill with nobody working the batch
+  at all: the launcher log distinguishes only its own skip reasons, and point 752 measures the
+  handover, not the standstill.
+  ONE GAP WAS DECOMPOSED BY HAND and turned out to be pure standstill. Owner session 6a0621ed
+  wrote its last transcript line at 10:15:29 inside a `ci-status-guard` wait (run 32462093487
+  still running, hook text: sleep about 90 s, then end the turn again) and never came back. The
+  launcher ticks every 900 s and skipped four consecutive ticks with: "skip: live batch-writer
+  process 2156063 measured for session 593e0d2f-1829-4d61-b023-8fc73ad4a551 independently of the
+  owner lock". That process is the VS Code extension window, alive since 19.08. 19:24 and idle,
+  whose last batch write was 09:08:03. In `scripts/batch-autostart-core.mjs` the function
+  `launcherStartDecision` lets a foreign live writer veto every start for `WRITER_VETO_MAX_AGE_MS`
+  (2 h) after its last write, and that check runs BEFORE every other rule, including an explicit
+  handover mark. The successor was spawned at 11:14:05, six minutes after the veto aged out: 59
+  minutes with nobody working the batch, visible on the board as the empty stretch between the
+  card of point 772 (08:31 to 08:54) and the card of point 800 (11:14 to 11:24). The launcher SAW
+  it and had no remedy: "ESCALATING: session 593e0d2f (pid 2156063) has blocked launcher recovery
+  for 15 min (2 consecutive ticks)" — followed by two more skips.
+  FINAL STATE:
+  1. ONE COMMAND REPORTS EVERY STANDSTILL, and it is the only way this question is ever asked
+  again (memory rule: a recurring forensic lookup gets a command, never a hand analysis). It reads
+  the commit times on main, .claude/autostart.log, the boundary markers, the verification run
+  records and the session transcripts, and prints every gap over a threshold with its start, its
+  end, its length and its MEASURED cause class. It runs over a chosen window (--since) and needs
+  no batch lock, because the session most likely to ask is the one standing down.
+  2. THE CAUSE CLASSES ARE MEASURED, NOT GUESSED. At minimum: owner alive and advancing (a run
+  record, a worktree or a delegated agent moved inside the gap), owner alive but stuck (nothing
+  advanced), no owner at all (launcher vetoed, or no tick happened), handover ramp, claim
+  reservation, user pause, quota wait. A gap whose cause cannot be established is reported as
+  UNATTRIBUTED rather than folded into a neighbouring class, and the share of unattributed time is
+  itself a reported result - a classifier that explains everything is the failure mode to avoid.
+  3. THE LAST 14 DAYS ARE RUN THROUGH IT ONCE and the result is recorded as evidence: how much of
+  the wall clock was standstill, split by class, and which classes are large enough to be worth
+  removing. This is the analysis half of the point and it comes BEFORE the levers, so the fixes
+  are aimed by evidence rather than by the two incidents that happened to be noticed.
+  4. EVERY CLASS THE REPORT SHOWS AS AVOIDABLE IS FIXED IN THIS POINT. Two are already measured
+  and are fixed regardless of what else the report finds:
+     a) A FOREIGN LIVE WRITER MAY NOT VETO RECOVERY BY EXISTING. An idle editor window that once
+  wrote batch state is not evidence that the batch is being worked. The veto follows evidence that
+  the writer is ADVANCING - the same advancing-evidence reading the launcher already performs for
+  a declared wait - and not the age of its last write; and an explicit handover mark outranks a
+  foreign writer that is not advancing, exactly as it already outranks the writer the lock itself
+  names. The escalation line that fires after two blocked ticks ends in an ACTION, not in another
+  skip.
+     b) A SESSION THAT ENDS INSIDE A DECLARED CI WAIT MAY NOT COST AN HOUR. Either the wait
+  survives the session end because something re-invokes it, or the ending session releases the
+  lock so the very next launcher tick takes over. Which of the two is decided by evidence inside
+  the point; what may not remain is the measured state, where the wait simply stops and nothing
+  notices for 59 minutes.
+  5. THE THRESHOLD FOR A REPORTED GAP IS STATED WHERE IT IS SET, together with why that number and
+  not a smaller one, so a later reader can lower it without re-deriving the argument.
+  VERIFIABLE: pure Vitest over the classifier (a gap with an advancing run record becomes working;
+  the same gap without it becomes stuck; a gap with no live owner and a launcher skip becomes
+  no-owner; a gap under a pause marker becomes paused; an unclassifiable gap becomes unattributed
+  and is counted as such), pure Vitest over launcherStartDecision (foreign writer advancing
+  vetoes; foreign writer idle does not; foreign writer idle plus a handover mark starts the
+  successor; the lock own-writer behaviour stays byte for byte as it is), and a test over the
+  CI-wait release path in the direction the point chooses. The 14-day report is itself evidence in
+  the point.
+  IMPLIED CHANGES: `docs/batch-owner-runbook.md` gains the command and what its cause classes
+  mean; `docs/work-packages.md` gains the point. No design.md change.
+  FILES AND POINTS: scripts/batch-autostart-core.mjs (launcherStartDecision,
+  WRITER_VETO_MAX_AGE_MS), scripts/batch-autostart.mjs, .claude/autostart.log,
+  .claude/autostart-last.json, scripts/ci-status-guard.mjs, scripts/wait-marker-core.mjs,
+  scripts/batch-ownership-core.mjs; points 517, 744, 752, 795.
+  THIS POINT SUPERSEDES POINT 808, which filed 4(b) alone from the same incident before this
+  request was drained; 808 is folded into it.
+  Criticality: high — it is the user's own ranking decision and it governs how fast every
+  remaining point reaches him: 48.8 of 96 hours are gaps nobody can account for, and one decomposed
+  gap was a full hour of nothing.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
