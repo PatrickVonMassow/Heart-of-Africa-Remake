@@ -2480,3 +2480,25 @@ Hebel: Wer zuerst repariert, repariert die zwei Vorfälle, die jemand zufällig 
 Zuordnung, die alles erklärt, ist die eigentliche Gefahr — nicht zuordenbare Zeit muss als solche
 ausgewiesen werden und ihr Anteil ist selbst ein Ergebnis. Dass ausgerechnet die größte Ursache erst
 der blinden Zweitlesung auffiel, ist der Beleg dafür, wozu das geteilte Verfahren da ist (§3.19).
+
+### 3.120 Der Statussatz wurde angehängt, nicht aus dem gemessenen Zustand abgeleitet
+
+Die Punktgrenze stellt beim Übergeben fest, ob übertragbare Arbeit läuft — sie nennt den Zweig und
+den Commit sogar beim Namen. Im selben Ausdruck diktiert sie danach eine Tafel-Karte, die
+unbedingt mit »Hier läuft nichts weiter.« endet. Beide Sätze stammen aus einem Aufruf, und der
+zweite liest nicht, was der erste gerade gemessen hat. Am 21.08.2026 hat die Nachfolgesitzung
+genau das vorgefunden: Die veröffentlichte Tafel meldete Stillstand, während GPT-5.6 Sol an
+Punkt 809 weiterbaute.
+
+Die Klasse ist nicht »falscher Text«, sondern eine Ausgabe, die neben dem Zustand hergestellt wird
+statt aus ihm. Solange der Satz eine Konstante ist, kann keine Messung ihn widerlegen — er ist
+richtig, solange der häufigste Fall eintritt, und schweigend falsch im Rest. Das trifft
+ausgerechnet die Karte, die der Nutzer auf dem Handy liest, und sie wird unter dem Zeitdruck des
+Sitzungsendes wörtlich übernommen, also ohne die Ruhe, in der jemand den Widerspruch bemerkt.
+
+Die Prüfung dagegen ist billig und wurde nie gefordert: Ein diktierter Text wird mit BEIDEN
+Belegungen des Zustands erzeugt — mit laufender Arbeit und ohne — und beide Male gelesen. Wo eine
+Ausgabe zwei Fälle behaupten kann, aber nur einer je erzeugt wird, ist der zweite Fall nicht
+getestet, sondern nur noch nicht aufgefallen. Verwandt mit §3.19 (die zweite Lesung findet, was
+die erste nicht sehen konnte) und mit der Familie der diktierten Übergabe-Karte, die schon
+mehrfach an ihren eigenen Toren gescheitert ist.
