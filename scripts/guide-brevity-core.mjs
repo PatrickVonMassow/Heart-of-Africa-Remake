@@ -49,7 +49,7 @@
 // lines under the old 409 and rides that slack, so 408 is the exact count and 417 would have
 // been room for a whole future entry — the four-eyes review caught precisely that.
 export const LIMITS = {
-  maxLines: 425,
+  maxLines: 431,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -104,7 +104,18 @@ export const LIMITS = {
   // +10 lines / +96 words to the exact 425 / 3773 fit, with zero slack. This
   // raise was NOT escalated to the user under his general 10.08.2026 withdrawal
   // of ask-before-raising; the written justification here is the last step.
-  maxWords: 3773,
+  // Raised again on 21.08.2026 by ONE genuinely new tip: a run reporting that it
+  // delivered NOTHING while finished, unsecured work lies beside it, so the
+  // reader's next move clears the work away. It is not the swallowed-error tip
+  // (that one hides a failure behind a success) and not the narrow-window tip
+  // (that one measures too little of the right thing): here a NEGATIVE claim is
+  // made over a state nobody measured at all, and the claim is read exactly when
+  // acting on it destroys something. The decision a reader copies is that a
+  // denial names the measured state it denies. It cost +6 body lines / +59 words
+  // against the guide's measured 425 / 3773, and the ceilings move by exactly
+  // that to the 431 / 3832 fit, with zero slack. Nothing was removed to fit it,
+  // and no existing entry grew.
+  maxWords: 3832,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

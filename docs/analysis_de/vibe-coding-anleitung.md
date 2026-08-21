@@ -329,6 +329,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
+- **„Nichts geliefert" wurde nie nachgemessen.** Ein Lauf meldet, er habe nichts geschrieben,
+  während fertige, ungesicherte Arbeit danebenliegt — und der nächste Griff räumt sie weg.
+  → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint.
+  ‚Nichts da' gilt nur für den nachweislich leeren Fall; sonst nenn die **Größe** des Vorhandenen
+  und den Befehl, der es **sichert**."
+
 - **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
   „es lief durch" beweist den Weg nicht.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
@@ -422,4 +428,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: cd3df4e17c2c96b05383ba923cbc24a65333850d85417efa053f565197d41858 -->
+<!-- GUIDE-FINGERPRINT: 04c677f1f0d91d6446b82bf6dbc6388f35ebff6f8a97838b8661f343d3052ef7 -->
