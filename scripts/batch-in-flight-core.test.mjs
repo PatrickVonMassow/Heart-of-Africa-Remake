@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  assessCiWait,
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
@@ -1829,6 +1830,74 @@ describe('declarationShields — the expiry the branch sweep now applies too', (
     expect(declarationShields({ declaration: {}, now: NOW })).toMatchObject({ shields: true, reason: 'no-timestamp' })
     expect(declarationShields({ declaration: { at: 'soon' }, now: NOW }).shields).toBe(true)
     expect(declarationShields().shields).toBe(true)
+  })
+})
+
+describe('durable CI wait assessment', () => {
+  const wait = (over = {}) => ({
+    v: 1,
+    identity: 'origin/feat/x:abc:CI:42',
+    state: 'pending',
+    ref: 'origin/feat/x',
+    sha: 'abc',
+    workflow: 'CI',
+    runId: 42,
+    firstObservationAt: NOW - 60_000,
+    lastObservationAt: NOW - 1_000,
+    deadline: NOW + 60_000,
+    wakeToken: 'wake-1',
+    observer: { pid: 44, startedAt: NOW - 20_000 },
+    terminal: null,
+    ...over,
+  })
+
+  it('remains visible after its worker exits and after its interaction deadline', () => {
+    expect(assessCiWait({ wait: wait(), now: NOW, probePid: () => null })).toMatchObject({
+      visible: true,
+      pending: true,
+      observerAlive: false,
+      repair: true,
+      deadlineReached: false,
+      reason: 'observer-missing',
+    })
+    expect(assessCiWait({ wait: wait({ deadline: NOW - 1 }), now: NOW, probePid: () => null })).toMatchObject({
+      visible: true,
+      pending: true,
+      repair: true,
+      deadlineReached: true,
+    })
+  })
+
+  it('proves the observer by pid and start time, never by a recycled pid alone', () => {
+    expect(assessCiWait({
+      wait: wait(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: NOW - 20_000 }),
+    })).toMatchObject({ observerAlive: true, repair: false, reason: 'observing' })
+    expect(assessCiWait({
+      wait: wait(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: NOW - 200_000 }),
+    })).toMatchObject({ observerAlive: false, repair: true })
+  })
+
+  it('keeps a terminal result visible for the matching wake request', () => {
+    expect(assessCiWait({
+      wait: wait({ state: 'failed', observer: null, terminal: { state: 'failed', verdict: 'red', observedAt: NOW } }),
+      now: NOW,
+    })).toMatchObject({
+      visible: true,
+      pending: false,
+      terminal: true,
+      repair: false,
+      wakeToken: 'wake-1',
+      result: { verdict: 'red' },
+    })
+  })
+
+  it('does not invent visibility from malformed state', () => {
+    expect(assessCiWait({ wait: null })).toMatchObject({ visible: false, reason: 'no-wait' })
+    expect(assessCiWait({ wait: { state: 'pending' } })).toMatchObject({ visible: false, reason: 'unreadable' })
   })
 })
 

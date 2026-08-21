@@ -93,6 +93,52 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
 export const LAUNCHER_WORK_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
 /**
+ * A CI wait is in-flight work even after the worker that first observed it has
+ * exited. Unlike a hand-authored declaration it does not age out: its deadline
+ * releases the interaction budget, while the detached observer remains obliged
+ * to carry the run to a terminal result. The observer identity is evidence for
+ * repair, not a condition for visibility — losing the observer must expose a
+ * repair action, never make the wait disappear. PURE.
+ */
+export function assessCiWait({ wait, now = Date.now(), probePid = () => null } = {}) {
+  const empty = (reason) => ({ visible: false, pending: false, terminal: false, observerAlive: false, repair: false, deadlineReached: false, reason })
+  try {
+    if (!wait || typeof wait !== 'object') return empty('no-wait')
+    const required = ['identity', 'ref', 'sha', 'workflow', 'wakeToken']
+    if (required.some((key) => typeof wait[key] !== 'string' || !wait[key])) return empty('unreadable')
+    if ((typeof wait.runId !== 'number' && typeof wait.runId !== 'string') || !Number.isFinite(wait.firstObservationAt) || !Number.isFinite(wait.lastObservationAt) || !Number.isFinite(wait.deadline)) {
+      return empty('unreadable')
+    }
+    const pending = wait.state === 'pending' && wait.terminal == null
+    const terminal = (wait.state === 'success' || wait.state === 'failed') && !!wait.terminal
+    if (!pending && !terminal) return empty('unreadable')
+    const pid = Number(wait.observer?.pid)
+    const recordedStartedAt = Number(wait.observer?.startedAt)
+    const measured = Number.isInteger(pid) && pid > 0 ? probePid(pid) : null
+    const measuredStartedAt = Number(measured?.startedAt)
+    const observerAlive = pending && measured?.exists === true && (
+      !Number.isFinite(recordedStartedAt) ||
+      !Number.isFinite(measuredStartedAt) ||
+      Math.abs(measuredStartedAt - recordedStartedAt) <= PID_START_TOLERANCE_MS
+    )
+    return {
+      visible: true,
+      pending,
+      terminal,
+      observerAlive,
+      repair: pending && !observerAlive,
+      deadlineReached: Number(now) >= wait.deadline,
+      reason: pending ? (observerAlive ? 'observing' : 'observer-missing') : `terminal-${wait.state}`,
+      identity: wait.identity,
+      wakeToken: wait.wakeToken,
+      result: terminal ? wait.terminal : null,
+    }
+  } catch {
+    return empty('unreadable')
+  }
+}
+
+/**
  * MAY A DECLARATION STILL SHIELD SOMETHING FROM A SWEEP? PURE (point 437 G).
  *
  * The branch sweep read the in-flight file RAW — every branch and worktree it
