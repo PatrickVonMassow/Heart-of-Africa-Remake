@@ -449,6 +449,21 @@ export function cardProofFragments({ cause = BOUNDARY_CAUSES.POINT, destination 
 }
 
 /**
+ * The claimant identity the handover card may print. The claim record is the
+ * launcher's authority; a session id remembered elsewhere can predate a
+ * `/clear`, while the window's process survives it. Keeping this projection
+ * pure lets the composer test prove that no stale session id leaks in.
+ */
+export function claimantCardIdentity(claim) {
+  const claimantSid = typeof claim?.sessionId === 'string' ? claim.sessionId.trim() : ''
+  const claimantPid = Number(claim?.pid)
+  return {
+    claimantSid: claimantSid || null,
+    claimantPid: Number.isInteger(claimantPid) && claimantPid > 0 ? claimantPid : null,
+  }
+}
+
+/**
  * DOES THE BOARD CARRY THAT CARD? PURE. Returns
  * { carries, verifiable, missing } — `verifiable` false for a board that could
  * not be read at all.
@@ -957,15 +972,13 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
  * User-facing prose (the board is read on a phone), so it says the destination in
  * the first sentence and never leaves the reader to infer it.
  *
- * IT NAMES NO POINT NUMBER (point 439, 30.07.2026). This text is prescribed for
- * use VERBATIM, and it goes into the gap card `board.mjs done <n> --none` writes
- * — a card that owns no point number, so `dashboard-card-topic-guard` counted
- * every "Punkt N" in it as a reference to a FOREIGN point and blocked the turn
- * end. Two sanctioned mechanisms thus contradicted each other, and the loser was
- * always the boundary: the block costs a turn, and every remedy command counts as
- * work and deletes the boundary marker, so the handover had to be re-taken. The
- * closed point's own story belongs in Erledigt anyway, which is where `done`
- * files it in the same edit; this card says only where the batch GOES.
+ * IT NAMES THE NEXT OPEN POINT (point 800). This text is prescribed for use
+ * VERBATIM in the unnumbered gap card `board.mjs done <n> --none` writes. The
+ * board writer requires that forward reference, and the topic guard permits it
+ * only on this state card by title; the shared property test applies the same
+ * writer predicate so those two rules cannot drift apart again. The closed
+ * point's own story belongs in Erledigt anyway, which is where `done` files it
+ * in the same edit; this card says where the batch GOES.
  */
 /**
  * THE COMMAND THAT PUTS THE BOUNDARY CARD UP. PURE.
@@ -987,13 +1000,28 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
     : `${NONE_CARD_CMD} --text-stdin`
 }
 
-export function boundaryCardText({ destination, claimantSid = null, cause = BOUNDARY_CAUSES.POINT } = {}) {
+export function boundaryCardText({
+  destination,
+  claimantSid = null,
+  claimantPid = null,
+  nextPoint,
+  cause = BOUNDARY_CAUSES.POINT,
+} = {}) {
+  const followOn = Number(nextPoint)
+  if (!Number.isInteger(followOn) || followOn <= 0 || followOn > 999_999) {
+    throw new Error('boundary card: nextPoint must name the first open work-order point')
+  }
   // The WATERMARK head (point 675, defeat 3): the reader must see that the
   // handover happens BECAUSE the context passed the mark, not because a point
   // closed — a card that says "der Punkt ist abgeschlossen" over a watermark
   // handover claims a closure that never happened.
   const head = BOUNDARY_CARD_HEADS[cause] ?? BOUNDARY_CARD_HEADS[BOUNDARY_CAUSES.POINT]
-  if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
+  if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW) {
+    const currentSid = typeof claimantSid === 'string' ? claimantSid.trim() : ''
+    const stablePid = Number(claimantPid)
+    if (!currentSid || !Number.isInteger(stablePid) || stablePid <= 0) {
+      throw new Error('boundary card: a claiming-window handover needs the current claim session and pid')
+    }
     // The reservation is stated with its LIMIT, not as a promise. It survives the
     // release now (point 461 — the freed lock stays that window's while its
     // process lives), so the card no longer has to warn about losing a race; but
@@ -1002,20 +1030,17 @@ export function boundaryCardText({ destination, claimantSid = null, cause = BOUN
     // would repeat, one step later, the very misdirection this card was rewritten
     // to remove (four-eyes review, finding 2).
     return (
-      `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster ${claimantSid} hat ihn beansprucht, der ` +
-      'Launcher hält den Start deshalb zurück und reserviert den Stapel für dieses Fenster. Weitergearbeitet ' +
-      `wird dort, sobald es den Anspruch einlöst (\`node scripts/batch-claim.mjs --session ${claimantSid}\`). ` +
-      'Die Reservierung bleibt auch nach der Freigabe bestehen, solange dieses Fenster offen ist — kein ' +
-      'Launcher-Lauf und keine andere Sitzung nimmt sie ihm beim Rundenende weg. Wird sie innerhalb der ' +
-      'Übernahmefrist nicht eingelöst oder das Fenster geschlossen, greift die gewöhnliche Übergabe — der ' +
-      'Stapel bleibt nie ohne Eigentümer. ' +
-      'Hier läuft nichts weiter.'
+      `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster mit PID ${stablePid} (aktuelle Sitzung ` +
+      `${currentSid}) hat ihn beansprucht; der Launcher hält den Start deshalb zurück. Dort wird mit Punkt ` +
+      `${followOn} weitergearbeitet, sobald das Fenster den Anspruch einlöst. Die Reservierung bleibt bis zum ` +
+      'Ende der Übernahmefrist oder bis zum Schließen des Fensters bestehen.\n\n' +
+      'Danach greift die gewöhnliche Übergabe; der Stapel bleibt nie ohne Eigentümer. Hier läuft nichts weiter.'
     )
   }
   return (
-    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls, und ` +
-    'sie nimmt den nächsten Punkt der Warteschlange auf. Kein Fenster hat den Stapel beansprucht. Hier läuft ' +
-    'nichts weiter.'
+    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls. Sie ` +
+    `nimmt Punkt ${followOn} als nächsten offenen Punkt der Warteschlange auf. Kein Fenster hat den Stapel ` +
+    'beansprucht.\n\nHier läuft nichts weiter.'
   )
 }
 

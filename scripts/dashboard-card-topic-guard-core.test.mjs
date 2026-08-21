@@ -228,11 +228,12 @@ describe('the idle and closing cards are exempt', () => {
     expect(evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE }).block).toBe(false)
   })
 
-  it('passes over the idle card just the same', () => {
+  it('accepts the idle card\'s required forward reference', () => {
     const html = boardHtml({
-      now: [stateCard(NO_CURRENT_WORK_TITLE, '<p>Punkt 266 ist abgeschlossen, der Stapel wartet.</p>')],
+      now: [stateCard(NO_CURRENT_WORK_TITLE, '<p>Der Nachfolger nimmt Punkt 266 als Nächstes auf.</p>')],
     })
     expect(topicViolations(html, KNOWN)).toEqual([])
+    expect(evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE }).block).toBe(false)
   })
 
   it('exempts the two by NAME, not every card without a number', () => {

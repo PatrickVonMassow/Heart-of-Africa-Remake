@@ -894,11 +894,11 @@ export const STATE_KINDS = ['idle', 'closing']
 const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
 
 /**
- * The UNNUMBERED state-card titles. The handover card owns no point number by
- * design, so every rule written for a numbered card — the topic guard's
- * foreign-point complaint above all — has to know it by name. The closing card
- * carries a number since point 655; its legacy title stays listed so a board
- * written earlier is still exempted.
+ * The UNNUMBERED state-card titles. The handover card owns no point chip by
+ * design, but must name its follow-on point in prose, so rules written for a
+ * numbered card — the topic guard's foreign-point complaint above all — have
+ * to know it by name. The closing card carries a number since point 655; its
+ * legacy title stays listed so a board written earlier is still exempted.
  */
 export const STATE_CARD_TITLES = [NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE]
 
