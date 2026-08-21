@@ -161,8 +161,9 @@ describe('immediate handover and supervised exit are runtime transports', () => 
     expect(code).toMatch(/triggerKind[\s\S]*SUCCESSOR_TRIGGERS\.WATCHDOG/)
   })
 
-  it('does not charge scheduler backoff to an event-driven handover', () => {
-    expect(code).toMatch(/if \(!immediate && lastSpawn[\s\S]{0,180}?now - lastSpawn\.at < backoffMs\)/)
+  it('lets only the boundary cause bypass the spawn backoff', () => {
+    expect(code).toMatch(/shouldWaitForSpawnBackoff\(\{ triggerKind, lastSpawnAt: lastSpawn\?\.at, now, backoffMs \}\)/)
+    expect(code).not.toMatch(/if \(!immediate && lastSpawn/)
   })
 
   it('puts the generation and token reservation inside the atomic acquire', () => {

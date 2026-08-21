@@ -70,6 +70,7 @@ import {
   judgePreviousSpawn,
   spawnProgressed,
   spawnBackoffMs,
+  shouldWaitForSpawnBackoff,
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
@@ -1207,7 +1208,7 @@ if (dispossessed) {
 // practically nothing, so the probe rides the ordinary tick.
 const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
 const lastSpawn = readJson(C('autostart-last.json'))
-if (!immediate && lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < backoffMs) {
+if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })) {
   log(
     `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
       `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +

@@ -928,6 +928,15 @@ export const SPAWN_BACKOFF_BASE_MS = 10 * 60 * 1000
  *  short enough that a recovered machine is picked up the same morning. */
 export const SPAWN_BACKOFF_CAP_MS = 2 * 60 * 60 * 1000
 
+/** A clean boundary is an optimization over the watchdog and may start at
+ * once. Failure-triggered transports still need the same backoff ladder as a
+ * scheduler tick, even though they arrive through the immediate CLI path. */
+export function shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt, now = Date.now(), backoffMs } = {}) {
+  if (triggerKind === SUCCESSOR_TRIGGERS.BOUNDARY) return false
+  return Number.isFinite(lastSpawnAt) && Number.isFinite(now) && Number.isFinite(backoffMs) &&
+    now - lastSpawnAt < backoffMs
+}
+
 /**
  * (iii) THE BACKOFF ESCALATES. PURE.
  *

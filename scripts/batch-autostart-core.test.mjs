@@ -41,6 +41,7 @@ import {
   judgePreviousSpawn,
   spawnProgressed,
   spawnBackoffMs,
+  shouldWaitForSpawnBackoff,
   SPAWN_PROVE_MS,
   SPAWN_BACKOFF_BASE_MS,
   SPAWN_BACKOFF_CAP_MS,
@@ -853,6 +854,18 @@ describe('spawnBackoffMs — the ladder rises instead of hammering', () => {
     for (const failCount of [-5, NaN, 'many', null, undefined]) {
       expect(spawnBackoffMs({ failCount })).toBe(SPAWN_BACKOFF_BASE_MS)
     }
+  })
+
+  it('keeps failure-triggered immediate requests on the ladder but exempts a clean boundary', () => {
+    const now = 1_784_900_000_000
+    const recent = {
+      lastSpawnAt: now - 60_000,
+      now,
+      backoffMs: SPAWN_BACKOFF_BASE_MS,
+    }
+    expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.CRASH })).toBe(true)
+    expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.CHILD_EXIT })).toBe(true)
+    expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.BOUNDARY })).toBe(false)
   })
 })
 
