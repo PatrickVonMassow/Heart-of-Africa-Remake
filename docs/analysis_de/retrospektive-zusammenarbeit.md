@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1319,7 +1320,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 19:58 · Quellen-Fingerprint: `1de805604edf…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 20:28 · Quellen-Fingerprint: `4ee4bac5846a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1415,8 +1416,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 5 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 1de805604edf2fcdb7f6bc19bd619a5e9c73d9710703c6deebee47d7606e7f43 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:58:14.419Z -->
+<!-- RETRO-FINGERPRINT: 4ee4bac5846a61b664332d2758b8b692b7212abad7f74d1be42d526c2750884c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T18:28:00.020Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2619,3 +2620,46 @@ Verwechslung ist genau dort am wahrscheinlichsten, wo ein Übergang stattfindet.
 jedem Detektor: *Welchen Zustand behaupte ich, und wäre meine Messung auch dann noch wahr, wenn
 der Zustand gerade endet?* Und für jede Eskalation, die einen Menschen adressiert: *Was passiert,
 wenn niemand liest?* Verwandt mit §3.149 (zwei Leser, ein Datensatz, zwei Antworten).
+
+
+### 3.155 Die Übergabe trug den Zustand, aber nicht das Leben
+
+Am 21.08.2026 gegen 20:05 nahm eine frische Sitzung den Stapel auf. Die Vorgängerin war tot, und
+ihre Übergabe hatte funktioniert — jedenfalls die Hälfte, die aus Daten besteht: Die In-Flight-
+Deklaration zum laufenden Autorenlauf war sauber transferiert, der Nachfolger konnte sie
+übernehmen, und sie benannte Zweig, Arbeitsbaum, Protokoll und Prozess. Nur lief der Prozess
+nicht mehr. Er war ein Kind der gestorbenen Sitzung und mit ihr gefallen.
+
+Die Deklaration behauptete das Gegenteil, und sie hatte sogar einen Beleg dafür: Der als Nachweis
+geführte Prozess antwortete auf `kill -0`. Er war der kurzlebige Shell-Mantel um den Autorenlauf,
+nicht der Autorenlauf selbst — ein Prozess, der nur langsamer starb als sein Kind. Damit ist das
+dieselbe Wurzel wie in §3.154, eine Ebene tiefer: Dort beantwortete eine Frischemessung die Frage
+nach dem Leben einer Sitzung, hier beantwortet ein Mantelprozess die Frage nach dem Leben der
+delegierten ARBEIT. Ein Lebendnachweis ist nur so viel wert wie die Genauigkeit dessen, worauf er
+zeigt.
+
+Die zweite Hälfte des Schadens ist die lehrreichere, weil sie zeigt, wie zwei je für sich richtige
+Regeln zusammen eine Sackgasse bauen. Im Arbeitsbaum lagen zehn geänderte und zwei neue Dateien,
+unversioniert — die angefangene Arbeit des Autors im Moment seines Todes. Das Runbook sagt, nicht
+gepushte Arbeit werde zuerst gedraint; erzwungen wird das nirgends, denn ein Drain geschieht nur
+auf dem geordneten Weg, und genau den nimmt ein unerwarteter Tod nicht. Zugleich weigert sich der
+Autorenstart zu Recht, auf einem schmutzigen Baum anzufangen: Sonst ließe sich neu Geschriebenes
+nicht von Vorgefundenem unterscheiden. Ergebnis: Die geretteten Reste blockierten genau die
+Fortsetzung, zu der sie gehörten. Auflösen ließ sich das nur von Hand, mit einem Rettungs-Commit,
+der die Arbeit ungeprüft und CI-übersprungen sichert und dem Autor zugeschrieben bleibt.
+
+Am selben Abend fiel ein zweiter Mechanismus in dieselbe Kerbe wie §3.140: Das Kritikalitätstor
+nennt in seinem eigenen Verweigerungstext einen zweiten Ausweg — jeden Befund als offenen Punkt
+anlegen und eine Quittung anhängen —, und für diese Quittung existiert kein Befehl. Sie musste als
+JSON-Zeile von Hand in das Register geschrieben werden, samt der Bedingungen, die nur im Quelltext
+stehen. Dass eine falsch getroffene Quittung stillschweigend ignoriert wird, macht den Handweg
+zusätzlich gefährlich.
+
+**Lehre:** Eine Übergabe ist erst vollständig, wenn sie neben dem Zustand auch das Schicksal der
+laufenden Arbeit regelt — überlebt sie, wird sie nachweisbar am richtigen Prozess gemessen; stirbt
+sie, wird ihr Rest gesichert statt liegengelassen. Prüffragen: *Zeigt mein Lebendnachweis auf den
+Prozess, der die Arbeit tut, oder auf seine Hülle?* Und: *Was passiert mit dem, was halbfertig im
+Baum liegt, wenn niemand mehr den geordneten Weg geht?* Wo zwei Regeln einander sperren — hier
+»nicht ungeprüft committen« gegen »nicht auf schmutzigem Baum starten« —, braucht die Kreuzung
+einen eigenen benannten Weg, sonst wird sie jedes Mal von Hand aufgelöst. Verwandt mit §3.154
+(Frische statt Leben) und §3.140 (die nur behauptete Ausnahme).
