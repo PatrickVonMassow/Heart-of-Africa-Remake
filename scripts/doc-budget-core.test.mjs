@@ -146,11 +146,17 @@ describe('fenceTracker — one CommonMark fence rule for both readers', () => {
   })
 
   it('refuses a backtick opener whose info string carries a backtick', () => {
-    expect(run(['``` a`b', 'not code'])).toEqual(['F.', '..'])
+    // It opens nothing AND it is not furniture: it is an ordinary prose line (round 2).
+    expect(run(['``` a`b', 'not code'])).toEqual(['..', '..'])
   })
 
   it('allows only spaces and tabs behind a closing run', () => {
     expect(run(['```', '``` and a word', '```  \t'])).toEqual(['FO', 'FO', 'F.'])
+  })
+
+  it('does not call a refused backtick opener furniture — it is prose', () => {
+    // ```lang ` … is not a fence, so it must be READ, not skipped (round 2).
+    expect(run(['``` a`b because it argues'])).toEqual(['..'])
   })
 
   it('is total on missing input', () => {
@@ -230,6 +236,22 @@ describe('proseRationaleFindings — the file instructs, it does not argue', () 
 
   it('leaves an unclosed backtick run alone instead of swallowing the line', () => {
     expect(find('- The reason is a stray ` backtick.')).toHaveLength(1)
+  })
+
+  it('reads a line whose backtick run opens no fence', () => {
+    expect(find('``` a`b because it argues')).toHaveLength(1)
+  })
+
+  it('closes a code span only on a run of the SAME length', () => {
+    // A two-backtick opener is not closed by the first two of a three-backtick run, so
+    // the text between them was never code and is read (round 2).
+    expect(find('- Run ``--because``` here.')).toHaveLength(1)
+    expect(find('- Run ``--because`` here.')).toEqual([])
+  })
+
+  it('leaves a binding condition alone — only an ADVERB may stand before the purpose', () => {
+    expect(find('If the lock exists and belongs to the session, keep it.')).toEqual([])
+    expect(find('Keep the record where it exists and points to a live branch.')).toEqual([])
   })
 
   it('catches an adverb between the verb and its purpose', () => {

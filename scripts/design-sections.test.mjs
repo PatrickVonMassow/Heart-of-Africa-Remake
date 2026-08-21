@@ -81,6 +81,52 @@ const homesOf = (id) => [
   ...neighbours.filter((n) => n.sections.has(id)).map((n) => n.path),
 ]
 
+/**
+ * The 32 acceptance criteria as §7.1 carries them, number → title. FROZEN like
+ * BASELINE_SECTION_IDS above and for the same reason: point 768 cut §7.1 to number and
+ * title alone, so the numbers and titles ARE the contract now — `point-brief.mjs`
+ * resolves a bare `§22` through them and the closing reports against them. A contiguous
+ * run of non-empty titles is not enough to pin that (cross-vendor review, round 2):
+ * reordering the criteria and renumbering them 1–32 satisfies it exactly.
+ *
+ * Extending this is free. TRIMMING it, renumbering an entry or retitling one is a
+ * deliberate edit here, in the commit that changes §7.1 — never a green surprise.
+ */
+export const ACCEPTANCE_CRITERIA_BASELINE = {
+  1: "Build/start",
+  2: "Two perspectives",
+  3: "World model",
+  4: "Movement and time",
+  5: "Port city",
+  6: "Village and cultural contact",
+  7: "Language and communication",
+  8: "Chronicle/journal",
+  9: "Status bar",
+  10: "Goal scaffolding",
+  11: "Game graphics",
+  12: "Atmosphere",
+  13: "Real geodata",
+  14: "Lighting and post-processing",
+  15: "Lively settlements",
+  16: "Settlement collision",
+  17: "Localization",
+  18: "Lint and dependency hygiene",
+  19: "Journal voice/read-aloud",
+  20: "Comfort and audio settings",
+  21: "Water realism",
+  22: "Health and afflictions",
+  23: "Random events",
+  24: "Deadline and successor",
+  25: "Trade economy",
+  26: "Standing with the natives",
+  27: "Camps",
+  28: "Saving/loading",
+  29: "Animated handwriting",
+  30: "Gamepad and position query",
+  31: "Orientation and panorama wildlife",
+  32: "Render pipeline upgrades",
+}
+
 describe('design.md section numbers', () => {
   it('still resolves every number it carried before the point-367 compression', () => {
     const lost = BASELINE_SECTION_IDS.filter((id) => homesOf(id).length === 0)
@@ -126,11 +172,20 @@ describe('CLAUDE.md references into design.md', () => {
     const parts = run.split(/\s*[/,]\s*/)
     const out = []
     for (const part of parts) {
-      const range = /^(\d+)\s*[–—-]\s*(\d+)$/.exec(part)
-      // An INTEGER range names every number between its ends; a dotted one (17.1–17.3)
-      // is not arithmetic, so only its two ends are claimed.
+      // A range names every number BETWEEN its ends, dotted or not (cross-vendor review
+      // round 2: §§17.1–17.3 claimed cover for §17.2 without ever checking it). A dotted
+      // range counts on its last component and only where both ends share a prefix.
+      const range = /^(\d+(?:\.\d+)*)\s*[–—-]\s*(\d+(?:\.\d+)*)$/.exec(part)
       if (range) {
-        for (let n = Number(range[1]); n <= Number(range[2]); n++) out.push(String(n))
+        const [a, b] = [range[1].split('.'), range[2].split('.')]
+        const prefix = a.slice(0, -1)
+        const sharedPrefix = a.length === b.length && prefix.join('.') === b.slice(0, -1).join('.')
+        const [from, to] = [Number(a.at(-1)), Number(b.at(-1))]
+        if (sharedPrefix && Number.isInteger(from) && Number.isInteger(to) && from <= to) {
+          for (let n = from; n <= to; n++) out.push([...prefix, n].join('.'))
+        } else {
+          out.push(range[1], range[2])
+        }
         continue
       }
       for (const id of part.split(/\s*[–—-]\s*/)) if (id) out.push(id)
@@ -138,13 +193,32 @@ describe('CLAUDE.md references into design.md', () => {
     return out
   }
   const citedIn = (text) => [...new Set([...text.matchAll(RUN)].flatMap((m) => expand(m[1])))]
-  const dangling = (cited) =>
-    cited.filter((id) => homesOf(id).length === 0 && !claude.has(id) && !criteria.has(Number(id)))
+  // THE CRITERION ESCAPE HATCH IS CLAUDE.md's ALONE (cross-vendor review, round 2).
+  // A bare `§22` in the build order may mean acceptance criterion 22, which is a list
+  // item no section resolver reaches — but in the detail document every `§` means a
+  // design.md section, and letting criteria 1–32 absorb those numbers made the deletion
+  // of design §8, §9 or §10 read green.
+  const dangling = (cited, { criteriaResolve = false } = {}) =>
+    cited.filter(
+      (id) => homesOf(id).length === 0 && !claude.has(id) && !(criteriaResolve && criteria.has(Number(id))),
+    )
 
   it('reads every number of a multi-section citation', () => {
     expect(citedIn('see §§8–10 and §§15.2–15.3/16.1 and §7')).toEqual([
       '8', '9', '10', '15.2', '15.3', '16.1', '7',
     ])
+  })
+
+  it('expands a DOTTED range across the section it steps over', () => {
+    expect(citedIn('see §§17.1–17.4')).toEqual(['17.1', '17.2', '17.3', '17.4'])
+    // Ends that share no prefix are not arithmetic; only what is written is claimed.
+    expect(citedIn('see §§17.1–19.2')).toEqual(['17.1', '19.2'])
+  })
+
+  it('does not let an acceptance-criterion number cover a missing design section', () => {
+    // §8 in a document whose §§ mean design.md sections is design §8, never criterion 8.
+    expect(dangling(['999'], { criteriaResolve: true })).toEqual(['999'])
+    expect(dangling(['8'], { criteriaResolve: false })).toEqual(homesOf('8').length ? [] : ['8'])
   })
 
   it('resolves every § it cites', () => {
@@ -154,7 +228,8 @@ describe('CLAUDE.md references into design.md', () => {
     // 768 cut those conditions to docs/acceptance-criteria-detail.md, which is checked
     // below, and the citations left in the always-loaded file are a handful.
     expect(cited.length).toBeGreaterThan(3)
-    expect(dangling(cited), `CLAUDE.md cites sections nothing holds: ${dangling(cited).join(', ')}`).toEqual([])
+    const bad = dangling(cited, { criteriaResolve: true })
+    expect(bad, `CLAUDE.md cites sections nothing holds: ${bad.join(', ')}`).toEqual([])
   })
 
   // THE CHECK FOLLOWS THE TEXT IT WAS WRITTEN FOR (point 768). The §7.1 conditions were
@@ -181,9 +256,14 @@ describe('CLAUDE.md references into design.md', () => {
     expect(numbers.length).toBeGreaterThanOrEqual(32)
     expect(numbers).toEqual(numbers.map((_, i) => i + 1))
     expect(numbered.every((m) => m[2].trim().length > 0)).toBe(true)
-    // And what point-brief-core resolves is exactly that list, title by title.
+    // And what point-brief-core resolves is exactly that list, in the same order.
     expect([...criteria.keys()]).toEqual(numbers)
-    for (const [n, title] of criteria) expect(title, `criterion ${n} has no title`).toBeTruthy()
+  })
+
+  it('keeps each criterion AT ITS NUMBER, under its own title', () => {
+    for (const [number, title] of Object.entries(ACCEPTANCE_CRITERIA_BASELINE)) {
+      expect(criteria.get(Number(number)), `acceptance criterion ${number} is gone`).toBe(title)
+    }
   })
 
   it('finds the acceptance criteria it needs to resolve the bare numbers', () => {

@@ -330,9 +330,11 @@ export const RATIONALE_MARKERS = Object.freeze([
   Object.freeze({ re: /\b(?:which|that) is why\b/i, marker: 'which/that is why' }),
   Object.freeze({ re: /\b(?:the|one|another) reason\b/i, marker: 'the reason' }),
   // An adverb between the verb and its purpose is the commonest form of this claim
-  // ("exists ONLY to stop…"), and a bare `exists to` missed every one of them.
+  // ("exists ONLY to stop…"), and a bare `exists to` missed every one of them. Only an
+  // ADVERB may stand there: `\w+` waved through "exists and belongs to", which is a
+  // binding condition and not an argument (cross-vendor review, round 2).
   Object.freeze({
-    re: /\bexists?\s+(?:\w+\s+){0,2}(?:to|because)\b/i,
+    re: /\bexists?\s+(?:(?:only|solely|purely|just|merely|simply|entirely|\w+ly)\s+){0,2}(?:to|because)\b/i,
     marker: 'exists to/because',
   }),
   Object.freeze({ re: /\bso that\b/i, marker: 'so that' }),
@@ -368,7 +370,11 @@ export function fenceTracker() {
       const marker = run[0]
       const info = m[4] ?? ''
       if (fence === null) {
-        if (!(marker === '`' && info.includes('`'))) fence = { marker, length: run.length }
+        // A BACKTICK OPENER WITH A BACKTICK IN ITS INFO STRING IS NOT A FENCE, so it is
+        // not furniture either — it is an ordinary prose line, and skipping it hid a
+        // rationale written on it (cross-vendor review, round 2).
+        if (marker === '`' && info.includes('`')) return { furniture: false, open: false }
+        fence = { marker, length: run.length }
       } else if (marker === fence.marker && run.length >= fence.length && CLOSER_TAIL.test(info)) {
         fence = null
       }
@@ -380,14 +386,16 @@ export function fenceTracker() {
 /**
  * `text` with every inline code span blanked. PURE.
  *
- * A span is delimited by a run of backticks and closed by a run of the SAME length, so
- * ``--because`` is code exactly like `--because` is (cross-vendor review, round 1: the
- * single-backtick pattern left the longer form's content exposed and reported it as an
- * argument). Spans do not cross a line, so an unclosed run is left alone rather than
- * swallowing the rest of the document.
+ * A span is delimited by a run of backticks and closed by a run of EXACTLY that length,
+ * so ``--because`` is code exactly like `--because` is (cross-vendor review, round 1:
+ * the single-backtick pattern left the longer form's content exposed and reported it as
+ * an argument). The lookarounds are what make the run EXACT: without them a two-backtick
+ * opener closed on the first two backticks of a three-backtick run, which CommonMark
+ * does not do, and the text between them was blanked unread (round 2). Spans do not
+ * cross a line, so an unclosed run is left alone rather than swallowing the document.
  */
 export function withoutCodeSpans(text) {
-  return String(text ?? '').replace(/(`+)(?:(?!\1)[^\n])*?\1/g, ' ')
+  return String(text ?? '').replace(/(?<!`)(`+)(?:(?!\1)[^\n])*?\1(?!`)/g, ' ')
 }
 
 /**
