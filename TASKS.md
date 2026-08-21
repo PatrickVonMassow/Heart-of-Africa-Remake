@@ -77,58 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 800. The boundary hands out a handover text "verbatim", and the board's own publish gate
-  refuses exactly that text — at every point boundary (measured 20.08.2026, 23:32, closing 793).
-  WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare 793` printed the gap-card text and
-  instructed: "take this text verbatim rather than writing it again. It names NO point number on
-  purpose: it goes into the unnumbered gap card, where the topic guard reads every point reference
-  as a foreign one." Piping that exact text into `node scripts/board.mjs none --text-stdin` was
-  refused: "the handover card is the one card without a number, so its reason must NAME the point
-  the batch picks up next. The publish gate refuses a handover card that names none." The board
-  publish ran anyway on the OLD content, so the refusal also left a published board that did not
-  yet carry the card.
-  WHY IT MATTERS: this is not a one-off. Every session ends at a point boundary and every session
-  walks into the same wall, spends a turn discovering which of the two rules wins, and re-writes by
-  hand the sentence it was told not to write. Two guards in one repository disagree about one card,
-  and the one that speaks first is the one that is wrong.
-  FINAL STATE: one rule. `--prepare` emits a handover text that the publish gate accepts — it names
-  the point the successor picks up, which `--prepare` already knows as the first open point in
-  work-order order — and the topic guard tolerates that one forward reference on the unnumbered
-  card, as its own refusal message already demands. Whichever way it is resolved, the printed text
-  and the gate agree, and neither comment claims the other's rule.
-  VERIFIABLE: Vitest over the pure cores — the text `--prepare` composes for a given next point
-  passes the same predicate `board.mjs none` applies, asserted as one property over several
-  next-point numbers so the two cannot drift apart again; plus a case that the topic guard accepts
-  the forward reference on the unnumbered card; plus, for BOTH dictated forms, a case that the text
-  passes the conciseness budget and still matches every fragment `--commit` asserts.
-  ALSO COVERED — POINT 787 IS THE SAME WALL FILED FROM THE OTHER SIDE AND FOLDS INTO THIS POINT.
-  It measured two further gates on the same dictated text, and they are part of "one rule":
-  `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while the
-  dictated CLAIM form (the reserved-for-a-claiming-window variant) is 103 words in one block — so
-  the prescribed text is refused a second time, for an unrelated reason; and `--commit` afterwards
-  demands the card back, matched against EXACT fragments in `cardProofFragments` — `Der Punkt ist
-  abgeschlossen.` plus, for the claimed-window form, the literal `Der Stapel geht NICHT an eine
-  frische Sitzung` with that capitalisation — so shortening the text to fit the word budget makes
-  the boundary refuse its own handover with "THE BOARD DOES NOT CARRY THE HANDOVER CARD".
-  FINAL STATE therefore covers BOTH forms: what `--prepare` prints is accepted, as printed, by the
-  publish gate, the topic guard and the conciseness guard, and is still matched by the proof
-  fragments `--commit` asserts.
-  RELATED: point 434 (7) is where the verbatim card text came from; point 787 is the duplicate
-  filing this point supersedes.
-  THIS POINT OWNS THE TEXT RULE — THREE OPEN POINTS CARRIED THE SAME CONTRADICTION (found
-  21.08.2026 while deriving the handover chain). The dictated boundary text the publish gate
-  refuses was specified as work in points 800, 744 and 708 gap (1) at once, at queue positions 54,
-  8 and 27, so the fix would have been worked at 744 and then met twice more. THE CUT, OWED BEFORE
-  ANY OF THE THREE IS COMMISSIONED: this point keeps the text rule whole — the conciseness guard,
-  both dictated forms and the `--commit` proof fragments — and supersedes the duplicate filing
-  787. Point 744 keeps only what is uniquely its own. Point 708 strikes its gap (1) and keeps gaps
-  (2), (3) and (4). ORDER CONSEQUENCE: the dependency chain is 800 → 744 → 752, and this point
-  currently stands 46 positions behind the point that depends on it. Point 790 edits the same card
-  composer and is a rider on this branch, not a member of the chain.
-  Criticality: medium — no product defect, but it taxes every single session boundary, and the
-  instruction it contradicts is the one that says not to re-write the text.
-  Bundle: Chat & Tafel.
-
 - [ ] 790. The handover card names the session id from BEFORE the `/clear`, so the reader looks for a
   window that no longer exists (measured 20.08.2026, 19:16, while the user asked why his own window
   had not taken the batch).
