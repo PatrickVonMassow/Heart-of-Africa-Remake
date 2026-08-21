@@ -509,6 +509,56 @@ export function boundaryHandover({
   return { ...cardInput, card: boundaryCardText(cardInput) }
 }
 
+/** Ask the shared launcher decision to start the successor now. The launcher is
+ * still the only spawner; this is merely an event transport into that door. */
+export function requestImmediateSuccessor({ generation, cause = 'boundary', run = execFileSync } = {}) {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    return { requested: false, reason: 'handover-generation-unreadable' }
+  }
+  try {
+    run(
+      process.execPath,
+      [repoPath('scripts/batch-autostart.mjs'), '--immediate', '--cause', cause, '--generation', String(generation)],
+      {
+        cwd: repoPath('.'),
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 180_000,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+    return { requested: true, reason: 'requested', generation }
+  } catch (error) {
+    return { requested: false, reason: 'request-failed', generation, error }
+  }
+}
+
+/** Mark this generation handed over, then synchronously place its immediate
+ * request before the boundary command returns. */
+export function handoverAndRequest({
+  sid,
+  point = null,
+  mark = markHandover,
+  readLock = readOwnerLock,
+  request = requestImmediateSuccessor,
+} = {}) {
+  const handed = mark(sid, { point })
+  if (!handed?.handed) return handed
+  const lock = readLock()
+  const generation = lock?.sessionId === sid && Number.isSafeInteger(lock?.fence) ? lock.fence : null
+  const successor = request({ generation, cause: 'boundary' })
+  if (!successor?.requested) {
+    return {
+      ...handed,
+      handed: false,
+      reason: 'successor-request-failed',
+      error: successor?.error ?? successor?.reason ?? 'unknown request failure',
+      successor,
+    }
+  }
+  return { ...handed, successor }
+}
+
 /**
  * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
  * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
@@ -729,7 +779,7 @@ if (isMain) {
       try {
         transferred = commitSealedBoundary({
           transfer,
-          handover: () => markHandover(sid, { point: null }),
+          handover: () => handoverAndRequest({ sid, point: null }),
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -925,7 +975,7 @@ if (isMain) {
     try {
       transferred = commitSealedBoundary({
         transfer,
-        handover: () => markHandover(sid, { point }),
+        handover: () => handoverAndRequest({ sid, point }),
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,

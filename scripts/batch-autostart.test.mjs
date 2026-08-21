@@ -45,7 +45,7 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(imports[0]).toMatch(/\bbuildSpawnOptions\b/)
   })
 
-  it('CALLS them at the one spawn site — a re-inlined call would drop the env fix', () => {
+  it('CALLS them at the Claude spawn site — a re-inlined call would drop the env fix', () => {
     // Every statement that launches an executable BY PATH: an optional member
     // prefix, one of the launching functions, then an identifier argument. The
     // first version of this counted bare `spawn(` only, so `cp.spawn(…)` or
@@ -55,9 +55,10 @@ describe('the launcher uses the pure spawn builders', () => {
     // literal, so the legitimate git calls are not caught either.
     const LAUNCHES = /(?:^|[^\w.])(?:[A-Za-z_$][\w$]*\.)?(?:spawnSync|spawn|execFileSync|execFile|fork)\s*\(\s*[A-Za-z_$][\w$]*\s*,/
     const spawnSites = codeLines.filter((l) => LAUNCHES.test(l))
-    expect(spawnSites, 'the launcher must have exactly one process-launching site').toHaveLength(1)
-    expect(spawnSites[0]).toMatch(/buildSpawnArgs\(/)
-    expect(spawnSites[0]).toMatch(/buildSpawnOptions\(/)
+    const claudeSites = spawnSites.filter((line) => /buildSpawnArgs\(/.test(line) || /buildSpawnOptions\(/.test(line))
+    expect(claudeSites, 'the launcher must have exactly one Claude process-launching site').toHaveLength(1)
+    expect(claudeSites[0]).toMatch(/buildSpawnArgs\(/)
+    expect(claudeSites[0]).toMatch(/buildSpawnOptions\(/)
   })
 
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
@@ -78,10 +79,10 @@ describe('the launcher uses the pure spawn builders', () => {
 
   it('wires process liveness into both persisted start records', () => {
     expect(source).toMatch(
-      /launcherStartDecision\(\{[\s\S]{0,300}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
+      /successorStartDecision\(\{[\s\S]{0,400}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
     )
     const records = source.match(/launcherStartRecord\(\{/g) ?? []
-    expect(records, 'both the pre-spawn and pid-bound records carry measured evidence').toHaveLength(2)
+    expect(records, 'the refusal, pre-spawn and pid-bound records carry measured evidence').toHaveLength(3)
     expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
   })
 
@@ -146,6 +147,44 @@ describe('the launcher uses the pure spawn builders', () => {
       expect(l, 'an early exit that skips the state write').not.toMatch(/process\.exit\(/)
     }
     expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
+  })
+})
+
+describe('immediate handover and supervised exit are runtime transports', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const code = source.split('\n').filter((line) => !line.trimStart().startsWith('//')).join('\n')
+
+  it('routes immediate, supervised-exit and watchdog starts through the one pure decision', () => {
+    expect(code).toMatch(/const immediate = argv\.includes\('--immediate'\)/)
+    expect(code).toMatch(/--cause', exitTrigger\.kind/)
+    expect(code).toMatch(/successorStartDecision\(\{[\s\S]*?trigger,[\s\S]*?spawnToken,[\s\S]*?lock,[\s\S]*?assessment,/)
+    expect(code).toMatch(/triggerKind[\s\S]*SUCCESSOR_TRIGGERS\.WATCHDOG/)
+  })
+
+  it('does not charge scheduler backoff to an event-driven handover', () => {
+    expect(code).toMatch(/if \(!immediate && lastSpawn[\s\S]{0,180}?now - lastSpawn\.at < backoffMs\)/)
+  })
+
+  it('puts the generation and token reservation inside the atomic acquire', () => {
+    const acquire = code.match(/const acq = acquire\(launcherSid, \{[\s\S]*?\n\}\)\nif \(acq/)?.[0] ?? ''
+    expect(acquire).toMatch(/expected:/)
+    expect(acquire).toMatch(/fence: trigger\.generation/)
+    expect(acquire).toMatch(/\.\.\.startDecision\.reservation/)
+  })
+
+  it('supervises the exact child identity and requests immediately when it disappears', () => {
+    expect(code).toMatch(/if \(argv\[0\] === '--supervise'\)/)
+    expect(code).toMatch(/Math\.abs\(seen\.startedAt - childStartedAt\) <= 2000/)
+    expect(code).toMatch(/while \(sameChildAlive\(\)\)/)
+    expect(code).toMatch(/supervisedExitTrigger\(records, \{ childStartedAt \}\)/)
+    expect(code).toMatch(/'--immediate', '--cause', exitTrigger\.kind/)
+    expect(code).toMatch(/startChildSupervisor\(\{ pid: child\.pid, pidStartedAt: childStartedAt, token: spawnToken \}\)/)
+  })
+
+  it('lets a periodic watchdog replace a missing supervisor without starting a second owner', () => {
+    expect(code).toMatch(/supervisorRestartDecision\(\{ lastSpawn: last, lock, childProbe, supervisorProbe \}\)/)
+    expect(code).toMatch(/if \(repair\.restart\)/)
+    expect(code).toMatch(/supervisorRestartedAt: now/)
   })
 })
 

@@ -55,7 +55,14 @@ import { markHandover, progressGuardDecision, readOwnerLock } from './batch-sing
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { boundaryHandover, clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
+import {
+  boundaryHandover,
+  clearBoundary,
+  commitSealedBoundary,
+  handoverAndRequest,
+  requestImmediateSuccessor,
+  standingCards,
+} from './batch-boundary.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
 import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
@@ -1266,6 +1273,54 @@ describe('commitSealedBoundary — the marker and ownership handover are one com
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('boundary immediate successor request', () => {
+  it('invokes the shared launcher synchronously with the handed-over generation', () => {
+    let call = null
+    const result = requestImmediateSuccessor({
+      generation: 17,
+      run: (file, args, options) => { call = { file, args, options } },
+    })
+    expect(result).toEqual({ requested: true, reason: 'requested', generation: 17 })
+    expect(call.file).toBe(process.execPath)
+    expect(call.args).toEqual(expect.arrayContaining([
+      expect.stringMatching(/batch-autostart\.mjs$/), '--immediate', '--cause', 'boundary', '--generation', '17',
+    ]))
+    expect(call.options).toMatchObject({ windowsHide: true, timeout: 180_000 })
+  })
+
+  it('marks first, reads that generation, and requests before returning', () => {
+    const order = []
+    const result = handoverAndRequest({
+      sid: SID,
+      point: 811,
+      mark: (sid, { point }) => (order.push(`mark:${sid}:${point}`), { handed: true, reason: 'ok' }),
+      readLock: () => (order.push('read'), { sessionId: SID, fence: 23, handedOver: true }),
+      request: ({ generation, cause }) => (order.push(`request:${cause}:${generation}`), { requested: true }),
+    })
+    expect(order).toEqual([`mark:${SID}:811`, 'read', 'request:boundary:23'])
+    expect(result).toMatchObject({ handed: true, successor: { requested: true } })
+  })
+
+  it('makes an unreadable generation or failed request loud while leaving recovery possible', () => {
+    const noGeneration = handoverAndRequest({
+      sid: SID,
+      mark: () => ({ handed: true, reason: 'ok' }),
+      readLock: () => ({ sessionId: SID }),
+      request: ({ generation }) => requestImmediateSuccessor({ generation, run: () => {} }),
+    })
+    expect(noGeneration).toMatchObject({ handed: false, reason: 'successor-request-failed' })
+
+    const failed = handoverAndRequest({
+      sid: SID,
+      mark: () => ({ handed: true, reason: 'ok' }),
+      readLock: () => ({ sessionId: SID, fence: 24 }),
+      request: () => ({ requested: false, reason: 'request-failed', error: new Error('launcher unavailable') }),
+    })
+    expect(failed).toMatchObject({ handed: false, reason: 'successor-request-failed' })
+    expect(failed.error.message).toBe('launcher unavailable')
   })
 })
 

@@ -130,8 +130,10 @@ export const RESUME_PROMPT =
   '<punkt>` aus, erledige dessen Buchhaltung, dann `--commit <punkt>` als LETZTE Repository-Aktion, und ' +
   'BEENDE die Session, statt den naechsten Punkt in denselben Kontext zu ziehen; ein noch bauender Agent ' +
   'mit gepushten Checkpoints wird dabei an den Nachfolger uebergeben (`--adopt`), und die ' +
-  'Kontext-Wassermarke erzwingt dieselbe Uebergabe auch ohne gelandeten Punkt (`--context`). Der OS-Task ' +
-  'startet die naechste Session. Halte sonst NICHT still an. Wenn ein git ' +
+  'Kontext-Wassermarke erzwingt dieselbe Uebergabe auch ohne gelandeten Punkt (`--context`). Die Punktgrenze ' +
+  'fordert den Nachfolger SOFORT ueber dieselbe geschuetzte Startentscheidung an; der Child-Supervisor tut ' +
+  'das bei jedem Prozessende ebenfalls. Der 900-Sekunden-OS-Tick bleibt nur der Recovery-Watchdog fuer einen ' +
+  'fehlenden Supervisor oder fehlgeschlagenen Spawn — er ist NICHT der normale Transport. Halte sonst NICHT still an. Wenn ein git ' +
   'push scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn ' +
   'der SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
   'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren. ' +
@@ -603,6 +605,28 @@ export function supervisorRestartDecision({ lastSpawn = null, lock = null, child
   }
   if (evidence.supervisorAlive) return { restart: false, reason: 'the child supervisor is alive', evidence }
   return { restart: true, reason: 'the live owner child has no live supervisor', evidence }
+}
+
+/** The terminal event a supervisor carries into the shared decision after its
+ * child exits. A terminal CI observation in this child's lifetime is preserved
+ * as the cause; every other normal/crash/Stop termination is `child-exit`. PURE. */
+export function supervisedExitTrigger(records = [], { childStartedAt = 0 } = {}) {
+  const terminal = (Array.isArray(records) ? records : [])
+    .filter((record) =>
+      record?.event === 'ci-wait-finish' &&
+      typeof record?.atMs === 'number' &&
+      record.atMs >= (Number.isFinite(childStartedAt) ? childStartedAt : 0) &&
+      record?.evidence?.terminal,
+    )
+    .at(-1)
+  if (terminal) {
+    return {
+      kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+      terminal: true,
+      evidence: { seq: terminal.seq ?? null, result: terminal.evidence.terminal },
+    }
+  }
+  return { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null }
 }
 
 /** The persisted record for a start the decision licensed. PURE. */

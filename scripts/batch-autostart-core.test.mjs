@@ -63,6 +63,7 @@ import {
   launcherStartRecord,
   successorStartDecision,
   supervisorRestartDecision,
+  supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   WRITER_VETO_MAX_AGE_MS,
 } from './batch-autostart-core.mjs'
@@ -309,6 +310,26 @@ describe('supervisor restart decision', () => {
   })
 })
 
+describe('supervised exit trigger', () => {
+  it('carries a terminal CI result into the immediate decision', () => {
+    expect(supervisedExitTrigger([
+      { seq: 3, atMs: 1500, event: 'ci-wait-finish', evidence: { terminal: { state: 'success', verdict: 'green' } } },
+    ], { childStartedAt: 1000 })).toEqual({
+      kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+      terminal: true,
+      evidence: { seq: 3, result: { state: 'success', verdict: 'green' } },
+    })
+  })
+
+  it('does not attribute an older CI result to this child, and treats every other exit alike', () => {
+    expect(supervisedExitTrigger([
+      { seq: 2, atMs: 999, event: 'ci-wait-finish', evidence: { terminal: { state: 'failure' } } },
+      { seq: 3, atMs: 1500, event: 'foreground-activity', evidence: {} },
+    ], { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
+    expect(supervisedExitTrigger(null, { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
+  })
+})
+
 describe('buildSpawnOptions — the ten-minute execution is switched off', () => {
   it('THE FIX: the child carries the background-wait ceiling as 0 (wait indefinitely)', () => {
     const opts = buildSpawnOptions({ cwd: '/repo', stdio: ['ignore', 1, 1], env: { PATH: '/bin' } })
@@ -380,6 +401,14 @@ describe('the resume prompt', () => {
   it('still carries the point boundary and the stand-down instruction', () => {
     expect(RESUME_PROMPT).toMatch(/batch-boundary\.mjs/)
     expect(RESUME_PROMPT).toMatch(/STAND DOWN/)
+  })
+
+  it('names immediate handover as transport and the 900-second tick only as recovery', () => {
+    expect(RESUME_PROMPT).toMatch(/Nachfolger SOFORT/)
+    expect(RESUME_PROMPT).toMatch(/Child-Supervisor/)
+    expect(RESUME_PROMPT).toMatch(/900-Sekunden-OS-Tick bleibt nur der Recovery-Watchdog/)
+    expect(RESUME_PROMPT).toMatch(/NICHT der normale Transport/)
+    expect(RESUME_PROMPT).not.toMatch(/OS-Task startet die naechste Session/)
   })
 
   it('points the landing at the ONE command (point 594)', () => {
