@@ -5,7 +5,7 @@
 // stamp blocks, unreadable transcript blocks (bounded by the loop escape).
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
@@ -27,12 +27,13 @@ import { buildRaceFixture, raceTranscriptPath } from './timestamp-race-fixture.m
 const GUARD = join(process.cwd(), 'scripts', 'timestamp-guard.mjs')
 const RACE_FIXTURE = join(process.cwd(), 'scripts', 'fixtures', 'timestamp-guard-302ms-race.json')
 // The transcript the race fixture quotes is a private session log and cannot be
-// committed, so the re-derivation case can only run where it lives. The anchor is
-// this project's OWN session directory: where that exists, the transcript is
-// REQUIRED and its absence is a failure — a `return` there would green the case
-// without measuring anything. Everywhere else the case is genuinely skipped.
+// committed, so the re-derivation case can only run where it lives. It is anchored
+// on THAT FILE and nothing else: a directory probe would demand this one historical
+// session from any machine that ever ran Claude in this checkout, and an early
+// `return` would record a pass without measuring anything. `skipIf` on the file is
+// the honest form — where the log is present the case runs, where it is not the
+// suite reports a SKIP that is visible in the run rather than a silent green.
 const RACE_SOURCE = raceTranscriptPath()
-const ON_BATCH_MACHINE = existsSync(join(homedir(), '.claude', 'projects', '-workspace-hoa'))
 
 /** One transcript JSONL line in the real Claude Code shape (assistant
  *  messages stream one entry per content block, sharing message.id). */
@@ -270,9 +271,7 @@ describe('end-to-end guard process', () => {
   // The fixture asserting its own provenance proves nothing, so the derivation is
   // repeated here against the source — the same split the document-cut accounting
   // uses for the files it reads out of the user's home.
-  it.skipIf(!ON_BATCH_MACHINE)('re-derives the whole fixture from the real transcript', () => {
-    expect(existsSync(RACE_SOURCE), `race transcript missing: ${RACE_SOURCE}`).toBe(true)
-
+  it.skipIf(!existsSync(RACE_SOURCE))('re-derives the whole fixture from the real transcript', () => {
     const committed = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
     const rebuilt = buildRaceFixture(readFileSync(RACE_SOURCE, 'utf8'))
 
@@ -286,6 +285,48 @@ describe('end-to-end guard process', () => {
     expect(rebuilt.source.totalRows).toBeGreaterThanOrEqual(committed.source.totalRows)
     expect(rebuilt.source.elidedRows.assistantTextRows).toBe(0)
     expect(rebuilt.source.elidedRows.sidechainTextRows).toBe(0)
+  })
+
+  // The builder's strict parsing IS the elided-row measurement, so it needs a case
+  // that does not depend on the private log — otherwise restoring the old silent
+  // `continue` would leave the suite green wherever the transcript is absent.
+  it('refuses to measure an elided range it cannot read, naming the row', () => {
+    const rows = []
+    for (let n = 1; n <= 953; n++) rows.push(JSON.stringify({ type: 'attachment', row: n }))
+    rows[710] = JSON.stringify({
+      type: 'assistant',
+      message: { id: 'narr', content: [{ type: 'text', text: 'Zwischenzeile.' }] },
+    })
+    for (let n = 930; n <= 949; n++) {
+      rows[n - 1] = JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result' }] } })
+    }
+    rows[949] = JSON.stringify({
+      type: 'assistant',
+      timestamp: '2026-08-20T06:15:18.404Z',
+      message: { id: 'final', content: [{ type: 'text', text: '**Donnerstag, 20.08.2026, 08:14**' }] },
+    })
+    rows[952] = JSON.stringify({
+      type: 'user',
+      timestamp: '2026-08-20T06:15:18.706Z',
+      message: { role: 'user', content: 'Stop hook feedback: …' },
+    })
+
+    // Readable throughout: the count is produced and the 302 ms falls out of the rows.
+    const clean = buildRaceFixture(rows.join('\n'))
+    expect(clean.source.elidedRows).toMatchObject({ count: 218, assistantTextRows: 0 })
+    expect(
+      Date.parse(clean.stopFeedbackRow.timestamp) - Date.parse(clean.finalReplyRow.timestamp),
+    ).toBe(302)
+
+    // One unreadable row inside that range and the count is not produced at all.
+    const corrupt = [...rows]
+    corrupt[799] = '{not json'
+    expect(() => buildRaceFixture(corrupt.join('\n'))).toThrow(/row 800 is not valid JSON/)
+
+    // A blank line is not corruption and must not stop the measurement.
+    const blank = [...rows]
+    blank[799] = ''
+    expect(buildRaceFixture(blank.join('\n')).source.elidedRows.assistantTextRows).toBe(0)
   })
 
   it('measures the residual tool-free-turn race the core documents: a false ALLOW', () => {
