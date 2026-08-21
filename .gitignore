@@ -137,6 +137,15 @@ scripts/.tile-cache
 # What the DISARMED context fence would have refused (point 758). This
 # machine's session readings, like every other .claude runtime record.
 .claude/context-fence-observations.jsonl
+.claude/context-fence-ledger.json
+.claude/context-fence-ledger.json.tmp-*
+.claude/context-fence-ledger.lock/
+.claude/context-fence-permit.json
+.claude/context-fence-permit.json.tmp-*
+.claude/context-fence-permit-pending.json
+.claude/context-fence-permit-pending.json.tmp-*
+.claude/context-fence-permits.jsonl
+.claude/context-fence-state.lock/
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
 # Point 809's append-only activity journal and its short-lived append mutex are
