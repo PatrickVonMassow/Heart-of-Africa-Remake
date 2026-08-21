@@ -184,6 +184,14 @@ describe('end-to-end guard process', () => {
     const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
     expect(Date.parse(fixture.stopFeedbackAt) - Date.parse(fixture.finalReplyRow.timestamp)).toBe(302)
 
+    // The fixture is a REAL slice, so the rows carry their own ids and flags and
+    // the narration that was wrongly judged is genuinely in it — not implied.
+    const narration = fixture.rowsBeforeFinalReply[0]
+    expect(narration.message.id).toBe('msg_011CeDW3R8CZhKYQ7jp2sAyw')
+    expect(narration.isSidechain).toBe(false)
+    expect(narration.message.content[0].text).toBe(fixture.narrationText)
+    expect(fixture.narrationText).toBe('Jetzt die \u00c4nderung.')
+
     const p = join(dir, 'measured-race.jsonl')
     writeFileSync(p, fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n') + '\n')
     expect(runGuard({ transcript_path: p }, { session: fixture.sessionId })).toBe(null)
@@ -195,6 +203,31 @@ describe('end-to-end guard process', () => {
         now: new Date(fixture.stopFeedbackAt),
       }),
     ).toBe(null)
+  })
+
+  it('pins the regression: without the tool-result boundary the narration is what gets judged', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const pending = fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n')
+
+    // The superseded rule verbatim: the first text block of the last assistant
+    // message carrying text, with no boundary at the last tool_result.
+    let preFix = null
+    for (const row of pending.split('\n')) {
+      const entry = JSON.parse(row)
+      const content = entry.message && entry.message.content
+      if (entry.type !== 'assistant' || entry.isSidechain || !Array.isArray(content)) continue
+      const block = content.find((b) => b && b.type === 'text' && b.text.trim() !== '')
+      if (block) preFix = block.text
+    }
+    expect(preFix).toBe(fixture.narrationText)
+
+    // …and judging it produces exactly the refusal the user was served.
+    const verdict = evaluate({ lastText: preFix, now: new Date(fixture.stopFeedbackAt) })
+    expect(verdict?.decision).toBe('block')
+    expect(verdict?.reason).toContain('"Jetzt die \u00c4nderung."')
+
+    // The landed rule returns no judgement at all on the same rows.
+    expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
   })
 
   it('still blocks genuinely unstamped and stale final replies after a tool result', () => {
