@@ -149,21 +149,32 @@ const NEGATION_WINDOW = 60
  * is exactly such filler, and it stops attaching once a whole other predicate
  * has intervened.
  */
-const NEGATION_BEFORE = new RegExp(`${NEGATION_CUE.source}[\\s,]*(?:[\\w'-]+[\\s,]+){0,3}$`, 'i')
+const CONNECTOR = "but|however|yet|and|or|because|since|while|when|if|so|unless|until"
+
+const NEGATION_BEFORE = new RegExp(
+  // …the cue, then only PLAIN filler words. A connector is not filler (seventh
+  // pass): "it does not fail but blocks the release" denies the failing and
+  // asserts the block, and swallowing the "but" denied the block instead.
+  `${NEGATION_CUE.source}[\\s,]*(?:(?!\\b(?:${CONNECTOR})\\b)[\\w'-]+[\\s,]+){0,3}$`,
+  'i',
+)
 
 /**
  * Where the matched phrase's own clause ENDS on the side AFTER it — because a
  * negation can stand there too (fifth pass): «"blocks the release" is not the
  * observed failure» reads as a claim to anything that only looks backwards.
  *
- * A COMMA ENDS IT ON THIS SIDE, and so does a subordinator (fifth and sixth
- * pass). After the phrase, both introduce something OTHER than a denial of it:
- * "it blocks the release, not a development lane" contrasts, and "it blocks the
- * release because no artifact can be published" gives the reason. Reading either
- * as a denial REFUSES a point that states the block outright.
+ * A COMMA ENDS IT ON THIS SIDE, and so do a subordinator and a PREPOSITION
+ * (fifth, sixth and seventh pass). After the phrase, each introduces something
+ * OTHER than a denial of it: "it blocks the release, not a development lane"
+ * contrasts, "…because no artifact can be published" gives the reason, and "…with
+ * no fallback" describes the block rather than denying it. Reading any of them as
+ * a denial REFUSES a point that states the block outright. What survives is the
+ * phrase's own predicate — "is not the observed failure" — which is the one shape
+ * that really does deny it.
  */
 const AFTER_END =
-  /[.;:!?—,]|\b(?:but|however|because|since|when|while|if|as|so|unless|until|after|before)\b/i
+  /[.;:!?—,]|\b(?:but|however|because|since|when|while|if|as|so|unless|until|after|before|with|without|for|from|to|on|in|at|by|of|under|over|during|despite|against)\b/i
 
 function clauseAfter(text, at) {
   const window = text.slice(at, at + NEGATION_WINDOW)
