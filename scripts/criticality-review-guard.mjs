@@ -42,6 +42,7 @@ import {
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
   highTicks,
+  openNumbers,
   strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
@@ -302,7 +303,10 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
     head,
     branch,
     baseline: effective,
-    inputs: { baseline: effective, head, ticks, records },
+    // A filed finding clears only while its numbered carrier is visibly open in
+    // the live work order. TASKS.md is the open half; the archive cannot prove
+    // that unfinished work remains scheduled.
+    inputs: { baseline: effective, head, ticks, openPoints: [...openNumbers(headTasks)], records },
   }
 }
 

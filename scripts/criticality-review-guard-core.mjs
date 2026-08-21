@@ -39,6 +39,9 @@ export const LEVELS = Object.freeze(['low', 'med', 'high'])
 /** The level that arms this gate. */
 export const GATED_LEVEL = 'high'
 
+/** Append-only ledger row that transfers every finding of one review to open points. */
+export const FINDINGS_FILED_KIND = 'review-findings-filed'
+
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
 /**
@@ -102,6 +105,11 @@ export function criticalityOf(body) {
 /** The point numbers a work-order text marks done. */
 export function tickedNumbers(text) {
   return new Set(parsePointBlocks(text).filter((p) => p.done).map((p) => p.n))
+}
+
+/** Point numbers the current work order still carries as open. */
+export function openNumbers(text) {
+  return new Set(parsePointBlocks(text).filter((p) => !p.done).map((p) => p.n))
 }
 
 /**
@@ -223,6 +231,7 @@ export function strictAncestorProbe(index, fallback) {
  *   head       current HEAD, for the message only
  *   ticks      [{ number, rationale }] — the HIGH points newly ticked since the
  *              baseline
+ *   openPoints point numbers that are visibly open in the current work order
  *   records    [{ point, sha, model, verdict, evidence, at, authoredBy,
  *                reachable, descendsFrom }]
  *              `reachable` false means the record judged a commit that is not in
@@ -233,10 +242,11 @@ export function strictAncestorProbe(index, fallback) {
  *
  * Returns { block, clear, bootstrap, findings }.
  */
-export function evaluateCriticalityReview({ baseline = null, head = '', ticks = [], records = [] } = {}) {
+export function evaluateCriticalityReview({ baseline = null, head = '', ticks = [], openPoints = [], records = [] } = {}) {
   if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
 
   const findings = []
+  const open = new Set((openPoints ?? []).map(Number).filter(Number.isInteger))
   for (const tick of ticks ?? []) {
     const all = (records ?? []).filter((r) => Number(r?.point) === Number(tick?.number))
     const reachable = all.filter((r) => r.reachable !== false)
@@ -364,25 +374,50 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       ...compositions.filter((g) => String(g.verdict) === CLEARING_VERDICT),
     ]
     const unresolved = valid.filter((r) => String(r.verdict) !== CLEARING_VERDICT)
+    // A refusal has two durable answers:
+    //   1. a `merge` recorded later in time against a later commit; or
+    //   2. an append-only disposition row binding THIS exact review to one or
+    //      more point numbers that are still visibly OPEN in the work order.
+    // The second form is deliberately structured. Evidence prose saying
+    // "filed" is not a receipt, and a refusal that names no point still blocks.
+    // `reviewAt` disambiguates two reviews by the same model against the same
+    // sha without rewriting either historical ledger row.
+    const filed = (review) =>
+      reachable.some((r) => {
+        if (r?.kind !== FINDINGS_FILED_KIND || r.reachable === false) return false
+        if (Number(r.point) !== Number(tick.number) || r.sha !== review.sha) return false
+        if (String(r.model ?? '').trim() !== String(review.model ?? '').trim()) return false
+        if (Number(r.reviewAt) !== Number(review.at) || !ledgerAtUsable(r.at) || Number(r.at) <= Number(review.at)) {
+          return false
+        }
+        if (!Array.isArray(r.findingPoints) || r.findingPoints.length === 0) return false
+        const points = r.findingPoints.map(Number)
+        return points.every((n) => Number.isInteger(n) && n > 0 && open.has(n))
+      })
+
     if (!clean.length) {
+      const unfiled = unresolved.filter((r) => !filed(r))
+      // All honest refusals have been transferred to open numbered points. No
+      // invented clean verdict is needed, and no refusal has vanished.
+      if (unresolved.length && !unfiled.length) continue
       // Merge pass rows of an INCOMPLETE split leave `unresolved` empty while
       // nothing may clear — the finding then names those rows instead.
-      const pool = unresolved.length ? unresolved : valid
+      const pool = unfiled.length ? unfiled : valid
       const latest = pool.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unresolved', tick, records: [latest] })
       continue
     }
-    // Every refusal must have been ANSWERED: a `merge` recorded later in time
-    // AND against a later commit. Same-commit re-records do not count — nothing
-    // changed between them, so nothing was fixed.
-    const open = unresolved.filter(
+
+    // Same-commit re-records do not count as code fixes — nothing changed
+    // between them. A filed disposition may name that commit because it answers
+    // by moving the work, not by claiming the code changed.
+    const unanswered = unresolved.filter(
       (u) =>
-        !clean.some(
-          (c) => Number(c.at ?? 0) > Number(u.at ?? 0) && (c.descendsFrom ?? []).includes(u.sha),
-        ),
+        !filed(u) &&
+        !clean.some((c) => Number(c.at ?? 0) > Number(u.at ?? 0) && (c.descendsFrom ?? []).includes(u.sha)),
     )
-    if (open.length) {
-      const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+    if (unanswered.length) {
+      const latest = unanswered.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unanswered', tick, records: [latest] })
     }
   }
@@ -428,7 +463,8 @@ export function formatCriticalityReviewVerdict(verdict) {
       lines.push(
         head,
         `      ${String(r.model ?? '').trim()} recorded ${r.verdict} on ${short(r.sha)}: ${r.evidence ?? ''}`,
-        '      A refusal is not advisory. Fix what it found, commit the fix, then record the re-review.',
+        '      A refusal is not advisory. Fix it and record the re-review, or file every finding',
+        '      as an open work-order point and append a review-findings-filed receipt naming them.',
       )
     } else {
       lines.push(
