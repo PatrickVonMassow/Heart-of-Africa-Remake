@@ -273,6 +273,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
   Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
 
+- **Geteilte Funktion, trotzdem zwei Antworten.** Die Regel liegt an *einer* Stelle — aber jede
+  Aufrufstelle baut ihre Eingaben selbst zusammen, und eine vergisst eine davon. Der Vorgabewert
+  bedeutet „nein", also entscheidet die vergessene Übergabe still das Gegenteil.
+  → *Prompt:* „Zähl bei jedem geteilten Mechanismus die **Aufrufstellen** und lass sie dieselbe
+  Frage einmal beantworten — weichen sie ab, ist die Funktion nicht geteilt. Mach den Eingang zur
+  **Pflicht** oder leite ihn **in** der Funktion ab; kein Vorgabewert, der eine Entscheidung trifft."
+
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das immer
   schreibt, und eine Prüfung, die einen Zug **nicht enden lässt**, der untersucht und nichts
@@ -389,6 +396,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Normalfalls nachahmen, und nur eine irreführende Formulierung besteht dessen Prüfung.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
+
+- **Das Rettungsnetz hängt an dem, der verschwindet.** Ein Aufräum- oder Übergabeschritt, den nur
+  die scheidende Seite ausführen kann, greift im geordneten Fall — und fehlt im abrupten, für den
+  er gedacht war.
+  → *Prompt:* „Frag bei jedem Sicherungsnetz: **Wer muss handeln, damit es greift** — und ist das
+  ausgerechnet der, dessen Ausfall es abfangen soll? Wo ja, lies den Zustand direkt aus, statt
+  einer von Hand gepflegten Liste zu glauben."
 
 ---
 
