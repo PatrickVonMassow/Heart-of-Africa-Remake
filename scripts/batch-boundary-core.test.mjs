@@ -61,6 +61,7 @@ import {
   commitSealedBoundary,
   handoverAndRequest,
   requestImmediateSuccessor,
+  successorRequestFailureLine,
   standingCards,
 } from './batch-boundary.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
@@ -1304,14 +1305,22 @@ describe('boundary immediate successor request', () => {
     expect(result).toMatchObject({ handed: true, successor: { requested: true } })
   })
 
-  it('makes an unreadable generation or failed request loud while leaving recovery possible', () => {
+  it('keeps the handover successful when the eager request fails and names the watchdog fallback', () => {
     const noGeneration = handoverAndRequest({
       sid: SID,
       mark: () => ({ handed: true, reason: 'ok' }),
       readLock: () => ({ sessionId: SID }),
       request: ({ generation }) => requestImmediateSuccessor({ generation, run: () => {} }),
     })
-    expect(noGeneration).toMatchObject({ handed: false, reason: 'successor-request-failed' })
+    expect(noGeneration).toMatchObject({
+      handed: true,
+      reason: 'ok',
+      successorFailure: 'handover-generation-unreadable',
+      successor: { requested: false, reason: 'handover-generation-unreadable' },
+    })
+    expect(successorRequestFailureLine(noGeneration)).toBe(
+      'the immediate successor request failed (handover-generation-unreadable); the 900-second watchdog remains armed',
+    )
 
     const failed = handoverAndRequest({
       sid: SID,
@@ -1319,8 +1328,20 @@ describe('boundary immediate successor request', () => {
       readLock: () => ({ sessionId: SID, fence: 24 }),
       request: () => ({ requested: false, reason: 'request-failed', error: new Error('launcher unavailable') }),
     })
-    expect(failed).toMatchObject({ handed: false, reason: 'successor-request-failed' })
-    expect(failed.error.message).toBe('launcher unavailable')
+    expect(failed).toMatchObject({ handed: true, reason: 'ok', successorFailure: 'request-failed' })
+    expect(failed.successor.error.message).toBe('launcher unavailable')
+
+    // `commitSealedBoundary` is the CLI's exit-1 boundary: only a failed mark
+    // may cross it. A failed optimization leaves the already-written boundary
+    // successful so the watchdog can recover it.
+    expect(() => commitSealedBoundary({
+      marker: { v: 2, cause: 'point' },
+      write: () => {},
+      handover: () => failed,
+    })).not.toThrow()
+    expect(successorRequestFailureLine(failed)).toBe(
+      'the immediate successor request failed (request-failed); the 900-second watchdog remains armed',
+    )
   })
 })
 

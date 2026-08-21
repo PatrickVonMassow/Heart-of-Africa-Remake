@@ -550,13 +550,20 @@ export function handoverAndRequest({
   if (!successor?.requested) {
     return {
       ...handed,
-      handed: false,
-      reason: 'successor-request-failed',
-      error: successor?.error ?? successor?.reason ?? 'unknown request failure',
       successor,
+      successorFailure: successor?.reason ?? 'unknown request failure',
     }
   }
   return { ...handed, successor }
+}
+
+/** A failed eager request does not undo the durable handover. Tell the closing
+ * session which recovery path remains without turning the boundary into an
+ * error or inviting an impossible retry. */
+export function successorRequestFailureLine(result) {
+  if (result?.handed !== true || result?.successor?.requested !== false) return ''
+  const reason = result.successorFailure ?? result.successor.reason ?? 'unknown request failure'
+  return `the immediate successor request failed (${reason}); the 900-second watchdog remains armed`
 }
 
 /**
@@ -776,10 +783,11 @@ if (isMain) {
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
       let transferred = null
+      let handoverResult = null
       try {
         transferred = commitSealedBoundary({
           transfer,
-          handover: () => handoverAndRequest({ sid, point: null }),
+          handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -822,6 +830,8 @@ if (isMain) {
               'with `node scripts/batch-in-flight.mjs --adopt`.'
             : ''),
       )
+      const successorFailureLine = successorRequestFailureLine(handoverResult)
+      if (successorFailureLine) console.log(successorFailureLine)
       // The distance is a NUMBER somebody reads, not a claim (point 700): a
       // commit further past the ceiling than the stated margin owes the
       // closing report a sentence. Admission above used the trigger; overshoot
@@ -972,10 +982,11 @@ if (isMain) {
     // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
     // `commitSealedBoundary` pins the order.
     let transferred = null
+    let handoverResult = null
     try {
       transferred = commitSealedBoundary({
         transfer,
-        handover: () => handoverAndRequest({ sid, point }),
+        handover: () => (handoverResult = handoverAndRequest({ sid, point })),
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,
@@ -1016,6 +1027,8 @@ if (isMain) {
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
+    const successorFailureLine = successorRequestFailureLine(handoverResult)
+    if (successorFailureLine) console.log(successorFailureLine)
     // Point 700: a boundary further past the ceiling than the stated margin —
     // or one whose context could not be measured — owes the closing report a
     // line. The trigger in wmPoint is for admission, not this overshoot record.
