@@ -258,6 +258,20 @@ if (isMainModule(import.meta.url)) {
         `queue-rank: release front frozen with ${next.boundary.points.length} point(s) in front of ` +
           `${RELEASE_TAG_POINT} — "${why.trim()}"`,
       )
+      // AND THE WINDOW IS NAMED, exactly as `--seed` names its own (cross-vendor
+      // review, 21.08.2026). Staging makes the freeze visible to git, but while
+      // HEAD still holds a record WITHOUT a boundary, restoring that version
+      // leaves a tracked, present, unarmed record — and the arming would take
+      // today's front, breaches included, as legacy order. Only the commit ends
+      // that, so the command says so instead of leaving it to be discovered.
+      const headRecord = runGit(['cat-file', '-p', `HEAD:${RANK_RECORD_PATH}`])
+      if (headRecord.status !== 0 || !parseRankRecord(String(headRecord.stdout ?? '')).boundary) {
+        console.log(
+          `  COMMIT ${RANK_RECORD_PATH} NOW. Until the repository carries this freeze, restoring the version in ` +
+            'HEAD gives back a record that reads as never armed, and the next arming would grandfather whatever ' +
+            'stands in front of the release then.',
+        )
+      }
     } else if (argv.includes('--seed')) {
       // THE ARMING BASELINE, and nothing more: the order as it stands today is
       // taken as judged, with one stated reason, so a newly armed (or freshly
