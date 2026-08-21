@@ -393,21 +393,6 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
 }
 
 /**
- * Launcher decision: may the autostart spawn a takeover session?
- * Returns 'spawn' | 'skip-alive'.
- *
- * THE THIRD OUTCOME IS GONE (point 434). 'skip-wedged' named a session that was
- * alive AND stuck, and everything downstream of it — `wedgeAction`,
- * `wedgeTakeover`, `takeWedged`, the two-stage silence report — existed to decide
- * what to do about a state the launcher could describe but not resolve. An
- * expired lease is not a third state: it is simply not alive, and the ordinary
- * takeover this function has always licensed handles it.
- */
-export function spawnDecision(assessment) {
-  return assessment.alive ? 'skip-alive' : 'spawn'
-}
-
-/**
  * WHAT THE PID PROBE SAYS ABOUT THE LOCK'S OWNER. PURE (the probe is passed in).
  *
  * The same three readings `assessOwner` has always made further down, lifted out
