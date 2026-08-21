@@ -67,6 +67,11 @@ describe('remainingBudgetDecision', () => {
         book: false,
       })
     }
+    expect(decide({
+      reading: null,
+      toolName: 'Bash',
+      toolInput: { command: 'node scripts/batch-boundary.mjs --prepare --context' },
+    })).toMatchObject({ state: 'unreadable', fits: true, alert: true, book: false })
   })
 
   it('keeps an unclassified call allowed', () => {

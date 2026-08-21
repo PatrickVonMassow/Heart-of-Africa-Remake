@@ -193,21 +193,6 @@ export function remainingBudgetDecision({
     ? pendingDebit
     : 0
 
-  if (exempt) {
-    return {
-      state: 'exempt',
-      fits: true,
-      alert: false,
-      book: false,
-      exempt,
-      kind: null,
-      projectedCost: 0,
-      remainingBeforeCall: null,
-      remainingAfterCall: null,
-      unknownTypeCost: false,
-    }
-  }
-
   const readingId = readingIdentity(reading)
   if (readingId === null) {
     return {
@@ -218,6 +203,24 @@ export function remainingBudgetDecision({
       exempt: null,
       kind: null,
       projectedCost: null,
+      remainingBeforeCall: null,
+      remainingAfterCall: null,
+      unknownTypeCost: false,
+    }
+  }
+
+  // The reading is validated before exemptions. A bounded control is always
+  // admitted, but an unreadable transcript must still take the one explicit,
+  // loud fail-open branch instead of making the measurement failure invisible.
+  if (exempt) {
+    return {
+      state: 'exempt',
+      fits: true,
+      alert: false,
+      book: false,
+      exempt,
+      kind: null,
+      projectedCost: 0,
       remainingBeforeCall: null,
       remainingAfterCall: null,
       unknownTypeCost: false,

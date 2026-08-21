@@ -227,6 +227,7 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     const r = callGuard('Agent', {}, { transcript: resolve(repo, 'no-such-transcript.jsonl') })
     expect(r.status, r.stderr).toBe(0)
     expect(r.stdout.trim()).toBe('')
+    expect(r.stderr).toContain('CONTEXT FENCE FAIL-OPEN: NO CONTEXT READING COULD BE TAKEN')
   })
 
   it('binds ONLY the batch owner — a foreign or absent lock passes', () => {
