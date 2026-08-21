@@ -10666,3 +10666,36 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but every pace and queue statement the user reads is
   built on the number this conflates, and he has already had to ask twice.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 802. The design.md budget still owes the user a yes he withdrew ten days earlier
+  (found 21.08.2026 while reviewing point 794, and deliberately not folded into it). Point 794
+  removed the instruction that routed a raise of the BEGINNER GUIDE's budget to the user as a
+  decision card, because the user withdrew ask-before-raising generally on 10.08.2026 ("Frage
+  mich in Zukunft allgemein nicht mehr bzgl. Anhebungen"). The same wording survives one file
+  over: `scripts/doc-budget-core.mjs` carries, in the rationale comment on design.md's
+  `maxWords`, the line "NOT yet confirmed by the user: the rule above wants his yes for a raise,
+  and the alternative is 102 words found elsewhere in design.md."
+  WHY IT IS A DEFECT AND NOT A NOTE. It reads as a live obligation on the next session that
+  touches that budget, and the obligation no longer exists — so the next raise there either
+  escalates to the user against his ruling, or is taken in silent contradiction of a comment
+  that says it may not be. That is the same shape point 794 was filed for, and it was already
+  lost once. The rule it invokes ("the rule above") is not in the rule text at the head of the
+  file either: that text demands a raise be for content that genuinely belongs and be justified
+  in writing, and says nothing about the user's yes.
+  WHAT MUST BE DECIDED, NOT ASSUMED: whether the 102 words of the keyboard-capture raise are
+  simply RATIFIED by the general withdrawal, or whether that specific raise was left genuinely
+  open on its merits and needs the written justification the rule does demand. Read the comment
+  in full before rewriting it — it is a record of what was added as well as an instruction, and
+  only the instruction half is stale.
+  FILE COLLISION, TO BE RESPECTED: point 762 already owns `scripts/doc-budget-core.mjs` for the
+  memory-index ceiling, so this is worked with 762 or after it, never beside it.
+  FINAL STATE: no budget in `scripts/doc-budget-core.mjs` instructs a session to obtain the
+  user's confirmation for a raise; every raise there is closed by the written justification the
+  head-of-file rule demands, and the design.md entry states which of the two readings above
+  applies to its 102 words.
+  VERIFIABLE: a Vitest case over the rationale comments proving no budget entry asks for the
+  user's confirmation of a raise — the same shape as the case point 794 added for the guide, so
+  the two guard the same ruling on both documents.
+  Criticality: low — no product defect and nothing is red today; it is a stale instruction that
+  contradicts a standing user ruling and misdirects the next session that reads it.
+  Bundle: Session- & Repo-Hygiene.

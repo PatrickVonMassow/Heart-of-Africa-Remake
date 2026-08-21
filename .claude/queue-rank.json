@@ -219,6 +219,12 @@
       "at": "2026-08-20T16:16:13.001Z",
       "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first.",
       "place": "last"
+    },
+    "802": {
+      "at": "2026-08-21T01:29:55.069Z",
+      "why": "Low criticality, nothing red today, and it is blocked behind point 762 which owns the same file — so last is where it belongs; the release order puts nothing but communication-mechanic work ahead of the queue anyway.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -275,15 +281,13 @@
       779,
       781,
       784,
-      789,
-      794,
       795,
       796
     ],
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T00:55:14.983Z",
+    "at": "2026-08-21T01:29:55.074Z",
     "points": [
       174,
       184,
@@ -511,16 +515,15 @@
       784,
       785,
       786,
-      789,
       790,
       791,
-      794,
       795,
       796,
       797,
       798,
       799,
-      800
+      800,
+      802
     ]
   }
 }
