@@ -20868,3 +20868,27 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product defect, but it is a user ruling that was already lost once and
   executed against the wrong mechanism the first time.
   Bundle: Dokumentation.
+
+- [x] 795. The launcher judges liveness by the LOCK, so it started a second batch session beside a
+  live working one — and both wrote main (measured 20.08.2026, 21:48–22:02).
+  WHAT WAS MEASURED. The OS autostart began session pid 2962038 with the reason "the previous owner
+  was demonstrably dead". The VS Code window session pid 2156063 had never stopped: it committed
+  three times on main at 21:38/21:39, committed `c846147b` at 21:59:42, pushed main at 22:01, ran a
+  cross-vendor review and appended points to the work order. Both sessions committed on the same
+  main inside that window — `4ed5c5c8` from the lock holder, `c846147b` from the window session.
+  WHY IT MATTERS: the ownership fence binds whoever HOLDS the lock, so a session that never took it
+  is never braked by it. The lock is therefore a registration, not an exclusion, and the launcher
+  reads that registration as proof of life. Two writers on one main is the state every branch,
+  worktree and landing rule in CLAUDE.md §6 is built to prevent, and it arose without either session
+  doing anything forbidden.
+  FINAL STATE: liveness is judged on the PROCESS, not on the lock — an unlocked but live batch-
+  writing session counts as alive and the launcher starts nothing beside it. A session that writes
+  main without holding the lock is either braked by the fence or takes the lock by doing so; which
+  of the two is chosen, the refusal or the acquisition says so in words. The launcher's start record
+  names what it measured, so "demonstrably dead" is never again a claim about a lock file.
+  VERIFIABLE: pure tests over the launcher's start decision — a live process with no lock yields no
+  start; a stale lock with no process yields one; and a start record always carries the measured
+  evidence. Plus a case over the fence: a main-writing action from a session that holds no lock does
+  not silently pass.
+  Criticality: high — it produces concurrent writers on main, which no later check can untangle.
+  Bundle: Session- & Repo-Hygiene.
