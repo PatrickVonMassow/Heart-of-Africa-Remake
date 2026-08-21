@@ -1318,7 +1318,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 17:12 · Quellen-Fingerprint: `253632aae89a…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 18:11 · Quellen-Fingerprint: `0de000b3f0f8…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1355,7 +1355,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 5 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 11 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1414,8 +1414,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
 
-<!-- RETRO-FINGERPRINT: 253632aae89a254b88029aefb04bdcb5c49a9b511d22621978f8c3c74f0e4fe1 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T15:12:14.831Z -->
+<!-- RETRO-FINGERPRINT: 0de000b3f0f8459616471eb6ba925cf1932ab31f5ee370407d133e2146a0daba -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T16:11:32.255Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2480,6 +2480,31 @@ Hebel: Wer zuerst repariert, repariert die zwei Vorfälle, die jemand zufällig 
 Zuordnung, die alles erklärt, ist die eigentliche Gefahr — nicht zuordenbare Zeit muss als solche
 ausgewiesen werden und ihr Anteil ist selbst ein Ergebnis. Dass ausgerechnet die größte Ursache erst
 der blinden Zweitlesung auffiel, ist der Beleg dafür, wozu das geteilte Verfahren da ist (§3.19).
+
+### 3.152 Die Regel griff nur nach vorn — der Bestand, den sie meinte, blieb liegen
+
+Am 20.08.2026 wurde ein Tor gebaut, das jeden maschinell abgelegten Punkt hinter den Release-Punkt
+einreiht, sofern er nicht hoch dringlich ist. Es funktionierte: In den achtzehn Stunden danach
+rückten von neunzehn gerankten Punkten genau zwei nach vorn, und der Vorderblock schrumpfte. Am
+21.08.2026 fragte der Nutzer trotzdem, warum wieder so viele neue Tickets vor der
+Kommunikationsmechanik stünden — und die Messung gab ihm scheinbar unrecht und in der Sache recht.
+Vor der Mechanik standen 34 Punkte, aber 32 davon trugen überhaupt keinen Rang-Eintrag. Sie hatten
+dort gestanden, bevor das Tor existierte, und niemand hatte je zurückgegriffen.
+
+Die erste Antwort auf seine Frage war zusätzlich falsch: Sie behauptete, das Tor schütze die
+Kommunikationsmechanik nicht, weil es nur die Grenze am Release-Punkt kenne. Der Nutzer stellte das
+richtig — die Mechanik steht auf den Positionen 34 bis 41, der Release-Punkt auf 49, also heißt
+»hinter den Release« bereits »hinter die Mechanik«. Die Diagnose hatte einen Mechanismus-Umbau
+vorgeschlagen, wo eine einmalige Nachräumung fällig war.
+
+**Lehren:** Eine Regel, die den Zugang regelt, sagt nichts über den Bestand, der vor ihr da war —
+und weil sie ab ihrem Inkrafttreten sauber arbeitet, sieht die Statistik gut aus, während der
+Zustand, den sie herstellen sollte, unverändert bleibt. Wer ein solches Tor baut, schuldet im selben
+Zug die Frage, was mit dem Altbestand geschieht: nachräumen, oder ausdrücklich stehen lassen und das
+schreiben. Und die Diagnose eines Fehlers, den ein Nutzer meldet, gehört gegen die tatsächliche
+Reihenfolge geprüft, bevor sie einen Umbau vorschlägt — die Zahlen lagen vor, die Positionen waren
+mit einem Befehl abfragbar, und die Fehldiagnose kostete einen ganzen Zug plus die Korrektur eines
+bereits festgehaltenen Befundes.
 
 ### 3.120 Der Statussatz wurde angehängt, nicht aus dem gemessenen Zustand abgeleitet
 
