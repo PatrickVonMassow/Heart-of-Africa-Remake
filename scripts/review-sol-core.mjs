@@ -42,11 +42,6 @@ export { BLIND_REVIEWER, blindReviewerAdmission }
 // caller of the review command already looks for them.
 export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
 
-// Compatibility export for callers that already reach the repository path
-// decision through this review core. Its implementation and null contract are
-// shared with worktree bootstrap.
-export { mainCheckoutFrom } from './main-checkout-core.mjs'
-
 /** The model id `codex exec -m` is given, and the name a record calls it by. */
 export const SOL_MODEL_ID = 'gpt-5.6-sol'
 export const SOL_MODEL_NAME = 'GPT-5.6 Sol'

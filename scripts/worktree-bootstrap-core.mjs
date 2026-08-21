@@ -21,11 +21,6 @@
 // so every branch is covered by plain Vitest cases.
 import { createHash } from 'node:crypto'
 
-// Compatibility exports for callers that already get the path decision from
-// this bootstrap core. The implementation and its null contract live in the
-// repository-wide path core.
-export { mainCheckoutFrom, samePath } from './main-checkout-core.mjs'
-
 /** Actions plan() can return. */
 export const ACTIONS = {
   /** The checkout already has its dependencies — nothing to do. */

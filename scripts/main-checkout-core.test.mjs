@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { resolve } from 'node:path'
 import { mainCheckoutFrom, samePath } from './main-checkout-core.mjs'
-import { mainCheckoutFrom as reviewMainCheckoutFrom } from './review-sol-core.mjs'
-import { mainCheckoutFrom as bootstrapMainCheckoutFrom } from './worktree-bootstrap-core.mjs'
 
 describe('the distinct main checkout contract', () => {
-  const callers = [
-    ['shared path core', mainCheckoutFrom],
-    ['worktree bootstrap', bootstrapMainCheckoutFrom],
-    ['review tooling', reviewMainCheckoutFrom],
-  ]
   const cases = [
     {
       situation: 'bare repository',
@@ -32,9 +25,7 @@ describe('the distinct main checkout contract', () => {
   ]
 
   it.each(cases)('answers the documented value for $situation', ({ common, root, expected }) => {
-    for (const [caller, implementation] of callers) {
-      expect(implementation(common, root), caller).toBe(expected)
-    }
+    expect(mainCheckoutFrom(common, root)).toBe(expected)
   })
 
   it('is total when git did not return a common directory', () => {
