@@ -82,78 +82,139 @@ put it is the mistake this line exists to stop.
   of the queue, ahead of 517, 744 and 752, so the tickets standing before the communication
   mechanic are finished quickly: "Ich will, dass die Queue schnell abgearbeitet werden kann,
   damit schnell die Tickets erledigt werden, die vor der Kommunikationsmechanik stehen").
-  WHAT WAS MEASURED. Over the last four days main took 588 commits, and between consecutive
-  commits there are 65 gaps of 20 minutes or more, together 48.8 hours of a roughly 96-hour wall
-  clock. Nothing in the repository can say which of those hours were real work (a browser suite, a
-  delegated author, a long verification) and which were standstill with nobody working the batch
-  at all: the launcher log distinguishes only its own skip reasons, and point 752 measures the
-  handover, not the standstill.
-  ONE GAP WAS DECOMPOSED BY HAND and turned out to be pure standstill. Owner session 6a0621ed
-  wrote its last transcript line at 10:15:29 inside a `ci-status-guard` wait (run 32462093487
-  still running, hook text: sleep about 90 s, then end the turn again) and never came back. The
-  launcher ticks every 900 s and skipped four consecutive ticks with: "skip: live batch-writer
-  process 2156063 measured for session 593e0d2f-1829-4d61-b023-8fc73ad4a551 independently of the
-  owner lock". That process is the VS Code extension window, alive since 19.08. 19:24 and idle,
-  whose last batch write was 09:08:03. In `scripts/batch-autostart-core.mjs` the function
-  `launcherStartDecision` lets a foreign live writer veto every start for `WRITER_VETO_MAX_AGE_MS`
-  (2 h) after its last write, and that check runs BEFORE every other rule, including an explicit
-  handover mark. The successor was spawned at 11:14:05, six minutes after the veto aged out: 59
-  minutes with nobody working the batch, visible on the board as the empty stretch between the
-  card of point 772 (08:31 to 08:54) and the card of point 800 (11:14 to 11:24). The launcher SAW
-  it and had no remedy: "ESCALATING: session 593e0d2f (pid 2156063) has blocked launcher recovery
-  for 15 min (2 consecutive ticks)" — followed by two more skips.
-  FINAL STATE:
-  1. ONE COMMAND REPORTS EVERY STANDSTILL, and it is the only way this question is ever asked
-  again (memory rule: a recurring forensic lookup gets a command, never a hand analysis). It reads
-  the commit times on main, .claude/autostart.log, the boundary markers, the verification run
-  records and the session transcripts, and prints every gap over a threshold with its start, its
-  end, its length and its MEASURED cause class. It runs over a chosen window (--since) and needs
-  no batch lock, because the session most likely to ask is the one standing down.
-  2. THE CAUSE CLASSES ARE MEASURED, NOT GUESSED. At minimum: owner alive and advancing (a run
-  record, a worktree or a delegated agent moved inside the gap), owner alive but stuck (nothing
-  advanced), no owner at all (launcher vetoed, or no tick happened), handover ramp, claim
-  reservation, user pause, quota wait. A gap whose cause cannot be established is reported as
-  UNATTRIBUTED rather than folded into a neighbouring class, and the share of unattributed time is
-  itself a reported result - a classifier that explains everything is the failure mode to avoid.
-  3. THE LAST 14 DAYS ARE RUN THROUGH IT ONCE and the result is recorded as evidence: how much of
-  the wall clock was standstill, split by class, and which classes are large enough to be worth
-  removing. This is the analysis half of the point and it comes BEFORE the levers, so the fixes
-  are aimed by evidence rather than by the two incidents that happened to be noticed.
-  4. EVERY CLASS THE REPORT SHOWS AS AVOIDABLE IS FIXED IN THIS POINT. Two are already measured
-  and are fixed regardless of what else the report finds:
-     a) A FOREIGN LIVE WRITER MAY NOT VETO RECOVERY BY EXISTING. An idle editor window that once
-  wrote batch state is not evidence that the batch is being worked. The veto follows evidence that
-  the writer is ADVANCING - the same advancing-evidence reading the launcher already performs for
-  a declared wait - and not the age of its last write; and an explicit handover mark outranks a
-  foreign writer that is not advancing, exactly as it already outranks the writer the lock itself
-  names. The escalation line that fires after two blocked ticks ends in an ACTION, not in another
-  skip.
-     b) A SESSION THAT ENDS INSIDE A DECLARED CI WAIT MAY NOT COST AN HOUR. Either the wait
-  survives the session end because something re-invokes it, or the ending session releases the
-  lock so the very next launcher tick takes over. Which of the two is decided by evidence inside
-  the point; what may not remain is the measured state, where the wait simply stops and nothing
-  notices for 59 minutes.
-  5. THE THRESHOLD FOR A REPORTED GAP IS STATED WHERE IT IS SET, together with why that number and
-  not a smaller one, so a later reader can lower it without re-deriving the argument.
-  VERIFIABLE: pure Vitest over the classifier (a gap with an advancing run record becomes working;
-  the same gap without it becomes stuck; a gap with no live owner and a launcher skip becomes
-  no-owner; a gap under a pause marker becomes paused; an unclassifiable gap becomes unattributed
-  and is counted as such), pure Vitest over launcherStartDecision (foreign writer advancing
-  vetoes; foreign writer idle does not; foreign writer idle plus a handover mark starts the
-  successor; the lock own-writer behaviour stays byte for byte as it is), and a test over the
-  CI-wait release path in the direction the point chooses. The 14-day report is itself evidence in
-  the point.
-  IMPLIED CHANGES: `docs/batch-owner-runbook.md` gains the command and what its cause classes
-  mean; `docs/work-packages.md` gains the point. No design.md change.
+  WHAT WAS MEASURED. Measured 21.08.2026. Over four days main took 588 commits, and between
+  consecutive commits there are 65 gaps of 20 minutes or more, together 48.8 hours of a roughly
+  96-hour wall clock; nothing in the repository can say which of those hours were work and which
+  were standstill. Two causes were decomposed by hand. FIRST: owner session 6a0621ed wrote its
+  last transcript line at 08:15:29Z inside a ci-status-guard wait (run 32462093487 still running,
+  hook text: sleep about 90 s, then end the turn again) and never came back; nothing re-invoked
+  it. SECOND: the launcher then skipped four consecutive ticks with skip: live batch-writer
+  process 2156063 measured for session 593e0d2f independently of the owner lock - that process is
+  an idle VS Code extension window, alive since 19.08., whose last batch write was 07:08:03Z.
+  launcherStartDecision in scripts/batch-autostart-core.mjs lets a foreign live writer veto every
+  start for WRITER_VETO_MAX_AGE_MS (2 h) after its last write, ahead of every other rule including
+  an explicit handover. The successor started at 09:14:05Z, six minutes after the veto aged out:
+  59 minutes with nobody working the batch. The launcher saw it (ESCALATING ... has blocked
+  launcher recovery for 15 min) and had no remedy but to skip again. THE BLIND SECOND HALF ADDED A
+  THIRD, LARGER CAUSE: the handover travels by the 900-second scheduler tick at all - there is no
+  immediate successor start on a clean boundary or on a child exit - so every point pays scheduler
+  latency even when nothing is broken.
+  FINAL STATE, in two stages. Stage 1 is the measurement and lands first; stage 2 is aimed by what
+    stage 1 measures, and the three levers 2a to 2c are already proven by the evidence above and are
+    built whatever else the report shows.
+  STAGE 1 - THE STANDSTILL BECOMES MEASURABLE
+  1. A batch activity journal exists: append-only, concurrency-safe, one line per batch-state
+    transition, carrying UTC time, a monotonic sequence, the event type, the session, the point, the
+    PID together with its process start time, the ownership generation, the cause code and the
+    evidence behind it. Without it the question cannot be answered at all: commit times and the
+    launcher log alone cannot separate work from standstill.
+  2. The lifecycle emits into that journal: owner claims, foreground tool activity,
+    delegated-agent starts and finishes, verification starts and finishes, CI waits, handovers,
+    process exits, vetoes, pauses, spawn attempts, spawn failures and successor starts.
+  3. An open interval is bounded by explicit completion, by loss of process identity, or by a
+    renewable lease, so a crashed process cannot manufacture hours of apparent work. A fresh
+    heartbeat proves liveness only and never by itself classifies an interval as work.
+  4. ONE COMMAND REPORTS THE STANDSTILL and needs no batch lock: it prints every interval over a
+    threshold with start, end, duration, measured cause, the evidence behind that cause, and the
+    totals, in UTC, over a chosen window. Its declared inputs are the first-parent commit times on
+    main, .claude/autostart.log, the boundary markers, the verification run records, the session
+    transcripts and the journal of item 1. The threshold is stated where it is set, together with
+    why that number and not a smaller one.
+  5. The classifier splits overlapping evidence at event boundaries and assigns every wall-clock
+    millisecond exactly once under a documented precedence: nothing is dropped and nothing is
+    counted twice.
+  6. The classes are evidence-bound, not guessed: foreground work (session-linked transcript or
+    tool activity), delegated work (a live matching process, or branch, worktree or output-log
+    progress), verification (a named in-flight interval with command identity, progress lease and
+    result), CI wait (ref, SHA, workflow, run id, first and last observation, terminal result),
+    handover transition (from the committed handover or worker exit to the successor claiming
+    ownership), blocked by the user, blocked by quota, blocked by environment, blocked by a writer
+    veto (with the writer session, its process identity, its ownership generation, its last fenced
+    operation and the exact interval it blocked), standstill with no worker, and standstill with an
+    idle owner.
+  7. Evidence that is missing, contradictory or older than the journal stays UNKNOWN, is reported
+    with its duration and its share, and is never inferred to have been work from a commit gap, a
+    heartbeat or a living process.
+  8. The last 14 days run through the command once. The result is evidence in the point: how much
+    of the wall clock was standstill, split by class, and which classes are large enough to remove.
+    The analysis comes before the levers.
+  STAGE 2 - THE CAUSES THE EVIDENCE ALREADY PROVES
+  2a. THE HANDOVER STOPS TRAVELLING BY SCHEDULER TICK. A successful point boundary hands ownership
+    over and requests its successor before it returns; a supervisor watches the spawned child and
+    runs the same guarded decision the moment it exits, whether normally, by crash or by a Stop-hook
+    termination. Boundary handover, supervised exit and periodic recovery reach ONE pure
+    successor-start decision that returns the precise blocking evidence for every refusal, and
+    handover generation, successor reservation and spawn token move by one atomic compare-and-swap
+    so no two paths can start two owners. The 900-second tick remains the recovery watchdog for a
+    missing supervisor or a failed spawn and is no longer the normal transport; the resume prompt
+    says so instead of promising that the next point waits for the scheduler.
+  2b. A WRITER MAY NOT VETO BY EXISTING. Every writer record carries an ownership generation and
+    an explicit active-or-retired state, and an accepted handover or release retires that authority
+    at once even while the host process lives. A veto requires current fenced main-write authority
+    or demonstrably advancing work; the fixed two-hour historical-write veto goes, because it turned
+    an idle editor window into an hour of standstill. A retired generation is ignored, an unretired
+    writer whose lock vanished still vetoes, and the decision reports every simultaneously
+    authoritative writer rather than the first match. The escalation that fires after two blocked
+    ticks executes a recovery - retiring an explicitly handed-over generation or revoking its fence
+    - instead of logging and skipping again. Spawn progress counts only when it is attributed to the
+    spawned child by token, session, PID identity, generation or fenced write. A released or claimed
+    reservation expires unless its holder renews it with real batch activity, and an owner with no
+    foreground, delegate, verification or durable-wait progress across two decision intervals is
+    assessed stalled even while its heartbeat is fresh.
+  2c. THE CI WAIT BECOMES DURABLE. A pending CI check is a renewable in-flight wait carrying ref,
+    SHA, workflow identity, run id, first and last observation, deadline and wake token, and it
+    survives worker exit and supervisor restart. It is observed by event or bounded backoff instead
+    of instructing a headless session to sleep and end its turn again - the measured session did
+    exactly that and exited while the run was still going. Reaching the interaction budget may
+    release the process but may not abandon the observation, erase the state or defer recovery to a
+    later tick. A terminal result wakes the successor on green and a repair path on red.
+  VERIFIABLE:
+  - CLASSIFIER: an advancing run record becomes work, the same interval without it becomes
+    idle-owner standstill, no owner plus a launcher skip becomes no-worker standstill, a pause
+    marker becomes blocked by the user, an unclassifiable interval becomes unknown and is counted as
+    such; every millisecond is covered exactly once, with no overlap.
+  - THE 21.08.2026 FIXTURE: the standstill after 08:15:29Z, the stale writer veto by session
+    593e0d2f, the remaining scheduler delay before 09:14:05Z, and totals that reconcile exactly
+    against elapsed wall time.
+  - launcherStartDecision: an advancing writer vetoes; an idle one does not; a retired or
+    handed-over writer does not; a recycled PID does not; an unretired writer whose lock vanished
+    still does; escalation cannot leave a retired writer blocking; the behaviour for the writer the
+    lock itself names stays as it is.
+  - SUCCESSOR START: a fake clock proves that a clean boundary, a clean child exit, a crash and a
+    terminal CI result each start exactly ONE successor without advancing the 900-second clock; a
+    supervisor restart, a concurrent tick, a duplicate boundary notification and a stale
+    pending-spawn state all recover through the same atomic decision without losing a wake or
+    starting two writers.
+  - CI WAIT: a fake-clock test reproduces two Stop attempts followed by worker exit and proves the
+    wait stays visible and its terminal result triggers recovery without a 900-second gap.
+  - THE FOUR-DAY FIXTURE keeps the measured 65 gaps and 48.8 hours and additionally accounts for
+    every minute by class.
+  DELIVERABILITY: if the ceiling refuses this as one point, the split is fixed in advance rather
+    than decided in the moment: stage 1 stays this point, 2a becomes its own point, 2b its own, 2c
+    its own, and each carries the tests named for it. Stage 1 lands first in every case.
+  FOUR EYES: this spec is the merged result of a blind-parallel divergent stage (CLAUDE.md §6).
+    Opus 5 wrote list A (15 entries) and GPT-5.6 Sol wrote list B (60 entries) from the same
+    evidence without seeing A; the union was folded under the decorrelated framing and counted by
+    scripts/blind-merge.mjs: 48 union entries, 38 merged, 2 only A, 35 only B, every input entry
+    accounted for. Fable 5 was unreachable as the third model (switch OFF, user instruction
+    20.08.2026), so the merge fell to GPT-5.6 Sol - the weaker same-model fallback, recorded as
+    such.
+  THIS SPEC IS THE MERGED FOUR-EYES RESULT and REPLACES the first draft of this point, which was
+  cut from one model's list alone before the user ordered the blind second reading.
+  IMPLIED CHANGES: `docs/batch-owner-runbook.md` gains the standstill command and what its cause
+  classes mean; `docs/work-packages.md` gains the point. No design.md change. Overlaps to settle
+  when the point is cut: 517 (lease expiry and honoured claim), 744 and 752 (handover cost and
+  attribution), 795 (launcher liveness).
   FILES AND POINTS: scripts/batch-autostart-core.mjs (launcherStartDecision,
-  WRITER_VETO_MAX_AGE_MS), scripts/batch-autostart.mjs, .claude/autostart.log,
-  .claude/autostart-last.json, scripts/ci-status-guard.mjs, scripts/wait-marker-core.mjs,
-  scripts/batch-ownership-core.mjs; points 517, 744, 752, 795.
-  THIS POINT SUPERSEDES POINT 808, which filed 4(b) alone from the same incident before this
-  request was drained; 808 is folded into it.
+  WRITER_VETO_MAX_AGE_MS, spawnProgressed), scripts/batch-autostart.mjs, scripts/batch-boundary.mjs,
+  scripts/batch-in-flight-core.mjs, scripts/batch-ownership-core.mjs, scripts/ci-status-guard-core.mjs,
+  .claude/autostart.log, .claude/autostart-last.json; points 517, 744, 752, 795.
+  THIS POINT SUPERSEDES POINT 808, which filed stage 2c alone from the same incident before the
+  merged request was drained; 808 is folded into it.
   Criticality: high — it is the user's own ranking decision and it governs how fast every
-  remaining point reaches him: 48.8 of 96 hours are gaps nobody can account for, and one decomposed
-  gap was a full hour of nothing.
+  remaining point reaches him: 48.8 of 96 hours are gaps nobody can account for, one decomposed
+  gap was a full hour of nothing, and the largest cause turned out to be that the handover travels
+  by scheduler tick at all.
   Bundle: Session- & Repo-Hygiene.
 
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
@@ -10856,4 +10917,71 @@ to land than a mechanism that needs a review.
   and the outer count of 772 keeps its current behaviour unchanged.
   Criticality: medium — it is a detector, not a product path; its failure mode is the measured
   one, a session that repairs itself for two hours while nothing in the work order moves.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 810. Sixteen candidate defects in the CI guard and the launcher, found by the blind half of
+  point 809's four-eyes stage and never verified (swept 21.08.2026, GPT-5.6 Sol, reading
+  scripts/ci-status-guard-core.mjs and scripts/batch-autostart-core.mjs).
+  WHY THEY ARE HERE AND NOT IN 809. The merge scoped them OUT of point 809 deliberately: they are
+  real-looking defects but unrelated hardening of two files that merely happened to be attached to
+  that reading, and 809 has to stay deliverable. Losing them would waste a sweep that has already
+  been paid for.
+  WHY THEY ARE ONE POINT AND NOT SIXTEEN. The deposit proposes one point each. Every one of the
+  sixteen is a CANDIDATE, unverified by a second reading — the deposit says so itself — and
+  sixteen unverified blocks at the front of a queue the user has just asked to run fast would be
+  sixteen ranking decisions taken on unchecked evidence. So the verification is the first half of
+  THIS point, and the splitting rule is fixed in advance rather than in the moment: a candidate
+  confirmed and too large to fix here leaves as its own point with the verification already
+  recorded, and a candidate refuted is struck with its reason. That is a deliberate deviation from
+  the deposit's proposed shape, recorded here so a reader can overrule it.
+  THE SIXTEEN, verbatim from the sweep:
+  (1) classifyRuns keys workflows by DISPLAY NAME, so two workflows sharing a name collapse and
+  one verdict disappears.
+  (2) A completed conclusion outside the accepted set (action_required, stale, null) counts as
+  nothing and can be masked by another green workflow.
+  (3) recoveredWorkflows clears the famine clock on every completed non-failure value instead of
+  an accepted terminal one.
+  (4) A successful SHA cache entry is never revalidated, so a later failing rerun stays invisible
+  for the whole push window.
+  (5) A nocheck result has no retry horizon, so a workflow appearing after the three-minute grace
+  is ignored forever.
+  (6) refTargets appends a pushed HEAD missing from the reflog set LAST although the documented
+  order is HEAD first.
+  (7) Existing-ref enumeration cannot distinguish an empty list from a failed git call, so a git
+  error silently drops every target.
+  (8) A cached pending entry crossing its wait budget omits the stated fail-open reason while
+  recheck throttling suppresses the fetch.
+  (9) Exceptions from fetchRuns, judgeRed or notify escape the supposedly non-throwing Stop
+  decision.
+  (10) spawnBackoffMs computes a validated floor and then multiplies the raw invalid base and
+  passes an invalid cap to Math.min.
+  (11) Automated failure pauses share the user's own persistent pause mechanism instead of a
+  self-clearing circuit breaker with scheduled probes.
+  (12) resolveClaudeCli accepts a candidate that merely EXISTS, so an unexecutable first candidate
+  blocks fallback to a usable CLI.
+  (13) Windows .cmd and .ps1 shims are passed to a shell-free spawn that cannot execute them.
+  (14) firewallTopUpDecision matches a child by PID and a substring, so a recycled unrelated PID
+  whose command contains firewall-allow suppresses top-up indefinitely.
+  (15) recordSpawn, pruneSpawns and reapableSpawns accept NaN, infinite, negative or future
+  values, and one malformed entry or a throwing probe aborts reaping.
+  (16) The chat handover cursor selects the NEWEST pending messages and advances to wall clock
+  after the spawn, so overflow and messages arriving during prompt construction can be stranded
+  forever.
+  FINAL STATE: each of the sixteen carries a recorded cross-vendor verdict — confirmed with the
+  failing input or state that reproduces it, or refuted with the reason it cannot happen. Every
+  confirmed one is then either fixed here with a test that fails without the fix, or filed as its
+  own point carrying its verification; every refuted one is struck with its reason, so the sweep
+  is closed rather than carried. No candidate stays in the state it is in now, which is the one
+  state this point exists to leave.
+  VERIFIABLE: for each confirmed candidate, a pure test over the same core that fails before the
+  fix and passes after it — the CI guard candidates against scripts/ci-status-guard-core.mjs, the
+  launcher candidates against scripts/batch-autostart-core.mjs. For each refuted candidate, the
+  recorded verdict is the evidence and no test is owed. The point's own completeness is checkable
+  by counting: sixteen candidates in, sixteen verdicts out.
+  DEPENDENCY: point 809 rewrites launcherStartDecision, the writer veto and the CI wait, so
+  several of these candidates sit in code 809 changes. This point is worked AFTER 809 and never
+  beside it; a candidate 809 removes on its way is struck with that as its reason.
+  Criticality: medium — none is a product defect and none is confirmed yet, but they sit in the
+  two mechanisms that decide whether the batch keeps running at all, which is exactly the
+  machinery the user has just asked to be made fast.
   Bundle: Session- & Repo-Hygiene.
