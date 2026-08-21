@@ -265,6 +265,31 @@ put it is the mistake this line exists to stop.
   the batch is otherwise healthy and merely waiting for green.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 814. The dictated handover card claims nothing is running while a delegated authoring run
+  continues (measured 21.08.2026 at this session's context watermark).
+  WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare --context` reported in the same
+  breath that "the declared in-flight work is transferable
+  (feat/809-standstill-journal@9ec4e3a7)" AND dictated a board card ending unconditionally with
+  "Hier läuft nichts weiter." The sentence sits in scripts/batch-boundary-core.mjs at two places
+  (around lines 1049 and 1058) with no condition on the in-flight state, so it is appended even
+  when declared, transferable work exists and the successor adopts it with
+  `batch-in-flight --adopt`. The successor session confirmed the effect: the published board read
+  standstill while GPT-5.6 Sol was still building point 809.
+  WHY IT MATTERS: the board is the user's phone-glanceable view of the batch. A card that says
+  standstill during live delegated work is not merely imprecise — it is the one statement the
+  board exists to get right, and it is dictated to the session under end-of-session pressure, so
+  a careful session copies it verbatim and publishes the falsehood.
+  FINAL STATE: the closing sentence is bound to the in-flight state. Without transferable work it
+  stays as it is; with transferable work the card names WHAT continues and that the successor
+  takes it over.
+  VERIFIABLE: a pure test over the card composer with and without declared in-flight work.
+  OVERLAP TO SETTLE WHEN COMMISSIONED: points 800 and 790 own the dictated handover card's text
+  rule and its composer. This point is the card's CONDITION on measured state, not its wording —
+  whoever is commissioned first settles which side carries it, so the fix is not built twice.
+  FILES: scripts/batch-boundary-core.mjs.
+  Criticality: med — no code breaks, but the board misreports the batch precisely at the handover.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
