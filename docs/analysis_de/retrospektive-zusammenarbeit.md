@@ -1319,7 +1319,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 19:30 · Quellen-Fingerprint: `7ec4b382b2aa…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 19:58 · Quellen-Fingerprint: `1de805604edf…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1356,7 +1356,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 11 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 13 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1415,8 +1415,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 5 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 7ec4b382b2aacda286d9c92fcf7b9500c9510d38b3ca5d4bf45a9446404ae5b4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:30:40.067Z -->
+<!-- RETRO-FINGERPRINT: 1de805604edf2fcdb7f6bc19bd619a5e9c73d9710703c6deebee47d7606e7f43 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:58:14.419Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2588,3 +2588,34 @@ sonst hat sie für den häufigsten Mischfall gar keine Antwort, und die stille A
 »niemand«. Und ein Tor, das erst beim Abhaken prüft, prüft zu spät: Was die Landung verlangt,
 gehört an den Anfang des Punktes, nicht an sein Ende. Verwandt mit §3.119 (die Marke mahnt beim
 Aufhören statt beim Anfangen).
+
+### 3.154 Eine Frischemessung als Antwort auf eine Lebendigkeitsfrage
+
+Am 21.08.2026 um 17:40:28Z startete der Nachfolger, 34 Sekunden später meldete der Launcher zwei
+parallele Sitzungen, und zwei Sekunden danach pausierte der gesamte Stapel. Es lief genau eine
+Sitzung. Die zweite war der Vorgänger, der 37 Sekunden zuvor regulär übergeben hatte und dessen
+Prozess nachweislich tot war; der Batch-Doctor bestätigte Minuten später `parallelNow=1` und ein
+konsistentes Repository.
+
+Der Klassifikator stellt die richtige Frage — »fährt hier ein zweiter?« — und beantwortet sie mit
+einer anderen Größe: der Frische des letzten Werkzeugaufrufs. Das ist keine Ungenauigkeit am Rand,
+sondern ein Treffer per Konstruktion: Eine Übergabe besteht gerade darin, dass der Vorgänger seine
+letzte Handlung tut und geht, während der Nachfolger anfängt. Der Detektor feuert also am
+zuverlässigsten in dem Moment, in dem er am sichersten falsch liegt. Dass er es nicht nur einmal
+tat, steht im Protokoll: dieselbe Eskalation am 09., 13., 17., 18. und 19.08.2026, jedes Mal mit
+zehn bis zwanzig Minuten Stillstand als Preis. Die Ausnahmeliste des Klassifikators kannte die
+angemeldete Zweitsitzung bereits — der abgetretene Vorgänger gehört in dieselbe Klasse und fehlte.
+
+Zwei Dinge machen den Fall teuer statt bloß ärgerlich. Erstens eskaliert der Mechanismus mit der
+Wiederholung: Die fünfte unbeantwortete Meldung pausiert den Batch, und die Meldungen blieben
+unbeantwortet, weil niemand da war — die Eskalation ist an einen Menschen adressiert und feuert im
+unbeaufsichtigten Lauf. Zweitens hat der Mechanismus einen gebauten Ausweg, der auch stimmte: Der
+Doctor ist der vorgesehene Weg, den Alarm zu beantworten, und er tat es in einem einzigen Aufruf.
+Der Stillstand entstand nicht, weil die Prüfung fehlte, sondern weil niemand sie aufrief.
+
+**Lehre:** Wer eine Zustandsfrage stellt, muss den Zustand messen und nicht seine Spur. Eine
+Aktivitätsspur sagt, dass etwas geschehen IST, nie dass etwas noch geschieht — und die
+Verwechslung ist genau dort am wahrscheinlichsten, wo ein Übergang stattfindet. Prüffrage bei
+jedem Detektor: *Welchen Zustand behaupte ich, und wäre meine Messung auch dann noch wahr, wenn
+der Zustand gerade endet?* Und für jede Eskalation, die einen Menschen adressiert: *Was passiert,
+wenn niemand liest?* Verwandt mit §3.149 (zwei Leser, ein Datensatz, zwei Antworten).

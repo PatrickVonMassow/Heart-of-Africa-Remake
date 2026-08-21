@@ -11136,3 +11136,40 @@ to land than a mechanism that needs a review.
   Criticality: medium — nothing is corrupted, but the board is the user's only view and it was
   both unreadable and wrong.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 823. The parallel-session detector counts the predecessor that has just handed over, and a
+  batch pause is the price (measured 21.08.2026, 19:41). `classifyParallel`
+  (`scripts/batch-singleton.mjs:577-590`) calls a session parallel when its LAST TOOL CALL is
+  fresher than `PARALLEL_FRESH_MS`. Whether that session's PROCESS is still alive is asked
+  nowhere. That condition is met at EVERY handover by construction: the predecessor commits its
+  boundary and exits, so its final tool call is seconds old exactly while the successor starts
+  beside it.
+  MEASURED, IN ONE SEQUENCE: the successor was launched at 17:40:28Z and the launcher logged
+  `PARALLEL SESSIONS DETECTED: owner=08663d81 plus c88d67fb` at 17:41:02Z — 34 seconds later.
+  c88d67fb was pid 3168101, which `ps` showed absent, and it had handed the batch over regularly
+  37 seconds earlier (`HANDOVER accepted: c88d67fb … at point 769`). Exactly one batch session was
+  running, and the batch doctor confirmed it minutes later with `parallelNow=1` and a `consistent`
+  verdict.
+  WHAT IT COSTS: that detection was the fifth unanswered alert, so it PAUSED THE WHOLE BATCH
+  (`.claude/batch-paused`, restart clock 20 minutes). The same escalation stands in
+  `.claude/autostart.log` on 09.08., 13.08., 17.08., 18.08. and 19.08.2026 — every time 10 to 20
+  minutes of standstill bought by a phantom. The detector does not merely report imprecisely; it
+  regularly stops the batch over a session that no longer exists.
+  FINAL STATE: the classifier no longer treats freshness as sufficient. A session counts as
+  parallel only while something still shows it DRIVING — a live process for its sid, or activity
+  after its own committed boundary. A sid whose boundary marker is committed, or whose process is
+  gone, is out, the same way the claimant window is already excluded through `exclude`. The
+  exclusion is narrow: it removes the retired predecessor, not a second live driver, which is the
+  whole reason the detector exists.
+  VERIFIABLE: pure cases over the classifier — a retired predecessor with a fresh last call and a
+  dead process is NOT flagged; a second session with a live process IS flagged; a predecessor that
+  keeps making calls AFTER its committed boundary IS flagged, because that is the covert second
+  driver the detector was written for; the existing claimant exclusion keeps working unchanged.
+  Plus one case over the escalation path proving that a detection the classifier drops raises no
+  alert and starts no pause clock.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: it costs measured minutes rather
+  than correctness, and under the user's ruling of 20.08.2026 a machine-filed point of this
+  urgency waits for the release.
+  Criticality: medium — nothing is corrupted, but a false alarm halts the whole batch and the halt
+  is invisible until someone reads the pause file.
+  Bundle: Session- & Repo-Hygiene.

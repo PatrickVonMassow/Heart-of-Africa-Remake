@@ -496,6 +496,12 @@
       "why": "Hinter 174 einsortiert: Es fehlinformiert die Tafel, blockiert aber weder Batch noch Release",
       "origin": "machine",
       "place": "last"
+    },
+    "823": {
+      "at": "2026-08-21T17:57:36.026Z",
+      "why": "Hinter Punkt 174 ans Ende: Der Fehlalarm kostet gemessene Minuten, nicht Korrektheit, und faellt damit unter die Nutzerregel vom 20.08.2026 fuer maschinell eingereihte Punkte dieser Dringlichkeit.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -552,7 +558,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T17:30:39.911Z",
+    "at": "2026-08-21T17:57:36.033Z",
     "points": [
       174,
       184,
@@ -795,7 +801,8 @@
       819,
       820,
       821,
-      822
+      822,
+      823
     ]
   }
 }
