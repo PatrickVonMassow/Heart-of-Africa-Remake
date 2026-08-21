@@ -19,14 +19,6 @@
 export const CONTEXT_CEILING_TOKENS = 150_000
 
 /**
- * THE MEASURED COST OF LEAVING — what a session still pays between deciding to
- * hand over and its last repository action (measured 19.08.2026). The handover
- * threshold is derived from it, so it is a constant here rather than a number
- * repeated in a test.
- */
-export const MEASURED_BOUNDARY_COST_TOKENS = 27_336
-
-/**
  * THE HANDOVER THRESHOLD, in tokens of context — the mark at which a session
  * finishes its step and ENDS. It is DERIVED, not chosen: the largest mark at
  * which the ordinary case (the mark fires, the boundary is taken straight
@@ -54,6 +46,16 @@ export const MEASURED_BOUNDARY_COST_TOKENS = 27_336
  * the consumption-reducing points have landed.
  */
 export const CONTEXT_TRIGGER_TOKENS = 122_000
+
+/**
+ * THE HANDOVER RESERVE used by pre-call admission. Today it is derived from
+ * point 743's ceiling/trigger pair, so the exit budget that pair withheld is
+ * never lent to ordinary calls. Point 744 replaces this one derivation with
+ * its clean, mechanically capped measurement. Its contaminated 27,336-token
+ * observation is deliberately not copied forward.
+ */
+export const CONTEXT_HANDOVER_RESERVE_TOKENS =
+  CONTEXT_CEILING_TOKENS - CONTEXT_TRIGGER_TOKENS
 
 /**
  * THE REFUSAL THRESHOLD, in tokens of context — the mark past which the context

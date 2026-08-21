@@ -4,12 +4,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   CONTEXT_CEILING_TOKENS,
+  CONTEXT_HANDOVER_RESERVE_TOKENS,
   CONTEXT_FENCE_MODES,
   CONTEXT_FENCE_MODE_DEFAULT,
   CONTEXT_MARGIN_TOKENS,
   CONTEXT_REFUSAL_TOKENS,
   CONTEXT_TRIGGER_TOKENS,
-  MEASURED_BOUNDARY_COST_TOKENS,
   contextDistanceNote,
   normalizeFenceMode,
   parseContextTokens,
@@ -106,20 +106,11 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
     }
   })
 
-  it('the handover threshold is DERIVED from the ceiling and the measured cost of leaving', () => {
-    // "Close under the ceiling" is arithmetic, not taste: the largest mark at
-    // which the ordinary case — the mark fires, the boundary is taken straight
-    // away — still lands under the ceiling.
-    expect(MEASURED_BOUNDARY_COST_TOKENS).toBe(27_336)
-    expect(CONTEXT_TRIGGER_TOKENS + MEASURED_BOUNDARY_COST_TOKENS).toBeLessThanOrEqual(
-      CONTEXT_CEILING_TOKENS,
+  it('exports the one provisional handover reserve derived from the point-743 pair', () => {
+    expect(CONTEXT_HANDOVER_RESERVE_TOKENS).toBe(
+      CONTEXT_CEILING_TOKENS - CONTEXT_TRIGGER_TOKENS,
     )
-    // …and it really is CLOSE under it: raising it by another 1,000 would break
-    // that. This is what stops the threshold from drifting back down to where
-    // it forbade work well before the ceiling.
-    expect(CONTEXT_TRIGGER_TOKENS + 1_000 + MEASURED_BOUNDARY_COST_TOKENS).toBeGreaterThan(
-      CONTEXT_CEILING_TOKENS,
-    )
+    expect(CONTEXT_HANDOVER_RESERVE_TOKENS).toBe(28_000)
   })
 
   it('NAMES the worst case neither threshold covers — the residual is stated, not hidden', () => {
@@ -134,7 +125,7 @@ describe('watermarkDecision — past, below, or LOUDLY unreadable', () => {
     const worstCase =
       CONTEXT_TRIGGER_TOKENS +
       LARGEST_OBSERVED_SINGLE_RESPONSE_TOKENS +
-      MEASURED_BOUNDARY_COST_TOKENS
+      CONTEXT_HANDOVER_RESERVE_TOKENS
     expect(worstCase).toBeGreaterThan(CONTEXT_CEILING_TOKENS)
   })
 
