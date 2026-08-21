@@ -255,26 +255,6 @@ put it is the mistake this line exists to stop.
   told it.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 822. A now-card names the mechanism instead of the problem, and outlives its own landing
-  (measured 21.08.2026, 19:01, by session 8bed111b during its stand-down while the batch ran in
-  c88d67fb). The board's "Woran ich gerade arbeite" carried one sentence for point 769: "Stand
-  18:26 — Zeitstempel-Guard: nur die Endantwort beurteilen". No problem, no why, no state — the
-  user asked unprompted what the card meant, which is the measurement. A card that names only the
-  mechanism is worth nothing to the reader it is written for.
-  IT WAS ALSO ALREADY FALSE when he read it: the merge was at 18:57 and the archive move at 19:00,
-  and at 19:01 the card still stood as running work. A now-card that survives its own landing
-  makes the whole board untrue, and the board is what he reads instead of asking.
-  FINAL STATE: a now-card says what is wrong and why it matters before it names the mechanism, and
-  it cannot outlive the tick of its own point — the landing that ticks a point is what closes or
-  replaces its card, in the same step rather than in a later turn that may never come.
-  VERIFIABLE: pure cases over the card composer and the landing sequence — a card whose body names
-  only a mechanism is refused; a ticked point with a standing now-card is refused; the landing that
-  ticks a point leaves no now-card naming it.
-  QUEUE RANK: behind 820. Reason: it misinforms the user rather than blocking the batch.
-  Criticality: medium — nothing is corrupted, but the board is the user's only view and it was
-  both unreadable and wrong.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 820. The criticality gate cannot be cleared by the review shape the tooling produces, so
   every HIGH point blocks at the exit of the session that lands it (measured 21.08.2026 while
   landing point 769). `scripts/criticality-review-guard-core.mjs` `passShape()` requires
@@ -11133,4 +11113,26 @@ to land than a mechanism that needs a review.
   FILES: .claude/queue-rank.json, scripts/queue-rank-core.mjs, TASKS.md.
   Criticality: medium — no product defect, but it is the reason the user keeps seeing process
   work ahead of the game, and the gate that was built for it cannot reach it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 822. A now-card names the mechanism instead of the problem, and outlives its own landing
+  (measured 21.08.2026, 19:01, by session 8bed111b during its stand-down while the batch ran in
+  c88d67fb). The board's "Woran ich gerade arbeite" carried one sentence for point 769: "Stand
+  18:26 — Zeitstempel-Guard: nur die Endantwort beurteilen". No problem, no why, no state — the
+  user asked unprompted what the card meant, which is the measurement. A card that names only the
+  mechanism is worth nothing to the reader it is written for.
+  IT WAS ALSO ALREADY FALSE when he read it: the merge was at 18:57 and the archive move at 19:00,
+  and at 19:01 the card still stood as running work. A now-card that survives its own landing
+  makes the whole board untrue, and the board is what he reads instead of asking.
+  FINAL STATE: a now-card says what is wrong and why it matters before it names the mechanism, and
+  it cannot outlive the tick of its own point — the landing that ticks a point is what closes or
+  replaces its card, in the same step rather than in a later turn that may never come.
+  VERIFIABLE: pure cases over the card composer and the landing sequence — a card whose body names
+  only a mechanism is refused; a ticked point with a standing now-card is refused; the landing that
+  ticks a point leaves no now-card naming it.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: it misinforms the user on the
+  board but blocks nothing, so under the user's ruling of 20.08.2026 a machine-filed point of
+  this urgency waits for the release.
+  Criticality: medium — nothing is corrupted, but the board is the user's only view and it was
+  both unreadable and wrong.
   Bundle: Session- & Repo-Hygiene.

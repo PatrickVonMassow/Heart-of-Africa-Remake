@@ -373,10 +373,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, den sie gerade gebaut hat.** Er feuert zuerst gegen ihre
-  eigene Arbeit, und die Schleife sieht von innen wie Fortschritt aus.
-  → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es beim
-  dritten Mal: **wäre dieser Commit auch ohne den neuen Wächter nötig?**"
+- **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
+  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt.
+  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
+  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
   Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
@@ -426,4 +426,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 0de000b3f0f8459616471eb6ba925cf1932ab31f5ee370407d133e2146a0daba -->
+<!-- GUIDE-FINGERPRINT: 7ec4b382b2aacda286d9c92fcf7b9500c9510d38b3ca5d4bf45a9446404ae5b4 -->

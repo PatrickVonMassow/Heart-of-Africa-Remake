@@ -1319,7 +1319,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 19:19 · Quellen-Fingerprint: `be222c40f75b…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 19:30 · Quellen-Fingerprint: `7ec4b382b2aa…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1333,7 +1333,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 11 | hoch | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
+| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 2 | mittel | findings-guard.mjs | ✔ Mechanismus |
 | board.mjs commands must run SEQUENTIALLY — two in one turn raced and tore the dashboard's section structure | 1 | niedrig | board-edit-lock.mjs, board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-edit-lock.mjs, board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1415,8 +1415,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 5 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: be222c40f75b97eb04b0d9daaf902ae2b83e58b7a22b9d52ad8397952dae88e4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:19:47.073Z -->
+<!-- RETRO-FINGERPRINT: 7ec4b382b2aacda286d9c92fcf7b9500c9510d38b3ca5d4bf45a9446404ae5b4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:30:40.067Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
