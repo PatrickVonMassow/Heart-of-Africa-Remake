@@ -11016,3 +11016,40 @@ to land than a mechanism that needs a review.
   verdicts are correct; the defect only arrives with the evidence the mechanism is designed to
   accumulate, which is why it is filed rather than fixed inside 809.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 817. The activity journal's tail read can hand out a sequence number twice, and appends onto
+  a torn line (found 21.08.2026 by GPT-5.6 Sol's cross-vendor reading of the Claude half of point
+  809's branch, commissioned by point 816).
+  WHAT WAS MEASURED. `nextSequence` in `scripts/batch-activity-journal.mjs` reads the last 64 KiB,
+  hands the bytes to `parseActivityJournal`, and takes `records.at(-1).seq + 1`. That parser DROPS
+  every unparsable fragment, so a journal ending in a complete record 40 followed by a torn,
+  unterminated record 41 yields 40 as the newest record and returns 41 — a number already handed
+  out. The append at the same file then opens with `'a'` and writes its JSON directly behind the
+  torn fragment WITHOUT a terminating newline of its own before it, welding two records into one
+  unparsable line; the next call drops that line again and returns 41 once more. A clean
+  truncation from 50 back to 40 restarts at 41 the same way. Separately, `readSync`'s returned
+  byte count is ignored: a short read leaves the tail buffer padded with NUL bytes, the newest
+  record becomes unparsable, and a LOWER sequence is accepted instead of the read being retried.
+  `writeSync`'s byte count is ignored on the same path, so a partial record can be fsynced and
+  returned to the caller as the durable record it is not.
+  WHY IT MATTERS. The fenced sequence is what makes every standstill classification reproducible
+  and what proves no event was lost. Two events sharing a number, or a torn line that swallows
+  its successor, breaks exactly the property the journal exists to guarantee — and the mutex does
+  not help, because a crash mid-write leaves the torn line behind for the NEXT holder of the lock.
+  FINAL STATE: the tail read establishes where the journal genuinely ends before it trusts the
+  last record — an unterminated final line is detected rather than dropped, and a journal whose
+  tail is torn either repairs to the last newline or refuses to hand out a sequence rather than
+  reusing one. `readSync` and `writeSync` byte counts are honoured on both paths, short reads
+  retry or widen instead of accepting a lower sequence, and a partial write is never reported as
+  durable. A sequence, once handed out, is never handed out again by any of these paths.
+  VERIFIABLE: pure tests over the append path cover a torn unterminated final line, a clean
+  truncation below a previously handed-out sequence, a short read, and a short write — each
+  asserting that no sequence is reused and that no record is welded onto another. The existing
+  concurrent fixture is extended past the 64 KiB tail window so concurrent writers actually
+  exercise the optimized path.
+  DEPENDENCY: none. Point 815 covers the report's READ path and journal retention and explicitly
+  leaves the append path out; this point is that append path, so the two do not overlap.
+  FILES: scripts/batch-activity-journal.mjs, scripts/batch-activity-journal-core.test.mjs.
+  Criticality: high — it is the integrity of the evidence every standstill measurement rests on,
+  and a reused sequence is silent: nothing downstream can tell it happened.
+  Bundle: Session- & Repo-Hygiene.
