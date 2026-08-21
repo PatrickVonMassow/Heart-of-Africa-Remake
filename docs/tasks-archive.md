@@ -20829,3 +20829,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   landing in front of the release by default, which is the drift the user has just corrected by
   hand for eight points.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 794. The user ruled on the guide's size budget: raise the ceiling, drop no pitfall
+  (USER-ANSWERED(2026-08-20), given at 21:10 and first executed against the wrong mechanism).
+  WHAT WAS ASKED. `docs/analysis_de/vibe-coding-anleitung.md` stands exactly at its ceiling — 415
+  lines, 3677 words — and the standing rule is shorten-before-raise, so every new pitfall displaces
+  an old one. The lesson of retrospective §3.141 (a guard grants an exception in its text but builds
+  no command for it, so the only wording that passes is the dishonest one) was therefore written to
+  the retrospective and taken back OUT of the guide rather than sacrificing an existing entry, and
+  the choice went to the user as a decision card. HIS ANSWER: raise the limit. No entry is dropped.
+  WHY IT MATTERS: the guide is what a reader copies process from, and the lesson is a decision, not
+  an experience to read about — the class of guard that describes an escape it does not provide is
+  one a reader must recognise before he meets it.
+  THE SECOND HALF, TO BE CHECKED WITH IT: the comment at `LIMITS.maxWords` in
+  `scripts/guide-brevity-core.mjs` records that the user withdrew the ask-before-raising requirement
+  generally on 10.08.2026 ("Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen") — a raise
+  is ours to take and to justify in writing. Under that ruling this card should never have been put
+  to him. Whatever produced it is found and either follows the withdrawal or states why it still
+  asks.
+  A SECOND ENTRY IS OWED WITH IT (found 21.08.2026 at the guide review the currency guard demands):
+  the night of 20./21.08.2026 measured a class the guide's pitfall list does not carry at all — the
+  TEST SUITE THAT WRITES INTO THE REPOSITORY IT IS RUN IN. A full unit run force-moved the live
+  main branch to a fixture commit, made the checkout bare and left fifteen fixture branches behind,
+  because scripts resolved their repository root from their own source location and ignored the
+  fixture root the tests handed them. It is exactly the guide's own shape — one sentence of risk,
+  then the prompt ("Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das
+  Projekt verändert hat, in dem er läuft") — and it could not be written on 21.08.2026 because the
+  guide stood at 416 lines against a ceiling of 415. It is therefore part of THIS point's raise,
+  not a separate one. Point 801 is where it was measured.
+  FINAL STATE: §3.141's lesson AND the suite-writes-into-its-own-repository lesson stand in the
+  guide as pitfall entries in the house form, with no existing entry removed;
+  `LIMITS.maxLines`/`maxWords` rise by exactly the measured net size of those entries, with the
+  usual written justification in the comment; and the escalation path that raised the card no
+  longer routes a budget raise to the user.
+  VERIFIABLE: `node scripts/guide-brevity-guard.mjs` green at the new ceilings; a Vitest case that
+  the guide carries the entry and that the ceilings equal the measured size rather than carrying
+  slack; and a case over the escalation path proving a budget raise produces no decision card.
+  Criticality: medium — no product defect, but it is a user ruling that was already lost once and
+  executed against the wrong mechanism the first time.
+  Bundle: Dokumentation.
