@@ -1,5 +1,11 @@
 {
   "ranked": {
+    "517": {
+      "at": "2026-08-21T06:59:48.282Z",
+      "why": "Nutzer 21.08.2026: die fuer den Uebergabe-Beschleunigungseffekt noetigen Punkte in passender Reihenfolge nach vorn.",
+      "origin": "user",
+      "place": "ahead"
+    },
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
       "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work.",
@@ -220,11 +226,17 @@
       "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first.",
       "place": "last"
     },
-    "800": {
-      "at": "2026-08-21T06:56:46.487Z",
-      "why": "Nutzer 21.08.2026: die Uebergabe-Beschleunigungskette nach vorn; 800 ist die Steuer, die jede Sitzung an jeder Punktgrenze zahlt.",
+    "790": {
+      "at": "2026-08-21T06:59:48.174Z",
+      "why": "Nutzer 21.08.2026: die fuer den Uebergabe-Beschleunigungseffekt noetigen Punkte in passender Reihenfolge nach vorn.",
       "origin": "user",
-      "place": "last"
+      "place": "ahead"
+    },
+    "800": {
+      "at": "2026-08-21T06:59:48.061Z",
+      "why": "Nutzer 21.08.2026: die fuer den Uebergabe-Beschleunigungseffekt noetigen Punkte in passender Reihenfolge nach vorn.",
+      "origin": "user",
+      "place": "ahead"
     },
     "802": {
       "at": "2026-08-21T01:29:55.069Z",
@@ -249,10 +261,70 @@
       "why": "Medium and nothing blocked once the author is quiet: the push waits out the delegated run instead of being lost, so it takes the place append-and-defer gives it, behind the release.",
       "origin": "machine",
       "place": "last"
+    },
+    "806": {
+      "at": "2026-08-21T07:03:38.926Z",
+      "why": "Nachgelagerte Verschaerfung des gerade gelandeten 772; kein Blocker, gehoert ans Ende der Ordnung.",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      515,
+      553,
+      581,
+      595,
+      596,
+      597,
+      598,
+      633,
+      659,
+      660,
+      663,
+      669,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      720,
+      730,
+      733,
+      734,
+      735,
+      736,
+      737,
+      738,
+      739,
+      744,
+      745,
+      746,
+      747,
+      748,
+      749,
+      750,
+      752,
+      759,
+      760,
+      762,
+      764,
+      768,
+      769,
+      779
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-21T05:48:21.489Z",
+    "at": "2026-08-21T07:03:38.932Z",
     "points": [
       174,
       184,
@@ -486,61 +558,8 @@
       802,
       803,
       804,
-      805
+      805,
+      806
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      515,
-      553,
-      581,
-      595,
-      596,
-      597,
-      598,
-      633,
-      659,
-      660,
-      663,
-      669,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      713,
-      715,
-      719,
-      720,
-      730,
-      733,
-      734,
-      735,
-      736,
-      737,
-      738,
-      739,
-      744,
-      745,
-      746,
-      747,
-      748,
-      749,
-      750,
-      752,
-      759,
-      760,
-      762,
-      764,
-      768,
-      769,
-      779
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }

@@ -203,6 +203,44 @@ put it is the mistake this line exists to stop.
   evidence still advances → renew, never spawn; lease expired + a declaration whose
   evidence has gone quiet → spawn), and the boundary path's existing tests stay green
   unchanged.
+  MEASURED AGAIN 21.08.2026, AND IT ADDS A THIRD PATH AND AN EARLIER CAUSE. The user's own
+  window claimed the batch at 07:46 and lost it anyway. `.claude/autostart.log` honoured the
+  claim twice — 05:55:24Z "skip: session 593e0d2f has CLAIMED the batch 9 min ago (reserved)"
+  and the same line at 24 min — then at 06:25:29Z, with the claim 39 minutes old, the claim
+  vanished from the tick's reasoning and it logged only "skip: owner alive". At 06:30:03Z the
+  owner handed over regularly and the launcher logged "HANDOVER accepted: 388cea5f handed the
+  batch over — spawning the successor", starting a FRESH session that then owned the batch.
+  (a) THE HANDOVER BRANCH IS THE THIRD PATH. `scripts/batch-autostart.mjs` spawns
+  unconditionally when the owner hands over; it never asks the claim. This point's item 2
+  already forbids fixing one path and leaving another behind, so this branch joins the same
+  shared decision rather than getting one of its own. Point 752's stage 2b names the missing
+  resolver (`resolveBoundaryDestination`); a grep over `scripts/` shows it does not exist yet,
+  so nothing today redirects a handover to a claiming window.
+  (b) THE LAUNCHER'S CLAIM READING EXPIRES EARLY, which is why (a) never even saw a live claim.
+  `assessClaim` suspends its clock on `ownerHolding` (`scripts/batch-claim-core.mjs:302`), and
+  two readers derive that input through the pure `ownerIsHolding` predicate
+  (`scripts/batch-claim.mjs:150`, `scripts/batch-resume-hook.mjs:318`). The launcher does not:
+  `scripts/batch-autostart.mjs:658` calls `takeoverDecision` with claim, now, maxAgeMs and
+  probePid only, so `ownerHolding` defaults false and every claim expires for the launcher at
+  `CLAIM_MAX_AGE_MS` — while `node scripts/batch-claim.mjs --status` kept answering `honour`
+  for the same record at 21 and at 44 minutes. The comment over `ownerIsHolding` says the
+  predicate is pure so both readers "cannot drift apart" and calls two readers disagreeing
+  about one state "the disease this point was written for". The launcher is the reader that
+  drifted, and it holds the lock in hand at that moment — it reads it a few lines later for
+  the handover branch.
+  FINAL STATE (continued):
+  7. The handover branch reaches the SAME shared decision as items 1 and 5, so an honoured
+     claim reserves the freed lock for the claiming window instead of spawning a successor.
+  8. Every reader of a claim derives `ownerHolding` through `ownerIsHolding`, the launcher
+     included, so no door judges the same record differently from `--status`.
+  VERIFIABLE, added: a case that a claim older than `CLAIM_MAX_AGE_MS` with a LIVE owner
+  holding is honoured by the launcher's own decision exactly as `--status` honours it; a case
+  that a handover with an honoured claim reserves and does not spawn; and a case that a
+  handover with no claim, or a dead claimant, still spawns at once.
+  Criticality: high — it hands the batch past the window that asked for it, so the user cannot
+  take over without forcing something, and it defeats the claim mechanism the whole handover
+  protocol rests on.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 744. Leaving is the most expensive step of a session, and nobody has measured it
   (19.08.2026). Every token spent on the handover is a token subtracted from the working
@@ -442,6 +480,25 @@ put it is the mistake this line exists to stop.
   25,000-token search reproduced as a twenty-line answer.
   Criticality: medium — no product defect, but it is the token cost the whole 738–759 programme is
   about, in the one shape that programme does not cover: a question with no command behind it.
+  BUILT AND GREEN ON ITS BRANCH, WAITING ONLY FOR A LANDING (delegated author 21.08.2026,
+  reported after the owning session had sealed its boundary, so it could not reach this file).
+  Branch `feat/779-three-missing-commands`, head cb8aeee7, pushed and clean; all three items
+  delivered — the transcript reader repaired (`--sessions`, main-checkout fallback, corpus
+  footer, reliable non-zero exit), `batch-claim --wait/--take` added, and `help.mjs` plus a
+  generated `docs/command-index.md` with 257 entries. Gates on the final head: unit GREEN
+  (360 files, 12,372 passed, 5 skipped), build GREEN, lint GREEN, no browser suite needed. Two
+  cross-vendor reviews stand in `.claude/mechanism-reviews.jsonl`: a42515bb merge-with-fixes,
+  then cb8aeee7 MERGE. The blocking finding was real: `claimWaitDecision` counted a bare
+  reason `released` as a finished wait, and since only the acquire path clears
+  `batch-claim.json`, a stale released record survives under the next owner — so `--wait`
+  exited 0 saying "run --take now" against a fixture reporting the lock held and its owner
+  alive, which is verbatim the failure this point exists to prevent.
+  FOR THE LANDING SESSION: delete the parked branch `origin/feat/user-said-command` when this
+  lands — its only commit d7a59ef8 is an ancestor of this branch, so nothing is lost; `help.mjs`
+  indexes top-level `scripts/*.mjs` only, not `scripts/verify/*.mjs`, matching this point's own
+  framing and deliberately not charged here; and the byte-for-byte drift test goes red whenever
+  any script's FIRST COMMENT SENTENCE changes, not only its usage line, so
+  `node scripts/help.mjs --write` becomes a routine step after comment edits.
   Bundle: Session- & Repo-Hygiene.
 - [ ] 764. The chat header's context reading is required by nothing, and six replies proved it
   (measured 20.08.2026, session d5fcb9cf; the user found it before we did: "Dann war es da und
@@ -10736,4 +10793,34 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but it withholds the push rule's protection for as long
   as a delegated author runs, and leaves bookkeeping committed but unpushed, which is the exact
   state that rule exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 806. The repair-loop bound speaks on the ninth commit, one minute after the human already
+  ended the session (reported 21.08.2026 by the reviewing session, the morning point 772 landed).
+  WHAT LANDED AND WHAT IT MEASURES. Point 772 shipped `REPAIR_COMMIT_ORDINARY_MAX = 8`, so a run
+  of same-mechanism commits is surfaced on the NINTH. The number is honestly measured — the review
+  widened the family from guards to every top-level `scripts/*.mjs` module, and first-parent
+  history was replayed independently: `clear-claim-guard` 9 on 20.08., `cut-account` 8 on 20.08.,
+  `board` 6 on 18.08. The `cut-account` eight was read and is genuinely ordinary: authoring plus
+  review answering inside 26 minutes. So eight cannot be lowered without reporting ordinary work.
+  WHY THAT IS STILL TOO LATE. In the incident 772 was written for, the ninth commit fell at 10:37
+  on 20.08.2026 and the user ended the session by hand at 10:38. The mechanism would have spoken
+  one minute before the human did. 772's FINAL STATE asks only for a count surfaced outside the
+  ordinary range, and that is delivered and tested; what is not delivered is PREVENTION, because
+  counting alone cannot separate a repair loop from ordinary authoring of one module.
+  THE SHARPER SIGNAL, present in the measured case and unused: every one of the nine commits
+  repaired a mechanism the SAME session had landed hours earlier, and no work-order point moved
+  in all that time. That is a much narrower population than "commits touching one module", and a
+  bound over it could sit far below eight without ever reporting the `cut-account` eight.
+  FINAL STATE: the repair-loop reading is taken over the narrower population — commits that
+  repair a mechanism this same session already landed, while the work order stands still — and
+  its bound is measured against the same replayed history that calibrated the eight, so the new
+  number is evidence and not taste. The existing count stays as the outer backstop; this is a
+  second, earlier reading, not a replacement.
+  VERIFIABLE: Vitest over the pure reading — the 20.08. history reaches the narrow bound before
+  its ninth commit; the `cut-account` run of eight ordinary commits does NOT reach it; a session
+  that repairs its own landed mechanism while a point is progressing does not reach it either;
+  and the outer count of 772 keeps its current behaviour unchanged.
+  Criticality: medium — it is a detector, not a product path; its failure mode is the measured
+  one, a session that repairs itself for two hours while nothing in the work order moves.
   Bundle: Session- & Repo-Hygiene.
