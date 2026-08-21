@@ -17,11 +17,16 @@
 // that last is right. Everything here serves that single question.
 //
 // THE STATE, all of it, is the tracked `.claude/queue-rank.json`:
-//   { "ranked":  { "<N>": { "at": …, "why": … } },      the deliberate decisions
-//     "settled": { "at": …, "points": [ … ], "why"? } } the PROVENANCE baseline —
-// the open set as it stood the last time no rank question was outstanding. A
-// point is "appended since" exactly when it is missing from that set, which is
-// the one thing its NUMBER and its POSITION cannot tell anybody (`appendGateState`).
+//   { "ranked":   { "<N>": { "at": …, "why": …, "origin": … } },  the decisions
+//     "settled":  { "at": …, "points": [ … ], "why"? },  the PROVENANCE baseline —
+//     "boundary": { "at": …, "points": [ … ], "why"? } } the FROZEN release front
+// The baseline is the open set as it stood the last time no rank question was
+// outstanding: a point is "appended since" exactly when it is missing from it,
+// which is the one thing its NUMBER and its POSITION cannot tell anybody
+// (`appendGateState`). The boundary is the set that stood in FRONT of the release
+// point when the release rule was armed — frozen, never advanced, because a
+// grandfather set that moved with the order would forgive every point moved into
+// the front afterwards (`releaseBoundaryState`).
 //
 // THIS MODULE OWNS NO ORDER, AND IT OWNS NO POINT NUMBER. It is deliberately
 // separate from board-queue-core: that module renders the queue and names the
@@ -73,6 +78,9 @@ export const URGENT_RANK_CMD =
 /** Record that a point standing there is the USER's own ranking. */
 export const USER_RANK_CMD = 'node scripts/queue-rank.mjs --ranked <N> --origin user --why "<one line>"'
 
+/** Arm the release rule: freeze the front of the order as it stands today. */
+export const BOUNDARY_SEED_CMD = 'node scripts/queue-rank.mjs --seed-boundary --why "<one line>"'
+
 /**
  * The blocking conditions a point may NAME instead of carrying the tag — the
  * four the spec enumerates, and no more. They are matched narrowly and in
@@ -84,7 +92,11 @@ export const BLOCKING_PATTERNS = Object.freeze([
   /\bstops?\s+the\s+batch\b/i,
   /\bblocks?\s+(?:a|the|every|another)\s+lane\b/i,
   /\bblocks?\s+(?:the\s+)?release\b/i,
-  /\bholds?\s+a\s+red\b/i,
+  // THE QUALIFICATION IS PART OF THE CONDITION (cross-vendor review, 21.08.2026).
+  // A bare "holds a red" matched "it holds a red temporarily, but the red can
+  // otherwise close" — the opposite of what the spec names, and every pattern
+  // here EXCUSES a point rather than blocking one.
+  /\bholds?\s+a\s+red\s+(?:that\s+|which\s+)?cannot\b/i,
 ])
 
 /**
@@ -95,22 +107,38 @@ export const BLOCKING_PATTERNS = Object.freeze([
  * point the rule exists to place behind the release, so a match is dropped when
  * a negation stands close in front of it.
  */
-const NEGATION_CUES = ['not ', "n't ", 'never ', 'no longer ', 'nothing ', 'cannot ', 'without ', 'nor ']
+const NEGATION_CUE = /\b(?:not|never|nothing|cannot|can't|won't|doesn't|without|nor|no longer)\b/i
 
 /** How far in front of a match a negation still governs it. */
-const NEGATION_WINDOW = 40
+const NEGATION_WINDOW = 60
 
 /**
- * The words standing in front of a match inside its OWN clause. A negation binds
- * to the clause it stands in, and a fixed character window crosses the boundary:
- * "it does not block a lane, but it stops the batch" would read as denied, when
- * the second half states the condition outright.
+ * Where a preceding clause ENDS — a full stop, a semicolon, a colon, or the
+ * contrast words that flip a sentence back to a claim.
+ *
+ * A COMMA IS NOT ONE, AND NEITHER IS A NEWLINE (cross-vendor review,
+ * 21.08.2026). Both were, and both let a plain denial through: "It does not, in
+ * practice, stop the batch" put the negation behind the last comma, and every
+ * point body in this work order is HARD-WRAPPED, so "does not\nstop the batch"
+ * had a line break sitting between the two halves of one clause. Read as claims,
+ * those sentences excuse exactly the point the rule exists to place behind the
+ * release.
+ */
+const CLAUSE_END = /[.;:]|\bbut\b|\bhowever\b/gi
+
+/**
+ * The words standing in front of a match inside its OWN clause, on one line.
+ *
+ * The text is whitespace-collapsed first, so a wrap can never separate a
+ * negation from what it denies, and only a real clause end cuts the window: a
+ * negation binds to the clause it stands in, and "it does not block a lane, but
+ * it stops the batch" states the second condition outright.
  */
 function clauseBefore(text, at) {
   const window = text.slice(Math.max(0, at - NEGATION_WINDOW), at)
-  const breaks = [...window.matchAll(/[.;:,—\n]/g)]
-  const last = breaks.length ? breaks[breaks.length - 1].index + 1 : 0
-  return window.slice(last).toLowerCase()
+  const breaks = [...window.matchAll(CLAUSE_END)]
+  const last = breaks.length ? breaks[breaks.length - 1].index + breaks[breaks.length - 1][0].length : 0
+  return window.slice(last)
 }
 
 /**
@@ -123,14 +151,16 @@ function clauseBefore(text, at) {
  * the answer cannot be argued into the record by whoever files the point.
  */
 export function statesHighUrgency(body) {
-  const text = String(body ?? '')
-  if (criticalityOf(text).level === 'high') return true
+  const raw = String(body ?? '')
+  if (criticalityOf(raw).level === 'high') return true
+  // ONE LINE, whatever the point's wrapping: the reading below is about words in
+  // front of words, and a hard wrap is not a break in the sentence.
+  const text = raw.replace(/\s+/g, ' ')
   return BLOCKING_PATTERNS.some((re) => {
     // EVERY occurrence, not the first: a body that denies one blocking condition
     // and names another states the second one all the same.
     for (const m of text.matchAll(new RegExp(re.source, `${re.flags.replace(/g/g, '')}g`))) {
-      const before = clauseBefore(text, m.index)
-      if (!NEGATION_CUES.some((cue) => before.includes(cue))) return true
+      if (!NEGATION_CUE.test(clauseBefore(text, m.index))) return true
     }
     return false
   })
@@ -244,8 +274,24 @@ function appendsSinceSettled(open, known) {
   return list.filter((n, i) => i > lastKnown && !known.has(n))
 }
 
-/** A stored baseline in the shape this module works with, or null if there is none. */
-function normaliseSettled(raw) {
+/**
+ * The stored shape, carrying exactly the parts that exist.
+ *
+ * EVERY WRITER GOES THROUGH IT. The record grew a third part (`boundary`) and
+ * five functions rebuild the record from destructured halves; one of them
+ * forgetting the new part would silently drop a frozen decision, which is the
+ * failure mode this file spends most of its length guarding against.
+ */
+function storedRecord({ ranked = {}, settled = null, boundary = null } = {}) {
+  const out = { ranked }
+  if (settled) out.settled = settled
+  if (boundary) out.boundary = boundary
+  return out
+}
+
+/** A stored point set with its stamp — the shape both `settled` and `boundary`
+ *  have — or null if the raw value is not one. */
+function normalisePointSet(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.points)) return null
   const points = []
   for (const v of raw.points) {
@@ -309,7 +355,12 @@ export function normaliseRankRecord(raw) {
     const n = Number(key)
     if (!Number.isInteger(n) || n <= 0 || !value || typeof value !== 'object') continue
     const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : '')
-    const why = str(value.why)
+    // ONE LINE MEANS ONE LINE (cross-vendor review, 21.08.2026). `recordRank`
+    // collapses the reason it is handed, but the record is TRACKED and
+    // hand-editable, so a pasted or merged entry could carry a whole paragraph
+    // and still satisfy every "the reason is recorded" check. Collapsing here
+    // makes the rule true of the file rather than of one writer.
+    const why = str(value.why).replace(/\s+/g, ' ')
     if (!why) continue
     // AN UNKNOWN ORIGIN IS NO ORIGIN, and no origin reads as the machine's
     // (see `originOf`). Dropping the field rather than keeping the odd string
@@ -320,7 +371,7 @@ export function normaliseRankRecord(raw) {
   // NOT `src.torn`: the flag is read off the parser's mark, so a record can never
   // declare itself unreadable and silence the gate.
   const torn = raw !== null && raw !== undefined && raw[PARSER_TORN] === true
-  const out = { ranked, settled: normaliseSettled(src.settled), torn }
+  const out = { ranked, settled: normalisePointSet(src.settled), boundary: normalisePointSet(src.boundary), torn }
   return torn ? markTorn(out) : out
 }
 
@@ -347,8 +398,8 @@ export function normaliseRankRecord(raw) {
  * `existsSync(path) ? readFileSync(path) : null`.
  */
 export function parseRankRecord(text) {
-  const empty = { ranked: {}, settled: null, torn: false }
-  const broken = markTorn({ ranked: {}, settled: null, torn: true })
+  const empty = { ranked: {}, settled: null, boundary: null, torn: false }
+  const broken = markTorn({ ranked: {}, settled: null, boundary: null, torn: true })
   if (text === null || text === undefined) return empty
   // Anything that is not the file's own bytes is not a record either.
   if (typeof text !== 'string' || !text.trim()) return broken
@@ -365,7 +416,11 @@ export function parseRankRecord(text) {
   // A baseline that is present but unreadable is TORN, not absent: reading it as
   // "never armed" would turn a damaged file into a clean-slate exemption, which
   // is the very silencing route this gate had to close.
-  if ('settled' in parsed && !normaliseSettled(parsed.settled)) return broken
+  if ('settled' in parsed && !normalisePointSet(parsed.settled)) return broken
+  // The FROZEN release boundary is read the same way and for the same reason: a
+  // present-but-unreadable one would turn a damaged file into a clean-slate
+  // exemption, which is the silencing route every rule here is closed against.
+  if ('boundary' in parsed && !normalisePointSet(parsed.boundary)) return broken
   return normaliseRankRecord(parsed)
 }
 
@@ -417,42 +472,108 @@ export function unrankedAppends(open, record) {
  * from a stored index. Re-sequencing the work order therefore moves the boundary
  * with it, and a release point that has closed leaves no boundary at all.
  *
- * ONLY NEW POINTS ARE JUDGED, for the same reason the append gate judges only
- * new ones: the order in front of the release was arranged under the old regime,
- * and re-litigating all of it at the first turn end is a block loop rather than a
- * decision. A point is new exactly when the provenance baseline does not
- * remember it — the same reading, off the same record.
+ * THE GRANDFATHER SET IS FROZEN, NOT THE MOVING BASELINE (cross-vendor review,
+ * 21.08.2026). The first cut exempted every point the PROVENANCE baseline
+ * remembered, which reads right for one turn and is a bypass ever after: the
+ * baseline advances at every turn end, so a machine point settled anywhere in the
+ * order could afterwards be MOVED in front of the release and the rule stayed
+ * silent — the very act it exists to refuse, done in two turns instead of one.
+ * The exemption is therefore the `boundary` set, written ONCE by an arming and
+ * never advanced: exactly the points that stood in front of the release when the
+ * rule landed. Everything else in front of it is judged, whenever it got there.
  *
  * `bodies` is `{ <point>: '<the point block text>' }`; a point with no body
  * supplied states nothing, and a point stating nothing is not high.
  *
- * Returns `[{ point, cause }]`, `cause` being:
- *   - `not-high`  the point states neither the high tag nor a blocking condition,
- *                 so no reason CAN be recorded for it — it belongs behind the
- *                 release;
+ * Returns `{ state, breaches, ahead }`:
+ *   - `torn`        the record cannot be read — no verdict, the guard is quiet;
+ *   - `unarmed`     no frozen front was ever recorded, so nothing can tell the
+ *                   legacy order from a point that pushed in front afterwards.
+ *                   The rule ASKS for the arming rather than falling silent;
+ *   - `no-boundary` the release point is not in the order (it closed) — there is
+ *                   no front to earn;
+ *   - `breach`/`ok` the judgment itself.
+ * `ahead` is the open points standing in front of the release — what an arming
+ * freezes — and `breaches` is `[{ point, cause }]`, `cause` being:
+ *   - `not-high`   the point states neither the high tag nor a blocking
+ *                  condition, so no reason CAN be recorded for it;
  *   - `unrecorded` it does state high urgency, but nothing in the record says so
- *                 in one line, and an urgency nobody wrote down is an impression.
+ *                  in one line, and an urgency nobody wrote down is an impression.
  */
-export function releaseBoundaryBreaches(open, record, { releasePoint, bodies = {} } = {}) {
+export function releaseBoundaryState(open, record, { releasePoint, bodies = {} } = {}) {
+  const quiet = (state) => ({ state, breaches: [], ahead: [] })
   const list = pointList(open)
   const release = Number(releasePoint)
-  if (!Number.isInteger(release)) return []
+  if (!Number.isInteger(release)) return quiet('no-boundary')
   const at = list.indexOf(release)
-  if (at < 0) return []
-  const { ranked, settled, torn } = normaliseRankRecord(record)
-  // No verdict from state that cannot be read, and none from a record that
-  // remembers nothing: without a baseline every point reads as new, which would
-  // put the whole order in front of the release on trial at once.
-  if (torn || !settled) return []
-  const known = new Set(settled.points)
-  const out = []
-  for (const n of list.slice(0, at)) {
-    if (known.has(n)) continue
+  if (at < 0) return quiet('no-boundary')
+  const { ranked, boundary, torn } = normaliseRankRecord(record)
+  if (torn) return quiet('torn')
+  const ahead = list.slice(0, at)
+  if (!boundary) return { state: 'unarmed', breaches: [], ahead }
+  const grandfathered = new Set(boundary.points)
+  const breaches = []
+  for (const n of ahead) {
+    if (grandfathered.has(n)) continue
     if (originOf({ ranked }, n) === ORIGIN_USER) continue
-    if (!statesHighUrgency(bodies[n])) out.push({ point: n, cause: 'not-high' })
-    else if (!ranked[n]) out.push({ point: n, cause: 'unrecorded' })
+    if (!statesHighUrgency(bodies[n])) breaches.push({ point: n, cause: 'not-high' })
+    else if (!ranked[n]) breaches.push({ point: n, cause: 'unrecorded' })
   }
-  return out
+  return { state: breaches.length ? 'breach' : 'ok', breaches, ahead }
+}
+
+/** Just the breaches — what the settle must freeze on and the guard reports. */
+export function releaseBoundaryBreaches(open, record, options = {}) {
+  return releaseBoundaryState(open, record, options).breaches
+}
+
+/**
+ * What the release rule is told where no front was ever frozen.
+ *
+ * It does NOT fall silent there, for the reason the append gate does not either:
+ * a clean-slate exemption is how a damaged or half-merged record swallows the
+ * whole question. One arming states, once, which points were standing in front of
+ * the release when the rule landed; everything that arrives there afterwards is
+ * judged on its own.
+ */
+export const boundaryUnarmedMessage = (ahead = [], releasePoint) =>
+  `RELEASE BOUNDARY NOT ARMED: nothing records which points stood in front of point ${releasePoint} when the ` +
+  'rule landed, so no check can tell that order from a point that pushed its way in front afterwards. Arm it ' +
+  `once, for the whole front at once (${ahead.length} point(s) today) — ${BOUNDARY_SEED_CMD} — and every point ` +
+  'that reaches the front after that is judged on its own.'
+
+/** What an arming is told when the front is already frozen. Re-arming would
+ *  grandfather exactly the points the rule is currently refusing. */
+export const boundaryArmedMessage = (points = []) =>
+  `${RANK_RECORD_PATH} already carries a frozen release front (${points.length} point(s)), so there is nothing ` +
+  'to arm. Re-arming would take whatever stands in front of the release TODAY as legacy order — including every ' +
+  'point the rule is refusing right now, which is the one thing the freeze exists to prevent.'
+
+/**
+ * Freeze the front of the order: the points standing in front of the release
+ * point today count as the legacy arrangement.
+ *
+ * Like `seedRecord`, it is a command somebody RUNS with a stated reason, never
+ * something a guard does for itself — an automatic freeze would grandfather the
+ * breach it was looking at. It is refused on an already-armed record for the same
+ * reason, and refused where the release point is not in the order at all, because
+ * a front nobody can see is not a front anybody may freeze.
+ */
+export function seedBoundary(record, open, { releasePoint, why = '', at = '' } = {}) {
+  const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
+  if (!reason) throw new Error('--why is required — one line saying why the front as it stands is the legacy order')
+  const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
+  if (torn) throw new Error(TORN_RECORD_MESSAGE)
+  if (boundary) throw new Error(boundaryArmedMessage(boundary.points))
+  const state = releaseBoundaryState(open, { ranked, settled }, { releasePoint })
+  if (state.state === 'no-boundary') {
+    throw new Error(
+      `point ${releasePoint} is not in the open work order, so there is no front to freeze. Arm the boundary ` +
+        'while the release point stands in the order it is the boundary of.',
+    )
+  }
+  const points = [...state.ahead].sort((a, b) => a - b)
+  return storedRecord({ ranked, settled, boundary: { at: String(at ?? '').trim(), why: reason, points } })
 }
 
 /**
@@ -492,7 +613,17 @@ export function releaseBoundaryMessage(breaches, releasePoint) {
         `${URGENT_RANK_CMD}.`,
     )
   }
-  parts.push(`A point the USER asked for is exempt, and says so: ${USER_RANK_CMD}.`)
+  // THE MOVE IS NOT THE WHOLE REMEDY, AND SAYING SO IS THIS MECHANISM'S JOB
+  // (cross-vendor review, 21.08.2026). Behind the release is often the END of the
+  // order, which is where append-and-defer puts a point — so the append gate asks
+  // its own question about the same block the moment it lands there. A refusal
+  // that names a remedy leading straight into the next refusal is a refusal the
+  // reader cannot close.
+  parts.push(
+    `A point the USER asked for is exempt, and says so: ${USER_RANK_CMD}. And where the move lands the block at ` +
+      `the END of the order, the append gate asks about that placement in the same turn — answer it with ` +
+      `${RANK_CMD}.`,
+  )
   return parts.join(' ')
 }
 
@@ -528,7 +659,7 @@ export function releaseBoundaryMessage(breaches, releasePoint) {
  */
 export function settleRecord(open, record, { at = '', closed = [], blocked = [] } = {}) {
   const list = pointList(open)
-  const { ranked, settled, torn } = normaliseRankRecord(record)
+  const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
   if (torn || !settled) return { changed: false, record: null }
   // AN EMPTY ORDER ADVANCES NOTHING — a work order that momentarily reads as zero
   // open points (unreadable, half-written, a checkout mid-merge) would otherwise
@@ -564,7 +695,10 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [] 
     if (kept.length === settled.points.length) return { changed: false, record: null }
     const live = {}
     for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
-    return { changed: true, record: { ranked: live, settled: { ...settled, points: kept } } }
+    // The FROZEN FRONT rides through untouched: an empty order cannot narrow it
+    // any more than it can narrow the baseline, and erasing it on a bad read
+    // would grandfather the whole front at the next arming.
+    return storedChange({ ranked: live, settled: { ...settled, points: kept }, boundary })
   }
   const state = appendGateState(list, record)
   // A RELEASE-BOUNDARY BREACH FREEZES THE BASELINE EXACTLY AS AN UNRANKED APPEND
@@ -600,17 +734,19 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [] 
     if (kept.length === settled.points.length) return { changed: false, record: null }
     // The baseline keeps its own `at`/`why`: this is the same settlement, minus
     // what has since closed, not a new one.
-    const narrowed = { ...pruneRankRecord({ ranked }, list), settled: { ...settled, points: kept } }
-    return { changed: true, record: narrowed }
+    return storedChange({ ...pruneRankRecord({ ranked, boundary }, list), settled: { ...settled, points: kept } })
   }
   const points = [...list].sort((a, b) => a - b)
-  const next = { ...pruneRankRecord({ ranked }, list), settled: { at: String(at ?? '').trim(), points } }
+  const next = { ...pruneRankRecord({ ranked, boundary }, list), settled: { at: String(at ?? '').trim(), points } }
   // Unchanged is unchanged — the same baseline AND the same live decisions. The
   // caller writes only on a difference, so a settled order costs no file churn.
   const sameBaseline =
     settled && settled.points.length === points.length && settled.points.every((n, i) => n === points[i])
   const sameRanked = Object.keys(next.ranked).length === Object.keys(ranked).length
-  if (sameBaseline && sameRanked) return { changed: false, record: null }
+  // The frozen front SHRINKS with the order too, so an unchanged verdict has to
+  // ask about it as well — otherwise a narrowing was computed and never written.
+  const sameBoundary = !boundary || (next.boundary?.points.length ?? 0) === boundary.points.length
+  if (sameBaseline && sameRanked && sameBoundary) return { changed: false, record: null }
   return { changed: true, record: next }
 }
 
@@ -654,11 +790,14 @@ export function recordRank(record, point, { why = '', at = '', origin = ORIGIN_M
   if (!reason) throw new Error('--why is required — one line saying why this point belongs where it stands')
   const who = String(origin ?? '').trim() || ORIGIN_MACHINE
   if (!ORIGINS.includes(who)) throw new Error(`--origin must be ${ORIGINS.join(' or ')} — got "${origin}"`)
-  const { ranked, settled, torn } = normaliseRankRecord(record)
+  const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
   // A TORN record must never be written over (the point-530 lesson).
   if (torn) throw new Error(TORN_RECORD_MESSAGE)
-  const next = { ranked: { ...ranked, [n]: { at: String(at ?? '').trim(), why: reason, origin: who } } }
-  return settled ? { ...next, settled } : next
+  return storedRecord({
+    ranked: { ...ranked, [n]: { at: String(at ?? '').trim(), why: reason, origin: who } },
+    settled,
+    boundary,
+  })
 }
 
 /**
@@ -772,7 +911,7 @@ export function seedRecord(
 ) {
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
   if (!reason) throw new Error('--why is required — one line saying why the order as it stands is right')
-  const { ranked, torn } = normaliseRankRecord(record)
+  const { ranked, boundary, torn } = normaliseRankRecord(record)
   if (torn) throw new Error(TORN_RECORD_MESSAGE)
   const list = pointList(open)
   const state = appendGateState(list, record)
@@ -780,18 +919,35 @@ export function seedRecord(
   if (tracked && !present) throw new Error(removedRecordMessage(restore))
   const points = [...list].sort((a, b) => a - b)
   return {
-    ...pruneRankRecord({ ranked }, list),
+    ...pruneRankRecord({ ranked, boundary }, list),
     settled: { at: String(at ?? '').trim(), why: reason, points },
   }
 }
 
-/** Drop decisions about points that are no longer open — the file records live
- *  judgments, not history the archive already keeps. The baseline is carried
- *  through untouched; only `settleRecord` and `seedRecord` may move it. */
+/**
+ * Drop decisions about points that are no longer open — the file records live
+ * judgments, not history the archive already keeps. The baseline is carried
+ * through untouched; only `settleRecord` and `seedRecord` may move it.
+ *
+ * THE FROZEN FRONT SHRINKS HERE TOO, and only ever shrinks. A grandfathered point
+ * that CLOSES must leave, or its reopen would walk back into the front carrying
+ * an exemption nobody granted it — the same reasoning that makes the baseline
+ * shrink. It can never grow: only an arming writes it, and only once. An EMPTY
+ * open order narrows nothing, because absence proves nothing about a work order.
+ */
 export function pruneRankRecord(record, open) {
-  const keep = new Set((Array.isArray(open) ? open : [...(open ?? [])]).map(Number))
-  const { ranked, settled } = normaliseRankRecord(record)
+  const list = Array.isArray(open) ? open : [...(open ?? [])]
+  const keep = new Set(list.map(Number))
+  const { ranked, settled, boundary } = normaliseRankRecord(record)
   const out = {}
   for (const [key, value] of Object.entries(ranked)) if (keep.has(Number(key))) out[key] = value
-  return settled ? { ranked: out, settled } : { ranked: out }
+  const front =
+    boundary && list.length ? { ...boundary, points: boundary.points.filter((n) => keep.has(n)) } : boundary
+  return storedRecord({ ranked: out, settled, boundary: front })
+}
+
+/** A settle result that carries the whole record shape, so no writer here can
+ *  drop a part by rebuilding it from halves. */
+function storedChange(parts) {
+  return { changed: true, record: storedRecord(parts) }
 }

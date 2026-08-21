@@ -4,6 +4,7 @@
 //   node scripts/queue-rank.mjs --ranked <N> --why "<one line>"   # last IS right, and why
 //   node scripts/queue-rank.mjs --ranked <N> --origin user --why …# the USER ranked it there
 //   node scripts/queue-rank.mjs --seed --why "<one line>"         # arm: what stands today is judged
+//   node scripts/queue-rank.mjs --seed-boundary --why "<one line>" # arm: freeze the front of the order
 //
 // WHY IT EXISTS. Append-and-defer puts a new point at the END of the work order,
 // and since the board's queue is rendered from that order (point 608) the end is
@@ -30,7 +31,7 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
-import { QUEUE_REBUILD_CMD, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
+import { QUEUE_REBUILD_CMD, RELEASE_TAG_POINT, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import { releaseBoundaryProblem } from './queue-order-guard-core.mjs'
 import {
   ORIGIN_MACHINE,
@@ -43,6 +44,7 @@ import {
   pruneRankRecord,
   recordProvenanceFrom,
   recordRank,
+  seedBoundary,
   seedRecord,
   settleRecord,
 } from './queue-rank-core.mjs'
@@ -208,6 +210,24 @@ if (isMainModule(import.meta.url)) {
           `"${why.trim()}"`,
       )
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
+    } else if (argv.includes('--seed-boundary')) {
+      // THE FRONT OF THE ORDER, FROZEN ONCE (point 789). Everything standing in
+      // front of the release point today counts as the arrangement that predates
+      // the rule; every point that reaches the front afterwards is judged on its
+      // own. Like `--seed` it is a stated decision rather than something a guard
+      // does for itself: an automatic freeze would grandfather the very breach it
+      // was looking at.
+      const next = writeRankRecord(
+        seedBoundary(record, open, { releasePoint: RELEASE_TAG_POINT, why, at: new Date().toISOString() }),
+        open,
+        tasksMd,
+      )
+      const unstaged = stageRecord()
+      if (unstaged) throw new Error(`the boundary was armed but ${RANK_RECORD_PATH} could not be staged (${unstaged})`)
+      console.log(
+        `queue-rank: release front frozen with ${next.boundary.points.length} point(s) in front of ` +
+          `${RELEASE_TAG_POINT} — "${why.trim()}"`,
+      )
     } else if (argv.includes('--seed')) {
       // THE ARMING BASELINE, and nothing more: the order as it stands today is
       // taken as judged, with one stated reason, so a newly armed (or freshly

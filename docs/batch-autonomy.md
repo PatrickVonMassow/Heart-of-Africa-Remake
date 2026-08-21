@@ -2085,8 +2085,20 @@ record and defaults to the machine, so the user's exemption
 release point CURRENTLY stands in `TASKS.md`, so re-sequencing moves it, and a
 breach freezes the provenance baseline exactly as an unranked append does — a
 gate that could be answered by forgetting the question would have a one-turn
-life. Only points the baseline does not remember are judged: re-litigating the
-order that stood before the rule existed is a block loop, not a decision.
+life.
+
+WHAT IS GRANDFATHERED IS FROZEN, NOT REMEMBERED (cross-vendor review by GPT-5.6
+Sol, 21.08.2026). The order that stood in front of the release before the rule
+landed is not re-litigated — that would be a block loop rather than a decision —
+but reading the exemption off the moving provenance baseline made it a two-turn
+bypass: settle anywhere in the order, then move the point in front of the
+release, and nothing ever asked. So the record carries a third part, `boundary`:
+the set that stood in front of the release when the rule was armed, written ONCE
+by `--seed-boundary --why` and never advanced. It shrinks when a point in it
+closes, so a reopen walks back in without its exemption, and it can never grow.
+Until it is armed the rule ASKS for the arming rather than falling silent, for
+the reason a missing baseline is asked about too: a clean-slate exemption is how
+the whole question gets swallowed.
 
 The watchdog runs as its own process (`scripts/board-watchdog.mjs`), called by
 the launcher. That is not tidiness: on this platform a `process.exit()` after any

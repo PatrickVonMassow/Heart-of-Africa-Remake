@@ -45,9 +45,10 @@ import {
   RANK_CMD,
   SEED_CMD,
   appendGateState,
+  boundaryUnarmedMessage,
   parseRankRecord,
-  releaseBoundaryBreaches,
   releaseBoundaryMessage,
+  releaseBoundaryState,
 } from './queue-rank-core.mjs'
 import { parsePointBlocks } from './criticality-review-guard-core.mjs'
 
@@ -341,11 +342,17 @@ export function openPointBodies(tasksMd) {
  * before the rule existed is not re-litigated at the first turn end.
  */
 export function releaseBoundaryProblem(tasksMd, rankRecordJson) {
-  const breaches = releaseBoundaryBreaches(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
+  const state = releaseBoundaryState(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
     releasePoint: RELEASE_TAG_POINT,
     bodies: openPointBodies(tasksMd),
   })
-  return { breaches, reason: releaseBoundaryMessage(breaches, RELEASE_TAG_POINT) }
+  // An UNARMED front asks for its arming rather than falling silent — the same
+  // answer the append gate gives to a missing baseline, and for the same reason:
+  // a clean-slate exemption is how the whole question gets swallowed.
+  if (state.state === 'unarmed') {
+    return { breaches: [], reason: boundaryUnarmedMessage(state.ahead, RELEASE_TAG_POINT) }
+  }
+  return { breaches: state.breaches, reason: releaseBoundaryMessage(state.breaches, RELEASE_TAG_POINT) }
 }
 
 /** Top-level decision on the raw file contents. Total: any bad input → allow. */
