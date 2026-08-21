@@ -510,6 +510,11 @@ export const SUCCESSOR_TRIGGERS = Object.freeze({
 })
 
 const SUCCESSOR_TRIGGER_SET = new Set(Object.values(SUCCESSOR_TRIGGERS))
+const CI_WAIT_VETO_TRIGGERS = new Set([
+  SUCCESSOR_TRIGGERS.CHILD_EXIT,
+  SUCCESSOR_TRIGGERS.CRASH,
+  SUCCESSOR_TRIGGERS.WATCHDOG,
+])
 
 /**
  * THE ONE SUCCESSOR-START DECISION. PURE.
@@ -546,6 +551,11 @@ export function successorStartDecision({
   const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
     ? new Date(ciWaitDeadline).toISOString()
     : 'its recorded interaction deadline'
+  const ciWaitVetoActive =
+    CI_WAIT_VETO_TRIGGERS.has(kind) &&
+    ciWait?.visible === true &&
+    ciWait.pending === true &&
+    ciWait.deadlineReached !== true
   const evidence = {
     trigger: {
       kind: kind || null,
@@ -563,7 +573,7 @@ export function successorStartDecision({
           repair: ciWait.repair === true,
           deadline: ciWaitDeadline,
           deadlineReached: ciWait.deadlineReached === true,
-          vetoActive: ciWait.pending === true && ciWait.deadlineReached !== true,
+          vetoActive: ciWaitVetoActive,
           identity: ciWait.identity ?? null,
           wakeToken: ciWait.wakeToken ?? null,
           result: ciWait.result ?? null,
@@ -591,10 +601,13 @@ export function successorStartDecision({
   if (claimReserved === true) return refuse('claim-reserved', 'an honoured user claim reserves the next ownership')
 
   // An unfinished run temporarily owns the empty interval after its worker
-  // exits. The same interaction deadline which makes Stop fail open also bounds
-  // this veto: observation continues after it, but the batch may recover rather
-  // than idle forever behind an unreachable run.
-  if (ciWait?.visible === true && ciWait.pending === true && ciWait.deadlineReached !== true) {
+  // exits. Replacement-style child-exit, crash, and watchdog requests would
+  // only wake into the same Stop, so they wait for the observer. A deliberate
+  // boundary does useful work on the next point while CI continues in parallel
+  // and must not make every clean handover pay this exceptional-path latency.
+  // The interaction deadline also bounds the veto so an unreachable run cannot
+  // idle the batch forever; observation itself continues on either path.
+  if (ciWaitVetoActive) {
     return refuse(
       'ci-wait-pending',
       `CI run ${ciWait.identity ?? 'unknown'} is still under durable observation and remains a successor veto until ${ciWaitDeadlineLabel}` +

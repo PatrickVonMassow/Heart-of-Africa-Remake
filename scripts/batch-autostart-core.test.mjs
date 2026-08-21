@@ -295,7 +295,11 @@ describe('the immediate successor decision — one door for every transport', ()
     })
   })
 
-  it('keeps child exit and watchdog recovery behind a pending durable wait', () => {
+  it.each([
+    ['child exit', SUCCESSOR_TRIGGERS.CHILD_EXIT],
+    ['crash', SUCCESSOR_TRIGGERS.CRASH],
+    ['watchdog', SUCCESSOR_TRIGGERS.WATCHDOG],
+  ])('keeps %s recovery behind a pending durable wait', (_label, kind) => {
     const ciWait = {
       visible: true,
       pending: true,
@@ -307,13 +311,44 @@ describe('the immediate successor decision — one door for every transport', ()
       identity: 'origin/feat/x:abc:CI:42',
       wakeToken: 'wake-1',
     }
-    expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT }, ciWait })).toMatchObject({
+    expect(start({ trigger: { kind }, ciWait })).toMatchObject({
       start: false,
       code: 'ci-wait-pending',
       reason: `CI run origin/feat/x:abc:CI:42 is still under durable observation and remains a successor veto until ${new Date(NOW + 60_000).toISOString()}; its observer must be repaired before a successor starts`,
       evidence: { ciWait: { repair: true, deadline: NOW + 60_000, deadlineReached: false, vetoActive: true } },
     })
-    expect(start({ ciWait })).toMatchObject({ start: false, code: 'ci-wait-pending' })
+  })
+
+  it('lets a deliberate boundary overlap a pending CI observation', () => {
+    const ciWait = {
+      visible: true,
+      pending: true,
+      terminal: false,
+      observerAlive: true,
+      repair: false,
+      deadline: NOW + 60_000,
+      deadlineReached: false,
+      identity: 'origin/feat/x:abc:CI:42',
+      wakeToken: 'wake-1',
+    }
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      lock: { sessionId: 'old', kind: 'session', fence: 17, handedOver: true },
+      assessment: { alive: false, reason: 'handed-over' },
+      ciWait,
+    })).toMatchObject({
+      start: true,
+      code: 'start',
+      reservation: { trigger: 'boundary', sourceGeneration: 17 },
+      evidence: {
+        ciWait: {
+          pending: true,
+          observerAlive: true,
+          deadlineReached: false,
+          vetoActive: false,
+        },
+      },
+    })
   })
 
   it.each([

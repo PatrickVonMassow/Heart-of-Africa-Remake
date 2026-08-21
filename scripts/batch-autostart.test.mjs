@@ -208,7 +208,7 @@ describe('immediate handover and supervised exit are runtime transports', () => 
     expect(code).toMatch(/supervisorRestartedAt: now/)
   })
 
-  it('repairs a missing durable CI observer and reserves starts while it is pending', () => {
+  it('repairs a missing durable CI observer and routes its assessment into the start decision', () => {
     expect(code).toMatch(/assessCiWait\(\{ wait: ciWait, now, probePid \}\)/)
     expect(code).toMatch(/if \(!batchParked && ciWaitAssessment\.repair\)/)
     expect(code).toMatch(/'\.\/ci-status-guard\.mjs'\), '--observe', ciWait\.wakeToken/)
