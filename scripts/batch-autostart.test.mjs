@@ -119,6 +119,13 @@ describe('the launcher uses the pure spawn builders', () => {
     )
   })
 
+  it('assesses two decision intervals from real owner activity, not heartbeat freshness', () => {
+    expect(source).toMatch(/ownerActivityDecision\(\{[\s\S]{0,220}?records:\s*recentActivityRecords\(\)[\s\S]{0,160}?previous:\s*state\.ownerActivity/)
+    expect(source).toMatch(/state\.ownerActivity\s*=\s*ownerActivity\.state/)
+    expect(source).toMatch(/assessOwner\([^\n]+activity:\s*ownerActivity/)
+    expect(source).toMatch(/ACTIVITY_TAIL_BYTES/)
+  })
+
   // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes
   // review, finding C). Order is the whole behaviour here, and order is only
   // visible in the source — the file cannot be imported. The sweep sat BELOW the

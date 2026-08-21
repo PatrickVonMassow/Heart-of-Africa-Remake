@@ -98,6 +98,7 @@ import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { ownerActivityDecision } from './batch-ownership-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -131,6 +132,25 @@ const log = (m) => {
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')) } catch { return null } }
 const writeJsonAtomic = (p, obj) => {
   try { const t = `${p}.tmp`; writeFileSync(t, JSON.stringify(obj, null, 2)); renameSync(t, p) } catch { /* ignore */ }
+}
+const ACTIVITY_TAIL_BYTES = 256 * 1024
+const recentActivityRecords = () => {
+  const path = C('batch-activity.jsonl')
+  try {
+    const size = statSync(path).size
+    const length = Math.min(size, ACTIVITY_TAIL_BYTES)
+    if (length <= 0) return []
+    const fd = openSync(path, 'r')
+    try {
+      const buffer = Buffer.alloc(length)
+      readSync(fd, buffer, 0, length, size - length)
+      return parseActivityJournal(buffer.toString('utf8')).records
+    } finally {
+      closeSync(fd)
+    }
+  } catch {
+    return []
+  }
 }
 const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
@@ -840,7 +860,14 @@ const work = assessOwnerWork({
 // in the same line it used to take the batch anyway, producing the double session.
 // The launcher is the ONLY caller that passes `work` — it is the only one that has
 // it — so every other door keeps comparing numbers.
-const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
+const ownerActivity = ownerActivityDecision({
+  lock,
+  work,
+  records: recentActivityRecords(),
+  previous: state.ownerActivity ?? null,
+})
+state.ownerActivity = ownerActivity.state
+const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work, activity: ownerActivity })
 
 // --- Verify the previous spawn ------------------------------------------------
 // LIVING IS NOT WORKING (point 433, §4 of docs/batch-resilience.md). This used to

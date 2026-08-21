@@ -397,8 +397,8 @@ export function checkEvidence(
 ) {
   const kind = String(item?.kind ?? '')
   const label = typeof item?.label === 'string' && item.label.trim() ? ` (${item.label.trim()})` : ''
-  const no = (describe, detail) => ({ ok: false, kind, describe, detail })
-  const yes = (describe, detail) => ({ ok: true, kind, describe, detail })
+  const no = (describe, detail) => ({ ok: false, kind, describe, detail, progressAt: null })
+  const yes = (describe, detail, progressAt = null) => ({ ok: true, kind, describe, detail, progressAt })
   const window = (fallback) => (Number.isFinite(item?.freshMs) && item.freshMs > 0 ? item.freshMs : fallback)
 
   if (kind === 'pid') {
@@ -422,7 +422,7 @@ export function checkEvidence(
     if (typeof tip !== 'number') return no(`branch ${ref}${label}`, 'branch-gone')
     const idle = now - tip
     return idle <= window(workFreshMs)
-      ? yes(`branch ${ref}${label}`, `tip ${minutes(idle)} min old`)
+      ? yes(`branch ${ref}${label}`, `tip ${minutes(idle)} min old`, tip)
       : no(`branch ${ref}${label}`, `no commit for ${minutes(idle)} min`)
   }
   if (kind === 'worktree') {
@@ -435,7 +435,7 @@ export function checkEvidence(
     // both asked, and a verdict that does not say which one answered is exactly
     // how "quiet for 21 min" hid a mid-edit agent.
     return idle <= window(workFreshMs)
-      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago${stamp.source ? ` (${stamp.source})` : ''}`)
+      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago${stamp.source ? ` (${stamp.source})` : ''}`, stamp.at)
       : no(`worktree ${path}${label}`, `quiet for ${minutes(idle)} min${stamp.source ? ` (newest: ${stamp.source})` : ''}`)
   }
   if (kind === 'log') {
@@ -445,7 +445,7 @@ export function checkEvidence(
     if (typeof mtime !== 'number') return no(`log ${path}${label}`, 'log-missing')
     const idle = now - mtime
     return idle <= window(logFreshMs)
-      ? yes(`log ${path}${label}`, `written ${Math.round(idle / 1000)}s ago`)
+      ? yes(`log ${path}${label}`, `written ${Math.round(idle / 1000)}s ago`, mtime)
       : no(`log ${path}${label}`, `silent for ${minutes(idle)} min`)
   }
   return no(`${kind || 'unnamed'}${label}`, 'unknown-kind')

@@ -17,6 +17,7 @@ import {
   idleVerdict,
   lockDeclaresWait,
   ownershipVerdict,
+  ownerActivityDecision,
   workedSinceClaim,
 } from './batch-ownership-core.mjs'
 
@@ -74,6 +75,69 @@ describe('workedSinceClaim — has the owner done anything at all?', () => {
     // Unknown may not dispossess anybody: that is what makes this need no migration.
     expect(workedSinceClaim({ claimedAt: NOW })).toBeNull()
     expect(workedSinceClaim(null)).toBeNull()
+  })
+})
+
+describe('ownerActivityDecision — a heartbeat is not progress', () => {
+  const owner = lock({ fence: 17, claimedAt: NOW })
+  const foreground = {
+    event: 'foreground-activity',
+    session: 's1',
+    generation: 17,
+    atMs: NOW - 1_000,
+  }
+
+  it('assesses stalled only after two unchanged decision intervals', () => {
+    const first = ownerActivityDecision({ lock: owner, records: [foreground] })
+    const second = ownerActivityDecision({ lock: { ...owner, claimedAt: NOW + 1 }, records: [foreground], previous: first.state })
+    const third = ownerActivityDecision({ lock: { ...owner, claimedAt: NOW + 2 }, records: [foreground], previous: second.state })
+    expect(first).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW - 1_000 })
+    expect(second).toMatchObject({ stalled: false, unchangedIntervals: 1 })
+    expect(third).toMatchObject({ stalled: true, unchangedIntervals: 2, reason: 'no-real-progress' })
+  })
+
+  it('resets on foreground, delegated, verification, durable-wait, or declared-output progress', () => {
+    const baseline = ownerActivityDecision({ lock: owner, records: [foreground] })
+    for (const event of ['foreground-activity', 'delegated-start', 'verification-progress', 'ci-wait-observation']) {
+      const next = ownerActivityDecision({
+        lock: owner,
+        records: [{ ...foreground, event, atMs: NOW + 1_000 }],
+        previous: { ...baseline.state, unchangedIntervals: 1 },
+      })
+      expect(next).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 1_000 })
+    }
+    const output = ownerActivityDecision({
+      lock: owner,
+      records: [foreground],
+      work: { items: [{ ok: true, kind: 'worktree', progressAt: NOW + 2_000 }] },
+      previous: { ...baseline.state, unchangedIntervals: 1 },
+    })
+    expect(output).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 2_000 })
+  })
+
+  it('does not borrow another session or generation activity', () => {
+    const result = ownerActivityDecision({
+      lock: owner,
+      records: [
+        { ...foreground, session: 'other', atMs: NOW + 1_000 },
+        { ...foreground, generation: 18, atMs: NOW + 2_000 },
+      ],
+    })
+    expect(result).toMatchObject({ progressAt: null, stalled: false, reason: 'no-progress-observed' })
+  })
+
+  it('lets a stalled verdict outrank a fresh heartbeat, except while paused', () => {
+    const activity = { stalled: true, unchangedIntervals: 2 }
+    expect(ownershipVerdict({ lock: owner, now: NOW + 1, activity, corroboration: live })).toMatchObject({
+      settled: true,
+      owns: false,
+      reason: 'stalled-no-progress',
+    })
+    expect(ownershipVerdict({ lock: owner, now: NOW + 1, activity, paused: true, corroboration: live })).toMatchObject({
+      settled: true,
+      owns: true,
+      reason: 'fresh-heartbeat',
+    })
   })
 })
 

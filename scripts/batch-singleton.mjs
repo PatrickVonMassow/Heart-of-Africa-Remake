@@ -279,12 +279,22 @@ const readJson = (p) => {
  * arithmetics on the same number. This function reads the files and the pid probe
  * and asks that one; only the pid branches below, which ARE probe semantics, stay.
  */
-export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_MS, paused = false, idleWindowMs = idleWindow() } = {}) {
+export function assessOwner(lock, {
+  now,
+  bootTime,
+  probe,
+  work,
+  activity,
+  leaseMs = LEASE_MS,
+  paused = false,
+  idleWindowMs = idleWindow(),
+} = {}) {
   const v = ownershipVerdict({
     lock,
     now,
     bootTime,
     work,
+    activity,
     paused,
     idleWindowMs,
     leaseMs,
