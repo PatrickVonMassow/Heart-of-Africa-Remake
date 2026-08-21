@@ -10963,3 +10963,32 @@ to land than a mechanism that needs a review.
   two mechanisms that decide whether the batch keeps running at all, which is exactly the
   machinery the user has just asked to be made fast.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 815. The standstill classifier scales quadratically with the journal it reads, and the
+  journal has no rotation (measured 21.08.2026 during the cross-vendor review of point 809).
+  WHAT WAS MEASURED. `classifyTimeline` in `scripts/batch-standstill-core.mjs` cuts the timeline
+  at every evidence boundary and then calls `covering()` for EACH segment, which filters over ALL
+  intervals: the cost is segments x intervals. This was invisible while the journal was empty —
+  the 14-day run on 21.08.2026 classified the whole window as `unknown` because no journal
+  existed yet. But the journal gains one line per owner tool call, so it grows by thousands of
+  lines a day; at 100k records inside a 14-day window roughly 200k cuts meet roughly 100k
+  intervals and the report stops finishing. The APPEND path is already fixed and is not part of
+  this point (tail read, flat at 2-3 ms through 20,000 lines, commit 80b96e63); this point is
+  about the READ path of the report, and about the fact that nothing ever rotates, compacts or
+  ages out `.claude/batch-activity.jsonl`.
+  FINAL STATE: the report's classification is linear-ish in the number of intervals — the
+  intervals are sorted by start and swept against the ordered cuts, or held in an interval tree,
+  instead of being re-filtered per segment — and the journal has a stated retention: what is
+  rotated or compacted, when, and why that horizon and not a shorter one. A rotated-away segment
+  must still be reportable or be explicitly declared out of the reporting window; silently
+  losing evidence is the one outcome this point may not produce.
+  VERIFIABLE: a pure test over `scripts/batch-standstill-core.mjs` that classifies a synthetic
+  journal of at least 50,000 records inside a wall-clock budget, asserting the same class totals
+  as the small fixture produces for its shape — so the speed-up is proven not to change the
+  verdicts. Every millisecond stays covered exactly once, as point 809 requires. A second test
+  pins the retention rule: what falls out of the journal, and what the report says about that
+  window afterwards.
+  Criticality: medium — nothing is wrong with the measurement today, and the classifier's
+  verdicts are correct; the defect only arrives with the evidence the mechanism is designed to
+  accumulate, which is why it is filed rather than fixed inside 809.
+  Bundle: Session- & Repo-Hygiene.
