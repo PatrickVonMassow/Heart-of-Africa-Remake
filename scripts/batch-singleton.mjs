@@ -1491,6 +1491,41 @@ export function retireBatchWriter(sessionId, opts = {}) {
   }
 }
 
+/**
+ * Revoke exactly one still-current writer fence. The launcher uses this only
+ * after the same non-advancing authority blocked two decisions. Advancing the
+ * high-water mark makes every guard reject the old generation at its next main
+ * write; it does not kill the process or invent a replacement owner.
+ */
+export function revokeWriterFence(sessionId, generation, opts = {}) {
+  const rejected = (reason, fence = null) => ({ revoked: false, reason, fence })
+  if (!sessionId || !Number.isSafeInteger(generation) || generation < 0) return rejected('invalid-authority')
+  try {
+    const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
+    const current = readFence({ fencePath })
+    if (current.fence !== generation) return rejected('generation-changed', current.fence)
+    if (current.holder && current.holder !== sessionId) return rejected('holder-changed', current.fence)
+    const now = opts.now ?? Date.now()
+    const next = generation + 1
+    writeJsonAtomic(fencePath, {
+      ...current,
+      v: 1,
+      fence: next,
+      holder: '',
+      at: now,
+      lastTakeover: {
+        from: sessionId,
+        fence: next,
+        reason: typeof opts.reason === 'string' && opts.reason ? opts.reason : 'stalled-writer-veto',
+        at: now,
+      },
+    }, opts)
+    return { revoked: true, reason: 'revoked', fence: next }
+  } catch {
+    return rejected('write-failed')
+  }
+}
+
 /** Process identities available to the launcher. Missing/torn state is empty. */
 export function readSessionProcesses(opts = {}) {
   try {

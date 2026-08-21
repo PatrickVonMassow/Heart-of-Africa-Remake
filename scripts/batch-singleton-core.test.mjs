@@ -64,6 +64,7 @@ import {
   SESSION_ACTIVITY_PATH,
   noteBatchWriter,
   retireBatchWriter,
+  revokeWriterFence,
   readSessionProcesses,
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
@@ -1740,6 +1741,45 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       generation,
       authorityState: 'retired',
       retiredReason: 'owner-release',
+    })
+  })
+
+  it('revokes only the still-current writer fence and records the recovery', () => {
+    const fencePath = join(dir, 'writer-recovery-fence.json')
+    writeFileSync(fencePath, JSON.stringify({
+      v: 1,
+      fence: 17,
+      holder: 'writer-session',
+      at: NOW - 1_000,
+      holders: [{ sessionId: 'writer-session', fence: 17, at: NOW - 1_000 }],
+    }))
+    expect(revokeWriterFence('other', 17, { fencePath, now: NOW })).toMatchObject({
+      revoked: false,
+      reason: 'holder-changed',
+    })
+    expect(revokeWriterFence('writer-session', 16, { fencePath, now: NOW })).toMatchObject({
+      revoked: false,
+      reason: 'generation-changed',
+    })
+    expect(revokeWriterFence('writer-session', 17, {
+      fencePath,
+      now: NOW,
+      reason: 'launcher-stall-recovery',
+    })).toEqual({ revoked: true, reason: 'revoked', fence: 18 })
+    expect(readFence({ fencePath })).toMatchObject({
+      fence: 18,
+      holder: '',
+      lastTakeover: {
+        from: 'writer-session',
+        fence: 18,
+        reason: 'launcher-stall-recovery',
+        at: NOW,
+      },
+    })
+    expect(revokeWriterFence('writer-session', 17, { fencePath, now: NOW + 1 })).toMatchObject({
+      revoked: false,
+      reason: 'generation-changed',
+      fence: 18,
     })
   })
 
