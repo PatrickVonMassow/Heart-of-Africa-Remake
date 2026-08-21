@@ -113,18 +113,42 @@ describe('--wait — the status assessment is the only state it reads', () => {
     expect(sleeps).toBe(1)
   })
 
-  it('treats the spent released reservation as success even if the owner reading is still held', async () => {
+  it('keeps waiting while a live owner holds the lock over a spent released record', async () => {
+    let now = NOW
     const state = {
       lockHeld: true,
-      assessment: { releasedAt: NOW, reason: 'released', reserve: true },
+      assessment: {
+        claimantSid: CLAIMANT,
+        releasedAt: NOW - 8_000_000,
+        reason: 'released',
+        reserve: false,
+      },
     }
-    expect(claimWaitDecision(state)).toEqual({ done: true, reason: 'spent' })
+    expect(claimWaitDecision(state, CLAIMANT)).toEqual({ done: false, reason: 'held' })
     const waited = await waitForClaimEnd({
       readState: () => state,
-      clock: () => NOW,
-      sleep: async () => { throw new Error('a completed wait must not sleep') },
+      claimantSid: CLAIMANT,
+      clock: () => now,
+      sleep: async (ms) => { now += ms },
+      timeoutMs: 1_000,
+      pollMs: 500,
     })
-    expect(waited).toMatchObject({ ok: true, reason: 'spent', probes: 1 })
+    expect(waited).toMatchObject({ ok: false, reason: 'timeout', probes: 3 })
+  })
+
+  it('reports a released reservation only to its claimant after the lock is free', () => {
+    const state = {
+      lockHeld: false,
+      assessment: {
+        claimantSid: CLAIMANT,
+        releasedAt: NOW,
+        reason: 'released-reserved',
+        reserve: true,
+      },
+    }
+    expect(claimWaitDecision(state, CLAIMANT)).toEqual({ done: true, reason: 'spent' })
+    expect(claimWaitDecision(state, 'session-other')).toEqual({ done: true, reason: 'free' })
+    expect(claimWaitDecision(state)).toEqual({ done: true, reason: 'free' })
   })
 
   it('returns immediately when nobody holds the lock and times out without real sleeping', async () => {
@@ -173,10 +197,20 @@ describe('--wait — the status assessment is the only state it reads', () => {
     expect(waited.status).toBe(1)
     expect(waited.stderr).toContain('timed out')
 
+    const spentClaim = JSON.stringify(claimOf({
+      at: stamp - 9_000_000,
+      releasedAt: stamp - 8_000_000,
+      releasedBy: 'session-old-owner',
+    }))
+    writeFileSync(join(stateDir, 'batch-claim.json'), spentClaim)
+    const waitedOverSpentClaim = run(['--wait', '--session', CLAIMANT, '--timeout', '0.001'])
+    expect(waitedOverSpentClaim.status).toBe(1)
+    expect(waitedOverSpentClaim.stderr).toContain('timed out')
+
     const taken = run(['--take', '--session', CLAIMANT])
     expect(taken.status).toBe(1)
     expect(taken.stderr).toContain('--take never writes or replaces a claim')
-    expect(existsSync(join(stateDir, 'batch-claim.json'))).toBe(false)
+    expect(readFileSync(join(stateDir, 'batch-claim.json'), 'utf8')).toBe(spentClaim)
 
     rmSync(join(stateDir, 'batch-lock.json'))
     const takenFree = run(['--take', '--session', CLAIMANT])

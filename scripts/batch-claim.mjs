@@ -331,6 +331,7 @@ if (isMain) {
     if (!Number.isFinite(minutes) || minutes < 0) fail(`--timeout must be a non-negative number of minutes.\n${usage}`)
     const waited = await waitForClaimEnd({
       readState: () => gatherClaimStatus(sid),
+      claimantSid: sid,
       timeoutMs: minutes * 60_000,
       sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     })

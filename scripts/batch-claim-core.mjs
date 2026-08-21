@@ -141,26 +141,30 @@ export function ownerIsHolding({ lock = null, claimantSid = '', alive = false } 
  * the gathered status object printed by `batch-claim.mjs --status`; no caller
  * needs to rediscover ownership from its JSON shape.
  */
-export function claimWaitDecision(state = {}) {
+export function claimWaitDecision(state = {}, claimantSid = '') {
+  if (state?.lockHeld === true) return { done: false, reason: 'held' }
   const assessment = state?.assessment ?? null
-  const spent =
-    assessment?.reserve === true ||
-    typeof assessment?.releasedAt === 'number' ||
-    assessment?.reason === 'released' ||
-    assessment?.reason === 'released-reserved'
+  const spent = claimantSid !== '' &&
+    assessment?.claimantSid === claimantSid &&
+    (assessment?.reserve === true ||
+      typeof assessment?.releasedAt === 'number' ||
+      assessment?.reason === 'released' ||
+      assessment?.reason === 'released-reserved')
   if (spent) return { done: true, reason: 'spent' }
-  if (state?.lockHeld !== true) return { done: true, reason: 'free' }
-  return { done: false, reason: 'held' }
+  return { done: true, reason: 'free' }
 }
 
 /**
- * Wait for the first probe that sees a free lock or a spent claim. PURE ASYNC
+ * Wait for the first probe that sees a free lock. A released claim belonging to
+ * this waiter only changes the success message; it can never outweigh a live
+ * lock. PURE ASYNC
  * orchestration: state reader, monotonic clock and sleep are all injected, so a
  * fixture advances without a real timer and a successful probe returns without
  * one trailing poll delay.
  */
 export async function waitForClaimEnd({
   readState,
+  claimantSid = '',
   clock = Date.now,
   sleep,
   timeoutMs = CLAIM_MAX_AGE_MS,
@@ -174,7 +178,7 @@ export async function waitForClaimEnd({
   for (;;) {
     const state = await readState()
     probes += 1
-    const decision = claimWaitDecision(state)
+    const decision = claimWaitDecision(state, claimantSid)
     if (decision.done) return { ok: true, reason: decision.reason, probes, state }
 
     const remaining = timeoutMs - (clock() - startedAt)
