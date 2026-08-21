@@ -47,10 +47,12 @@ export const BOUNDED_CONTROL_OPERATIONS = Object.freeze({
 })
 
 const CONTROL_SCRIPTS = Object.freeze({
-  board: ['board.mjs'],
+  board: ['board.mjs', 'board-queue.mjs'],
   'board-publish': ['board-publish.mjs'],
   boundary: ['batch-boundary.mjs'],
 })
+
+const OUTPUT_PAGERS = new Set(['cat', 'head', 'more', 'tail'])
 
 function boundedSegmentId(segment) {
   const { head, args } = headAndArgs(segment)
@@ -69,6 +71,29 @@ function boundedSegmentId(segment) {
   return null
 }
 
+const segmentWords = (segment) => (segment?.words ?? []).map((word) => String(word?.text ?? word))
+
+function boundedAuxiliary(segment, index, segments, command) {
+  const { head } = headAndArgs(segment)
+  const words = segmentWords(segment)
+  if (head === 'git') {
+    const sub = gitSubcommand(segment)
+    if (sub === 'add') return 'commit-stage'
+    if (sub === 'log' && (
+      words.includes('-1') || words.includes('--max-count=1') ||
+      words.some((word, at) => word === '-n' && words[at + 1] === '1')
+    )) return 'commit-receipt'
+    if (sub === 'rev-list' && words.includes('--count')) return 'push-receipt'
+  }
+  if (head === 'echo' && String(segment?.raw ?? '').includes('$(git rev-list --count')) return 'push-receipt'
+  if (OUTPUT_PAGERS.has(head) && index > 0) {
+    const prior = segments[index - 1]
+    const separator = String(command).slice(prior.end, segment.start)
+    if (/^\s*\|\s*$/.test(separator)) return 'output-pager'
+  }
+  return null
+}
+
 /**
  * Return the bounded controls performed by a shell call, or null. Every real
  * segment must be bounded: `git commit && npm test` is an admitted test call,
@@ -76,11 +101,18 @@ function boundedSegmentId(segment) {
  */
 export function boundedControlCall({ toolName = '', command = '' } = {}) {
   if (!['Bash', 'PowerShell'].includes(String(toolName))) return null
-  const segments = expandSegments(String(command ?? ''))
+  const source = String(command ?? '')
+  const segments = expandSegments(source)
   if (!segments.length) return null
   const ids = segments.map(boundedSegmentId)
-  if (ids.some((id) => !id)) return null
-  const unique = [...new Set(ids)]
+  const auxiliaries = segments.map((segment, index) => ids[index] ? null : boundedAuxiliary(segment, index, segments, source))
+  if (ids.some((id, index) => !id && !auxiliaries[index])) return null
+  const unique = [...new Set(ids.filter(Boolean))]
+  if (!unique.length) return null
+  if (auxiliaries.includes('commit-stage') || auxiliaries.includes('commit-receipt')) {
+    if (!unique.includes('git-commit')) return null
+  }
+  if (auxiliaries.includes('push-receipt') && !unique.includes('git-push')) return null
   return {
     ids: unique,
     reasons: unique.map((id) => BOUNDED_CONTROL_OPERATIONS[id].reason),

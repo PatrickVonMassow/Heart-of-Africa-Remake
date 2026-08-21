@@ -188,6 +188,37 @@ describe('bounded control exemptions', () => {
     })
   })
 
+  it.each([
+    [
+      'git add TASKS.md && git commit -m done && git log --oneline -1',
+      ['git-commit'],
+    ],
+    [
+      'git push origin main 2>&1 | tail -4; echo "ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null)"',
+      ['git-push'],
+    ],
+    ['node scripts/board-queue.mjs 2>&1 | tail -2', ['board']],
+    [
+      'node scripts/board-publish.mjs 2>&1 | tail -2 && ' +
+        'node scripts/batch-boundary.mjs --commit --context 2>&1 | tail -6',
+      ['board-publish', 'boundary'],
+    ],
+  ])('recognises the bounded receipt spelling %s', (command, ids) => {
+    expect(boundedControlCall({ toolName: 'Bash', command })?.ids).toEqual(ids)
+  })
+
+  it('does not let a receipt or pager launder an unrelated growing call', () => {
+    for (const command of [
+      'git log --oneline -1',
+      'echo "ahead=$(git rev-list --count @{u}..HEAD)"',
+      'tail -4',
+      'git commit -m done && npm test | tail -4',
+      'node scripts/board-queue.mjs && rg needle huge.log',
+    ]) {
+      expect(boundedControlCall({ toolName: 'Bash', command }), command).toBeNull()
+    }
+  })
+
   it('does not let one bounded segment exempt a growing call beside it', () => {
     expect(boundedControlCall({ toolName: 'Bash', command: 'git commit -m done && npm test' })).toBeNull()
     expect(decide({
