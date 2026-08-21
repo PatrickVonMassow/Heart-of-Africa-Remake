@@ -52,9 +52,9 @@ describe('claim survival across clean owner turns', () => {
         ownsBatch: true,
       })
       state = result.state
-      if (result.report) reports.push(result.count)
+      if (result.report) reports.push([result.kind, result.count])
     }
-    expect(reports).toEqual([CLAIM_CLEAN_TURN_LIMIT])
+    expect(reports).toEqual([['release', CLAIM_CLEAN_TURN_LIMIT]])
     expect(state.cleanTurns).toBe(7)
   })
 
@@ -77,13 +77,17 @@ describe('claim survival across clean owner turns', () => {
   })
 
   it('counts no dirty turn and stands down for non-owners and pauses', () => {
-    const dirty = advanceClaimSurvival({
-      claimKey: 'claim-a',
-      turnKey: 'message-a',
-      verdict: 'wait',
-      ownsBatch: true,
-    })
-    expect(dirty.count).toBe(0)
+    let dirty
+    for (const turnKey of ['message-a', 'message-b', 'message-c']) {
+      dirty = advanceClaimSurvival({
+        state: dirty?.state,
+        claimKey: 'claim-a',
+        turnKey,
+        verdict: 'wait',
+        ownsBatch: true,
+      })
+    }
+    expect(dirty).toMatchObject({ count: 0, report: true, kind: 'reason' })
     expect(advanceClaimSurvival({ ...dirty, ownsBatch: false }).state.cleanTurns).toBe(0)
     expect(advanceClaimSurvival({ ...dirty, ownsBatch: true, paused: true }).state.cleanTurns).toBe(0)
   })

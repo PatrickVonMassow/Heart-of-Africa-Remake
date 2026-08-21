@@ -32,16 +32,23 @@ export function latestAssistantTurnKey(transcript = '') {
   return key
 }
 
-const emptyClaimState = () => ({ claimKey: '', cleanTurns: 0, lastTurnKey: '', reported: false })
+const emptyClaimState = () => ({
+  claimKey: '',
+  turns: 0,
+  cleanTurns: 0,
+  lastTurnKey: '',
+  reasonReported: false,
+  releaseReported: false,
+})
 
 /**
  * Count unique clean assistant response boundaries survived by one claim.
  *
  * `release` is the exact verdict from batch-claim-core's `releaseDecision`.
- * A dirty/unverifiable boundary preserves the claim identity but does not count;
- * the ordinary batch-progress Stop path already states that reason whenever it
- * gets a Stop event. Missing ownership, a pause, or no honoured claim resets the
- * observation, so subagents and paused batches can never inherit the duty.
+ * A dirty/unverifiable boundary does not count as clean, but it does count as a
+ * response survived: after the same bound it reports WHY release is waiting.
+ * Missing ownership, a pause, or no honoured claim resets the observation, so
+ * subagents and paused batches can never inherit the duty.
  */
 export function advanceClaimSurvival({
   state,
@@ -53,24 +60,31 @@ export function advanceClaimSurvival({
   limit = CLAIM_CLEAN_TURN_LIMIT,
 } = {}) {
   if (!ownsBatch || paused || !claimKey) {
-    return { state: emptyClaimState(), report: false, count: 0 }
+    return { state: emptyClaimState(), report: false, kind: '', count: 0 }
   }
 
   const prior = state?.claimKey === claimKey ? state : emptyClaimState()
-  if (verdict !== 'release' || !turnKey || prior.lastTurnKey === turnKey) {
-    return { state: { ...prior, claimKey }, report: false, count: prior.cleanTurns }
+  if (!turnKey || prior.lastTurnKey === turnKey) {
+    return { state: { ...prior, claimKey }, report: false, kind: '', count: prior.cleanTurns }
   }
 
-  const cleanTurns = prior.cleanTurns + 1
-  const report = cleanTurns >= limit && prior.reported !== true
+  const turns = (prior.turns ?? prior.cleanTurns ?? 0) + 1
+  const cleanTurns = prior.cleanTurns + (verdict === 'release' ? 1 : 0)
+  const releaseReport = cleanTurns >= limit && prior.releaseReported !== true
+  const reasonReport =
+    !releaseReport && verdict !== 'release' && turns >= limit && prior.reasonReported !== true
+  const report = releaseReport || reasonReport
   return {
     state: {
       claimKey,
+      turns,
       cleanTurns,
       lastTurnKey: turnKey,
-      reported: prior.reported === true || report,
+      reasonReported: prior.reasonReported === true || reasonReport,
+      releaseReported: prior.releaseReported === true || releaseReport,
     },
     report,
+    kind: releaseReport ? 'release' : reasonReport ? 'reason' : '',
     count: cleanTurns,
   }
 }

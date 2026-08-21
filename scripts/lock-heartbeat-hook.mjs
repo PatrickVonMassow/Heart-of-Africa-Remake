@@ -56,6 +56,12 @@
 //     hand-written one and cannot go blind on it. It lives here for duty (5)'s
 //     reason — .claude/settings.json is a protected path an unattended session
 //     cannot edit — and with no verify run record on disk it costs one readdir.
+// (9) THE HAND-BACK AND REPAIR-LOOP BOUNDS (point 772): Stop is not a model-turn
+//     hook. The 20.08 owner ended every response in `tool_use`, so its clean
+//     claim release, implemented only in batch-progress-guard's Stop path, never
+//     ran. Count unique assistant tool-response turns here, release at the bound,
+//     and surface a same-guard commit run once when it leaves the measured
+//     ordinary range. Pure decisions live in handover-repair-loop-core.mjs.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
@@ -66,6 +72,7 @@ import { classifyPublishResponse, publishStatePatch } from './publish-outcome-co
 import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { armWaitMarker } from './wait-marker.mjs'
+import { observeOwnerLoops } from './handover-repair-loop.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -218,6 +225,7 @@ try {
       process.stdout.write(
         `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: notice.context } })}\n`,
       )
+      spoke = true
     }
   }
 } catch {
@@ -229,5 +237,32 @@ try {
 // paused-aware inside `armWaitMarker`, which also swallows every error, so this
 // call has no failure mode of its own.
 armWaitMarker({ sid, ownsBatch, paused })
+
+// (9) hand-back and repair-loop bounds — see the header. The observer uses the
+// dashboard state only as an ignored, atomic carrier; its decisions are pure.
+// If chat delivery or dispossession already spoke, the due report is left
+// unrecorded and emitted on the next call, preserving the one-JSON-envelope
+// contract of PostToolUse stdout.
+try {
+  const current = readJson(STATE_PATH) ?? {}
+  const observed = observeOwnerLoops({
+    sid,
+    ownsBatch,
+    paused,
+    transcriptPath: data.transcript_path ?? data.transcriptPath ?? '',
+    toolName: data.tool_name ?? data.toolName ?? '',
+    command: (data.tool_input ?? data.toolInput ?? {}).command ?? '',
+    state: current.ownerLoopWatch ?? {},
+    mayAct: !spoke,
+  })
+  mergeState({ ownerLoopWatch: observed.state })
+  if (observed.context) {
+    process.stdout.write(
+      `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: observed.context } })}\n`,
+    )
+  }
+} catch {
+  /* an observer may never break a tool call */
+}
 
 process.exit(0)
