@@ -98,6 +98,38 @@ put it is the mistake this line exists to stop.
   VERIFIABLE: Vitest over the pure halves — a claim that has survived N clean turn ends is
   reported; a session whose last N commits all touch the same guard file is reported once, not
   every turn. Plus the measured 20.08. sequence as a fixture, which must be reported by both.
+  IN FLIGHT — A BRANCH ALREADY STANDS (21.08.2026, handed over at a context boundary).
+  `feat/772-handover-and-repair-loop` carries the finished authoring by GPT-5.6 Sol at
+  `815a30d7`: a pure core `scripts/handover-repair-loop-core.mjs` beside its I/O half, both wired
+  into the EXISTING all-tools PostToolUse heartbeat rather than into a new hook, every path inside
+  try/catch so the heartbeat cannot be made to throw. The measured 20.08. sequence is one frozen
+  fixture and BOTH halves assert against it — claim survival over its seven turn ends, and the
+  eight-commit repair run reported once with count eight. "Surfaced once" is proven by remembering
+  a sha inside the live run, so a later separate run of the same mechanism still reports. Sol
+  reports test:unit and build green; lint and the audit were green under the pre-push gate.
+  THE CROSS-VENDOR REVIEW IS NOT RECORDED, so `mechanism-review-guard` still blocks the landing.
+  The delegated reader's verdict was merge-with-fixes on four findings, carried here so the next
+  session does not re-read the diff to rediscover them:
+  1. `observeOwnerLoops` reads and JSON-parses the FULL transcript on every owner tool call, as an
+     eager argument, even with no claim standing — measured ~32 ms read plus ~19 ms parse on a
+     10 MB transcript in this repository. The value is needed only when the claim observation key
+     is non-empty; gate it, or read the tail alone.
+  2. THE RECORDED "WHY" IS NOT PROVEN. Sol's stated cause is that the 20.08. owner never produced a
+     Stop event because every response ended in `tool_use`. That sits uneasily with this point's
+     own "at least seven of its turn ends passed", and the transcript examined looks like the
+     CLAIMANT window rather than the owner's — the owner's transcript was never identified. The
+     alternative this point hints at, a stale board card with `dashboard-guard` ahead of
+     `batch-progress-guard` in the Stop chain, was not examined. The mechanism survives either way,
+     because moving the hand-back onto PostToolUse is independent of the Stop chain; the recorded
+     WHY must be softened or proven before it becomes repository lore.
+  3. `guardMechanisms` recognises only `scripts/*-guard[-core][.test].mjs`, so a repair loop on a
+     non-guard mechanism is invisible. This point says "the same mechanism", not "the same guard".
+  4. NEEDS AN OWNER OPINION: the hand-back now fires MID-TURN from PostToolUse rather than at a
+     clean turn end. The release still gates on in-flight work and a git operation in progress, but
+     this is the first place the batch lock is released while the owner is still mid-response.
+  BRIEF DEFECT TO FIX WHEN THIS POINT IS NEXT COMMISSIONED: the text cites "the way point 769 makes
+  a review round count visible", but 769 is the timestamp-guard defect and holds no round counter.
+  That cross-reference is wrong and cost the author a lookup.
   Criticality: high — the batch stood still for two hours with a live owner, and neither the
   handover mechanism nor the board noticed.
   Bundle: Session- & Repo-Hygiene.
@@ -176,6 +208,24 @@ put it is the mistake this line exists to stop.
   naming what the header must read. A second case walks every `COVERED` entry of the cut document
   and asserts the named guard's core actually rejects what the entry claims it rejects — the
   case that would have caught this one.
+  HALF OF THIS POINT HAS ALREADY LANDED (measured 21.08.2026 by the author of point 769, on
+  `feat/769-764-timestamp-header-guard`; this point itself was never commissioned there). Commit
+  `017f3b08` "Hand over the whole reply header, not half of it" (20.08.2026, Claude Opus 5) already
+  carries `HEADER_SUFFIX_RE`, the `enforceSuffix` gate, the `--` reading, the "no hook line demands
+  nothing" rule and all five named Vitest cases, all green on main. WHAT REMAINS IS ESSENTIALLY THE
+  SECOND CASE: the walk over `docs/document-cut-757.md`. Do not let an author rebuild the first
+  half.
+  WHAT THE SAME MEASUREMENT ALREADY FOUND: the cut document holds FOURTEEN `COVERED -> <guard>`
+  entries (lines 127, 132, 169–175, 180, 184–186, 191) and all twelve named guards exist as
+  scripts. The predicted class defect is already visible in one of them — `rule-echo-core.mjs`'s
+  `RULE_REGISTRY` holds exactly ONE entry, `model-policy`, while THREE COVERED claims point at
+  `rule-echo-guard` (U9 document synchronization, U61 commit and documentation duplicates, U66
+  every cut lands with its twin and lowered ceiling). Those three claims almost certainly do not
+  hold.
+  ESCALATION OWED BEFORE THE REMEDY PATH IS CHOSEN: `MEMORY.md` lives OUTSIDE the repository, so
+  "restore its rule to `MEMORY.md`" cannot be committed on a branch — and `doc-budget-core` records
+  `MEMORY.md` at ZERO line headroom, so a restored index line trips `doc-budget-guard`. Whoever
+  picks this point up needs a ruling on repair-versus-restore first.
   Criticality: high — it is not one lost line. It is a deletion method that removed live rules on
   an untested claim, and the only reason we know is that the user noticed a missing number in a
   chat header. A guard change is a mechanism, so it needs the other model's recorded review
@@ -223,6 +273,27 @@ put it is the mistake this line exists to stop.
   point that passes another must say so in its own text). Reason: it fires at the exit of EVERY
   turn of every session, and the fault it invents is then written into the chat as a correction —
   it is the only open point that actively degrades work while it waits.
+  IN FLIGHT — A BRANCH ALREADY STANDS (21.08.2026, handed over at a context boundary).
+  `feat/769-764-timestamp-header-guard` carries the authoring by GPT-5.6 Sol at `efa2ca44` plus a
+  recorded cross-vendor verdict of merge-with-fixes at `28d48437`. `inspectLastAssistantText`
+  discards every text candidate before the last `tool_result`, so pre-result narration can no
+  longer be judged; the wrapper allows silently when a tool result is the last thing in the
+  transcript; and every refusal now quotes the line it actually saw. The delegated reader verified
+  the fix against the real transcript of session d5fcb9cf — narration at row 710, last
+  `tool_result` at row 947, final reply row 949 (06:15:18.404Z), Stop feedback row 952
+  (06:15:18.706Z) — and the pre-flush slice genuinely yields null now. `npm run test:unit` green
+  (358 files, 12,344 passed, 5 skipped); lint and audit green through the pre-push gate.
+  TWO FIXES ARE OWED before the verdict can become merge:
+  1. `scripts/fixtures/timestamp-guard-302ms-race.json` is a hand-built reconstruction — two
+     synthetic rows, no `message.id`, no `isSidechain`, none of the ~20 real intervening rows. This
+     point's VERIFIABLE clause demands the race be replayed as a fixture that pins the REAL event,
+     so it must be a real slice of the rows named above, keeping ids, flags, timestamps and row
+     shapes (text bodies may be truncated).
+  2. A RESIDUAL RACE IS UNDOCUMENTED: a turn that uses NO tools is still exposed, because the last
+     `tool_result` then belongs to a PREVIOUS turn and that turn's minutes-old stamped reply becomes
+     the judged text — a stale-stamp refusal. Name it in a comment. Extending the boundary to a
+     real user-prompt row would close it, but that goes beyond the form this point chose, so it is
+     the author's call.
   Criticality: high — it does not corrupt anything, but it produces false refusals at the exit of
   every turn, and the correction it demands is a fabricated fault. A guard change is a mechanism,
   so it needs the other model's recorded review before it lands.
