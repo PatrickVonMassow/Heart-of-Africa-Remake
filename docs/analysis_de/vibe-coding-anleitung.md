@@ -374,6 +374,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es beim
   dritten Mal: **wäre dieser Commit auch ohne den neuen Wächter nötig?**"
 
+- **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
+  Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
+  → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
+
+- **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
+  baut aber weder Zustand noch Befehl dafür. Der ehrliche Ausnahmefall muss die Form des
+  Normalfalls nachahmen, und nur eine irreführende Formulierung besteht dessen Prüfung.
+  → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
+  ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
