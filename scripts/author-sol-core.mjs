@@ -446,11 +446,38 @@ export function namesSolAsAuthor(trailers) {
   return modelNamesIn(trailers).some((name) => sameModel(name, SOL_MODEL_NAME))
 }
 
-export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty = '', branchAfter = '', branch = '' } = {}) {
+/** Summarise Git's `--numstat` output without trusting path spelling. */
+export function uncommittedSummary({ dirty = '', numstat = '' } = {}) {
+  const changedPaths = String(dirty ?? '')
+    .split('\n')
+    .filter((line) => line.trim()).length
+  let measuredPaths = 0
+  let binaryPaths = 0
+  let insertions = 0
+  let deletions = 0
+  for (const line of String(numstat ?? '').split('\n')) {
+    const match = line.match(/^(-|\d+)\s+(-|\d+)\s+/)
+    if (!match) continue
+    measuredPaths += 1
+    if (match[1] === '-' || match[2] === '-') binaryPaths += 1
+    else {
+      insertions += Number(match[1])
+      deletions += Number(match[2])
+    }
+  }
+  return { changedPaths, measuredPaths, binaryPaths, insertions, deletions }
+}
+
+export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty = '', numstat = '', branchAfter = '', branch = '' } = {}) {
   const list = Array.isArray(commits) ? commits : []
+  const uncommitted = uncommittedSummary({ dirty, numstat })
   const problems = []
   if (!list.length) {
-    problems.push('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+    problems.push(
+      uncommitted.changedPaths
+        ? 'NOTHING WAS COMMITTED — the commits are missing, but the work is not; see its measured UNCOMMITTED SIZE and run CHECKPOINT IT NOW before the review'
+        : 'NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review',
+    )
   }
   // THE RUN MUST END WHERE IT STARTED (cross-vendor review, P1). Nothing stops a
   // sandbox-less run from checking out another branch, and `base..HEAD` would
@@ -469,8 +496,11 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
       problems.push(`${short(commit.sha)} does not name ${SOL_MODEL_NAME} as its author — this lane's commits must`)
     }
   }
-  if (String(dirty ?? '').trim()) {
-    problems.push('the run left UNCOMMITTED changes behind — commit or discard them before the review')
+  if (uncommitted.changedPaths) {
+    problems.push(
+      `the run left UNCOMMITTED changes behind: ${uncommitted.changedPaths} changed path(s), ` +
+        `${uncommitted.insertions} insertion(s), ${uncommitted.deletions} deletion(s) — run CHECKPOINT IT NOW before the review`,
+    )
   }
   if (!outcome?.ok) problems.push(`the codex run did not finish cleanly: ${outcome?.cause || 'no cause was reported'}`)
   else if (!parsed?.ok) problems.push(`the run gave no usable closing report (${parsed?.error || 'no reason given'})`)
@@ -490,6 +520,7 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
     clean: problems.length === 0,
     problems,
     commits: list,
+    uncommitted,
   }
 }
 
@@ -518,8 +549,24 @@ export function formatAuthoringReport({
       `author-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) authored ${commits.length} commit(s) on ${branch}:`,
       ...commits.map((c) => `    ${short(c.sha)}  ${c.subject ?? ''}`),
     )
+  } else if (judged.uncommitted?.changedPaths) {
+    lines.push(`author-sol: ${SOL_MODEL_NAME} left UNCOMMITTED WORK on ${branch}.`)
   } else {
     lines.push(`author-sol: ${SOL_MODEL_NAME} authored NOTHING on ${branch}.`)
+  }
+  if (judged.uncommitted?.changedPaths) {
+    const { changedPaths, measuredPaths = 0, binaryPaths = 0, insertions = 0, deletions = 0 } = judged.uncommitted
+    const unmeasuredPaths = Math.max(0, changedPaths - measuredPaths)
+    const qualifications = [
+      binaryPaths ? `${binaryPaths} binary path(s)` : '',
+      unmeasuredPaths ? `${unmeasuredPaths} path(s) whose lines could not be measured` : '',
+    ].filter(Boolean)
+    lines.push(
+      `  UNCOMMITTED SIZE: ${changedPaths} changed path(s), ${insertions} insertion(s), ${deletions} deletion(s)` +
+        `${qualifications.length ? `; ${qualifications.join(', ')}` : ''}.`,
+      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'` +
+        ` && git push -u origin ${branch}`,
+    )
   }
   if (parsed?.ok) {
     lines.push(`  DONE:  ${parsed.done}`, `  GATES: ${parsed.gates}`, `  OPEN:  ${parsed.open}`)
