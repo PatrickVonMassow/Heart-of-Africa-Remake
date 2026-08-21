@@ -25,6 +25,7 @@ import {
   PROBE_SESSION_PREFIX,
   progressGuardDecision,
   acquire,
+  acquisitionExpectationMatches,
   heartbeat,
   release,
   readOwnerLock,
@@ -892,6 +893,47 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('s2')
   })
 
+  it('moves the handover generation, reservation and spawn token in one checked takeover', () => {
+    const handedOverAt = Date.now()
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'owner', kind: 'session', fence: 17, handedOver: true, handedOverAt,
+      claimedAt: handedOverAt, pid: 999999,
+    }))
+    const reservation = {
+      spawnToken: 'spawn-token', sourceGeneration: 17, sourceSpawnToken: 'before-token',
+      trigger: 'boundary', requestedAt: NOW,
+    }
+    expect(acquire('launcher', opts({
+      kind: 'pending-spawn',
+      expected: { sessionId: 'owner', fence: 17, handedOver: true },
+      extra: reservation,
+    }))).toBe('acquired')
+    expect(readOwnerLock(lockPath)).toMatchObject({
+      sessionId: 'launcher', kind: 'pending-spawn', ...reservation,
+    })
+  })
+
+  it('a stale boundary generation cannot reserve over a newer owner', () => {
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'new-owner', kind: 'session', fence: 18, handedOver: true,
+      claimedAt: Date.now(), pid: 999999,
+    }))
+    expect(acquire('launcher', opts({
+      kind: 'pending-spawn',
+      expected: { sessionId: 'old-owner', fence: 17, handedOver: true },
+      extra: { spawnToken: 'stale-token', sourceGeneration: 17 },
+    }))).toBe('stale-event')
+    expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'new-owner', fence: 18 })
+  })
+
+  it('the expectation matcher compares only the supplied CAS fields', () => {
+    const lock = { sessionId: 'owner', fence: 17, handedOver: true, spawnToken: 'one' }
+    expect(acquisitionExpectationMatches(lock, { sessionId: 'owner', fence: 17, handedOver: true })).toBe(true)
+    expect(acquisitionExpectationMatches(lock, { fence: 18 })).toBe(false)
+    expect(acquisitionExpectationMatches(lock, { spawnToken: 'two' })).toBe(false)
+    expect(acquisitionExpectationMatches(null, { fence: 17 })).toBe(false)
+  })
+
   it('a corrupt but FRESH lock file is never reaped (mid-write protection)', () => {
     writeFileSync(lockPath, '{ torn')
     expect(acquire('s2', opts())).toBe('held')
@@ -1006,6 +1048,25 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     const lock = readOwnerLock(lockPath)
     expect(lock.sessionId).toBe('spawned')
     expect(lock.kind).toBe('session')
+  })
+
+  it('pending-spawn conversion preserves the token which binds supervised exit to this child', () => {
+    acquire('launcher-1', opts({
+      kind: 'pending-spawn',
+      extra: {
+        spawnedPid: 555,
+        spawnToken: 'spawn-token',
+        sourceGeneration: 17,
+        sourceSpawnToken: 'before-token',
+        trigger: 'boundary',
+        requestedAt: NOW,
+      },
+    }))
+    expect(convertPendingSpawn('spawned', { lockPath, pid: 555 })).toBe(true)
+    expect(readOwnerLock(lockPath)).toMatchObject({
+      sessionId: 'spawned', kind: 'session', spawnToken: 'spawn-token',
+      sourceGeneration: 17, sourceSpawnToken: 'before-token', trigger: 'boundary', requestedAt: NOW,
+    })
   })
 
   it('markHandover: only the owner may hand over, and it does not touch the heartbeat', () => {
