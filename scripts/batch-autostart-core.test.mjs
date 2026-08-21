@@ -268,11 +268,48 @@ describe('the immediate successor decision — one door for every transport', ()
   it.each([
     ['clean child exit', { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' }],
     ['crash', { kind: SUCCESSOR_TRIGGERS.CRASH, predecessorToken: 'spawn-1' }],
-    ['terminal CI result', { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: true }],
   ])('%s starts immediately from the same decision', (_label, trigger) => {
     let clock = NOW
     expect(start({ trigger, lock: null, now: clock })).toMatchObject({ start: true, code: 'start' })
     expect(clock).toBe(NOW)
+  })
+
+  it.each(['green', 'red'])('a matching terminal CI %s wakes immediately', (verdict) => {
+    const state = verdict === 'green' ? 'success' : 'failed'
+    const ciWait = {
+      visible: true,
+      pending: false,
+      terminal: true,
+      wakeToken: 'wake-1',
+      identity: 'origin/feat/x:abc:CI:42',
+      result: { state, verdict },
+    }
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: true, wakeToken: 'wake-1', result: ciWait.result },
+      ciWait,
+    })).toMatchObject({
+      start: true,
+      code: 'start',
+      reservation: { wakeToken: 'wake-1', trigger: 'ci-terminal' },
+    })
+  })
+
+  it('keeps child exit and watchdog recovery behind a pending durable wait', () => {
+    const ciWait = {
+      visible: true,
+      pending: true,
+      terminal: false,
+      observerAlive: false,
+      repair: true,
+      identity: 'origin/feat/x:abc:CI:42',
+      wakeToken: 'wake-1',
+    }
+    expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT }, ciWait })).toMatchObject({
+      start: false,
+      code: 'ci-wait-pending',
+      evidence: { ciWait: { repair: true } },
+    })
+    expect(start({ ciWait })).toMatchObject({ start: false, code: 'ci-wait-pending' })
   })
 
   it('returns precise evidence for every policy refusal', () => {
@@ -297,9 +334,17 @@ describe('the immediate successor decision — one door for every transport', ()
       trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' },
       lock: { sessionId: 'new', spawnToken: 'spawn-2' },
     })).toMatchObject({ start: false, code: 'stale-spawn' })
+    const terminal = {
+      visible: true, pending: false, terminal: true, wakeToken: 'wake-1', identity: 'wait-1', result: { verdict: 'green' },
+    }
+    expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: false }, ciWait: terminal }))
+      .toMatchObject({ start: false, code: 'ci-not-terminal' })
+    expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: true }, ciWait: terminal }))
+      .toMatchObject({ start: false, code: 'missing-ci-wake' })
     expect(start({
-      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: false },
-    })).toMatchObject({ start: false, code: 'ci-not-terminal' })
+      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: true, wakeToken: 'old-wake' },
+      ciWait: terminal,
+    })).toMatchObject({ start: false, code: 'stale-ci-wake' })
   })
 
   it('a concurrent watchdog and duplicate notification reserve exactly one writer', () => {
@@ -391,10 +436,12 @@ describe('supervisor restart decision', () => {
 describe('supervised exit trigger', () => {
   it('carries a terminal CI result into the immediate decision', () => {
     expect(supervisedExitTrigger([
-      { seq: 3, atMs: 1500, event: 'ci-wait-finish', evidence: { terminal: { state: 'success', verdict: 'green' } } },
+      { seq: 3, atMs: 1500, event: 'ci-wait-finish', evidence: { wakeToken: 'wake-1', terminal: { state: 'success', verdict: 'green' } } },
     ], { childStartedAt: 1000 })).toEqual({
       kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
       terminal: true,
+      wakeToken: 'wake-1',
+      result: { state: 'success', verdict: 'green' },
       evidence: { seq: 3, result: { state: 'success', verdict: 'green' } },
     })
   })

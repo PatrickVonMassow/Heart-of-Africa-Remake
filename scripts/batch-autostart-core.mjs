@@ -523,6 +523,7 @@ const SUCCESSOR_TRIGGER_SET = new Set(Object.values(SUCCESSOR_TRIGGERS))
 export function successorStartDecision({
   trigger = { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
   spawnToken = '',
+  ciWait = null,
   paused = false,
   openPoints = 1,
   formatAlarm = false,
@@ -540,9 +541,28 @@ export function successorStartDecision({
   const sourceSpawnToken = typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken
     ? trigger.predecessorToken
     : null
+  const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
   const evidence = {
-    trigger: { kind: kind || null, generation: sourceGeneration, predecessorToken: sourceSpawnToken },
+    trigger: {
+      kind: kind || null,
+      generation: sourceGeneration,
+      predecessorToken: sourceSpawnToken,
+      wakeToken,
+      result: trigger?.result ?? null,
+    },
     policy: { paused: paused === true, openPoints, formatAlarm: formatAlarm === true, claimReserved: claimReserved === true },
+    ciWait: ciWait?.visible === true
+      ? {
+          pending: ciWait.pending === true,
+          terminal: ciWait.terminal === true,
+          observerAlive: ciWait.observerAlive === true,
+          repair: ciWait.repair === true,
+          deadlineReached: ciWait.deadlineReached === true,
+          identity: ciWait.identity ?? null,
+          wakeToken: ciWait.wakeToken ?? null,
+          result: ciWait.result ?? null,
+        }
+      : null,
     observed: {
       lockKind: typeof lock?.kind === 'string' ? lock.kind : null,
       lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
@@ -564,6 +584,18 @@ export function successorStartDecision({
   if (openPoints === 0) return refuse('batch-complete', 'the work order has no open successor')
   if (claimReserved === true) return refuse('claim-reserved', 'an honoured user claim reserves the next ownership')
 
+  // An unfinished run owns the empty interval after its worker exits. Child
+  // exit and watchdog notifications must not manufacture replacement workers
+  // which can do nothing but encounter the same Stop. The durable observer is
+  // the transport; only its matching terminal token opens this door again.
+  if (ciWait?.visible === true && ciWait.pending === true) {
+    return refuse(
+      'ci-wait-pending',
+      `CI run ${ciWait.identity ?? 'unknown'} is still under durable observation` +
+        (ciWait.repair === true ? '; its observer must be repaired before a successor starts' : ''),
+    )
+  }
+
   if (kind === SUCCESSOR_TRIGGERS.BOUNDARY) {
     if (sourceGeneration === null) return refuse('missing-generation', 'the boundary notification names no handover generation')
     if (!lock || lock.handedOver !== true) return refuse('boundary-not-standing', 'the notified boundary is not standing on the owner lock')
@@ -575,8 +607,14 @@ export function successorStartDecision({
     }
   }
 
-  if (kind === SUCCESSOR_TRIGGERS.CI_TERMINAL && trigger?.terminal !== true) {
-    return refuse('ci-not-terminal', 'the CI notification does not carry a terminal result')
+  if (kind === SUCCESSOR_TRIGGERS.CI_TERMINAL) {
+    if (trigger?.terminal !== true || ciWait?.terminal !== true) {
+      return refuse('ci-not-terminal', 'the CI notification does not carry a persisted terminal result')
+    }
+    if (!wakeToken) return refuse('missing-ci-wake', 'the terminal CI notification carries no wake token')
+    if (wakeToken !== ciWait.wakeToken) {
+      return refuse('stale-ci-wake', 'the terminal CI notification belongs to a superseded wait')
+    }
   }
 
   if (sourceSpawnToken && evidence.observed.lockSpawnToken && evidence.observed.lockSpawnToken !== sourceSpawnToken) {
@@ -613,6 +651,7 @@ export function successorStartDecision({
       spawnToken,
       sourceGeneration,
       sourceSpawnToken,
+      wakeToken,
       trigger: kind,
       requestedAt: now,
     },
@@ -673,6 +712,8 @@ export function supervisedExitTrigger(records = [], { childStartedAt = 0 } = {})
     return {
       kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
       terminal: true,
+      wakeToken: terminal.evidence.wakeToken ?? null,
+      result: terminal.evidence.terminal,
       evidence: { seq: terminal.seq ?? null, result: terminal.evidence.terminal },
     }
   }
