@@ -282,3 +282,21 @@ export function remainingBudgetDecision({
 }
 
 export { CALL_KINDS }
+
+/** The armed refusal explains the complete inequality and its one-use escape. */
+export function contextBudgetRefusal({ decision, reading, ceiling = CONTEXT_CEILING_TOKENS, sessionId, point } = {}) {
+  const unknown = decision?.unknownTypeCost
+    ? ' No p90 exists for this already-classified start, so the conservative emergency brake fired.'
+    : ''
+  const permit = Number.isInteger(Number(point)) && Number(point) > 0 && String(sessionId ?? '').trim()
+    ? ` Emergency only: \`node scripts/context-fence-override.mjs --session ${String(sessionId).trim()} ` +
+      `--point ${Number(point)} --reason "<why>" --max-tokens ${decision?.projectedCost}\` issues one short-lived permit.`
+    : ' No point-bound permit can be used until this session has a declared numeric focus.'
+  return (
+    `THIS CALL DOES NOT FIT UNDER THE CONTEXT CEILING: reading ${reading?.tokens ?? 'unreadable'} + ` +
+    `pending debit ${Math.max(0, Number(decision?.pendingDebit) || 0)} + projected ${decision?.kind ?? 'unknown'} ` +
+    `cost ${decision?.projectedCost ?? 'unknown'} + handover reserve ${decision?.handoverReserve ?? CONTEXT_HANDOVER_RESERVE_TOKENS} ` +
+    `would exceed ${ceiling} by ${Math.max(0, -(Number(decision?.remainingAfterCall) || 0))} tokens.${unknown}` +
+    ` Finish and hand over; bounded commit, push, board, focus and boundary calls remain allowed.${permit}`
+  )
+}

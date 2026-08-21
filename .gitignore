@@ -139,6 +139,7 @@ scripts/.tile-cache
 .claude/context-fence-observations.jsonl
 .claude/context-fence-ledger.json
 .claude/context-fence-ledger.json.tmp-*
+.claude/context-fence-ledger.lock/
 .claude/context-fence-permit.json
 .claude/context-fence-permit.json.tmp-*
 .claude/context-fence-permit-pending.json

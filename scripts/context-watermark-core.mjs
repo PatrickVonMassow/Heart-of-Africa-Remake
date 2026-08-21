@@ -29,9 +29,9 @@ export const CONTEXT_CEILING_TOKENS = 150_000
  * used to be 110,000 and served TWO purposes at once — it ended the session AND
  * it was the mark past which the context fence refused new work. Those are
  * different contracts: ending late is cheap (the boundary still fits), while
- * refusing early is expensive (it forbids work a session could still do). They
- * are split now — the refusal side is `CONTEXT_REFUSAL_TOKENS` below — and this
- * side moved up to where the arithmetic actually puts it.
+ * refusing early is expensive (it forbids work a session could still do).
+ * Point 745 replaces the refusal side with per-call remaining-budget arithmetic;
+ * this handover side stays where its own boundary arithmetic puts it.
  *
  * THE FLOOR RULE still binds: this number may never sit below the measured
  * startup cost of a session that has done no work, plus a margin. A threshold
@@ -56,23 +56,6 @@ export const CONTEXT_TRIGGER_TOKENS = 122_000
  */
 export const CONTEXT_HANDOVER_RESERVE_TOKENS =
   CONTEXT_CEILING_TOKENS - CONTEXT_TRIGGER_TOKENS
-
-/**
- * THE REFUSAL THRESHOLD, in tokens of context — the mark past which the context
- * fence (`context-fence-guard.mjs`) refuses to START new work, and NOTHING
- * else. Split off from the handover threshold by point 758.
- *
- * It is only ever consulted in ARMED mode (`CONTEXT_FENCE_MODES` below). In the
- * DEFAULT observation mode the fence measures against it and records what it
- * would have refused, but refuses nothing — so this number currently describes
- * an observation, not a refusal.
- *
- * 110,000 is the value the single combined threshold last carried (user
- * 20.08.2026). It is kept unchanged so that re-arming restores exactly the
- * behaviour that was measured, rather than a new untested one; point 747
- * recomputes it from the series before the fence is armed again.
- */
-export const CONTEXT_REFUSAL_TOKENS = 110_000
 
 /**
  * THE FENCE MODES — the named, single-valued switch point 758 demands, so that a
