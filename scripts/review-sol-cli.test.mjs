@@ -88,6 +88,7 @@ let headSha = ''
 let fableSha = ''
 let solSha = ''
 let solHeadSha = ''
+let unreviewableSha = ''
 let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
@@ -332,6 +333,21 @@ beforeAll(() => {
   git('add', '-A')
   git('commit', '--no-verify', '-q', '-m', 'Extend the Sol work\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
   solHeadSha = git('rev-parse', 'HEAD')
+
+  // A single contribution authored by both vendors has no independent vendor
+  // left in the configured reviewer pool. Its refusal must still name the
+  // bounded narrowing the operator can use to make progress around it.
+  git('checkout', '-q', '-b', 'unreviewable', 'main')
+  writeFileSync(join(repo, 'unreviewable.txt'), 'written by both authoring lanes\n')
+  git('add', '-A')
+  git(
+    'commit',
+    '--no-verify',
+    '-q',
+    '-m',
+    'Write across both authoring lanes\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+  )
+  unreviewableSha = git('rev-parse', 'HEAD')
 
   // A branch whose material CANNOT fit one round (point 714): two files of 120k
   // characters, so the range needs more than the 200k budget however it is cut.
@@ -635,6 +651,14 @@ describe('the guards around the run', () => {
     expect(r.status).not.toBe(0)
     expect(r.stderr).toMatch(/does not diverge/)
     expect(r.stderr).toMatch(/--since/)
+  })
+
+  it('names the bounded --since narrowing when no reviewer vendor is eligible', () => {
+    const r = run(['--sha', unreviewableSha, '--brief', 'judge it'])
+    expect(r.status).toBe(4)
+    expect(r.stderr).toMatch(/UNREVIEWABLE/)
+    expect(r.stderr).toMatch(/--since <the last reviewed sha>/)
+    expect(r.stderr).toMatch(/bounded 1\/1 pass/)
   })
 
   it('records a narrowed one-round range as exactly one scoped pass', () => {
