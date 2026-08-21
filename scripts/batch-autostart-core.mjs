@@ -588,15 +588,32 @@ export function successorStartDecision({
 
 /** Whether the watchdog must replace a missing supervisor for the live child. PURE. */
 export function supervisorRestartDecision({ lastSpawn = null, lock = null, childProbe = null, supervisorProbe = null } = {}) {
+  const recordedChildStartedAt = typeof lastSpawn?.pidStartedAt === 'number' ? lastSpawn.pidStartedAt : null
+  const measuredChildStartedAt = typeof childProbe?.startedAt === 'number' ? childProbe.startedAt : null
+  const sameChild = childProbe?.exists === true && (
+    recordedChildStartedAt === null ||
+    measuredChildStartedAt === null ||
+    Math.abs(recordedChildStartedAt - measuredChildStartedAt) <= 2000
+  )
+  const recordedSupervisorStartedAt = typeof lastSpawn?.supervisorStartedAt === 'number' ? lastSpawn.supervisorStartedAt : null
+  const measuredSupervisorStartedAt = typeof supervisorProbe?.startedAt === 'number' ? supervisorProbe.startedAt : null
+  const sameSupervisor = supervisorProbe?.exists === true && (
+    recordedSupervisorStartedAt === null ||
+    measuredSupervisorStartedAt === null ||
+    Math.abs(recordedSupervisorStartedAt - measuredSupervisorStartedAt) <= 2000
+  )
   const evidence = {
     childPid: Number.isInteger(lastSpawn?.pid) ? lastSpawn.pid : null,
-    childStartedAt: typeof lastSpawn?.pidStartedAt === 'number' ? lastSpawn.pidStartedAt : null,
+    childStartedAt: recordedChildStartedAt,
+    measuredChildStartedAt,
     spawnToken: typeof lastSpawn?.spawnToken === 'string' ? lastSpawn.spawnToken : null,
     supervisorPid: Number.isInteger(lastSpawn?.supervisorPid) ? lastSpawn.supervisorPid : null,
+    supervisorStartedAt: recordedSupervisorStartedAt,
+    measuredSupervisorStartedAt,
     lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
     lockSpawnToken: typeof lock?.spawnToken === 'string' ? lock.spawnToken : null,
-    childAlive: childProbe?.exists === true,
-    supervisorAlive: supervisorProbe?.exists === true,
+    childAlive: sameChild,
+    supervisorAlive: sameSupervisor,
   }
   if (!evidence.childPid || !evidence.spawnToken) return { restart: false, reason: 'no supervised spawn is recorded', evidence }
   if (!evidence.childAlive) return { restart: false, reason: 'the recorded child has already exited', evidence }
@@ -630,13 +647,14 @@ export function supervisedExitTrigger(records = [], { childStartedAt = 0 } = {})
 }
 
 /** The persisted record for a start the decision licensed. PURE. */
-export function launcherStartRecord({ decision, at, head = '', pid, pidStartedAt, supervisorPid } = {}) {
+export function launcherStartRecord({ decision, at, head = '', pid, pidStartedAt, supervisorPid, supervisorStartedAt } = {}) {
   return {
     at,
     head,
     ...(typeof pid === 'number' && pid > 0 ? { pid } : {}),
     ...(typeof pidStartedAt === 'number' ? { pidStartedAt } : {}),
     ...(typeof supervisorPid === 'number' && supervisorPid > 0 ? { supervisorPid } : {}),
+    ...(typeof supervisorStartedAt === 'number' ? { supervisorStartedAt } : {}),
     ...(typeof decision?.reservation?.spawnToken === 'string' ? { spawnToken: decision.reservation.spawnToken } : {}),
     ...(decision?.reservation ? { reservation: decision.reservation } : {}),
     startReason: decision?.reason ?? 'start decision unavailable',

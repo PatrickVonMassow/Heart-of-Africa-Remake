@@ -180,7 +180,7 @@ function startChildSupervisor({ pid, pidStartedAt, token }) {
       { cwd: REPO, detached: true, windowsHide: true, stdio: ['ignore', out, out] },
     )
     supervisor.unref()
-    return supervisor.pid
+    return { pid: supervisor.pid, startedAt: probePid(supervisor.pid)?.startedAt ?? Date.now() }
   } catch (error) {
     log(`supervisor failed to start for child ${pid} (${error?.message ?? error})`)
     return null
@@ -244,14 +244,19 @@ if (!immediate) {
   const supervisorProbe = last?.supervisorPid ? probePid(last.supervisorPid) : null
   const repair = supervisorRestartDecision({ lastSpawn: last, lock, childProbe, supervisorProbe })
   if (repair.restart) {
-    const supervisorPid = startChildSupervisor({
+    const supervisor = startChildSupervisor({
       pid: last.pid,
       pidStartedAt: last.pidStartedAt ?? childProbe?.startedAt ?? last.at,
       token: last.spawnToken,
     })
-    if (supervisorPid) {
-      writeJsonAtomic(C('autostart-last.json'), { ...last, supervisorPid, supervisorRestartedAt: now })
-      log(`restarted missing supervisor for live child ${last.pid} (supervisor ${supervisorPid})`)
+    if (supervisor) {
+      writeJsonAtomic(C('autostart-last.json'), {
+        ...last,
+        supervisorPid: supervisor.pid,
+        supervisorStartedAt: supervisor.startedAt,
+        supervisorRestartedAt: now,
+      })
+      log(`restarted missing supervisor for live child ${last.pid} (supervisor ${supervisor.pid})`)
     }
   }
 }
@@ -1485,7 +1490,7 @@ writeJsonAtomic(C('autostart-authorized.json'), {
   startReason: startDecision.reason,
   measured: startDecision.evidence,
 })
-const supervisorPid = startChildSupervisor({ pid: child.pid, pidStartedAt: childStartedAt, token: spawnToken })
+const supervisor = startChildSupervisor({ pid: child.pid, pidStartedAt: childStartedAt, token: spawnToken })
 writeJsonAtomic(
   C('autostart-last.json'),
   launcherStartRecord({
@@ -1494,7 +1499,8 @@ writeJsonAtomic(
     head: curHead,
     pid: child.pid,
     pidStartedAt: childStartedAt,
-    supervisorPid,
+    supervisorPid: supervisor?.pid,
+    supervisorStartedAt: supervisor?.startedAt,
   }),
 )
 writeJsonAtomic(C('autostart-state.json'), {
@@ -1518,9 +1524,16 @@ journal(ACTIVITY_EVENTS.SUCCESSOR_START, {
   pid: child.pid,
   pidStartedAt: null,
   cause: 'spawned-successor',
-  evidence: { head: curHead, startReason: startDecision.reason, launcherSession: launcherSid, spawnToken, supervisorPid },
+  evidence: {
+    head: curHead,
+    startReason: startDecision.reason,
+    launcherSession: launcherSid,
+    spawnToken,
+    supervisorPid: supervisor?.pid ?? null,
+    supervisorStartedAt: supervisor?.startedAt ?? null,
+  },
 })
-log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervisor ${supervisorPid ?? 'failed'}`)
+log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervisor ${supervisor?.pid ?? 'failed'}`)
 // A PROBE UNDER A STANDING BLOCK IS NOT NEWS (point 444). Probing every quarter of
 // an hour through a limit window would otherwise buzz an unattended phone all
 // night for a condition that repairs itself; the probes stay in the log, and the

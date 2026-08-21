@@ -285,7 +285,13 @@ describe('the immediate successor decision — one door for every transport', ()
 })
 
 describe('supervisor restart decision', () => {
-  const lastSpawn = { pid: 70, pidStartedAt: 1000, spawnToken: 'spawn-1', supervisorPid: 80 }
+  const lastSpawn = {
+    pid: 70,
+    pidStartedAt: 1000,
+    spawnToken: 'spawn-1',
+    supervisorPid: 80,
+    supervisorStartedAt: 1100,
+  }
   const lock = { sessionId: 'child', kind: 'session', spawnToken: 'spawn-1' }
 
   it('restarts a missing supervisor only for the current live owner child', () => {
@@ -299,7 +305,7 @@ describe('supervisor restart decision', () => {
 
   it('does not duplicate a live supervisor or attach to a newer owner', () => {
     expect(supervisorRestartDecision({
-      lastSpawn, lock, childProbe: { exists: true }, supervisorProbe: { exists: true },
+      lastSpawn, lock, childProbe: { exists: true }, supervisorProbe: { exists: true, startedAt: 1100 },
     }).restart).toBe(false)
     expect(supervisorRestartDecision({
       lastSpawn,
@@ -307,6 +313,28 @@ describe('supervisor restart decision', () => {
       childProbe: { exists: true },
       supervisorProbe: { exists: false },
     }).restart).toBe(false)
+  })
+
+  it('restarts when the supervisor pid was recycled by another process', () => {
+    const decision = supervisorRestartDecision({
+      lastSpawn,
+      lock,
+      childProbe: { exists: true, startedAt: 1000 },
+      supervisorProbe: { exists: true, startedAt: 9000 },
+    })
+    expect(decision).toMatchObject({
+      restart: true,
+      evidence: { supervisorAlive: false, supervisorStartedAt: 1100, measuredSupervisorStartedAt: 9000 },
+    })
+  })
+
+  it('never attaches a supervisor to a recycled child pid', () => {
+    expect(supervisorRestartDecision({
+      lastSpawn,
+      lock,
+      childProbe: { exists: true, startedAt: 9000 },
+      supervisorProbe: { exists: false },
+    })).toMatchObject({ restart: false, reason: 'the recorded child has already exited', evidence: { childAlive: false } })
   })
 })
 
