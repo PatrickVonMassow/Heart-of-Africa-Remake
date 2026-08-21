@@ -149,7 +149,8 @@ const NEGATION_WINDOW = 60
  * is exactly such filler, and it stops attaching once a whole other predicate
  * has intervened.
  */
-const CONNECTOR = "but|however|yet|and|or|because|since|while|when|if|so|unless|until"
+const CONNECTOR =
+  'but|however|yet|and|or|nor|because|since|while|whilst|when|if|so|unless|until|although|though|whereas'
 
 const NEGATION_BEFORE = new RegExp(
   // …the cue, then only PLAIN filler words. A connector is not filler (seventh
@@ -173,8 +174,18 @@ const NEGATION_BEFORE = new RegExp(
  * phrase's own predicate — "is not the observed failure" — which is the one shape
  * that really does deny it.
  */
-const AFTER_END =
-  /[.;:!?—,]|\b(?:but|however|because|since|when|while|if|as|so|unless|until|after|before|with|without|for|from|to|on|in|at|by|of|under|over|during|despite|against)\b/i
+const PREPOSITION = 'with|without|for|from|to|on|in|at|by|of|under|over|during|despite|against'
+
+const AFTER_END = new RegExp(`[.;:!?—,]|\\b(?:${CONNECTOR}|as|after|before|${PREPOSITION})\\b`, 'i')
+
+/**
+ * The negative-polarity IDIOMS a preposition would otherwise hide (cross-vendor
+ * review, eighth pass). Ending the trailing clause at every preposition let "it
+ * blocks the release under no circumstances" read as a claim: the boundary fell
+ * before the `no`. These phrases are denials whole, so they are matched whole,
+ * on either side and across any boundary.
+ */
+const NEGATIVE_IDIOM = /\b(?:under no circumstances?|in no case|in no way|at no point|by no means|on no account)\b/i
 
 function clauseAfter(text, at) {
   const window = text.slice(at, at + NEGATION_WINDOW)
@@ -222,7 +233,10 @@ export function statesHighUrgency(body) {
       // condition's own "cannot" must not read as a denial of the condition.
       const before = text.slice(Math.max(0, m.index - NEGATION_WINDOW), m.index)
       if (NEGATION_BEFORE.test(before)) continue
+      const after = text.slice(m.index + m[0].length, m.index + m[0].length + NEGATION_WINDOW)
       if (NEGATION_CUE.test(clauseAfter(text, m.index + m[0].length))) continue
+      // …and the idioms, which a boundary would otherwise cut the denial out of.
+      if (NEGATIVE_IDIOM.test(before) || NEGATIVE_IDIOM.test(after)) continue
       return true
     }
     return false

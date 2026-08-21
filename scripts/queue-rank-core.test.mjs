@@ -573,8 +573,12 @@ describe('URGENCY is read off what the point STATES', () => {
     expect(statesHighUrgency('It does not block a development lane, it blocks the release.')).toBe(true)
     // A connector is not filler: the denial ends at it, and what follows asserts.
     expect(statesHighUrgency('It does not fail but blocks the release.')).toBe(true)
-    // A prepositional phrase DESCRIBES the block; it does not deny it.
+    expect(statesHighUrgency('It does not fail although it blocks the release.')).toBe(true)
+    // A prepositional phrase DESCRIBES the block; it does not deny it …
     expect(statesHighUrgency('It blocks the release with no fallback.')).toBe(true)
+    // … unless it is one of the idioms that ARE a denial, whole.
+    expect(statesHighUrgency('It blocks the release under no circumstances.')).toBe(false)
+    expect(statesHighUrgency('It stops the batch in no case.')).toBe(false)
     // …while the condition's OWN "cannot" is not read as a denial of itself.
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
     expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
