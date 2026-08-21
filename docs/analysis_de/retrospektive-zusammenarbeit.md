@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 01:07 · Quellen-Fingerprint: `caca7c3a0b1b…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 03:49 · Quellen-Fingerprint: `b385bfbc1c9d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1351,6 +1351,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1407,10 +1408,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 85 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: caca7c3a0b1baa92acae18fce6b748e4c35d81f7e818943c71de53bd1d0de609 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-20T23:07:38.378Z -->
+<!-- RETRO-FINGERPRINT: b385bfbc1c9dcc2a608eb966ebc73a80c89f0e70c4d9560d15abef041a5244ae -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T01:49:46.756Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2345,3 +2346,28 @@ verdrahtet gelesen worden wäre. Die Auflösung war der Name: Das Modul ist kein
 sondern die Grenze des Prüflaufs selbst — und heißt jetzt so. **Zusatzlehre:** Wenn ein Register
 ein Ding falsch einordnet, ist die erste Frage, ob das Ding richtig benannt ist, und erst die
 zweite, ob das Register mehr lernen muss.
+
+### 3.147 Der Wächter urteilte richtig und gab falsch Auskunft — gefragt wird nur die Auskunft
+
+Am frühen 21.08.2026 meldete die Wächter-Vorschau `mechanism-review-guard` als merge-blockierend.
+Die naheliegende Rückfrage — `node scripts/mechanism-review-guard.mjs --status` — antwortete nicht
+mit dem Grund, sondern mit »stands down: another live session owns the batch lock«, und zwar
+gegenüber genau der Sitzung, die den Lock nachweislich hielt: Das Sperrfile nannte ihre Id und
+ihren lebenden Prozess. Gemessen betraf das nicht einen Wächter, sondern fünf; die übrigen
+Status-Leser antworteten normal, die Menge ist also keine pauschale.
+
+Entscheidend ist die Aufteilung: Derselbe Mechanismus hat einen DURCHSETZENDEN Pfad, den der Hook
+aufruft, und einen LESENDEN Pfad, den ein Mensch aufruft. Der durchsetzende Pfad bekommt die
+Sitzungs-Id gereicht und urteilt korrekt — deshalb fällt nichts auf, solange man nur zusieht. Der
+lesende Pfad löst dieselbe Frage selbst auf, greift ins Leere und schließt aus der leeren Id auf
+einen fremden Eigner. Die Wirkung ist tückischer als ein kaputter Wächter: Die Durchsetzung bleibt
+richtig, nur die Begründung ist unerreichbar. Wer nachfragt, warum er blockiert wird, bekommt eine
+Antwort, die zu seiner Lage nicht passt — und die einzige Stelle, an der ein Mensch überhaupt
+nachfragt, ist die falsche.
+
+**Lehre:** Der Lesepfad eines Durchsetzers ist Teil des Durchsetzers, nicht sein Beiwerk. Er muss
+seine Eingaben aus derselben Quelle nehmen wie der Hook-Pfad, und ein Wert, den er ehrlich nicht
+bestimmen kann, wird als *unbekannt* gemeldet, nie als eine fremde Zuständigkeit. Prüffrage:
+*Sagt `--status` derselben Sitzung dasselbe wie der Hook, der sie gerade gebremst hat?* Und weil
+die Aufteilung baulich ist und nicht namentlich, zählt die Prüfung nicht die bekannten Namen auf,
+sondern zählt alle Wächter mit Status-Pfad auf und misst jeden.

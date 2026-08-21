@@ -3594,6 +3594,12 @@ put it is the mistake this line exists to stop.
   session with »stands down: another live session owns the batch lock« in the same breath, so the
   defect sits in the shared status path rather than in either guard. Every `--status` reader has to
   be checked for it, and the fix belongs where the session id is resolved, not in one caller.
+  MEASURED SET (21.08.2026, 03:50, by the session that provably held the lock — `.claude/batch-lock.json`
+  named its id and its live pid): FIVE guards answer `--status` with the foreign-owner stand-down —
+  `bundle-first-guard`, `commission-guard`, `mechanism-review-guard`, `criticality-review-guard`,
+  `branch-hygiene-guard`. The other status readers answer normally, so the set is not "all guards".
+  The test therefore ENUMERATES the guards that expose a `--status` path and asserts none of them
+  stands down for the owning session, rather than listing the five known names.
   WHY IT IS NOT COSMETIC: `--status` is what CLAUDE.md §7.2 and point 614 name as the way to READ
   the bundle coverage. Asked by the very session that owns the batch, it answers with a stand-down
   instead of the count, so the reading a point is verified against cannot be taken at all.
