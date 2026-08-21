@@ -484,6 +484,18 @@
       "why": "Blockiert den Zugausgang jeder Sitzung, die einen HIGH-Punkt landet, und verlangt dabei Arbeit, die schon getan ist — die Release-Punkte selbst muessen gelandet werden, es kann also nicht hinter dem Release warten",
       "origin": "machine",
       "place": "ahead"
+    },
+    "821": {
+      "at": "2026-08-21T17:27:18.047Z",
+      "why": "Guard: eine Sitzung ohne Batch-Lock kann nicht festhalten, was der Nutzer ihr gerade gesagt hat — die Anweisung reist sonst ueber den Traeger in die naechste Sitzung",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "822": {
+      "at": "2026-08-21T17:27:18.120Z",
+      "why": "Es fehlinformiert den Nutzer auf der Tafel, blockiert aber den Batch nicht — hinter 820",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "settled": {
