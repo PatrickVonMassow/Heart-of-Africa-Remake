@@ -77,29 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 790. The handover card names the session id from BEFORE the `/clear`, so the reader looks for a
-  window that no longer exists (measured 20.08.2026, 19:16, while the user asked why his own window
-  had not taken the batch).
-  WHAT WAS MEASURED. The point-boundary card on the board said "Fenster c0ad5041 hat ihn beansprucht
-  … der Launcher reserviert ihn dort". The launcher's own log named the CURRENT id at the same
-  moment: "skip: session ecc312cf-… has CLAIMED the batch (reserved)". Both ids belong to the same
-  pid 2156063 (`.claude/session-process.json`) — `c0ad5041` was that window's session BEFORE the
-  `/clear`, `ecc312cf` after it. The card is therefore fed from an older source (the parallel-session
-  detection, or text dictated earlier in the session) rather than from `.claude/batch-claim.json`,
-  which is what the launcher reads.
-  WHY IT MATTERS: a session id dies with a `/clear` while the WINDOW lives on, and the card is the
-  one place a reader is told where the batch went. Naming a dead id makes a correct reservation look
-  like a lost one — the user asked exactly that question.
-  FINAL STATE: the dictated card takes its claimant from the claim record the launcher reads, and it
-  identifies the window by something that survives a `/clear` (the pid), not by the session id alone.
-  Where both are known it says so in one breath, so a reader can match what the launcher logs.
-  VERIFIABLE: pure test over the card composer — a claim record whose session id differs from the
-  one last seen in the same pid yields a card naming the CURRENT claimant, and the text never names
-  an id that no claim record carries.
-  Criticality: medium — no product defect, and the reservation itself worked; it misinforms the one
-  reader who has to decide whether to wait or take over.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
