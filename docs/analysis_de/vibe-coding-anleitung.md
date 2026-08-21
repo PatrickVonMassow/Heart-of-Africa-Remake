@@ -208,6 +208,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim
   Start, was **lokal fertig, aber nirgends angekommen** ist."
 
+- **Der Statussatz wird angehängt, nicht gemessen.** Dasselbe Kommando stellt den Zustand fest und
+  diktiert danach einen Text, der ihn nicht liest: Es meldet „nichts läuft mehr", während es die
+  laufende Arbeit gerade selbst aufgezählt hat. Wer den Text unter Zeitdruck übernimmt,
+  veröffentlicht die Falschaussage.
+  → *Prompt:* „Ein Satz über den Zustand wird aus dem **gemessenen Zustand abgeleitet**, nie
+  unbedingt angehängt. Prüf jeden diktierten Text mit **beiden** Belegungen — mit laufender Arbeit
+  und ohne."
+
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz: Sie feuert, wird geglaubt, deckt nur einen Teil.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
@@ -426,4 +434,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d41a6762c7b340086de61e052044195bac58697eb969c755cb0609d33894acbe -->
+<!-- GUIDE-FINGERPRINT: 75e8f90762cb9344036d142a27b760a30d1bdfb5f2df3a1199494131a6f7224e -->
