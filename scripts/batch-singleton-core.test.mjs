@@ -1597,6 +1597,14 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
     })
     expect(readSessionProcesses({ path })['writer-session']).toMatchObject({ at: NOW, batchWriterAt: NOW + 1_000 })
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session'].generation).toBe(17)
   })
 
   it('never records an unidentifiable process or a synthetic probe as a writer', () => {

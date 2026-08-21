@@ -912,6 +912,7 @@ if (verdict === 'skip-alive') {
           session: writer.sessionId,
           pid: writer.pid,
           pidStartedAt: writer.recordedStartedAt,
+          generation: writer.generation,
           cause: 'live-writer-veto',
           evidence: {
             blockedFrom: state.writerVetoSince,
@@ -1052,6 +1053,16 @@ if (dispossessed) {
         ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
         : `owner process measured inactive (${assessment.reason}) — taking over; no live batch-writer process measured`,
   )
+  if (assessment.reason !== 'handed-over' && assessment.reason !== 'idle') {
+    journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+      session: lock.sessionId,
+      pid: lock.pid ?? null,
+      pidStartedAt: lock.pidStartedAt ?? null,
+      generation: lock.fence ?? null,
+      cause: assessment.reason,
+      evidence: { detail: assessment.detail ?? null, detectedBy: 'launcher' },
+    })
+  }
   if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a

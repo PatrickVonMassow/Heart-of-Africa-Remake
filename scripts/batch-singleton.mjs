@@ -1421,12 +1421,17 @@ export function noteBatchWriter(sessionId, opts = {}) {
     if (!(typeof processIdentity?.pid === 'number' && processIdentity.pid > 0)) return false
     const processes = readJson(path) ?? {}
     const prior = processes[sessionId] && typeof processes[sessionId] === 'object' ? processes[sessionId] : {}
+    const owner = opts.lock ?? readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    const generation = owner?.sessionId === sessionId && typeof owner.fence === 'number'
+      ? owner.fence
+      : (typeof prior.generation === 'number' ? prior.generation : null)
     processes[sessionId] = {
       ...prior,
       pid: processIdentity.pid,
       startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
       at: typeof prior.at === 'number' ? prior.at : now,
       batchWriterAt: now,
+      ...(generation === null ? {} : { generation }),
     }
     for (const [sid, entry] of Object.entries(processes)) {
       const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)

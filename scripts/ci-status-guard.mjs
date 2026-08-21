@@ -55,7 +55,7 @@ import {
   blockingDeployments,
   candidateDeployments,
 } from './pages-deploy-unblock-core.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, readOwnerLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
@@ -492,6 +492,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   })
 
   if (!readOnly) {
+    const owner = readOwnerLock()
     for (const observation of swept.observations ?? []) {
       const state = observation.classification?.state
       const event = state === 'pending'
@@ -501,9 +502,11 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
         event,
         at: observation.observedAt,
         session: sessionId || null,
-        pid: process.pid,
-        pidStartedAt: Date.now() - Math.round(process.uptime() * 1000),
-        generation: null,
+        pid: owner?.sessionId === sessionId ? owner.pid ?? null : process.pid,
+        pidStartedAt: owner?.sessionId === sessionId
+          ? owner.pidStartedAt ?? null
+          : Date.now() - Math.round(process.uptime() * 1000),
+        generation: owner?.sessionId === sessionId ? owner.fence ?? null : null,
         cause: `github-actions-${state}`,
         evidence: {
           id: `ci:${observation.target?.ref ?? 'unknown'}:${observation.target?.sha ?? 'unknown'}`,

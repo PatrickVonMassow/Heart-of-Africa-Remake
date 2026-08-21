@@ -424,6 +424,7 @@ export function launcherStartDecision({
     const recentWrite = writerAgeMs >= 0 && writerAgeMs <= writerVetoMaxAgeMs
     writers.push({
       sessionId,
+      generation: Number.isSafeInteger(record.generation) && record.generation >= 0 ? record.generation : null,
       pid,
       recordedStartedAt,
       measuredExists: probe?.exists === true,
