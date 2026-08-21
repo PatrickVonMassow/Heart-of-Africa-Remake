@@ -388,6 +388,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
+- **Der Agent stirbt, seine halbfertige Arbeit bleibt liegen — und meldet sich als „läuft noch".**
+  Stirbt die Sitzung, die einen Agenten gestartet hat, stirbt er mit. Die Übergabe reicht seinen
+  Zustand weiter, aber niemand räumt auf, was er unversioniert im Arbeitsbaum liegen ließ — und der
+  Lebendnachweis zeigt oft auf die Hülle um den Agenten statt auf ihn selbst, sagt also
+  fälschlich „lebt". Bitter wird es, weil ein Neustart sich zu Recht weigert, auf unaufgeräumtem
+  Baum anzufangen: Der Rest blockiert genau die Fortsetzung, zu der er gehört.
+  → *Prompt:* „Miss Lebendigkeit am **Prozess, der die Arbeit tut**, nie an seinem Elternteil oder
+  seiner Hülle. Und regle, was mit halbfertiger Arbeit geschieht, wenn niemand den geordneten Weg
+  geht: Sichere sie als eigens gekennzeichneten, ungeprüften Zwischenstand, statt sie liegen zu
+  lassen." *(Sperren sich zwei Regeln gegenseitig, braucht die Kreuzung einen eigenen Weg.)*
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -426,4 +437,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7ec4b382b2aacda286d9c92fcf7b9500c9510d38b3ca5d4bf45a9446404ae5b4 -->
+<!-- GUIDE-FINGERPRINT: 4ee4bac5846a61b664332d2758b8b692b7212abad7f74d1be42d526c2750884c -->
