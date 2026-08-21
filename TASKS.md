@@ -441,6 +441,35 @@ put it is the mistake this line exists to stop.
   a place a step gets forgotten.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 807. Pushed work for an open point can lie on a branch that nothing points at, and the next
+  session rebuilds it from main (measured 21.08.2026, 09:20, while resuming the batch).
+  WHAT WAS MEASURED. Two branches carried work pushed 39 and 49 minutes earlier:
+  `feat/779-three-missing-commands` at ff25c000, whose own commit message records three green
+  gates on that head, and `feat/769-764-timestamp-header-guard` at 28d48437, which carries a
+  recorded cross-vendor review. The session that built them died without a point boundary and
+  without an in-flight declaration, so `node scripts/batch-in-flight.mjs --status` answered
+  `no-declaration` and no mechanism named either branch. They were found only because the
+  resuming session listed `git worktree list` by hand while checking for a half-finished merge.
+  WHY IT MATTERS: a session that takes point 779 runs `node scripts/point-brief.mjs 779`, which
+  never looks for an existing `feat/<point>-…` branch, and then branches fresh from `main` — so
+  built, reviewed and green work is silently rebuilt. The park list of `commission-guard` is the
+  only place such a branch becomes visible, and it is filled BY HAND: the resuming session parked
+  both AFTER finding them, which is exactly the step a dead session cannot take. The in-flight
+  adoption path already covers the session that ends properly; this is the case where it ends
+  improperly, which is the case that needs the backstop.
+  FINAL STATE: taking a point states, from git and without being asked, whether a branch or
+  worktree for that point already exists — its tip, how far behind `main` it stands, whether it
+  is parked, and with what reason. The reading is derived from the refs themselves, not from a
+  hand-maintained list, so a branch nobody parked is still named. Continuing it or discarding it
+  then becomes a deliberate choice instead of an omission.
+  VERIFIABLE: Vitest over the pure reading — a ref set containing `feat/779-…` yields that branch
+  for point 779 with its distance from `main`; a parked branch is reported WITH its park reason; a
+  point with no branch yields nothing rather than a false match; and a branch whose name merely
+  contains the digits of another point (`feat/1779-…`, `feat/779x-…`) is not reported for it.
+  Criticality: medium — no product defect, but its failure mode is paying twice for finished work,
+  and it fires precisely when a session died without cleaning up, which is when nobody is watching.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
   (measured 20.08.2026, all three in a single session). They are filed together because they are
   one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
