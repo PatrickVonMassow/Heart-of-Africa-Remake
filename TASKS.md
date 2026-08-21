@@ -90,8 +90,8 @@ put it is the mistake this line exists to stop.
   the same Stop chain.
   TWO SEPARATE QUESTIONS, and the point owes both: WHY the hand-back did not run in that session
   when the same guard runs it here, and WHAT BOUNDS a repair loop — a mechanism whose own follow-up
-  fixes never end has to become visible as a number, the way point 769 makes a review round count
-  visible, rather than being noticed only because the user asked.
+  fixes never end has to become visible as a number, rather than being noticed only because the
+  user asked.
   FINAL STATE: a standing claim is honoured within a bounded number of the owner's turn ends or the
   reason it is not is stated in the owner's own output; and consecutive commits that only repair
   the same mechanism are counted and surfaced once the count leaves the ordinary range.
@@ -127,9 +127,6 @@ put it is the mistake this line exists to stop.
   4. NEEDS AN OWNER OPINION: the hand-back now fires MID-TURN from PostToolUse rather than at a
      clean turn end. The release still gates on in-flight work and a git operation in progress, but
      this is the first place the batch lock is released while the owner is still mid-response.
-  BRIEF DEFECT TO FIX WHEN THIS POINT IS NEXT COMMISSIONED: the text cites "the way point 769 makes
-  a review round count visible", but 769 is the timestamp-guard defect and holds no round counter.
-  That cross-reference is wrong and cost the author a lookup.
   Criticality: high — the batch stood still for two hours with a live owner, and neither the
   handover mechanism nor the board noticed.
   Bundle: Session- & Repo-Hygiene.
