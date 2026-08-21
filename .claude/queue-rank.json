@@ -262,12 +262,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "809": {
-      "at": "2026-08-21T10:15:42.890Z",
-      "why": "Der Nutzer hat am 21.08.2026 ausdrücklich diese Reihenfolge verlangt: der Punkt steht vor der Auslieferung, damit die Tickets vor der Kommunikationsmechanik zügig durchlaufen",
-      "origin": "user",
-      "place": "ahead"
-    },
     "810": {
       "at": "2026-08-21T10:35:17.647Z",
       "why": "Hinten ist richtig: Jeder der sechzehn Verdachtsfälle sitzt in Code, den der vorderste Punkt ohnehin neu schreibt — vorher geprüft hieße zweimal prüfen",
@@ -291,6 +285,12 @@
       "why": "Hebel 2a/2b/2c aus dem zusammengeführten Vier-Augen-Spec von 809, dessen vorab festgelegter Schnitt sie als eigene Punkte vorsieht; sie stehen direkt hinter 809, weil der Nutzer die Queue-Geschwindigkeit selbst zur Spitze erklärt hat und genau diese drei Ursachen sie kosten.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "815": {
+      "at": "2026-08-21T12:12:01.487Z",
+      "why": "Last is right: the classifier's cost only becomes a defect once the journal has accumulated for weeks, and the retention rule it needs is not urgent today — it belongs behind the release point with 810, the other medium finding from the same 809 review.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -348,7 +348,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T10:51:47.135Z",
+    "at": "2026-08-21T12:12:01.493Z",
     "points": [
       174,
       184,
@@ -583,11 +583,12 @@
       805,
       806,
       807,
-      809,
       810,
       811,
       812,
-      813
+      813,
+      814,
+      815
     ]
   }
 }
