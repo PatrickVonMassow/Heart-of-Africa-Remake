@@ -301,16 +301,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Die Reihenfolge, aus der gearbeitet
-  wird, steht woanders — und die Nachfolge-Sitzung kennt deinen Chat nicht.
-  → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
-  fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
-  schneller fertig macht, kommt mit nach vorn."
+- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.** Die
+  nächste Sitzung kennt deinen Chat nicht, der alte Bestand bleibt liegen.
+  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander,
+  schlägt eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit
+  dem **Altbestand** geschieht: nachräumen oder liegen lassen."
 
-- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du gern einen
+- **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
-  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob der Weg trägt. Fehlt
-  wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob er trägt. Fehlt eine
+  Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu.
@@ -426,4 +426,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 253632aae89a254b88029aefb04bdcb5c49a9b511d22621978f8c3c74f0e4fe1 -->
+<!-- GUIDE-FINGERPRINT: 0de000b3f0f8459616471eb6ba925cf1932ab31f5ee370407d133e2146a0daba -->
