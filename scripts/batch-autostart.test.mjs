@@ -77,6 +77,12 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/reapableSpawns\(/)
   })
 
+  it('attributes spawn progress to the recorded child identity', () => {
+    expect(source).toMatch(
+      /spawnProgressed\(\{[\s\S]{0,250}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,180}?lastSpawn:\s*previousSpawn/,
+    )
+  })
+
   it('wires process liveness into both persisted start records', () => {
     expect(source).toMatch(
       /successorStartDecision\(\{[\s\S]{0,500}?batchWriters[\s\S]{0,200}?previousBatchWriters[\s\S]{0,200}?fenceState[\s\S]{0,200}?probePid/,

@@ -1445,6 +1445,7 @@ export function noteBatchWriter(sessionId, opts = {}) {
       at: typeof prior.at === 'number' ? prior.at : now,
       batchWriterAt: now,
       generation,
+      spawnToken: typeof owner?.spawnToken === 'string' && owner.spawnToken ? owner.spawnToken : null,
       authorityState: 'active',
     }
     for (const [sid, entry] of Object.entries(processes)) {

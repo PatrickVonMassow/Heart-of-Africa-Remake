@@ -1097,16 +1097,22 @@ describe('announceSpawn — a standing block is not news every quarter of an hou
   })
 })
 
-describe('spawnProgressed — the launcher’s own pending lock is not progress', () => {
+describe('spawnProgressed — progress belongs to the spawned child', () => {
   const SPAWNED = 1_785_200_000_000
+  const spawn = {
+    at: SPAWNED,
+    spawnToken: 'spawn-token',
+    pid: 4242,
+    pidStartedAt: SPAWNED - 1_000,
+  }
 
-  it('a moved head is progress', () => {
-    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(true)
+  it('a moved head without child attribution is not progress', () => {
+    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: 'a'.repeat(40), lastSpawn: spawn })).toBe(false)
   })
 
-  it('a SESSION that claimed the lock after the spawn is progress', () => {
-    const lock = { kind: 'session', claimedAt: SPAWNED + 60_000 }
-    expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(true)
+  it('a converted lock carrying the child token is progress', () => {
+    const lock = { kind: 'session', claimedAt: SPAWNED + 60_000, spawnToken: spawn.spawnToken }
+    expect(spawnProgressed({ lock, lastSpawn: spawn })).toBe(true)
   })
 
   it('THE TRAP: the launcher’s own pending-spawn lock is stamped AFTER the spawn and is not progress', () => {
@@ -1116,20 +1122,59 @@ describe('spawnProgressed — the launcher’s own pending lock is not progress'
     // counting it would read every stillborn spawn as a success and no refusal
     // would ever be classified.
     const lock = { kind: 'pending-spawn', claimedAt: SPAWNED + 12, spawnedPid: 4242 }
-    expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(false)
-    expect(spawnProgressed({ curHead: 'a'.repeat(40), lastHead: 'a'.repeat(40), lock, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock, lastSpawn: spawn })).toBe(false)
+    expect(spawnProgressed({ curHead: 'a'.repeat(40), lastHead: 'a'.repeat(40), lock, lastSpawn: spawn })).toBe(false)
+  })
+
+  it('a converted lock can instead be attributed by qualified PID identity', () => {
+    const lock = {
+      kind: 'session',
+      claimedAt: SPAWNED + 1,
+      pid: spawn.pid,
+      pidStartedAt: spawn.pidStartedAt,
+    }
+    expect(spawnProgressed({ lock, lastSpawn: spawn })).toBe(true)
+    expect(spawnProgressed({ lock: { ...lock, pidStartedAt: spawn.pidStartedAt + 10_000 }, lastSpawn: spawn })).toBe(false)
+  })
+
+  it('an attributed fenced write is progress even after the child released its lock', () => {
+    const writers = {
+      child: {
+        pid: spawn.pid,
+        startedAt: spawn.pidStartedAt,
+        spawnToken: spawn.spawnToken,
+        generation: 19,
+        batchWriterAt: SPAWNED + 5_000,
+        authorityState: 'retired',
+      },
+    }
+    expect(spawnProgressed({ batchWriters: writers, lastSpawn: spawn })).toBe(true)
+  })
+
+  it('an unrelated session claim, fenced write, or commit cannot prove the child', () => {
+    const lock = { kind: 'session', claimedAt: SPAWNED + 1, pid: 9898, pidStartedAt: SPAWNED - 2_000 }
+    const batchWriters = {
+      other: { pid: 9898, startedAt: SPAWNED - 2_000, generation: 20, batchWriterAt: SPAWNED + 2_000 },
+    }
+    expect(spawnProgressed({
+      curHead: 'b'.repeat(40),
+      lastHead: 'a'.repeat(40),
+      lock,
+      batchWriters,
+      lastSpawn: spawn,
+    })).toBe(false)
   })
 
   it('an older claim, no lock, and junk are all "nothing moved"', () => {
-    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: SPAWNED - 1 }, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: SPAWNED - 1 }, lastSpawn: spawn })).toBe(false)
     expect(spawnProgressed({ lastSpawnAt: SPAWNED })).toBe(false)
-    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: 'soon' }, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: 'soon' }, lastSpawn: spawn })).toBe(false)
     expect(spawnProgressed()).toBe(false)
   })
 
   it('an unknown head on either side is not evidence of a move', () => {
-    expect(spawnProgressed({ curHead: '', lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(false)
-    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: '', lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ curHead: '', lastHead: 'a'.repeat(40), lastSpawn: spawn })).toBe(false)
+    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: '', lastSpawn: spawn })).toBe(false)
   })
 })
 

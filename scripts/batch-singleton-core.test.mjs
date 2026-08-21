@@ -1656,6 +1656,7 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
         at: NOW,
         batchWriterAt: NOW,
         generation: null,
+        spawnToken: null,
         authorityState: 'active',
       },
     })

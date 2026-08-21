@@ -849,7 +849,15 @@ const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work 
 // successors would burn a whole night's tokens while looking busy. The decision is
 // pure (`judgePreviousSpawn`); this only gathers the three facts.
 if (state.lastSpawnAt > 0) {
-  const progressed = spawnProgressed({ curHead, lastHead: state.lastHead, lock, lastSpawnAt: state.lastSpawnAt })
+  const previousSpawn = readJson(C('autostart-last.json'))
+  const progressed = spawnProgressed({
+    curHead,
+    lastHead: state.lastHead,
+    lock,
+    batchWriters: readSessionProcesses(),
+    lastSpawn: previousSpawn,
+    lastSpawnAt: state.lastSpawnAt,
+  })
   const proveMin = Number(process.env.HOA_SPAWN_PROVE_MIN)
   const v = judgePreviousSpawn({
     lastSpawnAt: state.lastSpawnAt,

@@ -914,11 +914,51 @@ export const SPAWN_PROVE_MS = 20 * 60 * 1000
  * which is exactly the state `judgePreviousSpawn` is asked about; a usage-limit
  * refusal, which converts nothing, would never be classified at all.
  */
-export function spawnProgressed({ curHead = '', lastHead = '', lock = null, lastSpawnAt = 0 } = {}) {
-  if (curHead && lastHead && curHead !== lastHead) return true
-  if (!lock || !Number.isFinite(lock.claimedAt)) return false
-  if (lock.kind === 'pending-spawn') return false // not converted = not proof of anything
-  return lock.claimedAt > lastSpawnAt
+export function spawnProgressed({
+  curHead = '',
+  lastHead = '',
+  lock = null,
+  batchWriters = {},
+  lastSpawn = null,
+  lastSpawnAt = 0,
+} = {}) {
+  const spawnedAt = Number.isFinite(lastSpawn?.at) ? lastSpawn.at : lastSpawnAt
+  if (!(spawnedAt > 0)) return false
+  const token = typeof lastSpawn?.spawnToken === 'string' && lastSpawn.spawnToken ? lastSpawn.spawnToken : null
+  const sessionId = typeof lastSpawn?.sessionId === 'string' && lastSpawn.sessionId ? lastSpawn.sessionId : null
+  const generation = Number.isSafeInteger(lastSpawn?.generation) ? lastSpawn.generation : null
+  const pid = Number.isInteger(lastSpawn?.pid) && lastSpawn.pid > 0 ? lastSpawn.pid : null
+  const pidStartedAt = Number.isFinite(lastSpawn?.pidStartedAt) ? lastSpawn.pidStartedAt : null
+  const attributed = (record, sid = null) => {
+    if (!record || typeof record !== 'object') return false
+    if (token && record.spawnToken === token) return true
+    if (sessionId && (record.sessionId === sessionId || sid === sessionId)) return true
+    if (generation !== null && record.generation === generation) return true
+    const observedStartedAt = Number.isFinite(record.pidStartedAt)
+      ? record.pidStartedAt
+      : (Number.isFinite(record.startedAt) ? record.startedAt : null)
+    return pid !== null && pidStartedAt !== null && record.pid === pid && observedStartedAt !== null &&
+      Math.abs(observedStartedAt - pidStartedAt) <= 2000
+  }
+  const convertedLock =
+    lock?.kind !== 'pending-spawn' &&
+    Number.isFinite(lock?.claimedAt) &&
+    lock.claimedAt > spawnedAt &&
+    attributed(lock, lock.sessionId)
+  if (convertedLock) return true
+
+  const fencedWrite = Object.entries(batchWriters && typeof batchWriters === 'object' ? batchWriters : {}).some(
+    ([sid, record]) =>
+      Number.isFinite(record?.batchWriterAt) &&
+      record.batchWriterAt > spawnedAt &&
+      attributed(record, sid),
+  )
+  if (fencedWrite) return true
+
+  // A commit is progress only after some current state attributes it to this
+  // child. An unrelated user/session moving HEAD no longer clears a failed
+  // spawn's watchdog.
+  return !!(curHead && lastHead && curHead !== lastHead && attributed(lock, lock?.sessionId))
 }
 
 /**
