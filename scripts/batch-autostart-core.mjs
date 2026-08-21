@@ -372,16 +372,6 @@ export function pruneSpawns({ spawns, probePid } = {}) {
 // --- WHAT THE LAUNCHER MEASURED BEFORE STARTING -------------------------------
 
 /**
- * A process identity is evidence that a main writer still exists; the time of
- * its last fenced main write is evidence that it is still acting as one. After
- * two hours without another tracked-state write, keeping a merely living process
- * authoritative would stop the batch indefinitely for a session that released
- * its lock and then lingered. Eight launcher ticks leave ample time to expose an
- * immediate lock-loss race while putting a hard end on that failure mode.
- */
-export const WRITER_VETO_MAX_AGE_MS = 2 * 60 * 60 * 1000
-
-/**
  * May the launcher start a batch session? PURE.
  *
  * The owner lock is an ownership registration, not a process registry. A batch
@@ -406,9 +396,10 @@ export function launcherStartDecision({
   lock = null,
   assessment = null,
   batchWriters = {},
+  previousBatchWriters = {},
+  fenceState = null,
   probePid = () => null,
   now = Date.now(),
-  writerVetoMaxAgeMs = WRITER_VETO_MAX_AGE_MS,
 } = {}) {
   const writers = []
   for (const [sessionId, record] of Object.entries(batchWriters && typeof batchWriters === 'object' ? batchWriters : {})) {
@@ -420,21 +411,46 @@ export function launcherStartDecision({
     const sameProcess =
       probe?.exists === true &&
       (recordedStartedAt === null || measuredStartedAt === null || Math.abs(recordedStartedAt - measuredStartedAt) <= 2000)
-    const writerAgeMs = now - record.batchWriterAt
-    // Future-dated and old records are observations we cannot place in the
-    // current writer episode. Neither may veto; process life alone is timeless.
-    const recentWrite = writerAgeMs >= 0 && writerAgeMs <= writerVetoMaxAgeMs
+    const generation = Number.isSafeInteger(record.generation) && record.generation >= 0 ? record.generation : null
+    const previous = previousBatchWriters && typeof previousBatchWriters === 'object'
+      ? previousBatchWriters[sessionId]
+      : null
+    const sameRecordedProcess = !!(
+      previous &&
+      previous.pid === record.pid &&
+      (typeof previous.startedAt !== 'number' || recordedStartedAt === null || Math.abs(previous.startedAt - recordedStartedAt) <= 2000)
+    )
+    const advancing = !!(
+      sameRecordedProcess &&
+      previous.generation === record.generation &&
+      typeof previous.batchWriterAt === 'number' &&
+      record.batchWriterAt > previous.batchWriterAt &&
+      record.batchWriterAt <= now
+    )
+    // Missing state is the one-release migration path for records written by the
+    // previous build. New writes always make the state explicit; only an explicit
+    // retirement can remove authority.
+    const authorityState = record.authorityState === 'retired' ? 'retired' : 'active'
+    const currentFence =
+      generation !== null &&
+      Number.isSafeInteger(fenceState?.fence) &&
+      fenceState.fence === generation &&
+      (typeof fenceState?.holder !== 'string' || !fenceState.holder || fenceState.holder === sessionId)
+    const authoritative = authorityState === 'active' && sameProcess && (currentFence || advancing)
     writers.push({
       sessionId,
-      generation: Number.isSafeInteger(record.generation) && record.generation >= 0 ? record.generation : null,
+      generation,
+      authorityState,
       pid,
       recordedStartedAt,
       measuredExists: probe?.exists === true,
       measuredStartedAt,
       sameProcess,
       batchWriterAt: record.batchWriterAt,
-      writerAgeMs,
-      recentWrite,
+      writerAgeMs: now - record.batchWriterAt,
+      currentFence,
+      advancing,
+      authoritative,
     })
   }
   const evidence = {
@@ -452,16 +468,18 @@ export function launcherStartDecision({
   // built to decide, and handover deliberately leaves its process alive. What
   // this independent registry adds is the process the lock DOES NOT name — a
   // lockless writer, or a second writer beside a stale lock.
-  const liveWriter = writers.find(
-    (writer) => writer.sameProcess && writer.recentWrite && (!lock || writer.sessionId !== evidence.lock.sessionId),
+  const vetoes = writers.filter(
+    (writer) => writer.authoritative && (!lock || writer.sessionId !== evidence.lock.sessionId),
   )
-  if (liveWriter) {
+  if (vetoes.length > 0) {
+    const identities = vetoes.map((writer) => `${writer.sessionId} (pid ${writer.pid})`).join(', ')
     return {
       start: false,
       reason:
-        `live batch-writer process ${liveWriter.pid} measured for session ${liveWriter.sessionId}` +
+        `authoritative batch-writer process${vetoes.length === 1 ? '' : 'es'} measured for ${identities}` +
         (lock ? ' independently of the owner lock' : ' with no owner lock present'),
-      veto: liveWriter,
+      veto: vetoes[0],
+      vetoes,
       evidence,
     }
   }
@@ -512,9 +530,10 @@ export function successorStartDecision({
   lock = null,
   assessment = null,
   batchWriters = {},
+  previousBatchWriters = {},
+  fenceState = null,
   probePid = () => null,
   now = Date.now(),
-  writerVetoMaxAgeMs = WRITER_VETO_MAX_AGE_MS,
 } = {}) {
   const kind = trigger && typeof trigger.kind === 'string' ? trigger.kind : ''
   const sourceGeneration = Number.isSafeInteger(trigger?.generation) ? trigger.generation : null
@@ -567,9 +586,23 @@ export function successorStartDecision({
     )
   }
 
-  const ownership = launcherStartDecision({ lock, assessment, batchWriters, probePid, now, writerVetoMaxAgeMs })
+  const ownership = launcherStartDecision({
+    lock,
+    assessment,
+    batchWriters,
+    previousBatchWriters,
+    fenceState,
+    probePid,
+    now,
+  })
   evidence.ownership = ownership.evidence
-  if (!ownership.start) return refuse('owner-live', ownership.reason, { ownership: ownership.evidence, veto: ownership.veto ?? null })
+  if (!ownership.start) {
+    return refuse('owner-live', ownership.reason, {
+      ownership: ownership.evidence,
+      veto: ownership.veto ?? null,
+      vetoes: ownership.vetoes ?? [],
+    })
+  }
 
   return {
     start: true,
