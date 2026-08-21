@@ -104,6 +104,7 @@ describe('observeOwnerLoops', () => {
     const guardCommit = (sha) => ({ sha, paths: ['scripts/example-guard-core.mjs'] })
     let state = {
       repair: {
+        ownerSid: 'owner',
         lastHead: 'old',
         commits: [guardCommit('c4'), guardCommit('c3'), guardCommit('c2'), guardCommit('c1')],
       },
@@ -147,6 +148,29 @@ describe('observeOwnerLoops', () => {
     )
     expect(readCommits).toHaveBeenCalledWith('observer-landing^', 'observer-landing')
     expect(result.state.repair.commits).toHaveLength(1)
+  })
+
+  it('never joins consecutive-looking commits across two owner sessions', () => {
+    const guardCommit = (sha) => ({ sha, paths: ['scripts/example-guard.mjs'] })
+    const result = observeOwnerLoops(
+      {
+        sid: 'new-owner',
+        ownsBatch: true,
+        state: {
+          repair: {
+            ownerSid: 'old-owner',
+            lastHead: 'old-head',
+            commits: ['c1', 'c2', 'c3', 'c4'].map(guardCommit),
+          },
+        },
+      },
+      deps({
+        readHead: () => 'same-head',
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(result.context).toBe('')
+    expect(result.state.repair).toMatchObject({ ownerSid: 'new-owner', commits: [] })
   })
 })
 

@@ -168,23 +168,25 @@ export function observeOwnerLoops(
     // An observer never makes the high-frequency heartbeat fail.
   }
 
-  let nextRepair = state.repair ?? {}
+  const repairState = state.repair?.ownerSid === sid ? state.repair : {}
+  let nextRepair = repairState
   let repairContext = ''
   try {
     const head = readHead()
-    const priorHead = state.repair?.lastHead ?? ''
-    let commits = state.repair?.commits ?? []
+    const priorHead = repairState.lastHead ?? ''
+    let commits = repairState.commits ?? []
     if (!priorHead && callMayCreateCommit({ toolName, command })) {
       commits = readCommits(`${head}^`, head)
     } else if (priorHead && head !== priorHead) {
       const introduced = readCommits(priorHead, head)
       commits = introduced.length ? [...introduced, ...commits].slice(0, 40) : []
     }
-    const detected = detectRepairLoop({ commits, state: state.repair?.reported })
+    const detected = detectRepairLoop({ commits, state: repairState.reported })
     nextRepair = {
+      ownerSid: sid,
       lastHead: head,
       commits,
-      reported: mayAct || !detected.report ? detected.state : state.repair?.reported,
+      reported: mayAct || !detected.report ? detected.state : repairState.reported,
     }
     if (detected.report && mayAct) {
       repairContext =
