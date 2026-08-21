@@ -77,37 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 811. The handover travels by the 900-second scheduler tick, so every point pays scheduler
-  latency even when nothing is broken (measured 21.08.2026 by the blind half of point 809's
-  four-eyes stage; lever 2a of that merged spec, cut as its own point because it is a mechanism of
-  its own).
-  WHAT WAS MEASURED. There is no immediate successor start on a clean boundary and none on a child
-  exit: a session that finishes its point commits its boundary and ends, and nothing runs until the
-  next 900-second tick of the OS scheduler happens to fire. On 21.08.2026 the decomposed incident
-  showed the tick as the only transport there is - the successor started at 09:14:05Z, six minutes
-  after a veto aged out, because a tick came round then and not because the handover reached
-  anyone.
-  FINAL STATE: a successful point boundary hands ownership over and requests its successor before
-  it returns; a supervisor watches the spawned child and runs the same guarded decision the moment
-  it exits, whether normally, by crash or by a Stop-hook termination. Boundary handover, supervised
-  exit and periodic recovery reach ONE pure successor-start decision that returns the precise
-  blocking evidence for every refusal, and handover generation, successor reservation and spawn
-  token move by one atomic compare-and-swap so no two paths can start two owners. The 900-second
-  tick remains the recovery watchdog for a missing supervisor or a failed spawn and is no longer
-  the normal transport; the resume prompt says so rather than promising that the next point waits
-  for the scheduler.
-  VERIFIABLE: a fake clock proves that a clean boundary, a clean child exit, a crash and a terminal
-  CI result each start exactly ONE successor without advancing the 900-second clock; a supervisor
-  restart, a concurrent tick, a duplicate boundary notification and a stale pending-spawn state all
-  recover through the same atomic decision without losing a wake or starting two writers.
-  DEPENDENCY: point 809 lands first — its journal is what makes the removed latency visible, and
-  its report states how much of the wall clock this lever is worth.
-  FILES: scripts/batch-autostart-core.mjs, scripts/batch-autostart.mjs, scripts/batch-boundary.mjs,
-  .claude/autostart-last.json; the resume prompt text.
-  Criticality: high — it is the largest of the three proven causes and it is paid on every single
-  point, not only on a broken one.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 812. A live writer process vetoes the launcher by merely existing, and an idle editor window
   cost an hour of standstill (measured 21.08.2026 by the decomposition behind point 809; lever 2b
   of that merged spec, cut as its own point because it is a mechanism of its own).
