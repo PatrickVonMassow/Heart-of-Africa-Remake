@@ -16,6 +16,8 @@ import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 
 /** The session whose race this fixture replays, and the rows that carry it. */
+const WHO = 'timestamp-race-fixture'
+
 export const RACE_SESSION = 'd5fcb9cf-2936-4743-9502-f504f08b8ac5'
 export const NARRATION_ROW = 711
 export const LAST_TOOL_RESULT_ROW = 948
@@ -55,11 +57,18 @@ export function buildRaceFixture(jsonl) {
   let assistantTextRows = 0
   let sidechainTextRows = 0
   for (let n = NARRATION_ROW + 1; n < TAIL_FROM; n++) {
+    const line = lines[n - 1]
+    if (line === undefined) throw new Error(`${WHO}: transcript ends before row ${n}`)
+    if (line.trim() === '') continue
     let entry
     try {
-      entry = JSON.parse(lines[n - 1])
-    } catch {
-      continue
+      entry = JSON.parse(line)
+    } catch (cause) {
+      // The guard core skips a corrupt line on purpose; this builder must NOT.
+      // Its whole output is the claim that the elided rows were measured, and a
+      // row it could not read is a row it did not measure — reporting zero from
+      // a failed parse is exactly the silent lie the count exists to rule out.
+      throw new Error(`${WHO}: transcript row ${n} is not valid JSON`, { cause })
     }
     const content = entry.message && entry.message.content
     if (entry.type !== 'assistant' || !Array.isArray(content)) continue
@@ -116,9 +125,9 @@ if (process.argv[1] && process.argv[1].endsWith('timestamp-race-fixture.mjs')) {
   const flag = process.argv.indexOf('--transcript')
   const path = flag === -1 ? raceTranscriptPath() : process.argv[flag + 1]
   if (!existsSync(path)) {
-    console.error(`timestamp-race-fixture: transcript not found: ${path}`)
+    console.error(`${WHO}: transcript not found: ${path}`)
     process.exit(1)
   }
   writeFileSync(FIXTURE_PATH, `${JSON.stringify(buildRaceFixture(readFileSync(path, 'utf8')), null, 2)}\n`)
-  console.log(`timestamp-race-fixture: rebuilt ${FIXTURE_PATH} from ${path}`)
+  console.log(`${WHO}: rebuilt ${FIXTURE_PATH} from ${path}`)
 }

@@ -5,7 +5,7 @@
 // stamp blocks, unreadable transcript blocks (bounded by the loop escape).
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
@@ -26,6 +26,13 @@ import { buildRaceFixture, raceTranscriptPath } from './timestamp-race-fixture.m
 // jsdom environment, so the guard path is resolved from cwd instead.
 const GUARD = join(process.cwd(), 'scripts', 'timestamp-guard.mjs')
 const RACE_FIXTURE = join(process.cwd(), 'scripts', 'fixtures', 'timestamp-guard-302ms-race.json')
+// The transcript the race fixture quotes is a private session log and cannot be
+// committed, so the re-derivation case can only run where it lives. The anchor is
+// this project's OWN session directory: where that exists, the transcript is
+// REQUIRED and its absence is a failure — a `return` there would green the case
+// without measuring anything. Everywhere else the case is genuinely skipped.
+const RACE_SOURCE = raceTranscriptPath()
+const ON_BATCH_MACHINE = existsSync(join(homedir(), '.claude', 'projects', '-workspace-hoa'))
 
 /** One transcript JSONL line in the real Claude Code shape (assistant
  *  messages stream one entry per content block, sharing message.id). */
@@ -260,17 +267,14 @@ describe('end-to-end guard process', () => {
     expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
   })
 
-  // The fixture asserting its own provenance proves nothing, so the derivation
-  // is repeated here against the source. The transcript is a private session log
-  // that cannot be committed, so this measures on the batch machine and skips
-  // elsewhere — the same split the document-cut accounting uses for the files it
-  // reads out of the user's home.
-  it('re-derives the whole fixture from the real transcript, where that transcript exists', () => {
-    const source = raceTranscriptPath()
-    if (!existsSync(source)) return // off the batch machine: nothing to measure against
+  // The fixture asserting its own provenance proves nothing, so the derivation is
+  // repeated here against the source — the same split the document-cut accounting
+  // uses for the files it reads out of the user's home.
+  it.skipIf(!ON_BATCH_MACHINE)('re-derives the whole fixture from the real transcript', () => {
+    expect(existsSync(RACE_SOURCE), `race transcript missing: ${RACE_SOURCE}`).toBe(true)
 
     const committed = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
-    const rebuilt = buildRaceFixture(readFileSync(source, 'utf8'))
+    const rebuilt = buildRaceFixture(readFileSync(RACE_SOURCE, 'utf8'))
 
     // Every row, id, flag, timestamp and the elided-row COUNT come back identical
     // — so "no assistant text between 712 and 929" is re-measured, not restated.
