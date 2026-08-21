@@ -17,6 +17,15 @@ describe('command index', () => {
     expect(matches[0].usages.join('\n')).toContain('board.mjs vdzk-remove')
   })
 
+  it('excludes Vitest files from both the index and topic ranking', () => {
+    const entries = readCommandEntries()
+    expect(entries.some((entry) => entry.name.endsWith('.test.mjs'))).toBe(false)
+
+    const matches = findCommands(entries, 'wait for the batch lock')
+    expect(matches[0].name).toBe('batch-claim.mjs')
+    expect(matches.some((entry) => entry.name.endsWith('.test.mjs'))).toBe(false)
+  })
+
   it('changes the generated artefact when a script gains OR loses a usage line', () => {
     const without = harvestCommands([{ name: 'tool.mjs', source: '// TOOL PURPOSE.\nconst x = 1\n' }])
     const withUsage = harvestCommands([{

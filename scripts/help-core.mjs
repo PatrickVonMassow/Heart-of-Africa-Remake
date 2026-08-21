@@ -55,7 +55,7 @@ export function usageLines(source) {
 /** Parsed entries from [{ name, source }], sorted once for stable output. */
 export function harvestCommands(files = []) {
   return files
-    .filter((file) => file?.name?.endsWith('.mjs'))
+    .filter((file) => file?.name?.endsWith('.mjs') && !file.name.endsWith('.test.mjs'))
     .map(({ name, source }) => ({ name, purpose: leadingPurpose(source, name), usages: usageLines(source) }))
     .sort((a, b) => a.name.localeCompare(b.name))
 }
