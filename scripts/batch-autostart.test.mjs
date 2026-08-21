@@ -79,19 +79,22 @@ describe('the launcher uses the pure spawn builders', () => {
 
   it('wires process liveness into both persisted start records', () => {
     expect(source).toMatch(
-      /successorStartDecision\(\{[\s\S]{0,400}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
+      /successorStartDecision\(\{[\s\S]{0,500}?batchWriters[\s\S]{0,200}?previousBatchWriters[\s\S]{0,200}?fenceState[\s\S]{0,200}?probePid/,
     )
     const records = source.match(/launcherStartRecord\(\{/g) ?? []
     expect(records, 'the refusal, pre-spawn and pid-bound records carry measured evidence').toHaveLength(3)
     expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
   })
 
-  it('repeats and escalates an inactive-lock writer veto instead of silently stopping', () => {
-    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)?.[0] ?? ''
+  it('recovers an inactive-lock writer veto after two unchanged decisions', () => {
+    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?if \(!writerRecovered\) \{[\s\S]*?process\.exit\(0\)/)?.[0] ?? ''
     expect(vetoBranch).toMatch(/writer-veto#/)
     expect(vetoBranch).toMatch(/verdictRepeat\(/)
     expect(vetoBranch).toMatch(/writerVetoSince/)
-    expect(vetoBranch).toMatch(/await notify\(/)
+    expect(vetoBranch).toMatch(/revokeWriterFence\(/)
+    expect(vetoBranch).toMatch(/retireBatchWriter\(/)
+    expect(vetoBranch).toMatch(/successorStartDecision\(/)
+    expect(vetoBranch).toMatch(/RECOVERED:/)
     expect(vetoBranch).toMatch(/writer\.sessionId/)
     expect(vetoBranch).toMatch(/writer\.pid/)
     expect(vetoBranch).toMatch(/blockedMinutes/)

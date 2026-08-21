@@ -45,6 +45,9 @@ import {
   verdictRepeat,
   isOwnSpawn,
   readSessionProcesses,
+  retireBatchWriter,
+  revokeWriterFence,
+  readFence,
   PENDING_STALE_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
@@ -81,7 +84,6 @@ import {
   supervisorRestartDecision,
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
-  WRITER_VETO_MAX_AGE_MS,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -988,7 +990,12 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
 // kill-then-take valve — are gone. An owner whose lease ran out is not a third
 // state to be adjudicated; it is simply not the owner, and the takeover below is
 // the one this file has always performed for a dead one.
-const startDecision = successorStartDecision({
+const batchWriters = readSessionProcesses()
+const previousBatchWriters = state.writerObservations && typeof state.writerObservations === 'object'
+  ? state.writerObservations
+  : {}
+const fenceState = readFence()
+let startDecision = successorStartDecision({
   trigger,
   spawnToken,
   paused: batchParked,
@@ -997,12 +1004,19 @@ const startDecision = successorStartDecision({
   claimReserved: false,
   lock,
   assessment,
-  batchWriters: readSessionProcesses(),
+  batchWriters,
+  previousBatchWriters,
+  fenceState,
   probePid,
   now,
 })
-const verdict = startDecision.start ? 'spawn' : 'skip-alive'
+// The next tick compares the same generation/process record with this one. A
+// timestamp that actually advances is work; a historical timestamp merely
+// sitting beside a breathing editor is not.
+state.writerObservations = batchWriters
+let verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
+  let writerRecovered = false
   if (startDecision.code !== 'owner-live') {
     const previous = readJson(C('autostart-last.json')) ?? {}
     writeJsonAtomic(C('autostart-last.json'), {
@@ -1015,13 +1029,19 @@ if (verdict === 'skip-alive') {
   if (!lock || assessment.alive !== true) {
     // A separately recorded writer may outvote an inactive/missing owner lock,
     // but that is a refusal to recover, not a healthy tick. Make repetition
-    // audible just like an expired lease that keeps outvoting takeover. The key
-    // is the writer PROCESS identity (not its changing last-write timestamp), so
-    // consecutive vetoes form one episode; the core separately ages the write
-    // evidence out after WRITER_VETO_MAX_AGE_MS.
-    const writer = startDecision.veto
-    const key = writer
-      ? `writer-veto#${writer.sessionId}#${writer.pid ?? 'nopid'}#${writer.recordedStartedAt ?? 'nostart'}`
+    // audible just like an expired lease that keeps outvoting takeover. Progress
+    // starts a new episode. Two decisions over the SAME fenced-write
+    // observation therefore mean the authority is stalled; a writer which keeps
+    // advancing never reaches recovery.
+    const writers = Array.isArray(startDecision.vetoes) ? startDecision.vetoes : (startDecision.veto ? [startDecision.veto] : [])
+    const key = writers.length > 0
+      ? `writer-veto#${writers.map((writer) => [
+          writer.sessionId,
+          writer.pid ?? 'nopid',
+          writer.recordedStartedAt ?? 'nostart',
+          writer.generation ?? 'nogen',
+          writer.batchWriterAt,
+        ].join('#')).join('|')}`
       : ''
     const rep = verdictRepeat({
       key,
@@ -1032,87 +1052,143 @@ if (verdict === 'skip-alive') {
     state.wedgeVerdictKey = rep.key
     state.wedgeVerdictRepeats = rep.repeats
     log(`skip: ${startDecision.reason}`)
-    if (writer) {
-      const vetoJournalKey = `${writer.sessionId}:${writer.pid ?? ''}:${writer.recordedStartedAt ?? ''}:${writer.batchWriterAt}`
+    if (writers.length > 0) {
+      const vetoJournalKey = writers.map((writer) =>
+        `${writer.sessionId}:${writer.pid ?? ''}:${writer.recordedStartedAt ?? ''}:${writer.generation ?? ''}:${writer.batchWriterAt}`,
+      ).join('|')
       if (state.writerVetoJournalKey !== vetoJournalKey) {
-        journal(ACTIVITY_EVENTS.WRITER_VETO, {
-          session: writer.sessionId,
-          pid: writer.pid,
-          pidStartedAt: writer.recordedStartedAt,
-          generation: writer.generation,
-          cause: 'live-writer-veto',
-          evidence: {
-            blockedFrom: state.writerVetoSince,
-            blockedUntil: writer.batchWriterAt + WRITER_VETO_MAX_AGE_MS,
-            lastFencedOperationAt: writer.batchWriterAt,
-            writerAgeMs: writer.writerAgeMs,
-            ownerLock: startDecision.evidence?.lock ?? null,
-          },
-        })
+        for (const writer of writers) {
+          journal(ACTIVITY_EVENTS.WRITER_VETO, {
+            session: writer.sessionId,
+            pid: writer.pid,
+            pidStartedAt: writer.recordedStartedAt,
+            generation: writer.generation,
+            cause: 'live-writer-veto',
+            evidence: {
+              blockedFrom: state.writerVetoSince,
+              lastFencedOperationAt: writer.batchWriterAt,
+              writerAgeMs: writer.writerAgeMs,
+              currentFence: writer.currentFence,
+              advancing: writer.advancing,
+              ownerLock: startDecision.evidence?.ownership?.lock ?? null,
+            },
+          })
+        }
         state.writerVetoJournalKey = vetoJournalKey
       }
     }
-    if (writer && rep.escalate) {
+    if (writers.length > 0 && rep.escalate) {
       const blockedMinutes = Math.max(0, Math.round((now - state.writerVetoSince) / 60000))
       log(
-        `ESCALATING: session ${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has blocked launcher recovery ` +
+        `ESCALATING: ${writers.length} writer authorit${writers.length === 1 ? 'y has' : 'ies have'} blocked launcher recovery ` +
           `for ${blockedMinutes} min (${rep.repeats} consecutive ticks)`,
       )
-      await notify(
-        'Live writer blocking batch recovery',
-        `${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has vetoed a launcher start for ${blockedMinutes} minutes ` +
-          `across ${rep.repeats} consecutive ticks, although the owner lock is inactive or missing. Its last fenced ` +
-          `main write was ${Math.max(0, Math.round(writer.writerAgeMs / 60000))} minutes ago. Please look.`,
-        'high',
-      )
+      const recoveries = writers.map((writer) => {
+        const handedOverGeneration =
+          lock?.handedOver === true &&
+          lock?.fence === writer.generation &&
+          (lock?.sessionId === writer.sessionId || lock?.sessionIdBefore === writer.sessionId)
+        if (handedOverGeneration) {
+          const retired = retireBatchWriter(writer.sessionId, {
+            generation: writer.generation,
+            now,
+            reason: 'launcher-handover-recovery',
+          })
+          return { writer, action: 'retire-handed-over-generation', recovered: retired }
+        }
+        const revoked = revokeWriterFence(writer.sessionId, writer.generation, {
+          now,
+          reason: 'launcher-stalled-writer-recovery',
+        })
+        return { writer, action: 'revoke-writer-fence', recovered: revoked.revoked, detail: revoked.reason }
+      })
+      const afterWriters = readSessionProcesses()
+      const after = successorStartDecision({
+        trigger,
+        spawnToken,
+        paused: batchParked,
+        openPoints: open,
+        formatAlarm: open === -1,
+        claimReserved: false,
+        lock,
+        assessment,
+        batchWriters: afterWriters,
+        previousBatchWriters: state.writerObservations,
+        fenceState: readFence(),
+        probePid,
+        now,
+      })
+      state.writerObservations = afterWriters
+      if (recoveries.every((item) => item.recovered) && after.start) {
+        log(`RECOVERED: ${recoveries.map((item) => `${item.action} ${item.writer.sessionId}#${item.writer.generation}`).join(', ')}`)
+        startDecision = after
+        verdict = 'spawn'
+        writerRecovered = true
+        delete state.wedgeVerdictKey
+        delete state.wedgeVerdictRepeats
+        delete state.writerVetoSince
+        delete state.writerVetoJournalKey
+      } else {
+        const failed = recoveries.filter((item) => !item.recovered)
+        await notify(
+          'Writer recovery failed',
+          `The launcher executed recovery after ${rep.repeats} blocked ticks, but ${after.reason}. ` +
+            `${failed.map((item) => `${item.writer.sessionId}: ${item.detail ?? 'retirement failed'}`).join('; ') || 'The recovered authority still vetoes.'}`,
+          'urgent',
+        )
+      }
     }
+    if (!writerRecovered) {
+      writeJsonAtomic(C('autostart-state.json'), state)
+      process.exit(0)
+    }
+  }
+  if (!writerRecovered) {
+    const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
+    log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
+    // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
+    // expired lease would be the same blindness in the other direction: the morning
+    // reader must be able to see that the arithmetic said "take it" and what
+    // outvoted it, or the next incident is invisible in this log too.
+    if (assessment.detail) log(`  ${assessment.detail}`)
+    // A SKIP THAT OVERRODE AN EXPIRED LEASE IS NOT A HEALTHY TICK (four-eyes review
+    // of point 556, confirmed finding 1). It must keep ESCALATING, or the one state
+    // where the launcher deliberately declines to act would also be the one state
+    // nobody is ever told about — an owner silent past its lease with something
+    // still moving in the background would skip in silence tick after tick. The
+    // override is time-capped in the core; this is what makes the run-up audible.
+    if (assessment.reason === 'lease-expired-owner-working') {
+      const rep = verdictRepeat({
+        key: `${assessment.reason}#${ownerStateKey(lock)}`,
+        lastKey: state.wedgeVerdictKey,
+        repeats: state.wedgeVerdictRepeats,
+      })
+      state.wedgeVerdictKey = rep.key
+      state.wedgeVerdictRepeats = rep.repeats
+      if (rep.escalate) {
+        log(`ESCALATING: the same owner has outvoted its expired lease for ${rep.repeats} launcher ticks`)
+        await notify(
+          'Batch owner silent past its lease',
+          `${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has been silent past its lease for ${rep.repeats} ticks ` +
+            'running. It is NOT being taken over because its declared work keeps producing output — but if that is a ' +
+            'runaway rather than a long verification, only a person can tell. Please look.',
+          'high',
+        )
+      }
+      writeJsonAtomic(C('autostart-state.json'), state)
+      process.exit(0)
+    }
+    // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
+    // without this a later, identically-worded episode of the same owner would
+    // escalate on its second tick instead of its own count, because the key never
+    // stopped matching. The direction is harmless either way, but "escalates after N
+    // repeats" should mean N repeats of THIS episode.
+    delete state.wedgeVerdictKey
+    delete state.wedgeVerdictRepeats
+    delete state.writerVetoSince
     writeJsonAtomic(C('autostart-state.json'), state)
     process.exit(0)
   }
-  const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
-  log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
-  // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
-  // expired lease would be the same blindness in the other direction: the morning
-  // reader must be able to see that the arithmetic said "take it" and what
-  // outvoted it, or the next incident is invisible in this log too.
-  if (assessment.detail) log(`  ${assessment.detail}`)
-  // A SKIP THAT OVERRODE AN EXPIRED LEASE IS NOT A HEALTHY TICK (four-eyes review
-  // of point 556, confirmed finding 1). It must keep ESCALATING, or the one state
-  // where the launcher deliberately declines to act would also be the one state
-  // nobody is ever told about — an owner silent past its lease with something
-  // still moving in the background would skip in silence tick after tick. The
-  // override is time-capped in the core; this is what makes the run-up audible.
-  if (assessment.reason === 'lease-expired-owner-working') {
-    const rep = verdictRepeat({
-      key: `${assessment.reason}#${ownerStateKey(lock)}`,
-      lastKey: state.wedgeVerdictKey,
-      repeats: state.wedgeVerdictRepeats,
-    })
-    state.wedgeVerdictKey = rep.key
-    state.wedgeVerdictRepeats = rep.repeats
-    if (rep.escalate) {
-      log(`ESCALATING: the same owner has outvoted its expired lease for ${rep.repeats} launcher ticks`)
-      await notify(
-        'Batch owner silent past its lease',
-        `${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has been silent past its lease for ${rep.repeats} ticks ` +
-          'running. It is NOT being taken over because its declared work keeps producing output — but if that is a ' +
-          'runaway rather than a long verification, only a person can tell. Please look.',
-        'high',
-      )
-    }
-    writeJsonAtomic(C('autostart-state.json'), state)
-    process.exit(0)
-  }
-  // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
-  // without this a later, identically-worded episode of the same owner would
-  // escalate on its second tick instead of its own count, because the key never
-  // stopped matching. The direction is harmless either way, but "escalates after N
-  // repeats" should mean N repeats of THIS episode.
-  delete state.wedgeVerdictKey
-  delete state.wedgeVerdictRepeats
-  delete state.writerVetoSince
-  writeJsonAtomic(C('autostart-state.json'), state)
-  process.exit(0)
 }
 delete state.writerVetoSince
 // A LEASE THAT RAN OUT IS REPORTED, ALWAYS (docs/batch-resilience.md §5: no silent
