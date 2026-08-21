@@ -77,27 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 796. "Authored NOTHING" was said over 118 finished lines lying in the tree (measured
-  20.08.2026, 22:00 on point 792).
-  WHAT WAS MEASURED. `scripts/author-sol.mjs` closed its run with `GPT-5.6 Sol authored NOTHING on
-  feat/792-…` and three problem lines — nothing committed, uncommitted changes left behind, no
-  DONE/GATES/OPEN closing. The worktree held 118 finished lines: `fableStateAtCommit()` in
-  `scripts/model-guard-core.mjs` plus 67 lines of tests, exactly the per-commit judgement the point
-  asks for. The work existed; it was merely uncommitted. Only reading the diff saved it, and it was
-  rescued into checkpoint `5bdea763`.
-  WHY IT MATTERS: whoever takes the message at its word clears the worktree and throws away a
-  complete delivery. The wording is demonstrably false the moment the tree is dirty, and it is the
-  one moment the message is read under time pressure.
-  FINAL STATE: a run that leaves uncommitted changes says HOW MUCH lies there and offers the
-  checkpoint, instead of reporting that nothing was authored. "Nothing authored" is reserved for a
-  clean tree with no commits, which is the only state in which it is true.
-  VERIFIABLE: pure tests over the run's closing report — a dirty tree with no commits reports the
-  measured size and names the checkpoint command; a clean tree with no commits still reports nothing
-  authored; and a tree with commits reports them regardless of what else is dirty.
-  Criticality: high — the message invites destroying finished work, and it was one diff read away
-  from doing so.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
   `vendorOf` reads the authoring model out of the `Co-Authored-By` trailer, but a merge commit is
