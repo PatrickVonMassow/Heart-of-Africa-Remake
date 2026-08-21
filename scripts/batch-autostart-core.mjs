@@ -479,12 +479,142 @@ export function launcherStartDecision({
   }
 }
 
+/** Every transport which may ask for a successor. The scheduler is deliberately
+ * only one member: boundaries and supervised process exits use this same door. */
+export const SUCCESSOR_TRIGGERS = Object.freeze({
+  BOUNDARY: 'boundary',
+  CHILD_EXIT: 'child-exit',
+  CRASH: 'crash',
+  CI_TERMINAL: 'ci-terminal',
+  WATCHDOG: 'watchdog',
+})
+
+const SUCCESSOR_TRIGGER_SET = new Set(Object.values(SUCCESSOR_TRIGGERS))
+
+/**
+ * THE ONE SUCCESSOR-START DECISION. PURE.
+ *
+ * Callers gather policy state and process evidence, then every event comes
+ * through here. A refusal is never a boolean without a diagnosis: `code`,
+ * `reason`, and the exact evidence used travel together into the launch record.
+ * The returned reservation is also plain data. The IO half places all of it on
+ * the pending-spawn lock in the same atomic acquisition which wins ownership.
+ */
+export function successorStartDecision({
+  trigger = { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+  spawnToken = '',
+  paused = false,
+  openPoints = 1,
+  formatAlarm = false,
+  claimReserved = false,
+  lock = null,
+  assessment = null,
+  batchWriters = {},
+  probePid = () => null,
+  now = Date.now(),
+  writerVetoMaxAgeMs = WRITER_VETO_MAX_AGE_MS,
+} = {}) {
+  const kind = trigger && typeof trigger.kind === 'string' ? trigger.kind : ''
+  const sourceGeneration = Number.isSafeInteger(trigger?.generation) ? trigger.generation : null
+  const sourceSpawnToken = typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken
+    ? trigger.predecessorToken
+    : null
+  const evidence = {
+    trigger: { kind: kind || null, generation: sourceGeneration, predecessorToken: sourceSpawnToken },
+    policy: { paused: paused === true, openPoints, formatAlarm: formatAlarm === true, claimReserved: claimReserved === true },
+    observed: {
+      lockKind: typeof lock?.kind === 'string' ? lock.kind : null,
+      lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
+      lockGeneration: Number.isSafeInteger(lock?.fence) ? lock.fence : null,
+      lockSpawnToken: typeof lock?.spawnToken === 'string' ? lock.spawnToken : null,
+      handedOver: lock?.handedOver === true,
+    },
+  }
+  const refuse = (code, reason, extra = {}) => ({ start: false, code, reason, evidence: { ...evidence, ...extra } })
+
+  if (!SUCCESSOR_TRIGGER_SET.has(kind)) return refuse('invalid-trigger', `unknown successor trigger "${kind || 'missing'}"`)
+  if (typeof spawnToken !== 'string' || spawnToken.trim() === '') {
+    return refuse('missing-spawn-token', 'the request has no spawn token, so it cannot be reserved atomically')
+  }
+  if (paused === true) return refuse('paused', 'the batch is paused')
+  if (formatAlarm === true || !Number.isInteger(openPoints) || openPoints < 0) {
+    return refuse('work-order-unreadable', 'the open-point count is not trustworthy')
+  }
+  if (openPoints === 0) return refuse('batch-complete', 'the work order has no open successor')
+  if (claimReserved === true) return refuse('claim-reserved', 'an honoured user claim reserves the next ownership')
+
+  if (kind === SUCCESSOR_TRIGGERS.BOUNDARY) {
+    if (sourceGeneration === null) return refuse('missing-generation', 'the boundary notification names no handover generation')
+    if (!lock || lock.handedOver !== true) return refuse('boundary-not-standing', 'the notified boundary is not standing on the owner lock')
+    if (evidence.observed.lockGeneration !== sourceGeneration) {
+      return refuse(
+        'stale-generation',
+        `the boundary observed generation ${sourceGeneration}, but the owner lock is generation ${evidence.observed.lockGeneration ?? 'unknown'}`,
+      )
+    }
+  }
+
+  if (kind === SUCCESSOR_TRIGGERS.CI_TERMINAL && trigger?.terminal !== true) {
+    return refuse('ci-not-terminal', 'the CI notification does not carry a terminal result')
+  }
+
+  if (sourceSpawnToken && evidence.observed.lockSpawnToken && evidence.observed.lockSpawnToken !== sourceSpawnToken) {
+    return refuse(
+      'stale-spawn',
+      `the exit notification belongs to spawn ${sourceSpawnToken}, but the current owner came from ${evidence.observed.lockSpawnToken}`,
+    )
+  }
+
+  const ownership = launcherStartDecision({ lock, assessment, batchWriters, probePid, now, writerVetoMaxAgeMs })
+  evidence.ownership = ownership.evidence
+  if (!ownership.start) return refuse('owner-live', ownership.reason, { ownership: ownership.evidence, veto: ownership.veto ?? null })
+
+  return {
+    start: true,
+    code: 'start',
+    reason: ownership.reason,
+    evidence,
+    reservation: {
+      spawnToken,
+      sourceGeneration,
+      sourceSpawnToken,
+      trigger: kind,
+      requestedAt: now,
+    },
+  }
+}
+
+/** Whether the watchdog must replace a missing supervisor for the live child. PURE. */
+export function supervisorRestartDecision({ lastSpawn = null, lock = null, childProbe = null, supervisorProbe = null } = {}) {
+  const evidence = {
+    childPid: Number.isInteger(lastSpawn?.pid) ? lastSpawn.pid : null,
+    childStartedAt: typeof lastSpawn?.pidStartedAt === 'number' ? lastSpawn.pidStartedAt : null,
+    spawnToken: typeof lastSpawn?.spawnToken === 'string' ? lastSpawn.spawnToken : null,
+    supervisorPid: Number.isInteger(lastSpawn?.supervisorPid) ? lastSpawn.supervisorPid : null,
+    lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
+    lockSpawnToken: typeof lock?.spawnToken === 'string' ? lock.spawnToken : null,
+    childAlive: childProbe?.exists === true,
+    supervisorAlive: supervisorProbe?.exists === true,
+  }
+  if (!evidence.childPid || !evidence.spawnToken) return { restart: false, reason: 'no supervised spawn is recorded', evidence }
+  if (!evidence.childAlive) return { restart: false, reason: 'the recorded child has already exited', evidence }
+  if (!lock || lock.kind === 'pending-spawn' || evidence.lockSpawnToken !== evidence.spawnToken) {
+    return { restart: false, reason: 'the recorded child is not the current session owner', evidence }
+  }
+  if (evidence.supervisorAlive) return { restart: false, reason: 'the child supervisor is alive', evidence }
+  return { restart: true, reason: 'the live owner child has no live supervisor', evidence }
+}
+
 /** The persisted record for a start the decision licensed. PURE. */
-export function launcherStartRecord({ decision, at, head = '', pid } = {}) {
+export function launcherStartRecord({ decision, at, head = '', pid, pidStartedAt, supervisorPid } = {}) {
   return {
     at,
     head,
     ...(typeof pid === 'number' && pid > 0 ? { pid } : {}),
+    ...(typeof pidStartedAt === 'number' ? { pidStartedAt } : {}),
+    ...(typeof supervisorPid === 'number' && supervisorPid > 0 ? { supervisorPid } : {}),
+    ...(typeof decision?.reservation?.spawnToken === 'string' ? { spawnToken: decision.reservation.spawnToken } : {}),
+    ...(decision?.reservation ? { reservation: decision.reservation } : {}),
     startReason: decision?.reason ?? 'start decision unavailable',
     measured: decision?.evidence ?? { lock: null, batchWriters: [] },
   }

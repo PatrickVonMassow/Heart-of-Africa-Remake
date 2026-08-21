@@ -61,6 +61,9 @@ import {
   staleEtaLogLine,
   launcherStartDecision,
   launcherStartRecord,
+  successorStartDecision,
+  supervisorRestartDecision,
+  SUCCESSOR_TRIGGERS,
   WRITER_VETO_MAX_AGE_MS,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
@@ -182,6 +185,127 @@ describe('launcher start liveness — process evidence, not lock presence', () =
     expect(record).toMatchObject({ at: NOW, head: 'abc123', pid: 5150, startReason: decision.reason })
     expect(record.measured).toEqual(decision.evidence)
     expect(record.measured.lock).toMatchObject({ present: true, pid: 3131, assessedAlive: false, assessmentReason: 'pid-dead' })
+  })
+})
+
+describe('the immediate successor decision — one door for every transport', () => {
+  const NOW = 1_800_000_000_000
+  const TOKEN = 'spawn-2'
+  const start = (over = {}) => successorStartDecision({
+    trigger: { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+    spawnToken: TOKEN,
+    openPoints: 4,
+    assessment: { alive: false, reason: 'no-lock' },
+    now: NOW,
+    ...over,
+  })
+
+  it('a clean boundary starts without advancing the 900-second watchdog clock', () => {
+    let clock = NOW
+    const lock = { sessionId: 'old', kind: 'session', fence: 17, handedOver: true }
+    const decision = start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      lock,
+      assessment: { alive: false, reason: 'handed-over' },
+      now: clock,
+    })
+    expect(decision).toMatchObject({ start: true, code: 'start' })
+    expect(decision.reservation).toMatchObject({ spawnToken: TOKEN, sourceGeneration: 17, trigger: 'boundary' })
+    expect(clock).toBe(NOW)
+  })
+
+  it.each([
+    ['clean child exit', { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' }],
+    ['crash', { kind: SUCCESSOR_TRIGGERS.CRASH, predecessorToken: 'spawn-1' }],
+    ['terminal CI result', { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: true }],
+  ])('%s starts immediately from the same decision', (_label, trigger) => {
+    let clock = NOW
+    expect(start({ trigger, lock: null, now: clock })).toMatchObject({ start: true, code: 'start' })
+    expect(clock).toBe(NOW)
+  })
+
+  it('returns precise evidence for every policy refusal', () => {
+    expect(start({ paused: true })).toMatchObject({ start: false, code: 'paused', evidence: { policy: { paused: true } } })
+    expect(start({ openPoints: 0 })).toMatchObject({ start: false, code: 'batch-complete' })
+    expect(start({ formatAlarm: true })).toMatchObject({ start: false, code: 'work-order-unreadable' })
+    expect(start({ claimReserved: true })).toMatchObject({ start: false, code: 'claim-reserved' })
+    const live = start({
+      lock: { sessionId: 'owner', pid: 44 },
+      assessment: { alive: true, reason: 'pid-alive' },
+    })
+    expect(live).toMatchObject({ start: false, code: 'owner-live' })
+    expect(live.evidence.ownership.lock).toMatchObject({ sessionId: 'owner', assessmentReason: 'pid-alive' })
+  })
+
+  it('rejects a duplicate boundary and stale child/CI notifications by generation or spawn token', () => {
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 16 },
+      lock: { sessionId: 'old', fence: 17, handedOver: true },
+    })).toMatchObject({ start: false, code: 'stale-generation' })
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' },
+      lock: { sessionId: 'new', spawnToken: 'spawn-2' },
+    })).toMatchObject({ start: false, code: 'stale-spawn' })
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: false },
+    })).toMatchObject({ start: false, code: 'ci-not-terminal' })
+  })
+
+  it('a concurrent watchdog and duplicate notification reserve exactly one writer', () => {
+    // Both decisions see the same handed-over generation. The IO half then does
+    // an exclusive compare-and-swap; this tiny fake models that single atomic
+    // boundary without advancing the watchdog clock.
+    let lock = { sessionId: 'old', kind: 'session', fence: 17, handedOver: true }
+    let version = 1
+    const observedVersion = version
+    const boundary = start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      spawnToken: 'boundary-token', lock, assessment: { alive: false, reason: 'handed-over' },
+    })
+    const tick = start({ spawnToken: 'tick-token', lock, assessment: { alive: false, reason: 'handed-over' } })
+    const reserve = (decision, expectedVersion) => {
+      if (!decision.start || version !== expectedVersion) return false
+      lock = { kind: 'pending-spawn', spawnToken: decision.reservation.spawnToken }
+      version += 1
+      return true
+    }
+    expect([reserve(boundary, observedVersion), reserve(tick, observedVersion)]).toEqual([true, false])
+    expect(lock.spawnToken).toBe('boundary-token')
+  })
+
+  it('a stale pending-spawn is recoverable through the same decision', () => {
+    const decision = start({
+      lock: { sessionId: 'old-launcher', kind: 'pending-spawn', spawnToken: 'lost-token' },
+      assessment: { alive: false, reason: 'pending-stale' },
+    })
+    expect(decision).toMatchObject({ start: true, code: 'start' })
+    expect(decision.evidence.observed).toMatchObject({ lockKind: 'pending-spawn', lockSpawnToken: 'lost-token' })
+  })
+})
+
+describe('supervisor restart decision', () => {
+  const lastSpawn = { pid: 70, pidStartedAt: 1000, spawnToken: 'spawn-1', supervisorPid: 80 }
+  const lock = { sessionId: 'child', kind: 'session', spawnToken: 'spawn-1' }
+
+  it('restarts a missing supervisor only for the current live owner child', () => {
+    expect(supervisorRestartDecision({
+      lastSpawn,
+      lock,
+      childProbe: { exists: true, startedAt: 1000 },
+      supervisorProbe: { exists: false },
+    })).toMatchObject({ restart: true, reason: 'the live owner child has no live supervisor' })
+  })
+
+  it('does not duplicate a live supervisor or attach to a newer owner', () => {
+    expect(supervisorRestartDecision({
+      lastSpawn, lock, childProbe: { exists: true }, supervisorProbe: { exists: true },
+    }).restart).toBe(false)
+    expect(supervisorRestartDecision({
+      lastSpawn,
+      lock: { ...lock, spawnToken: 'spawn-2' },
+      childProbe: { exists: true },
+      supervisorProbe: { exists: false },
+    }).restart).toBe(false)
   })
 })
 
