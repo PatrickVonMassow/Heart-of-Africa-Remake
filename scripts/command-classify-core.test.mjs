@@ -15,6 +15,7 @@ import {
   commandHead,
   gitSubcommand,
   segmentIntent,
+  directSegmentIntent,
   isMutatingSegment,
   firstMutatingSegment,
   segmentInvokesScript,
@@ -183,6 +184,15 @@ describe('package managers — `ls` reads, `run` writes', () => {
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
   const writes = ['npm run build', 'npm install', 'npm test', 'npm ci', 'npm audit', 'npx vitest run', 'npm config set x y', 'yarn add x', 'pnpm install']
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
+})
+
+describe('direct segment intent', () => {
+  it('leaves carried commands for expandSegments callers to judge at their leaf', () => {
+    expect(segmentIntent('bash -lc "npm run build"')).toBe('write')
+    expect(directSegmentIntent('bash -lc "npm run build"')).toBe('read')
+    expect(directSegmentIntent('npm run build')).toBe('write')
+    expect(directSegmentIntent('bash -lc "npm run build" > report.txt')).toBe('write')
+  })
 })
 
 describe('gh — the action decides', () => {

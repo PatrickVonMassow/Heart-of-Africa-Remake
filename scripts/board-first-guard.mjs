@@ -24,6 +24,7 @@
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
 import { readFileSync, existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import {
   REPO_ROOT,
@@ -41,8 +42,10 @@ import {
   readFence,
   readBoundaryMarker,
   readOwnerLock,
+  ownsLock,
+  noteBatchWriter,
 } from './batch-singleton.mjs'
-import { fenceDecision } from './batch-lease-core.mjs'
+import { fenceDecision, mainWriteFenceDecision } from './batch-lease-core.mjs'
 import {
   handoverSurvivesCall,
   describeWithdrawalTrigger,
@@ -227,6 +230,51 @@ try {
     }
   } catch {
     /* fail-OPEN: a fence we cannot read must never cost anybody a tool call */
+  }
+
+  // A LOCKLESS MAIN WRITER IS NOT COVERED BY STALE-FENCE DETECTION (point 795).
+  // The fence above can stop only a session whose old grant is on record. The
+  // measured concurrent writer had never acquired at all, so `held === null`
+  // correctly meant "not stale" while also leaving the launcher with no process
+  // identity to measure. Main writes now require ownership in their own right.
+  //
+  // Feature worktrees stand down: they commit their own branch by design and
+  // inherit the parent's session id. A paused batch also stood down above. For
+  // the owning main session, record its process separately from the lock before
+  // allowing the call; if the lock later disappears, the launcher still sees the
+  // live writer rather than treating lock absence as death.
+  try {
+    const branch = execFileSync('git', ['symbolic-ref', '--short', 'HEAD'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const sid = payload.session_id || ''
+    const lock = readOwnerLock()
+    const mainWrite = mainWriteFenceDecision({
+      branch,
+      worktree: isWorktreeCheckout(REPO_ROOT),
+      ownsBatchLock: ownsLock(sid, { lock }).mine,
+      toolName: payload.tool_name,
+      command: input0.command,
+    })
+    if (mainWrite.block) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: mainWrite.reason,
+          },
+        }),
+      )
+      process.exit(0)
+    }
+    if (mainWrite.registerWriter) noteBatchWriter(sid)
+  } catch {
+    /* fail-OPEN: an unreadable branch or process identity never traps a call */
   }
 
   if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)

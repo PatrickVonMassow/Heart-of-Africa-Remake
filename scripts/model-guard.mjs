@@ -24,6 +24,7 @@ import {
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { currentFableState } from './fable-switch.mjs'
 
 const BASELINE = repoPath('.claude/model-guard-baseline.json')
 const PAUSE = repoPath('.claude/batch-paused')
@@ -90,6 +91,7 @@ export function gatherModelGuardInputs({ arm = true } = {}) {
     log: recentLog(),
     baselineMs: baselineMs({ arm }),
     backupRefs: backupRefsIn(backupRefListing()),
+    fableState: currentFableState(),
   }
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused', inputs }
   return { applicable: true, inputs }
@@ -101,9 +103,21 @@ if (isMainModule(import.meta.url)) {
     // the log and the baseline here would let the two drift apart with nothing
     // to notice it (the identity test can only see a shared function).
     const gathered = gatherModelGuardInputs()
-    const { log, baselineMs: baseline, backupRefs } = gathered.inputs
-    const hits = findForbiddenCommits(log, baseline)
-    const unidentified = findUnidentifiedCommits(log, baseline)
+    const { log, baselineMs: baseline, backupRefs, fableState } = gathered.inputs
+    if (!fableState.ok && !gathered.applicable) {
+      if (process.argv[2] === '--status') console.log(JSON.stringify({ applicable: false, fableProblem: fableState.problem }, null, 2))
+      process.exit(0)
+    }
+    if (!fableState.ok && gathered.applicable) {
+      if (process.argv[2] === '--status') {
+        console.error(`model-guard: ${fableState.problem}`)
+        process.exit(1)
+      }
+      process.stdout.write(JSON.stringify({ decision: 'block', reason: `SERVING-MODEL TRIPWIRE: ${fableState.problem}` }))
+      process.exit(0)
+    }
+    const hits = findForbiddenCommits(log, baseline, fableState)
+    const unidentified = findUnidentifiedCommits(log, baseline, fableState)
     if (process.argv[2] === '--status') {
       console.log(
         JSON.stringify({ baseline: new Date(baseline).toISOString(), hits, unidentified, backupRefs }, null, 2),
@@ -117,14 +131,14 @@ if (isMainModule(import.meta.url)) {
       process.stdout.write(
         JSON.stringify({
           decision: 'block',
-          reason: formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified }),
+          reason: formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, fableState }),
         }),
       )
     } else if (unidentified.length && gathered.applicable) {
       // The UNNAMED case: blocking, but resolvable in-session from the
       // transcripts — no ntfy, no pause file, no user interruption owed.
       process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatUnidentifiedReason(unidentified, { backupRefs }) }),
+        JSON.stringify({ decision: 'block', reason: formatUnidentifiedReason(unidentified, { backupRefs, fableState }) }),
       )
     }
     process.exit(0)

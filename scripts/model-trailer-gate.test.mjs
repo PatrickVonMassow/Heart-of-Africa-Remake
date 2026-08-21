@@ -8,16 +8,27 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { writeState } from './fable-switch-core.mjs'
 
 const GATE = resolve(process.cwd(), 'scripts/model-trailer-gate.mjs')
 const HOOK = resolve(process.cwd(), 'scripts/git-hooks/commit-msg')
+
+const stateFile = (dir, state = 'on') => {
+  const file = resolve(dir, 'fable-switch.json')
+  writeFileSync(file, JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
+  return file
+}
 
 const judge = (message) => {
   const dir = mkdtempSync(resolve(tmpdir(), 'hoa-model-trailer-'))
   try {
     const file = resolve(dir, 'COMMIT_EDITMSG')
     writeFileSync(file, message, 'utf8')
-    return spawnSync(process.execPath, [GATE, '--message', file], { windowsHide: true, encoding: 'utf8' })
+    return spawnSync(process.execPath, [GATE, '--message', file], {
+      windowsHide: true,
+      encoding: 'utf8',
+      env: { ...process.env, FABLE_SWITCH_FILE: stateFile(dir) },
+    })
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -70,9 +81,14 @@ describe('the commit-msg model-trailer gate', () => {
     const missing = spawnSync(process.execPath, [GATE, '--message', resolve(tmpdir(), 'no-such-msg')], {
       windowsHide: true,
       encoding: 'utf8',
+      env: { ...process.env, FABLE_SWITCH_FILE: stateFile(tmpdir()) },
     })
     expect(missing.status).toBe(0)
-    expect(spawnSync(process.execPath, [GATE], { windowsHide: true, encoding: 'utf8' }).status).toBe(0)
+    expect(spawnSync(process.execPath, [GATE], {
+      windowsHide: true,
+      encoding: 'utf8',
+      env: { ...process.env, FABLE_SWITCH_FILE: stateFile(tmpdir()) },
+    }).status).toBe(0)
   })
 })
 
@@ -88,6 +104,10 @@ describe('a real commit through the commit-msg hook', () => {
     'commit-scope-guard-core.mjs',
     'model-trailer-gate.mjs',
     'model-guard-core.mjs',
+    'fable-switch.mjs',
+    'fable-switch-core.mjs',
+    'atomic-write.mjs',
+    'repo-paths.mjs',
     'is-main.mjs',
   ]
 
@@ -99,11 +119,13 @@ describe('a real commit through the commit-msg hook', () => {
         copyFileSync(resolve(process.cwd(), 'scripts', name), resolve(repo, 'scripts', name))
       }
       copyFileSync(HOOK, resolve(repo, 'scripts/git-hooks/commit-msg'))
+      const fable = stateFile(repo)
       const vcs = (...args) =>
         spawnSync('git', ['-c', 'commit.gpgsign=false', ...args], {
           cwd: repo,
           windowsHide: true,
           encoding: 'utf8',
+          env: { ...process.env, FABLE_SWITCH_FILE: fable },
         })
       vcs('init', '-q')
       vcs('config', 'user.email', 'gate@test.local')

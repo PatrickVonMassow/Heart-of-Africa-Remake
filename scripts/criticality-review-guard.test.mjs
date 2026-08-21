@@ -186,6 +186,11 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     }
   })
 
+  it('binds every fixture git call to the temporary repository', () => {
+    expect(git('rev-parse', '--show-toplevel').stdout.trim()).toBe(resolve(repo))
+    expect(repo.startsWith(tmpdir())).toBe(true)
+  })
+
   it('is clear before anything is ticked, and arms its baseline there', () => {
     expectAllow()
   })

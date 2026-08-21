@@ -84,6 +84,7 @@ scripts/.tile-cache
 .claude/current-focus.json
 .claude/focus-check-pending.json
 .claude/session-process.json
+.claude/session-process.json.tmp-*
 .claude/tool-activity.json
 .claude/wait-prep.json
 .claude/render-verify-state.json
@@ -170,6 +171,8 @@ scripts/.tile-cache
 # reads the setting the user actually flipped.
 .claude/sol-share.json
 .claude/sol-share.json.tmp-*
+.claude/fable-switch.json
+.claude/fable-switch.json.tmp-*
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/

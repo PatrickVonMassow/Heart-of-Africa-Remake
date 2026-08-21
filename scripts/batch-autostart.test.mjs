@@ -76,6 +76,26 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/reapableSpawns\(/)
   })
 
+  it('wires process liveness into both persisted start records', () => {
+    expect(source).toMatch(
+      /launcherStartDecision\(\{[\s\S]{0,300}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
+    )
+    const records = source.match(/launcherStartRecord\(\{/g) ?? []
+    expect(records, 'both the pre-spawn and pid-bound records carry measured evidence').toHaveLength(2)
+    expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
+  })
+
+  it('repeats and escalates an inactive-lock writer veto instead of silently stopping', () => {
+    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)?.[0] ?? ''
+    expect(vetoBranch).toMatch(/writer-veto#/)
+    expect(vetoBranch).toMatch(/verdictRepeat\(/)
+    expect(vetoBranch).toMatch(/writerVetoSince/)
+    expect(vetoBranch).toMatch(/await notify\(/)
+    expect(vetoBranch).toMatch(/writer\.sessionId/)
+    expect(vetoBranch).toMatch(/writer\.pid/)
+    expect(vetoBranch).toMatch(/blockedMinutes/)
+  })
+
   // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
   // `assessOwnerWork` defaults to the launcher's window, but the launcher names it
   // anyway — and this pins that it does, because the window is the one input that

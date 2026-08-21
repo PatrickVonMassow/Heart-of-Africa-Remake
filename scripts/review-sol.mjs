@@ -19,8 +19,8 @@
 // every command the reviewer would run (see formatReviewMaterial).
 //
 // WHEN SOL IS NOT AVAILABLE the command says so in ONE line, names the cause,
-// and hands the review to Fable 5 — and the record it prints then carries
-// Fable's name with an EMPTY verdict, so nothing can be recorded as reviewed
+// and hands the review to the first eligible Claude reviewer — and the record it
+// prints then carries that model's name with an EMPTY verdict, so nothing can be recorded as reviewed
 // that nobody reviewed. The decision logic is pure (review-sol-core.mjs); this
 // half does the process work and fails LOUD. It is a command, not a hook.
 //
@@ -50,6 +50,7 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -60,7 +61,6 @@ import {
   coverageDecision,
   decideReview,
   OUTCOME,
-  FALLBACK_CHAIN,
   formatReviewReport,
   isUnknownModelRefusal,
   modelsInTrailerField,
@@ -95,7 +95,12 @@ import {
   undecodablePaths,
   unquoteGitPath,
 } from './review-material-core.mjs'
-import { mechanismLogCommand, parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import {
+  mechanismLogCommand,
+  parseRangeLog,
+  planAuthorshipGroups,
+  UNREVIEWABLE_NARROWING_REMEDY,
+} from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -359,6 +364,8 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
         authors: group.authors,
         vendor: group.vendor,
         reviewer: group.reviewer,
+        reviewerVendor: group.reviewerVendor,
+        unreviewableReason: group.unreviewableReason,
         authorshipKind: group.kind,
         rangeBase,
         rangeHead,
@@ -397,14 +404,16 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   }
   for (const pass of plan.passes ?? []) {
     lines.push(
-      `  pass ${pass.index}/${pass.total} → ${pass.reviewer || 'NO ELIGIBLE REVIEWER'}; ` +
+      `  pass ${pass.index}/${pass.total} → ${pass.reviewer ? `${pass.reviewerVendor} reviewer ${pass.reviewer}` : 'UNREVIEWABLE'}; ` +
         `${pass.size} characters; commits ${pass.commits.map((commit) => commit.slice(0, 7)).join(', ')}; ` +
         `files ${pass.files.map(quotePassFile).join(', ')}`,
       `    node scripts/review-sol.mjs --sha ${sha} --brief "<what to judge>" --pass ${pass.index}`,
     )
   }
   for (const group of plan.unreviewable ?? []) {
-    lines.push(`  CANNOT ASSIGN: ${group.files.map(quotePassFile).join(', ')} — every candidate authored this group`)
+    lines.push(
+      `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
+    )
   }
   lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
@@ -752,12 +761,15 @@ export const usage = () =>
     'and split into PASSES over the FILE SET — --pass <k> reviews one of them, and the',
     'record it prints covers that pass alone. Splitting by COMMIT does not help: every',
     'commit ships the current content of the files it touches.',
+    'An explicit --since that narrows a fitting range records one scoped 1/1 pass whose',
+    'commit/file contribution lists clear exactly what that round read and nothing earlier.',
     'Recorded scoped passes remain cleared at their exact commit/file contributions; later',
     'plans owe only new contributions. No carry record or carry planning flag is needed.',
     'A commit written to answer a recorded finding is itself a new contribution by design:',
     'the confirming clean pass reviews it too. The convergence cost is accepted, not hidden.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
-    `cannot be reached the review is HANDED OVER to the first model of ${FALLBACK_CHAIN.join(' → ')}`,
+    'cannot be reached the review is HANDED OVER to the first eligible Claude model',
+    'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
     'that authored no part of the reviewed range — the recorded review always names the',
     'model that ACTUALLY ran, and none of them may review its own work.',
   ].join('\n')
@@ -802,6 +814,8 @@ if (isMainModule(import.meta.url)) {
     // exactly where every unavailable Sol lands: with a Claude reviewer that authored
     // none of the range, and with NO verdict, because nobody has reviewed it yet.
     const share = currentSetting()
+    const fableState = currentFableState()
+    if (!fableState.ok) throw new Error(fableState.problem)
     // A fallback nobody is told about is a setting nobody chose (cross-vendor review).
     if (share.problem) console.error(settingProblemLine(share, 'review-sol'))
     // THE COVERAGE QUESTION IS ASKED ON EVERY PATH THAT PRINTS A TEMPLATE
@@ -862,7 +876,10 @@ if (isMainModule(import.meta.url)) {
     const plan = buildAuthorshipPassPlan({ sha: full, base })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
     if (plan.unreviewable.length) {
-      console.error('review-sol: at least one pass has no eligible non-author reviewer; no round can clear it.')
+      console.error(
+        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; ' +
+          `no round can clear it. ${UNREVIEWABLE_NARROWING_REMEDY}`,
+      )
       process.exit(4)
     }
     if (plan.passes.length > MAX_PASS_TOTAL) {
@@ -881,7 +898,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
     const selected = plan.fits ? plan.passes[0] : selection.pass
-    const pass = plan.fits ? null : selected
+    // A FITTING BUT NARROWED RANGE IS ONE SCOPED PASS. Its commit/file lists
+    // are the exact boundary the old pass-less record could not express: the
+    // gate credits those contributions and no ancestor the round did not read.
+    // A full branch-range review stays pass-less for ledger compatibility.
+    const pass = plan.fits ? (partialFor(base) ? selected : null) : selected
     const rangeAuthors = selected
       ? selected.authors
       : [...new Set(plan.passes.flatMap((candidate) => candidate.authors ?? []))]
@@ -891,6 +912,7 @@ if (isMainModule(import.meta.url)) {
         outcome: { ok: false, kind: OUTCOME.SWITCHED_OFF, cause: causeTextFor(OUTCOME.SWITCHED_OFF) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
+        fableState,
       })
       // THE FIT IS MEASURED ON THIS PATH TOO (cross-vendor review, second
       // round). No round is spent here, but the record command printed for the
@@ -926,6 +948,7 @@ if (isMainModule(import.meta.url)) {
         outcome: { ok: false, kind: OUTCOME.SELF_REVIEW, cause: causeTextFor(OUTCOME.SELF_REVIEW) },
         parsed: { ok: false },
         authorModel: rangeAuthors,
+        fableState,
       })
       // Same measurement, same reason: the role swap hands the WHOLE range on,
       // and a range no single round can hold must be handed on as its passes.
@@ -964,12 +987,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(2)
     }
 
-    // What a record at this sha would CLEAR: everything back to where the branch
-    // left `main`. A narrower review is allowed, but it may not be recorded.
-    // FAILING TO ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a
-    // sha with no merge base against `main` used to leave this empty, which
-    // switched the check OFF and printed a record for a range nobody bounded.
-    // The decision itself is pure and tested (coverageDecision).
+    // A narrowed one-round review records its explicit contribution scope above;
+    // a pass-less record still requires whole-branch coverage. FAILING TO
+    // ANSWER IS NOT AN ANSWER OF "FULL COVERAGE" (fourth round): a sha with no
+    // merge base against `main` used to leave this empty, which switched the
+    // check off and printed a record for a range nobody bounded.
     const partial = pass ? null : partialFor(base)
     const range = selected.sourceRange
     const assembly = assemblePass(range, selected, plan)
@@ -1002,10 +1024,10 @@ if (isMainModule(import.meta.url)) {
     // `ready` rests on this answer (escalation round): a clean exit with a
     // parseable verdict is not delivery evidence.
     const shortfall = materialShortfall({ assembly, sent: run.sentInput, transportError: run.transportError })
-    // WHO AUTHORED IT decides who may review it if Sol is unavailable: Fable
-    // cannot review its own commit (see fallbackReviewerFor), and the record
+    // WHO AUTHORED IT decides who may review it if Sol is unavailable: no model
+    // can review its own commit (see fallbackReviewerFor), and the record
     // covers the whole range, so every author in it counts.
-    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall })
+    const decision = decideReview({ outcome, parsed, authorModel: rangeAuthors, shortfall, fableState })
     // THE FINDINGS ARE THE POINT, not the verdict word: a `do-not-merge` whose
     // reasons were never printed cannot be acted on, and the evidence line the
     // ledger carries is one sentence by design. So the reviewer's whole answer

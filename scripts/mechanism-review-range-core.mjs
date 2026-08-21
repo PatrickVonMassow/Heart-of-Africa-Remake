@@ -7,6 +7,12 @@
 import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
+export const UNREVIEWABLE_NARROWING_REMEDY =
+  'Narrow with --since <the last reviewed sha> to a reviewable subset; when it fits, review-sol records that subset as a bounded 1/1 pass.'
+export const NO_ELIGIBLE_REVIEWER_REASON =
+  `every configured reviewer vendor authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
+export const UNKNOWN_AUTHOR_REVIEWER_REASON =
+  `authorship vendor is unknown, so no reviewer can prove cross-vendor independence. ${UNREVIEWABLE_NARROWING_REMEDY}`
 
 const uniq = (xs) => [
   ...new Set((xs ?? []).filter((value) => value !== null && value !== undefined && String(value)).map(String)),
@@ -31,7 +37,10 @@ const RANGE_FIELD = String.fromCharCode(0x1f)
 // refusal could not bite. Machine-shaped fields cannot contain the separator;
 // the free-text facts travel per commit through their own single-format git
 // calls, where there is no separator to forge.
-const RANGE_HEADER = new RegExp(`^${RANGE_RECORD}([0-9a-f]{40})${RANGE_FIELD}(\\d+)$`)
+const RANGE_HEADER = new RegExp(
+  `^${RANGE_RECORD}([0-9a-f]{40})${RANGE_FIELD}(\\d+)${RANGE_FIELD}` +
+    `((?:[0-9a-f]{40}(?: [0-9a-f]{40})*)?)$`,
+)
 
 // %x1e/%x1f are expanded by GIT, so the arguments stay ASCII and the separators
 // reach the output as raw control bytes no quoted path can carry (round-4
@@ -41,7 +50,7 @@ export const mechanismLogCommand = (base, head) => [
   '-c',
   'core.quotepath=on',
   'log',
-  '--format=%x1e%H%x1f%ct',
+  '--format=%x1e%H%x1f%ct%x1f%P',
   '--name-only',
   '--no-renames',
   '--diff-merges=cc',
@@ -61,7 +70,12 @@ export function parseRangeLog(out, { decodePath = (path) => path } = {}) {
     const header = RANGE_HEADER.exec(line)
     if (header) {
       finish()
-      current = { sha: header[1], at: Number(header[2]) * 1000 || 0, files: [] }
+      current = {
+        sha: header[1],
+        at: Number(header[2]) * 1000 || 0,
+        parentShas: header[3] ? header[3].split(' ') : [],
+        files: [],
+      }
     } else if (current && line) {
       current.files.push(decodePath(line))
     }
@@ -81,6 +95,35 @@ export function commitAuthors(commit = {}) {
   return uniq(Array.isArray(commit.authorModels) ? commit.authorModels : [commit.authorModel])
 }
 
+/**
+ * Resolve the authorship a contribution carries. A merge does not create a
+ * third, unattributed authoring lane: when its own trailer is absent, its
+ * contribution belongs to the trailer-bearing tip(s) Git says it merged (all
+ * non-first parents). This is structural ancestry, not a subject-line guess.
+ *
+ * An ordinary trailerless commit, or a merge whose merged parent is outside the
+ * measured range or is itself unattributable, deliberately stays unknown.
+ */
+const authorshipResolver = (commits = []) => {
+  const bySha = new Map((commits ?? []).map((commit) => [String(commit?.sha ?? ''), commit]))
+  const cache = new Map()
+  const resolving = new Set()
+  const resolve = (commit = {}) => {
+    const sha = String(commit?.sha ?? '')
+    if (cache.has(sha)) return cache.get(sha)
+    const own = commitAuthors(commit)
+    if (own.length || resolving.has(sha)) return own
+    const parents = uniq(commit?.parentShas)
+    if (parents.length < 2) return own
+    resolving.add(sha)
+    const merged = uniq(parents.slice(1).flatMap((parent) => resolve(bySha.get(parent))))
+    resolving.delete(sha)
+    cache.set(sha, merged)
+    return merged
+  }
+  return resolve
+}
+
 export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES) {
   const writtenBy = uniq(authors)
   // No authorship fact means no candidate can prove it is the second pair of
@@ -88,20 +131,41 @@ export function eligibleReviewer(authors = [], candidates = REVIEWER_CANDIDATES)
   // historical commit must become an explicit unreviewable pass, not an
   // assignment made from absence.
   if (!writtenBy.length) return ''
-  const vendors = new Set(writtenBy.map(vendorOf).filter((v) => v !== 'unknown'))
+  if (writtenBy.some((author) => vendorOf(author) === 'unknown')) return ''
+  const vendors = new Set(writtenBy.map(vendorOf))
+  // Cross-VENDOR means the candidate's vendor authored NONE of the group. A
+  // commit co-authored by both vendors has no eligible reviewer in this chain,
+  // even when a different model at one of those vendors did not personally
+  // author it. Calling that model eligible would reduce four eyes to a model-id
+  // distinction exactly where the repository rule requires vendor separation.
   return (
     (candidates ?? []).find((candidate) => {
       if (writtenBy.some((author) => sameModel(candidate, author))) return false
       const candidateVendor = vendorOf(candidate)
-      return vendors.size !== 1 || !vendors.has(candidateVendor)
+      return candidateVendor !== 'unknown' && !vendors.has(candidateVendor)
     }) ?? ''
   )
+}
+
+const reviewerFields = (authors, candidates) => {
+  const reviewer = eligibleReviewer(authors, candidates)
+  const writtenBy = uniq(authors)
+  const unknownAuthorship = !writtenBy.length || writtenBy.some((author) => vendorOf(author) === 'unknown')
+  const reason = unknownAuthorship
+    ? UNKNOWN_AUTHOR_REVIEWER_REASON
+    : (candidates ?? []).length
+      ? NO_ELIGIBLE_REVIEWER_REASON
+      : `no reviewer is configured for this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
+  return reviewer
+    ? { reviewer, reviewerVendor: vendorOf(reviewer) }
+    : { reviewer: '', reviewerVendor: '', unreviewableReason: reason }
 }
 
 /** Every changed (commit, file) pair, oldest first and byte-exact by path. */
 export function contributionsIn(commits = []) {
   const seen = new Set()
   const out = []
+  const authorsFor = authorshipResolver(commits)
   for (const commit of commits ?? []) {
     const sha = String(commit?.sha ?? '')
     if (!sha) continue
@@ -109,7 +173,7 @@ export function contributionsIn(commits = []) {
       const key = keyFor(sha, file)
       if (seen.has(key)) continue
       seen.add(key)
-      out.push({ sha, file, authors: commitAuthors(commit), commit })
+      out.push({ sha, file, authors: authorsFor(commit), commit })
     }
   }
   return out
@@ -125,6 +189,10 @@ export function contributionsIn(commits = []) {
  */
 export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDIDATES } = {}) {
   const contributions = contributionsIn(commits)
+  const authorsByCommit = new Map()
+  for (const contribution of contributions) {
+    if (!authorsByCommit.has(contribution.sha)) authorsByCommit.set(contribution.sha, contribution.authors)
+  }
   const byFile = new Map()
   for (const contribution of contributions) {
     if (!byFile.has(contribution.file)) byFile.set(contribution.file, [])
@@ -154,7 +222,7 @@ export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDI
       authors,
       files: uniq(changes.map((c) => c.file)),
       commits: uniq(changes.map((c) => c.sha)),
-      reviewer: eligibleReviewer(authors, candidates),
+      ...reviewerFields(authors, candidates),
     })
   }
 
@@ -163,14 +231,14 @@ export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDI
   for (const commit of commits ?? []) {
     const files = uniq(commit?.files).filter((file) => mixedFiles.includes(file))
     if (!files.length) continue
-    const authors = commitAuthors(commit)
+    const authors = authorsByCommit.get(String(commit.sha)) ?? []
     groups.push({
       kind: 'commit',
       vendor: uniq(authors.map(vendorOf)).join('+') || 'unknown',
       authors,
       files,
       commits: [String(commit.sha)],
-      reviewer: eligibleReviewer(authors, candidates),
+      ...reviewerFields(authors, candidates),
     })
   }
 

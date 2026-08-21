@@ -159,7 +159,7 @@ describe('the captured lines charge the way the guard reads them', () => {
     const reds = chargeReds(failedChecks(state.lines.join('\n')), { suite: 'polish', backend: 'webgpu' })
     const pointOf = (needle) => reds.find((r) => r.name.includes(needle))?.point
     expect(reds.length).toBe(3)
-    expect(pointOf('settlement walker (goat)')).toBe(506)
+    expect(pointOf('settlement walker (goat)')).toBe(642)
     // The leak was point 546's until it was fixed; with the point ticked its
     // ledger entry expired, so the same line now charges to nobody.
     expect(pointOf('render-resource-leak')).toBeNull()
@@ -167,11 +167,14 @@ describe('the captured lines charge the way the guard reads them', () => {
   })
 
   it('charges the same output to the OTHER point on the other lane, where the goat red is real', () => {
-    // 506 is the software lane's rate problem and disclaims the hardware lane in
-    // its own words, so a hardware-lane occurrence is charged to nobody and
-    // blocks. Charging it to the point that must classify it was tried and
-    // refused by the cross-vendor review: an open owner would excuse every later
-    // red of the same wording on the lane whose verdicts we trust.
+    // The WebGPU entry disclaims the hardware lane in its own words, so a
+    // hardware-lane occurrence is charged to nobody and blocks. Charging it to
+    // the point that must classify it was tried and refused by the cross-vendor
+    // review: an open owner would excuse every later red of the same wording on
+    // the lane whose verdicts we trust.
+    // THE OWNER MOVED 20.08.2026 from 506 to 642, which inherited its mechanism
+    // when 506 was folded away — a charge to a ticked point expires. Only the
+    // number changed; the lane split this case pins did not.
     const lines = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const reds = chargeReds(failedChecks(lines), { suite: 'polish', backend: 'webgl' })
     expect(reds.map((r) => r.point)).toEqual([null])
@@ -190,12 +193,12 @@ describe('the captured lines charge the way the guard reads them', () => {
   it('charges a red to nothing outside the suite its evidence was taken in (F2)', () => {
     const line = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     expect(chargeReds(failedChecks(line), { suite: 'flow', backend: 'webgpu' }).map((r) => r.point)).toEqual([null])
-    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu' }).map((r) => r.point)).toEqual([506])
+    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu' }).map((r) => r.point)).toEqual([642])
   })
 })
 
 describe('the armed recorder — the REAL wiring, not a stand-in', () => {
-  const openPoints = [506]
+  const openPoints = [642]
 
   it('records a red run with its charged reds, and the run then accounts', async () => {
     const run = await armed('polish')
@@ -203,7 +206,7 @@ describe('the armed recorder — the REAL wiring, not a stand-in', () => {
     const record = run.exit(1)
     expect(record.exit).toBe(1)
     expect(record.crashed).toBe(false)
-    expect(record.reds.map((r) => r.point)).toEqual([506])
+    expect(record.reds.map((r) => r.point)).toEqual([642])
     expect(runVerdict(record, { openPoints }).status).toBe('accounted')
   })
 

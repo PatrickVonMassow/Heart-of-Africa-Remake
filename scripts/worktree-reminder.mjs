@@ -6,12 +6,10 @@
 // and is fail-OPEN: any internal error → no-op, so a hook bug never blocks a
 // spawn. Respects `.claude/batch-paused` like the other guards.
 import { readFileSync, existsSync } from 'node:fs'
-import { resolve, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { worktreeReminder } from './worktree-reminder-core.mjs'
+import { repoPath } from './repo-paths.mjs'
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+const PAUSE = repoPath('.claude', 'batch-paused')
 
 try {
   if (existsSync(PAUSE)) {

@@ -37,22 +37,25 @@
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { execFileSync } from 'node:child_process'
-import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { REPO_ROOT } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
 import {
   formatArgErrors,
   KNOWN_FLAGS,
+  ledgerPathFrom,
   modelFromTrailers,
   modelsFromTrailers,
   MODES,
   parseArgs,
   validatePass,
   validateRecord,
+  resolveMergePolicy,
   VERDICTS,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
+import { currentFableState } from './fable-switch.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
 // import path for its callers.
@@ -61,8 +64,35 @@ export { KNOWN_FLAGS }
 /** An injective identity for an unordered set of Git paths. */
 export const reviewFileSetKey = (files = []) => JSON.stringify([...(files ?? [])].map(String).sort())
 
-/** The tracked ledger of recorded mechanism reviews (JSON Lines). */
-export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
+/** The git toplevel of a working directory, or '' outside a checkout. Its own
+ *  spawn rather than `git()` above: that one is pinned to REPO_ROOT, which is
+ *  the very assumption this lookup exists to replace, and a missing checkout is
+ *  an answer here, not a failure.
+ *
+ *  Only git's TERMINATING LINE BREAK is stripped (cross-vendor review, rounds 1
+ *  and 2): a POSIX directory may end in a space — trimming would then name a
+ *  path that is not the checkout — and it may legitimately end in a CARRIAGE
+ *  RETURN, which is why `\r` is only stripped where it is really part of the
+ *  platform's line ending and cannot occur inside a path. */
+export function gitToplevel(cwd = process.cwd()) {
+  const res = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', windowsHide: true })
+  if (res.status !== 0 || res.error) return ''
+  const out = (res.stdout ?? '').replace(/\n$/, '')
+  return process.platform === 'win32' ? out.replace(/\r$/, '') : out
+}
+
+/** The tracked ledger of the checkout this command RUNS IN, or `null` outside
+ *  any checkout — see ledgerPathFrom for why there is no fallback tree. */
+export function recordsPathFor(cwd = process.cwd()) {
+  return ledgerPathFrom(gitToplevel(cwd))
+}
+
+/** The tracked ledger of recorded mechanism reviews (JSON Lines), or `null`
+ *  when this command runs outside a checkout. Resolved ONCE at load against the
+ *  invocation's working directory: no script here chdirs, and a per-call git
+ *  spawn on every default argument would be paid by every reader of the ledger.
+ *  A caller that needs another checkout passes its own. */
+export const RECORDS_PATH = recordsPathFor()
 
 // AN ARGUMENT VECTOR, NEVER A SHELL LINE (landing-round pass 4): the sha this
 // command interpolated reached a shell before any validation ran, so a value
@@ -73,11 +103,22 @@ const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_R
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */
 export function readRecords(path = RECORDS_PATH) {
+  // No checkout, no ledger — an empty history, not another tree's file.
+  if (!path) return []
   let text = ''
   try {
     text = readFileSync(path, 'utf8')
-  } catch {
-    return []
+  } catch (e) {
+    // ABSENT IS AN EMPTY HISTORY; UNREADABLE IS NOT (cross-vendor review of
+    // point 780, round 3). EACCES, EISDIR and an I/O error all used to answer
+    // "no reviews recorded" — which a writer reads as a clean ledger and a gate
+    // reads as a ledger with nothing in it: two different wrong answers out of
+    // one silent catch. The flag is what keeps the gates from treating it as
+    // the environment error their fail-open catch waves through.
+    if (e && e.code === 'ENOENT') return []
+    const error = new Error(`cannot read the review ledger at ${path}: ${(e && e.message) || e}`)
+    error.ledgerUnreadable = true
+    throw error
   }
   const out = []
   for (const line of text.split(/\r?\n/)) {
@@ -97,6 +138,15 @@ export function readRecords(path = RECORDS_PATH) {
 
 /** Append one record. Callers validate first — this only writes. */
 export function appendRecord(record, path = RECORDS_PATH) {
+  // A WRITE HAS NO FALLBACK TREE (cross-vendor review of point 780): appending
+  // to the module's own checkout from outside any checkout is exactly the
+  // silent cross-tree write this resolution was changed to end.
+  if (!path) {
+    throw new Error(
+      'mechanism-review: no ledger here — this command is running outside a git checkout, ' +
+        'and the record belongs to the checkout it judges. Run it inside one.',
+    )
+  }
   mkdirSync(dirname(path), { recursive: true })
   appendFileSync(path, `${JSON.stringify(record)}\n`)
   return record
@@ -165,6 +215,7 @@ export function buildRecord({
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
+  fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
   // resolve step used to answer `fatal: ambiguous argument '^{commit}'` from
@@ -267,6 +318,13 @@ export function buildRecord({
     source = 'computed'
   }
   const commit = resolve(sha)
+  const merge = resolveMergePolicy({
+    mode,
+    mergedBy,
+    mergeFallback,
+    authors: [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])],
+    fableState,
+  })
   const check = validateRecord({
     sha: commit.sha,
     model,
@@ -280,14 +338,14 @@ export function buildRecord({
     framing,
     authorFraming,
     specExamination,
-    mergedBy,
-    mergeFallback,
+    mergedBy: merge.mergedBy,
+    mergeFallback: merge.mergeFallback,
     accounting: receipt,
     pass,
     passFiles,
     passCommits,
   })
-  const errors = [...check.errors]
+  const errors = [...merge.errors, ...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block
   // the real one while the ledger LOOKED like it held the answer.
@@ -341,8 +399,8 @@ export function buildRecord({
       // — the merge is the one step where a finding can vanish, so the model
       // that wrote neither list does it and the record NAMES that model. Rows
       // written before this flag carry none, and read as unrecorded.
-      ...(String(mergedBy).trim() ? { mergedBy: String(mergedBy).trim() } : {}),
-      ...(String(mergeFallback).trim() ? { mergeFallback: String(mergeFallback).trim() } : {}),
+      ...(merge.mergedBy ? { mergedBy: merge.mergedBy } : {}),
+      ...(merge.mergeFallback ? { mergeFallback: merge.mergeFallback } : {}),
       // The count itself, so the ledger holds the receipt and not only the claim
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.
@@ -631,8 +689,8 @@ export const usage = () =>
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
-  `           --merged-by "<model>" --accounting "<the blind-merge summary line>" \\\n` +
-  `           [--merge-fallback "<which model was unavailable>"]           (blind-parallel)\n` +
+  `           [--merged-by "<switch-selected model>"] --accounting "<the blind-merge summary line>" \\\n` +
+  `           [--merge-fallback "<switch-generated reason>"]                (blind-parallel)\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
   `\n--mode names which half of the four-eyes principle this verdict covers ` +
   `(CLAUDE.md §6):\n` +
@@ -646,19 +704,21 @@ export const usage = () =>
   `       beside the review that followed it. Rounds zero and one have none.\n` +
   `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
   `       sound when the text survived the findings, amended when the work order changed.\n` +
-  `--merged-by names the model that folded the two lists into the union — the one that\n` +
+  `--merged-by names the model that folded the two lists into the union — selected by\n` +
+  `       node scripts/fable-switch.mjs --status, and checked when explicitly supplied — the one that\n` +
   `       wrote NEITHER of them, because a merge can lose a finding silently — and the\n` +
   `       COUNT says none did. Hand over the FILES and it is counted here:\n` +
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
   `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
   `       it prints as --accounting "<summary>".\n` +
-  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE pass of a range whose material no\n` +
-  `       single review round can hold. The passes cut through the FILE SET, and the gate\n` +
+  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded contribution scope, or one\n` +
+  `       pass of a range whose material no single review round can hold. The passes cut\n` +
+  `       through the FILE SET, and the gate\n` +
   `       clears the range only once EVERY pass of the same total is recorded — a pass on\n` +
   `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
-  `       An authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
+  `       A scoped or authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
   `       file is credited only at the commit boundaries this reviewer actually read.\n` +
   `       A commit written to answer a finding is still a NEW contribution by design: the\n` +
   `       confirming clean pass must review and record it. This convergence cost is accepted.\n` +
@@ -750,7 +810,9 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    const built = buildRecord(parsed.values)
+    const fableState = parsed.values.mode === 'blind-parallel' ? currentFableState() : undefined
+    if (fableState && !fableState.ok) throw new Error(fableState.problem)
+    const built = buildRecord({ ...parsed.values, fableState })
     if (!built.ok) {
       console.error('mechanism-review: refusing to record this review.\n')
       for (const e of built.errors) console.error(`  · ${e}`)

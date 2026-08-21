@@ -1,5 +1,5 @@
 // THE SWITCH THAT MOVES WORK BETWEEN THE TWO VENDORS (point 654, widened by 667).
-// rule:model-policy@058e29dc
+// rule:model-policy@4f8dd494
 //
 // WHY IT EXISTS: the user pays two vendors whose allowances run out at different times,
 // and wants the load moved BEFORE one of them is nearly spent. It began as a read-only
@@ -13,7 +13,7 @@
 // scripts/sol-share.mjs. Pinned by sol-share-core.test.mjs.
 
 import { KINDS as ASK_KINDS } from './ask-sol-core.mjs'
-import { mainCheckoutFrom } from './review-sol-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 /**
  * The three settings, ordered from the least Sol to the most. The order IS the
@@ -92,7 +92,8 @@ export const SETTING_FILE_NAME = 'sol-share.json'
  * with its worktree.
  */
 export function settingPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
-  return `${mainCheckoutFrom(gitCommonDir, repoRoot)}${sep}.claude${sep}${SETTING_FILE_NAME}`
+  const owner = mainCheckoutFrom(gitCommonDir, repoRoot) ?? String(repoRoot ?? '')
+  return `${owner}${sep}.claude${sep}${SETTING_FILE_NAME}`
 }
 
 /**

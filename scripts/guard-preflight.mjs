@@ -169,17 +169,18 @@ export const GUARDS = [
     gather: ({ sessionId } = {}) => gatherModelGuardInputs({ sessionId, arm: false }),
     // Both halves of the split (point 397), so the preflight predicts which of
     // the two blocks the session would meet — they have different remedies.
-    decide: ({ log, baselineMs, backupRefs }) => {
-      const forbidden = findForbiddenCommits(log, baselineMs)
-      const unidentified = findUnidentifiedCommits(log, baselineMs)
+    decide: ({ log, baselineMs, backupRefs, fableState }) => {
+      if (!fableState?.ok) return { block: true, reason: `SERVING-MODEL TRIPWIRE: ${fableState?.problem}` }
+      const forbidden = findForbiddenCommits(log, baselineMs, fableState)
+      const unidentified = findUnidentifiedCommits(log, baselineMs, fableState)
       if (forbidden.length) {
         return {
           block: true,
-          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified }),
+          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified, fableState }),
         }
       }
       if (unidentified.length) {
-        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs }) }
+        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs, fableState }) }
       }
       return { block: false }
     },
@@ -201,7 +202,9 @@ export const GUARDS = [
       const verdict = evaluateMechanismReview(inputs)
       return {
         block: verdict.block,
-        reason: verdict.deferred ? verdict.reason : formatMechanismReviewVerdict(verdict),
+        reason: verdict.deferred
+          ? verdict.reason
+          : formatMechanismReviewVerdict(verdict, { authorshipPlan: inputs.authorshipPlan }),
       }
     },
   },

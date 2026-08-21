@@ -111,13 +111,13 @@ node scripts/author-sol.mjs --point 651 --dry-run  # the prompt and the argv, no
 node scripts/author-sol.mjs --point 651 --findings f.md   # the second leg: answer the review
 ```
 
-<!-- rule:model-policy@058e29dc -->
+<!-- rule:model-policy@4f8dd494 -->
 **The cut is a function, not a taste.** CLAUDE.md §6 is the single prose source
 for the authoring and escalation policy. `scripts/author-routing-core.mjs`
-applies it from the point text and recorded review history. A point may override
-the function with `Author lane: sol|fable|opus` **on a line of its own** in its
-spec, and `--rounds <n>` is the deliberate override for history the ledger
-cannot know.
+applies it from the point text and recorded review history. A point may request
+an override with `Author lane: sol|fable|opus` **as a standalone line** in its
+spec; the Fable lane remains subject to `node scripts/fable-switch.mjs --status`.
+`--rounds <n>` is the deliberate override for history the ledger cannot know.
 
 **What the cut actually moved**, measured over the whole open queue on
 18.08.2026, before and after the day's ruling: **203 points → 120 Sol / 0 Fable
@@ -173,7 +173,7 @@ reported as having authored nothing.
 - A point whose verification is the work, unless its spec marks it hard — since
   18.08.2026 a hard or critical point is Sol's whatever else it says. No SETTING
   routes it; the routing function decides, and a point's own `Author lane:` tag
-  or `--anyway` is the deliberate override.
+  or `--anyway` is the deliberate override subject to the model switches.
 - REVIEWING what Sol itself authored — no model reviews its own work, so
   `review-sol.mjs` refuses such a range before it spends a call on it.
 - Driving the browser suites and **judging the picture**.

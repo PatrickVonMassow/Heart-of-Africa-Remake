@@ -34,6 +34,9 @@ import {
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
 } from './review-sol-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test', by: 'test', now: 1 })))
 
 const solSays = (verdict = 'merge', evidence = 'read the diff and the guard test; the fail-open path is covered') =>
   `I checked the change.\n\nVERDICT: ${verdict}\nEVIDENCE: ${evidence}\n`
@@ -343,6 +346,17 @@ describe('decideReview — the recorded model follows the RUN, never the prefere
     expect(fallbackReviewerFor('')).toBe(FALLBACK_MODEL_NAME)
   })
 
+  it('removes Fable from both review directions while the shared switch refuses it', () => {
+    const failed = { outcome: classifyOutcome({ exitCode: 1, stderr: 'not logged in' }), parsed: { ok: false } }
+    expect(decideReview({ ...failed, fableState: FABLE_OFF }).model).toBe('Opus 5')
+    expect(fallbackReviewerFor('', FABLE_OFF)).toBe('Opus 5')
+    expect(claudeReviewerFor(['GPT-5.6 Sol', 'Opus 5'], FABLE_OFF)).toBe('Opus 4.8')
+    expect(decideReview({ ...failed, authorModel: ['Opus 5', 'Opus 4.8'], fableState: FABLE_OFF })).toMatchObject({
+      model: '',
+      chain: ['Opus 5', 'Opus 4.8'],
+    })
+  })
+
   it('looks at EVERY author in the reviewed range, and picks one that wrote none of it', () => {
     // One record clears every commit it contains, so the reviewer must have
     // authored NO part of the range — picking Opus 5 for an Opus+Fable range
@@ -585,6 +599,21 @@ describe('the record the command prints', () => {
     expect(report).toMatch(/NOT cleared until every pass 1\.\.3 is recorded/)
   })
 
+  it('prints a bounded one-round record as scoped contribution coverage', () => {
+    const commit = 'b'.repeat(40)
+    const report = formatReviewReport({
+      decision: decideReview(okRun()),
+      sha: 'a'.repeat(40),
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], commits: [commit] },
+    })
+    expect(report).toContain('--pass 1/1')
+    expect(report).toContain(`--pass-commits "${commit}"`)
+    expect(report).toContain('SCOPED PASS')
+    expect(report).toContain('clears only the listed commit/file contributions')
+    expect(report).not.toContain('range too large')
+  })
+
   it('sends the caller to the LEDGER for the remainder, never to a guessed next number', () => {
     // Round-3 pass 6 kept the warning on every pass; round-4 pass 6 removed
     // the numeric hint entirely — passes run in any order, so "next: k+1"
@@ -789,11 +818,13 @@ describe('the saved login survives what it has to survive', () => {
     expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-1')).toBe(
       '/workspace/hoa/local/codex-auth.json',
     )
+    expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa')).toBe('/workspace/hoa/local/codex-auth.json')
   })
 
   it('falls back to the current checkout when git answers nothing', () => {
     expect(savedAuthPathFrom('', '/repo')).toBe('/repo/local/codex-auth.json')
     expect(savedAuthPathFrom('   \n', '/repo')).toBe('/repo/local/codex-auth.json')
+    expect(savedAuthPathFrom('/srv/hoa.git', '/repo')).toBe('/repo/local/codex-auth.json')
   })
 
   it('handles a windows path and a trailing separator', () => {

@@ -38,10 +38,10 @@ export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
     // LOWERED after the 20.08.2026 three-document cut: 786 lines / 6585 words
-    // became 332 / 2091 by this guard's tokenizer. Guard mechanics, owner operation and why-history now
+    // became 333 / 2095 by this guard's tokenizer after the Fable-switch pointer. Guard mechanics, owner operation and why-history now
     // live at their named destinations; §7.1 keeps one condition per criterion.
-    // Two lines and seven words are the same sentence-sized margin used by the
-    // previous cut. Leaving the former ceiling would invite all 4497 words back.
+    // The line margin remains; the word ceiling is now exact. Leaving the former
+    // ceiling would invite all 4493 words back.
     maxLines: 334,
     maxWords: 2095,
     why: 'loaded at every session start — the most expensive document in the project',
@@ -94,6 +94,29 @@ export const DOC_BUDGETS = [
     maxLines: 70,
     maxWords: 620,
     why: 'the preamble only; the points below it may grow, its framing may not',
+    // A CAP PER POINT, not on the file (point 614). A line limit on the whole
+    // work order would punish appending, which is what the order is for — so the
+    // file below the preamble stays uncapped and every POINT carries a ceiling of
+    // its own. It bites exactly where the cost is: `point-brief.mjs` pays a point's
+    // spec IN FULL at every delegation, so the largest points are paid again at
+    // every hand-off, while the mean point costs a fraction of them.
+    // MEASURED FROM THE RESULT of the 20.08.2026 cut, the same way the CLAUDE.md
+    // ceiling was measured from the size point 555 reached — never chosen
+    // beforehand. A point that genuinely needs more raises this with its reason in
+    // the comment beside it; a longer retelling of what it already says does not.
+    // MEASURED 20.08.2026 from the result of the cut, over all 227 points the work
+    // order then held: 132,088 words in total, mean 582, median 459, p90 1,026,
+    // p95 1,300, and a maximum of 3,458 (the largest of the unbundled audits). The
+    // ceiling is that maximum plus a sentence — the same shape the always-loaded
+    // file's ceiling has, and the same ratchet: it HOLDS THE LINE the cut reached
+    // and comes DOWN whenever a later cut reaches a smaller one. It does not roll
+    // today's umbrella points back; that is a separate decision, and the numbers
+    // above are what it would be taken against — a cap at p95 would name eleven
+    // points, a cap at 2,300 would name four.
+    perPoint: {
+      maxWords: 3480,
+      why: 'point-brief.mjs pays a point spec IN FULL at every delegation',
+    },
   },
   {
     path: 'design.md',
@@ -170,6 +193,70 @@ export const DOC_BUDGETS = [
   },
 ]
 
+/**
+ * The work order's points, each with its word count — the checkbox line plus every
+ * line under it until the next checkbox. PURE.
+ *
+ * TICKED POINTS COUNT TOO while they are still in the file: a point is moved out to
+ * the archive at its tick, so anything still here is either open or waiting to be
+ * moved, and both are read by whoever loads the file.
+ */
+export function workOrderPoints(text) {
+  const lines = String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+  const START = /^- \[[ x~*]\] (\d+)\. /
+  // A CHECKBOX INSIDE A FENCE IS NOT A POINT (cross-vendor review, 20.08.2026).
+  // Points quote the work order's own shape — a specimen line in a fenced block, a
+  // remedy printed as an example. Splitting on those would cut ONE oversized point
+  // into several compliant fragments, which is evasion rather than measurement, and
+  // the ceiling would report green on the very point it exists for.
+  //
+  // THE FENCE IS TRACKED AS COMMONMARK DEFINES IT, not as it usually looks (second
+  // cross-vendor round, which found both shortcuts of the first attempt). An opener
+  // is three or more backticks or tildes indented by AT MOST THREE spaces — the
+  // work order indents its examples, so a column-zero-only rule left the whole
+  // evasion open. A closer is the SAME character, AT LEAST AS LONG as the opener,
+  // and followed by nothing but whitespace: a shorter run or a run with text after
+  // it does not close, or a four-backtick block would end at the first three-backtick
+  // line inside it and everything after would read as work order again.
+  const FENCE_OPEN = /^ {0,3}((`{3,})|(~{3,}))(.*)$/
+  // CommonMark allows only SPACES AND TABS after a closing run — nothing else, and
+  // `trim()` is not that rule (third cross-vendor round): it eats every Unicode
+  // space, so a non-breaking space behind a fence would close the block and the next
+  // checkbox would split the point that quoted it.
+  const CLOSER_TAIL = /^[ \t]*$/
+  const out = []
+  let cur = null
+  let fence = null // { marker, length } while open
+  for (const line of lines) {
+    const f = FENCE_OPEN.exec(line)
+    if (f) {
+      const run = f[2] ?? f[3]
+      const marker = run[0]
+      const info = f[4] ?? ''
+      if (fence === null) {
+        // A backtick opener may not carry a backtick in its info string.
+        if (!(marker === '`' && info.includes('`'))) fence = { marker, length: run.length }
+      } else if (marker === fence.marker && run.length >= fence.length && CLOSER_TAIL.test(info)) {
+        fence = null
+      }
+      if (cur) cur.lines.push(line)
+      continue
+    }
+    const m = fence === null ? START.exec(line) : null
+    if (m) {
+      if (cur) out.push(cur)
+      cur = { number: Number(m[1]), lines: [line] }
+    } else if (cur) cur.lines.push(line)
+  }
+  if (cur) out.push(cur)
+  return out.map((p) => ({
+    number: p.number,
+    words: p.lines.join(' ').split(/\s+/).filter(Boolean).length,
+  }))
+}
+
 /** Lines and words of `text`, optionally only up to `until`. */
 export function measure(text, until = null) {
   const lines = String(text ?? '')
@@ -210,6 +297,46 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         budget: budget.maxWords,
         why: budget.why,
       })
+    }
+    // The per-POINT ceiling. Measured over the whole file, not the `until` slice:
+    // the preamble budget above governs the framing, this one governs the points
+    // below it, and the two never overlap.
+    // AN INVALID CEILING IS A REFUSAL, NOT A PASS (cross-vendor review, 20.08.2026).
+    // `0` is the ONE sentinel that means "measured later, judging nothing yet"; every
+    // other unusable value — a negative, a string, NaN, a typo — used to fail open and
+    // disable the ceiling silently, which is the failure this whole guard exists to
+    // prevent one layer up.
+    // A DECLARED perPoint MUST CARRY A USABLE NUMBER (second cross-vendor round). The
+    // first attempt validated only a value that was THERE, so a misspelled field, an
+    // empty object or an explicit `undefined` still switched the ceiling off in
+    // silence — which is the very failure it was written to stop. Declaring the block
+    // at all is now the commitment; `0` is the one value that means "measured later".
+    // `null` IS A DECLARATION, and an unusable one (third cross-vendor round): the
+    // rule above is that writing the block at all is the commitment, so an explicit
+    // null must refuse exactly like a misspelled field rather than pass as absent.
+    const perPoint = budget.perPoint
+    const declared = perPoint !== undefined
+    const cap = perPoint == null ? undefined : perPoint.maxWords
+    if (declared && !(Number.isInteger(cap) && cap >= 0)) {
+      findings.push({
+        path: budget.path,
+        kind: 'per-point ceiling is not a whole number of words',
+        actual: cap === undefined ? '(no maxWords)' : String(cap),
+        budget: 'a non-negative integer (0 = not measured yet)',
+        why: 'an unusable ceiling must refuse rather than switch the check off',
+      })
+    }
+    if (Number.isInteger(cap) && cap > 0) {
+      for (const point of workOrderPoints(doc.text)) {
+        if (point.words <= cap) continue
+        findings.push({
+          path: budget.path,
+          kind: `point ${point.number} words`,
+          actual: point.words,
+          budget: cap,
+          why: budget.perPoint.why,
+        })
+      }
     }
     if (Number.isFinite(budget.maxEntryWords)) {
       const lines = String(doc.text).replace(/\r\n/g, '\n').split('\n')

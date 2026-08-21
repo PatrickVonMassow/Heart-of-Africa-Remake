@@ -25,7 +25,6 @@ import {
   CALL_DISCIPLINE_DE,
   callDisciplineTopics,
   SPAWN_MODEL,
-  SPAWN_FALLBACK_MODEL,
   BG_WAIT_CEILING_ENV,
   BG_WAIT_CEILING_OVERRIDE_ENV,
   BG_WAIT_CEILING_DEFAULT,
@@ -60,8 +59,131 @@ import {
   CLAUDE_CLI_ENV,
   ETA_OVERDUE_ALERT_MIN,
   staleEtaLogLine,
+  launcherStartDecision,
+  launcherStartRecord,
+  WRITER_VETO_MAX_AGE_MS,
 } from './batch-autostart-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
+const FABLE_ON = fable('on')
+const FABLE_OFF = fable('off')
 import { isOwnSpawn } from './batch-singleton.mjs'
+
+describe('launcher start liveness — process evidence, not lock presence', () => {
+  const NOW = 1_800_000_000_000
+  const writer = { pid: 4242, startedAt: NOW - 60_000, batchWriterAt: NOW - 1_000 }
+
+  it('does not start beside a live batch-writer process when there is no lock', () => {
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { 'window-session': writer },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: false })
+    expect(decision.reason).toContain('live batch-writer process 4242')
+    expect(decision.reason).toContain('no owner lock')
+    expect(decision.evidence.lock).toMatchObject({ present: false, assessmentReason: 'no-lock' })
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ sessionId: 'window-session', sameProcess: true })
+    expect(decision.veto).toMatchObject({ sessionId: 'window-session', pid: 4242, writerAgeMs: 1_000 })
+  })
+
+  it('stops treating a living process as a writer after two hours without a main write', () => {
+    const oldWriter = { ...writer, batchWriterAt: NOW - WRITER_VETO_MAX_AGE_MS - 1 }
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { 'former-owner': oldWriter },
+      probePid: () => ({ exists: true, startedAt: oldWriter.startedAt }),
+      now: NOW,
+    })
+    expect(WRITER_VETO_MAX_AGE_MS).toBe(2 * 60 * 60 * 1000)
+    expect(decision).toMatchObject({ start: true })
+    expect(decision.evidence.batchWriters[0]).toMatchObject({
+      sessionId: 'former-owner',
+      sameProcess: true,
+      recentWrite: false,
+      writerAgeMs: WRITER_VETO_MAX_AGE_MS + 1,
+    })
+  })
+
+  it('does not let a future-dated writer record veto forever', () => {
+    const futureWriter = { ...writer, batchWriterAt: NOW + 60_000 }
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { future: futureWriter },
+      probePid: () => ({ exists: true, startedAt: futureWriter.startedAt }),
+      now: NOW,
+    })
+    expect(decision.start).toBe(true)
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ recentWrite: false, writerAgeMs: -60_000 })
+  })
+
+  it('starts for a stale lock when neither its process nor any batch writer is live', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'stale-owner', pid: 3131 },
+      assessment: { alive: false, reason: 'pid-dead' },
+      batchWriters: { 'stale-owner': { pid: 3131, startedAt: NOW - 60_000, batchWriterAt: NOW - 2_000 } },
+      probePid: () => ({ exists: false, startedAt: null }),
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: true })
+    expect(decision.reason).toContain('no live batch-writer process measured')
+    expect(decision.reason).toContain('pid-dead')
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ measuredExists: false, sameProcess: false })
+  })
+
+  it('does not start when a DIFFERENT live writer survives beside a stale lock', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'stale-owner', pid: 3131 },
+      assessment: { alive: false, reason: 'pid-dead' },
+      batchWriters: { 'window-session': writer },
+      probePid: (pid) =>
+        pid === writer.pid ? { exists: true, startedAt: writer.startedAt } : { exists: false, startedAt: null },
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: false })
+    expect(decision.reason).toContain('independently of the owner lock')
+  })
+
+  it('does not let the lock owner process undo its own explicit handover', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'handing-over', pid: writer.pid, handedOver: true },
+      assessment: { alive: false, reason: 'handed-over' },
+      batchWriters: { 'handing-over': writer },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: true })
+    expect(decision.reason).toContain('handed-over')
+  })
+
+  it('does not mistake a recycled pid for the recorded batch writer', () => {
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { old: writer },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt + 10_000 }),
+      now: NOW,
+    })
+    expect(decision.start).toBe(true)
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ measuredExists: true, sameProcess: false })
+  })
+
+  it('puts the measured lock and process evidence into every start record', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'stale-owner', pid: 3131 },
+      assessment: { alive: false, reason: 'pid-dead' },
+      batchWriters: {},
+      probePid: () => ({ exists: false, startedAt: null }),
+    })
+    const record = launcherStartRecord({ decision, at: NOW, head: 'abc123', pid: 5150 })
+    expect(record).toMatchObject({ at: NOW, head: 'abc123', pid: 5150, startReason: decision.reason })
+    expect(record.measured).toEqual(decision.evidence)
+    expect(record.measured.lock).toMatchObject({ present: true, pid: 3131, assessedAlive: false, assessmentReason: 'pid-dead' })
+  })
+})
 
 describe('buildSpawnOptions — the ten-minute execution is switched off', () => {
   it('THE FIX: the child carries the background-wait ceiling as 0 (wait indefinitely)', () => {
@@ -104,18 +226,18 @@ describe('buildSpawnOptions — the ten-minute execution is switched off', () =>
 
 describe('buildSpawnArgs — print mode, the model chain, and no prompt that can block', () => {
   it('spawns print mode with the resume prompt and the permission flag', () => {
-    const args = buildSpawnArgs()
+    const args = buildSpawnArgs({ fableState: FABLE_ON })
     expect(args[0]).toBe('-p')
     expect(args[1]).toBe(RESUME_PROMPT)
     expect(args).toContain('--dangerously-skip-permissions')
   })
 
-  it('carries the model policy: Opus 5 as the worker, Fable 5 as the first fallback', () => {
-    const args = buildSpawnArgs()
+  it('carries the switch-selected serving fallback behind Opus 5', () => {
+    const args = buildSpawnArgs({ fableState: FABLE_ON })
     expect(args[args.indexOf('--model') + 1]).toBe(SPAWN_MODEL)
-    expect(args[args.indexOf('--fallback-model') + 1]).toBe(SPAWN_FALLBACK_MODEL)
+    expect(args[args.indexOf('--fallback-model') + 1]).toBe('claude-fable-5')
     expect(SPAWN_MODEL).toMatch(/opus-5/)
-    expect(SPAWN_FALLBACK_MODEL).toMatch(/fable-5/)
+    expect(buildSpawnArgs({ fableState: FABLE_OFF })[args.indexOf('--fallback-model') + 1]).toBe('claude-opus-4-8[1m]')
   })
 })
 
@@ -280,7 +402,7 @@ describe('chatPromptSuffix', () => {
     for (const empty of [[], null, undefined, 'nope', 42, [{}, { text: '   ' }]]) {
       expect(chatPromptSuffix(empty)).toBe('')
     }
-    expect(buildSpawnArgs({ prompt: RESUME_PROMPT + chatPromptSuffix([]) })[1]).toBe(RESUME_PROMPT)
+    expect(buildSpawnArgs({ prompt: RESUME_PROMPT + chatPromptSuffix([]), fableState: FABLE_ON })[1]).toBe(RESUME_PROMPT)
   })
 
   it('carries the message text and its time', () => {

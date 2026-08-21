@@ -10,7 +10,8 @@ node scripts/commit-scope-guard.mjs || exit 1
 # 20.08.2026). Asked here, that commit is never made in the first place.
 #
 # Worktrees share one .git/config, so this hook also runs on branches that
-# predate the check. Skip silently there rather than make a checkout
-# uncommittable over a file that branch cannot have.
-[ -f scripts/guard-registration-guard.mjs ] || exit 0
+# predate the check. Ask the INDEX whether the commit has the wrapper: the
+# working tree may have a different deletion or restoration in a partial stage.
+# Skip silently only when the commit being made really predates the check.
+git cat-file -e ':scripts/guard-registration-guard.mjs' 2>/dev/null || exit 0
 exec node scripts/guard-registration-guard.mjs

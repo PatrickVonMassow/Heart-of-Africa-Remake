@@ -11,7 +11,6 @@ import {
   authorRoundHistory,
   authorLaneFor,
   FABLE_ESCALATION_ROUNDS,
-  FABLE_ESCALATION_SUSPENDED,
   formatAuthorRoundHistory,
   formatLaneReport,
   HARD_MARKERS,
@@ -24,8 +23,13 @@ import {
   unsuccessfulReviewRounds,
   VERIFICATION_MARKERS,
 } from './author-routing-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
 
-const lane = (body, extra = {}) => authorLaneFor({ body, ...extra }).lane
+const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test decision', by: 'test', now: 1 })))
+const OFF = fable('off')
+const ON = fable('on')
+const decision = (input = {}) => authorLaneFor({ fableState: OFF, ...input })
+const lane = (body, extra = {}) => decision({ body, ...extra }).lane
 
 describe('authorLaneFor — which lane authors a point', () => {
   it('sends the mechanical and mid-difficulty work to Sol, which is the point', () => {
@@ -33,7 +37,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('The board card says "stand" for a point nobody is working on. Say what it is.')).toBe('sol')
     // No signal at all is the mechanical case, not a reason to hold the work back.
     expect(lane('')).toBe('sol')
-    expect(authorLaneFor()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
+    expect(decision()).toMatchObject({ lane: 'sol', model: 'GPT-5.6 Sol' })
   })
 
   it('sends the hard cases straight to Sol, in CLAUDE.md §6’s own words (user 18.08.2026)', () => {
@@ -48,10 +52,10 @@ describe('authorLaneFor — which lane authors a point', () => {
     ]) {
       expect(lane(body), body).toBe('sol')
     }
-    expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
+    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/hard case \(complex\)/)
     // Neither of the two lanes this used to take: not Fable from the start (its
     // weekly pool is the scarcest, 17.08.) and no longer held back for Opus.
-    expect(authorLaneFor({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Sol/)
+    expect(decision({ body: 'A complex rebuild.' }).why[0]).toMatch(/straight to Sol/)
     // AND IT OUTRANKS THE VERIFICATION LANE (user 18.08.2026, asked explicitly):
     // a hard picture point is authored by Sol too — the main session judges the
     // picture whoever wrote the code, so only the authoring moves.
@@ -105,8 +109,7 @@ describe('authorLaneFor — which lane authors a point', () => {
     }
   })
 
-  it('sends nothing to Fable at the boundary while the escalation is suspended', () => {
-    expect(FABLE_ESCALATION_SUSPENDED).toBe(true)
+  it('sends nothing to Fable at the boundary while the switch refuses it', () => {
     const reworkRounds = FABLE_ESCALATION_ROUNDS
     // Past the threshold the point stays in the lane its other signals demand.
     expect(lane('Something mechanical.', { reworkRounds })).toBe('sol')
@@ -114,32 +117,36 @@ describe('authorLaneFor — which lane authors a point', () => {
     expect(lane('Something mechanical.\nAuthor lane: sol', { reworkRounds })).toBe('sol')
     expect(lane('A picture point.\nAuthor lane: opus', { reworkRounds })).toBe('opus')
     expect(lane('x', { reworkRounds, override: 'sol' })).toBe('sol')
-    // Both deliberate doors into the lane stay open.
-    expect(lane('x\nAuthor lane: fable', { reworkRounds: 0 })).toBe('fable')
-    expect(lane('x', { reworkRounds: 0, override: 'fable' })).toBe('fable')
+    // Neither explicit door bypasses the one shared decision.
+    expect(decision({ body: 'x\nAuthor lane: fable', reworkRounds: 0 })).toMatchObject({ lane: '', refused: true })
+    expect(decision({ body: 'x', reworkRounds: 0, override: 'fable' })).toMatchObject({ lane: '', refused: true })
   })
 
-  it('says at every crossed round that the escalation was suspended, not missed', () => {
+  it('names the switch at every crossed round instead of hiding the boundary', () => {
     for (const reworkRounds of [FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_ROUNDS + 7]) {
-      const why = authorLaneFor({ body: 'x', reworkRounds }).why
+      const why = decision({ body: 'x', reworkRounds }).why
       expect(why[0]).toBe('mechanical or mid-difficulty, and nothing marks it otherwise')
-      expect(why[1]).toBe(
-        `${reworkRounds} unsuccessful review rounds would have reached the §6 escalation threshold of ` +
-          `${FABLE_ESCALATION_ROUNDS}, but the Fable escalation is SUSPENDED (user 20.08.2026)`,
-      )
+      expect(why[1]).toContain('node scripts/fable-switch.mjs --status')
+      expect(why[1]).toContain('test decision')
     }
     // Below the threshold nothing is said about it at all.
-    expect(authorLaneFor({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
+    expect(decision({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS - 1 }).why).toHaveLength(1)
+  })
+
+  it('admits the tag, override, and automatic boundary while the switch allows Fable', () => {
+    expect(authorLaneFor({ body: 'x\nAuthor lane: fable', fableState: ON })).toMatchObject({ lane: 'fable', refused: false })
+    expect(authorLaneFor({ body: 'x', override: 'fable', fableState: ON })).toMatchObject({ lane: 'fable' })
+    expect(authorLaneFor({ body: 'x', reworkRounds: FABLE_ESCALATION_ROUNDS, fableState: ON })).toMatchObject({ lane: 'fable' })
   })
 
   it('lets a point name its own lane, and a caller override even that', () => {
     expect(lane('A complex rebuild.\nAuthor lane: sol')).toBe('sol')
-    expect(lane('Something mechanical.\nAuthor lane: fable')).toBe('fable')
+    expect(authorLaneFor({ body: 'Something mechanical.\nAuthor lane: fable', fableState: ON }).lane).toBe('fable')
     expect(lane('Something mechanical.\nAuthor lane: opus')).toBe('opus')
     expect(lane('A complex rebuild.\nAuthor lane: sol', { override: 'opus' })).toBe('opus')
     // An override that is not a lane is no override at all.
     expect(lane('Something mechanical.', { override: 'haiku' })).toBe('sol')
-    expect(authorLaneFor({ body: 'x', override: 'FABLE' }).lane).toBe('fable')
+    expect(authorLaneFor({ body: 'x', override: 'FABLE', fableState: ON }).lane).toBe('fable')
   })
 
   it('reads a tag only as a LINE of its own, never inside a sentence', () => {
@@ -198,7 +205,7 @@ describe('authorLaneFor — which lane authors a point', () => {
   })
 
   it('reports every signal it saw, not only the deciding one', () => {
-    const d = authorLaneFor({ body: 'A complex screenshot problem.', criticality: 'med' })
+    const d = decision({ body: 'A complex screenshot problem.', criticality: 'med' })
     expect(d.signals).toMatchObject({ criticality: 'med', reworkRounds: 0 })
     expect(d.signals.hard).toEqual(['complex'])
     expect(d.signals.verification).toEqual(['screenshot'])
@@ -210,7 +217,7 @@ describe('authorLaneFor — which lane authors a point', () => {
   it('answers for every lane and cannot be handed something it throws on', () => {
     for (const l of LANES) expect(LANE_MODEL[l]).toBeTruthy()
     for (const body of [null, undefined, 42, {}, []]) {
-      expect(LANES).toContain(authorLaneFor({ body }).lane)
+      expect(LANES).toContain(decision({ body }).lane)
     }
     expect(HARD_MARKERS.length).toBeGreaterThan(0)
     expect(VERIFICATION_MARKERS.length).toBeGreaterThan(0)
@@ -478,7 +485,7 @@ describe('formatLaneReport', () => {
       { number: 3, lane: 'opus', why: ['picture'] },
     ]
     const text = formatLaneReport(rows)
-    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — sol 2 · fable 0 · opus 1')
+    expect(text.split('\n')[0]).toBe('author-routing: 3 open point(s) — sol 2 · fable 0 · opus 1 · blocked 0')
     expect(text).toMatch(/ {4}1 {2}sol {4}mechanical/)
     expect(formatLaneReport()).toContain('0 open point(s)')
   })

@@ -18,7 +18,6 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import {
   assessOwner,
-  spawnDecision,
   classifyParallel,
   isProbeSessionId,
   ownsLock,
@@ -61,6 +60,8 @@ import {
   IN_FLIGHT_PATH,
   SESSIONS_SEEN_PATH,
   SESSION_ACTIVITY_PATH,
+  noteBatchWriter,
+  readSessionProcesses,
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
   ANCESTOR_CACHE_PATH,
@@ -197,7 +198,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('lease-expired')
-    expect(spawnDecision(a)).toBe('spawn')
   })
 
   // POINT 556 (measured 08.08.2026, 05:45Z) — the SAME expired lease, but the two
@@ -214,7 +214,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       work: { advancing: true, declared: true, judgedOn: 'git', summary: 'active 2 min ago (working files)' },
     })
     expect(a).toMatchObject({ alive: true, reason: 'lease-expired-owner-working' })
-    expect(spawnDecision(a)).toBe('skip-alive')
     // …and the skip SAYS the lease age it overrode, or the next incident is as
     // invisible in the log as this one was.
     expect(a.detail).toContain('3 min out')
@@ -357,7 +356,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       probe: aliveProbe,
     })
     expect(a).toMatchObject({ alive: true, reason: 'pid-alive' })
-    expect(spawnDecision(a)).toBe('skip-alive')
   })
 
   it('NEEDS NO MIGRATION: a lock written before the lease existed carries an implicit one', () => {
@@ -382,7 +380,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       probe: aliveProbe,
     })
     expect(expired.wedged).toBeUndefined()
-    expect(['spawn', 'skip-alive']).toContain(spawnDecision(expired))
   })
 
   it('no lock → dead (free to claim)', () => {
@@ -401,7 +398,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     const a = assessOwner(handed(), { now: NOW, bootTime: BOOT, probe: deadProbe })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('handed-over')
-    expect(spawnDecision(a)).toBe('spawn')
   })
 
   it('a handed-over lock with a LIVE process frees AT ONCE — no grace (point 612)', () => {
@@ -416,7 +412,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(justNow.alive).toBe(false)
     expect(justNow.reason).toBe('handed-over')
-    expect(spawnDecision(justNow)).toBe('spawn')
 
     // …and it is still the same verdict a whole grace window later.
     const old = NOW - HANDOVER_GRACE_MS - 1000
@@ -449,7 +444,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     })
     expect(a.alive).toBe(false)
     expect(a.reason).toBe('handed-over')
-    expect(spawnDecision(a)).toBe('spawn')
 
     // THE SAFETY INVARIANT IS UNCHANGED, only its mechanism: a session that really
     // did keep working WITHDRAWS its handover by DELETING it, which `heartbeat`
@@ -457,7 +451,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     // with no mark on it is an ordinary live owner again.
     const withdrawn = assessOwner(lock({ claimedAt: NOW - 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
     expect(withdrawn.alive).toBe(true)
-    expect(spawnDecision(withdrawn)).toBe('skip-alive')
   })
 
   it('a half-written or forged handover flag alone frees nothing', () => {
@@ -523,7 +516,6 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
   it('a CRASH still holds the lock until the lease runs out — only a taken boundary hands it over early', () => {
     const crashed = assessOwner(lock({ claimedAt: NOW - 30 * 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
     expect(crashed.alive).toBe(true)
-    expect(spawnDecision(crashed)).toBe('skip-alive')
   })
 })
 
@@ -593,29 +585,6 @@ describe('resolveOwnership — identity on the process, never on liveness alone'
     expect(resolveOwnership({ lock: lock({ kind: 'pending-spawn' }), sessionId: 'new-id', ancestor: ours }).via).toBe(
       'pending-spawn',
     )
-  })
-})
-
-// ---------------------------------------------------------------------------
-describe('spawnDecision (scenario 2 + 4: the launcher path)', () => {
-  it('live owner, fresh heartbeat → skip (no spawn)', () => {
-    const a = assessOwner({ sessionId: 's', claimedAt: NOW - 60_000, pid: 1, pidStartedAt: null }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('THE EXACT 24.07 BUG REPLAY: heartbeat 24 min stale, owner process alive → skip (the old 12-min window spawned here)', () => {
-    const a = assessOwner({ sessionId: 'f8c46e2f', claimedAt: NOW - 24 * 60_000, pid: 4242, pidStartedAt: null }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('post-reboot with a fresh re-claimed heartbeat → skip (reboot is NOT sufficient)', () => {
-    const a = assessOwner({ sessionId: 're-claimed', claimedAt: NOW - 60_000, pid: 777, pidStartedAt: null }, { now: NOW, bootTime: NOW - 5 * 60_000, probe: aliveProbe })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('post-reboot, owner never came back (pre-boot heartbeat, dead pid) → spawn', () => {
-    const a = assessOwner({ sessionId: 'gone', claimedAt: NOW - 60 * 60_000, pid: 4242, pidStartedAt: null }, { now: NOW, bootTime: NOW - 30 * 60_000, probe: deadProbe })
-    expect(spawnDecision(a)).toBe('spawn')
   })
 })
 
@@ -1599,6 +1568,35 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     // …but not forever.
     expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail, retryMs: 0 })).toBe(null)
     expect(failed).toBe(2)
+  })
+
+  it('records a batch writer process independently of the owner lock', () => {
+    const path = join(dir, 'batch-writer-process.json')
+    expect(
+      noteBatchWriter('writer-session', {
+        path,
+        now: NOW,
+        processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+      }),
+    ).toBe(true)
+    expect(readSessionProcesses({ path })).toEqual({
+      'writer-session': { pid: 4242, startedAt: NOW - 60_000, at: NOW, batchWriterAt: NOW },
+    })
+    // The marker survives without a lock and advances on the next main write.
+    expect(existsSync(lockPath)).toBe(false)
+    noteBatchWriter('writer-session', {
+      path,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({ at: NOW, batchWriterAt: NOW + 1_000 })
+  })
+
+  it('never records an unidentifiable process or a synthetic probe as a writer', () => {
+    const path = join(dir, 'unidentified-writer-process.json')
+    expect(noteBatchWriter('writer-session', { path, processIdentity: null })).toBe(false)
+    expect(noteBatchWriter('preflight-writer', { path, processIdentity: { pid: 42, startedAt: NOW } })).toBe(false)
+    expect(readSessionProcesses({ path })).toEqual({})
   })
 
   it('a PROBE gets the same answer and leaves no record behind (point 434 (8))', () => {

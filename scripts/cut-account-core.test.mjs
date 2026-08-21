@@ -24,9 +24,21 @@ import {
   wiredGuards,
 } from './cut-account-core.mjs'
 import { DOC_BUDGETS, measure } from './doc-budget-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { execFileSync } from 'node:child_process'
 
 const ROOT = resolve(process.cwd())
+// Floor transcripts record the main checkout or one of ITS worktrees. Vitest
+// itself runs in an isolated point worktree, so process.cwd() is the source for
+// tracked fixtures but cannot be the root used to classify those transcripts.
+const MAIN_ROOT =
+  mainCheckoutFrom(
+    execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }),
+    ROOT,
+  ) ?? ROOT
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
 const MEMORY_DIR = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory')
 const MEMORY_PATH = resolve(MEMORY_DIR, 'MEMORY.md')
@@ -576,7 +588,7 @@ describe('docs/document-cut-757.md — the measured floors', () => {
         String(first.cwd).startsWith('/'),
         `${r.transcript} records a relative cwd (${first.cwd}), which is no evidence of any tree`,
       ).toBe(true)
-      const kind = sessionKindOf({ cwd: canon(first.cwd), prompt, root: realpathSync(ROOT) })
+      const kind = sessionKindOf({ cwd: canon(first.cwd), prompt, root: realpathSync(MAIN_ROOT) })
       expect(
         kind,
         `cwd and prompt disagree, or the tree is neither, for ${r.transcript}`,

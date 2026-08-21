@@ -6,6 +6,7 @@
 // wrote the thing, a refusal that must not be treated as advice, and the twenty-
 // odd guards that predate the gate and owe nothing.
 import { describe, it, expect } from 'vitest'
+import { resolve } from 'node:path'
 import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
@@ -14,6 +15,8 @@ import {
   formatMechanismReviewVerdict,
   isMechanismPath,
   KNOWN_FLAGS,
+  ledgerPathFrom,
+  LEDGER_RELATIVE_PATH,
   MERGE_ACCOUNTING_SINCE,
   MODE_REQUIRED_SINCE,
   mechanismPathsIn,
@@ -24,12 +27,16 @@ import {
   parseArgs,
   parseModel,
   receiptBalances,
+  resolveMergePolicy,
   sameModel,
   validateMode,
   validatePass,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
+import { readState, writeState } from './fable-switch-core.mjs'
+
+const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
 
 const SCRIPTS = [
   'mechanism-review-guard.mjs',
@@ -380,6 +387,53 @@ describe('evaluateMechanismReview', () => {
     expect(text).toMatch(/FOUR-EYES GATE ON MECHANISMS/)
     expect(text).toContain('scripts/pre-push-gate-core.mjs')
     expect(text).toMatch(/mechanism-review\.mjs --record/)
+  })
+
+  it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {
+    const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [commit()], records: [] })
+    const text = formatMechanismReviewVerdict(v, {
+      authorshipPlan: {
+        unreviewable: [
+          {
+            files: ['scripts/pre-push-gate-core.mjs'],
+            unreviewableReason: 'every configured reviewer vendor authored part of this contribution',
+          },
+        ],
+      },
+    })
+    expect(text).toContain('UNREVIEWABLE')
+    expect(text).toContain('every configured reviewer vendor authored part')
+    expect(text).not.toContain('Have the OTHER model review')
+  })
+
+  it('reports mixed authorship as separately reviewable vendor groups', () => {
+    const v = evaluateMechanismReview({ baseline: 'b', head: 'h'.repeat(40), pendingCommits: [commit()], records: [] })
+    const text = formatMechanismReviewVerdict(v, {
+      authorshipPlan: {
+        groups: [
+          {
+            kind: 'files',
+            vendor: 'anthropic',
+            reviewer: 'GPT-5.6 Sol',
+            reviewerVendor: 'openai',
+            files: ['scripts/claude-guard.mjs'],
+          },
+          {
+            kind: 'files',
+            vendor: 'openai',
+            reviewer: 'Opus 5',
+            reviewerVendor: 'anthropic',
+            files: ['scripts/sol-guard.mjs'],
+          },
+        ],
+        unreviewable: [],
+      },
+    })
+    expect(text).toContain('MIXES AUTHORSHIP')
+    expect(text).toContain('anthropic-authored files → openai reviewer GPT-5.6 Sol')
+    expect(text).toContain('openai-authored files → anthropic reviewer Opus 5')
+    expect(text).toContain('review-sol.mjs --sha hhhhhhh')
+    expect(text).not.toContain('reviewing the branch head is enough')
   })
 
   it('hands a pending cross-vendor review to the successor after the context fence closes', () => {
@@ -1444,8 +1498,17 @@ describe('validatePass', () => {
     expect(v.errors.join('\n')).toContain('--pass')
   })
 
-  it('REFUSES a single-pass split — that is an ordinary whole-range record', () => {
+  it('REFUSES a one-pass scope without contribution boundaries', () => {
     expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs' }).ok).toBe(false)
+  })
+
+  it('accepts a bounded one-pass scope with its exact contribution boundaries', () => {
+    const boundary = 'a'.repeat(40)
+    expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs', passCommits: boundary })).toEqual({
+      ok: true,
+      errors: [],
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], commits: [boundary] },
+    })
   })
 
   it('REFUSES a pass number outside its own split, and a malformed spec', () => {
@@ -1555,6 +1618,26 @@ describe('validateRecord carries the mode', () => {
   it('accepts it once the mode is named', () => {
     expect(validateRecord({ ...good, mode: 'review' })).toEqual({ ok: true, errors: [] })
     expect(validateRecord({ ...good, ...counted }).ok, validateRecord({ ...good, ...counted }).errors).toBe(true)
+  })
+
+  it('derives a Sol merger and the weaker switch reason while Fable is off', () => {
+    const input = {
+      sha: 'a'.repeat(40),
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read both independent lists against the same invariants',
+      authoredBy: 'Claude Opus 5',
+      mode: 'blind-parallel',
+      accounting: counted.accounting,
+      fableState: FABLE_OFF,
+    }
+    expect(validateRecord(input).ok, validateRecord(input).errors).toBe(true)
+    expect(resolveMergePolicy({ ...input, authors: [input.model, input.authoredBy] })).toMatchObject({
+      mergedBy: 'GPT-5.6 Sol',
+      mergeFallback: expect.stringContaining('node scripts/fable-switch.mjs --status'),
+      errors: [],
+    })
+    expect(validateRecord({ ...input, mergedBy: 'Fable 5' }).ok).toBe(false)
   })
 
   it('refuses a blind-parallel record that names no merging model', () => {
@@ -1931,5 +2014,28 @@ describe('the refusal teaches the command that actually works', () => {
     const text = formatMechanismReviewVerdict(v)
     expect(text).toContain('--mode')
     for (const m of MODES) expect(text).toContain(m)
+  })
+})
+
+// WHICH CHECKOUT'S LEDGER (point 780). The I/O half asks git for the toplevel;
+// this is what it does with the answer.
+describe('the ledger path of a checkout', () => {
+  it('resolves the relative ledger against the toplevel it was given', () => {
+    expect(ledgerPathFrom('/repo/.claude/worktrees/point-780')).toBe(
+      resolve('/repo/.claude/worktrees/point-780', LEDGER_RELATIVE_PATH),
+    )
+    expect(ledgerPathFrom('/repo')).toBe(resolve('/repo', LEDGER_RELATIVE_PATH))
+  })
+
+  it('answers null rather than another tree when git names no toplevel', () => {
+    // The cross-vendor review of this very point: a fallback checkout is the
+    // same silent cross-tree write, only quieter. There is no ledger here.
+    for (const nothing of [null, undefined, '']) expect(ledgerPathFrom(nothing)).toBe(null)
+  })
+
+  it('uses the toplevel exactly as git gave it, spaces and all', () => {
+    // Trimming would rename a legitimate POSIX directory into a different one.
+    expect(ledgerPathFrom('/repo/odd name ')).toBe(resolve('/repo/odd name ', LEDGER_RELATIVE_PATH))
+    expect(ledgerPathFrom('   ')).toBe(resolve('   ', LEDGER_RELATIVE_PATH))
   })
 })

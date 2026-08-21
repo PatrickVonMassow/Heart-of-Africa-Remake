@@ -404,6 +404,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       records,
       sessionId,
       fence: guardDuty({ sessionId }),
+      authorshipPlan,
     },
     commits,
     debt,
@@ -581,11 +582,16 @@ if (isMainModule(import.meta.url)) {
       for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
         console.log(
           `  ${(group.authorshipKind ?? group.kind) === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor ?? 'authored'} files`} → ` +
-            `${group.reviewer || 'NO ELIGIBLE REVIEWER'}: ${group.files.map((f) => quotePassFile(f)).join(', ')}`,
+            `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
+            `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
-      else console.log(verdict.block ? `\n${formatMechanismReviewVerdict(verdict)}` : '\nGATE CLEAR')
+      else console.log(
+        verdict.block
+          ? `\n${formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan })}`
+          : '\nGATE CLEAR',
+      )
       process.exit(0)
     }
 
@@ -598,7 +604,10 @@ if (isMainModule(import.meta.url)) {
     }
     if (outcome.action === 'block') {
       process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatMechanismReviewVerdict(verdict) }),
+        JSON.stringify({
+          decision: 'block',
+          reason: formatMechanismReviewVerdict(verdict, { authorshipPlan: gathered.authorshipPlan }),
+        }),
       )
       process.exit(0)
     }
@@ -607,6 +616,22 @@ if (isMainModule(import.meta.url)) {
     if (gathered.head) writeBaseline(gathered.branch, gathered.head)
     process.exit(0)
   } catch (e) {
+    // AN UNREADABLE LEDGER IS NOT AN ENVIRONMENT TRANSIENT (cross-vendor review
+    // of point 780). The ledger IS this gate's evidence: without it the gate
+    // cannot tell a reviewed mechanism from an unreviewed one, so the fail-open
+    // catch below would wave through exactly what it exists to stop.
+    if (e && e.ledgerUnreadable) {
+      process.stdout.write(
+        JSON.stringify({
+          decision: 'block',
+          reason:
+            `mechanism-review-guard: the review ledger cannot be read, so nothing here can be proven reviewed.\n` +
+            `  ${e.message}\n` +
+            '  Repair the ledger (it is tracked in git) and end the turn again.',
+        }),
+      )
+      process.exit(0)
+    }
     console.error(`mechanism-review-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }

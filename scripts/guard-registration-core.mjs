@@ -20,10 +20,20 @@
 // working tree, so the check judges the commit being made and not whatever the
 // tree happens to hold beside it.
 import { unregisteredStopHooks, wiredStopHookIds } from './guard-preflight-core.mjs'
+import ts from 'typescript'
 
 /** Paths whose staging makes the wiring worth re-checking. */
 const SETTINGS_PATH = '.claude/settings.json'
+const PREFLIGHT_PATH = 'scripts/guard-preflight.mjs'
+export const EXPECTED_PATH = 'scripts/guard-preflight-expected.mjs'
 const GUARD_SCRIPT = /^scripts\/[\w.-]*guard[\w.-]*\.mjs$/
+
+/**
+ * Include deletions and show both sides of renames. Otherwise removing or
+ * renaming guard-preflight.mjs makes its staged blob disappear without putting
+ * that path in the set `evaluate` uses to decide whether the commit broke it.
+ */
+export const STAGED_PATH_ARGS = ['diff', '--cached', '--name-only', '--no-renames', '-z']
 
 /**
  * Does this staged set touch the wiring at all? A commit that changes neither
@@ -45,29 +55,84 @@ export function touchesGuardWiring(paths = []) {
  * wrapper called `main()` on import and blocked the whole preflight on a pipe
  * nobody was writing.
  *
- * Total: an unrecognisable source yields an empty list. That direction is
- * deliberate — see `evaluate`, which treats "no registry found" as unreadable
- * rather than as "everything is unregistered".
+ * Parsing rather than matching is important here: comments and unrelated
+ * strings are valid source text, but neither one registers a guard. The
+ * compiler parser also gives single- and double-quoted string literals the
+ * same meaning and tells an empty array apart from a missing/broken one.
  */
-export function registeredIdsFromSource(source = '') {
+function exportedConstInitializer(source, path, name) {
   const text = String(source ?? '')
-  const start = text.indexOf('export const GUARDS = [')
-  if (start === -1) return []
-  const end = text.indexOf('\n]', start)
-  const block = text.slice(start, end === -1 ? undefined : end)
-  return [...block.matchAll(/\bid:\s*'([\w.-]+)'/g)].map((m) => m[1])
+  const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS)
+  if (file.parseDiagnostics?.length) return null
+
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    if (!statement.modifiers?.some(({ kind }) => kind === ts.SyntaxKind.ExportKeyword)) continue
+    if (!(statement.declarationList.flags & ts.NodeFlags.Const)) continue
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== name) continue
+      return declaration.initializer ?? null
+    }
+  }
+  return null
+}
+
+function readRegistry(source = '') {
+  const initializer = exportedConstInitializer(source, PREFLIGHT_PATH, 'GUARDS')
+  if (!initializer || !ts.isArrayLiteralExpression(initializer)) return { found: false, ids: [] }
+
+  const ids = []
+  for (const element of initializer.elements) {
+        // Every array element must either expose a literal id or plainly be
+        // metadata with no id. Skipping an unresolved element would make this
+        // a partial registry and could falsely call its wired hook unregistered.
+        if (!ts.isObjectLiteralExpression(element)) return { found: false, ids: [] }
+        const property = element.properties.find(
+          (candidate) =>
+            candidate.name &&
+            ((ts.isIdentifier(candidate.name) && candidate.name.text === 'id') ||
+              (ts.isStringLiteral(candidate.name) && candidate.name.text === 'id')),
+        )
+        if (!property) {
+          if (element.properties.some((candidate) => ts.isSpreadAssignment(candidate))) {
+            return { found: false, ids: [] }
+          }
+          continue
+        }
+        if (!ts.isPropertyAssignment(property) || !ts.isStringLiteral(property.initializer)) {
+          return { found: false, ids: [] }
+        }
+        if (/^[\w.-]+$/.test(property.initializer.text)) ids.push(property.initializer.text)
+  }
+  return { found: true, ids }
+}
+
+function readExpected(source = '') {
+  const initializer = exportedConstInitializer(source, EXPECTED_PATH, 'EXPECTED_GUARD_IDS')
+  if (!initializer || !ts.isArrayLiteralExpression(initializer)) return { found: false, ids: [] }
+  const ids = []
+  for (const element of initializer.elements) {
+    if (!ts.isStringLiteral(element) || !/^[\w.-]+$/.test(element.text)) {
+      return { found: false, ids: [] }
+    }
+    ids.push(element.text)
+  }
+  return { found: true, ids }
+}
+
+export function registeredIdsFromSource(source = '') {
+  return readRegistry(source).ids
 }
 
 /**
  * The verdict on one staged commit.
  *
- * FAILS CLOSED on a real finding and OPEN on everything it cannot read: an
- * unparseable settings file, or a preflight source with no recognisable
- * registry, reports nothing. A check that blocks a commit because it could not
- * understand its own inputs makes the tree uncommittable, which is worse than
- * the drift it watches — and the pre-push gate still stands behind it.
+ * FAILS CLOSED on a real finding, including a commit that makes the registry
+ * itself unreadable. It remains open when an unchanged input cannot be read:
+ * that is an infrastructure failure, not a defect introduced by this commit.
  */
-export function evaluate({ paths = [], settingsJson = '', preflightSource = '' } = {}) {
+export function evaluate({ paths = [], settingsJson = '', preflightSource = '', expectedSource = '' } = {}) {
   if (!touchesGuardWiring(paths)) {
     return { block: false, unregistered: [], why: 'no guard wiring in this commit' }
   }
@@ -77,28 +142,88 @@ export function evaluate({ paths = [], settingsJson = '', preflightSource = '' }
   } catch {
     return { block: false, unregistered: [], why: 'settings file unreadable — judged nothing' }
   }
-  const registered = registeredIdsFromSource(preflightSource)
-  if (registered.length === 0) {
+  const registry = readRegistry(preflightSource)
+  if (!registry.found && paths.includes(PREFLIGHT_PATH)) {
+    return {
+      block: true,
+      unregistered: [],
+      registryUnreadable: true,
+      why: 'this commit makes the GUARDS registry unreadable',
+    }
+  }
+  if (!registry.found) {
     return { block: false, unregistered: [], why: 'no registry found in the preflight source — judged nothing' }
+  }
+  const expected = readExpected(expectedSource)
+  if (!expected.found && paths.includes(EXPECTED_PATH)) {
+    return {
+      block: true,
+      unregistered: [],
+      expectedUnreadable: true,
+      why: 'this commit makes the expected-guard list unreadable',
+    }
+  }
+  if (!expected.found) {
+    return { block: false, unregistered: [], why: 'no expected-guard list found — judged nothing' }
   }
   const unregistered = unregisteredStopHooks(
     wiredStopHookIds(settings),
-    registered.map((id) => ({ id })),
+    registry.ids.map((id) => ({ id })),
   )
+  const expectedIds = new Set(expected.ids)
+  const registeredIds = new Set(registry.ids)
+  const absentFromExpected = registry.ids.filter((id) => !expectedIds.has(id))
+  const absentFromRegistry = expected.ids.filter((id) => !registeredIds.has(id))
+  const duplicateIds = (ids) => ids.filter((id, index) => ids.indexOf(id) !== index)
+  const duplicateExpected = duplicateIds(expected.ids)
+  const duplicateRegistry = duplicateIds(registry.ids)
+  const block =
+    unregistered.length > 0 ||
+    absentFromExpected.length > 0 ||
+    absentFromRegistry.length > 0 ||
+    duplicateExpected.length > 0 ||
+    duplicateRegistry.length > 0
   return {
-    block: unregistered.length > 0,
+    block,
     unregistered,
-    why: unregistered.length > 0 ? 'wired Stop hooks with no registry entry' : 'every wired Stop hook is registered',
+    absentFromExpected,
+    absentFromRegistry,
+    duplicateExpected,
+    duplicateRegistry,
+    why: block ? 'guard wiring and its expected list disagree' : 'guard wiring and its expected list agree',
   }
 }
 
 /** The refusal text. It names the fix, because a guard that only says no costs a turn. */
 export function formatVerdict(verdict = {}) {
+  if (verdict?.expectedUnreadable) {
+    return [
+      'GUARD REGISTRATION: this commit makes the expected-guard list unreadable.',
+      '',
+      `Restore the literal EXPECTED_GUARD_IDS array in ${EXPECTED_PATH}, then commit again.`,
+    ].join('\n')
+  }
+  if (verdict?.registryUnreadable) {
+    return [
+      'GUARD REGISTRATION: this commit makes the GUARDS registry unreadable.',
+      '',
+      'The staged scripts/guard-preflight.mjs was deleted, renamed, or no longer',
+      'contains a parseable `export const GUARDS = [...]` registry. Without that',
+      'registry, wired Stop hooks cannot participate in the preflight.',
+      '',
+      'Restore the GUARDS registry in scripts/guard-preflight.mjs, then commit again.',
+    ].join('\n')
+  }
   const ids = verdict?.unregistered ?? []
-  const plural = ids.length === 1 ? 'hook is' : 'hooks are'
+  const absentFromExpected = verdict?.absentFromExpected ?? []
+  const absentFromRegistry = verdict?.absentFromRegistry ?? []
   return [
-    `GUARD REGISTRATION: ${ids.length} wired Stop ${plural} missing from the preflight registry.`,
-    ...ids.map((id) => `  · ${id}`),
+    'GUARD REGISTRATION: the staged guard sources disagree.',
+    ...ids.map((id) => `  · wired but not registered: ${id}`),
+    ...absentFromExpected.map((id) => `  · registered but not expected: ${id}`),
+    ...absentFromRegistry.map((id) => `  · expected but not registered: ${id}`),
+    ...(verdict?.duplicateExpected ?? []).map((id) => `  · repeated in expected list: ${id}`),
+    ...(verdict?.duplicateRegistry ?? []).map((id) => `  · registered more than once: ${id}`),
     '',
     'A Stop hook wired in .claude/settings.json but absent from GUARDS in',
     'scripts/guard-preflight.mjs reports NOTHING in the preflight while it still blocks',
@@ -106,7 +231,7 @@ export function formatVerdict(verdict = {}) {
     'it puts that red state on the branch, where the next session inherits it.',
     '',
     'Register it in the GUARDS array in scripts/guard-preflight.mjs (a gather that honestly',
-    'reports "not judged" counts) and add it to the expected list in',
-    'scripts/guard-preflight-core.test.mjs. Then commit again.',
+    'reports "not judged" counts) and keep the expected list in',
+    `${EXPECTED_PATH} in sync. Then commit again.`,
   ].join('\n')
 }

@@ -195,11 +195,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
-  oder er ist nur dort grün, wo er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
-  gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest. Vor dem
-  Abgeben: ‚auch im **Hauptstand** grün?'"
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
+  ist nur dort grün, wo er lief — das Werkzeug nur dort, wo es geschrieben wurde.
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen nach gemessener Last.
+  Vor dem Abgeben: ‚auch im **Hauptstand** grün — und einmal **von dem Ort aus** geprüft, an dem es
+  wirklich läuft?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -329,6 +329,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
+- **„Nichts geliefert" wurde nie nachgemessen.** Ein Lauf meldet, er habe nichts geschrieben,
+  während fertige, ungesicherte Arbeit danebenliegt — und der nächste Griff räumt sie weg.
+  → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint.
+  ‚Nichts da' gilt nur für den nachweislich leeren Fall; sonst nenn die **Größe** des Vorhandenen
+  und den Befehl, der es **sichert**."
+
 - **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
   „es lief durch" beweist den Weg nicht.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
@@ -374,6 +380,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es beim
   dritten Mal: **wäre dieser Commit auch ohne den neuen Wächter nötig?**"
 
+- **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
+  Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
+  → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
+
+- **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
+  baut aber weder Zustand noch Befehl dafür. Der ehrliche Ausnahmefall muss die Form des
+  Normalfalls nachahmen, und nur eine irreführende Formulierung besteht dessen Prüfung.
+  → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
+  ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -412,4 +428,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b0e061a541f13d848634c800294fe941f9d4abe72cb25221612e2e495564fb07 -->
+<!-- GUIDE-FINGERPRINT: 04c677f1f0d91d6446b82bf6dbc6388f35ebff6f8a97838b8661f343d3052ef7 -->

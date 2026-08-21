@@ -1290,9 +1290,15 @@ describe('the CLI records RESOLVED evidence, not what was typed', () => {
   it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
     const git = (...args) =>
-      execFileSync('git', args, { windowsHide: true, cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        windowsHide: true,
+        cwd: dir,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
     try {
       git('init', '-b', 'main')
+      expect(git('rev-parse', '--show-toplevel')).toBe(resolve(dir))
       git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
       const at = (ref) => resolveRefName(ref, { cwd: dir })
       // The two live bypasses, resolved to names the refusal already knows.
@@ -1576,13 +1582,14 @@ describe('the running-file set comes from the worktree too, not only from a --br
     const dir = mkdtempSync(join(tmpdir(), 'hoa-slots-'))
     try {
       const git = (...args) =>
-        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
           windowsHide: true,
           cwd: dir,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
         })
       git('init', '-q', '-b', 'main', '.')
+      expect(git('rev-parse', '--show-toplevel').trim()).toBe(resolve(dir))
       writeFileSync(join(dir, 'seed.txt'), 'seed\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'seed')
@@ -2609,9 +2616,17 @@ describe('branchSlotDecision — the pool counts OPEN BRANCHES, not running agen
   it('marks the entire census unreadable when one requested behind-count fails', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-open-branches-'))
     const git = (...args) =>
-      execFileSync('git', args, { cwd: dir, stdio: 'ignore', windowsHide: true, env: { ...process.env, LC_ALL: 'C' } })
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd: dir,
+        stdio: 'ignore',
+        windowsHide: true,
+        env: { ...process.env, LC_ALL: 'C' },
+      })
     try {
       git('init', '-b', 'main')
+      expect(
+        execFileSync('git', ['-C', dir, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', windowsHide: true }).trim(),
+      ).toBe(resolve(dir))
       git('config', 'user.email', 'test@example.invalid')
       git('config', 'user.name', 'Test')
       writeFileSync(join(dir, 'base.txt'), 'base')

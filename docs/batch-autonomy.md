@@ -2064,9 +2064,47 @@ PARSE is torn: the gate stays quiet — every
 guard here is fail-open — while the CLI refuses to write over it, and a `ranked`
 entry without a reason is no decision and is dropped. Whether the gate is armed
 is read off `settled` alone, so an emptied `ranked` cannot pose as a fresh
-checkout. The decision logic is pure in `scripts/queue-rank-core.mjs`, which
-imports nothing: it judges provenance, `board-queue-core.mjs` renders the order,
-and neither owns a copy of the other's fact.
+checkout. The decision logic is pure in `scripts/queue-rank-core.mjs`: it judges
+provenance and urgency, `board-queue-core.mjs` renders the order and names the
+release point once, and neither owns a copy of the other's fact.
+
+**And the FRONT of the order is earned, not taken** (point 789, user instruction
+20.08.2026, in the turn that moved eight machine-filed points behind point 174 by
+hand: "wenn automatisch neue Tickets angelegt werden, diese nur bei hoher
+Dringlichkeit vorne einreihen"). A point the MACHINE filed for itself — a drained
+finding, a charged red, a review finding, a guard remedy — may stand BEFORE the
+release point only when the point itself STATES high urgency (the
+`Criticality: high` tag, or one of the four named blocking conditions: it stops
+the batch, blocks a lane or the release, or holds a red that cannot otherwise
+close) and the rank record carries the one-line reason
+(`--ahead <N> --why …`). Anything else belongs behind the release. The two gates
+take two flags on purpose: `--ranked` answers the APPEND question (the end of the
+order is right) and `--ahead` the RELEASE one (it stands in front, and why it
+cannot wait), and neither reason answers the other — a point ranked "last is
+right" and afterwards moved to the front used to arrive carrying a reason that
+said nothing about the front. The urgency is read off the POINT, never off the reason, so it cannot be
+argued into the record by whoever files the ticket; the ORIGIN is read off the
+record and defaults to the machine, so the user's exemption
+(`--ahead <N> --origin user`) can only ever be claimed out loud — and it is a
+decision about the FRONT like any other, so a "last is right" entry never carries
+it across. The boundary is wherever the
+release point CURRENTLY stands in `TASKS.md`, so re-sequencing moves it, and a
+breach freezes the provenance baseline exactly as an unranked append does — a
+gate that could be answered by forgetting the question would have a one-turn
+life.
+
+WHAT IS GRANDFATHERED IS FROZEN, NOT REMEMBERED (cross-vendor review by GPT-5.6
+Sol, 21.08.2026). The order that stood in front of the release before the rule
+landed is not re-litigated — that would be a block loop rather than a decision —
+but reading the exemption off the moving provenance baseline made it a two-turn
+bypass: settle anywhere in the order, then move the point in front of the
+release, and nothing ever asked. So the record carries a third part, `boundary`:
+the set that stood in front of the release when the rule was armed, written ONCE
+by `--seed-boundary --why` and never advanced. It shrinks when a point in it
+closes, so a reopen walks back in without its exemption, and it can never grow.
+Until it is armed the rule ASKS for the arming rather than falling silent, for
+the reason a missing baseline is asked about too: a clean-slate exemption is how
+the whole question gets swallowed.
 
 The watchdog runs as its own process (`scripts/board-watchdog.mjs`), called by
 the launcher. That is not tidiness: on this platform a `process.exit()` after any

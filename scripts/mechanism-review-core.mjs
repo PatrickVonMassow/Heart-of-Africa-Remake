@@ -17,10 +17,13 @@
 // scripts/mechanism-review-guard.mjs (fail-open) and the record CLI
 // scripts/mechanism-review.mjs. Pinned by mechanism-review-core.test.mjs.
 
+import { resolve } from 'node:path'
+
 // What a co-author trailer naming a MODEL looks like. It is the author
 // allowlist's own answer (scripts/model-guard-core.mjs, which imports nothing),
 // so "who authored this" cannot drift from "who may author at all".
 import { modelNamesIn } from './model-guard-core.mjs'
+import { isSwitchFallbackReason, mergeFallbackReason, mergerModel } from './fable-switch-core.mjs'
 // …and how a review split into PASSES over the file set composes back into a
 // coverage (point 714). Both the recorder and this gate ask the same module, so
 // what may be WRITTEN and what CLEARS cannot drift apart.
@@ -164,6 +167,39 @@ export const LEDGER_AT_MIN_MS = 1_700_000_000_000
 export const LEDGER_AT_MAX_MS = 4_102_444_800_000
 export const ledgerAtUsable = (at) =>
   typeof at === 'number' && Number.isFinite(at) && at >= LEDGER_AT_MIN_MS && at <= LEDGER_AT_MAX_MS
+
+/** Where the tracked ledger sits inside ANY checkout of this repository. */
+export const LEDGER_RELATIVE_PATH = '.claude/mechanism-reviews.jsonl'
+
+/**
+ * The ledger of the checkout a command is ACTUALLY RUNNING IN (point 780).
+ *
+ * It used to be pinned to the module's own directory, which is the MAIN
+ * checkout whenever the command is invoked by its main-tree path — and every
+ * delegated author runs from an isolation worktree (CLAUDE.md §6). The append
+ * then landed in the main tree while the commit that seals it ran in the
+ * worktree, so `git add` refused the absolute main path as "outside repository"
+ * and the run aborted having already written a line about a commission that
+ * never started. Resolving against the git TOPLEVEL of the working directory
+ * puts the record on the point's own branch, where the comment above it always
+ * said it belonged, and it travels to `main` with the merge.
+ *
+ * NO FALLBACK CHECKOUT (cross-vendor review of this point, both passes). A run
+ * outside any checkout — a bare repository, a stray working directory — has NO
+ * ledger, and answering it with the module's own tree is the very defect this
+ * function exists to remove, only quieter: it would silently read and write a
+ * DIFFERENT checkout's tracked file. `null` says so, and the writers refuse on
+ * it rather than guessing.
+ *
+ * The toplevel is used EXACTLY as git gave it (same review): a POSIX path may
+ * legitimately end in a space, so only "git said nothing" is special-cased here
+ * and the caller strips git's terminating line break, nothing else.
+ */
+export function ledgerPathFrom(toplevel) {
+  const root = toplevel == null ? '' : String(toplevel)
+  if (root === '') return null
+  return resolve(root, LEDGER_RELATIVE_PATH)
+}
 
 /** The mechanism paths out of a commit's file list. */
 export function mechanismPathsIn(paths, opts) {
@@ -365,6 +401,7 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     errors.push(`a two-model fallback is recorded, but "${who}" authored neither list — no fallback was needed`)
   }
   if (reason) {
+    const switchFallback = isSwitchFallbackReason(reason)
     // A FALLBACK HAS TO SAY WHICH MODEL WAS NOT THERE (four-eyes review of point
     // 634, rounds one and five). Any eight characters would otherwise buy an
     // author the right to merge its own list — the escape hatch would be the
@@ -381,7 +418,14 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
     const bound = clauses.some(
       (c) => UNAVAILABLE.test(c) && !NEGATED_ABSENCE.test(c) && namesOtherModel(c, who),
     )
-    if (!named.length) {
+    if (switchFallback && !sameModel(who, 'GPT-5.6 Sol')) {
+      errors.push(`the Fable-switch fallback is only the recorded reason GPT-5.6 Sol may merge its own blind half`)
+    } else if (switchFallback && !conflict) {
+      // The general no-fallback-needed error above remains the one explanation.
+    } else if (switchFallback) {
+      // A decision is not an outage. This exact, command-bearing form is the
+      // separately checkable exception; every other reason still owes absence.
+    } else if (!named.length) {
       errors.push(
         `the two-model fallback has to NAME the model that was unavailable ("${reason}" names none) — ` +
           'it is the reason an author was allowed to merge, and an unnamed reason cannot be checked',
@@ -398,7 +442,35 @@ export function validateMerger({ mergedBy, authors = [], fallback = '' } = {}) {
       )
     }
   }
-  return { ok: errors.length === 0, errors, fallback: Boolean(conflict && reason) }
+  return {
+    ok: errors.length === 0,
+    errors,
+    fallback: Boolean(conflict && reason),
+  }
+}
+
+/** Resolve the switch-owned merger and the fallback owed when it authored a half. */
+export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', authors = [], fableState } = {}) {
+  const m = String(mode ?? '').trim()
+  if (m !== BLIND_PARALLEL || fableState === undefined) {
+    return { mergedBy: String(mergedBy ?? '').trim(), mergeFallback: String(mergeFallback ?? '').trim(), errors: [] }
+  }
+  const expected = mergerModel(fableState)
+  const declared = String(mergedBy ?? '').trim()
+  const errors = []
+  if (declared && !sameModel(declared, expected)) {
+    errors.push(
+      `--merged-by "${declared}" contradicts the Fable switch: ${expected} owns this merge ` +
+        '(node scripts/fable-switch.mjs --status)',
+    )
+  }
+  const conflict = (authors ?? []).filter(Boolean).some((author) => sameModel(expected, author))
+  const derivedReason = conflict ? mergeFallbackReason(fableState) : ''
+  const statedReason = String(mergeFallback ?? '').trim()
+  if (statedReason && statedReason !== derivedReason) {
+    errors.push('--merge-fallback contradicts the reason generated by the Fable switch')
+  }
+  return { mergedBy: expected, mergeFallback: statedReason || derivedReason, errors }
 }
 
 /**
@@ -424,10 +496,19 @@ export function validateMergedBy({
   model,
   authoredBy,
   authors,
+  fableState,
 } = {}) {
   const m = String(mode ?? '').trim()
-  const who = String(mergedBy ?? '').trim()
-  const reason = String(mergeFallback ?? '').trim()
+  const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  const policy = resolveMergePolicy({
+    mode: m,
+    mergedBy,
+    mergeFallback,
+    authors: [model, ...wrote],
+    fableState,
+  })
+  const who = policy.mergedBy
+  const reason = policy.mergeFallback
   const receipt = String(accounting ?? '').trim()
   if (m && m !== BLIND_PARALLEL) {
     const errors = []
@@ -441,8 +522,7 @@ export function validateMergedBy({
     return { ok: errors.length === 0, errors }
   }
   if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
-  const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
-  const { errors } = validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason })
+  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason }).errors]
   if (!receipt) {
     errors.push(
       '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
@@ -843,9 +923,10 @@ export function validateMode({ mode, framing } = {}) {
 /**
  * Is the PASS this record claims a usable one, and does it say what it read?
  *
- * A pass record is the answer to a range no single review round can hold (point
- * 714): the material is cut through the FILE SET, each pass is reviewed on its
- * own, and the range is cleared only once every pass is on record. So a pass
+ * A pass record is either a bounded one-round scope or the answer to a range no
+ * single review round can hold (points 783 and 714): the material is cut through
+ * the FILE SET, each pass is reviewed on its own, and the range is cleared only
+ * once every contribution (and, for a split, every pass) is on record. So a pass
  * MUST name its files — a verdict that covers "one of three passes" without
  * saying which files it read is a coverage claim nobody can check — and the two
  * flags come as a pair, because either alone describes half a composition.
@@ -905,6 +986,11 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
   const commits = commitList ? commitList.split(',') : []
+  if (parsed.ok && parsed.total === 1 && !hasCommits) {
+    errors.push(
+      '--pass 1/1 is a scoped review and needs --pass-commits: without contribution boundaries it would claim the whole range',
+    )
+  }
   if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
     errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
   }
@@ -945,6 +1031,7 @@ export function validateRecord({
   pass,
   passFiles,
   passCommits,
+  fableState,
 } = {}) {
   const errors = []
   errors.push(...validateMode({ mode, framing }).errors)
@@ -972,7 +1059,7 @@ export function validateRecord({
     errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
   }
   errors.push(...validatePass({ pass, passFiles, passCommits }).errors)
-  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors }).errors)
+  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, fableState }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -1372,11 +1459,15 @@ export function evaluateMechanismReview({
 }
 
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
-export function formatMechanismReviewVerdict(verdict) {
+export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } = {}) {
   if (!verdict?.block) return ''
+  const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
+  const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
   const lines = [
-    'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
-      'second model has recorded a review of it.',
+    unreviewable.length
+      ? 'FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions with no eligible reviewer vendor.'
+      : 'FOUR-EYES GATE ON MECHANISMS: a guard, gate or git hook changed here and no ' +
+        'second model has recorded a review of it.',
     '',
   ]
   for (const f of verdict.findings) {
@@ -1465,17 +1556,50 @@ export function formatMechanismReviewVerdict(verdict) {
           : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
     )
   }
-  lines.push(
-    '',
-    'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
-    'nobody looks again. Have the OTHER model review the change — plan and result — and',
-    'record what it said:',
-    '',
-    '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
-    '',
-    'One record covers every mechanism commit it contains, so reviewing the branch head is',
-    'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
-  )
+  if (unreviewable.length) {
+    lines.push('', 'UNREVIEWABLE contributions (none may be treated as an ordinary missing review):')
+    for (const group of unreviewable) {
+      lines.push(
+        `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
+          `${group.unreviewableReason || 'no configured reviewer vendor is eligible'}`,
+      )
+    }
+    lines.push(
+      '',
+      'No record by the configured reviewer chain can clear those contributions. Inspect the',
+      'authorship split with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else if (groups.length > 1) {
+    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these contribution groups:')
+    for (const group of groups) {
+      lines.push(
+        `  · ${group.vendor || 'unknown'}-authored ${group.kind === 'commit' ? `commit ${(group.commits ?? [''])[0].slice(0, 7)}` : 'files'} ` +
+          `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
+          `${(group.files ?? []).join(', ') || '<files unknown>'}`,
+      )
+    }
+    lines.push(
+      '',
+      'Ask the planner for the runnable pass commands; each recorded pass clears only its',
+      'listed author contribution, so the two vendors accumulate coverage without self-review:',
+      '',
+      `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
+      '',
+      'Inspect the remaining contribution debt with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  } else {
+    lines.push(
+      '',
+      'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
+      'nobody looks again. Have the OTHER model review the change — plan and result — and',
+      'record what it said:',
+      '',
+      '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
+      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+      '',
+      'One record covers every mechanism commit it contains, so reviewing the branch head is',
+      'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
+    )
+  }
   return lines.join('\n')
 }

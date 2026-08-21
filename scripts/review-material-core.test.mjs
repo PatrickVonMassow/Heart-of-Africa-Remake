@@ -1367,8 +1367,8 @@ describe('the pass flag', () => {
     expect(parsePassSpec(' 1 / 2 ')).toMatchObject({ ok: true, index: 1, total: 2 })
   })
 
-  it('refuses a single pass — that is an ordinary record', () => {
-    expect(parsePassSpec('1/1').ok).toBe(false)
+  it('accepts one pass so the recorder can bind it to a bounded contribution scope', () => {
+    expect(parsePassSpec('1/1')).toEqual({ ok: true, index: 1, total: 1, errors: [] })
   })
 
   it('refuses a pass number outside its own total', () => {

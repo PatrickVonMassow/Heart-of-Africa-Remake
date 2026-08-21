@@ -53,10 +53,10 @@ const writeTranscript = (tokens) =>
     ].join('\n') + '\n',
   )
 
-function callGuard(toolName, toolInput = {}, { guardPath, sessionId = SID, transcript, env = ARMED } = {}) {
+function callGuard(toolName, toolInput = {}, { guardPath, cwd = repo, sessionId = SID, transcript, env = ARMED } = {}) {
   const r = spawnSync(process.execPath, [guardPath ?? resolve(repo, 'scripts', 'context-fence-guard.mjs')], {
     windowsHide: true,
-    cwd: repo,
+    cwd,
     encoding: 'utf8',
     // The ambient environment may carry the launcher's own relief overrides
     // (point 758) — neutralised here so the suite measures the code, not the
@@ -242,7 +242,7 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     cpSync(resolve(repo, 'scripts'), resolve(wt, 'scripts'), { recursive: true })
     mkdirSync(resolve(wt, '.claude'), { recursive: true })
     writeJson(resolve(wt, '.claude', 'batch-lock.json'), { v: 2, sessionId: SID, claimedAt: Date.now(), pid: process.pid })
-    const r = callGuard('Agent', {}, { guardPath: resolve(wt, 'scripts', 'context-fence-guard.mjs') })
+    const r = callGuard('Agent', {}, { guardPath: resolve(wt, 'scripts', 'context-fence-guard.mjs'), cwd: wt })
     expect(r.status, r.stderr).toBe(0)
     expect(r.stdout.trim()).toBe('')
   })

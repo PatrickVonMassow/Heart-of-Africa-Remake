@@ -9,6 +9,7 @@ import {
   measure,
   evaluateDocBudgets,
   formatDocBudgetVerdict,
+  workOrderPoints,
 } from './doc-budget-core.mjs'
 import { docBudgetPath } from './doc-budget-guard.mjs'
 
@@ -116,5 +117,140 @@ describe('the real documents', () => {
   // criteria grow. A cut whose DESTINATION is uncapped buys nothing for long.
   it('budgets the destination of the §7.1 cut too', () => {
     expect(DOC_BUDGETS.map((b) => b.path)).toContain('docs/acceptance-criteria-detail.md')
+  })
+})
+
+describe('the per-point ceiling of the work order', () => {
+  const order = (...points) =>
+    ['# Work order', '', '## Checklist', '', ...points].join('\n')
+  // `- [ ] N.` is four whitespace-separated tokens, so the body carries the rest.
+  const point = (n, words) => `- [ ] ${n}. ${Array.from({ length: words - 4 }, (_, i) => 'w' + i).join(' ')}`
+  const budget = [
+    {
+      path: 'TASKS.md',
+      until: /^## Checklist/,
+      maxLines: 999,
+      maxWords: 9999,
+      why: 'preamble',
+      perPoint: { maxWords: 20, why: 'a brief pays a point spec in full at every delegation' },
+    },
+  ]
+
+  it('splits the file into points, attributing continuation lines to the point above', () => {
+    const points = workOrderPoints(order('- [ ] 7. one two', '  three four', '- [x] 8. five'))
+    expect(points.map((p) => p.number)).toEqual([7, 8])
+    expect(points[0].words).toBe(8) // four tokens of checkbox, then four words over two lines
+    // `- [x]` is ONE token where `- [ ]` is two, so a ticked point measures one lower.
+    // Irrelevant against a ceiling in the thousands, but it is what the tokenizer does.
+    expect(points[1].words).toBe(4)
+  })
+
+  it('is green when the largest point sits ON the ceiling', () => {
+    const text = order(point(11, 20), point(12, 9))
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(false)
+  })
+
+  it('goes RED one word over, and names the point', () => {
+    const text = order(point(11, 20), point(12, 21))
+    const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text }], budget)
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings.map((f) => f.kind)).toEqual(['point 12 words'])
+    expect(verdict.findings[0].actual).toBe(21)
+    expect(verdict.findings[0].budget).toBe(20)
+  })
+
+  it('judges nothing per point while the ceiling is unset — the mechanism ships before its number', () => {
+    const unset = [{ ...budget[0], perPoint: { maxWords: 0, why: 'not measured yet' } }]
+    const text = order(point(11, 500))
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], unset).block).toBe(false)
+  })
+
+  it('does not split on a COLUMN-ZERO checkbox inside an INDENTED fence', () => {
+    // Both halves matter and the first version of this case had neither: the specimen
+    // must sit at column zero (an indented one START ignores anyway, so the test would
+    // pass without any fence tracking), and the fence must be indented, which is what
+    // the work order actually writes and what a column-zero-only rule let through.
+    const text = order(
+      '- [ ] 11. ' + Array.from({ length: 12 }, (_, i) => 'w' + i).join(' '),
+      '  It prints this remedy:',
+      '   ```',
+      '- [ ] 99. a specimen line that only looks like a point',
+      '   ```',
+      '  and then says one more thing here',
+    )
+    const points = workOrderPoints(text)
+    expect(points.map((p) => p.number)).toEqual([11])
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(true)
+  })
+
+  it('needs a closer at least as long as its opener, so a shorter run does not end the block', () => {
+    const points = workOrderPoints(
+      order('- [ ] 11. one', '````', '```', '- [ ] 12. still inside the longer fence', '````', '- [ ] 13. out'),
+    )
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('does not let a run with text after it close a block', () => {
+    const points = workOrderPoints(
+      order('- [ ] 11. one', '```', '``` still an info line', '- [ ] 12. inside', '```', '- [ ] 13. out'),
+    )
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('closes a fence only with its own marker, so a tilde never ends a backtick block', () => {
+    const points = workOrderPoints(
+      order('- [ ] 11. one', '```', '~~~', '- [ ] 12. still inside the backtick fence', '```', '- [ ] 13. out'),
+    )
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('REFUSES a ceiling that is not a whole number of words instead of switching itself off', () => {
+    for (const bad of [-1, 12.5, '20', Number.NaN, undefined]) {
+      const broken = [{ ...budget[0], perPoint: { maxWords: bad, why: 'typo' } }]
+      const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 5)) }], broken)
+      expect(verdict.block, `${String(bad)} must refuse`).toBe(true)
+      expect(verdict.findings[0].kind).toBe('per-point ceiling is not a whole number of words')
+    }
+  })
+
+
+  it('REFUSES a declared ceiling whose field is missing or misspelled', () => {
+    for (const perPoint of [{}, { maxWord: 20, why: 'typo' }, { why: 'no number at all' }]) {
+      const broken = [{ ...budget[0], perPoint }]
+      const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 5)) }], broken)
+      expect(verdict.block, JSON.stringify(perPoint) + ' must refuse').toBe(true)
+      expect(verdict.findings[0].kind).toBe('per-point ceiling is not a whole number of words')
+    }
+  })
+
+  it('REFUSES an explicit null block, which is a declaration and not an absence', () => {
+    const broken = [{ ...budget[0], perPoint: null }]
+    const verdict = evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 5)) }], broken)
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings[0].kind).toBe('per-point ceiling is not a whole number of words')
+  })
+
+  it('does not let a non-breaking space behind a fence close the block', () => {
+    const points = workOrderPoints(
+      order('- [ ] 11. one', '```', '```\u00a0', '- [ ] 12. inside', '```', '- [ ] 13. out'),
+    )
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('lets spaces and tabs behind a closing run close it, as CommonMark does', () => {
+    const points = workOrderPoints(order('- [ ] 11. one', '```', '- [ ] 12. inside', '``` \t ', '- [ ] 13. out'))
+    expect(points.map((p) => p.number)).toEqual([11, 13])
+  })
+
+  it('judges nothing when no per-point block is declared at all', () => {
+    const none = [{ ...budget[0], perPoint: undefined }]
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text: order(point(11, 500)) }], none).block).toBe(false)
+  })
+
+  it('measures the WHOLE file per point, not only the part before the preamble marker', () => {
+    // The preamble budget stops at the Checklist heading; the point ceiling must not,
+    // or it would judge no point at all.
+    const text = order(point(11, 40))
+    expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(true)
   })
 })

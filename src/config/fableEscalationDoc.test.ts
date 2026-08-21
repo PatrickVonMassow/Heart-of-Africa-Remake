@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FABLE_ESCALATION_ROUNDS, FABLE_ESCALATION_SUSPENDED } from '../../scripts/author-routing-core.mjs'
+import { FABLE_ESCALATION_ROUNDS } from '../../scripts/author-routing-core.mjs'
 
 const ROOT = resolve(process.cwd())
 const EXCLUDED = new Set([
@@ -35,16 +35,24 @@ function trackedProseAndSource() {
   return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
 }
 
-describe('the Fable escalation boundary has at most one prose statement', () => {
-  // The user SUSPENDED the automatic escalation on 20.08.2026, so §6 no longer
-  // states a round threshold at all: the number survives only as the constant in
-  // author-routing-core.mjs, next to the flag that switches the lane change off.
-  // The check itself stays — it is what stops the threshold being re-stated in
-  // prose, whether the escalation is live or waiting to be lifted.
-  it('pins the premise: the escalation is suspended', () => {
-    expect(FABLE_ESCALATION_SUSPENDED).toBe(true)
-  })
+const stateClaim =
+  /\bfable\b[\s\S]{0,100}\bswitch\b[\s\S]{0,100}\b(?:on|off|enabled|disabled|suspended|active|inactive)\b|\bfable\b[\s\S]{0,100}\b(?:on|off|enabled|disabled|suspended|active|inactive)\b[\s\S]{0,100}\bswitch\b/i
 
+function switchStateClaims(files: Map<string, string>) {
+  return [...files].filter(([, text]) => stateClaim.test(text)).map(([path]) => path)
+}
+
+function trackedDocuments() {
+  const paths = execFileSync('git', ['ls-files', '*.md'], { cwd: ROOT, encoding: 'utf8' })
+    .split(/\r?\n/)
+    .filter(Boolean)
+    // The work order and archive are specifications/history, not operational
+    // restatements; they necessarily preserve the instruction this test enforces.
+    .filter((path) => !EXCLUDED.has(path))
+  return new Map(paths.map((path) => [path, readFileSync(resolve(ROOT, path), 'utf8')]))
+}
+
+describe('the Fable escalation boundary has at most one prose statement', () => {
   it('finds the threshold stated in no prose file', () => {
     expect(thresholdClaims(trackedProseAndSource())).toEqual([])
   })
@@ -57,6 +65,23 @@ describe('the Fable escalation boundary has at most one prose statement', () => 
       const files = trackedProseAndSource()
       files.set('docs/duplicate.md', duplicate)
       expect(thresholdClaims(files)).toEqual(['docs/duplicate.md'])
+    }
+  })
+})
+
+describe('the Fable switch state exists in no tracked operational document', () => {
+  it('finds no prose claim that the switch has a direction', () => {
+    expect(switchStateClaims(trackedDocuments())).toEqual([])
+  })
+
+  it('catches either direction written around the switch name', () => {
+    for (const duplicate of [
+      'The Fable switch is enabled for this run.',
+      'Fable remains disabled by the shared switch.',
+    ]) {
+      const files = trackedDocuments()
+      files.set('docs/duplicate.md', duplicate)
+      expect(switchStateClaims(files)).toEqual(['docs/duplicate.md'])
     }
   })
 })

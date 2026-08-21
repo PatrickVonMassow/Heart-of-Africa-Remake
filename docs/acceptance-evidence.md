@@ -27,6 +27,19 @@ lives in `scripts/verify/README.md`.
 
 ---
 
+## 1. Build/start.
+
+Verifiable: `npm install`, `npm run dev` and `npm run build` each complete
+without errors; the build chains `scripts/deps-preflight.mjs`, `tsc -b` and the
+Vite production build, so a missing dependency or a type error fails THIS
+criterion rather than surfacing later as someone else's. That the application
+loads without console errors is asserted by every browser suite: each one opens
+the application and closes its report with `console errors: 0`, and one console
+error fails the run. `scripts/verify/startup.mjs` additionally holds the loading
+picture to `balance.startup.pictureFreezeBudgetMs` on both backends, so a load
+counts only where a picture is actually PAINTED — a served document that never
+reaches the player is not a start.
+
 ## 2. Two perspectives.
 
 Verifiable: an automated
@@ -411,6 +424,24 @@ and longitude equal the actual grave position and that non-knowing
 chiefs point to the knowing people; `scripts/verify/flow.mjs` plays
 the full loop (gift → lesson → deciphered latitude, the East leg for
 the longitude, then the dig).
+
+## 11. Game graphics.
+
+Verifiable: screenshots on BOTH backends — `scripts/verify/world.mjs` shoots the
+bird's-eye view at characteristic locations, the settlement suites the walkable
+ones — plus `scripts/verify/visualsweep.mjs`, which passes and fails nothing but
+DRIVES a walk at each spot and captures a filmstrip along the path, so the
+frames can be inspected the way a player meets them rather than as a jump cut.
+
+The AAA impression itself is a human verdict and deliberately has no pass/fail
+suite: it is judged on the rendered picture of deployed `main`, under the rule
+that binds every chain here — the RESULT the player sees, not the mechanism that
+was supposed to produce it. What the suites do pin is the geography beneath the
+picture: `src/world/world.test.ts` holds the counts, the terrain sampling and
+the coast/river distances, so the shape being smoothed stays the right shape,
+while the smoothness of that geometry is read off the screenshots. Screenshot
+METRICS count as evidence only once `node scripts/picture-stability.mjs <suite>`
+reports STABLE; the verdicts are `docs/picture-check-levers.md`.
 
 ## 12. Atmosphere.
 
@@ -1431,6 +1462,18 @@ Verifiable: screenshots of the status bar, journal, a trade
 dialog and the map in both languages; no hardcoded player-visible
 strings outside the language files (spot check); the application runs
 without console errors in both languages.
+
+## 18. Lint and dependency hygiene.
+
+Verifiable: `npm run lint` (oxlint) reports zero errors and zero warnings, run
+on every change rather than saved up for a closing. `node scripts/audit-check.mjs`
+wraps `npm audit --json` and exits non-zero for ANY advisory not recorded in its
+`ALLOW` map together with the reason it is tolerable, so a new vulnerability
+fails loudly while a recorded one cannot quietly rot; CLAUDE.md §7.2 runs it
+whenever the lockfile changes. The single current entry is GHSA-f88m-g3jw-g9cj
+(sharp/libvips, high, no upstream fix): a transitive Node dependency of
+kokoro-js that is absent from the browser bundle and never runs at build time,
+so it is not reachable in the shipped game.
 
 ## 19. Journal voice markup and read-aloud.
 

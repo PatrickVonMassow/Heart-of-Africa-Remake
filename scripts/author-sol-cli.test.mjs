@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { recordAuthoringCommission } from './author-sol.mjs'
+import { uncommittedSummary } from './author-sol-core.mjs'
+import { ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
+import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
 const script = resolve(root, 'scripts', 'author-sol.mjs')
@@ -19,12 +21,20 @@ function ledger(rows) {
   return path
 }
 
+function fableFile() {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-author-fable-'))
+  dirs.push(dir)
+  const path = join(dir, 'fable-switch.json')
+  writeFileSync(path, JSON.stringify(writeFableState('off', { why: 'test decision', by: 'test', now: 1 })))
+  return path
+}
+
 function route(records, extra = []) {
   return spawnSync(process.execPath, [script, '--routing', '--point', point, ...extra], {
     cwd: root,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records },
+    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
   })
 }
 
@@ -35,9 +45,69 @@ function examine(records) {
     cwd,
     encoding: 'utf8',
     windowsHide: true,
-    env: { ...process.env, AUTHOR_REVIEW_RECORDS_FILE: records },
+    // Examination intentionally runs before an authoring worktree exists, so
+    // it gives the management checkout explicitly instead of asking the live
+    // script's source path to override its cwd.
+    env: { ...process.env, HOA_REPO_ROOT: root, AUTHOR_REVIEW_RECORDS_FILE: records, FABLE_SWITCH_FILE: fableFile() },
   })
 }
+
+/** One git call in a temp checkout; loud, because a silent setup failure would
+ *  make the assertions below pass for the wrong reason. */
+const git = (cwd, ...args) => {
+  const res = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
+  if (res.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${res.stderr}`)
+  return (res.stdout ?? '').trim()
+}
+
+/** A real, committed checkout — the index is what these cases are about. */
+const gitRepo = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'hoa-ledger-index-'))
+  dirs.push(dir)
+  git(dir, 'init', '-q', '-b', 'main')
+  git(dir, 'config', 'user.email', 'test@example.invalid')
+  git(dir, 'config', 'user.name', 'Test')
+  writeFileSync(join(dir, 'seed.txt'), 'seed\n')
+  git(dir, 'add', '-A')
+  git(dir, 'commit', '-q', '-m', 'seed')
+  return dir
+}
+
+describe('uncommittedNumstat', () => {
+  it('measures the final tracked tree and untracked text and binary files', () => {
+    const repo = gitRepo()
+    writeFileSync(join(repo, 'seed.txt'), 'seed\nnext\n')
+    git(repo, 'add', 'seed.txt')
+    writeFileSync(join(repo, 'seed.txt'), 'seed\nnext\nthird\n')
+    writeFileSync(join(repo, 'new.txt'), 'one\ntwo')
+    writeFileSync(join(repo, 'image.bin'), Buffer.from([0, 1, 2]))
+
+    const dirty = git(repo, 'status', '--porcelain')
+    expect(uncommittedSummary({ dirty, numstat: uncommittedNumstat({ cwd: repo }) })).toEqual({
+      changedPaths: 3,
+      measuredPaths: 3,
+      binaryPaths: 1,
+      insertions: 4,
+      deletions: 0,
+    })
+  })
+
+  it('counts every file inside a wholly untracked directory', () => {
+    const repo = gitRepo()
+    mkdirSync(join(repo, 'new-module'))
+    writeFileSync(join(repo, 'new-module', 'index.mjs'), 'export const answer = 42\n')
+    writeFileSync(join(repo, 'new-module', 'index.test.mjs'), 'it("answers", () => {})\n')
+
+    const dirty = git(repo, 'status', '--porcelain', '-uall')
+    expect(uncommittedSummary({ dirty, numstat: uncommittedNumstat({ cwd: repo }) })).toEqual({
+      changedPaths: 2,
+      measuredPaths: 2,
+      binaryPaths: 0,
+      insertions: 2,
+      deletions: 0,
+    })
+  })
+})
 
 afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
@@ -72,6 +142,168 @@ describe('author-sol records a commission before dispatch', () => {
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
   })
 
+  it('leaves the ledger byte-identical when the commit that seals the append fails', () => {
+    // THE HALF-STATE THE RECORD EXISTS TO PREVENT (point 780). A commission that
+    // aborts before the authoring starts must not leave a line claiming it ran:
+    // two governing rules count rounds out of this append-only file.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-commission-rollback-'))
+    dirs.push(dir)
+    const ledger = join(dir, 'mechanism-reviews.jsonl')
+    const priorLine = `${JSON.stringify({ sha: 'a'.repeat(40), kind: 'note' })}\n`
+    writeFileSync(ledger, priorLine)
+    const before = readFileSync(ledger)
+
+    const input = {
+      records: [],
+      point,
+      round: 0,
+      framing: AUTHORING_FRAMINGS[0],
+      sha: 'b'.repeat(40),
+      now: 1_787_130_000_000,
+      append: (record) => appendFileSync(ledger, `${JSON.stringify(record)}\n`),
+      commit: () => {
+        throw new Error('git add -- … is outside repository')
+      },
+      rollback: () => writeFileSync(ledger, before),
+    }
+    expect(() => recordAuthoringCommission(input)).toThrow(/outside repository/)
+    expect(readFileSync(ledger)).toEqual(before)
+    expect(readFileSync(ledger, 'utf8')).toBe(priorLine)
+
+    // …and the SAME commission succeeds once the commit can run, so the rollback
+    // undoes the append rather than poisoning the round.
+    const sealed = recordAuthoringCommission({ ...input, commit: () => {}, rollback: () => {} })
+    expect(sealed.written).toBe(true)
+    expect(readFileSync(ledger, 'utf8').trim().split('\n')).toHaveLength(2)
+  })
+
+  it('undoes a PART-WAY append too, not only a failing commit', () => {
+    // Finding 3 of the cross-vendor review: the append sat outside the try, so a
+    // write that died half-way left a fragment in the append-only ledger and
+    // never reached the undo at all.
+    const undone = []
+    expect(() =>
+      recordAuthoringCommission({
+        records: [],
+        point,
+        round: 0,
+        framing: AUTHORING_FRAMINGS[0],
+        sha: 'b'.repeat(40),
+        now: 1_787_130_000_000,
+        append: () => {
+          throw new Error('ENOSPC half a line')
+        },
+        commit: () => undone.push('commit'),
+        rollback: () => undone.push('rollback'),
+      }),
+    ).toThrow(/ENOSPC/)
+    expect(undone).toEqual(['rollback'])
+  })
+
+  it('reports the failed undo BESIDE the failure that caused it', () => {
+    expect(() =>
+      recordAuthoringCommission({
+        records: [],
+        point,
+        round: 0,
+        framing: AUTHORING_FRAMINGS[0],
+        sha: 'b'.repeat(40),
+        now: 1_787_130_000_000,
+        append: () => {},
+        commit: () => {
+          throw new Error('is outside repository')
+        },
+        rollback: () => {
+          throw new Error('read-only file system')
+        },
+      }),
+    ).toThrow(/is outside repository[\s\S]*could not be restored[\s\S]*read-only file system/)
+  })
+
+  it('restores the working tree AND the index with the production undo', () => {
+    // FINDING 4 OF THE CROSS-VENDOR REVIEW: the case above injects its own undo,
+    // so it can never see the half that actually bit — `git add` had already
+    // STAGED the appended line, and a working-tree-only restore left it there
+    // for the next commit in that worktree to carry. This drives the REAL pair
+    // against a REAL index.
+    const repo = gitRepo()
+    const ledger = join(repo, '.claude', 'mechanism-reviews.jsonl')
+    mkdirSync(dirname(ledger), { recursive: true })
+    const priorLine = `${JSON.stringify({ sha: 'a'.repeat(40), kind: 'note' })}\n`
+    writeFileSync(ledger, priorLine)
+    git(repo, 'add', '--', ledger)
+    git(repo, 'commit', '-q', '-m', 'ledger')
+
+    const before = ledgerSnapshot(ledger, { cwd: repo })
+    expect(before.staged).toMatch(/mechanism-reviews\.jsonl$/)
+
+    appendFileSync(ledger, `${JSON.stringify({ sha: 'b'.repeat(40), kind: 'authoring-commission' })}\n`)
+    git(repo, 'add', '--', ledger)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toContain('mechanism-reviews.jsonl')
+
+    restoreLedger(before)
+    expect(readFileSync(ledger, 'utf8')).toBe(priorLine)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toBe('')
+    expect(git(repo, 'status', '--porcelain')).toBe('')
+  })
+
+  it('leaves neither file nor index behind when the ledger did not exist before', () => {
+    const repo = gitRepo()
+    const ledger = join(repo, '.claude', 'mechanism-reviews.jsonl')
+    mkdirSync(dirname(ledger), { recursive: true })
+
+    const before = ledgerSnapshot(ledger, { cwd: repo })
+    expect(before.bytes).toBe(null)
+    expect(before.staged).toBe('')
+
+    writeFileSync(ledger, `${JSON.stringify({ sha: 'c'.repeat(40) })}\n`)
+    git(repo, 'add', '--', ledger)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toContain('mechanism-reviews.jsonl')
+
+    restoreLedger(before)
+    expect(existsSync(ledger)).toBe(false)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toBe('')
+    expect(git(repo, 'status', '--porcelain')).toBe('')
+  })
+
+  it('unstages by the name git really holds, in a checkout whose path ends in a space', () => {
+    // Round 2 of the cross-vendor review: the undo asked for the toplevel
+    // through a helper that TRIMS, so in such a checkout it computed a
+    // different name and left the staged ledger behind.
+    const outer = mkdtempSync(join(tmpdir(), 'hoa-ledger-space-'))
+    dirs.push(outer)
+    const repo = join(outer, 'checkout ')
+    mkdirSync(repo, { recursive: true })
+    git(repo, 'init', '-q', '-b', 'main')
+    git(repo, 'config', 'user.email', 'test@example.invalid')
+    git(repo, 'config', 'user.name', 'Test')
+    writeFileSync(join(repo, 'seed.txt'), 'seed\n')
+    git(repo, 'add', '-A')
+    git(repo, 'commit', '-q', '-m', 'seed')
+
+    const ledger = join(repo, '.claude', 'mechanism-reviews.jsonl')
+    mkdirSync(dirname(ledger), { recursive: true })
+    const before = ledgerSnapshot(ledger, { cwd: repo })
+    expect(before.bytes).toBe(null)
+
+    writeFileSync(ledger, `${JSON.stringify({ sha: 'e'.repeat(40) })}\n`)
+    git(repo, 'add', '--', ledger)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toContain('mechanism-reviews.jsonl')
+
+    restoreLedger(before)
+    expect(existsSync(ledger)).toBe(false)
+    expect(git(repo, 'diff', '--cached', '--name-only')).toBe('')
+  })
+
+  it('refuses the transaction when the ledger cannot be read at all', () => {
+    // …rather than calling it absent and letting the undo delete it. A
+    // directory in the ledger's place is an unreadable file that is NOT missing.
+    const repo = gitRepo()
+    const ledger = join(repo, '.claude', 'mechanism-reviews.jsonl')
+    mkdirSync(ledger, { recursive: true })
+    expect(() => ledgerSnapshot(ledger, { cwd: repo })).toThrow(/cannot read the ledger/)
+  })
+
   it('refuses to rewrite the framing already recorded for a round', () => {
     const prior = {
       kind: AUTHORING_COMMISSION_KIND,
@@ -99,7 +331,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     expect(result.stdout).toContain('review record: 0 unsuccessful round(s)')
   })
 
-  it('derives N non-passing reviews and holds the lane while the escalation is suspended', () => {
+  it('derives N non-passing reviews and holds the lane while the switch refuses Fable', () => {
     const rows = Array.from({ length: FABLE_ESCALATION_ROUNDS }, (_, round) => ({
       point: Number(point),
       mode: 'review',
@@ -117,7 +349,7 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
     const result = route(ledger(rows))
     expect(result.status, result.stderr).toBe(0)
     expect(result.stdout).toContain(`point ${point} → sol`)
-    expect(result.stdout).toContain('but the Fable escalation is SUSPENDED')
+    expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
     expect(result.stdout).toContain(
       `review record: ${FABLE_ESCALATION_ROUNDS} unsuccessful round(s); ${FABLE_ESCALATION_ROUNDS} fresh attempt(s)`,
     )
@@ -155,9 +387,9 @@ describe('author-sol routing reads unsuccessful rounds from the review ledger', 
   it('accepts an explicit numeric override for history outside the ledger', () => {
     const result = route(ledger([]), ['--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
-    // The override still carries the count; only the lane change is suspended.
+    // The override still carries the count; only the lane change is withheld.
     expect(result.stdout).toContain(`point ${point} → sol`)
-    expect(result.stdout).toContain('but the Fable escalation is SUSPENDED')
+    expect(result.stdout).toContain('node scripts/fable-switch.mjs --status')
   })
 
   it('turns the override immediately before the threshold into the examination step', () => {

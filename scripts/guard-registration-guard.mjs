@@ -10,7 +10,12 @@
 // broken guard must never make the tree uncommittable. A real finding fails
 // CLOSED, which is the whole point.
 import { execFileSync } from 'node:child_process'
-import { evaluate, formatVerdict, touchesGuardWiring } from './guard-registration-core.mjs'
+import {
+  evaluate,
+  formatVerdict,
+  STAGED_PATH_ARGS,
+  touchesGuardWiring,
+} from './guard-registration-core.mjs'
 
 const git = (args) => execFileSync('git', args, { windowsHide: true, encoding: 'utf8' })
 
@@ -24,9 +29,7 @@ function staged(path) {
 }
 
 try {
-  // ACMR: added, copied, modified, renamed — deletions are absent, so removing a
-  // guard script is never blocked by the check that covers it.
-  const names = git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z'])
+  const names = git(STAGED_PATH_ARGS)
     .split('\0')
     .filter(Boolean)
 
@@ -35,6 +38,7 @@ try {
       paths: names,
       settingsJson: staged('.claude/settings.json'),
       preflightSource: staged('scripts/guard-preflight.mjs'),
+      expectedSource: staged('scripts/guard-preflight-expected.mjs'),
     })
     if (verdict.block) {
       process.stderr.write(`${formatVerdict(verdict)}\n`)

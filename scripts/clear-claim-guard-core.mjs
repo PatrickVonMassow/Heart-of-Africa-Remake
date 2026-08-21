@@ -18,25 +18,14 @@
 // PURE. The wrapper scripts/clear-claim-guard.mjs does the reading.
 
 /**
- * How a reply asks the user to end the session — deliberately NARROW.
+ * How a reply asks the user to end the session.
  *
- * FOUR cross-vendor rounds on 20.08.2026 each found new prose the previous draft
- * refused wrongly: an indicative that reads like an imperative, a noun that
- * contains one, a quotation of the very sentence this guard looks for, an
- * unrelated "mach das Bild clear", a negation escaping past a comma. That is not
- * a list of bugs to work through — it is what a regex over free German prose is,
- * and every round of widening bought a new class of false refusals.
- *
- * THE TWO ERRORS ARE NOT SYMMETRIC. A missed invitation costs nothing: the claim
- * is withdrawn at the boundary anyway and the batch is unharmed. A false refusal
- * costs a whole turn and teaches the reader to distrust the guard. So this
- * matcher recognises only shapes that cannot be anything else, and every
- * ambiguity — every single one — resolves toward ALLOW. Misses are the price and
- * they are cheap.
- *
- * The one structural rule that does the work: a German imperative LEADS its
- * clause. Requiring the verb to be the clause's first word removes the whole
- * indicative-and-noun family at a stroke, without a list of exceptions.
+ * The matcher uses sentence context rather than the position of `/clear` alone:
+ * an imperative, an offer, or a recommendation is an invitation even when the
+ * command has ordinary words after it. Reports, guard descriptions, quotations,
+ * negations, and orders about a test or document remain mentions rather than
+ * invitations. This keeps the false-positive protections found by the reviews
+ * on 20.08.2026 without making a sentence-final token the price of detection.
  */
 // A leading "Bitte" is the one particle that may precede the verb without making
 // the clause anything other than an order — "Bitte führe einen clear aus". The
@@ -70,9 +59,16 @@ const ARTICLE = String.raw`(?:(?:eine|einen|die|den|nen)\s+)?`
 const PREFIX = String.raw`(?:\s+(?:aus|an|auf|durch|weiter|nach))?`
 const TAIL = String.raw`${PREFIX}[\s.!?)»"'\u201c\u201d\u0060]*$`
 
+// Once `/clear` is the direct object of an imperative, these are continuations
+// of that instruction rather than prose ABOUT the token. In particular, this
+// admits the project's ordinary "… und fang neu an" handover wording without
+// admitting "Mach bitte /clear ist der Positivfall" or documentation commands.
+const COMMAND_TAIL = String.raw`(?:\s+(?:aus|an|auf|durch|weiter|nach|neu|jetzt|nun|gleich|bitte)|\s+und\b[^.!?]*)*[\s.!?)»"'\u201c\u201d\u0060]*$`
+const ENGLISH_COMMAND_TAIL = String.raw`(?:\s+(?:now|please)|\s+and\b[^.!?]*)*[\s.!?"'\u201c\u201d\u0060]*$`
+
 /** A clause that IS the slash command, or leads with an imperative carrying it. */
 const SLASH_CLEAR = new RegExp(
-  String.raw`^(?:${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}\/clear\b|\/clear\b)${TAIL}`,
+  String.raw`^(?:${LEAD}(?:${IMPERATIVE}|${POLITE})${SUBJECT}\b${FILLER}${ARTICLE}\/clear\b${COMMAND_TAIL}|\/clear\b${TAIL})`,
   'i',
 )
 
@@ -86,12 +82,35 @@ const ARTICLED_CLEAR = new RegExp(
 
 export const CLEAR_INVITATION = Object.freeze([
   SLASH_CLEAR,
+  // A separable restart instruction may carry the command after "mit".
+  new RegExp(
+    String.raw`^${LEAD}(?:starte|beginne)${SUBJECT}\b${FILLER}mit\s+\/clear\b${COMMAND_TAIL}`,
+    'i',
+  ),
+  // Here "clear" is itself the imperative verb and the session its object.
+  new RegExp(
+    String.raw`^(?:bitte\s+)?clear\s+(?:(?:die|deine?)\s+)?(?:session|sitzung)\b${COMMAND_TAIL}`,
+    'i',
+  ),
+  // Offers and recommendations are invitations too, despite not being in the
+  // imperative mood. Their subject/modal shapes keep reports about past clears
+  // and descriptions of this guard outside the match.
+  new RegExp(
+    String.raw`^(?:du\s+kannst|ihr\s+könnt|sie\s+können)\b${FILLER}${ARTICLE}\/clear\b(?:\s+(?:machen|ausführen|starten|jetzt|nun|gleich|bitte))*[\s.!?]*$`,
+    'i',
+  ),
+  /^(?:ein|der)\s+\/clear\b\s+(?:wäre|ist)\b(?:\s+\S+)*\s+sinnvoll[\s.!?]*$/i,
   ARTICLED_CLEAR,
   new RegExp(
     String.raw`^${LEAD}(?:${IMPERATIVE})${SUBJECT}\b${FILLER}${ARTICLE}${SESSION}\b${TAIL}`,
     'i',
   ),
   new RegExp(String.raw`^${LEAD}(?:${POLITE})\b${FILLER}${ARTICLE}${SESSION}\b${TAIL}`),
+  new RegExp(String.raw`^(?:please\s+)?(?:run|use)\s+\/clear\b${ENGLISH_COMMAND_TAIL}`, 'i'),
+  new RegExp(
+    String.raw`^you\s+can\b(?:\s+(?:now|please))*\s+(?:(?:run|use)\s+)?\/clear\b${ENGLISH_COMMAND_TAIL}`,
+    'i',
+  ),
   // English keeps no end constraint: a trailing prepositional phrase is ordinary
   // there ("… for the rest"), and the quoted-fixture case it would guard against
   // is already handled by stripping quotations and fenced code.

@@ -24,6 +24,7 @@ import {
   wiredStopHookIds,
 } from './guard-preflight-core.mjs'
 import { GUARDS, resolveSessionId, unregisteredHooks } from './guard-preflight.mjs'
+import { EXPECTED_GUARD_IDS } from './guard-preflight-expected.mjs'
 import { gatherRuleEchoInputs, gatherStampedFiles } from './rule-echo-guard.mjs'
 import { RULE_REGISTRY, checkAll, formatVerdict, unregisteredStamps } from './rule-echo-core.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
@@ -567,43 +568,11 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   })
 
   it('registers every guard whose wrapper exports a gather step', () => {
-    expect(Object.keys(byId).sort()).toEqual(
-      [
-        'batch-progress-guard',
-        'branch-hygiene-guard',
-        'bundle-first-guard',
-        'commission-guard',
-        'ci-status-guard',
-        'clear-claim-guard',
-        'container-ask-guard',
-        'criticality-review-guard',
-        'dashboard-card-topic-guard',
-        'dashboard-conciseness-guard',
-        'dashboard-guard',
-        'dashboard-integrity-guard',
-        'dashboard-sync',
-        'decision-card-guard',
-        'doc-budget-guard',
-        'findings-guard',
-        'guard-health-guard',
-        'guide-brevity-guard',
-        'mechanism-review-guard',
-        'model-guard',
-        'prep-guard',
-        'push-arrival-guard',
-        'queue-order-guard',
-        'render-verify-guard',
-        'retro-currency-guard',
-        'rule-echo-guard',
-        'rule-review-guard',
-        'tasks-archive-guard',
-        'tasks-spec-guard',
-        'timestamp-guard',
-      ].sort(),
-    )
+    expect(Object.keys(byId).sort()).toEqual([...EXPECTED_GUARD_IDS].sort())
   })
 
-  // THE DRIFT ITSELF (point 437 E). The list above is a second copy of the truth;
+  // THE DRIFT ITSELF (point 437 E). The expected list is shared with the
+  // commit-time guard rather than living as an unwatched third copy here;
   // this reads the AUTHORITATIVE chain. Until 07.08.2026 fourteen wired Stop
   // hooks sat outside the registry, so the preflight said nothing about them
   // while they would block — and §7.2 tells the session to preflight and answer
