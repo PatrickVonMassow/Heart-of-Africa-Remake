@@ -36,6 +36,17 @@ export function projectDirName(cwd) {
   return String(cwd).replace(/[^A-Za-z0-9]/g, '-')
 }
 
+/** Candidate project folders, worktree first and its main checkout second. */
+export function transcriptDirectoryCandidates({ projectsDir, checkoutRoot, mainCheckout = null, join }) {
+  const roots = [checkoutRoot, mainCheckout].filter(Boolean)
+  return [...new Set(roots.map((root) => join(projectsDir, projectDirName(root))))]
+}
+
+/** The first candidate that actually contains a session transcript. */
+export function chooseTranscriptDirectory(candidates = []) {
+  return candidates.find((candidate) => candidate.files.some((name) => name.endsWith('.jsonl'))) ?? null
+}
+
 /** Pull the plain text out of a message, ignoring tool results and images. */
 export function extractText(message) {
   const content = message?.content
@@ -101,10 +112,22 @@ export function parseSince(value, now = Date.now()) {
 }
 
 /** Filter and order the rows: oldest first, newest kept when `last` cuts. */
-export function selectEntries(entries, { grep = null, since = null, session = null, last = 20 } = {}) {
+export function selectEntries(entries, { grep = null, since = null, session = null, sessions = 0, last = 20 } = {}) {
+  let recentSessions = null
+  if (sessions > 0) {
+    const newest = new Map()
+    for (const row of entries) {
+      if (!row) continue
+      newest.set(row.session, Math.max(newest.get(row.session) ?? 0, row.at ?? 0))
+    }
+    recentSessions = new Set(
+      [...newest].sort((a, b) => b[1] - a[1]).slice(0, sessions).map(([id]) => id),
+    )
+  }
   const pattern = grep ? new RegExp(grep, 'i') : null
   const kept = entries.filter((row) => {
     if (!row) return false
+    if (recentSessions && !recentSessions.has(row.session)) return false
     if (pattern && !pattern.test(row.text)) return false
     if (since != null && (row.at == null || row.at < since)) return false
     if (session && !row.session.startsWith(session)) return false

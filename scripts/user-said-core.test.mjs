@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
+  chooseTranscriptDirectory,
   extractText,
   formatEntry,
   isHumanEntry,
@@ -7,6 +12,7 @@ import {
   parseSince,
   projectDirName,
   selectEntries,
+  transcriptDirectoryCandidates,
 } from './user-said-core.mjs'
 
 const human = (text, at = '2026-08-20T05:31:57.062Z', sessionId = 'd5fcb9cf-2936-4743') => JSON.stringify({
@@ -78,6 +84,15 @@ describe('selection', () => {
   it('last: 0 means everything', () => {
     expect(selectEntries(rows, { last: 0 })).toHaveLength(3)
   })
+
+  it('limits by the newest HUMAN MESSAGE in each of the newest sessions before matching', () => {
+    const fixture = [
+      { at: Date.parse('2026-08-20T08:00:00Z'), session: 'old', text: 'needle in an older session' },
+      { at: Date.parse('2026-08-20T10:00:00Z'), session: 'new', text: 'newest human turn does not match' },
+      { at: Date.parse('2026-08-20T09:00:00Z'), session: 'new', text: 'needle in the newest session' },
+    ]
+    expect(selectEntries(fixture, { grep: 'needle', sessions: 1, last: 0 })).toEqual([fixture[2]])
+  })
 })
 
 describe('--since', () => {
@@ -125,5 +140,48 @@ describe('one hit, one line', () => {
 describe('transcript directory', () => {
   it('mirrors the harness naming', () => {
     expect(projectDirName('/workspace/hoa')).toBe('-workspace-hoa')
+  })
+
+  it('prefers a populated worktree folder, then falls back to the populated main checkout', () => {
+    const dirs = transcriptDirectoryCandidates({
+      projectsDir: '/projects',
+      checkoutRoot: '/workspace/hoa/.claude/worktrees/agent-a',
+      mainCheckout: '/workspace/hoa',
+      join,
+    })
+    expect(dirs).toEqual([
+      '/projects/-workspace-hoa--claude-worktrees-agent-a',
+      '/projects/-workspace-hoa',
+    ])
+    expect(chooseTranscriptDirectory([
+      { dir: dirs[0], files: [] },
+      { dir: dirs[1], files: ['session.jsonl'] },
+      { dir: '/projects/-workspace-hoa-', files: ['wrong.jsonl'] },
+    ])).toEqual({ dir: dirs[1], files: ['session.jsonl'] })
+  })
+
+  it('exits non-zero when an explicit directory has no transcripts', () => {
+    const empty = mkdtempSync(join(tmpdir(), 'user-said-empty-'))
+    const run = spawnSync(process.execPath, ['scripts/user-said.mjs', '--dir', empty], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    })
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain(`no transcripts at ${empty}`)
+  })
+
+  it('the CLI honours --sessions against transcript fixtures', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'user-said-sessions-'))
+    writeFileSync(join(dir, 'old.jsonl'), `${human('needle old', '2026-08-20T08:00:00Z', 'old-session')}\n`)
+    writeFileSync(join(dir, 'new.jsonl'), [
+      human('needle new', '2026-08-20T09:00:00Z', 'new-session'),
+      human('newest turn', '2026-08-20T10:00:00Z', 'new-session'),
+    ].join('\n'))
+    const out = execFileSync(process.execPath, [
+      'scripts/user-said.mjs', '--dir', dir, '--grep', 'needle', '--sessions', '1', '--last', '0',
+    ], { cwd: process.cwd(), encoding: 'utf8' })
+    expect(out).toContain('needle new')
+    expect(out).not.toContain('needle old')
+    expect(out).toContain(`2 transcripts · ${dir}`)
   })
 })

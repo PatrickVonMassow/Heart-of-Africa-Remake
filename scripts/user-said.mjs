@@ -5,6 +5,7 @@
 //   node scripts/user-said.mjs --grep "reihenfolge"     every message matching, one line each
 //   node scripts/user-said.mjs --grep "614" --full      the matches in full
 //   node scripts/user-said.mjs --since 6h --last 50     a window, widened
+//   node scripts/user-said.mjs --sessions 5             only the five newest conversations
 //   node scripts/user-said.mjs --session d5fcb9cf       one conversation
 //
 // It streams the transcripts line by line and never holds a file in memory, so a
@@ -14,7 +15,17 @@ import { readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { formatEntry, parseLine, parseSince, projectDirName, selectEntries } from './user-said-core.mjs'
+import { execFileSync } from 'node:child_process'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
+import {
+  chooseTranscriptDirectory,
+  formatEntry,
+  parseLine,
+  parseSince,
+  selectEntries,
+  transcriptDirectoryCandidates,
+} from './user-said-core.mjs'
 
 function parseArgs(argv) {
   const out = { last: 20, width: 120, full: false }
@@ -24,6 +35,7 @@ function parseArgs(argv) {
     if (flag === '--grep') { out.grep = value; i += 1 }
     else if (flag === '--since') { out.since = value; i += 1 }
     else if (flag === '--session') { out.session = value; i += 1 }
+    else if (flag === '--sessions') { out.sessions = Number(value); i += 1 }
     else if (flag === '--last') { out.last = Number(value); i += 1 }
     else if (flag === '--width') { out.width = Number(value); i += 1 }
     else if (flag === '--dir') { out.dir = value; i += 1 }
@@ -35,22 +47,49 @@ function parseArgs(argv) {
 }
 
 const USAGE = `usage: node scripts/user-said.mjs [--grep <regex>] [--since <iso|90m|6h|2d|07:31>]
-       [--session <id-prefix>] [--last <n>] [--full] [--width <n>] [--dir <path>]
+       [--sessions <n>] [--session <id-prefix>] [--last <n>] [--full] [--width <n>] [--dir <path>]
 One line per message the user actually typed, oldest first. --full prints them whole.`
+
+function mainCheckout() {
+  try {
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return mainCheckoutFrom(common, REPO_ROOT)
+  } catch {
+    return null
+  }
+}
+
+async function transcriptDirectory(explicit) {
+  const projectsDir = join(homedir(), '.claude', 'projects')
+  const dirs = explicit
+    ? [explicit]
+    : transcriptDirectoryCandidates({ projectsDir, checkoutRoot: REPO_ROOT, mainCheckout: mainCheckout(), join })
+  const candidates = await Promise.all(dirs.map(async (dir) => {
+    try {
+      return { dir, files: await readdir(dir) }
+    } catch {
+      return { dir, files: [] }
+    }
+  }))
+  return { chosen: chooseTranscriptDirectory(candidates), tried: dirs }
+}
 
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (args.help) { console.log(USAGE); return }
 
-  const dir = args.dir ?? join(homedir(), '.claude', 'projects', projectDirName(process.cwd()))
-  let files
-  try {
-    files = (await readdir(dir)).filter((name) => name.endsWith('.jsonl'))
-  } catch {
-    console.error(`no transcripts at ${dir}`)
-    process.exitCode = 1
-    return
+  const { chosen, tried } = await transcriptDirectory(args.dir)
+  if (!chosen) {
+    console.error(`no transcripts at ${tried.join(' or ')}`)
+    return 1
   }
+  const { dir } = chosen
+  const files = chosen.files.filter((name) => name.endsWith('.jsonl'))
 
   const rows = []
   for (const name of files) {
@@ -65,14 +104,18 @@ async function main() {
     grep: args.grep ?? null,
     since: parseSince(args.since),
     session: args.session ?? null,
+    sessions: args.sessions ?? 0,
     last: args.last,
   })
 
   for (const row of selected) console.log(formatEntry(row, { width: args.width, full: args.full }))
-  console.log(`— ${selected.length} of ${rows.length} messages · ${files.length} transcripts`)
+  console.log(`— ${selected.length} of ${rows.length} messages · ${files.length} transcripts · ${dir}`)
+  return 0
 }
 
-main().catch((error) => {
+main().then((code) => {
+  process.exitCode = code
+}).catch((error) => {
   console.error(String(error?.message ?? error))
   process.exitCode = 1
 })
