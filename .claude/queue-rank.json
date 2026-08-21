@@ -267,6 +267,12 @@
       "why": "Der Nutzer hat am 21.08.2026 ausdrücklich diese Reihenfolge verlangt: der Punkt steht vor der Auslieferung, damit die Tickets vor der Kommunikationsmechanik zügig durchlaufen",
       "origin": "user",
       "place": "ahead"
+    },
+    "810": {
+      "at": "2026-08-21T10:35:17.647Z",
+      "why": "Hinten ist richtig: Jeder der sechzehn Verdachtsfälle sitzt in Code, den der vorderste Punkt ohnehin neu schreibt — vorher geprüft hieße zweimal prüfen",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -324,7 +330,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T10:15:42.896Z",
+    "at": "2026-08-21T10:35:17.653Z",
     "points": [
       174,
       184,
@@ -559,7 +565,8 @@
       805,
       806,
       807,
-      809
+      809,
+      810
     ]
   }
 }
