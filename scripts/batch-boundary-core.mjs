@@ -40,13 +40,15 @@
 //     the heartbeat past it, and a live pid still gets a grace window.
 //   - the launcher REPORTS a silent owner instead of only logging it.
 //
-// The imports are NAMES, from two constants modules that import nothing: the
-// board's commands (board-remedy) and the launcher's identity
-// (batch-launcher-core). This core prints the instruction a session follows
+// The imports are NAMES, from constants/contract modules that import nothing:
+// the board's commands (board-remedy), the launcher's identity
+// (batch-launcher-core), and the canonical empty handover state
+// (handover-card-contract). This core prints the instruction a session follows
 // literally at a boundary, and a second spelling of those names here is how the
 // printed path and the working path came apart in the first place.
 import { EDIT_CMD, NONE_CARD_CMD } from './board-remedy.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-launcher-core.mjs'
+import { NO_FOLLOW_ON_WORK } from './handover-card-contract.mjs'
 
 /** How long a recorded boundary marker stays usable. Long enough for the merge,
  *  the tick, the push and the closing report of a point; short enough that a
@@ -972,13 +974,14 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
  * User-facing prose (the board is read on a phone), so it says the destination in
  * the first sentence and never leaves the reader to infer it.
  *
- * IT NAMES THE NEXT OPEN POINT (point 800). This text is prescribed for use
- * VERBATIM in the unnumbered gap card `board.mjs done <n> --none` writes. The
- * board writer requires that forward reference, and the topic guard permits it
- * only on this state card by title; the shared property test applies the same
- * writer predicate so those two rules cannot drift apart again. The closed
- * point's own story belongs in Erledigt anyway, which is where `done` files it
- * in the same edit; this card says where the batch GOES.
+ * IT NAMES THE NEXT OPEN POINT (point 800), or states canonically that none
+ * remains. This text is prescribed for use VERBATIM in the unnumbered gap card
+ * `board.mjs done <n> --none` writes. The board writer requires that destination,
+ * and the topic guard permits it only on this state card by title; the shared
+ * property test applies the same writer predicate so those two rules cannot
+ * drift apart again. The closed point's own story belongs in Erledigt anyway,
+ * which is where `done` files it in the same edit; this card says where the
+ * batch GOES.
  */
 /**
  * THE COMMAND THAT PUTS THE BOUNDARY CARD UP. PURE.
@@ -1007,8 +1010,9 @@ export function boundaryCardText({
   nextPoint,
   cause = BOUNDARY_CAUSES.POINT,
 } = {}) {
+  const noFollowOn = nextPoint === null
   const followOn = Number(nextPoint)
-  if (!Number.isInteger(followOn) || followOn <= 0 || followOn > 999_999) {
+  if (!noFollowOn && (!Number.isInteger(followOn) || followOn <= 0 || followOn > 999_999)) {
     throw new Error('boundary card: nextPoint must name the first open work-order point')
   }
   // The WATERMARK head (point 675, defeat 3): the reader must see that the
@@ -1029,17 +1033,23 @@ export function boundaryCardText({
     // closing the window, and letting the take-up window run out. Promising more
     // would repeat, one step later, the very misdirection this card was rewritten
     // to remove (four-eyes review, finding 2).
+    const followOnSentence = noFollowOn
+      ? NO_FOLLOW_ON_WORK
+      : `Dort wird mit Punkt ${followOn} weitergearbeitet, sobald das Fenster den Anspruch einlöst.`
     return (
       `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster mit PID ${stablePid} (aktuelle Sitzung ` +
-      `${currentSid}) hat ihn beansprucht; der Launcher hält den Start deshalb zurück. Dort wird mit Punkt ` +
-      `${followOn} weitergearbeitet, sobald das Fenster den Anspruch einlöst. Die Reservierung bleibt bis zum ` +
+      `${currentSid}) hat ihn beansprucht; der Launcher hält den Start deshalb zurück. ${followOnSentence} ` +
+      'Die Reservierung bleibt bis zum ' +
       'Ende der Übernahmefrist oder bis zum Schließen des Fensters bestehen.\n\n' +
       'Danach greift die gewöhnliche Übergabe; der Stapel bleibt nie ohne Eigentümer. Hier läuft nichts weiter.'
     )
   }
+  const followOnSentence = noFollowOn
+    ? NO_FOLLOW_ON_WORK
+    : `Sie nimmt Punkt ${followOn} als nächsten offenen Punkt der Warteschlange auf.`
   return (
-    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls. Sie ` +
-    `nimmt Punkt ${followOn} als nächsten offenen Punkt der Warteschlange auf. Kein Fenster hat den Stapel ` +
+    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls. ` +
+    `${followOnSentence} Kein Fenster hat den Stapel ` +
     'beansprucht.\n\nHier läuft nichts weiter.'
   )
 }

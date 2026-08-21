@@ -215,8 +215,9 @@ export function cardNamingViolations(html) {
     if (card.kind === 'idle') {
       // The ONE deliberate exception (point 434(7)): the handover card belongs to
       // no point, so it may not carry a chip — but it owes the successor's point
-      // in prose. Its SHAPE is checked all the same: the marker alone must not be
-      // able to exempt an arbitrary card from every rule above.
+      // in prose or the canonical statement that none remains. Its SHAPE is
+      // checked all the same: the marker alone must not be able to exempt an
+      // arbitrary card from every rule above.
       if (card.chip != null || card.title !== NO_CURRENT_WORK_TITLE) {
         out.push({
           code: 'handover-card-shape',
@@ -236,8 +237,9 @@ export function cardNamingViolations(html) {
           code: 'handover-card-nameless',
           msg:
             `the handover card ${named} names no follow-on work — it is the one card without a ` +
-            'number, so its text must say which point the batch picks up next. Rewrite it: ' +
-            'node scripts/board.mjs none "<Grund, der den nächsten Punkt nennt>"',
+            'number, so its text must say which point the batch picks up next or use the dictated ' +
+            'no-open-point form. Rewrite it: node scripts/board.mjs none "<Grund mit dem nächsten Punkt ' +
+            'oder dem diktierten Leerzustand>"',
         })
       }
       return

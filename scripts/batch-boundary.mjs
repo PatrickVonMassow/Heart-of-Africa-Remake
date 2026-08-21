@@ -499,9 +499,10 @@ export function boundaryHandover({
     claimHonoured: reservationDecision({ assessment: claim }).acquire === false,
     claimantSid: claim.claimantSid,
   })
-  // The CARD owns no point chip, but its prose names the first open point: that
-  // is the publish gate's required handover destination. State-card titles are
-  // the topic guard's narrow exemption, so this one forward reference is legal.
+  // The CARD owns no point chip, but its prose names the first open point or the
+  // canonical fact that none remains: that is the publish gate's required
+  // handover destination. State-card titles are the topic guard's narrow
+  // exemption, so the forward reference is legal when one exists.
   const nextPoint = parseTasks(tasksText).open[0] ?? null
   const claimant = claimantCardIdentity(claim.claim)
   const cardInput = { ...where, ...claimant, nextPoint }
@@ -837,8 +838,9 @@ if (isMain) {
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
     const cardBlock =
       'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-      'verbatim rather than writing it again. It names the next open point on purpose: the unnumbered gap ' +
-      'card owes that destination to its reader, and the topic guard exempts that state card by title.\n\n' +
+      'verbatim rather than writing it again. It names the next open point, or says that none remains, on ' +
+      'purpose: the unnumbered gap card owes that destination to its reader, and the topic guard exempts ' +
+      'that state card by title.\n\n' +
       `${handover.card}\n\n` +
       // The command is CHOSEN from the board's real state (point 470), never
       // assumed: an instruction that does not work is what sent sessions to

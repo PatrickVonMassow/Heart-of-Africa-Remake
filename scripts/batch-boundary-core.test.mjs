@@ -55,7 +55,7 @@ import { markHandover, progressGuardDecision, readOwnerLock } from './batch-sing
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
+import { boundaryHandover, clearBoundary, commitSealedBoundary, standingCards } from './batch-boundary.mjs'
 import { evaluateRuleReview } from './rule-review-core.mjs'
 import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
@@ -636,6 +636,15 @@ describe('the boundary card names where the batch actually goes', () => {
     }
   })
 
+  it('dictates the canonical finished-batch card when the work order has no open point', () => {
+    const handover = boundaryHandover({ sid: 'x', tasksText: '# no open points\n' })
+    expect(handover.nextPoint).toBe(null)
+    expect(handover.card).toContain(
+      'Der Arbeitsauftrag enthält keinen offenen Punkt; der Stapel ist abgeschlossen.',
+    )
+    expect(namesFollowOnWork(handover.card)).toBe(true)
+  })
+
   // POINT 800: the dictated text and every gate that consumes it are one
   // contract. This is a property over several possible queue heads, for both
   // destinations, so the composer cannot drift back to a nameless card.
@@ -665,6 +674,32 @@ describe('the boundary card names where the batch actually goes', () => {
         expect(boardCarriesCard(card, cardProofFragments({ destination }))).toMatchObject({ carries: true })
         for (const fragment of cardProofFragments({ destination })) expect(text).toContain(fragment)
       }
+    }
+  })
+
+  it('dictates an empty-queue form accepted by every card gate for either destination', () => {
+    const section = (name) => `<details class="sect"><summary><h2>${name}</h2></summary>\n</details>\n`
+    const emptyBoard =
+      `<main>\n${section('Woran ich gerade arbeite')}${section('Von dir zu klären')}` +
+      `${section('Warteschlange')}${section('Erledigt')}</main>\n`
+    const tasks = '# no open points\n'
+    for (const destination of [
+      BOUNDARY_DESTINATIONS.FRESH_SESSION,
+      BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+    ]) {
+      const text = boundaryCardText({
+        destination,
+        nextPoint: null,
+        ...(destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
+          ? claimantCardIdentity(CURRENT_CLAIM)
+          : {}),
+      })
+      expect(namesFollowOnWork(text)).toBe(true)
+      const card = toNoCurrentWork(emptyBoard, text, { stamp: '21:10' })
+      expect(topicViolations(card, knownPoints(tasks))).toEqual([])
+      expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
+      expect(concisenessOffenders(card)).toEqual([])
+      expect(boardCarriesCard(card, cardProofFragments({ destination }))).toMatchObject({ carries: true })
     }
   })
 
