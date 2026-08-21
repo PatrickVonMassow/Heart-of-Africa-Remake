@@ -378,9 +378,11 @@ const minutes = (ms) => Math.round(ms / 60000)
  * EVERY kind is now judged on RECENCY, not on existence — a pid by the identity
  * of the process behind it, the other three by when something last happened.
  *
- * Returns { ok, kind, describe, detail } — `describe` is what the guard's allow
- * message says out loud, so a later reader of the transcript can see what the
- * turn ended on.
+ * Returns { ok, kind, describe, detail, progressAt } — `describe` is what the
+ * guard's allow message says out loud, so a later reader of the transcript can
+ * see what the turn ended on. `progressAt` is the latest moment the probe proves:
+ * for a matching live process that is this observation, while file/ref evidence
+ * carries the timestamp of its last durable movement.
  */
 export function checkEvidence(
   item,
@@ -413,7 +415,11 @@ export function checkEvidence(
     if (typeof item.startedAt !== 'number') return no(`pid ${pid}${label}`, 'no-start-time')
     if (typeof probe.startedAt !== 'number') return no(`pid ${pid}${label}`, 'start-time-unverifiable')
     if (Math.abs(probe.startedAt - item.startedAt) > tolerance) return no(`pid ${pid}${label}`, 'pid-reused')
-    return yes(`pid ${pid}${label}`, 'alive')
+    // A matching live process is not a bare owner heartbeat. It is the bounded,
+    // session-attributed work the owner declared, freshly re-proved by this tick.
+    // Stamp the observation itself so one long blocking verification call remains
+    // demonstrably live across launcher intervals instead of looking unchanged.
+    return yes(`pid ${pid}${label}`, 'alive', Number.isFinite(now) ? now : null)
   }
   if (kind === 'branch') {
     const ref = String(item.ref ?? '').trim()

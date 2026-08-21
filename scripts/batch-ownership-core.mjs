@@ -231,10 +231,12 @@ const OWNER_PROGRESS_EVENTS = new Set([
 /**
  * Has the owner produced real work across launcher decisions? PURE.
  *
- * A heartbeat and a living pid are deliberately absent. Foreground completion,
- * delegated/verification/durable-wait transitions, and an output timestamp from
- * declared work are the four admitted sources. The first observation establishes
- * a baseline; two unchanged intervals after it assess the generation stalled.
+ * A bare owner heartbeat and its pid are deliberately absent. Foreground
+ * completion, delegated/verification/durable-wait transitions, and a timestamp
+ * proved by declared work are the four admitted sources. That last source includes
+ * a matching live pid-backed declaration: `checkEvidence` stamps each successful
+ * identity probe at the observation time. The first observation establishes a
+ * baseline; two unchanged intervals after it assess the generation stalled.
  */
 export function ownerActivityDecision({ lock = null, work = null, records = [], previous = null } = {}) {
   const sessionId = typeof lock?.sessionId === 'string' ? lock.sessionId : null

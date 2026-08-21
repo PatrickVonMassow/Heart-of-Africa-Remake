@@ -11,6 +11,7 @@
 //      question nobody asked.
 import { describe, it, expect } from 'vitest'
 import { LEASE_MS, DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
+import { checkEvidence } from './batch-in-flight-core.mjs'
 import {
   IDLE_WINDOW_MS,
   effectiveLeaseUntil,
@@ -113,6 +114,34 @@ describe('ownerActivityDecision — a heartbeat is not progress', () => {
       previous: { ...baseline.state, unchangedIntervals: 1 },
     })
     expect(output).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 2_000 })
+  })
+
+  it('does not assess a live pid-backed declaration as stalled during one blocking call', () => {
+    const pidWork = (at) => ({
+      advancing: true,
+      items: [checkEvidence(
+        { kind: 'pid', pid: 812, startedAt: NOW - 10_000 },
+        { now: at, probePid: () => ({ exists: true, startedAt: NOW - 10_000 }) },
+      )],
+    })
+    const first = ownerActivityDecision({ lock: owner, records: [], work: pidWork(NOW) })
+    const second = ownerActivityDecision({ lock: owner, records: [], work: pidWork(NOW + 15 * 60_000), previous: first.state })
+    const third = ownerActivityDecision({ lock: owner, records: [], work: pidWork(NOW + 30 * 60_000), previous: second.state })
+
+    expect(first).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW })
+    expect(second).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 15 * 60_000 })
+    expect(third).toMatchObject({ stalled: false, unchangedIntervals: 0, progressAt: NOW + 30 * 60_000 })
+    expect(ownershipVerdict({
+      lock: { ...owner, claimedAt: NOW + 30 * 60_000 },
+      now: NOW + 30 * 60_000 + 1,
+      activity: third,
+      work: pidWork(NOW + 30 * 60_000),
+      corroboration: live,
+    })).toMatchObject({
+      settled: true,
+      owns: true,
+      reason: 'fresh-heartbeat',
+    })
   })
 
   it('does not borrow another session or generation activity', () => {
