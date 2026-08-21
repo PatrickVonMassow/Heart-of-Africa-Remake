@@ -20,7 +20,6 @@
 // This module answers only "what should happen"; nothing here touches the disk,
 // so every branch is covered by plain Vitest cases.
 import { createHash } from 'node:crypto'
-import { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 // Compatibility exports for callers that already get the path decision from
 // this bootstrap core. The implementation and its null contract live in the
