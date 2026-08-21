@@ -20791,3 +20791,41 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product defect, but it taxes every point boundary of every session, and
   it makes the one card the user reads on his phone hand-written instead of dictated.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 789. A point the machine files itself is ranked by its urgency, and only a high one
+  may stand before the release (user instruction 20.08.2026, in the same turn that deferred
+  eight points behind point 174: »Sichere außerdem per Mechanismus zu, dass, wenn automatisch
+  neue Tickets angelegt werden, diese nur bei hoher Dringlichkeit vorne eingereiht werden.
+  Sind sie nicht so dringend, sollen sie hinter 174 eingereiht werden.«).
+  WHAT EXISTS AND WHAT IS MISSING, measured against the code. The append gate of point 590
+  (`scripts/queue-rank-core.mjs`, rule 1c of `queue-order-guard`) already forces exactly ONE
+  rank decision per appended point and blocks the turn until it is taken — but it accepts both
+  answers equally: the block was moved somewhere, or "last is right" was recorded. It asks
+  nothing about urgency, and it does not know the release at all: `RELEASE_TAG_POINT = 174`
+  lives in `scripts/board-queue-core.mjs` and no ranking rule reads it. The urgency signal
+  exists too and is unused here — `criticalityOf` in `scripts/criticality-review-guard-core.mjs`
+  reads the `Criticality: low|med|high` tag every point carries.
+  FINAL STATE:
+  1. A point filed by the MACHINE — a drained finding, a charged red, a review finding, a guard
+     remedy: anything the user did not ask for in the same turn — may stand BEFORE the release
+     point only as HIGH urgency, and only with the one-line reason in its rank record. Every
+     other machine-filed point is placed BEHIND the release point.
+  2. "High" is decided from what the point states, not from an impression: the `Criticality:
+     high` tag, or a named blocking condition (it stops the batch, blocks a lane or the release,
+     or holds a red that cannot otherwise close). A point naming neither is not high.
+  3. The gate ENFORCES it at turn end: a machine-filed point standing before the release point
+     without that record blocks the turn, and the refusal names both remedies — move the block
+     behind the release point, or record the high-urgency reason.
+  4. A USER-requested point is exempt, because the user ranks it himself; the record keeps the
+     two origins apart, so the exemption cannot later be claimed for machine work.
+  5. The rule reads the CURRENT position of the release point out of `TASKS.md` and never a
+     stored index, so a re-sequencing — or the release itself moving — cannot silently
+     invalidate it.
+  VERIFIABLE: pure tests in `scripts/queue-rank-core.test.mjs` over a synthetic order —
+  machine-filed before the release without a reason blocks, with the reason passes, behind it
+  passes, user-filed is exempt, and a moved release point moves the boundary with it — plus the
+  refusal text asserted verbatim and no second copy of the release number in the ranking code.
+  Criticality: medium — no product defect, but without it every machine-filed point keeps
+  landing in front of the release by default, which is the drift the user has just corrected by
+  hand for eight points.
+  Bundle: Session- & Repo-Hygiene.
