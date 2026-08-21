@@ -605,6 +605,7 @@ describe('the boundary card names where the batch actually goes', () => {
     expect(text).toContain(`PID ${CURRENT_CLAIM.pid}`)
     expect(text).toContain('aktuelle Sitzung session-window-1')
     expect(text).toContain(`Punkt ${NEXT_POINT}`)
+    expect(text).toContain('node scripts/batch-claim.mjs --session session-window-1')
     expect(text).toContain('Launcher hält den Start deshalb zurück')
     // The sentence the incident was made of must not appear in this state.
     expect(text).not.toContain('nächsten Punkt der Warteschlange')

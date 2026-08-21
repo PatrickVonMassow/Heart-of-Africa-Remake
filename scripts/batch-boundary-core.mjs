@@ -1039,7 +1039,8 @@ export function boundaryCardText({
     // to remove (four-eyes review, finding 2).
     const followOnSentence = noFollowOn
       ? NO_FOLLOW_ON_WORK
-      : `Dort wird mit Punkt ${followOn} weitergearbeitet, sobald das Fenster den Anspruch einlöst.`
+      : `Dort wird mit Punkt ${followOn} weitergearbeitet, sobald das Fenster den Anspruch mit ` +
+        `\`node scripts/batch-claim.mjs --session ${currentSid}\` einlöst.`
     return (
       `${head} Der Stapel geht NICHT an eine frische Sitzung: ${claimantIdentity} hat ihn beansprucht; der ` +
       `Launcher hält den Start deshalb zurück. ${followOnSentence} ` +
