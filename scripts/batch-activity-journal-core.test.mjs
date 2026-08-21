@@ -79,6 +79,21 @@ describe('batch activity journal append protocol', () => {
     ])
   })
 
+  it('reads the next sequence from the tail, and falls back to the whole file', () => {
+    const path = fixture()
+    for (let index = 0; index < 40; index += 1) {
+      appendActivity({ event: ACTIVITY_EVENTS.FOREGROUND_ACTIVITY, cause: 'tool', evidence: { index } }, { path, now: () => 1000 + index })
+    }
+    // A tail far too short to hold one whole line must not restart the sequence:
+    // the whole-file fallback still finds record 40.
+    expect(appendActivity({ event: ACTIVITY_EVENTS.PAUSE, cause: 'user', evidence: {} }, { path, tailBytes: 8 }).seq).toBe(41)
+    // A tail that holds only the newest lines gives the same answer as a full read.
+    expect(appendActivity({ event: ACTIVITY_EVENTS.PAUSE_FINISH, cause: 'user', evidence: {} }, { path, tailBytes: 512 }).seq).toBe(42)
+    const parsed = parseActivityJournal(readFileSync(path, 'utf8'))
+    expect(parsed.rejected).toEqual([])
+    expect(parsed.records.map((record) => record.seq)).toEqual(Array.from({ length: 42 }, (_, index) => index + 1))
+  })
+
   it('fails open for lifecycle callers when the target cannot be written', () => {
     expect(emitActivity({ event: ACTIVITY_EVENTS.PAUSE, cause: 'user', evidence: {} }, { path: '/dev/null/nope' })).toBe(false)
   })

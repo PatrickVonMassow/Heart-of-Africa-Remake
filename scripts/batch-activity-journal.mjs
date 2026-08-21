@@ -12,8 +12,10 @@ import {
   mkdirSync,
   openSync,
   closeSync,
+  fstatSync,
   fsyncSync,
   readFileSync,
+  readSync,
   rmSync,
   statSync,
   writeSync,
@@ -70,13 +72,40 @@ function acquireJournalLock(lockPath, { now = Date.now, waitMs = JOURNAL_LOCK_WA
   }
 }
 
-function nextSequence(path) {
+/** The next sequence is read from the journal's TAIL, not from a re-parse of the
+ * whole file. This append sits in the PostToolUse hook of EVERY tool call, so a
+ * full parse made every call pay for the journal's entire history: measured
+ * 21.08.2026 at 4 ms for 500 lines, 7 ms for 2,000 and 15 ms for 5,000, growing
+ * without bound as the batch runs. A tail read still derives the sequence from
+ * the durable journal under the mutex — there is still no side counter that can
+ * advance without its line — and falls back to the whole file when the tail
+ * carries no complete record. */
+export const SEQUENCE_TAIL_BYTES = 64 * 1024
+
+function nextSequence(path, { tailBytes = SEQUENCE_TAIL_BYTES } = {}) {
+  let fd
   try {
-    const { records } = parseActivityJournal(readFileSync(path, 'utf8'))
-    return (records.at(-1)?.seq ?? 0) + 1
+    fd = openSync(path, 'r')
   } catch (error) {
     if (error?.code === 'ENOENT') return 1
     throw error
+  }
+  try {
+    const size = fstatSync(fd).size
+    const length = Math.min(size, Math.max(1, tailBytes))
+    if (length > 0) {
+      const buffer = Buffer.alloc(length)
+      readSync(fd, buffer, 0, length, size - length)
+      // A tail that starts mid-line yields one unparsable fragment, which the
+      // parser drops; a valid record in the tail is by definition the newest.
+      const { records } = parseActivityJournal(buffer.toString('utf8'))
+      if (records.length > 0) return records.at(-1).seq + 1
+    }
+    if (length >= size) return 1
+    const { records } = parseActivityJournal(readFileSync(path, 'utf8'))
+    return (records.at(-1)?.seq ?? 0) + 1
+  } finally {
+    closeSync(fd)
   }
 }
 
@@ -89,11 +118,12 @@ export function appendActivity(input, {
   now = Date.now,
   waitMs = JOURNAL_LOCK_WAIT_MS,
   staleMs = JOURNAL_LOCK_STALE_MS,
+  tailBytes = SEQUENCE_TAIL_BYTES,
 } = {}) {
   mkdirSync(dirname(path), { recursive: true })
   acquireJournalLock(lockPath, { now, waitMs, staleMs })
   try {
-    const record = activityRecord({ ...input, at: input?.at ?? now(), seq: nextSequence(path) })
+    const record = activityRecord({ ...input, at: input?.at ?? now(), seq: nextSequence(path, { tailBytes }) })
     const fd = openSync(path, 'a')
     try {
       writeSync(fd, `${JSON.stringify(record)}\n`)
