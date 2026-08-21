@@ -10705,3 +10705,28 @@ to land than a mechanism that needs a review.
   Criticality: low — no product defect and nothing is red today; it is a stale instruction that
   contradicts a standing user ruling and misdirects the next session that reads it.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 803. The push gate runs the full unit layer while an authoring agent holds the same machine
+  (measured 21.08.2026, 04:00). A `main` push was refused because `unit` came back red twice. The
+  gate's own words name the finding correctly: 357 files, 12320 tests, NO failing test named, and a
+  runner that exited non-zero — the `[vitest-worker]: Timeout calling "onTaskUpdate"` signature of a
+  run that never finished, not of a test that failed. Measured beside it: load average 11.35, then
+  18.35, because GPT-5.6 Sol was authoring point 795 in its isolated worktree and running its own
+  three gates while the main session started the full unit layer for the push.
+  WHY IT MATTERS: the contention is self-inflicted and repeats on every push that runs beside a
+  delegated agent. The result is a red gate with no product defect behind it, and it leaves
+  bookkeeping committed but unpushed — the exact state the push-after-every-commit rule exists to
+  prevent. The gate's own retry does not help: it runs under the same load. The standing user rule
+  (judge a rotating failure only after a quiet-host rerun) is never consulted BEFORE the expensive
+  run starts.
+  FINAL STATE: the gate measures load before it starts and names it in its verdict. A run whose
+  summary names NO failing test while the measured load sits above a calibrated threshold is
+  treated as NOT JUDGED and waits for a quiet moment, rather than blocking as a red — the
+  distinction the gate already draws in prose is drawn in its decision too. A run that names a
+  failing test blocks as it does today, at any load.
+  VERIFIABLE: pure tests over the verdict function — a summary with a named failure blocks at any
+  load; a no-failure non-zero exit under high load yields "not judged"; the same under low load
+  keeps blocking; and the measured load appears in the verdict text in every case.
+  Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
+  a delegated agent is running, which is the normal operating state of this batch.
+  Bundle: Session- & Repo-Hygiene.

@@ -225,6 +225,12 @@
       "why": "Low criticality, nothing red today, and it is blocked behind point 762 which owns the same file — so last is where it belongs; the release order puts nothing but communication-mechanic work ahead of the queue anyway.",
       "origin": "machine",
       "place": "last"
+    },
+    "803": {
+      "at": "2026-08-21T02:07:14.003Z",
+      "why": "Bleibt hinten: Die Sperre löst sich, sobald der Agent fertig ist und erneut gepusht wird — heute genau so gemessen — also kostet sie einen Wiederholungslauf, nicht einen Punkt Vorrang.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -287,7 +293,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T01:29:55.074Z",
+    "at": "2026-08-21T02:07:14.009Z",
     "points": [
       174,
       184,
@@ -523,7 +529,8 @@
       798,
       799,
       800,
-      802
+      802,
+      803
     ]
   }
 }

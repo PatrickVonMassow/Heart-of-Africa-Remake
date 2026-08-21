@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 03:56 · Quellen-Fingerprint: `1a1bc2e3769a…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 04:07 · Quellen-Fingerprint: `bc0aae90bd50…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1410,8 +1410,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 1a1bc2e3769add6b5ebcdd7d09a234c0af4a7cc50d31c907b289ca039f9b1d9d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T01:56:02.021Z -->
+<!-- RETRO-FINGERPRINT: bc0aae90bd502c3c1a4a311b965bd69f8295b6a9a1f81d28eafdd8bde341ffd2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T02:07:28.190Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2371,3 +2371,30 @@ bestimmen kann, wird als *unbekannt* gemeldet, nie als eine fremde Zuständigkei
 *Sagt `--status` derselben Sitzung dasselbe wie der Hook, der sie gerade gebremst hat?* Und weil
 die Aufteilung baulich ist und nicht namentlich, zählt die Prüfung nicht die bekannten Namen auf,
 sondern zählt alle Wächter mit Status-Pfad auf und misst jeden.
+
+### 3.148 Die Messung nahm sich selbst die Maschine weg — und wertete das Ergebnis als Befund
+
+In der Nacht auf den 21.08.2026 lehnte das Push-Tor einen Push ab, weil die Unit-Schicht zweimal
+rot lief. Sein eigener Text nannte den Sachverhalt bereits richtig: 357 Dateien, 12320 Tests, KEIN
+benannter fehlschlagender Test, dazu ein Runner, der ohne Zusammenfassung ausstieg — die Signatur
+eines Laufs, der nicht fertig wurde. Daneben gemessen: Last 11, kurz darauf 18, weil im selben
+Moment ein beauftragter Autoren-Agent im isolierten Arbeitsbaum seine eigenen drei Tore fuhr. Der
+Beweis kam eine halbe Stunde später von allein: Derselbe Stand lief grün, sobald die Maschine frei
+war, und der Agent meldete für seine eigene Arbeit 12.329 grüne Tests.
+
+Die Klasse ist die Prüfung, die mit dem konkurriert, was sie prüft. Sie ist nicht falsch
+programmiert — sie ist bloß nicht allein auf der Maschine, und ihr Ergebnis misst ab einer
+gewissen Last die Belegung statt das Produkt. Verschärfend kommt zweierlei hinzu: Der
+Wiederholungslauf, der die Verwechslung ausschließen soll, läuft unter derselben Last und schließt
+deshalb nichts aus; und die Regel, die es gäbe — rotierende Fehlschläge nur auf ruhiger Maschine
+beurteilen — wird erst NACH dem teuren Lauf herangezogen, wo sie nichts mehr retten kann. Der
+Schaden ist nicht das falsche Rot, sondern seine Folge: Fertige, geprüfte Buchhaltung bleibt
+ungepusht liegen, also genau der Zustand, den die Push-nach-jedem-Commit-Regel verhindern soll.
+
+**Lehre:** Wer eine Messung als Tor benutzt, muss ihre Gültigkeitsbedingung mitmessen — und zwar
+BEVOR er sie startet, nicht als Erklärung hinterher. Prüffrage: *Kann dieses Ergebnis unter den
+gerade herrschenden Bedingungen überhaupt etwas beweisen?* Wo es das nicht kann, ist die ehrliche
+Antwort **nicht beurteilt** und ein späterer Lauf — nicht **rot**. Und die Unterscheidung gehört in
+die Entscheidung des Mechanismus, nicht nur in seinen Meldetext: Ein Tor, das den Unterschied
+zwischen »Test fehlgeschlagen« und »Lauf nicht fertig geworden« bereits in Worten benennt, aber
+beide gleich behandelt, weiß mehr, als es tut.
