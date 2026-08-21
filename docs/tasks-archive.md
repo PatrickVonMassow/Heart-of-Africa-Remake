@@ -21130,3 +21130,99 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product defect, but it is pure lost batch time, it recurs on every CI
   wait, and the waits are frequent: this session alone declared three.
   Bundle: Urlaubsfestigkeit.
+
+- [x] 809. The batch stands still between points, and no command can say which standstill was
+  work (measured 21.08.2026; the user ruled the same day that this point goes to the very FRONT
+  of the queue, ahead of 517, 744 and 752, so the tickets standing before the communication
+  mechanic are finished quickly: "Ich will, dass die Queue schnell abgearbeitet werden kann,
+  damit schnell die Tickets erledigt werden, die vor der Kommunikationsmechanik stehen").
+  WHAT WAS MEASURED. Measured 21.08.2026. Over four days main took 588 commits, and between
+  consecutive commits there are 65 gaps of 20 minutes or more, together 48.8 hours of a roughly
+  96-hour wall clock; nothing in the repository can say which of those hours were work and which
+  were standstill. Two causes were decomposed by hand. FIRST: owner session 6a0621ed wrote its
+  last transcript line at 08:15:29Z inside a ci-status-guard wait (run 32462093487 still running,
+  hook text: sleep about 90 s, then end the turn again) and never came back; nothing re-invoked
+  it. SECOND: the launcher then skipped four consecutive ticks with skip: live batch-writer
+  process 2156063 measured for session 593e0d2f independently of the owner lock - that process is
+  an idle VS Code extension window, alive since 19.08., whose last batch write was 07:08:03Z.
+  launcherStartDecision in scripts/batch-autostart-core.mjs lets a foreign live writer veto every
+  start for WRITER_VETO_MAX_AGE_MS (2 h) after its last write, ahead of every other rule including
+  an explicit handover. The successor started at 09:14:05Z, six minutes after the veto aged out:
+  59 minutes with nobody working the batch. The launcher saw it (ESCALATING ... has blocked
+  launcher recovery for 15 min) and had no remedy but to skip again. THE BLIND SECOND HALF ADDED A
+  THIRD, LARGER CAUSE: the handover travels by the 900-second scheduler tick at all - there is no
+  immediate successor start on a clean boundary or on a child exit - so every point pays scheduler
+  latency even when nothing is broken.
+  THE MEASUREMENT IS THIS POINT, THE THREE LEVERS IT AIMS ARE 811, 812 AND 813. The merged spec
+  fixed this cut in advance for the case that the whole request is too large to deliver as one
+  point, and it is: the journal, the classifier and the report are one mechanism, and each of the
+  three proven causes is another. So this point makes the standstill measurable and lands first in
+  every case; 811 (the handover stops travelling by scheduler tick), 812 (a writer may not veto by
+  existing) and 813 (the CI wait becomes durable) carry the levers and stand directly behind it.
+  Its report is what aims theirs.
+  FINAL STATE - THE STANDSTILL BECOMES MEASURABLE
+  1. A batch activity journal exists: append-only, concurrency-safe, one line per batch-state
+  transition, carrying UTC time, a monotonic sequence, the event type, the session, the point, the
+  PID together with its process start time, the ownership generation, the cause code and the
+  evidence behind it. Without it the question cannot be answered at all: commit times and the
+  launcher log alone cannot separate work from standstill.
+  2. The lifecycle emits into that journal: owner claims, foreground tool activity,
+  delegated-agent starts and finishes, verification starts and finishes, CI waits, handovers,
+  process exits, vetoes, pauses, spawn attempts, spawn failures and successor starts.
+  3. An open interval is bounded by explicit completion, by loss of process identity, or by a
+  renewable lease, so a crashed process cannot manufacture hours of apparent work. A fresh
+  heartbeat proves liveness only and never by itself classifies an interval as work.
+  4. ONE COMMAND REPORTS THE STANDSTILL and needs no batch lock: it prints every interval over a
+  threshold with start, end, duration, measured cause, the evidence behind that cause, and the
+  totals, in UTC, over a chosen window. Its declared inputs are the first-parent commit times on
+  main, .claude/autostart.log, the boundary markers, the verification run records, the session
+  transcripts and the journal of item 1. The threshold is stated where it is set, together with
+  why that number and not a smaller one.
+  5. The classifier splits overlapping evidence at event boundaries and assigns every wall-clock
+  millisecond exactly once under a documented precedence: nothing is dropped and nothing is
+  counted twice.
+  6. The classes are evidence-bound, not guessed: foreground work (session-linked transcript or
+  tool activity), delegated work (a live matching process, or branch, worktree or output-log
+  progress), verification (a named in-flight interval with command identity, progress lease and
+  result), CI wait (ref, SHA, workflow, run id, first and last observation, terminal result),
+  handover transition (from the committed handover or worker exit to the successor claiming
+  ownership), blocked by the user, blocked by quota, blocked by environment, blocked by a writer
+  veto (with the writer session, its process identity, its ownership generation, its last fenced
+  operation and the exact interval it blocked), standstill with no worker, and standstill with an
+  idle owner.
+  7. Evidence that is missing, contradictory or older than the journal stays UNKNOWN, is reported
+  with its duration and its share, and is never inferred to have been work from a commit gap, a
+  heartbeat or a living process.
+  8. The last 14 days run through the command once. The result is evidence in the point: how much
+  of the wall clock was standstill, split by class, and which classes are large enough to remove.
+  The analysis comes before the levers.
+  VERIFIABLE:
+  - CLASSIFIER: an advancing run record becomes work, the same interval without it becomes
+  idle-owner standstill, no owner plus a launcher skip becomes no-worker standstill, a pause
+  marker becomes blocked by the user, an unclassifiable interval becomes unknown and is counted as
+  such; every millisecond is covered exactly once, with no overlap.
+  - THE 21.08.2026 FIXTURE: the standstill after 08:15:29Z, the stale writer veto by session
+  593e0d2f, the remaining scheduler delay before 09:14:05Z, and totals that reconcile exactly
+  against elapsed wall time.
+  - THE FOUR-DAY FIXTURE keeps the measured 65 gaps and 48.8 hours and additionally accounts for
+  every minute by class.
+  FOUR EYES: this spec is the merged result of a blind-parallel divergent stage (CLAUDE.md §6).
+  Opus 5 wrote list A (15 entries) and GPT-5.6 Sol wrote list B (60 entries) from the same
+  evidence without seeing A; the union was folded under the decorrelated framing and counted by
+  scripts/blind-merge.mjs: 48 union entries, 38 merged, 2 only A, 35 only B, every input entry
+  accounted for. Fable 5 was unreachable as the third model (switch OFF, user instruction
+  20.08.2026), so the merge fell to GPT-5.6 Sol - the weaker same-model fallback, recorded as
+  such.
+  IMPLIED CHANGES: `docs/batch-owner-runbook.md` gains the standstill command and what its cause
+  classes mean; `docs/work-packages.md` gains the point. No design.md change. Overlaps to settle
+  when the point is cut: 517 (lease expiry and honoured claim), 744 and 752 (handover cost and
+  attribution), 795 (launcher liveness).
+  FILES AND POINTS: the journal, the classifier and the report command are new files; the emission
+  sites are scripts/batch-autostart.mjs, scripts/batch-boundary.mjs, scripts/batch-in-flight-core.mjs,
+  scripts/batch-ownership-core.mjs, scripts/ci-status-guard-core.mjs, .claude/autostart.log,
+  .claude/autostart-last.json; points 517, 744, 752, 795, 811, 812, 813.
+  Criticality: high — it is the user's own ranking decision and it governs how fast every
+  remaining point reaches him: 48.8 of 96 hours are gaps nobody can account for, one decomposed
+  gap was a full hour of nothing, and the largest cause turned out to be that the handover travels
+  by scheduler tick at all.
+  Bundle: Session- & Repo-Hygiene.
