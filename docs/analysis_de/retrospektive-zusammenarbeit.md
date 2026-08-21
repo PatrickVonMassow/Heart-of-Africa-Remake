@@ -1318,7 +1318,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 14:20 · Quellen-Fingerprint: `57a3d5352ecf…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 14:33 · Quellen-Fingerprint: `2aeab16f8c45…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1414,8 +1414,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: 57a3d5352ecfc0fbc39d0536bdf85ed3f5815119a4d2d4ba01f46fea71c94468 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T12:20:34.187Z -->
+<!-- RETRO-FINGERPRINT: 2aeab16f8c45be2cc869c69dbb2165f41d4677e70cd8ce5221223b6ce36ab7fd -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T12:33:53.857Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2502,3 +2502,27 @@ Ausgabe zwei Fälle behaupten kann, aber nur einer je erzeugt wird, ist der zwei
 getestet, sondern nur noch nicht aufgefallen. Verwandt mit §3.19 (die zweite Lesung findet, was
 die erste nicht sehen konnte) und mit der Familie der diktierten Übergabe-Karte, die schon
 mehrfach an ihren eigenen Toren gescheitert ist.
+
+### 3.121 Zwei Autoren auf einem Zweig — und die Gegenlese fand nicht statt
+
+Punkt 809 ist am 21.08.2026 abgehakt worden, und das Kritikalitäts-Tor verweigerte danach jedes
+Zugende: Die Verdikt-Kartei hält für den Punkt genau einen Eintrag, die Beauftragung um 10:57Z,
+und kein Urteil. Eine Gegenlese hat es dabei nachweislich gegeben — die Punkte 810 und 815
+bezeichnen sich selbst als deren Ergebnis. Nur las sie die QUELLEN des Punktes, nicht den Zweig,
+der zusammengeführt wurde, und niemand hat sie als Urteil über den gelandeten Stand verzeichnet.
+
+Der Grund steht im Zweig selbst: Er hat ZWEI Autoren. GPT-5.6 Sol hat das meiste geschrieben,
+eine Claude-Sitzung einen Commit. Die Vier-Augen-Regel ist für einen Autor je Zweig gedacht — sie
+sagt, wer NICHT lesen darf, und lässt offen, wer bei geteilter Urheberschaft liest. Genau in
+dieser Lücke ist die Gegenlese nicht ausgefallen, sondern nie zugewiesen worden; das Tor hat den
+Fehler erst nach dem Abhaken bemerkt, also an der Stelle, an der er am teuersten ist.
+
+Die naheliegende Reparatur wäre gewesen, ein Urteil aus dem Vorhandenen zu buchen — es gab ja eine
+Lesung. Das wäre eine erfundene Quittung: Sie nennt weder den gelesenen Stand noch den Leser. Der
+Vorgang ist deshalb als eigener Punkt aktenkundig, nicht als Kartei-Eintrag.
+
+**Lehre:** Eine Regel, die Rollen über AUTORSCHAFT verteilt, muss den geteilten Zweig mitdenken —
+sonst hat sie für den häufigsten Mischfall gar keine Antwort, und die stille Antwort lautet
+»niemand«. Und ein Tor, das erst beim Abhaken prüft, prüft zu spät: Was die Landung verlangt,
+gehört an den Anfang des Punktes, nicht an sein Ende. Verwandt mit §3.119 (die Marke mahnt beim
+Aufhören statt beim Anfangen).

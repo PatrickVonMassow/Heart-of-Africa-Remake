@@ -169,6 +169,30 @@ put it is the mistake this line exists to stop.
   the batch is otherwise healthy and merely waiting for green.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 816. Point 809 is ticked while no cross-vendor review of the merged branch is recorded, and
+  the criticality gate refuses every turn end until it is (found 21.08.2026 at the resumption that
+  followed 809's landing).
+  WHAT WAS MEASURED. `.claude/mechanism-reviews.jsonl` holds exactly one entry for the point — the
+  authoring commission of 10:57Z — and no verdict. A cross-vendor reading demonstrably happened
+  before the merge: points 810 and 815 name themselves as its output, and 810 records GPT-5.6 Sol
+  sweeping `scripts/ci-status-guard-core.mjs` and `scripts/batch-autostart-core.mjs`. But that
+  sweep read the point's SOURCES, not the branch that landed at e25ceb2c, and no receipt names a
+  reviewer or a verdict for the merged code. Recording one from the evidence that exists would be
+  inventing it, so the debt is filed rather than papered over. The branch has MIXED authorship —
+  GPT-5.6 Sol wrote most of it, Claude wrote 80b96e63 — which is the reason the review was never
+  cut cleanly in the first place.
+  FINAL STATE: the merged range of 809 carries a recorded verdict per author, cut so that no model
+  reads its own work: Claude reads the Sol commits, Sol reads the Claude commits, and every finding
+  is answered, filed as its own point, or struck with a reason. The criticality gate stops refusing
+  because the ledger holds the receipt, not because the tag was weakened.
+  VERIFIABLE: `node scripts/criticality-review-guard.mjs --status` reports point 809 cleared, and
+  the ledger entry names sha, reviewing model, verdict and mode. A mixed-authorship branch is
+  covered by a test or a documented rule that says how the range is cut, so the next one does not
+  repeat this.
+  Criticality: high — it is not a product defect, but it stands in the way of EVERY session's turn
+  end, and a HIGH-tagged point that landed unreviewed is exactly what the gate exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
