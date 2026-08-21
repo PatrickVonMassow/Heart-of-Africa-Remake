@@ -2077,8 +2077,12 @@ release point only when the point itself STATES high urgency (the
 `Criticality: high` tag, or one of the four named blocking conditions: it stops
 the batch, blocks a lane or the release, or holds a red that cannot otherwise
 close) and the rank record carries the one-line reason
-(`--ranked <N> --origin machine --why …`). Anything else belongs behind the
-release. The urgency is read off the POINT, never off the reason, so it cannot be
+(`--ahead <N> --why …`). Anything else belongs behind the release. The two gates
+take two flags on purpose: `--ranked` answers the APPEND question (the end of the
+order is right) and `--ahead` the RELEASE one (it stands in front, and why it
+cannot wait), and neither reason answers the other — a point ranked "last is
+right" and afterwards moved to the front used to arrive carrying a reason that
+said nothing about the front. The urgency is read off the POINT, never off the reason, so it cannot be
 argued into the record by whoever files the ticket; the ORIGIN is read off the
 record and defaults to the machine, so the user's exemption
 (`--origin user`) can only ever be claimed out loud. The boundary is wherever the

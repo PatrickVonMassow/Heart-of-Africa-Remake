@@ -73,7 +73,26 @@ export const ORIGINS = Object.freeze([ORIGIN_MACHINE, ORIGIN_USER])
 
 /** Record a machine-filed point's place ahead of the release, with its reason. */
 export const URGENT_RANK_CMD =
-  'node scripts/queue-rank.mjs --ranked <N> --origin machine --why "<why it cannot wait for the release>"'
+  'node scripts/queue-rank.mjs --ahead <N> --why "<why it cannot wait for the release>"'
+
+// EACH GATE NEEDS ITS OWN DECISION, NOT ANY DECISION (cross-vendor review,
+// 21.08.2026). A rank entry used to be one undifferentiated "somebody judged
+// this", and the two gates read the same field — so a point answered with "last
+// is right", then MOVED in front of the release, arrived carrying a reason that
+// says nothing about the front, and the boundary let it through. The reverse
+// holds just as well: a front reason must not answer the append question after
+// the point drops back to the end. So the entry records WHICH placement was
+// decided, and each gate accepts only its own.
+
+/** The append gate's answer: the end of the order is where this point belongs. */
+export const PLACE_LAST = 'last'
+
+/** The release rule's answer: it stands in FRONT of the release, and why. */
+export const PLACE_AHEAD = 'ahead'
+
+/** The placements a decision can be about. An entry naming neither is `last` —
+ *  the only thing `--ranked` ever meant before the release rule existed. */
+export const PLACES = Object.freeze([PLACE_LAST, PLACE_AHEAD])
 
 /** Record that a point standing there is the USER's own ranking. */
 export const USER_RANK_CMD = 'node scripts/queue-rank.mjs --ranked <N> --origin user --why "<one line>"'
@@ -109,7 +128,7 @@ export const BLOCKING_PATTERNS = Object.freeze([
  * point the rule exists to place behind the release, so a match is dropped when
  * a negation stands close in front of it.
  */
-const NEGATION_CUE = /\b(?:not|never|nothing|cannot|can't|won't|doesn't|without|nor|no longer)\b/i
+const NEGATION_CUE = /\b(?:not|never|nothing|cannot|can't|won't|doesn't|without|neither|nor|no)\b/i
 
 /** How far in front of a match a negation still governs it. */
 const NEGATION_WINDOW = 60
@@ -368,7 +387,11 @@ export function normaliseRankRecord(raw) {
     // (see `originOf`). Dropping the field rather than keeping the odd string
     // means a typo — `--origin users` — can never be mistaken for the exemption.
     const origin = ORIGINS.includes(str(value.origin)) ? str(value.origin) : ''
-    ranked[n] = origin ? { at: str(value.at), why, origin } : { at: str(value.at), why }
+    // An unknown or absent placement is `last`: that is what every entry written
+    // before the release rule existed meant, and it is the reading that grants
+    // nothing — the front has to be claimed in so many words.
+    const place = PLACES.includes(str(value.place)) ? str(value.place) : PLACE_LAST
+    ranked[n] = origin ? { at: str(value.at), why, origin, place } : { at: str(value.at), why, place }
   }
   // NOT `src.torn`: the flag is read off the parser's mark, so a record can never
   // declare itself unreadable and silence the gate.
@@ -450,7 +473,9 @@ export function appendGateState(open, record) {
   const known = new Set(settled.points)
   const appended = appendsSinceSettled(list, known)
   const inside = list.filter((n) => !known.has(n) && !appended.includes(n))
-  const pending = appended.filter((n) => !ranked[n])
+  // …and symmetrically: a FRONT reason does not answer the append question once
+  // the point has dropped back to the end of the order.
+  const pending = appended.filter((n) => !ranked[n] || ranked[n].place === PLACE_AHEAD)
   return { state: pending.length ? 'pending' : 'settled', pending, appended, inside, baseline: settled.points }
 }
 
@@ -519,7 +544,9 @@ export function releaseBoundaryState(open, record, { releasePoint, bodies = {} }
     if (grandfathered.has(n)) continue
     if (originOf({ ranked }, n) === ORIGIN_USER) continue
     if (!statesHighUrgency(bodies[n])) breaches.push({ point: n, cause: 'not-high' })
-    else if (!ranked[n]) breaches.push({ point: n, cause: 'unrecorded' })
+    // ONLY a decision about the FRONT counts here — a "last is right" reason
+    // carried forward by a later move explains nothing about standing here.
+    else if (ranked[n]?.place !== PLACE_AHEAD) breaches.push({ point: n, cause: 'unrecorded' })
   }
   return { state: breaches.length ? 'breach' : 'ok', breaches, ahead }
 }
@@ -804,18 +831,20 @@ export const TORN_RECORD_MESSAGE = tornRecordMessage()
  * unknown word is refused rather than dropped — a rejected `--origin users`
  * would otherwise be silently recorded as machine work and read as a decision.
  */
-export function recordRank(record, point, { why = '', at = '', origin = ORIGIN_MACHINE } = {}) {
+export function recordRank(record, point, { why = '', at = '', origin = ORIGIN_MACHINE, place = PLACE_LAST } = {}) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`not a point number: ${point}`)
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
   if (!reason) throw new Error('--why is required — one line saying why this point belongs where it stands')
   const who = String(origin ?? '').trim() || ORIGIN_MACHINE
   if (!ORIGINS.includes(who)) throw new Error(`--origin must be ${ORIGINS.join(' or ')} — got "${origin}"`)
+  const where = String(place ?? '').trim() || PLACE_LAST
+  if (!PLACES.includes(where)) throw new Error(`place must be ${PLACES.join(' or ')} — got "${place}"`)
   const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
   // A TORN record must never be written over (the point-530 lesson).
   if (torn) throw new Error(TORN_RECORD_MESSAGE)
   return storedRecord({
-    ranked: { ...ranked, [n]: { at: String(at ?? '').trim(), why: reason, origin: who } },
+    ranked: { ...ranked, [n]: { at: String(at ?? '').trim(), why: reason, origin: who, place: where } },
     settled,
     boundary,
   })

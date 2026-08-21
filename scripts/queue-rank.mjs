@@ -3,6 +3,7 @@
 //   node scripts/queue-rank.mjs --status                          # what is still unranked
 //   node scripts/queue-rank.mjs --ranked <N> --why "<one line>"   # last IS right, and why
 //   node scripts/queue-rank.mjs --ranked <N> --origin user --why …# the USER ranked it there
+//   node scripts/queue-rank.mjs --ahead <N> --why "<one line>"    # it stands BEFORE the release, and why
 //   node scripts/queue-rank.mjs --seed --why "<one line>"         # arm: what stands today is judged
 //   node scripts/queue-rank.mjs --seed-boundary --why "<one line>" # arm: freeze the front of the order
 //
@@ -35,6 +36,8 @@ import { QUEUE_REBUILD_CMD, RELEASE_TAG_POINT, closedPointsOf, openPointsOf } fr
 import { releaseBoundaryProblemFrom } from './queue-order-guard-core.mjs'
 import {
   ORIGIN_MACHINE,
+  PLACE_AHEAD,
+  PLACE_LAST,
   RANK_CMD,
   RANK_RECORD_PATH,
   SEED_CMD,
@@ -201,13 +204,22 @@ if (isMainModule(import.meta.url)) {
     // exemption from the release boundary can only be claimed out loud.
     const origin = flagValue(argv, '--origin') ?? ORIGIN_MACHINE
 
-    if (argv.includes('--ranked')) {
-      const point = Number(flagValue(argv, '--ranked'))
+    if (argv.includes('--ranked') || argv.includes('--ahead')) {
+      // TWO DECISIONS, TWO FLAGS (point 789). `--ranked` answers the APPEND gate
+      // — the end of the order is right — and `--ahead` answers the RELEASE rule
+      // — it stands in front of the release, and why it cannot wait. Neither
+      // reason answers the other question, so neither flag writes the other's
+      // record.
+      const ahead = argv.includes('--ahead')
+      const point = Number(flagValue(argv, ahead ? '--ahead' : '--ranked'))
       if (!open.includes(point)) throw new Error(`point ${point} is not open in the work order`)
-      writeRankRecord(recordRank(record, point, { why, origin, at: new Date().toISOString() }), open, tasksMd)
+      const place = ahead ? PLACE_AHEAD : PLACE_LAST
+      writeRankRecord(recordRank(record, point, { why, origin, place, at: new Date().toISOString() }), open, tasksMd)
       console.log(
-        `queue-rank: point ${point} keeps the place the work order gives it, filed by the ${origin} — ` +
-          `"${why.trim()}"`,
+        ahead
+          ? `queue-rank: point ${point} stands BEFORE the release, filed by the ${origin} — "${why.trim()}"`
+          : `queue-rank: point ${point} keeps the place the work order gives it, filed by the ${origin} — ` +
+            `"${why.trim()}"`,
       )
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
     } else if (argv.includes('--seed-boundary')) {

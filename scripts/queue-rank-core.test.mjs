@@ -30,6 +30,8 @@ import {
   unrankedAppends,
   ORIGIN_MACHINE,
   ORIGIN_USER,
+  PLACE_AHEAD,
+  PLACE_LAST,
   originOf,
   BOUNDARY_SEED_CMD,
   boundaryUnarmedMessage,
@@ -175,7 +177,9 @@ describe('PROVENANCE — which points are new since the order was last settled',
     expect(record.settled.points).toEqual([615])
     // The ORIGIN travels with the decision (point 789) — an unstated one is the
     // machine's, so a prune can never quietly hand a point the user's exemption.
-    expect(pruneRankRecord(record, [616]).ranked).toEqual({ 616: { at: '', why: 'b', origin: ORIGIN_MACHINE } })
+    expect(pruneRankRecord(record, [616]).ranked).toEqual({
+      616: { at: '', why: 'b', origin: ORIGIN_MACHINE, place: PLACE_LAST },
+    })
     expect(pruneRankRecord(record, [616]).settled.points).toEqual([615])
   })
 })
@@ -408,7 +412,11 @@ describe('the baseline moves only when nothing is outstanding', () => {
 
 describe('the rank record degrades, it never throws inside a guard', () => {
   it('reads a stored file', () => {
-    expect(parseRankRecord('{"ranked":{"615":{"at":"t","why":"w"}}}').ranked[615]).toEqual({ at: 't', why: 'w' })
+    expect(parseRankRecord('{"ranked":{"615":{"at":"t","why":"w"}}}').ranked[615]).toEqual({
+      at: 't',
+      why: 'w',
+      place: PLACE_LAST,
+    })
   })
   it('separates ABSENT from TORN — the one asks for the baseline, the other stays quiet', () => {
     // Both used to read as "nothing recorded yet", which made an unreadable file
@@ -446,7 +454,11 @@ describe('the rank record degrades, it never throws inside a guard', () => {
   it('drops a decision that states no reason', () => {
     expect(parseRankRecord('{"ranked":{"300":{}}}').ranked).toEqual({})
     expect(parseRankRecord('{"ranked":{"300":{"at":"t"}}}').ranked).toEqual({})
-    expect(parseRankRecord('{"ranked":{"300":{"why":"weil"}}}').ranked[300]).toEqual({ at: '', why: 'weil' })
+    expect(parseRankRecord('{"ranked":{"300":{"why":"weil"}}}').ranked[300]).toEqual({
+      at: '',
+      why: 'weil',
+      place: PLACE_LAST,
+    })
   })
   it('lets NO record declare itself torn — the mark is the parser’s alone', () => {
     // The escape: a syntactically PERFECT file carrying `"torn": true` used to
@@ -467,7 +479,12 @@ describe('the rank record degrades, it never throws inside a guard', () => {
   })
   it('drops hostile entries instead of trusting them', () => {
     const r = normaliseRankRecord({ ranked: { 0: { why: 'x' }, '-2': { why: 'x' }, z: {}, 7: 'no', 8: { why: ' w ' } } })
-    expect(r).toEqual({ ranked: { 8: { at: '', why: 'w' } }, settled: null, boundary: null, torn: false })
+    expect(r).toEqual({
+      ranked: { 8: { at: '', why: 'w', place: PLACE_LAST } },
+      settled: null,
+      boundary: null,
+      torn: false,
+    })
     for (const raw of [null, 42, [], { ranked: 'no' }, { settled: 'no' }, { settled: { points: 7 } }]) {
       expect(normaliseRankRecord(raw)).toEqual({ ranked: {}, settled: null, boundary: null, torn: false })
     }
@@ -534,6 +551,8 @@ describe('URGENCY is read off what the point STATES', () => {
     expect(statesHighUrgency('No behaviour is wrong and this does not stop the batch.')).toBe(false)
     expect(statesHighUrgency('Nothing blocks the release here.')).toBe(false)
     expect(statesHighUrgency('It never blocks a lane.')).toBe(false)
+    expect(statesHighUrgency('It neither stops the batch nor blocks the release.')).toBe(false)
+    expect(statesHighUrgency('No process blocks the release.')).toBe(false)
     // A COMMA does not end the clause: the denial governs across it.
     expect(statesHighUrgency('It does not, in practice, stop the batch.')).toBe(false)
     // …and neither does the HARD WRAP every point body in this work order has.
@@ -559,6 +578,19 @@ describe('ORIGIN is stated, never inherited by omission', () => {
   })
   it('refuses an origin it does not know rather than filing it as machine work', () => {
     expect(() => recordRank({}, 7, { why: 'w', origin: 'users' })).toThrow(/--origin must be machine or user/)
+  })
+  it('records WHICH placement was decided, and refuses one it does not know', () => {
+    expect(recordRank({}, 7, { why: 'w' }).ranked[7].place).toBe(PLACE_LAST)
+    expect(recordRank({}, 7, { why: 'w', place: PLACE_AHEAD }).ranked[7].place).toBe(PLACE_AHEAD)
+    expect(() => recordRank({}, 7, { why: 'w', place: 'front' })).toThrow(/place must be last or ahead/)
+  })
+  it('does not let a FRONT reason answer the append question after the point drops back', () => {
+    // The mirror image of the stale-rank bypass: each gate accepts only the
+    // decision that was actually taken about its own placement.
+    const front = { 700: { at: '', why: 'it cannot wait', origin: ORIGIN_MACHINE, place: PLACE_AHEAD } }
+    expect(unrankedAppends([9, 5, 700], settledAt([5, 9], front))).toEqual([700])
+    const last = { 700: { at: '', why: 'nothing waits on it', origin: ORIGIN_MACHINE, place: PLACE_LAST } }
+    expect(unrankedAppends([9, 5, 700], settledAt([5, 9], last))).toEqual([])
   })
   it('reads a missing, old or damaged origin as the MACHINE', () => {
     expect(originOf({ ranked: { 7: { why: 'w' } } }, 7)).toBe(ORIGIN_MACHINE)
@@ -588,8 +620,14 @@ describe('THE RELEASE BOUNDARY — what may stand in front of the release', () =
   })
 
   it('lets it stand once the reason is recorded', () => {
-    const record = armed({ 60: { at: '', why: 'It holds the red that blocks every push.', origin: ORIGIN_MACHINE } })
+    const record = armed({
+      60: { at: '', why: 'It holds the red that blocks every push.', origin: ORIGIN_MACHINE, place: PLACE_AHEAD },
+    })
     expect(breach([60, 50, 90], record, { 60: HIGH })).toEqual([])
+    // A STALE "last is right" reason is NOT that decision: ranked behind the
+    // release, then moved in front, it explains nothing about standing here.
+    const stale = armed({ 60: { at: '', why: 'nothing waits on it', origin: ORIGIN_MACHINE, place: PLACE_LAST } })
+    expect(breach([60, 50, 90], stale, { 60: HIGH })).toEqual([{ point: 60, cause: 'unrecorded' }])
   })
 
   it('blocks a machine-filed point that states no urgency AT ALL — recorded or not', () => {
@@ -649,7 +687,7 @@ describe('THE RELEASE BOUNDARY — what may stand in front of the release', () =
         'red, a review finding, a guard remedy — is ranked by its urgency, and only a high one may stand before ' +
         'the release. Point(s) 60 do state high urgency, but nothing records why they cannot wait: MOVE the block ' +
         'inside TASKS.md to BEHIND point 50, or record the reason in one line — node scripts/queue-rank.mjs ' +
-        '--ranked <N> --origin machine --why "<why it cannot wait for the release>". A point the USER asked for ' +
+        '--ahead <N> --why "<why it cannot wait for the release>". A point the USER asked for ' +
         'is exempt, and says so: node scripts/queue-rank.mjs --ranked <N> --origin user --why "<one line>". And ' +
         'where the move lands the block at the END of the order, the append gate asks about that placement in ' +
         'the same turn — answer it with node scripts/queue-rank.mjs --ranked <N> --why "<one line>".',

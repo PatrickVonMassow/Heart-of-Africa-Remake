@@ -659,7 +659,7 @@ describe('rule 1d — the release boundary (point 789)', () => {
   })
 
   it('lets a high-urgency point stand there once its reason is recorded', () => {
-    const recorded = armed({ 900: { at: '', why: 'It stops the batch.', origin: 'machine' } })
+    const recorded = armed({ 900: { at: '', why: 'It stops the batch.', origin: 'machine', place: 'ahead' } })
     expect(evaluate({ dashboardHtml: '', tasksMd: order(900, HIGH), rankRecordJson: recorded }).block).toBe(false)
     // …and the SAME point without the record is still refused, so the record is
     // what the pass hangs on rather than the tag alone.
