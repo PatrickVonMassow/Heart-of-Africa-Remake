@@ -168,7 +168,7 @@ const NEGATION_BEFORE = new RegExp(
  * A COMMA ENDS IT ON THIS SIDE, and so do a subordinator and a PREPOSITION
  * (fifth, sixth and seventh pass). After the phrase, each introduces something
  * OTHER than a denial of it: "it blocks the release, not a development lane"
- * contrasts, "…because no artifact can be published" gives the reason, and "…with
+ * contrasts, "…because no build can be published" gives the reason, and "…with
  * no fallback" describes the block rather than denying it. Reading any of them as
  * a denial REFUSES a point that states the block outright. What survives is the
  * phrase's own predicate — "is not the observed failure" — which is the one shape

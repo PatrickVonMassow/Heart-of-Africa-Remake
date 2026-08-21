@@ -569,7 +569,7 @@ describe('URGENCY is read off what the point STATES', () => {
     // ELSE in front of it denies that other thing — reading any of the three as
     // a denial of the phrase refuses a point that states the block outright.
     expect(statesHighUrgency('It blocks the release, not a development lane.')).toBe(true)
-    expect(statesHighUrgency('It blocks the release because no artifact can be published.')).toBe(true)
+    expect(statesHighUrgency('It blocks the release because no build can be published.')).toBe(true)
     expect(statesHighUrgency('It does not block a development lane, it blocks the release.')).toBe(true)
     // A connector is not filler: the denial ends at it, and what follows asserts.
     expect(statesHighUrgency('It does not fail but blocks the release.')).toBe(true)
