@@ -44,6 +44,7 @@ import {
   boundaryCardCommand,
   cardProofFragments,
   cardRegions,
+  claimantCardIdentity,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
@@ -63,6 +64,7 @@ import { noteBoundaryIncident } from './context-incidents.mjs'
 import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
+import { parseTasks } from './dashboard-guard-core.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -479,7 +481,10 @@ export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) }
   }
 }
 
-export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}) {
+export function boundaryHandover({
+  sid = readOwnerLock()?.sessionId ?? '',
+  tasksText = readTasksOpen(TASKS_PATH),
+} = {}) {
   let claim = { honour: false, claimantSid: null }
   try {
     claim = gatherClaim(sid, { ownerLock: readOwnerLock() })
@@ -494,9 +499,14 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
     claimHonoured: reservationDecision({ assessment: claim }).acquire === false,
     claimantSid: claim.claimantSid,
   })
-  // The card takes NO point number (point 439): it goes into the unnumbered gap
-  // card, where the topic guard reads every point reference as a foreign one.
-  return { ...where, card: boundaryCardText(where) }
+  // The CARD owns no point chip, but its prose names the first open point or the
+  // canonical fact that none remains: that is the publish gate's required
+  // handover destination. State-card titles are the topic guard's narrow
+  // exemption, so the forward reference is legal when one exists.
+  const nextPoint = parseTasks(tasksText).open[0] ?? null
+  const claimant = claimantCardIdentity(claim.claim)
+  const cardInput = { ...where, ...claimant, nextPoint }
+  return { ...cardInput, card: boundaryCardText(cardInput) }
 }
 
 /**
@@ -653,6 +663,8 @@ if (isMain) {
       const card = boundaryCardText({
         destination: handover.destination,
         claimantSid: handover.claimantSid,
+        claimantPid: handover.claimantPid,
+        nextPoint: handover.nextPoint,
         cause: BOUNDARY_CAUSES.CONTEXT,
       })
       const cardBlock =
@@ -826,8 +838,9 @@ if (isMain) {
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
     const cardBlock =
       'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-      'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
-      'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
+      'verbatim rather than writing it again. It names the next open point, or says that none remains, on ' +
+      'purpose: the unnumbered gap card owes that destination to its reader, and the topic guard exempts ' +
+      'that state card by title.\n\n' +
       `${handover.card}\n\n` +
       // The command is CHOSEN from the board's real state (point 470), never
       // assumed: an instruction that does not work is what sent sessions to

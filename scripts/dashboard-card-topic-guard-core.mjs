@@ -35,11 +35,11 @@
 // Arbeit" and "Abschlussarbeiten zum gerade beendeten Punkt" own no point number
 // BY DESIGN, and the rule above reads a card without one as owning nothing — so
 // every point they name counted as a foreign reference. That already cost the
-// boundary once: the card's prescribed text had to be rewritten to name no point
-// at all, and a block there costs a whole turn, because every remedy command
-// counts as work and deletes the boundary marker. The closing card cannot be
-// written that way — saying WHICH duties are owed is its entire content — so the
-// two are exempted by name instead, from board-core, where the titles live.
+// boundary once, and a block there costs a whole turn because every remedy
+// command counts as work and deletes the boundary marker. The handover card now
+// MUST name the forward point, while the closing card must say WHICH duties are
+// owed, so the two are exempted by name instead, from board-core, where the
+// titles live.
 import { isStateCardTitle } from './board-core.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
 
@@ -130,8 +130,8 @@ export function topicViolations(html, known) {
   ]
   const violations = []
   for (const card of cards) {
-    // The two unnumbered state cards speak ABOUT the point that just ended; that
-    // is what they are for, so a point they name is never a cross-reference.
+    // The two state cards deliberately speak across a point boundary: closing
+    // names the point just ended, and handover names the one picked up next.
     if (isStateCardTitle(card.title)) continue
     for (const ref of foreignRefs(card.bodyHtml, card.point, known)) {
       violations.push({ where: card.where, point: card.point, title: card.title, ref })

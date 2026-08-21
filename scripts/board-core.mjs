@@ -2,11 +2,15 @@
 // board guard accepts is pinned by tests rather than by the shape of one
 // regex written once. The wrapper does the I/O.
 //
-// The one import is the auditor's OWN name for "no estimate yet": a card this
-// module writes must satisfy the audit that reads it, and spelling that value a
-// second time here is how the two would drift apart. dashboard-guard-core
-// imports nothing, so the direction cannot become a cycle.
+// The imports are the auditor's OWN name for "no estimate yet" and the handover
+// card's shared destination predicate. A card this module writes must satisfy
+// the gates that read it, and spelling either value a second time here is how
+// the writer and readers would drift apart. Both imported modules are leaves,
+// so the direction cannot become a cycle.
 import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { namesFollowOnWork } from './handover-card-contract.mjs'
+
+export { namesFollowOnWork }
 
 /** The flag that takes a card's text from STDIN instead of the argv (point 410). */
 export const TEXT_STDIN_FLAG = '--text-stdin'
@@ -894,11 +898,11 @@ export const STATE_KINDS = ['idle', 'closing']
 const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
 
 /**
- * The UNNUMBERED state-card titles. The handover card owns no point number by
- * design, so every rule written for a numbered card — the topic guard's
- * foreign-point complaint above all — has to know it by name. The closing card
- * carries a number since point 655; its legacy title stays listed so a board
- * written earlier is still exempted.
+ * The UNNUMBERED state-card titles. The handover card owns no point chip by
+ * design, but must name its follow-on point in prose, so rules written for a
+ * numbered card — the topic guard's foreign-point complaint above all — have
+ * to know it by name. The closing card carries a number since point 655; its
+ * legacy title stays listed so a board written earlier is still exempted.
  */
 export const STATE_CARD_TITLES = [NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE]
 
@@ -1086,7 +1090,8 @@ function sectionStateCards(html, kind) {
  *
  * IT IS THE ONE UNNUMBERED CARD (point 655), so it owes the reader in prose what
  * the numbered cards give him in a chip: the reason must NAME the point the
- * successor picks up. The publish gate refuses a handover card that names none.
+ * successor picks up, or say canonically that the work order has none. The
+ * publish gate refuses a handover card that does neither.
  *
  * AND IT MUST BE TRUE WHEN IT IS WRITTEN. A numbered card standing in the
  * section is work the board itself says is running, so the claim would
@@ -1110,8 +1115,8 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
       namesFollowOnWork(text)
         ? null
         : 'board: the handover card is the one card without a number, so its reason must NAME the ' +
-          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656"). The publish gate ' +
-          'refuses a handover card that names none.',
+          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656") or use the dictated ' +
+          'no-open-point form. The publish gate refuses a handover card that does neither.',
   })
 }
 
@@ -1170,18 +1175,6 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
     emptyReason: 'board: closing needs a reason — the reader must learn WHICH duties are still owed',
     claim: 'that only closing duties are left',
   })
-}
-
-/**
- * Does this text name a FOLLOW-ON point? It lives beside the writer that owes it,
- * and the publish gate imports it, so the two cannot ask it differently.
- *
- * KNOWN LIMIT: it asks that A point is named, not that it is the RIGHT one —
- * nothing here can know which point just ended. It catches the card that names
- * none at all, which is the reported defect.
- */
-export function namesFollowOnWork(text) {
-  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(text ?? ''))
 }
 
 /**
