@@ -165,6 +165,7 @@ describe('transcript directory', () => {
     const run = spawnSync(process.execPath, ['scripts/user-said.mjs', '--dir', empty], {
       cwd: process.cwd(),
       encoding: 'utf8',
+      windowsHide: true,
     })
     expect(run.status).toBe(1)
     expect(run.stderr).toContain(`no transcripts at ${empty}`)
@@ -179,7 +180,7 @@ describe('transcript directory', () => {
     ].join('\n'))
     const out = execFileSync(process.execPath, [
       'scripts/user-said.mjs', '--dir', dir, '--grep', 'needle', '--sessions', '1', '--last', '0',
-    ], { cwd: process.cwd(), encoding: 'utf8' })
+    ], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true })
     expect(out).toContain('needle new')
     expect(out).not.toContain('needle old')
     expect(out).toContain(`2 transcripts · ${dir}`)

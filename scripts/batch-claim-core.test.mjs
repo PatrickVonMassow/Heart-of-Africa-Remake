@@ -167,6 +167,7 @@ describe('--wait — the status assessment is the only state it reads', () => {
       env: { ...process.env, HOA_REPO_ROOT: root },
       encoding: 'utf8',
       timeout: 5_000,
+      windowsHide: true,
     })
     const waited = run(['--wait', '--timeout', '0.001'])
     expect(waited.status).toBe(1)
