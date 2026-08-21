@@ -562,28 +562,39 @@ describe('URGENCY is read off what the point STATES', () => {
     // …and so does every sentence end, not only the full stop.
     expect(statesHighUrgency('It does not block a lane! It stops the batch.')).toBe(true)
     expect(statesHighUrgency('Does it block a lane? It stops the batch.')).toBe(true)
-    // A negation standing AFTER what it denies counts too.
+    // A negation standing AFTER what it denies counts too …
     expect(statesHighUrgency('"blocks the release" is not the observed failure.')).toBe(false)
+    // … but a COMMA after the phrase introduces a CONTRAST, not a denial of it,
+    // and reading that as one refuses a point that states the block outright.
+    expect(statesHighUrgency('It blocks the release, not a development lane.')).toBe(true)
     // …while the condition's OWN "cannot" is not read as a denial of itself.
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
     expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
   })
 
-  it('cannot let a point through even where the reading is WRONG', () => {
-    // THE STATED RESIDUAL. No cue list closes every English construction — a
-    // denial split across sentences still reads as a claim. It costs nothing it
-    // must not cost: a point wrongly read as high is still refused, because the
-    // gate wants an explicit FRONT decision and this one has none. The false
-    // reading only changes which remedy the refusal names first.
+  it('states its residual exactly — an UNRECORDED point is refused either way', () => {
+    // THE STATED RESIDUAL, in both halves. No cue list closes every English
+    // construction: a denial split across sentences still reads as a claim.
     const split = 'Does it block the release? No.'
     expect(statesHighUrgency(split)).toBe(true)
-    const record = {
-      ranked: {},
-      settled: { at: 't', points: [50] },
-      boundary: { at: 't', why: 'legacy', points: [] },
-    }
-    expect(releaseBoundaryBreaches([60, 50], record, { releasePoint: 50, bodies: { 60: split } })).toEqual([
+    const front = { at: 't', why: 'legacy', points: [] }
+    const bare = { ranked: {}, settled: { at: 't', points: [50] }, boundary: front }
+    // With NO front decision the false reading costs only wording: still refused.
+    expect(releaseBoundaryBreaches([60, 50], bare, { releasePoint: 50, bodies: { 60: split } })).toEqual([
       { point: 60, cause: 'unrecorded' },
+    ])
+    // With one already recorded it DOES keep the placement alive — the narrow
+    // edge this rule accepts, and the reason the flat claim was withdrawn.
+    const recorded = {
+      ranked: { 60: { at: '', why: 'it cannot wait', origin: ORIGIN_MACHINE, place: PLACE_AHEAD } },
+      settled: { at: 't', points: [50] },
+      boundary: front,
+    }
+    expect(releaseBoundaryBreaches([60, 50], recorded, { releasePoint: 50, bodies: { 60: split } })).toEqual([])
+    // …while a body the reading gets RIGHT withdraws the placement at once, so a
+    // recorded decision is not a permanent exemption.
+    expect(releaseBoundaryBreaches([60, 50], recorded, { releasePoint: 50, bodies: { 60: MEDIUM } })).toEqual([
+      { point: 60, cause: 'not-high' },
     ])
   })
   it('reads an ordinary point as NOT high — the tag, the prose and the silence alike', () => {

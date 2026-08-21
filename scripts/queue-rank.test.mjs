@@ -9,7 +9,7 @@
 // git runner is injected, so those output SHAPES are driven here without a
 // repository, and the answers are asserted against what the CLI would do.
 import { describe, it, expect } from 'vitest'
-import { recordProvenance } from './queue-rank.mjs'
+import { ACTION_FLAGS, chosenAction, recordProvenance } from './queue-rank.mjs'
 
 const PATH = '.claude/queue-rank.json'
 const GOOD = JSON.stringify({ ranked: {}, settled: { at: 't', points: [1, 2] } })
@@ -134,5 +134,38 @@ describe('the git state the rank record is missing in', () => {
         throw new Error('git exploded')
       }),
     ).toEqual(nothing)
+  })
+})
+
+// THE DISPATCHER (cross-vendor review, fifth pass). The command grew from one
+// action to four, and the flag tests were written one pair at a time — so an
+// invocation naming two of them did one and dropped the other silently, and a
+// repeated flag answered for the first point while the second stood unanswered.
+// Both look exactly like success.
+describe('which action an invocation is', () => {
+  it('names the single action it was given', () => {
+    for (const flag of ACTION_FLAGS) expect(chosenAction([flag, '60', '--why', 'w'])).toBe(flag)
+  })
+  it('reads no action at all as the STATUS question, not as an error', () => {
+    expect(chosenAction([])).toBe('')
+    expect(chosenAction(['--status'])).toBe('')
+    expect(chosenAction(undefined)).toBe('')
+  })
+  it('refuses two actions instead of doing one of them', () => {
+    expect(() => chosenAction(['--ranked', '60', '--ahead', '61', '--why', 'w'])).toThrow(
+      /--ranked and --ahead are different decisions/,
+    )
+    expect(() => chosenAction(['--seed-boundary', '--ahead', '60', '--why', 'w'])).toThrow(
+      /different decisions/,
+    )
+  })
+  it('refuses a repeated flag, whose later occurrences nothing would read', () => {
+    expect(() => chosenAction(['--ahead', '60', '--ahead', '61', '--why', 'w'])).toThrow(
+      /--ahead was given 2 times/,
+    )
+    expect(() => chosenAction(['--ranked', '60', '--why', 'a', '--why', 'b'])).toThrow(/--why was given 2 times/)
+    expect(() => chosenAction(['--ranked', '60', '--origin', 'user', '--origin', 'machine'])).toThrow(
+      /--origin was given 2 times/,
+    )
   })
 })

@@ -185,6 +185,41 @@ function undoWrite(before, path = RECORD) {
   else writeTextAtomic(path, before)
 }
 
+/** The flags this command DISPATCHES on. Exactly one of them, exactly once. */
+export const ACTION_FLAGS = Object.freeze(['--ranked', '--ahead', '--seed', '--seed-boundary'])
+
+/** The flags that carry a value. Repeating one is the same silent loss: only the
+ *  first occurrence is ever read. */
+const VALUE_FLAGS = Object.freeze(['--why', '--origin'])
+
+/**
+ * WHICH ACTION THIS INVOCATION IS — or a refusal (cross-vendor review, fifth
+ * pass).
+ *
+ * The dispatcher used to test flags one at a time, so a command naming two of
+ * them did one and dropped the other WITHOUT SAYING SO: `--seed-boundary --ahead
+ * 60` recorded a front decision and armed nothing, and `--ahead 60 --ahead 61`
+ * answered for 60 while 61 stood unanswered. Both look like the command
+ * succeeded. Exactly one action, each flag once, decided before anything is
+ * written; no action at all is the STATUS read, which is why '' is an answer
+ * rather than an error.
+ */
+export function chosenAction(argv = []) {
+  const list = Array.isArray(argv) ? argv : []
+  const times = (flag) => list.filter((a) => a === flag).length
+  for (const flag of [...ACTION_FLAGS, ...VALUE_FLAGS]) {
+    if (times(flag) > 1) throw new Error(`${flag} was given ${times(flag)} times — only the first would be read`)
+  }
+  const given = ACTION_FLAGS.filter((flag) => times(flag) === 1)
+  if (given.length > 1) {
+    throw new Error(
+      `${given.join(' and ')} are different decisions — give ONE of them, and run the command again for the ` +
+        'other. Taking one and dropping the rest is how a command reports success for work it never did.',
+    )
+  }
+  return given[0] ?? ''
+}
+
 function flagValue(argv, flag) {
   const at = argv.indexOf(flag)
   if (at < 0) return null
@@ -204,23 +239,16 @@ if (isMainModule(import.meta.url)) {
     // exemption from the release boundary can only be claimed out loud.
     const origin = flagValue(argv, '--origin') ?? ORIGIN_MACHINE
 
-    if (argv.includes('--ranked') || argv.includes('--ahead')) {
-      // TWO DECISIONS, TWO FLAGS (point 789). `--ranked` answers the APPEND gate
-      // — the end of the order is right — and `--ahead` answers the RELEASE rule
-      // — it stands in front of the release, and why it cannot wait. Neither
-      // reason answers the other question, so neither flag writes the other's
-      // record.
-      // BOTH FLAGS IS NOT A DECISION (cross-vendor review, 21.08.2026). It used
-      // to record the `--ahead` one and drop the other without a word, so a
-      // command that named two points answered for one of them.
-      if (argv.includes('--ranked') && argv.includes('--ahead')) {
-        throw new Error(
-          '--ranked and --ahead are two different decisions — the end of the order is right, or the front is. ' +
-            'Give one of them, and run the command twice where both are meant.',
-        )
-      }
-      const ahead = argv.includes('--ahead')
-      const point = Number(flagValue(argv, ahead ? '--ahead' : '--ranked'))
+    // TWO DECISIONS, TWO FLAGS (point 789). `--ranked` answers the APPEND gate —
+    // the end of the order is right — and `--ahead` answers the RELEASE rule —
+    // it stands in front of the release, and why it cannot wait. Neither reason
+    // answers the other question, so neither flag writes the other's record, and
+    // an invocation naming more than one action is refused before any write.
+    const action = chosenAction(argv)
+
+    if (action === '--ranked' || action === '--ahead') {
+      const ahead = action === '--ahead'
+      const point = Number(flagValue(argv, action))
       if (!open.includes(point)) throw new Error(`point ${point} is not open in the work order`)
       const place = ahead ? PLACE_AHEAD : PLACE_LAST
       writeRankRecord(recordRank(record, point, { why, origin, place, at: new Date().toISOString() }), open, tasksMd)
@@ -231,7 +259,7 @@ if (isMainModule(import.meta.url)) {
             `"${why.trim()}"`,
       )
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
-    } else if (argv.includes('--seed-boundary')) {
+    } else if (action === '--seed-boundary') {
       // THE FRONT OF THE ORDER, FROZEN ONCE (point 789). Everything standing in
       // front of the release point today counts as the arrangement that predates
       // the rule; every point that reaches the front afterwards is judged on its
@@ -281,7 +309,7 @@ if (isMainModule(import.meta.url)) {
             'stands in front of the release then.',
         )
       }
-    } else if (argv.includes('--seed')) {
+    } else if (action === '--seed') {
       // THE ARMING BASELINE, and nothing more: the order as it stands today is
       // taken as judged, with one stated reason, so a newly armed (or freshly
       // cloned) checkout does not owe an answer for history nobody in the

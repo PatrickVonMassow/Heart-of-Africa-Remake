@@ -169,10 +169,19 @@ function clauseBefore(text, at) {
  * The rest of the match's own clause — because a negation can stand AFTER what it
  * denies (cross-vendor review, 21.08.2026): «"blocks the release" is not the
  * observed failure» reads as a claim to anything that only looks backwards.
+ *
+ * A COMMA ENDS IT ON THIS SIDE, though it does not on the other (fifth pass).
+ * After the phrase, a comma introduces the thing being contrasted rather than a
+ * denial of the phrase itself — "it blocks the release, not a development lane"
+ * states the block and denies something else, and reading that as a denial
+ * REFUSES a genuinely urgent point. Before the phrase there is no such
+ * asymmetry: "it does not, in practice, stop the batch" denies it across two.
  */
+const AFTER_END = /[.;:!?—,]|\bbut\b|\bhowever\b/i
+
 function clauseAfter(text, at) {
   const window = text.slice(at, at + NEGATION_WINDOW)
-  const end = window.search(CLAUSE_END)
+  const end = window.search(AFTER_END)
   return end < 0 ? window : window.slice(0, end)
 }
 
@@ -185,17 +194,22 @@ function clauseAfter(text, at) {
  * stating neither is not high — that is the whole decision, and it is the reason
  * the answer cannot be argued into the record by whoever files the point.
  *
- * THE RESIDUAL, STATED RATHER THAN CHASED (cross-vendor review, fourth pass).
+ * THE RESIDUAL, STATED EXACTLY (cross-vendor review, fourth and fifth pass).
  * This reads English prose by cue, and no cue list closes every construction: a
  * denial split across sentences — "Does it block the release? No." — still reads
- * as a claim. The regress stops here because of what a wrong reading can and
- * cannot do. It CANNOT let a point through: reading it as high only moves the
- * refusal from `not-high` to `unrecorded`, and the gate still demands an explicit
- * `--ahead` decision with a stated reason before anything stands in front of the
- * release. So the worst a false reading costs is a refusal that names the other
- * remedy first — and a human recording a front reason for a point that is not
- * urgent is an edit to a TRACKED record under review, which is where this file
- * puts that class of question everywhere else.
+ * as a claim. What that costs, precisely:
+ *   - for a point with NO front decision recorded, nothing at all beyond wording:
+ *     a false high only moves the refusal from `not-high` to `unrecorded`, and
+ *     the gate still demands an explicit `--ahead` decision before anything
+ *     stands in front of the release;
+ *   - for a point that ALREADY holds one, the false reading keeps that placement
+ *     alive after the body changed to a denial. That is the real edge, and it is
+ *     the narrow one: it needs a point that earned the front and was then
+ *     rewritten into something unurgent, and what answers it is the diff of a
+ *     tracked record and a work order under review — the same answer this file
+ *     gives to every hand-edit question.
+ * The claim used to be the flat "a wrong reading cannot let a point through",
+ * which was true only of the first case; the fifth pass was right to refuse it.
  */
 export function statesHighUrgency(body) {
   const raw = String(body ?? '')
