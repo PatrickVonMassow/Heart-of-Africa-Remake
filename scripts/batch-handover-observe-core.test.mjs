@@ -28,6 +28,8 @@ const launcherLog = (...lines) => parseLauncherLog(lines.join('\n'))
 const ACCEPT = '[2026-07-29T10:18:00.000Z] HANDOVER accepted: session-old handed the batch over at point 388 — spawning the successor'
 const SPAWN = '[2026-07-29T10:18:02.000Z] launched pid 5150 under pending-spawn lock launcher-xyz'
 const FREE = '[2026-07-29T10:18:00.000Z] no owner lock — taking over'
+const MEASURED_DEAD =
+  '[2026-08-21T10:18:00.000Z] owner process measured inactive (pid-dead) — taking over; no live batch-writer process measured'
 // Inside the grace the launcher waits ON PURPOSE — a healthy chain, not a failure.
 const GRACE_SKIP = '[2026-07-29T10:12:00.000Z] skip: owner alive (handover-grace; heartbeat 7 min old, pid 18492)'
 // Past the grace, still reading a live owner: THE failure of 28.07.2026.
@@ -71,6 +73,10 @@ describe('parsers — the log lines each link is proved by', () => {
     ])
     expect(l[0].point).toBe(388)
     expect(l[1].pid).toBe(5150)
+  })
+
+  it('classifies a process-evidenced dead-owner start without requiring the retired lock claim wording', () => {
+    expect(launcherLog(MEASURED_DEAD)[0]).toMatchObject({ kind: 'took-dead-lock' })
   })
 
   it('reads the LEASE EXPIRED takeover as the old-route takeover it is (point 434)', () => {

@@ -546,19 +546,9 @@ function redirectWrites(redirects) {
   })
 }
 
-/** 'write' or 'read' for ONE parsed segment. Unrecognised → 'read'. */
-function intentOfParsed(seg, depth = 0) {
+/** 'write' or 'read' for ONE parsed segment, excluding commands it carries. */
+function directIntentOfParsed(seg) {
   if (redirectWrites(seg.redirects)) return 'write'
-  // A WRAPPED command counts as its own: `bash -c "npm run build"`,
-  // `eval "git push"`, `echo $(git push)`. These are the one place a quoted
-  // string must be looked INTO, because there it is the command and not an
-  // argument. Judged BEFORE `--help`, so `bash --help -c "git push"` cannot
-  // talk its way past.
-  if (depth < MAX_NESTING) {
-    for (const nested of nestedCommands(seg)) {
-      if (segmentIntent(nested, { depth: depth + 1 }) === 'write') return 'write'
-    }
-  }
   const head = commandHead(seg)
   if (!head) return 'read'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
@@ -584,6 +574,21 @@ function intentOfParsed(seg, depth = 0) {
   // tool — reads. A script's own flags are not decidable from outside, and this
   // gate under-blocks by design.
   return 'read'
+}
+
+/** 'write' or 'read' for ONE parsed segment including commands it carries. */
+function intentOfParsed(seg, depth = 0) {
+  // A WRAPPED command counts as its own: `bash -c "npm run build"`,
+  // `eval "git push"`, `echo $(git push)`. These are the one place a quoted
+  // string must be looked INTO, because there it is the command and not an
+  // argument. Judged BEFORE `--help`, so `bash --help -c "git push"` cannot
+  // talk its way past.
+  if (depth < MAX_NESTING) {
+    for (const nested of nestedCommands(seg)) {
+      if (segmentIntent(nested, { depth: depth + 1 }) === 'write') return 'write'
+    }
+  }
+  return directIntentOfParsed(seg)
 }
 
 /**
@@ -612,6 +617,17 @@ function asSegments(input) {
 /** 'write' when ANY segment of the input changes state, else 'read'. */
 export function segmentIntent(segment, { depth = 0 } = {}) {
   for (const seg of asSegments(segment)) if (intentOfParsed(seg, depth) === 'write') return 'write'
+  return 'read'
+}
+
+/**
+ * The intent of a segment's own program, excluding `bash -c`, `eval` and command
+ * substitutions it carries. Callers that already use `expandSegments` need this
+ * view or they count the carried command twice and cannot apply a narrower rule
+ * to the leaf (the main-write fence's tracked-state exception for build gates).
+ */
+export function directSegmentIntent(segment) {
+  for (const seg of asSegments(segment)) if (directIntentOfParsed(seg) === 'write') return 'write'
   return 'read'
 }
 

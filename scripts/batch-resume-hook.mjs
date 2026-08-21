@@ -367,9 +367,10 @@ try {
         ? ownerRunbookContext(ownership, readOwnerRunbook())
         : ''
       if (ownership === 'acquired-spawn') {
+        const measured = auth?.startReason || 'the launcher recorded no start evidence'
         console.log(
-          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher (the previous owner was ` +
-            `provably dead). ${RESUME_BODY} ` +
+          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher. ` +
+            `Launcher start evidence: ${measured}. ${RESUME_BODY} ` +
             `Do NOT idle-stop (the batch-progress-guard enforces this).${ownerContext}`,
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {

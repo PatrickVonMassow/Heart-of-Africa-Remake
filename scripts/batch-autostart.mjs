@@ -39,12 +39,12 @@ import {
   assessOwner,
   probePid,
   bootTimeMs,
-  spawnDecision,
   detectParallel,
   raiseParallelAlert,
   ownerStateKey,
   verdictRepeat,
   isOwnSpawn,
+  readSessionProcesses,
   PENDING_STALE_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
@@ -75,6 +75,8 @@ import {
   announceSpawn,
   firewallTopUpDecision,
   staleEtaLogLine,
+  launcherStartDecision,
+  launcherStartRecord,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -819,8 +821,52 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
 // kill-then-take valve — are gone. An owner whose lease ran out is not a third
 // state to be adjudicated; it is simply not the owner, and the takeover below is
 // the one this file has always performed for a dead one.
-const verdict = lock ? spawnDecision(assessment) : 'spawn'
+const startDecision = launcherStartDecision({
+  lock,
+  assessment,
+  batchWriters: readSessionProcesses(),
+  probePid,
+  now,
+})
+const verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
+  if (!lock || assessment.alive !== true) {
+    // A separately recorded writer may outvote an inactive/missing owner lock,
+    // but that is a refusal to recover, not a healthy tick. Make repetition
+    // audible just like an expired lease that keeps outvoting takeover. The key
+    // is the writer PROCESS identity (not its changing last-write timestamp), so
+    // consecutive vetoes form one episode; the core separately ages the write
+    // evidence out after WRITER_VETO_MAX_AGE_MS.
+    const writer = startDecision.veto
+    const key = writer
+      ? `writer-veto#${writer.sessionId}#${writer.pid ?? 'nopid'}#${writer.recordedStartedAt ?? 'nostart'}`
+      : ''
+    const rep = verdictRepeat({
+      key,
+      lastKey: state.wedgeVerdictKey,
+      repeats: state.wedgeVerdictRepeats,
+    })
+    if (key !== state.wedgeVerdictKey || typeof state.writerVetoSince !== 'number') state.writerVetoSince = now
+    state.wedgeVerdictKey = rep.key
+    state.wedgeVerdictRepeats = rep.repeats
+    log(`skip: ${startDecision.reason}`)
+    if (writer && rep.escalate) {
+      const blockedMinutes = Math.max(0, Math.round((now - state.writerVetoSince) / 60000))
+      log(
+        `ESCALATING: session ${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has blocked launcher recovery ` +
+          `for ${blockedMinutes} min (${rep.repeats} consecutive ticks)`,
+      )
+      await notify(
+        'Live writer blocking batch recovery',
+        `${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has vetoed a launcher start for ${blockedMinutes} minutes ` +
+          `across ${rep.repeats} consecutive ticks, although the owner lock is inactive or missing. Its last fenced ` +
+          `main write was ${Math.max(0, Math.round(writer.writerAgeMs / 60000))} minutes ago. Please look.`,
+        'high',
+      )
+    }
+    writeJsonAtomic(C('autostart-state.json'), state)
+    process.exit(0)
+  }
   const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
   log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
   // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
@@ -862,9 +908,11 @@ if (verdict === 'skip-alive') {
   // repeats" should mean N repeats of THIS episode.
   delete state.wedgeVerdictKey
   delete state.wedgeVerdictRepeats
+  delete state.writerVetoSince
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
+delete state.writerVetoSince
 // A LEASE THAT RAN OUT IS REPORTED, ALWAYS (docs/batch-resilience.md §5: no silent
 // recovery). The take itself happens through the ordinary atomic acquire further
 // down; this says WHO lost the batch, for how long it had been quiet and what it
@@ -928,14 +976,14 @@ if (dispossessed) {
       ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
       : assessment.reason === 'idle'
         ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
-        : `owner provably dead (${assessment.reason}) — taking over`,
+        : `owner process measured inactive (${assessment.reason}) — taking over; no live batch-writer process measured`,
   )
   if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
   // boundary exits, and SessionEnd releases the lock before this tick runs. Said
   // distinctly so the handover chain can be read from this file either way.
-  log('no owner lock — taking over')
+  log('no owner lock — taking over; no live batch-writer process measured')
 }
 
 // Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
@@ -1140,7 +1188,7 @@ try {
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
-writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead })
+writeJsonAtomic(C('autostart-last.json'), launcherStartRecord({ decision: startDecision, at: now, head: curHead }))
 log(
   `RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount}` +
     `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''})`,
@@ -1196,8 +1244,16 @@ try {
 // spawned process, and the spawned session may convert it to itself (pid-bound).
 updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: null })
 // One-shot bind helper for the spawned session's SessionStart hook.
-writeJsonAtomic(C('autostart-authorized.json'), { at: now, pid: child.pid })
-writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead, pid: child.pid })
+writeJsonAtomic(C('autostart-authorized.json'), {
+  at: now,
+  pid: child.pid,
+  startReason: startDecision.reason,
+  measured: startDecision.evidence,
+})
+writeJsonAtomic(
+  C('autostart-last.json'),
+  launcherStartRecord({ decision: startDecision, at: now, head: curHead, pid: child.pid }),
+)
 writeJsonAtomic(C('autostart-state.json'), {
   ...state,
   lastHead: curHead,

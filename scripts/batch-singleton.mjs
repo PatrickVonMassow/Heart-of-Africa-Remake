@@ -393,21 +393,6 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
 }
 
 /**
- * Launcher decision: may the autostart spawn a takeover session?
- * Returns 'spawn' | 'skip-alive'.
- *
- * THE THIRD OUTCOME IS GONE (point 434). 'skip-wedged' named a session that was
- * alive AND stuck, and everything downstream of it — `wedgeAction`,
- * `wedgeTakeover`, `takeWedged`, the two-stage silence report — existed to decide
- * what to do about a state the launcher could describe but not resolve. An
- * expired lease is not a third state: it is simply not alive, and the ordinary
- * takeover this function has always licensed handles it.
- */
-export function spawnDecision(assessment) {
-  return assessment.alive ? 'skip-alive' : 'spawn'
-}
-
-/**
  * WHAT THE PID PROBE SAYS ABOUT THE LOCK'S OWNER. PURE (the probe is passed in).
  *
  * The same three readings `assessOwner` has always made further down, lifted out
@@ -1384,6 +1369,57 @@ export function ourClaudeProcess(sessionId, opts = {}) {
     }
   }
   return anc
+}
+
+/**
+ * Record that this top-level session is actively writing the batch's main
+ * checkout. The process identity lives beside, but independently of, the owner
+ * lock: losing or releasing the lock must not erase the launcher's evidence that
+ * the writer process itself is still alive.
+ *
+ * `ourClaudeProcess` supplies the memoised identity on the real hook path;
+ * tests may inject `processIdentity`. A missing identity records nothing — a
+ * session id or PID without a start-time-qualified process is not evidence the
+ * launcher may use to suppress a start indefinitely.
+ */
+export function noteBatchWriter(sessionId, opts = {}) {
+  if (!sessionId || isProbeSessionId(sessionId)) return false
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const now = opts.now ?? Date.now()
+    const processIdentity = Object.prototype.hasOwnProperty.call(opts, 'processIdentity')
+      ? opts.processIdentity
+      : ourClaudeProcess(sessionId, { ...opts, ancestorCachePath: path })
+    if (!(typeof processIdentity?.pid === 'number' && processIdentity.pid > 0)) return false
+    const processes = readJson(path) ?? {}
+    const prior = processes[sessionId] && typeof processes[sessionId] === 'object' ? processes[sessionId] : {}
+    processes[sessionId] = {
+      ...prior,
+      pid: processIdentity.pid,
+      startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
+      at: typeof prior.at === 'number' ? prior.at : now,
+      batchWriterAt: now,
+    }
+    for (const [sid, entry] of Object.entries(processes)) {
+      const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)
+      if (now - last > 7 * 24 * 3600 * 1000) delete processes[sid]
+    }
+    writeJsonAtomic(path, processes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Process identities available to the launcher. Missing/torn state is empty. */
+export function readSessionProcesses(opts = {}) {
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const processes = readJson(path)
+    return processes && typeof processes === 'object' && !Array.isArray(processes) ? processes : {}
+  } catch {
+    return {}
+  }
 }
 
 /**
