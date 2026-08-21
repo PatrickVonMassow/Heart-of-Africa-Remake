@@ -49,7 +49,7 @@
 // lines under the old 409 and rides that slack, so 408 is the exact count and 417 would have
 // been room for a whole future entry — the four-eyes review caught precisely that.
 export const LIMITS = {
-  maxLines: 415,
+  maxLines: 425,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -90,7 +90,20 @@ export const LIMITS = {
   // themselves. EXACT FIT, no headroom: 3580 + 97 = 3677. The LINE ceiling moves too, by the 7 lines those two entries
   // occupy after that tightening — the per-entry ceiling (11) is untouched, so
   // the guide's shape as a list of short tips is unchanged.
-  maxWords: 3677,
+  // Raised on 21.08.2026 to the exact measured fit of two genuinely new tips.
+  // One names a test suite that mutates the repository it runs in: unlike the
+  // existing environment-dependent-test tip, the test itself can report green
+  // while damaging its subject. The other names an exception promised only in
+  // refusal text, with neither state nor command: unlike a missing exception,
+  // it forces the honest exception through forms that only accept a dishonest
+  // normal-case account. Both are decisions a reader must copy, not longer
+  // tellings of an existing class, and no existing entry or claim was removed.
+  // Together they cost +10 body lines / +107 words against the guide's measured
+  // 415 / 3666. The old 11-word slack was absorbed, so the ceilings move by
+  // +10 lines / +96 words to the exact 425 / 3773 fit, with zero slack. This
+  // raise was NOT escalated to the user under his general 10.08.2026 withdrawal
+  // of ask-before-raising; the written justification here is the last step.
+  maxWords: 3773,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
@@ -125,6 +138,16 @@ export const PROJECT_MARKERS = [
   { re: /\bin diesem Projekt\b/i, hint: 'Anekdoten-Einleitung' },
   { re: /\ban einem einzigen Tag\b/i, hint: 'Anekdoten-Einleitung' },
 ]
+
+/** Measure exactly the body that the guide budget governs. */
+export function measureGuide(text) {
+  const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n')
+  const body = lines.filter((line) => !/^<!--/.test(line.trim()))
+  return {
+    lines: body.length,
+    words: body.join(' ').split(/\s+/).filter(Boolean).length,
+  }
+}
 
 /**
  * Return the body of a `## <heading>` section, with the line number each line
@@ -216,14 +239,13 @@ export function auditGuide(text, limits = LIMITS) {
   // CRLF must audit identically to LF, and the fingerprint comment is
   // bookkeeping rather than content — excluded from BOTH budgets, not just one.
   const lines = src.replace(/\r\n/g, '\n').split('\n')
-  const body = lines.filter((l) => !/^<!--/.test(l.trim()))
-  const words = body.join(' ').split(/\s+/).filter(Boolean).length
+  const measured = measureGuide(src)
 
-  if (body.length > limits.maxLines) {
-    push('length', body.length, `${body.length} Zeilen > Budget ${limits.maxLines}`)
+  if (measured.lines > limits.maxLines) {
+    push('length', measured.lines, `${measured.lines} Zeilen > Budget ${limits.maxLines}`)
   }
-  if (words > limits.maxWords) {
-    push('length', 1, `${words} Wörter > Budget ${limits.maxWords}`)
+  if (measured.words > limits.maxWords) {
+    push('length', 1, `${measured.words} Wörter > Budget ${limits.maxWords}`)
   }
 
   // Project markers are checked over the WHOLE document — a war story leaks in
