@@ -107,6 +107,9 @@ describe('authorship-cut mechanism review planning', () => {
       unreviewableReason: expect.stringMatching(/authorship vendor is unknown/),
       files: ['unknown-guard.mjs'],
     })
+    expect(plan.groups[0].unreviewableReason).toMatch(
+      /--since <the last reviewed sha>.*bounded 1\/1 pass/,
+    )
     expect(plan.unreviewable).toEqual([plan.groups[0]])
   })
 

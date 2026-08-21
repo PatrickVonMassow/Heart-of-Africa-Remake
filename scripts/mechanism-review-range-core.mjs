@@ -7,10 +7,12 @@
 import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
+export const UNREVIEWABLE_NARROWING_REMEDY =
+  'Narrow with --since <the last reviewed sha> to a reviewable subset; when it fits, review-sol records that subset as a bounded 1/1 pass.'
 export const NO_ELIGIBLE_REVIEWER_REASON =
-  'every configured reviewer vendor authored part of this contribution'
+  `every configured reviewer vendor authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
 export const UNKNOWN_AUTHOR_REVIEWER_REASON =
-  'authorship vendor is unknown, so no reviewer can prove cross-vendor independence'
+  `authorship vendor is unknown, so no reviewer can prove cross-vendor independence. ${UNREVIEWABLE_NARROWING_REMEDY}`
 
 const uniq = (xs) => [
   ...new Set((xs ?? []).filter((value) => value !== null && value !== undefined && String(value)).map(String)),
@@ -153,7 +155,7 @@ const reviewerFields = (authors, candidates) => {
     ? UNKNOWN_AUTHOR_REVIEWER_REASON
     : (candidates ?? []).length
       ? NO_ELIGIBLE_REVIEWER_REASON
-      : 'no reviewer is configured for this contribution'
+      : `no reviewer is configured for this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
   return reviewer
     ? { reviewer, reviewerVendor: vendorOf(reviewer) }
     : { reviewer: '', reviewerVendor: '', unreviewableReason: reason }

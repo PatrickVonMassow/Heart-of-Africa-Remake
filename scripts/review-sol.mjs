@@ -95,7 +95,12 @@ import {
   undecodablePaths,
   unquoteGitPath,
 } from './review-material-core.mjs'
-import { mechanismLogCommand, parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import {
+  mechanismLogCommand,
+  parseRangeLog,
+  planAuthorshipGroups,
+  UNREVIEWABLE_NARROWING_REMEDY,
+} from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
 export const CODEX_HOME = process.env.CODEX_HOME || join(homedir(), '.codex')
@@ -872,7 +877,8 @@ if (isMainModule(import.meta.url)) {
     console.error(formatAuthorshipPlan(plan, { sha: full }))
     if (plan.unreviewable.length) {
       console.error(
-        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; no round can clear it.',
+        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; ' +
+          `no round can clear it. ${UNREVIEWABLE_NARROWING_REMEDY}`,
       )
       process.exit(4)
     }
