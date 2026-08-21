@@ -15,6 +15,10 @@ import { resolve } from 'node:path'
 import { CONTEXT_CEILING_TOKENS, CONTEXT_TRIGGER_TOKENS } from './context-watermark-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
+const REPLAY = JSON.parse(readFileSync(
+  resolve(SOURCE_SCRIPTS, 'fixtures', 'context-budget-2026-08-19-replay.json'),
+  'utf8',
+))
 const SID = 'context-fence-test'
 let repo
 
@@ -149,6 +153,22 @@ beforeEach(() => {
 // it pins "armed, it refuses exactly as before". The DEFAULT — observation —
 // has its own block below.
 describe('context-fence-guard, ARMED (spawned)', () => {
+  it('intercepts the measured fixture command through the real PreToolUse wrapper', () => {
+    const apiCall = REPLAY.calls.find((entry) => entry.sourceCall === 36)
+    const [first, refused] = apiCall.operations
+    writeTranscript(apiCall.tokens)
+
+    expect(callGuard(first.toolName, first.toolInput).stdout.trim()).toBe('')
+    const result = callGuard(refused.toolName, refused.toolInput)
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.decision?.hookSpecificOutput).toMatchObject({
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+    })
+    expect(denial(result)).toContain('pending debit 2129')
+    expect(JSON.parse(readFileSync(ledgerPath(), 'utf8')).pendingDebit).toBe(2_129)
+  })
+
   it('denies a starting call for the owner past the mark, with the measurement in the reason', () => {
     const r = callGuard('Agent', { prompt: 'build point 701' })
     expect(r.status, r.stderr).toBe(0)

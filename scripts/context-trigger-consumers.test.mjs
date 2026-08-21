@@ -57,5 +57,11 @@ describe('the handover/ceiling consumer split', () => {
     expect(fence).not.toContain('refusalTokens')
     expect(fence).not.toContain('CONTEXT_REFUSAL_TOKENS')
     expect(fence).not.toMatch(/\b110[_,]?000\b/)
+
+    const settings = JSON.parse(readFileSync(resolve(HERE, '..', '.claude', 'settings.json'), 'utf8'))
+    const entry = settings.hooks.PreToolUse.find((candidate) =>
+      candidate.hooks?.some((hook) => hook.command?.includes('context-fence-guard.mjs')),
+    )
+    expect(entry?.matcher?.split('|')).toContain('Bash')
   })
 })
