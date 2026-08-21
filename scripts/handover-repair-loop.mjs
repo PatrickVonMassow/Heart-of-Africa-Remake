@@ -11,6 +11,7 @@ import { readOwnerLock } from './batch-singleton.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { expandSegments, gitSubcommand, segmentInvokesScript } from './command-classify-core.mjs'
 import {
+  REPAIR_COMMIT_ORDINARY_MAX,
   advanceClaimSurvival,
   detectRepairLoop,
   latestAssistantTurnKey,
@@ -194,9 +195,9 @@ export function observeOwnerLoops(
     if (detected.report && mayAct) {
       repairContext =
         `REPAIR LOOP ${detected.count}: this owner's last ${detected.count} commits all touch ` +
-        `${detected.mechanism}; four is the measured ordinary maximum. This run is reported once, not on ` +
-        'every later turn. Stop repairing the mechanism that is feeding work back to this session; hand over ' +
-        'or return to work-order progress, and state which in the next response.'
+        `${detected.mechanism}; ${REPAIR_COMMIT_ORDINARY_MAX} is the measured ordinary maximum. This run ` +
+        'is reported once, not on every later turn. Stop repairing the mechanism that is feeding work back ' +
+        'to this session; hand over or return to work-order progress, and state which in the next response.'
     }
   } catch {
     // Git/history failures invent neither a count nor a report.

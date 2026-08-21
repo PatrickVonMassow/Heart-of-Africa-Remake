@@ -4,8 +4,8 @@ import {
   REPAIR_COMMIT_ORDINARY_MAX,
   advanceClaimSurvival,
   detectRepairLoop,
-  guardMechanisms,
   latestAssistantTurnKey,
+  scriptMechanisms,
 } from './handover-repair-loop-core.mjs'
 
 const CLEAR = 'scripts/clear-claim-guard.mjs'
@@ -13,9 +13,9 @@ const CORE = 'scripts/clear-claim-guard-core.mjs'
 const TEST = 'scripts/clear-claim-guard.test.mjs'
 
 // The point's shared fixture: the claim recorded at 08:32 survived at least
-// seven clean tool-response turns, while the owner produced the landing commit
-// plus the seven repair commits named in the work order. Some commits touch only
-// core/test or registration beside the wrapper; all belong to the same family.
+// seven clean tool-response turns, while first-parent history records nine
+// consecutive repair commits from 09:15 through 10:37. Some touch only core/test
+// or registration beside the wrapper; all belong to the same family.
 const MEASURED_20_AUGUST = Object.freeze({
   claimKey: 'd5fcb9cf:2026-08-20T06:32:00.000Z',
   turns: ['turn-1', 'turn-2', 'turn-3', 'turn-4', 'turn-5', 'turn-6', 'turn-7'],
@@ -23,6 +23,8 @@ const MEASURED_20_AUGUST = Object.freeze({
     { sha: 'fdd8c394', at: '10:37', paths: [CORE, TEST] },
     { sha: '0f025d89', at: '10:27', paths: [CORE, CLEAR, TEST] },
     { sha: '25d1c3e7', at: '10:19', paths: [CORE, CLEAR, TEST] },
+    { sha: '72d832f3', at: '10:08', paths: [CORE, CLEAR, TEST] },
+    { sha: 'c70f151c', at: '09:59', paths: [CORE, TEST] },
     { sha: '28c8e63d', at: '09:44', paths: [CORE, CLEAR, TEST] },
     { sha: '19efc9d5', at: '09:32', paths: [CORE, CLEAR, TEST] },
     { sha: 'a8f13c0d', at: '09:23', paths: [CORE, CLEAR, TEST] },
@@ -30,11 +32,6 @@ const MEASURED_20_AUGUST = Object.freeze({
       sha: '1ce35aef',
       at: '09:15',
       paths: [CLEAR, 'scripts/guard-preflight.mjs', 'scripts/guard-preflight-core.test.mjs'],
-    },
-    {
-      sha: '99f467c6',
-      at: '08:29',
-      paths: [CLEAR, CORE, TEST, '.claude/settings.json', 'TASKS.md'],
     },
   ],
 })
@@ -104,39 +101,46 @@ describe('claim survival across clean owner turns', () => {
   })
 })
 
-describe('consecutive repairs of one guard mechanism', () => {
+describe('consecutive repairs of one script mechanism', () => {
   it('reports the measured 20.08 sequence once, with its visible count', () => {
     const first = detectRepairLoop({ commits: MEASURED_20_AUGUST.commits })
     expect(first).toMatchObject({
       report: true,
-      count: 8,
+      count: 9,
       mechanism: 'clear-claim-guard',
     })
     const nextTurn = detectRepairLoop({ commits: MEASURED_20_AUGUST.commits, state: first.state })
     expect(nextTurn.report).toBe(false)
 
-    const ninth = {
+    const laterRepair = {
       sha: 'later-fix',
       paths: [CORE],
     }
     expect(
-      detectRepairLoop({ commits: [ninth, ...MEASURED_20_AUGUST.commits], state: first.state }).report,
+      detectRepairLoop({ commits: [laterRepair, ...MEASURED_20_AUGUST.commits], state: first.state }).report,
     ).toBe(false)
   })
 
-  it('leaves the measured ordinary range alone and reports the fifth commit', () => {
+  it('leaves the measured ordinary range alone and reports the ninth commit', () => {
     const ordinary = MEASURED_20_AUGUST.commits.slice(0, REPAIR_COMMIT_ORDINARY_MAX)
     expect(detectRepairLoop({ commits: ordinary }).report).toBe(false)
-    expect(detectRepairLoop({ commits: MEASURED_20_AUGUST.commits.slice(0, 5) })).toMatchObject({
+    expect(detectRepairLoop({ commits: MEASURED_20_AUGUST.commits })).toMatchObject({
       report: true,
-      count: 5,
+      count: 9,
     })
   })
 
-  it('normalises wrapper, core and test paths into one family', () => {
-    expect(guardMechanisms([CLEAR, CORE, TEST, 'scripts/guard-preflight.mjs'])).toEqual([
-      'clear-claim-guard',
-    ])
+  it('normalises plain, core, hook and test modules into one family', () => {
+    expect(
+      scriptMechanisms([
+        'scripts/example.mjs',
+        'scripts/example-core.mjs',
+        'scripts/example-core.test.mjs',
+        'scripts/example-hook.mjs',
+        'scripts/example-hook.test.mjs',
+        'scripts/example.test.mjs',
+      ]),
+    ).toEqual(['example'])
   })
 
   it('breaks the run on a commit that does not touch the mechanism', () => {

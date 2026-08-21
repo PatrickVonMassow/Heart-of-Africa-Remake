@@ -9,13 +9,14 @@
 // Counting on PostToolUse fixes either path. `advanceClaimSurvival` counts
 // distinct assistant responses without confusing parallel calls for several.
 //
-// The same run repaired clear-claim-guard repeatedly. In first-parent history,
-// four consecutive commits touching one guard family is the largest other run;
-// the 20.08 clear-claim run has nine. Four is therefore the measured ordinary
-// range, not a guessed round number, and the fifth commit is surfaced once.
+// The same run repaired clear-claim-guard repeatedly. Replayed with
+// `git log --first-parent --format=@@%H --name-only main`, normalising every
+// top-level scripts/*.mjs family, the largest other run is eight (`cut-account`)
+// and the 20.08 clear-claim run has nine. Eight is therefore the measured
+// ordinary range, and the ninth commit is surfaced once.
 
 export const CLAIM_CLEAN_TURN_LIMIT = 3
-export const REPAIR_COMMIT_ORDINARY_MAX = 4
+export const REPAIR_COMMIT_ORDINARY_MAX = 8
 
 /** Stable identity of the newest assistant response in a JSONL transcript. */
 export function latestAssistantTurnKey(transcript = '') {
@@ -92,12 +93,14 @@ export function advanceClaimSurvival({
   }
 }
 
-/** Guard mechanism families touched by a commit's paths. */
-export function guardMechanisms(paths = []) {
+/** Top-level script mechanism families touched by a commit's paths. */
+export function scriptMechanisms(paths = []) {
   const found = new Set()
   for (const path of Array.isArray(paths) ? paths : []) {
-    const match = /^scripts\/(.+?-guard)(?:-core)?(?:\.test)?\.mjs$/.exec(String(path))
-    if (match) found.add(match[1])
+    const match = /^scripts\/([^/]+)\.mjs$/.exec(String(path))
+    if (!match) continue
+    const family = match[1].replace(/\.test$/, '').replace(/-(?:core|hook)$/, '')
+    if (family) found.add(family)
   }
   return [...found].sort()
 }
@@ -106,7 +109,7 @@ export function guardMechanisms(paths = []) {
 function leadingRun(commits, mechanism) {
   const run = []
   for (const commit of commits) {
-    if (!guardMechanisms(commit?.paths).includes(mechanism)) break
+    if (!scriptMechanisms(commit?.paths).includes(mechanism)) break
     run.push(commit)
   }
   return run
@@ -126,7 +129,7 @@ export function detectRepairLoop({
   ordinaryMax = REPAIR_COMMIT_ORDINARY_MAX,
 } = {}) {
   const list = Array.isArray(commits) ? commits.filter((commit) => commit?.sha) : []
-  const mechanisms = guardMechanisms(list[0]?.paths)
+  const mechanisms = scriptMechanisms(list[0]?.paths)
   let candidate = null
   for (const mechanism of mechanisms) {
     const run = leadingRun(list, mechanism)

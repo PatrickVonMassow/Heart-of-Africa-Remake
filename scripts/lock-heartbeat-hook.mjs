@@ -63,7 +63,7 @@
 //     not identified. A stale board card stopping the Stop chain at
 //     dashboard-guard before batch-progress-guard remains an unexamined
 //     alternative. PostToolUse handles either cause: count unique assistant
-//     tool-response turns here, release at the bound, and surface a same-guard
+//     tool-response turns here, release at the bound, and surface a same-mechanism
 //     commit run once outside the measured ordinary range. Pure decisions live
 //     in handover-repair-loop-core.mjs.
 import { existsSync, readFileSync, statSync } from 'node:fs'

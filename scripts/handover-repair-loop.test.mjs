@@ -119,33 +119,33 @@ describe('observeOwnerLoops', () => {
     expect(readTurnKey).toHaveBeenCalledWith('/transcript')
   })
 
-  it('surfaces a five-commit guard run once as later repairs extend it', () => {
-    const guardCommit = (sha) => ({ sha, paths: ['scripts/example-guard-core.mjs'] })
+  it('surfaces a nine-commit script run once as later repairs extend it', () => {
+    const scriptCommit = (sha) => ({ sha, paths: ['scripts/example-hook.mjs'] })
     let state = {
       repair: {
         ownerSid: 'owner',
         lastHead: 'old',
-        commits: [guardCommit('c4'), guardCommit('c3'), guardCommit('c2'), guardCommit('c1')],
+        commits: ['c8', 'c7', 'c6', 'c5', 'c4', 'c3', 'c2', 'c1'].map(scriptCommit),
       },
     }
-    const fifth = observeOwnerLoops(
+    const ninth = observeOwnerLoops(
       { sid: 'owner', ownsBatch: true, state },
       deps({
-        readHead: () => 'c5',
-        readCommits: () => [guardCommit('c5')],
+        readHead: () => 'c9',
+        readCommits: () => [scriptCommit('c9')],
         readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
       }),
     )
-    expect(fifth.context).toContain('REPAIR LOOP 5')
-    const sixth = observeOwnerLoops(
-      { sid: 'owner', ownsBatch: true, state: fifth.state },
+    expect(ninth.context).toContain('REPAIR LOOP 9')
+    const tenth = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state: ninth.state },
       deps({
-        readHead: () => 'c6',
-        readCommits: () => [guardCommit('c6')],
+        readHead: () => 'c10',
+        readCommits: () => [scriptCommit('c10')],
         readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
       }),
     )
-    expect(sixth.context).toBe('')
+    expect(tenth.context).toBe('')
   })
 
   it('counts the commit that first loads the new observer, instead of baselining past it', () => {
