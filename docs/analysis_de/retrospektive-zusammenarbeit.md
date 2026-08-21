@@ -49,6 +49,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
+| 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1318,7 +1319,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 18:11 · Quellen-Fingerprint: `0de000b3f0f8…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 19:19 · Quellen-Fingerprint: `be222c40f75b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1412,10 +1413,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 5 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 0de000b3f0f8459616471eb6ba925cf1932ab31f5ee370407d133e2146a0daba -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T16:11:32.255Z -->
+<!-- RETRO-FINGERPRINT: be222c40f75b97eb04b0d9daaf902ae2b83e58b7a22b9d52ad8397952dae88e4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:19:47.073Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2505,6 +2506,42 @@ schreiben. Und die Diagnose eines Fehlers, den ein Nutzer meldet, gehört gegen 
 Reihenfolge geprüft, bevor sie einen Umbau vorschlägt — die Zahlen lagen vor, die Positionen waren
 mit einem Befehl abfragbar, und die Fehldiagnose kostete einen ganzen Zug plus die Korrektur eines
 bereits festgehaltenen Befundes.
+
+### 3.153 Das Tor verlangte eine Freigabe, die unsere eigenen Werkzeuge nicht ausstellen können
+
+Am 21.08.2026 wurde Punkt 769 gelandet — der Zeitstempel-Wächter, der eine Zwischenzeile beurteilte
+und einen Stempel forderte, der längst dastand. Vier Review-Runden mit GPT-5.6 Sol endeten auf
+`merge` ohne Befund. Danach wies das Kritikalitäts-Gate den Zugausgang ab: »no second model has
+cleared it«, unter Nennung einer Runde, deren Befunde alle beantwortet waren.
+
+Die Ursache ist eine Formfrage mit voller Wirkung. `passShape()` verlangte `pass.total >= 2`. Ein
+Review-Record mit `pass 1/1` fiel damit in keinen der beiden Freigabe-Töpfe — weder in den für
+ungescopte Reviews noch in die Kompositionen —, und `review-sol.mjs` stellt genau `1/1` aus, sobald
+ein `--since` den Bereich auf eine passende Runde verengt. Das Gate lehnte also den Normalfall
+seiner eigenen Werkzeugkette strukturell ab, und das Mechanismus-Gate akzeptierte dieselben Records.
+Das ist dieselbe Klasse wie der Defekt, den 769 gerade entfernt hatte: ein Wächter, der einen
+erfundenen Fehler an den Zugausgang schreibt und Arbeit verlangt, die schon getan ist.
+
+Der naheliegende Einzeiler — die Untergrenze auf 1 — wurde gebaut, getestet und Sol ausdrücklich
+feindselig vorgelegt, mit offengelegtem Eigeninteresse: Er entsperrte den eigenen Zug. Sol lehnte
+ab, und zu Recht. Die Vollständigkeitsschleife prüft nur Pass-INDIZES und vergleicht nie die
+gelesenen Dateien mit denen, die der Punkt geändert hat; ein `1/1`-Record hätte damit einen Punkt
+freigegeben, dessen übrige Dateien niemand gelesen hat. Die Änderung wurde zurückgenommen.
+
+Darunter liegt die zweite Hälfte: Ein Punkt, an dem BEIDE Anbieter geschrieben haben, bekommt
+überhaupt keinen ungescopten sauberen Record. Auf die Bitte um eine Gesamtrunde über 769 zerlegte
+`review-sol` den Bereich nach Autorschaft in dreizehn Pässe über zwei Anbieter und erklärte einen
+davon für UNREVIEWABLE. Für einen solchen Punkt ist die Bedingung des Gates mit ehrlichen Mitteln
+nicht erfüllbar — 769 steht gemergt und abgehakt da, während sein Gate weiter ablehnt.
+
+**Lehren:** Ein Tor muss gegen die Form geprüft werden, die die eigenen Werkzeuge tatsächlich
+ausstellen, sonst verlangt es einen Nachweis, den niemand erbringen kann — und die Prüfung gehört an
+den Tag der Inbetriebnahme, nicht an den ersten Zug, den es blockiert. Zweitens: Wenn ein Gate den
+eigenen Zug sperrt, ist die Versuchung, es aufzuweiten, am größten und die Urteilskraft am
+kleinsten; der einzige verlässliche Umgang ist, das Eigeninteresse dem zweiten Modell offenzulegen
+und sein Nein zu nehmen. Drittens: Vier-Augen über einen Bereich, an dem beide Anbieter geschrieben
+haben, braucht eine ausdrücklich benannte Form — sonst entsteht eine Bedingung, die nur deshalb
+unerfüllbar ist, weil niemand sie je gegen diesen Fall gedacht hat.
 
 ### 3.120 Der Statussatz wurde angehängt, nicht aus dem gemessenen Zustand abgeleitet
 

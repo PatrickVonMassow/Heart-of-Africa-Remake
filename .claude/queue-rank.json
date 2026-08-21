@@ -285,10 +285,10 @@
       "place": "last"
     },
     "745": {
-      "at": "2026-08-21T16:06:00.611Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174 with the rest of the context-ceiling family. The blind-parallel merge decided it against the list that wanted it in front: a large admission-ledger build with a dependency chain that is not shown to repay before 174.",
+      "at": "2026-08-21T17:23:19.967Z",
+      "why": "Nutzeranweisung 21.08.2026 16:39Z im Board-Chat: die Kontext-Decke wird vor dem Release gebaut, 745 zuerst",
       "origin": "user",
-      "place": "last"
+      "place": "ahead"
     },
     "746": {
       "at": "2026-08-21T16:06:00.699Z",
@@ -303,10 +303,10 @@
       "place": "last"
     },
     "748": {
-      "at": "2026-08-21T16:06:00.963Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The measured 265,517-token attended window is the largest single drain, but it is admitted through 745 and inherits that whole build.",
+      "at": "2026-08-21T17:23:20.040Z",
+      "why": "Nutzeranweisung 21.08.2026 16:39Z im Board-Chat: direkt hinter 745, weil es dessen prospektives Budget erbt",
       "origin": "user",
-      "place": "last"
+      "place": "ahead"
     },
     "749": {
       "at": "2026-08-21T16:06:01.041Z",
@@ -388,12 +388,6 @@
     "768": {
       "at": "2026-08-21T16:05:59.141Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for TOKENS: CLAUDE.md loads on every turn and section 7.1 alone is about 1.9k of it. Its branch stands.",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "769": {
-      "at": "2026-08-21T16:05:58.986Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front as URGENT: it refuses a correct reply at the exit of every turn and makes the session write a fabricated self-correction. Its branch stands.",
       "origin": "user",
       "place": "ahead"
     },
@@ -484,10 +478,16 @@
       "why": "Es ist kein Produktdefekt und keine Nutzeranweisung, sondern die einmalige Nachraeumung eines Altbestands — nach Punkt 789 gehoert ein maschinell abgelegter, nicht hoch kritischer Punkt hinter den Release-Punkt 174 und damit hinter die Kommunikationsmechanik, und genau dieselbe Regel wendet er auf sich selbst an.",
       "origin": "machine",
       "place": "last"
+    },
+    "820": {
+      "at": "2026-08-21T17:18:26.518Z",
+      "why": "Blockiert den Zugausgang jeder Sitzung, die einen HIGH-Punkt landet, und verlangt dabei Arbeit, die schon getan ist — die Release-Punkte selbst muessen gelandet werden, es kann also nicht hinter dem Release warten",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "settled": {
-    "at": "2026-08-21T15:54:50.361Z",
+    "at": "2026-08-21T17:18:26.524Z",
     "points": [
       174,
       184,
@@ -705,7 +705,6 @@
       766,
       767,
       768,
-      769,
       774,
       777,
       778,
@@ -728,7 +727,8 @@
       815,
       817,
       818,
-      819
+      819,
+      820
     ]
   },
   "boundary": {
@@ -780,7 +780,6 @@
       762,
       764,
       768,
-      769,
       779
     ],
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
