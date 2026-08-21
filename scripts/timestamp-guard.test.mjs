@@ -4,7 +4,7 @@
 // mandated outcomes: current stamp allows, missing stamp blocks, stale/wrong
 // stamp blocks, unreadable transcript blocks (bounded by the loop escape).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -17,12 +17,14 @@ import {
   berlinStamp,
   evaluate,
   extractLastAssistantText,
+  inspectLastAssistantText,
   timestampReplyCondition,
 } from './timestamp-guard-core.mjs'
 
 // Vitest runs with cwd = repo root; import.meta.url is an http URL under the
 // jsdom environment, so the guard path is resolved from cwd instead.
 const GUARD = join(process.cwd(), 'scripts', 'timestamp-guard.mjs')
+const RACE_FIXTURE = join(process.cwd(), 'scripts', 'fixtures', 'timestamp-guard-302ms-race.json')
 
 /** One transcript JSONL line in the real Claude Code shape (assistant
  *  messages stream one entry per content block, sharing message.id). */
@@ -67,7 +69,7 @@ describe('acceptedStamps tolerance window', () => {
 })
 
 describe('extractLastAssistantText', () => {
-  it('returns the first text block of the LAST assistant message id', () => {
+  it('returns the first text block of the last assistant message after the last tool result', () => {
     const jsonl = [
       assistantText('**old stamp** first reply', { id: 'a' }),
       line('user', [{ type: 'tool_result', content: 'x' }], { id: '' }),
@@ -81,6 +83,7 @@ describe('extractLastAssistantText', () => {
     const jsonl = [
       assistantText('main reply', { id: 'a' }),
       assistantText('subagent chatter', { id: 'sub', sidechain: true }),
+      line('user', [{ type: 'tool_result' }], { id: '', sidechain: true }),
     ].join('\n')
     expect(extractLastAssistantText(jsonl)).toBe('main reply')
   })
@@ -88,6 +91,19 @@ describe('extractLastAssistantText', () => {
     expect(extractLastAssistantText('not json\n{"broken')).toBe(null)
     expect(extractLastAssistantText('')).toBe(null)
     expect(extractLastAssistantText(`not json\n${assistantText('ok')}`)).toBe('ok')
+  })
+
+  it('does not return intermediate narration while the final reply row is pending', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const pending = fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n')
+    expect(extractLastAssistantText(pending)).toBe(null)
+    expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
+  })
+
+  it('returns the final stamped reply once the raced row is flushed', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const flushed = [...fixture.rowsBeforeFinalReply, fixture.finalReplyRow].map(JSON.stringify).join('\n')
+    expect(extractLastAssistantText(flushed)).toBe(fixture.finalReplyRow.message.content[0].text)
   })
 })
 
@@ -103,9 +119,13 @@ describe('evaluate', () => {
     const verdict = evaluate({ lastText: 'Alles erledigt, Tests grün.', now })
     expect(verdict?.decision).toBe('block')
     expect(verdict?.reason).toContain('**Donnerstag, 23.07.2026, 10:00**')
+    expect(verdict?.reason).toContain('"Alles erledigt, Tests grün."')
   })
   it('blocks a stale stamp (hours off) and a yesterday stamp', () => {
-    expect(evaluate({ lastText: '**Donnerstag, 23.07.2026, 07:00** Report.', now })?.decision).toBe('block')
+    const staleText = '**Donnerstag, 23.07.2026, 07:00** Report.'
+    const stale = evaluate({ lastText: staleText, now })
+    expect(stale?.decision).toBe('block')
+    expect(stale?.reason).toContain(JSON.stringify(staleText))
     expect(evaluate({ lastText: '**Mittwoch, 22.07.2026, 10:00** Report.', now })?.decision).toBe('block')
   })
   it('blocks a wrong-format stamp (unbold, prose date)', () => {
@@ -160,6 +180,46 @@ describe('end-to-end guard process', () => {
     expect(verdict2?.decision).toBe('block')
   })
 
+  it('replays the measured 302 ms race without judging the intermediate narration', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    expect(Date.parse(fixture.stopFeedbackAt) - Date.parse(fixture.finalReplyRow.timestamp)).toBe(302)
+
+    const p = join(dir, 'measured-race.jsonl')
+    writeFileSync(p, fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n') + '\n')
+    expect(runGuard({ transcript_path: p }, { session: fixture.sessionId })).toBe(null)
+
+    const flushed = [...fixture.rowsBeforeFinalReply, fixture.finalReplyRow].map(JSON.stringify).join('\n')
+    expect(
+      evaluate({
+        lastText: extractLastAssistantText(flushed),
+        now: new Date(fixture.stopFeedbackAt),
+      }),
+    ).toBe(null)
+  })
+
+  it('still blocks genuinely unstamped and stale final replies after a tool result', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const p = join(dir, 'bad-finals.jsonl')
+    const writeFinal = (text) => {
+      const final = {
+        ...fixture.finalReplyRow,
+        message: { ...fixture.finalReplyRow.message, content: [{ type: 'text', text }] },
+      }
+      writeFileSync(
+        p,
+        [...fixture.rowsBeforeFinalReply, final].map(JSON.stringify).join('\n') + '\n',
+      )
+    }
+
+    writeFinal('Fertig — ohne Zeitstempel.')
+    const unstamped = runGuard({ transcript_path: p }, { session: 'race-unstamped' })
+    expect(unstamped?.decision).toBe('block')
+    expect(unstamped?.reason).toContain('"Fertig — ohne Zeitstempel."')
+
+    writeFinal('**Donnerstag, 20.08.2026, 05:14** · Kontext: 186.738 Tokens')
+    expect(runGuard({ transcript_path: p }, { session: 'race-stale' })?.decision).toBe('block')
+  })
+
   it('(d) blocks a missing/garbled transcript, bounded by the loop escape', () => {
     const missing = { transcript_path: join(dir, 'nope.jsonl') }
     // First three attempts block…
@@ -210,13 +270,15 @@ describe('the context reading in the header', () => {
   })
 
   it('blocks a reply that carries the stamp but drops the reading', () => {
+    const lastText = `${stamp()} Kurze Bestätigung.`
     const verdict = evaluate({
-      lastText: `${stamp()} Kurze Bestätigung.`,
+      lastText,
       headerSuffix: SUFFIX,
       enforceSuffix: true,
     })
     expect(verdict?.decision).toBe('block')
     expect(verdict.reason).toContain('CONTEXT READING')
+    expect(verdict.reason).toContain(JSON.stringify(lastText))
   })
 
   it('allows the complete header', () => {

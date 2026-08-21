@@ -1,0 +1,35 @@
+{
+  "sessionId": "d5fcb9cf-2936-4743-9502-f504f08b8ac5",
+  "stopFeedbackAt": "2026-08-20T06:15:18.706Z",
+  "rowsBeforeFinalReply": [
+    {
+      "type": "assistant",
+      "message": {
+        "content": [
+          { "type": "text", "text": "Jetzt die Änderung." },
+          { "type": "tool_use" }
+        ]
+      }
+    },
+    {
+      "type": "user",
+      "message": {
+        "content": [
+          { "type": "tool_result" }
+        ]
+      }
+    }
+  ],
+  "finalReplyRow": {
+    "type": "assistant",
+    "timestamp": "2026-08-20T06:15:18.404Z",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "**Donnerstag, 20.08.2026, 08:14** · Kontext: 186.738 Tokens"
+        }
+      ]
+    }
+  }
+}
