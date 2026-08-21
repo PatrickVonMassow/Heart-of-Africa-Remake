@@ -471,6 +471,12 @@ put it is the mistake this line exists to stop.
   cannot drift apart again; a case proving the boundary completes even when it
   overruns its cap AND that the overrun is recorded; and the three recorded handover
   measurements with their spread, not only their mean.
+  THE HANDOVER-TEXT HALF OF THIS POINT BELONGS TO POINT 800 (cut 21.08.2026, stated here because
+  a point that gives work away must say so). What remains uniquely this point's own: the three
+  clean handover measurements that replace the contaminated 27,336 tokens in the
+  `CONTEXT_TRIGGER_TOKENS` arithmetic comment, and the mechanical cap on the boundary path. This
+  point's own text says the measurement is worthless until that contradiction lands, so 800 runs
+  first; point 752's first stage in turn depends on the exit path corrected here.
   Criticality: high — it sits on the handover path, the one path that must never fail, and its
   failure mode is the measured one: a session that can neither hand over nor stop; every
   change here is fail-open or it is wrong.
@@ -1117,6 +1123,18 @@ put it is the mistake this line exists to stop.
   point whose ledger holds rounds from several sessions counts them all, and a case that FAILS
   if the counter is fed commits instead of review records; plus a fixture proving an unlanded
   point reports its measured token spend rather than zero.
+  MEASURED 21.08.2026, 07:51 — THE CRITICALITY LINE BELOW NO LONGER STANDS ON ITS OWN REASON.
+  `node scripts/fable-switch.mjs --status` reads OFF (user, 20.08.2026 17:34, "not enough Fable
+  volume left"), and `author-routing-core.mjs` gates the escalation branch on `fableOn`, so the
+  monotone rounds counter decides nothing while the switch stands off — Fable is the lane's only
+  escalation target. Probe: `node scripts/author-sol.mjs --routing --point 713` answers `sol` at
+  18 unsuccessful rounds, where the same command answered `fable` on 19.08. What survives the
+  20.08. re-cut is lane-independent: the round threshold, the token-based spend measurement, and a
+  trend read that bites only once the suspension is lifted. THE USER WAS ASKED whether the
+  criticality drops to medium when this point moves behind point 174, and the answer is PENDING —
+  the line below therefore stays untouched until it arrives. CONDITION ON THE MOVE: should the
+  Fable switch go back to ON before point 174 is tagged, this point is armed again and belongs in
+  FRONT of the release boundary rather than behind it.
   Criticality: high — it governs how the scarcest model pool is spent, and its absence has
   already put 58 % of a week's volume into a single point that never landed.
   THE SERVING FALLBACK IS NOT PART OF THIS POINT — it is decided and correct. The 18 % above is
@@ -1560,6 +1578,10 @@ put it is the mistake this line exists to stop.
   For the boundary's text: a Vitest case over the pure builder proving the produced handover reason
   satisfies the same predicate the publish gate applies, one for an empty queue, and one that FAILS
   when the point number is dropped from the text.
+  GAP (1) IS STRUCK AND BELONGS TO POINT 800 (cut 21.08.2026, stated here because a point that
+  gives work away must say so). The handover-text contradiction — the wording carried over from
+  point 731 — is one rule and is settled once, in 800. This point keeps gaps (2), (3) and (4):
+  filing a point, handing a point out, and the turn's end.
   Criticality: medium — it is the per-point overhead of every session, and each hand-driven chain is
   a place a step gets forgotten.
   Bundle: Session- & Repo-Hygiene.
@@ -3286,6 +3308,16 @@ put it is the mistake this line exists to stop.
   fragments `--commit` asserts.
   RELATED: point 434 (7) is where the verbatim card text came from; point 787 is the duplicate
   filing this point supersedes.
+  THIS POINT OWNS THE TEXT RULE — THREE OPEN POINTS CARRIED THE SAME CONTRADICTION (found
+  21.08.2026 while deriving the handover chain). The dictated boundary text the publish gate
+  refuses was specified as work in points 800, 744 and 708 gap (1) at once, at queue positions 54,
+  8 and 27, so the fix would have been worked at 744 and then met twice more. THE CUT, OWED BEFORE
+  ANY OF THE THREE IS COMMISSIONED: this point keeps the text rule whole — the conciseness guard,
+  both dictated forms and the `--commit` proof fragments — and supersedes the duplicate filing
+  787. Point 744 keeps only what is uniquely its own. Point 708 strikes its gap (1) and keeps gaps
+  (2), (3) and (4). ORDER CONSEQUENCE: the dependency chain is 800 → 744 → 752, and this point
+  currently stands 46 positions behind the point that depends on it. Point 790 edits the same card
+  composer and is a rider on this branch, not a member of the chain.
   Criticality: medium — no product defect, but it taxes every single session boundary, and the
   instruction it contradicts is the one that says not to re-write the text.
   Bundle: Chat & Tafel.
