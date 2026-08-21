@@ -4,7 +4,7 @@
 // mandated outcomes: current stamp allows, missing stamp blocks, stale/wrong
 // stamp blocks, unreadable transcript blocks (bounded by the loop escape).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -20,6 +20,7 @@ import {
   inspectLastAssistantText,
   timestampReplyCondition,
 } from './timestamp-guard-core.mjs'
+import { buildRaceFixture, raceTranscriptPath } from './timestamp-race-fixture.mjs'
 
 // Vitest runs with cwd = repo root; import.meta.url is an http URL under the
 // jsdom environment, so the guard path is resolved from cwd instead.
@@ -214,9 +215,9 @@ describe('end-to-end guard process', () => {
     const pending = fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n')
 
     // The slice may skip rows, but it may not skip a row that would have CHANGED
-    // the answer. The elided middle was measured, not assumed: it holds no
-    // assistant text of any kind, so the reduced fixture selects exactly what the
-    // full 1,259-row transcript selected.
+    // the answer — and the recorded count of what the elided middle holds is only
+    // a claim here. The case below re-derives it from the transcript wherever
+    // that transcript exists; this is the shape the claim has to have.
     expect(fixture.source.elidedRows).toMatchObject({
       from: 712,
       to: 929,
@@ -257,6 +258,30 @@ describe('end-to-end guard process', () => {
 
     // The landed rule returns no judgement at all on the same rows.
     expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
+  })
+
+  // The fixture asserting its own provenance proves nothing, so the derivation
+  // is repeated here against the source. The transcript is a private session log
+  // that cannot be committed, so this measures on the batch machine and skips
+  // elsewhere — the same split the document-cut accounting uses for the files it
+  // reads out of the user's home.
+  it('re-derives the whole fixture from the real transcript, where that transcript exists', () => {
+    const source = raceTranscriptPath()
+    if (!existsSync(source)) return // off the batch machine: nothing to measure against
+
+    const committed = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const rebuilt = buildRaceFixture(readFileSync(source, 'utf8'))
+
+    // Every row, id, flag, timestamp and the elided-row COUNT come back identical
+    // — so "no assistant text between 712 and 929" is re-measured, not restated.
+    // totalRows is the one field that may legitimately move (a resumed session
+    // only ever appends), so it is compared as a floor rather than for equality;
+    // the rows this fixture quotes are historical and cannot change.
+    const strip = (f) => ({ ...f, source: { ...f.source, totalRows: undefined } })
+    expect(strip(rebuilt)).toEqual(strip(committed))
+    expect(rebuilt.source.totalRows).toBeGreaterThanOrEqual(committed.source.totalRows)
+    expect(rebuilt.source.elidedRows.assistantTextRows).toBe(0)
+    expect(rebuilt.source.elidedRows.sidechainTextRows).toBe(0)
   })
 
   it('measures the residual tool-free-turn race the core documents: a false ALLOW', () => {
