@@ -16,7 +16,8 @@
 // .claude/ (batch-singleton finding 3): every state file is derived from the
 // caller's lock path.
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -27,11 +28,13 @@ import {
   assessClaim,
   claimIsBounded,
   claimWriteDecision,
+  claimWaitDecision,
   describeClaim,
   ownerIsHolding,
   releaseDecision,
   reservationDecision,
   takeoverDecision,
+  waitForClaimEnd,
 } from './batch-claim-core.mjs'
 import {
   acquire,
@@ -89,6 +92,136 @@ const asOwner = (claim, over = {}) =>
     probePid: aliveClaimant,
     ...over,
   })
+
+describe('--wait — the status assessment is the only state it reads', () => {
+  it('returns on the exact probe that sees the fixture lock free', async () => {
+    let now = 0
+    let reads = 0
+    let sleeps = 0
+    const states = [
+      { lockHeld: true, assessment: { reason: 'honour' } },
+      { lockHeld: false, assessment: { reason: 'honour' } },
+    ]
+    const waited = await waitForClaimEnd({
+      readState: () => states[Math.min(reads++, states.length - 1)],
+      clock: () => now,
+      sleep: async (ms) => { sleeps += 1; now += ms },
+      timeoutMs: 10_000,
+      pollMs: 500,
+    })
+    expect(waited).toMatchObject({ ok: true, reason: 'free', probes: 2 })
+    expect(reads).toBe(2)
+    expect(sleeps).toBe(1)
+  })
+
+  it('keeps waiting while a live owner holds the lock over a spent released record', async () => {
+    let now = NOW
+    const state = {
+      lockHeld: true,
+      assessment: {
+        claimantSid: CLAIMANT,
+        releasedAt: NOW - 8_000_000,
+        reason: 'released',
+        reserve: false,
+      },
+    }
+    expect(claimWaitDecision(state, CLAIMANT)).toEqual({ done: false, reason: 'held' })
+    const waited = await waitForClaimEnd({
+      readState: () => state,
+      claimantSid: CLAIMANT,
+      clock: () => now,
+      sleep: async (ms) => { now += ms },
+      timeoutMs: 1_000,
+      pollMs: 500,
+    })
+    expect(waited).toMatchObject({ ok: false, reason: 'timeout', probes: 3 })
+  })
+
+  it('reports a released reservation only to its claimant after the lock is free', () => {
+    const state = {
+      lockHeld: false,
+      assessment: {
+        claimantSid: CLAIMANT,
+        releasedAt: NOW,
+        reason: 'released-reserved',
+        reserve: true,
+      },
+    }
+    expect(claimWaitDecision(state, CLAIMANT)).toEqual({ done: true, reason: 'spent' })
+    expect(claimWaitDecision(state, 'session-other')).toEqual({ done: true, reason: 'free' })
+    expect(claimWaitDecision(state)).toEqual({ done: true, reason: 'free' })
+  })
+
+  it('returns immediately when nobody holds the lock and times out without real sleeping', async () => {
+    const free = await waitForClaimEnd({
+      readState: () => ({ lockHeld: false, assessment: { reason: 'no-claim' } }),
+      clock: () => 0,
+      sleep: async () => { throw new Error('a free lock must not sleep') },
+    })
+    expect(free).toMatchObject({ ok: true, reason: 'free', probes: 1 })
+
+    let now = 0
+    const timedOut = await waitForClaimEnd({
+      readState: () => ({ lockHeld: true, assessment: { reason: 'no-claim' } }),
+      clock: () => now,
+      sleep: async (ms) => { now += ms },
+      timeoutMs: 900,
+      pollMs: 500,
+    })
+    expect(timedOut).toMatchObject({ ok: false, reason: 'timeout', probes: 3 })
+  })
+
+  it('the CLI exits non-zero on timeout, and --take never writes a replacement claim', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hoa-claim-wait-'))
+    const stateDir = join(root, '.claude')
+    mkdirSync(stateDir)
+    const stamp = Date.now()
+    writeFileSync(join(stateDir, 'batch-lock.json'), JSON.stringify({
+      v: 2,
+      sessionId: OWNER,
+      kind: 'session',
+      startedAt: stamp,
+      claimedAt: stamp,
+      acquiredAt: stamp,
+      leaseUntil: stamp + 60_000,
+      pid: null,
+      pidStartedAt: null,
+    }))
+    const run = (args) => spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts', 'batch-claim.mjs'), ...args], {
+      cwd: root,
+      env: { ...process.env, HOA_REPO_ROOT: root },
+      encoding: 'utf8',
+      timeout: 5_000,
+      windowsHide: true,
+    })
+    const waited = run(['--wait', '--timeout', '0.001'])
+    expect(waited.status).toBe(1)
+    expect(waited.stderr).toContain('timed out')
+
+    const spentClaim = JSON.stringify(claimOf({
+      at: stamp - 9_000_000,
+      releasedAt: stamp - 8_000_000,
+      releasedBy: 'session-old-owner',
+    }))
+    writeFileSync(join(stateDir, 'batch-claim.json'), spentClaim)
+    const waitedOverSpentClaim = run(['--wait', '--session', CLAIMANT, '--timeout', '0.001'])
+    expect(waitedOverSpentClaim.status).toBe(1)
+    expect(waitedOverSpentClaim.stderr).toContain('timed out')
+
+    const taken = run(['--take', '--session', CLAIMANT])
+    expect(taken.status).toBe(1)
+    expect(taken.stderr).toContain('--take never writes or replaces a claim')
+    expect(readFileSync(join(stateDir, 'batch-claim.json'), 'utf8')).toBe(spentClaim)
+
+    rmSync(join(stateDir, 'batch-lock.json'))
+    const takenFree = run(['--take', '--session', CLAIMANT])
+    expect(takenFree.status).toBe(0)
+    expect(takenFree.stdout).toContain('THE BATCH IS YOURS')
+    expect(JSON.parse(readFileSync(join(stateDir, 'batch-lock.json'), 'utf8')).sessionId).toBe(CLAIMANT)
+    expect(existsSync(join(stateDir, 'batch-claim.json'))).toBe(false)
+    rmSync(root, { recursive: true, force: true })
+  })
+})
 
 // ---------------------------------------------------------------------------
 describe('assessClaim — a claim only ever moves the batch when it is provably live', () => {
