@@ -270,39 +270,18 @@ export function workOrderPoints(text) {
   // into several compliant fragments, which is evasion rather than measurement, and
   // the ceiling would report green on the very point it exists for.
   //
-  // THE FENCE IS TRACKED AS COMMONMARK DEFINES IT, not as it usually looks (second
-  // cross-vendor round, which found both shortcuts of the first attempt). An opener
-  // is three or more backticks or tildes indented by AT MOST THREE spaces — the
-  // work order indents its examples, so a column-zero-only rule left the whole
-  // evasion open. A closer is the SAME character, AT LEAST AS LONG as the opener,
-  // and followed by nothing but whitespace: a shorter run or a run with text after
-  // it does not close, or a four-backtick block would end at the first three-backtick
-  // line inside it and everything after would read as work order again.
-  const FENCE_OPEN = /^ {0,3}((`{3,})|(~{3,}))(.*)$/
-  // CommonMark allows only SPACES AND TABS after a closing run — nothing else, and
-  // `trim()` is not that rule (third cross-vendor round): it eats every Unicode
-  // space, so a non-breaking space behind a fence would close the block and the next
-  // checkbox would split the point that quoted it.
-  const CLOSER_TAIL = /^[ \t]*$/
+  // The CommonMark fence rule those rounds arrived at now lives in fenceTracker()
+  // below, shared with the prose-rationale check rather than written twice.
+  const fence = fenceTracker()
   const out = []
   let cur = null
-  let fence = null // { marker, length } while open
   for (const line of lines) {
-    const f = FENCE_OPEN.exec(line)
-    if (f) {
-      const run = f[2] ?? f[3]
-      const marker = run[0]
-      const info = f[4] ?? ''
-      if (fence === null) {
-        // A backtick opener may not carry a backtick in its info string.
-        if (!(marker === '`' && info.includes('`'))) fence = { marker, length: run.length }
-      } else if (marker === fence.marker && run.length >= fence.length && CLOSER_TAIL.test(info)) {
-        fence = null
-      }
+    const state = fence.next(line)
+    if (state.furniture) {
       if (cur) cur.lines.push(line)
       continue
     }
-    const m = fence === null ? START.exec(line) : null
+    const m = state.open ? null : START.exec(line)
     if (m) {
       if (cur) out.push(cur)
       cur = { number: Number(m[1]), lines: [line] }
@@ -321,12 +300,21 @@ export function workOrderPoints(text) {
  * No mechanism here can read prose, and none pretends to. What it can do is notice the
  * handful of constructions that exist only to justify: a causal clause, a claim about
  * what something is for, a narrated past state, an incident date offered as evidence.
- * A rule never needs one of them — "run build and lint always" carries no `because` —
- * so a line that does is either a reason (which belongs beside its switch) or a rule
- * that can be written as one.
  *
- * The list is deliberately SHORT and literal. `rather than` is not here: it contrasts
- * two instructions ("use TSL rather than raw GLSL") and is the commonest way this file
+ * A MARKER-BEARING INSTRUCTION IS A FINDING TOO, and that is the rule rather than a
+ * miss (cross-vendor review, round 1: "Never skip a required test because it is slow"
+ * is flagged). It is binding text — and it is binding text carrying its own argument,
+ * which is exactly what may not stand in this document. The rewrite is one line:
+ * "Never skip a required test; slowness is not a reason." So the check reports it, and
+ * the verdict says how to state it as a rule.
+ *
+ * WHAT IT CANNOT DO is find a rationale that uses none of these words. The same review
+ * is right about that, and no list closes it: prose has unbounded ways to explain. This
+ * is a NET, not a proof — it catches the forms the cut documents actually grew, and the
+ * word ceiling above catches the bulk whatever shape it arrives in.
+ *
+ * The list stays SHORT and literal. `rather than` is not here: it contrasts two
+ * instructions ("use TSL rather than raw GLSL") and is the commonest way this file
  * states a choice. `since` is not here either — it is a date word as often as a causal
  * one. The cost of being narrow is a rationale that slips through; the cost of being
  * broad is a guard that cries wolf on binding text, and a guard nobody believes is
@@ -336,7 +324,12 @@ export const RATIONALE_MARKERS = Object.freeze([
   Object.freeze({ re: /\bbecause\b/i, marker: 'because' }),
   Object.freeze({ re: /\b(?:which|that) is why\b/i, marker: 'which/that is why' }),
   Object.freeze({ re: /\b(?:the|one|another) reason\b/i, marker: 'the reason' }),
-  Object.freeze({ re: /\bexists?\s+(?:to|because)\b/i, marker: 'exists to/because' }),
+  // An adverb between the verb and its purpose is the commonest form of this claim
+  // ("exists ONLY to stop…"), and a bare `exists to` missed every one of them.
+  Object.freeze({
+    re: /\bexists?\s+(?:\w+\s+){0,2}(?:to|because)\b/i,
+    marker: 'exists to/because',
+  }),
   Object.freeze({ re: /\bso that\b/i, marker: 'so that' }),
   Object.freeze({ re: /\bhistorically\b/i, marker: 'historically' }),
   Object.freeze({ re: /\bwe (?:learned|found|measured|discovered|saw)\b/i, marker: 'we learned/found' }),
@@ -346,26 +339,69 @@ export const RATIONALE_MARKERS = Object.freeze([
 ])
 
 /**
+ * A CommonMark fence tracker: `next(line)` returns whether that line is fence FURNITURE
+ * (an opener or a closer) and keeps the open/closed state.
+ *
+ * It is the rule workOrderPoints above already learned across three cross-vendor rounds,
+ * lifted out so both readers share one implementation: an opener is three or more
+ * backticks or tildes indented by at most three spaces; a closer is the SAME character,
+ * AT LEAST AS LONG, followed by nothing but spaces and tabs. Toggling on any triple run
+ * closes a four-backtick block at the first inner ``` — the code after it then reads as
+ * prose and the prose after the real closer is skipped, which is a false finding and a
+ * missed one out of the same shortcut (cross-vendor review, round 1).
+ */
+export function fenceTracker() {
+  const OPEN = /^ {0,3}((`{3,})|(~{3,}))(.*)$/
+  const CLOSER_TAIL = /^[ \t]*$/
+  let fence = null
+  return {
+    /** true when `line` is the fence marker itself; `open` then says what follows it. */
+    next(line) {
+      const m = OPEN.exec(String(line ?? ''))
+      if (!m) return { furniture: false, open: fence !== null }
+      const run = m[2] ?? m[3]
+      const marker = run[0]
+      const info = m[4] ?? ''
+      if (fence === null) {
+        if (!(marker === '`' && info.includes('`'))) fence = { marker, length: run.length }
+      } else if (marker === fence.marker && run.length >= fence.length && CLOSER_TAIL.test(info)) {
+        fence = null
+      }
+      return { furniture: true, open: fence !== null }
+    },
+  }
+}
+
+/**
+ * `text` with every inline code span blanked. PURE.
+ *
+ * A span is delimited by a run of backticks and closed by a run of the SAME length, so
+ * ``--because`` is code exactly like `--because` is (cross-vendor review, round 1: the
+ * single-backtick pattern left the longer form's content exposed and reported it as an
+ * argument). Spans do not cross a line, so an unclosed run is left alone rather than
+ * swallowing the rest of the document.
+ */
+export function withoutCodeSpans(text) {
+  return String(text ?? '').replace(/(`+)(?:(?!\1)[^\n])*?\1/g, ' ')
+}
+
+/**
  * Every line of `text` that argues instead of instructing. PURE.
  *
  * Fenced blocks are skipped and inline code spans are blanked first: a command, a path
- * or an identifier is not prose, and `--because` in a flag name is not an argument.
- * One finding per line, at the first marker that matches — naming a second marker on
- * the same line tells the writer nothing the first did not.
+ * or an identifier is not prose. One finding per line, at the first marker that matches
+ * — naming a second marker on the same line tells the writer nothing the first did not.
  */
 export function proseRationaleFindings(text, { path = '', why = '' } = {}) {
   const findings = []
   const lines = String(text ?? '')
     .replace(/\r\n/g, '\n')
     .split('\n')
-  let fenced = false
+  const fence = fenceTracker()
   for (const [index, raw] of lines.entries()) {
-    if (/^ {0,3}(?:```|~~~)/.test(raw)) {
-      fenced = !fenced
-      continue
-    }
-    if (fenced) continue
-    const line = raw.replace(/`[^`]*`/g, ' ')
+    const state = fence.next(raw)
+    if (state.furniture || state.open) continue
+    const line = withoutCodeSpans(raw)
     const hit = RATIONALE_MARKERS.find((m) => m.re.test(line))
     if (!hit) continue
     findings.push({

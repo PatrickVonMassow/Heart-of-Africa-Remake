@@ -4,10 +4,11 @@ Two models produced complete keep/drop lists over `CLAUDE.md` from the same
 instruction (`docs/blind-768/instruction.md`), neither seeing the other's. List A
 (A1–A60) is the Claude Opus 5 half, list B (B1–B56) the GPT-5.6 Sol half.
 
-**DECORRELATED MERGE FRAMING** (this merge is a same-model fallback: the Fable switch
-is OFF, so the model that wrote list B also merges): reconstruct the union from the two
-numbered evidence lists and their invariants; do NOT reuse the framing, ordering, or
-categories of Sol's own half. Read list A first and in full.
+**DECORRELATED MERGE FRAMING** (a same-model fallback, recorded as weaker: the merging
+model selected by `node scripts/fable-switch.mjs --status` is the one that wrote list B):
+reconstruct the union from the two numbered evidence lists and their invariants; do NOT
+reuse the framing, ordering, or categories of Sol's own half. Read list A first and in
+full.
 
 ## How to decide a disagreement
 

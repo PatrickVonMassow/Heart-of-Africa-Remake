@@ -1,13 +1,14 @@
 // The document-budget guard's decision core (user 26.07.2026), plus the real
 // files: the point of the budgets is that they hold TODAY, so the shipped
 // documents are measured here rather than only synthetic ones.
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   DOC_BUDGETS,
   measure,
   evaluateDocBudgets,
+  fenceTracker,
   formatDocBudgetVerdict,
   proseRationaleFindings,
   workOrderPoints,
@@ -127,6 +128,36 @@ describe('the ratchet — headroom cannot be banked', () => {
   })
 })
 
+describe('fenceTracker — one CommonMark fence rule for both readers', () => {
+  const run = (lines) => lines.map((l) => { const t = track.next(l); return `${t.furniture ? 'F' : '.'}${t.open ? 'O' : '.'}` })
+  let track
+  beforeEach(() => { track = fenceTracker() })
+
+  it('opens and closes on a symmetric run', () => {
+    expect(run(['```', 'x', '```', 'y'])).toEqual(['FO', '.O', 'F.', '..'])
+  })
+
+  it('does not close a longer opener with a shorter run', () => {
+    expect(run(['````', '```', 'still inside', '````'])).toEqual(['FO', 'FO', '.O', 'F.'])
+  })
+
+  it('does not let a tilde close a backtick block', () => {
+    expect(run(['```', '~~~', '```'])).toEqual(['FO', 'FO', 'F.'])
+  })
+
+  it('refuses a backtick opener whose info string carries a backtick', () => {
+    expect(run(['``` a`b', 'not code'])).toEqual(['F.', '..'])
+  })
+
+  it('allows only spaces and tabs behind a closing run', () => {
+    expect(run(['```', '``` and a word', '```  \t'])).toEqual(['FO', 'FO', 'F.'])
+  })
+
+  it('is total on missing input', () => {
+    expect(fenceTracker().next(undefined)).toEqual({ furniture: false, open: false })
+  })
+})
+
 describe('proseRationaleFindings — the file instructs, it does not argue', () => {
   const find = (text) => proseRationaleFindings(text, { path: 'CLAUDE.md', why: 'read every turn' })
 
@@ -169,6 +200,53 @@ describe('proseRationaleFindings — the file instructs, it does not argue', () 
     const v = find('fine line\n- It exists to explain, because it argues twice.')
     expect(v).toHaveLength(1)
     expect(v[0].kind).toContain('line 2')
+  })
+
+  // ROUND 1 OF THE CROSS-VENDOR REVIEW found all three of these, each a false result
+  // out of a shortcut: an asymmetric fence, a longer code-span delimiter, and an
+  // adverb between "exists" and its purpose.
+  it('does not let an inner ``` close a four-backtick block, in either direction', () => {
+    const text = [
+      '````',
+      'node x --because',
+      '```',
+      'still inside the block, because a shorter run does not close it',
+      '````',
+      '- a clean rule',
+    ].join('\n')
+    expect(find(text)).toEqual([])
+  })
+
+  it('reads the prose AFTER a fence closes, rather than swallowing it', () => {
+    const v = find(['```', 'code because code', '```', '- The reason is written here.'].join('\n'))
+    expect(v).toHaveLength(1)
+    expect(v[0].kind).toContain('line 4')
+  })
+
+  it('blanks a code span of ANY delimiter length, not only one backtick', () => {
+    expect(find('- Run ``git commit --because-flag`` before pushing.')).toEqual([])
+    expect(find('- Run ```x --because``` first.')).toEqual([])
+  })
+
+  it('leaves an unclosed backtick run alone instead of swallowing the line', () => {
+    expect(find('- The reason is a stray ` backtick.')).toHaveLength(1)
+  })
+
+  it('catches an adverb between the verb and its purpose', () => {
+    for (const line of [
+      'This guard exists only to stop headroom being banked.',
+      'The ceiling exists purely because the file grew back.',
+      'It exists to be lowered.',
+    ]) {
+      expect(find(line), line).toHaveLength(1)
+    }
+  })
+
+  // NOT A MISS BUT THE RULE: binding text carrying its own argument is still argument
+  // in this document, and the rewrite is one line ("…; slowness is not a reason").
+  it('reports an INSTRUCTION that carries its own argument', () => {
+    expect(find('- Never skip a required test because it is slow.')).toHaveLength(1)
+    expect(find('- Never skip a required test; slowness is not a reason.')).toEqual([])
   })
 
   it('is total on missing input', () => {
