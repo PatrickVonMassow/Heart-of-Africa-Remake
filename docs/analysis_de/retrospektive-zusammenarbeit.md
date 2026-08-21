@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 08:09 · Quellen-Fingerprint: `16638d07767f…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 09:04 · Quellen-Fingerprint: `270a5ba9bd61…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1351,7 +1351,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 4 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 5 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1410,8 +1410,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
 
-<!-- RETRO-FINGERPRINT: 16638d07767fa2b205c9083bdcd5edb4b011a7a0aafaedea4d9010a81d889398 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T06:09:51.620Z -->
+<!-- RETRO-FINGERPRINT: 270a5ba9bd6197579ad148683d4fe5760d6a8abae1988a971426634a3cea439b -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T07:04:22.008Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2398,3 +2398,30 @@ Antwort **nicht beurteilt** und ein späterer Lauf — nicht **rot**. Und die Un
 die Entscheidung des Mechanismus, nicht nur in seinen Meldetext: Ein Tor, das den Unterschied
 zwischen »Test fehlgeschlagen« und »Lauf nicht fertig geworden« bereits in Worten benennt, aber
 beide gleich behandelt, weiß mehr, als es tut.
+
+### 3.149 Zwei Leser, ein Datensatz, zwei Antworten — und der dritte fragte gar nicht
+
+Am 21.08.2026 beanspruchte das Fenster des Nutzers den Stapel um 07:46 und verlor ihn trotzdem.
+Der Launcher respektierte den Anspruch zweimal und protokollierte das auch — »skip: session … has
+CLAIMED the batch 9 min ago (reserved)«, dann dieselbe Zeile bei 24 Minuten. Bei 39 Minuten
+verschwand der Anspruch aus seiner Begründung, und fünf Minuten später übergab der Eigner regulär:
+Der Launcher startete eine frische Sitzung, statt den freien Lock für das anspruchsberechtigte
+Fenster zu halten.
+
+Die Klasse hat zwei Hälften, und die zweite ist die lehrreichere. Die sichtbare Hälfte ist der
+dritte Pfad: Übergabe, Lease-Ablauf und Boundary entscheiden dieselbe Frage, aber nur zwei von
+ihnen fragen den Anspruch überhaupt. Die unsichtbare Hälfte liegt eine Ebene tiefer — die
+gemeinsame Entscheidungsfunktion hält ihre Uhr an, solange ein lebender Eigner hält, aber diesen
+Eingang leiten nur zwei der drei Aufrufstellen ab. Die dritte übergibt ihn nicht und bekommt den
+Vorgabewert, also läuft für sie jeder Anspruch nach dreißig Minuten ab, während das
+Auskunftskommando denselben Datensatz weiter für gültig erklärt. Der Kommentar über genau dieser
+Prädikatsfunktion warnt wörtlich davor, dass zwei Leser über einen Zustand uneins werden — und die
+Aufrufstelle, die abdriftete, ist die, die den Lock in derselben Sekunde in der Hand hält.
+
+**Lehre:** Eine reine Entscheidungsfunktion vereinheitlicht nichts, solange ihre Eingänge an jeder
+Aufrufstelle einzeln zusammengebaut werden. Wer eine gemeinsame Regel wirklich will, macht den
+Eingang zur Pflicht oder leitet ihn in der Funktion selbst ab; ein Vorgabewert, der »nein« bedeutet,
+verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. Prüffrage bei jedem
+geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
+gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
+neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
