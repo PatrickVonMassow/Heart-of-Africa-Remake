@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import {
   attachPointFileSets,
+  attachUnavailableClearances,
   baselineFor,
   bootstrapBase,
   pointFilesCommand,
@@ -137,6 +138,38 @@ describe('point file-set measurement', () => {
     })
     expect(rows[1].pointFiles).toEqual(['scripts/real.mjs', ' edge-space.mjs'])
     expect(rows[2].pointFiles).toBeUndefined()
+  })
+
+  it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 769,
+      sha: 'a'.repeat(40),
+      at: 1_787_000_000_000,
+      reachable: true,
+    }
+    const receipt = {
+      kind: 'criticality-review-unavailable',
+      point: 769,
+      sha: 'b'.repeat(40),
+      files: ['scripts/both.mjs'],
+      descendsFrom: [commission.sha],
+      unavailableVerified: true,
+      unavailableFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const wrong = { ...receipt, sha: 'c'.repeat(40), files: ['scripts/reviewable.mjs'] }
+    const rows = attachUnavailableClearances([commission, receipt, wrong], () => ({
+      pointFiles: ['scripts/reviewable.mjs', 'scripts/both.mjs'],
+      unavailableFiles: ['scripts/both.mjs'],
+    }))
+    expect(rows[1]).toMatchObject({
+      unavailableVerified: true,
+      unavailableFiles: ['scripts/both.mjs'],
+      pointFiles: ['scripts/reviewable.mjs', 'scripts/both.mjs'],
+    })
+    expect(rows[2].unavailableVerified).toBeUndefined()
+    expect(rows[2].unavailableFiles).toBeUndefined()
   })
 })
 

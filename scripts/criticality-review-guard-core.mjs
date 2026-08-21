@@ -42,6 +42,9 @@ export const GATED_LEVEL = 'high'
 /** Append-only ledger row that transfers every finding of one review to open points. */
 export const FINDINGS_FILED_KIND = 'review-findings-filed'
 
+/** Explicit receipt for files Git proves no configured vendor may review. */
+export const REVIEW_UNAVAILABLE_KIND = 'criticality-review-unavailable'
+
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
 /**
@@ -318,7 +321,23 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // file anyone can hand-edit.
     const valid = reviews.filter((r) => !sameModel(r.model, r.authoredBy))
 
-    if (!valid.length) {
+    // This is an exception record, never a review. The wrapper verifies its
+    // exact file list against Git's authorship plan and replaces both trusted
+    // fields below; a hand-written `unavailableVerified: true` is stripped.
+    const unavailable = reachable.filter(
+      (r) =>
+        r?.kind === REVIEW_UNAVAILABLE_KIND &&
+        r.unavailableVerified === true &&
+        ledgerAtUsable(r.at) &&
+        typeof r.reason === 'string' &&
+        r.reason.trim().length >= 8 &&
+        Array.isArray(r.unavailableFiles) &&
+        r.unavailableFiles.length > 0 &&
+        Array.isArray(r.pointFiles) &&
+        r.pointFiles.length > 0,
+    )
+
+    if (!valid.length && !unavailable.length) {
       let kind = 'no-review'
       if (reviews.length) kind = 'self-review'
       else if (all.length && !reachable.length) kind = 'not-in-history'
@@ -405,9 +424,31 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
         })
       }
     }
+    // A point can mix authoring vendors so completely that no configured
+    // reviewer is independent of every file. A verified availability receipt
+    // covers only the exact unreviewable paths; ordinary review rows must still
+    // cover every reviewable path. It can establish a clearance, but it is NOT
+    // a merge verdict and therefore cannot answer a do-not-merge below.
+    const unavailableClearances = unavailable.map((receipt) => {
+      const covered = new Set(receipt.unavailableFiles)
+      for (const r of valid) {
+        if (r.sha !== receipt.sha && !(receipt.descendsFrom ?? []).includes(r.sha)) continue
+        const files = r.pass === undefined ? r.pointFiles : passShape(r) ? r.pass.files : []
+        if (Array.isArray(files)) for (const file of files) covered.add(file)
+      }
+      const uncovered = receipt.pointFiles.filter((file) => !covered.has(file))
+      return {
+        ...receipt,
+        verdict: CLEARING_VERDICT,
+        availabilityClearance: true,
+        compositionComplete: uncovered.length === 0,
+        uncovered,
+      }
+    })
     const clean = [
       ...valid.filter((r) => r.pass === undefined && String(r.verdict) === CLEARING_VERDICT),
       ...compositions.filter((g) => g.compositionComplete && String(g.verdict) === CLEARING_VERDICT),
+      ...unavailableClearances.filter((g) => g.compositionComplete),
     ]
     const unresolved = valid.filter((r) => String(r.verdict) !== CLEARING_VERDICT)
     // A refusal has two durable answers:
@@ -438,7 +479,7 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       if (unresolved.length && !unfiled.length) continue
       // Merge pass rows of an INCOMPLETE split leave `unresolved` empty while
       // nothing may clear — the finding then names those rows instead.
-      const incompleteCoverage = compositions
+      const incompleteCoverage = [...compositions, ...unavailableClearances]
         .filter((g) => String(g.verdict) === CLEARING_VERDICT && !g.compositionComplete)
         .sort((a, b) => Number(b.at ?? 0) - Number(a.at ?? 0))[0]
       if (incompleteCoverage) {
@@ -463,7 +504,12 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     const unanswered = unresolved.filter(
       (u) =>
         !filed(u) &&
-        !clean.some((c) => Number(c.at ?? 0) > Number(u.at ?? 0) && (c.descendsFrom ?? []).includes(u.sha)),
+        !clean.some(
+          (c) =>
+            !c.availabilityClearance &&
+            Number(c.at ?? 0) > Number(u.at ?? 0) &&
+            (c.descendsFrom ?? []).includes(u.sha),
+        ),
     )
     if (unanswered.length) {
       const latest = unanswered.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
@@ -546,6 +592,9 @@ export function formatCriticalityReviewVerdict(verdict) {
     '',
     '  node scripts/mechanism-review.mjs --record <sha> --point <N> --model <name> \\',
     `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+    '',
+    `If Git proves no configured vendor can review part of the point, record that exact exception`,
+    `as kind ${REVIEW_UNAVAILABLE_KIND}; it covers only its verified file list and answers no refusal.`,
     '',
     'Inspect the gate with: node scripts/criticality-review-guard.mjs --status',
     'If the tag is wrong, correct the point rather than the ledger — the tag is the spec.',

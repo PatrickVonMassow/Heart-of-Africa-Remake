@@ -110,6 +110,26 @@ node scripts/mechanism-review.mjs --record <sha> --point <N> --model "Fable 5" \
   ledger is a file anyone can hand-edit, and a self-review in it is worse than an
   empty ledger, because the gate then reads green.
 
+### When no reviewer vendor is eligible
+
+`review-sol` can split a mixed-authorship point into contribution passes, but a
+file authored by every configured vendor has no independent reviewer. Recording
+a review nobody could run is forbidden. Record that bounded fact in the shared
+ledger instead:
+
+```json
+{"kind":"criticality-review-unavailable","point":769,"sha":"<point head>","files":["<exact unreviewable path>"],"reason":"<why no configured vendor is eligible>","at":<epoch milliseconds>}
+```
+
+This is not a waiver on its own word. The criticality guard discards any
+`unavailableVerified`, `unavailableFiles`, or `pointFiles` fields supplied by
+the row, rebuilds the point's first-parent non-merge authorship from its recorded
+`authoring-commission`, and accepts the receipt only when `files` is exactly the
+set for which the authorship planner finds no eligible vendor. Real review rows
+must still cover every other changed file. The receipt never answers a
+`merge-with-fixes` or `do-not-merge`; those findings still need a descendant
+clean review or the existing `review-findings-filed` disposition.
+
 Inspect the gate with `node scripts/criticality-review-guard.mjs --status`, or
 ask it before the action with
 `node scripts/guard-preflight.mjs --for tick --session <id>`.

@@ -37,12 +37,15 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
+import { modelsFromTrailers } from './mechanism-review-core.mjs'
+import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
 import {
   ancestorIndex,
   evaluateCriticalityReview,
   formatCriticalityReviewVerdict,
   highTicks,
   openNumbers,
+  REVIEW_UNAVAILABLE_KIND,
   strictAncestorProbe,
 } from './criticality-review-guard-core.mjs'
 
@@ -127,6 +130,74 @@ export function attachPointFileSets(records = [], measure = (base, sha) =>
       if (Array.isArray(files)) row.pointFiles = [...new Set(files.map(String).filter(Boolean))]
     } catch {
       /* unknown coverage is intentionally represented by absence */
+    }
+  }
+  return rows
+}
+
+/** Git-owned authorship and touched-file facts for one point's own lane. */
+function pointAuthorship(commissionSha, reviewSha) {
+  const shas = gitRawFile([
+    'rev-list',
+    '--reverse',
+    '--first-parent',
+    '--no-merges',
+    `${commissionSha}..${reviewSha}`,
+  ])
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+  const commits = shas.map((sha) => {
+    const trailers = gitRawFile([
+      'show',
+      '-s',
+      '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+      sha,
+    ])
+    const files = gitRawFile(['diff-tree', '--no-commit-id', '--name-only', '-r', '-z', sha])
+      .split('\0')
+      .filter(Boolean)
+    return { sha, files, authorModels: modelsFromTrailers(trailers) }
+  })
+  const plan = planAuthorshipGroups({ commits })
+  return {
+    pointFiles: [...new Set(commits.flatMap((commit) => commit.files))],
+    unavailableFiles: [...new Set(plan.unreviewable.flatMap((group) => group.files))],
+  }
+}
+
+/**
+ * Verify explicit no-reviewer receipts from Git, never from their own fields.
+ * The claimed files must equal the complete unreviewable set byte-for-byte;
+ * omitting one or adding an ordinary reviewable path earns no exception.
+ */
+export function attachUnavailableClearances(records = [], verify = pointAuthorship) {
+  const rows = records ?? []
+  for (const row of rows) {
+    delete row.unavailableVerified
+    delete row.unavailableFiles
+  }
+  const commissions = rows.filter((row) => row?.kind === AUTHORING_COMMISSION_KIND && row.reachable !== false)
+  for (const row of rows) {
+    if (row?.kind !== REVIEW_UNAVAILABLE_KIND || row.reachable === false) continue
+    const bases = commissions.filter(
+      (commission) =>
+        Number(commission.point) === Number(row.point) &&
+        (commission.sha === row.sha || (row.descendsFrom ?? []).includes(commission.sha)),
+    )
+    if (!bases.length) continue
+    const commission = bases.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+    try {
+      const measured = verify(commission.sha, row.sha)
+      const actual = [...new Set((measured?.unavailableFiles ?? []).map(String).filter(Boolean))]
+      const claimed = [...new Set((Array.isArray(row.files) ? row.files : []).map(String).filter(Boolean))]
+      const same = actual.length > 0 && JSON.stringify([...actual].sort()) === JSON.stringify([...claimed].sort())
+      if (!same) continue
+      row.unavailableVerified = true
+      row.unavailableFiles = actual
+      row.pointFiles = [...new Set((measured?.pointFiles ?? []).map(String).filter(Boolean))]
+    } catch {
+      /* no Git ruling means no exception */
     }
   }
   return rows
@@ -356,6 +427,7 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
       .map((o) => o.sha)
   }
   attachPointFileSets(records)
+  attachUnavailableClearances(records)
 
   return {
     applicable: true,

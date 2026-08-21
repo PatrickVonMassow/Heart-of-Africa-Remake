@@ -5,6 +5,8 @@
 // blocks every tick or none) and the LEDGER READER (was the second model's
 // review real, in this history, and were its findings answered).
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   ancestorIndex,
   CLEARING_VERDICT,
@@ -16,6 +18,7 @@ import {
   newlyTicked,
   openNumbers,
   parsePointBlocks,
+  REVIEW_UNAVAILABLE_KIND,
   strictAncestorProbe,
   tickedNumbers,
 } from './criticality-review-guard-core.mjs'
@@ -319,6 +322,62 @@ describe('evaluateCriticalityReview', () => {
     expect(refused.findings[0].kind).toBe('unresolved')
   })
 
+  it('clears a mixed-vendor point through verified review coverage plus an explicit unavailable receipt', () => {
+    const reviewed = record({
+      sha: 'b'.repeat(40),
+      pointFiles: ['scripts/claude.mjs', 'scripts/both-vendors.mjs'],
+      pass: { index: 1, total: 1, files: ['scripts/claude.mjs'] },
+    })
+    const receipt = {
+      kind: REVIEW_UNAVAILABLE_KIND,
+      point: 500,
+      sha: 'c'.repeat(40),
+      files: ['scripts/both-vendors.mjs'],
+      reason: 'both configured vendors authored this contribution',
+      at: 1_787_000_002_000,
+      reachable: true,
+      descendsFrom: [reviewed.sha],
+      unavailableVerified: true,
+      unavailableFiles: ['scripts/both-vendors.mjs'],
+      pointFiles: ['scripts/claude.mjs', 'scripts/both-vendors.mjs'],
+    }
+    const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [reviewed, receipt] })
+    expect(v).toMatchObject({ block: false, clear: true })
+  })
+
+  it('does not trust an unavailable receipt itself or let one answer a refusal', () => {
+    const forged = {
+      kind: REVIEW_UNAVAILABLE_KIND,
+      point: 500,
+      sha: 'b'.repeat(40),
+      files: ['scripts/guard.mjs'],
+      reason: 'claimed unavailable by hand',
+      at: 1_787_000_002_000,
+      reachable: true,
+      unavailableVerified: false,
+      unavailableFiles: ['scripts/guard.mjs'],
+      pointFiles: ['scripts/guard.mjs'],
+    }
+    const unverified = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [forged] })
+    expect(unverified.block).toBe(true)
+    expect(unverified.findings[0].kind).toBe('no-review')
+
+    const refused = record({
+      sha: 'a'.repeat(40),
+      verdict: 'do-not-merge',
+      at: 1_787_000_001_000,
+      pointFiles: ['scripts/guard.mjs'],
+    })
+    const verified = {
+      ...forged,
+      unavailableVerified: true,
+      descendsFrom: [refused.sha],
+    }
+    const unanswered = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, verified] })
+    expect(unanswered.block).toBe(true)
+    expect(unanswered.findings[0].kind).toBe('unanswered')
+  })
+
   it('names unknown point coverage instead of clearing on pass indices alone', () => {
     const unknown = evaluateCriticalityReview({
       baseline: 'b',
@@ -471,6 +530,37 @@ describe('evaluateCriticalityReview', () => {
       })
       expect(v.block, `case ${i}`).toBe(true)
     }
+  })
+
+  it('replays point 769: covered 1/1 passes answer efa589e and the filed receipt disposes e1d242a', () => {
+    const records = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, 'fixtures/criticality-point-769.json'), 'utf8'),
+    )
+    expect(records).toHaveLength(10)
+    expect(records.at(-1)).toMatchObject({
+      kind: FINDINGS_FILED_KIND,
+      point: 769,
+      sha: 'e1d242ace15c8704ea6099c37a7cf33c67439607',
+      reviewAt: 1_787_332_607_630,
+      findingPoints: [820],
+    })
+
+    const beforeReceipt = evaluateCriticalityReview({
+      baseline: 'baseline',
+      ticks: [tick(769)],
+      openPoints: [820],
+      records: records.slice(0, -1),
+    })
+    expect(beforeReceipt.block).toBe(true)
+    expect(beforeReceipt.findings[0].records[0].sha).toBe('e1d242ace15c8704ea6099c37a7cf33c67439607')
+
+    const afterReceipt = evaluateCriticalityReview({
+      baseline: 'baseline',
+      ticks: [tick(769)],
+      openPoints: [820],
+      records,
+    })
+    expect(afterReceipt).toMatchObject({ block: false, clear: true })
   })
 
   it('cuts a mixed-authorship range by author so neither model reads its own work', () => {
