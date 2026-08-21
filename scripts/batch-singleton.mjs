@@ -1444,11 +1444,45 @@ export function noteBatchWriter(sessionId, opts = {}) {
       startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
       at: typeof prior.at === 'number' ? prior.at : now,
       batchWriterAt: now,
-      ...(generation === null ? {} : { generation }),
+      generation,
+      authorityState: 'active',
     }
     for (const [sid, entry] of Object.entries(processes)) {
       const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)
       if (now - last > 7 * 24 * 3600 * 1000) delete processes[sid]
+    }
+    writeJsonAtomic(path, processes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Retire one writer generation without depending on its host process exiting.
+ * Handover and release are ownership events; a process that remains alive after
+ * either event has no authority merely because it once wrote main.
+ *
+ * A generation-qualified request never retires a newer episode which reused the
+ * same session id. Missing records are already non-authoritative and count as a
+ * successful no-op so lifecycle callers do not turn observability into a wedge.
+ */
+export function retireBatchWriter(sessionId, opts = {}) {
+  if (!sessionId || isProbeSessionId(sessionId)) return false
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const processes = readJson(path) ?? {}
+    const prior = processes[sessionId]
+    if (!prior || typeof prior !== 'object') return true
+    const generation = Number.isSafeInteger(opts.generation) ? opts.generation : null
+    if (generation !== null && prior.generation !== generation) return false
+    const now = opts.now ?? Date.now()
+    processes[sessionId] = {
+      ...prior,
+      generation: Number.isSafeInteger(prior.generation) ? prior.generation : generation,
+      authorityState: 'retired',
+      retiredAt: now,
+      retiredReason: typeof opts.reason === 'string' && opts.reason ? opts.reason : 'ownership-ended',
     }
     writeJsonAtomic(path, processes)
     return true
@@ -1593,6 +1627,12 @@ export function transitionOwnerSession(sessionId, opts = {}) {
     } catch (error) {
       return rejected(`write-failed:${error && error.message ? error.message : 'unknown error'}`)
     }
+    retireBatchWriter(current.sessionId, {
+      lockPath,
+      generation,
+      now: opts.now,
+      reason: 'session-transition',
+    })
     return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
   } finally {
     exitReapMutex(mutexPath)
@@ -1635,6 +1675,11 @@ export function heldByOtherLiveOwner(sessionId, opts = {}) {
 export function release(sessionId, lockPath = LOCK_PATH) {
   const lock = readOwnerLock(lockPath)
   if (lock && lock.sessionId === sessionId) {
+    retireBatchWriter(sessionId, {
+      lockPath,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      reason: 'owner-release',
+    })
     try {
       rmSync(lockPath, { force: true })
     } catch {
@@ -1686,6 +1731,12 @@ export function markHandover(sessionId, opts = {}) {
     opts,
   )
   if (res.ok) {
+    retireBatchWriter(sessionId, {
+      lockPath,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      now,
+      reason: 'handover',
+    })
     emitLockActivity(ACTIVITY_EVENTS.HANDOVER, { ...lock, handoverPoint: opts.point ?? null }, {
       lockPath,
       at: now,

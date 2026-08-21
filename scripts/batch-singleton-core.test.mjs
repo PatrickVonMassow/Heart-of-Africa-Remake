@@ -63,6 +63,7 @@ import {
   SESSIONS_SEEN_PATH,
   SESSION_ACTIVITY_PATH,
   noteBatchWriter,
+  retireBatchWriter,
   readSessionProcesses,
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
@@ -1648,7 +1649,14 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       }),
     ).toBe(true)
     expect(readSessionProcesses({ path })).toEqual({
-      'writer-session': { pid: 4242, startedAt: NOW - 60_000, at: NOW, batchWriterAt: NOW },
+      'writer-session': {
+        pid: 4242,
+        startedAt: NOW - 60_000,
+        at: NOW,
+        batchWriterAt: NOW,
+        generation: null,
+        authorityState: 'active',
+      },
     })
     // The marker survives without a lock and advances on the next main write.
     expect(existsSync(lockPath)).toBe(false)
@@ -1666,6 +1674,73 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
     })
     expect(readSessionProcesses({ path })['writer-session'].generation).toBe(17)
+  })
+
+  it('retires only the named writer generation and a later fenced write reactivates it', () => {
+    const path = join(dir, 'writer-authority.json')
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(retireBatchWriter('writer-session', { path, generation: 16, now: NOW + 1_000 })).toBe(false)
+    expect(readSessionProcesses({ path })['writer-session'].authorityState).toBe('active')
+    expect(retireBatchWriter('writer-session', {
+      path,
+      generation: 17,
+      now: NOW + 2_000,
+      reason: 'handover',
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      authorityState: 'retired',
+      retiredAt: NOW + 2_000,
+      retiredReason: 'handover',
+    })
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      authorityState: 'active',
+      batchWriterAt: NOW + 3_000,
+    })
+  })
+
+  it('handover and release retire authority while the process record remains', () => {
+    const path = join(dir, 'session-process.json')
+    acquire('writer-session', opts({ now: NOW, pid: 4242, pidStartedAt: NOW - 60_000 }))
+    const generation = readOwnerLock(lockPath).fence
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(markHandover('writer-session', { lockPath, now: NOW + 2_000, point: 812 }).handed).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'handover',
+    })
+
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(release('writer-session', lockPath)).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'owner-release',
+    })
   })
 
   it('never records an unidentifiable process or a synthetic probe as a writer', () => {
