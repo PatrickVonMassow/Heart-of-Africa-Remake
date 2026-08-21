@@ -116,9 +116,36 @@ describe('CLAUDE.md references into design.md', () => {
   // and are cited as bare `§22` / `pt. 30` — point-brief-core resolves them the
   // same way, so this test accepts them exactly as the brief generator does.
   const criteria = acceptanceCriteriaFrom(claude)
-  const citedIn = (text) => [...new Set([...text.matchAll(/§\s?(\d+(?:\.\d+)*)/g)].map((m) => m[1]))]
+  // EVERY NUMBER OF A CITATION, NOT ONLY THE FIRST (cross-vendor review of point 768).
+  // The moved conditions write `§§8–10` and `§§15.2–15.3/16.1`, and an extractor that
+  // takes the number straight after the `§` reads one of them and calls the rest
+  // covered — so a section deleted out of the middle of a range passed green, which is
+  // the exact failure this whole file exists to prevent.
+  const RUN = /§+\s?(\d+(?:\.\d+)*(?:\s*[–—\-/,]\s*\d+(?:\.\d+)*)*)/g
+  const expand = (run) => {
+    const parts = run.split(/\s*[/,]\s*/)
+    const out = []
+    for (const part of parts) {
+      const range = /^(\d+)\s*[–—-]\s*(\d+)$/.exec(part)
+      // An INTEGER range names every number between its ends; a dotted one (17.1–17.3)
+      // is not arithmetic, so only its two ends are claimed.
+      if (range) {
+        for (let n = Number(range[1]); n <= Number(range[2]); n++) out.push(String(n))
+        continue
+      }
+      for (const id of part.split(/\s*[–—-]\s*/)) if (id) out.push(id)
+    }
+    return out
+  }
+  const citedIn = (text) => [...new Set([...text.matchAll(RUN)].flatMap((m) => expand(m[1])))]
   const dangling = (cited) =>
     cited.filter((id) => homesOf(id).length === 0 && !claude.has(id) && !criteria.has(Number(id)))
+
+  it('reads every number of a multi-section citation', () => {
+    expect(citedIn('see §§8–10 and §§15.2–15.3/16.1 and §7')).toEqual([
+      '8', '9', '10', '15.2', '15.3', '16.1', '7',
+    ])
+  })
 
   it('resolves every § it cites', () => {
     const cited = citedIn(claudeText)
@@ -142,7 +169,24 @@ describe('CLAUDE.md references into design.md', () => {
     expect(bad, `docs/acceptance-criteria-detail.md cites sections nothing holds: ${bad.join(', ')}`).toEqual([])
   })
 
+  // THE CUT MAY NOT COST A CRITERION, AND MAY NOT MOVE ONE (cross-vendor review of
+  // point 768). "More than twenty parse" stayed green through the loss of eleven of
+  // them and through a wholesale renumbering — the two failures the compaction of §7.1
+  // could actually produce. The numbers are therefore pinned as a contiguous run from
+  // 1, in ascending DOCUMENT order, never fewer than the 32 the POC target carries;
+  // adding a criterion is free, losing or reordering one is not.
+  it('keeps every acceptance criterion, numbered from 1 in document order', () => {
+    const numbered = [...claude.get('7.1').text.matchAll(/^(\d+)\.\s+\*\*(.+?)\*\*/gm)]
+    const numbers = numbered.map((m) => Number(m[1]))
+    expect(numbers.length).toBeGreaterThanOrEqual(32)
+    expect(numbers).toEqual(numbers.map((_, i) => i + 1))
+    expect(numbered.every((m) => m[2].trim().length > 0)).toBe(true)
+    // And what point-brief-core resolves is exactly that list, title by title.
+    expect([...criteria.keys()]).toEqual(numbers)
+    for (const [n, title] of criteria) expect(title, `criterion ${n} has no title`).toBeTruthy()
+  })
+
   it('finds the acceptance criteria it needs to resolve the bare numbers', () => {
-    expect(criteria.size).toBeGreaterThan(20)
+    expect(criteria.size).toBeGreaterThanOrEqual(32)
   })
 })

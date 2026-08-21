@@ -75,11 +75,16 @@ export const DOC_BUDGETS = [
     // binding sentences and leaves the mechanics to docs/render-architecture.md and
     // docs/tts-architecture.md; every rule a PreToolUse guard refuses before the act
     // became a pointer, with that guard's assertion checked one by one.
+    // RAISED from that reading by the 21 measured words the cross-vendor review put
+    // back: `worktree-reminder` fires on an AGENT START and cannot refuse mechanism
+    // work done straight on `main`, so the delegate-a-larger-mechanism rule returns as
+    // a rule; and §7.2 is mandatory, so the scope line names §7 rather than §7.1 alone
+    // and §7 keeps the heading that pointer resolves against.
     // The line margin remains; the word ceiling is exact. Leaving the former ceiling
-    // standing would hand the next writer the 801 words this cut just bought — which
-    // is what the slack below now refuses.
-    maxLines: 189,
-    maxWords: 1294,
+    // standing would hand the next writer the 780 words this cut bought — which is
+    // what the slack below now refuses.
+    maxLines: 193,
+    maxWords: 1315,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.

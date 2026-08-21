@@ -15,7 +15,7 @@ the target state; this file governs how it is built and verified.
 - Supply playable numeric values by educated guess under `design.md` §14,
   without overriding stated values. Put estimates, marked calibratable, in
   `src/config/balance.ts`, not throughout the code.
-- Only §7.1 is in scope; begin nothing beyond it until §7.1 is fully met.
+- Only §7 is in scope; begin nothing beyond it until §7.1 is fully met.
 
 ## 3. Tech Stack
 
@@ -54,6 +54,8 @@ strategy and suite map: `scripts/verify/README.md`.
   code.
 - **The merge ends the branch:** remove its local branch, remote branch, and
   worktree. `branch-hygiene-guard` is the backstop.
+- Small cross-cutting bookkeeping may land on `main`; a larger mechanism is
+  delegated to its own isolated worktree.
 - `TASKS.md` is main-only: append there, tick only after merge, and move closed
   points verbatim to `docs/tasks-archive.md`. Consumers needing open and closed
   work use `scripts/tasks-source.mjs`.
@@ -97,6 +99,8 @@ strategy and suite map: `scripts/verify/README.md`.
   faithfully.
 - Keep comments brief and factual; mark placeholders. When design is unclear,
   do not guess: add `// OPEN: …` and report it at the run end.
+
+## 7. Acceptance
 
 ### 7.1 Acceptance Criteria (POC target)
 

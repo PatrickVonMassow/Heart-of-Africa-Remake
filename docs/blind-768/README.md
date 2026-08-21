@@ -52,6 +52,28 @@ and `render-verify-guard` all kept their preventive sentence for that reason.
   and a second document would cost a second budget, a heading sweep and a new way for a
   rule to land in neither half.
 
+## What the convergent review sent back
+
+The cut was then reviewed by the other vendor, artefact before rationale, and came back
+`do-not-merge` twice with eight findings in total. Two of them changed what this stage
+had decided:
+
+- **U25 is REVERSED.** The union removed "delegate larger mechanisms to an isolated
+  worktree" on the ground that `worktree-reminder` refuses an unisolated agent start.
+  It does — but a session doing the mechanism work ITSELF, on `main`, starts no agent,
+  so the guard never fires and the rule had no enforcer. That is precisely the unchecked
+  guard claim point 764 exists to stop, arriving from the other direction: the assertion
+  was real, it just did not cover the rule. The rule is back, without the pointer.
+- **U53 is NOT APPLIED.** Removing the `## 7. Acceptance` heading contradicts U8 in the
+  same union, which keeps "§7 is in scope" as a pointer, and §7.2 is mandatory — so a
+  scope line naming §7.1 alone puts self-verification out of scope. The heading stays
+  and §2 keeps §7.
+
+The other findings were mechanism defects rather than cut decisions: the prose check's
+fence, code-span and marker handling, the §-citation extractor reading only the first
+number of `§§8–10`, and a criteria assertion loose enough to stay green through the loss
+of eleven criteria.
+
 ## The one union entry deliberately not applied
 
 **U36** would have removed "Act on settled judgment. Confirm before outward-facing or
