@@ -8,6 +8,8 @@
 //                                     claim the batch — or take it, if it is free
 //   node scripts/batch-claim.mjs --status      who holds it, what is pending, how old
 //   node scripts/batch-claim.mjs --withdraw --session <id>   never mind
+//   node scripts/batch-claim.mjs --wait [--timeout <min>]     wait until release
+//   node scripts/batch-claim.mjs --take --session <id>       take, but never write a claim
 //
 // THE SESSION ID is the one thing this command cannot find out for itself: a CLI
 // has no hook payload. `scripts/batch-resume-hook.mjs` prints the whole command
@@ -43,6 +45,7 @@ import {
   describeClaim,
   ownerIsHolding,
   releaseDecision,
+  waitForClaimEnd,
   CLAIM_MAX_AGE_MS,
   GIT_STATE_UNVERIFIABLE,
 } from './batch-claim-core.mjs'
@@ -212,6 +215,30 @@ export function handBackToClaimant(
   return { released, stamped: released ? markClaimReleased(claim, { path, now, by: sid }) : false }
 }
 
+/** The exact gathered state printed by --status and consumed by --wait. */
+export function gatherClaimStatus(sid = '', { now = Date.now() } = {}) {
+  const lock = readOwnerLock()
+  const ownerAlive = lock
+    ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
+    : { alive: false, reason: 'no-lock' }
+  const claim = readClaim()
+  const ownerHolding = ownerIsHolding({
+    lock,
+    claimantSid: claim?.sessionId ?? '',
+    alive: ownerAlive.alive === true,
+  })
+  const assessment = assessClaim({
+    claim,
+    sid,
+    ownerSid: lock?.sessionId ?? '',
+    ownerHolding,
+    now,
+    maxAgeMs: maxAgeMs(),
+    probePid,
+  })
+  return { lock, ownerAlive, lockHeld: !!lock && ownerAlive.alive === true, ownerHolding, claim, assessment }
+}
+
 // --- CLI -----------------------------------------------------------------------
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
@@ -226,7 +253,8 @@ if (isMain) {
   const sid = flag('--session') ?? ''
   const now = Date.now()
   const usage =
-    'usage: node scripts/batch-claim.mjs --session <id> [--why "<text>"] | --status | --withdraw --session <id>'
+    'usage: node scripts/batch-claim.mjs --session <id> [--why "<text>"] | --wait [--timeout <min>] | ' +
+    '--take --session <id> | --status | --withdraw --session <id>'
   const fail = (msg) => {
     console.error(msg)
     process.exit(1)
@@ -240,30 +268,20 @@ if (isMain) {
     )
   }
 
-  const lock = readOwnerLock()
-  const ownerAlive = lock
-    ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
-    : { alive: false, reason: 'no-lock' }
+  const status = gatherClaimStatus(sid, { now })
+  const { lock, ownerAlive } = status
 
   const holdingFor = (other) =>
     ownerIsHolding({ lock, claimantSid: other?.sessionId ?? '', alive: ownerAlive.alive === true })
 
   if (has('--status')) {
-    const claim = readClaim()
-    const view = assessClaim({
-      claim,
-      sid,
-      ownerSid: lock?.sessionId ?? '',
-      ownerHolding: holdingFor(claim),
-      now,
-      maxAgeMs: maxAgeMs(),
-      probePid,
-    })
+    const { claim, assessment: view } = status
     console.log(
       JSON.stringify(
         {
           owner: lock ? { sessionId: lock.sessionId, pid: lock.pid ?? null, claimedAt: lock.claimedAt } : null,
           ownerAlive,
+          lockHeld: status.lockHeld,
           claim,
           assessment: view,
           gitOperation: gitOperationInProgress(),
@@ -306,6 +324,19 @@ if (isMain) {
       )
     } else console.log(`\nThe recorded claim is NOT honoured (${view.reason}) — it changes nothing.`)
     process.exit(0)
+  }
+
+  if (has('--wait')) {
+    const minutes = flag('--timeout') == null ? maxAgeMs() / 60_000 : Number(flag('--timeout'))
+    if (!Number.isFinite(minutes) || minutes < 0) fail(`--timeout must be a non-negative number of minutes.\n${usage}`)
+    const waited = await waitForClaimEnd({
+      readState: () => gatherClaimStatus(sid),
+      timeoutMs: minutes * 60_000,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    })
+    if (!waited.ok) fail(`timed out after ${minutes} min; the batch is still held.`)
+    console.log(waited.reason === 'spent' ? 'claim spent — the hand-over was released; run --take now.' : 'batch lock is free.')
+    if (!has('--take')) process.exit(0)
   }
 
   if (has('--withdraw')) {
@@ -351,6 +382,9 @@ if (isMain) {
         'by hand (`node scripts/batch-singleton.mjs release`).',
     )
     process.exit(0)
+  }
+  if (has('--take')) {
+    fail(`the batch is still held (${acq}); --take never writes or replaces a claim. Run --wait, then try --take again.`)
   }
 
   // 2. Somebody live holds it → record the claim. The owner sees it at its next
