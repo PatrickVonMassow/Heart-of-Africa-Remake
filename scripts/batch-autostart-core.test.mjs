@@ -66,7 +66,6 @@ import {
   supervisorRestartDecision,
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
-  WRITER_VETO_MAX_AGE_MS,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 
@@ -75,28 +74,35 @@ const FABLE_ON = fable('on')
 const FABLE_OFF = fable('off')
 import { isOwnSpawn } from './batch-singleton.mjs'
 
-describe('launcher start liveness — process evidence, not lock presence', () => {
+describe('launcher start liveness — fenced or advancing writer authority', () => {
   const NOW = 1_800_000_000_000
-  const writer = { pid: 4242, startedAt: NOW - 60_000, batchWriterAt: NOW - 1_000, generation: 17 }
+  const writer = {
+    pid: 4242,
+    startedAt: NOW - 60_000,
+    batchWriterAt: NOW - 1_000,
+    generation: 17,
+    authorityState: 'active',
+  }
 
   it('does not start beside a live batch-writer process when there is no lock', () => {
     const decision = launcherStartDecision({
       lock: null,
       assessment: { alive: false, reason: 'no-lock' },
       batchWriters: { 'window-session': writer },
+      fenceState: { fence: 17, holder: 'window-session' },
       probePid: () => ({ exists: true, startedAt: writer.startedAt }),
       now: NOW,
     })
     expect(decision).toMatchObject({ start: false })
-    expect(decision.reason).toContain('live batch-writer process 4242')
+    expect(decision.reason).toContain('authoritative batch-writer process')
     expect(decision.reason).toContain('no owner lock')
     expect(decision.evidence.lock).toMatchObject({ present: false, assessmentReason: 'no-lock' })
     expect(decision.evidence.batchWriters[0]).toMatchObject({ sessionId: 'window-session', sameProcess: true })
     expect(decision.veto).toMatchObject({ sessionId: 'window-session', generation: 17, pid: 4242, writerAgeMs: 1_000 })
   })
 
-  it('stops treating a living process as a writer after two hours without a main write', () => {
-    const oldWriter = { ...writer, batchWriterAt: NOW - WRITER_VETO_MAX_AGE_MS - 1 }
+  it('does not turn an old write into a fixed historical veto', () => {
+    const oldWriter = { ...writer, generation: 16, batchWriterAt: NOW - 24 * 60 * 60 * 1000 }
     const decision = launcherStartDecision({
       lock: null,
       assessment: { alive: false, reason: 'no-lock' },
@@ -104,26 +110,27 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       probePid: () => ({ exists: true, startedAt: oldWriter.startedAt }),
       now: NOW,
     })
-    expect(WRITER_VETO_MAX_AGE_MS).toBe(2 * 60 * 60 * 1000)
     expect(decision).toMatchObject({ start: true })
     expect(decision.evidence.batchWriters[0]).toMatchObject({
       sessionId: 'former-owner',
       sameProcess: true,
-      recentWrite: false,
-      writerAgeMs: WRITER_VETO_MAX_AGE_MS + 1,
+      currentFence: false,
+      advancing: false,
+      authoritative: false,
     })
   })
 
-  it('does not let a future-dated writer record veto forever', () => {
+  it('does not treat a future-dated change as advancing work', () => {
     const futureWriter = { ...writer, batchWriterAt: NOW + 60_000 }
     const decision = launcherStartDecision({
       assessment: { alive: false, reason: 'no-lock' },
       batchWriters: { future: futureWriter },
+      previousBatchWriters: { future: { ...futureWriter, batchWriterAt: NOW - 1_000 } },
       probePid: () => ({ exists: true, startedAt: futureWriter.startedAt }),
       now: NOW,
     })
     expect(decision.start).toBe(true)
-    expect(decision.evidence.batchWriters[0]).toMatchObject({ recentWrite: false, writerAgeMs: -60_000 })
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ advancing: false, writerAgeMs: -60_000 })
   })
 
   it('starts for a stale lock when neither its process nor any batch writer is live', () => {
@@ -145,12 +152,54 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       lock: { sessionId: 'stale-owner', pid: 3131 },
       assessment: { alive: false, reason: 'pid-dead' },
       batchWriters: { 'window-session': writer },
+      fenceState: { fence: 17, holder: 'window-session' },
       probePid: (pid) =>
         pid === writer.pid ? { exists: true, startedAt: writer.startedAt } : { exists: false, startedAt: null },
       now: NOW,
     })
     expect(decision).toMatchObject({ start: false })
     expect(decision.reason).toContain('independently of the owner lock')
+  })
+
+  it('lets a demonstrably advancing unretired writer veto after its fence was superseded', () => {
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { worker: writer },
+      previousBatchWriters: { worker: { ...writer, batchWriterAt: writer.batchWriterAt - 1_000 } },
+      fenceState: { fence: 18, holder: 'successor' },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+      now: NOW,
+    })
+    expect(decision).toMatchObject({ start: false })
+    expect(decision.veto).toMatchObject({ sessionId: 'worker', currentFence: false, advancing: true })
+  })
+
+  it('ignores a retired generation even while its host process lives', () => {
+    const retired = { ...writer, authorityState: 'retired' }
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { retired: retired },
+      fenceState: { fence: 17, holder: 'retired' },
+      probePid: () => ({ exists: true, startedAt: retired.startedAt }),
+      now: NOW,
+    })
+    expect(decision.start).toBe(true)
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ authorityState: 'retired', authoritative: false })
+  })
+
+  it('reports every simultaneously authoritative writer', () => {
+    const second = { ...writer, pid: 4343, startedAt: writer.startedAt - 1_000, generation: 16 }
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { fenced: writer, moving: second },
+      previousBatchWriters: { moving: { ...second, batchWriterAt: second.batchWriterAt - 1_000 } },
+      fenceState: { fence: 17, holder: 'fenced' },
+      probePid: (pid) => ({ exists: true, startedAt: pid === writer.pid ? writer.startedAt : second.startedAt }),
+      now: NOW,
+    })
+    expect(decision.vetoes).toHaveLength(2)
+    expect(decision.vetoes.map((item) => item.sessionId)).toEqual(['fenced', 'moving'])
+    expect(decision.reason).toContain('fenced (pid 4242), moving (pid 4343)')
   })
 
   it('does not let the lock owner process undo its own explicit handover', () => {
@@ -1048,16 +1097,22 @@ describe('announceSpawn — a standing block is not news every quarter of an hou
   })
 })
 
-describe('spawnProgressed — the launcher’s own pending lock is not progress', () => {
+describe('spawnProgressed — progress belongs to the spawned child', () => {
   const SPAWNED = 1_785_200_000_000
+  const spawn = {
+    at: SPAWNED,
+    spawnToken: 'spawn-token',
+    pid: 4242,
+    pidStartedAt: SPAWNED - 1_000,
+  }
 
-  it('a moved head is progress', () => {
-    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(true)
+  it('a moved head without child attribution is not progress', () => {
+    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: 'a'.repeat(40), lastSpawn: spawn })).toBe(false)
   })
 
-  it('a SESSION that claimed the lock after the spawn is progress', () => {
-    const lock = { kind: 'session', claimedAt: SPAWNED + 60_000 }
-    expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(true)
+  it('a converted lock carrying the child token is progress', () => {
+    const lock = { kind: 'session', claimedAt: SPAWNED + 60_000, spawnToken: spawn.spawnToken }
+    expect(spawnProgressed({ lock, lastSpawn: spawn })).toBe(true)
   })
 
   it('THE TRAP: the launcher’s own pending-spawn lock is stamped AFTER the spawn and is not progress', () => {
@@ -1067,20 +1122,59 @@ describe('spawnProgressed — the launcher’s own pending lock is not progress'
     // counting it would read every stillborn spawn as a success and no refusal
     // would ever be classified.
     const lock = { kind: 'pending-spawn', claimedAt: SPAWNED + 12, spawnedPid: 4242 }
-    expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(false)
-    expect(spawnProgressed({ curHead: 'a'.repeat(40), lastHead: 'a'.repeat(40), lock, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock, lastSpawn: spawn })).toBe(false)
+    expect(spawnProgressed({ curHead: 'a'.repeat(40), lastHead: 'a'.repeat(40), lock, lastSpawn: spawn })).toBe(false)
+  })
+
+  it('a converted lock can instead be attributed by qualified PID identity', () => {
+    const lock = {
+      kind: 'session',
+      claimedAt: SPAWNED + 1,
+      pid: spawn.pid,
+      pidStartedAt: spawn.pidStartedAt,
+    }
+    expect(spawnProgressed({ lock, lastSpawn: spawn })).toBe(true)
+    expect(spawnProgressed({ lock: { ...lock, pidStartedAt: spawn.pidStartedAt + 10_000 }, lastSpawn: spawn })).toBe(false)
+  })
+
+  it('an attributed fenced write is progress even after the child released its lock', () => {
+    const writers = {
+      child: {
+        pid: spawn.pid,
+        startedAt: spawn.pidStartedAt,
+        spawnToken: spawn.spawnToken,
+        generation: 19,
+        batchWriterAt: SPAWNED + 5_000,
+        authorityState: 'retired',
+      },
+    }
+    expect(spawnProgressed({ batchWriters: writers, lastSpawn: spawn })).toBe(true)
+  })
+
+  it('an unrelated session claim, fenced write, or commit cannot prove the child', () => {
+    const lock = { kind: 'session', claimedAt: SPAWNED + 1, pid: 9898, pidStartedAt: SPAWNED - 2_000 }
+    const batchWriters = {
+      other: { pid: 9898, startedAt: SPAWNED - 2_000, generation: 20, batchWriterAt: SPAWNED + 2_000 },
+    }
+    expect(spawnProgressed({
+      curHead: 'b'.repeat(40),
+      lastHead: 'a'.repeat(40),
+      lock,
+      batchWriters,
+      lastSpawn: spawn,
+    })).toBe(false)
   })
 
   it('an older claim, no lock, and junk are all "nothing moved"', () => {
-    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: SPAWNED - 1 }, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: SPAWNED - 1 }, lastSpawn: spawn })).toBe(false)
     expect(spawnProgressed({ lastSpawnAt: SPAWNED })).toBe(false)
-    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: 'soon' }, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: 'soon' }, lastSpawn: spawn })).toBe(false)
     expect(spawnProgressed()).toBe(false)
   })
 
   it('an unknown head on either side is not evidence of a move', () => {
-    expect(spawnProgressed({ curHead: '', lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(false)
-    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: '', lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ curHead: '', lastHead: 'a'.repeat(40), lastSpawn: spawn })).toBe(false)
+    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: '', lastSpawn: spawn })).toBe(false)
   })
 })
 

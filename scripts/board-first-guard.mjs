@@ -46,6 +46,7 @@ import {
   noteBatchWriter,
 } from './batch-singleton.mjs'
 import { fenceDecision, mainWriteFenceDecision } from './batch-lease-core.mjs'
+import { renewOwnClaim } from './batch-claim.mjs'
 import {
   handoverSurvivesCall,
   describeWithdrawalTrigger,
@@ -187,6 +188,11 @@ try {
     /* best effort — a lock we cannot write is not this gate's problem */
   }
   if (existsSync(PAUSE)) process.exit(0)
+
+  // A claim/reservation is renewed by this window doing real foreground work,
+  // never by its editor process merely remaining alive. Delegated worktrees are
+  // not the claiming window and must not refresh the parent's reservation.
+  if (!isWorktreeCheckout(REPO_ROOT)) renewOwnClaim(payload.session_id || '')
 
   // ---- THE FENCE CHOKEPOINT (point 434, docs/batch-resilience.md §3 layer 1) --
   // It sits BEFORE the ownership stand-down below, and it has to: a session whose

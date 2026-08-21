@@ -279,12 +279,22 @@ const readJson = (p) => {
  * arithmetics on the same number. This function reads the files and the pid probe
  * and asks that one; only the pid branches below, which ARE probe semantics, stay.
  */
-export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_MS, paused = false, idleWindowMs = idleWindow() } = {}) {
+export function assessOwner(lock, {
+  now,
+  bootTime,
+  probe,
+  work,
+  activity,
+  leaseMs = LEASE_MS,
+  paused = false,
+  idleWindowMs = idleWindow(),
+} = {}) {
   const v = ownershipVerdict({
     lock,
     now,
     bootTime,
     work,
+    activity,
     paused,
     idleWindowMs,
     leaseMs,
@@ -1438,13 +1448,18 @@ export function noteBatchWriter(sessionId, opts = {}) {
     const generation = owner?.sessionId === sessionId && typeof owner.fence === 'number'
       ? owner.fence
       : (typeof prior.generation === 'number' ? prior.generation : null)
+    const spawnToken = owner?.sessionId === sessionId && typeof owner.spawnToken === 'string' && owner.spawnToken
+      ? owner.spawnToken
+      : (typeof prior.spawnToken === 'string' && prior.spawnToken ? prior.spawnToken : null)
     processes[sessionId] = {
       ...prior,
       pid: processIdentity.pid,
       startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
       at: typeof prior.at === 'number' ? prior.at : now,
       batchWriterAt: now,
-      ...(generation === null ? {} : { generation }),
+      generation,
+      spawnToken,
+      authorityState: 'active',
     }
     for (const [sid, entry] of Object.entries(processes)) {
       const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)
@@ -1454,6 +1469,74 @@ export function noteBatchWriter(sessionId, opts = {}) {
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * Retire one writer generation without depending on its host process exiting.
+ * Handover and release are ownership events; a process that remains alive after
+ * either event has no authority merely because it once wrote main.
+ *
+ * A generation-qualified request never retires a newer episode which reused the
+ * same session id. Missing records are already non-authoritative and count as a
+ * successful no-op so lifecycle callers do not turn observability into a wedge.
+ */
+export function retireBatchWriter(sessionId, opts = {}) {
+  if (!sessionId || isProbeSessionId(sessionId)) return false
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const processes = readJson(path) ?? {}
+    const prior = processes[sessionId]
+    if (!prior || typeof prior !== 'object') return true
+    const generation = Number.isSafeInteger(opts.generation) ? opts.generation : null
+    if (generation !== null && prior.generation !== generation) return false
+    const now = opts.now ?? Date.now()
+    processes[sessionId] = {
+      ...prior,
+      generation: Number.isSafeInteger(prior.generation) ? prior.generation : generation,
+      authorityState: 'retired',
+      retiredAt: now,
+      retiredReason: typeof opts.reason === 'string' && opts.reason ? opts.reason : 'ownership-ended',
+    }
+    writeJsonAtomic(path, processes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Revoke exactly one still-current writer fence. The launcher uses this only
+ * after the same non-advancing authority blocked two decisions. Advancing the
+ * high-water mark makes every guard reject the old generation at its next main
+ * write; it does not kill the process or invent a replacement owner.
+ */
+export function revokeWriterFence(sessionId, generation, opts = {}) {
+  const rejected = (reason, fence = null) => ({ revoked: false, reason, fence })
+  if (!sessionId || !Number.isSafeInteger(generation) || generation < 0) return rejected('invalid-authority')
+  try {
+    const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
+    const current = readFence({ fencePath })
+    if (current.fence !== generation) return rejected('generation-changed', current.fence)
+    if (current.holder && current.holder !== sessionId) return rejected('holder-changed', current.fence)
+    const now = opts.now ?? Date.now()
+    const next = generation + 1
+    writeJsonAtomic(fencePath, {
+      ...current,
+      v: 1,
+      fence: next,
+      holder: '',
+      at: now,
+      lastTakeover: {
+        from: sessionId,
+        fence: next,
+        reason: typeof opts.reason === 'string' && opts.reason ? opts.reason : 'stalled-writer-veto',
+        at: now,
+      },
+    }, opts)
+    return { revoked: true, reason: 'revoked', fence: next }
+  } catch {
+    return rejected('write-failed')
   }
 }
 
@@ -1593,6 +1676,12 @@ export function transitionOwnerSession(sessionId, opts = {}) {
     } catch (error) {
       return rejected(`write-failed:${error && error.message ? error.message : 'unknown error'}`)
     }
+    retireBatchWriter(current.sessionId, {
+      lockPath,
+      generation,
+      now: opts.now,
+      reason: 'session-transition',
+    })
     return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
   } finally {
     exitReapMutex(mutexPath)
@@ -1635,6 +1724,11 @@ export function heldByOtherLiveOwner(sessionId, opts = {}) {
 export function release(sessionId, lockPath = LOCK_PATH) {
   const lock = readOwnerLock(lockPath)
   if (lock && lock.sessionId === sessionId) {
+    retireBatchWriter(sessionId, {
+      lockPath,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      reason: 'owner-release',
+    })
     try {
       rmSync(lockPath, { force: true })
     } catch {
@@ -1686,6 +1780,12 @@ export function markHandover(sessionId, opts = {}) {
     opts,
   )
   if (res.ok) {
+    retireBatchWriter(sessionId, {
+      lockPath,
+      generation: Number.isSafeInteger(lock.fence) ? lock.fence : null,
+      now,
+      reason: 'handover',
+    })
     emitLockActivity(ACTIVITY_EVENTS.HANDOVER, { ...lock, handoverPoint: opts.point ?? null }, {
       lockPath,
       at: now,

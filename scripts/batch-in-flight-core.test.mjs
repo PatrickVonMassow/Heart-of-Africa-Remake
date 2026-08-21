@@ -141,10 +141,14 @@ describe('checkEvidence — every kind is answered by a probe, never by the clai
   const pidItem = (over = {}) => ({ kind: 'pid', pid: 77, startedAt: RUN_STARTED, ...over })
 
   it('a pid counts only while the process is really alive', () => {
-    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() }).ok).toBe(true)
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() })).toMatchObject({
+      ok: true,
+      progressAt: NOW,
+    })
     expect(checkEvidence(pidItem(), { now: NOW, probePid: () => dead() })).toMatchObject({
       ok: false,
       detail: 'process-gone',
+      progressAt: null,
     })
   })
 

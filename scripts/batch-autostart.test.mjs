@@ -77,24 +77,34 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/reapableSpawns\(/)
   })
 
+  it('attributes spawn progress to the recorded child identity', () => {
+    expect(source).toMatch(
+      /spawnProgressed\(\{[\s\S]{0,250}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,180}?lastSpawn:\s*previousSpawn/,
+    )
+  })
+
   it('wires process liveness into both persisted start records', () => {
     expect(source).toMatch(
-      /successorStartDecision\(\{[\s\S]{0,400}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
+      /successorStartDecision\(\{[\s\S]{0,500}?batchWriters[\s\S]{0,200}?previousBatchWriters[\s\S]{0,200}?fenceState[\s\S]{0,200}?probePid/,
     )
     const records = source.match(/launcherStartRecord\(\{/g) ?? []
     expect(records, 'the refusal, pre-spawn and pid-bound records carry measured evidence').toHaveLength(3)
     expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
   })
 
-  it('repeats and escalates an inactive-lock writer veto instead of silently stopping', () => {
-    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)?.[0] ?? ''
+  it('recovers an inactive-lock writer veto after two unchanged decisions', () => {
+    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?if \(!writerRecovered\) \{[\s\S]*?process\.exit\(0\)/)?.[0] ?? ''
     expect(vetoBranch).toMatch(/writer-veto#/)
     expect(vetoBranch).toMatch(/verdictRepeat\(/)
     expect(vetoBranch).toMatch(/writerVetoSince/)
-    expect(vetoBranch).toMatch(/await notify\(/)
+    expect(vetoBranch).toMatch(/revokeWriterFence\(/)
+    expect(vetoBranch).toMatch(/retireBatchWriter\(/)
+    expect(vetoBranch).toMatch(/successorStartDecision\(/)
+    expect(vetoBranch).toMatch(/RECOVERED:/)
     expect(vetoBranch).toMatch(/writer\.sessionId/)
     expect(vetoBranch).toMatch(/writer\.pid/)
     expect(vetoBranch).toMatch(/blockedMinutes/)
+    expect(vetoBranch).toMatch(/blockedUntil:\s*now \+ LAUNCHER_TICK_MS/)
   })
 
   // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
@@ -108,6 +118,16 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(code, 'the guard’s 45-minute window makes the stall verdict unreachable').not.toMatch(
       /maxAgeMs:\s*IN_FLIGHT_MAX_AGE_MS/,
     )
+  })
+
+  it('assesses two decision intervals from real owner activity, not heartbeat freshness', () => {
+    expect(source).toMatch(/ownerActivityDecision\(\{[\s\S]{0,220}?records:\s*recentActivityRecords\(\)[\s\S]{0,160}?previous:\s*state\.ownerActivity/)
+    expect(source).toMatch(/state\.ownerActivity\s*=\s*ownerActivity\.state/)
+    expect(source).toMatch(/assessOwner\([^\n]+activity:\s*ownerActivity/)
+    expect(source).toMatch(/ACTIVITY_TAIL_BYTES/)
+    const reader = source.match(/const recentActivityRecords = \(\) => \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(reader).toMatch(/bytesRead\s*!==\s*length[^\n]+return null/)
+    expect(reader).toMatch(/catch\s*\{\s*return null\s*\}/)
   })
 
   // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes
