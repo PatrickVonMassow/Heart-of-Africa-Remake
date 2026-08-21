@@ -11194,3 +11194,30 @@ to land than a mechanism that needs a review.
   Criticality: medium — it corrupts nothing, but the documented escape is walkable only by hand
   and a malformed receipt fails silently.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 826. The criticality gate measures coverage against the reviewed sha, never against the
+  head it is clearing (measured 21.08.2026 while reading point 820). `attachPointFileSets` in
+  `scripts/criticality-review-guard.mjs` derives a point's file set as `commission..reviewSha`,
+  and `evaluateCriticalityReview` compares the recorded pass files against exactly that set;
+  `head` reaches the core for the message text alone. A file added by a commit made AFTER the
+  last clean review therefore never enters `expected`: it is neither covered nor reported as
+  uncovered, and the gate reads green on a file no reviewer opened. An unscoped clean review
+  (`r.pass === undefined`) skips the coverage test altogether and clears the same way.
+  BOTH BEHAVIOURS PREDATE POINT 820 and were deliberately left standing there — 820 closed the
+  index-counting hole and this is the anchoring one behind it, the same class the third landing
+  round opened.
+  FINAL STATE: coverage is measured against the point head that is being ticked rather than
+  against whichever sha happened to be read last, and files added after the last review appear
+  under "still uncovered". The review's OWN ledger commit is the ordinary case of such a late
+  addition and must not turn the gate into a loop that can never be satisfied — name how that
+  row is accounted for.
+  VERIFIABLE: pure cases over `evaluateCriticalityReview` — a composition covering everything up
+  to the reviewed sha but not a later commit's file refuses and names that file; the review's own
+  ledger row does not by itself keep the gate refusing; an unscoped clean review is held to the
+  same head coverage; and the point 769 replay keeps its recorded outcome.
+  QUEUE RANK: behind point 174, at the end of the order, and taken together with 825. Reason: it
+  is a latent gate hole rather than a blocking one — every landing today still passes — so under
+  the user's ruling of 20.08.2026 it waits for the release, and it rewrites the same criticality
+  core as 825, which must not run in parallel with it.
+  Criticality: high — it is a guard, and a green reading it has not earned is the one failure a
+  review gate may not have.
+  Bundle: Session- & Repo-Hygiene.
