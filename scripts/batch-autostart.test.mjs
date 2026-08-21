@@ -207,6 +207,20 @@ describe('immediate handover and supervised exit are runtime transports', () => 
     expect(code).toMatch(/if \(repair\.restart\)/)
     expect(code).toMatch(/supervisorRestartedAt: now/)
   })
+
+  it('repairs a missing durable CI observer and reserves starts while it is pending', () => {
+    expect(code).toMatch(/assessCiWait\(\{ wait: ciWait, now, probePid \}\)/)
+    expect(code).toMatch(/if \(!batchParked && ciWaitAssessment\.repair\)/)
+    expect(code).toMatch(/'\.\/ci-status-guard\.mjs'\), '--observe', ciWait\.wakeToken/)
+    expect(code).toMatch(/successorStartDecision\(\{[\s\S]*?ciWait: ciWaitAssessment/)
+  })
+
+  it('carries the persisted terminal result into the successor prompt', () => {
+    expect(code).toMatch(/ciTerminalPrompt\(ciWaitAssessment\)/)
+    expect(code).toMatch(/--wake-token/)
+    expect(code).toMatch(/--ci-result/)
+    expect(code).toMatch(/if \(ciWaitAssessment\.terminal\)[\s\S]*?acknowledgeCiWait\(ciWaitAssessment\.wakeToken\)/)
+  })
 })
 
 // ---------------------------------------------------------------------------

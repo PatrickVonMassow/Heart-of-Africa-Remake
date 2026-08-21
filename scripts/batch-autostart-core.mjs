@@ -720,6 +720,25 @@ export function supervisedExitTrigger(records = [], { childStartedAt = 0 } = {})
   return { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null }
 }
 
+/** A red terminal wake is a repair handoff, not permission to select unrelated
+ * work. Green simply confirms why the sleeping batch was resumed. */
+export function ciTerminalPrompt(ciWait) {
+  if (ciWait?.terminal !== true) return ''
+  const result = ciWait.result ?? {}
+  const identity = ciWait.identity ?? 'the observed workflow run'
+  if (result.verdict === 'red' || result.state === 'failed') {
+    return (
+      `\n\nCI-TERMINAL-HANDOFF: ${identity} concluded RED. This successor is the repair path: ` +
+      'run `node scripts/ci-status-guard.mjs` first, inspect the named failure, repair it, run the required gates, ' +
+      'and push the fixing commit before selecting another work-order point.'
+    )
+  }
+  if (result.verdict === 'green' || result.state === 'success') {
+    return `\n\nCI-TERMINAL-HANDOFF: ${identity} concluded GREEN; continue the batch immediately.`
+  }
+  return ''
+}
+
 /** The persisted record for a start the decision licensed. PURE. */
 export function launcherStartRecord({ decision, at, head = '', pid, pidStartedAt, supervisorPid, supervisorStartedAt } = {}) {
   return {

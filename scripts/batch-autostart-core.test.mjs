@@ -33,6 +33,7 @@ import {
   CHAT_PROMPT_MAX_CHARS,
   CHAT_PROMPT_MAX_MESSAGES,
   chatPromptSuffix,
+  ciTerminalPrompt,
   nextChatHandedAt,
   pendingSinceHandover,
   STANDING_ALERT_INTERVAL_MS,
@@ -452,6 +453,22 @@ describe('supervised exit trigger', () => {
       { seq: 3, atMs: 1500, event: 'foreground-activity', evidence: {} },
     ], { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
     expect(supervisedExitTrigger(null, { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
+  })
+})
+
+describe('terminal CI successor prompt', () => {
+  it('routes red to repair and green to ordinary continuation', () => {
+    expect(ciTerminalPrompt({
+      terminal: true,
+      identity: 'origin/feat/x:abc:CI:42',
+      result: { state: 'failed', verdict: 'red' },
+    })).toMatch(/successor is the repair path[\s\S]*ci-status-guard[\s\S]*fixing commit/)
+    expect(ciTerminalPrompt({
+      terminal: true,
+      identity: 'origin/feat/x:abc:CI:42',
+      result: { state: 'success', verdict: 'green' },
+    })).toMatch(/concluded GREEN; continue the batch immediately/)
+    expect(ciTerminalPrompt(null)).toBe('')
   })
 })
 

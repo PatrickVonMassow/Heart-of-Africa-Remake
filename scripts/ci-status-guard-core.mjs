@@ -207,12 +207,13 @@ export function renewCiWait(previous, observation, {
   try {
     const identity = ciWaitIdentity(observation)
     if (!identity || observation?.classification?.state !== 'pending' || !Number.isFinite(Number(now))) return null
-    const same = previous?.v === CI_WAIT_VERSION && previous?.identity === identity
+    const same = previous?.v === CI_WAIT_VERSION && previous?.identity === identity && previous?.state === 'pending' && previous?.terminal == null
     const firstObservationAt = same && Number.isFinite(previous.firstObservationAt)
       ? previous.firstObservationAt
-      : Number.isFinite(observation?.firstSeenAt)
-        ? observation.firstSeenAt
+      : Number.isFinite(observation?.observedAt)
+        ? observation.observedAt
         : Number(now)
+    const budgetStartedAt = Number.isFinite(observation?.firstSeenAt) ? observation.firstSeenAt : firstObservationAt
     const wakeToken = same && typeof previous.wakeToken === 'string' && previous.wakeToken
       ? previous.wakeToken
       : String(makeWakeToken() ?? '')
@@ -229,7 +230,7 @@ export function renewCiWait(previous, observation, {
       lastObservationAt: Number(now),
       deadline: same && Number.isFinite(previous.deadline)
         ? previous.deadline
-        : firstObservationAt + waitBudgetMs,
+        : budgetStartedAt + waitBudgetMs,
       wakeToken,
       observations: same && Number.isSafeInteger(previous.observations) ? previous.observations + 1 : 1,
       observer: same && previous.observer && typeof previous.observer === 'object'
@@ -274,6 +275,50 @@ export function observeCiWait(wait, classification, { now = Date.now() } = {}) {
     }
   } catch {
     return wait ?? null
+  }
+}
+
+/** Reconcile one completed sweep with the durable wait under the state lock.
+ * Terminal written by a concurrent observer outranks a stale pending response;
+ * a genuinely new run identity can still begin the next wait. */
+export function reconcileCiWait(previous, observations = [], options = {}) {
+  try {
+    const list = Array.isArray(observations) ? observations : []
+    const matching = previous?.identity
+      ? list.find((item) => ciWaitIdentity(item) === previous.identity)
+      : null
+    if (matching?.classification?.state === 'pending') {
+      return previous?.state === 'pending'
+        ? renewCiWait(previous, matching, options) ?? previous
+        : previous ?? null
+    }
+    if (matching) return observeCiWait(previous, matching.classification, options)
+    if (previous?.state === 'pending') return previous
+    const pending = list.find((item) => item?.classification?.state === 'pending')
+    return pending ? renewCiWait(null, pending, options) : previous ?? null
+  } catch {
+    return previous ?? null
+  }
+}
+
+/** Archive the terminal wait only for the successor carrying its wake token. */
+export function acknowledgeCiWaitState(state, wakeToken, { now = Date.now() } = {}) {
+  try {
+    const current = state && typeof state === 'object' ? state : {}
+    const wait = current.ciWait
+    if (!wait?.terminal || typeof wakeToken !== 'string' || wait.wakeToken !== wakeToken) {
+      return { state: current, acknowledged: false }
+    }
+    return {
+      acknowledged: true,
+      state: {
+        ...current,
+        lastCiWait: { ...wait, recoveredAt: now },
+        ciWait: null,
+      },
+    }
+  } catch {
+    return { state: state && typeof state === 'object' ? state : {}, acknowledged: false }
   }
 }
 
