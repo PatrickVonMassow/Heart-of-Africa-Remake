@@ -335,11 +335,22 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // sha among the valid rows — speaking with the WORST of its passes,
     // exactly as at the mechanism gate. A pass REFUSAL keeps its individual
     // standing in `unresolved` (fail-closed in both directions).
+    //
+    // THE FLOOR IS ONE, NOT TWO (measured 21.08.2026 landing point 769). It was
+    // two, which silently excluded the shape the tooling produces MOST often:
+    // `review-sol.mjs` records a fitting narrowed range as a scoped `1/1` pass,
+    // and such a row satisfied neither `pass === undefined` nor a composition,
+    // so `clean` stayed empty and the gate refused a point whose findings were
+    // all answered — telling it to record a re-review it had already recorded.
+    // That is the fault point 769 itself removed, at this gate instead. Nothing
+    // is loosened by the floor: completeness is proved by the 1..total loop
+    // below, which a one-pass group passes by construction rather than by
+    // exception, and the worst-verdict and refusal rules are untouched.
     const passShape = (r) => {
       const total = Number(r?.pass?.total)
       const index = Number(r?.pass?.index)
       return (
-        Number.isInteger(total) && total >= 2 && total <= 256 && Number.isInteger(index) && index >= 1 && index <= total
+        Number.isInteger(total) && total >= 1 && total <= 256 && Number.isInteger(index) && index >= 1 && index <= total
       )
     }
     const compositions = []

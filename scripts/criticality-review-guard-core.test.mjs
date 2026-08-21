@@ -266,6 +266,54 @@ describe('evaluateCriticalityReview', () => {
     expect(refused.block).toBe(true)
   })
 
+  it('a COMPLETE one-pass composition clears; a 1/1 refusal still does not (point 769 landing)', () => {
+    // `review-sol.mjs` records a narrowed, fitting range as a scoped 1/1 pass —
+    // the ordinary shape, not an edge case. It satisfied neither clean bucket,
+    // so the gate refused a point whose findings were every one of them answered.
+    const onePass = (verdict, at) =>
+      record({ verdict, at, pass: { index: 1, total: 1, files: ['scripts/guard.mjs'] } })
+
+    const cleared = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [onePass('merge', 1_787_000_001_000)],
+    })
+    expect(cleared.block).toBe(false)
+
+    // The floor moved; nothing else did. A 1/1 REFUSAL keeps its standing…
+    const refused = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [onePass('merge-with-fixes', 1_787_000_001_000)],
+    })
+    expect(refused.block).toBe(true)
+    expect(refused.findings[0].kind).toBe('unresolved')
+
+    // …and a 1/1 merge recorded LATER against a DESCENDANT answers it, which is
+    // the case that stood at point 769 and could not be expressed before.
+    const answered = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [
+        onePass('merge-with-fixes', 1_787_000_001_000),
+        { ...onePass('merge', 1_787_000_002_000), sha: 'c'.repeat(40), descendsFrom: [record({}).sha] },
+      ],
+    })
+    expect(answered.block).toBe(false)
+
+    // An INCOMPLETE multi-pass split is still refused — the hole stays closed.
+    const incomplete = evaluateCriticalityReview({
+      baseline: 'b',
+      head: 'h',
+      ticks: [tick()],
+      records: [record({ verdict: 'merge', pass: { index: 1, total: 2, files: ['a.mjs'] } })],
+    })
+    expect(incomplete.block).toBe(true)
+  })
+
   it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
     const carriedMerge = record({ verdict: 'merge', carried: { from: 'f'.repeat(40) } })
     const unstamped = evaluateCriticalityReview({ baseline: 'b', head: 'h', ticks: [tick()], records: [carriedMerge] })
