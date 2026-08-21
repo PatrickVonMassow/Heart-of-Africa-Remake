@@ -996,6 +996,28 @@ put it is the mistake this line exists to stop.
   `.claude/worktrees/` is admitted while the identical payload from the owner session in the main
   tree is refused (the case must fail against today's code, or it proves nothing); a call with no
   identifiable tree stands down; and the armed-mode refusal of the owner session is unchanged.
+  THE SAME BLINDNESS SITS IN THE STOP-GUARD FAMILY, not only in the fence (measured 21.08.2026,
+  17:33, by session 86848f90, which did NOT hold the batch lock). That session had been stood down
+  explicitly — the SessionStart hook and the batch-singleton hook both told it `STAND DOWN: this
+  session is NOT the batch worker`, and the lock demonstrably sat with session 86c03375 (pid
+  2379361, fresh heartbeat, checked with `scripts/batch-claim.mjs --status` in the same turn).
+  Two batch guards fired at its turn end anyway and blocked the answer: `dashboard-guard` (publish
+  the board, declare your focus) and `batch-progress-guard` ("DO NOT STOP THE BATCH … continue the
+  NEXT queue item now"). Both demand exactly the actions the singleton hook forbids that session,
+  while the main-write fence refuses the same writes in the same breath ("MAIN WRITE REFUSED —
+  this session holds no batch lock"): one mechanism commands the action, the other forbids it, and
+  a stood-down session cannot end its turn cleanly either way.
+  THE TRIGGER IS THE SAME ONE: the preceding turns of that session ended without the demand, and
+  the single change in between was that it had entered `.claude/worktrees/queue-triage-sol` and
+  ended its turn from there. The guard derives its jurisdiction from the repository root or the
+  working directory and loses, inside a worktree, the reading that another session holds the lock.
+  FINAL STATE (extension): every Stop guard of the batch family stands down for a session without
+  the batch lock exactly as the singleton hook does, and that determination may not depend on which
+  checkout the hook runs from. The named two are the measured cases, not the boundary of the fix —
+  the ownership reading is shared, so whatever carries it is corrected once for the whole family.
+  VERIFIABLE (extension): a case proves that a call from a worktree, made by a session that is not
+  the lock holder, is left alone by dashboard-guard and batch-progress-guard, while the owner
+  session's own turn end keeps being judged unchanged.
   Criticality: medium — it refuses nothing while the fence observes, but it silently voids the
   model policy the moment the fence is armed. A guard change is a mechanism, so it needs the
   other model's recorded review before it lands.
@@ -11024,4 +11046,37 @@ to land than a mechanism that needs a review.
   scripts/batch-autostart.mjs, scripts/lock-heartbeat-hook.mjs, scripts/ci-status-guard.mjs.
   Criticality: high — the report is the instrument the batch's own scheduling decisions are now made
   with, and today it answers "unknown" for almost everything while calling a dead night a handover.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 819. The queue's front block predates the ranking gate and was never cleared, so 34 points
+  stand ahead of the communication mechanism on seniority alone (measured 21.08.2026, on the
+  user's question why so many fresh tickets sit at the front). THE GATE ITSELF WORKS, and the
+  first reading of it was wrong: since point 789 landed (21.08., commit 4742933f) exactly TWO
+  points moved ahead of the communication block — 813 (machine-filed, criticality high, the CI
+  wait incident) and 517 (recorded origin user). The front block ahead of 686 SHRANK from 39 to
+  34, and ahead of 174 from 54 to 49; of 19 ranking entries since 20.08. seventeen sit at the
+  back (positions 230–238) or directly behind 174. Nor does the boundary need moving: the eight
+  communication points hold positions 34–41 and the release point 174 holds 49, so "queue behind
+  174" already means "behind the communication mechanism". 789 needs no rebuild.
+  WHAT IS LEFT IS THE LEGACY STOCK, and it is a one-off clearance rather than a mechanism: 32 of
+  the 34 points ahead of 686 carry NO ranking entry at all. They stood there before the gate
+  existed and 789 never reached back for them. By their own tags only 12 of the 34 are `high`,
+  and 20 of the 34 sit in the Session- & Repo-Hygiene bundle — process rather than game. Between
+  the last communication point and 174 stand 719, 720, 515, 660, 663, 669 and 633 as well.
+  FINAL STATE: every point ahead of 686 without a ranking entry is judged ONCE against the
+  standard 789 applies to a fresh one, and whatever does not meet it is queued behind the
+  communication mechanism with a written reason, exactly as a newly filed point would be. The
+  clearance is recorded per point, so a later reader can tell a deliberate placement from an
+  inherited one, and nothing is moved silently.
+  OPEN QUESTION FOR THE USER, to be answered before the clearance runs: the recorded user origin
+  of 517 rests solely on its own `why` entry in `.claude/queue-rank.json`; the repository holds no
+  second trace of that instruction. If this falls under the class of point 749 — the machine
+  booking its own situation reports as user decisions — then the exception of 789 point 4 was
+  claimed without warrant, and 517's placement belongs in the clearance too.
+  VERIFIABLE: after the clearance every point ahead of 686 carries a ranking entry, and a test
+  asserts that the front block holds nothing without one — the invariant 789 establishes for new
+  points, extended to the stock it could not reach.
+  FILES: .claude/queue-rank.json, scripts/queue-rank-core.mjs, TASKS.md.
+  Criticality: medium — no product defect, but it is the reason the user keeps seeing process
+  work ahead of the game, and the gate that was built for it cannot reach it.
   Bundle: Session- & Repo-Hygiene.
