@@ -91,6 +91,22 @@ describe('uncommittedNumstat', () => {
       deletions: 0,
     })
   })
+
+  it('counts every file inside a wholly untracked directory', () => {
+    const repo = gitRepo()
+    mkdirSync(join(repo, 'new-module'))
+    writeFileSync(join(repo, 'new-module', 'index.mjs'), 'export const answer = 42\n')
+    writeFileSync(join(repo, 'new-module', 'index.test.mjs'), 'it("answers", () => {})\n')
+
+    const dirty = git(repo, 'status', '--porcelain', '-uall')
+    expect(uncommittedSummary({ dirty, numstat: uncommittedNumstat({ cwd: repo }) })).toEqual({
+      changedPaths: 2,
+      measuredPaths: 2,
+      binaryPaths: 0,
+      insertions: 2,
+      deletions: 0,
+    })
+  })
 })
 
 afterEach(() => {

@@ -759,7 +759,9 @@ if (isMainModule(import.meta.url)) {
       }
     }
 
-    const dirty = git(['status', '--porcelain'], { cwd }) ?? ''
+    // `-uall` prevents Git from collapsing a wholly untracked directory into
+    // one `?? dir/` row, so the path count agrees with the files numstat reads.
+    const dirty = git(['status', '--porcelain', '-uall'], { cwd }) ?? ''
     const judged = judgeAuthoring({
       outcome,
       commits,
