@@ -233,7 +233,7 @@ export function strictAncestorProbe(index, fallback) {
  *              baseline
  *   openPoints point numbers that are visibly open in the current work order
  *   records    [{ point, sha, model, verdict, evidence, at, authoredBy,
- *                reachable, descendsFrom }]
+ *                reachable, descendsFrom, pointFiles }]
  *              `reachable` false means the record judged a commit that is not in
  *              this history (an abandoned branch) — it does not count.
  *              `descendsFrom` are the shas of OTHER records for the same point
@@ -332,14 +332,31 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // whole-range review, so ONE merge pass row could clear a HIGH point
     // whose other passes were never recorded. A pass-split review clears
     // only as a COMPLETE COMPOSITION — every index 1..total present at one
-    // sha among the valid rows — speaking with the WORST of its passes,
-    // exactly as at the mechanism gate. A pass REFUSAL keeps its individual
-    // standing in `unresolved` (fail-closed in both directions).
+    // sha among the valid rows AND the files read up to that sha covering the
+    // point's measured file set — speaking with the WORST of its passes. A
+    // pass REFUSAL keeps its individual standing in `unresolved` (fail-closed
+    // in both directions).
+    //
+    // COUNTING PASSES IS NOT COVERAGE (point 820). A scoped 1/1 is the normal
+    // shape produced for a fitting delta, but accepting it on its index alone
+    // lets one named file clear a point that changed ten. `pointFiles` is not a
+    // ledger claim: the wrapper replaces it with the paths changed by this
+    // point between its authoring commission and the reviewed sha. Coverage is
+    // cumulative along the review ancestry. An earlier refusal still proves
+    // what that review read; the later clean verdict decides whether its
+    // findings were answered. Unknown coverage refuses rather than narrowing.
     const passShape = (r) => {
       const total = Number(r?.pass?.total)
       const index = Number(r?.pass?.index)
       return (
-        Number.isInteger(total) && total >= 2 && total <= 256 && Number.isInteger(index) && index >= 1 && index <= total
+        Number.isInteger(total) &&
+        total >= 1 &&
+        total <= 256 &&
+        Number.isInteger(index) &&
+        index >= 1 &&
+        index <= total &&
+        Array.isArray(r?.pass?.files) &&
+        r.pass.files.every((file) => typeof file === 'string' && file.length > 0)
       )
     }
     const compositions = []
@@ -366,12 +383,31 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
           'merge',
         )
         const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
-        compositions.push({ ...latest, verdict: worst, at: Math.max(...rows.map((r) => Number(r.at ?? 0))) })
+        const expected = Array.isArray(latest.pointFiles)
+          ? [...new Set(latest.pointFiles.filter((file) => typeof file === 'string' && file.length > 0))]
+          : []
+        const ancestors = valid.filter(
+          (r) => r.sha === latest.sha || (latest.descendsFrom ?? []).includes(r.sha),
+        )
+        const covered = new Set()
+        for (const r of ancestors) {
+          const files = r.pass === undefined ? r.pointFiles : passShape(r) ? r.pass.files : []
+          if (Array.isArray(files)) for (const file of files) covered.add(file)
+        }
+        const uncovered = expected.filter((file) => !covered.has(file))
+        compositions.push({
+          ...latest,
+          verdict: worst,
+          at: Math.max(...rows.map((r) => Number(r.at ?? 0))),
+          compositionComplete: expected.length > 0 && uncovered.length === 0,
+          coverageUnknown: expected.length === 0,
+          uncovered,
+        })
       }
     }
     const clean = [
       ...valid.filter((r) => r.pass === undefined && String(r.verdict) === CLEARING_VERDICT),
-      ...compositions.filter((g) => String(g.verdict) === CLEARING_VERDICT),
+      ...compositions.filter((g) => g.compositionComplete && String(g.verdict) === CLEARING_VERDICT),
     ]
     const unresolved = valid.filter((r) => String(r.verdict) !== CLEARING_VERDICT)
     // A refusal has two durable answers:
@@ -402,6 +438,19 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
       if (unresolved.length && !unfiled.length) continue
       // Merge pass rows of an INCOMPLETE split leave `unresolved` empty while
       // nothing may clear — the finding then names those rows instead.
+      const incompleteCoverage = compositions
+        .filter((g) => String(g.verdict) === CLEARING_VERDICT && !g.compositionComplete)
+        .sort((a, b) => Number(b.at ?? 0) - Number(a.at ?? 0))[0]
+      if (incompleteCoverage) {
+        findings.push({
+          kind: 'uncovered-files',
+          tick,
+          records: [incompleteCoverage],
+          uncovered: incompleteCoverage.uncovered,
+          coverageUnknown: incompleteCoverage.coverageUnknown,
+        })
+        continue
+      }
       const pool = unfiled.length ? unfiled : valid
       const latest = pool.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'unresolved', tick, records: [latest] })
@@ -459,6 +508,20 @@ export function formatCriticalityReviewVerdict(verdict) {
         `      the only review on record is by ${String(r.model ?? '').trim() || 'the same model'}, which ` +
           `authored the work — a self-review is not a review`,
       )
+    } else if (f.kind === 'uncovered-files') {
+      lines.push(head)
+      if (f.coverageUnknown) {
+        lines.push(
+          '      the pass composition has no measured point file set, so its coverage is unknown.',
+          '      Re-run after the authoring commission and reviewed commit are available to Git.',
+        )
+      } else {
+        lines.push(
+          '      the recorded pass files do not cover every file this point changed. Still uncovered:',
+          ...(f.uncovered ?? []).map((file) => `        ${file}`),
+          '      Review those files and record the pass; a composition covers its union and not one file more.',
+        )
+      }
     } else if (f.kind === 'unresolved') {
       lines.push(
         head,

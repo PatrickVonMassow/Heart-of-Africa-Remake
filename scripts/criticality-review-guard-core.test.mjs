@@ -238,7 +238,12 @@ describe('evaluateCriticalityReview', () => {
     // review — one merge pass row cleared a HIGH point whose other passes
     // were never recorded.
     const passRow = (index, verdict, at) =>
-      record({ verdict, at, pass: { index, total: 2, files: [`f${index}.mjs`] } })
+      record({
+        verdict,
+        at,
+        pointFiles: ['f1.mjs', 'f2.mjs'],
+        pass: { index, total: 2, files: [`f${index}.mjs`] },
+      })
     const lone = evaluateCriticalityReview({
       baseline: 'b',
       head: 'h',
@@ -264,6 +269,65 @@ describe('evaluateCriticalityReview', () => {
       records: [passRow(1, 'merge', 1_787_000_001_000), passRow(2, 'do-not-merge', 1_787_000_002_000)],
     })
     expect(refused.block).toBe(true)
+  })
+
+  it('lets a 1/1 composition clear only when review ancestry covers the point file set', () => {
+    const base = record({
+      sha: 'a'.repeat(40),
+      verdict: 'merge-with-fixes',
+      at: 1_787_000_001_000,
+      pointFiles: ['scripts/original.mjs'],
+    })
+    const final = record({
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      at: 1_787_000_002_000,
+      descendsFrom: [base.sha],
+      pointFiles: ['scripts/original.mjs', 'scripts/fix.test.mjs'],
+      pass: { index: 1, total: 1, files: ['scripts/fix.test.mjs'] },
+    })
+
+    const covered = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [base, final] })
+    expect(covered).toMatchObject({ block: false, clear: true })
+
+    const missing = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [{ ...final, descendsFrom: [] }],
+    })
+    expect(missing.block).toBe(true)
+    expect(missing.findings[0]).toMatchObject({
+      kind: 'uncovered-files',
+      uncovered: ['scripts/original.mjs'],
+    })
+    expect(formatCriticalityReviewVerdict(missing)).toContain('scripts/original.mjs')
+  })
+
+  it('keeps a 1/1 refusal standing even when its files cover the point', () => {
+    const refused = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [
+        record({
+          verdict: 'merge-with-fixes',
+          pointFiles: ['scripts/guard.mjs'],
+          pass: { index: 1, total: 1, files: ['scripts/guard.mjs'] },
+        }),
+      ],
+    })
+    expect(refused.block).toBe(true)
+    expect(refused.findings[0].kind).toBe('unresolved')
+  })
+
+  it('names unknown point coverage instead of clearing on pass indices alone', () => {
+    const unknown = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [record({ pass: { index: 1, total: 1, files: ['scripts/guard.mjs'] } })],
+    })
+    expect(unknown.block).toBe(true)
+    expect(unknown.findings[0]).toMatchObject({ kind: 'uncovered-files', coverageUnknown: true })
+    expect(formatCriticalityReviewVerdict(unknown)).toContain('coverage is unknown')
   })
 
   it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
