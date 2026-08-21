@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ACTIVITY_CLASSES, evidenceInterval } from './batch-standstill-core.mjs'
+import { parsePauseRecord } from './batch-pause-core.mjs'
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value)
 const isoAtStart = /^\[?(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z)\]?\s+(.*)$/
@@ -53,6 +54,69 @@ export function autostartEvidence(text = '', { end = Number.POSITIVE_INFINITY } 
     }
   }
   return { intervals: intervals.filter(Boolean), boundaries: entries.map((entry) => entry.at) }
+}
+
+/** Atomic JSON state contributes boundaries and, where it carries the launcher's
+ * measured veto object, the exact maximum veto interval. */
+export function autostartLastEvidence(text = '') {
+  let record
+  try { record = JSON.parse(text) } catch { return { intervals: [], boundaries: [] } }
+  const at = Number(record?.at)
+  if (!finite(at)) return { intervals: [], boundaries: [] }
+  const intervals = []
+  for (const writer of record?.measured?.batchWriters ?? []) {
+    if (writer?.sameProcess !== true || writer?.recentWrite !== true || !finite(writer.batchWriterAt)) continue
+    intervals.push(evidenceInterval({
+      start: at,
+      end: writer.batchWriterAt + 2 * 60 * 60_000,
+      className: ACTIVITY_CLASSES.BLOCKED_WRITER_VETO,
+      source: 'autostart-last.json',
+      cause: 'measured-writer-veto',
+      evidence: {
+        writerSession: writer.sessionId ?? null,
+        pid: writer.pid ?? null,
+        pidStartedAt: writer.recordedStartedAt ?? null,
+        lastFencedOperationAt: writer.batchWriterAt,
+      },
+    }))
+  }
+  return { intervals: intervals.filter(Boolean), boundaries: [at] }
+}
+
+export function markerBoundary(text = '') {
+  try {
+    const marker = JSON.parse(text)
+    return finite(marker?.at) ? [marker.at] : []
+  } catch {
+    return []
+  }
+}
+
+export function boundaryMarkerEvidence(text = '', { end } = {}) {
+  let marker
+  try { marker = JSON.parse(text) } catch { return { intervals: [], boundaries: [] } }
+  if (!finite(marker?.at)) return { intervals: [], boundaries: [] }
+  const interval = marker.phase === 'committed'
+    ? evidenceInterval({
+        start: marker.at, end, className: ACTIVITY_CLASSES.HANDOVER,
+        source: 'batch-boundary.json', cause: marker.cause === 'context' ? 'context-boundary' : 'point-boundary',
+        evidence: { session: marker.sessionId ?? null, point: marker.point ?? null, phase: marker.phase },
+      })
+    : null
+  return { intervals: [interval].filter(Boolean), boundaries: [marker.at] }
+}
+
+export function pauseMarkerEvidence(text = '', { start, end } = {}) {
+  if (!text) return { intervals: [], boundaries: [] }
+  const pause = parsePauseRecord(text)
+  const began = finite(pause.pausedAt) ? pause.pausedAt : start
+  const until = finite(pause.retryAfter) ? Math.min(end, pause.retryAfter) : end
+  const interval = evidenceInterval({
+    start: began, end: until, className: ACTIVITY_CLASSES.BLOCKED_USER,
+    source: 'batch-paused', cause: pause.cause ?? 'user-pause',
+    evidence: { reason: pause.reason || null, retryAfter: pause.retryAfter ?? null },
+  })
+  return { intervals: [interval].filter(Boolean), boundaries: [began, until].filter(finite) }
 }
 
 function recordFiles(dir) {
@@ -156,13 +220,14 @@ export function readJournal(path) {
   return { ...parsed, startedAt: parsed.records[0]?.atMs ?? null }
 }
 
-export function declaredInputPaths(repo, transcriptPaths = []) {
+export function declaredInputPaths(repo, transcriptPaths = [], ref = 'main') {
   return {
-    firstParentCommits: `git:${repo}:main:first-parent`,
+    firstParentCommits: `git:${repo}:${ref}:first-parent`,
     autostartLog: join(repo, '.claude', 'autostart.log'),
     autostartLast: join(repo, '.claude', 'autostart-last.json'),
     boundaryLog: join(repo, '.claude', 'boundary.log'),
     boundaryMarker: join(repo, '.claude', 'batch-boundary.json'),
+    pauseMarker: join(repo, '.claude', 'batch-paused'),
     verificationRecords: join(repo, 'local', 'verify-logs', '*.run.json'),
     sessionTranscripts: transcriptPaths,
     journal: join(repo, '.claude', 'batch-activity.jsonl'),
@@ -170,4 +235,3 @@ export function declaredInputPaths(repo, transcriptPaths = []) {
 }
 
 export function existing(path) { return existsSync(path) }
-

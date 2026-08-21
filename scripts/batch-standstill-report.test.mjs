@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ACTIVITY_CLASSES, classifyTimeline, commitGapSummary, evidenceInterval, timelineTotals } from './batch-standstill-core.mjs'
-import { autostartEvidence, transcriptEvidence } from './batch-standstill-inputs.mjs'
+import {
+  autostartEvidence,
+  autostartLastEvidence,
+  boundaryMarkerEvidence,
+  markerBoundary,
+  pauseMarkerEvidence,
+  transcriptEvidence,
+} from './batch-standstill-inputs.mjs'
 import { parseWindow, renderStandstillReport } from './batch-standstill-report.mjs'
 
 describe('standstill report inputs', () => {
@@ -26,6 +33,39 @@ describe('standstill report inputs', () => {
     expect(parsed.intervals).toEqual([expect.objectContaining({
       start: Date.parse('2026-08-21T08:00:00Z'), end: Date.parse('2026-08-21T08:15:00Z'), state: 'no-worker',
     })])
+  })
+
+  it('reads exact writer identity and bounds from autostart-last', () => {
+    const at = Date.parse('2026-08-21T08:15:29Z')
+    const lastWrite = Date.parse('2026-08-21T07:08:03Z')
+    const parsed = autostartLastEvidence(JSON.stringify({
+      at,
+      measured: { batchWriters: [{
+        sessionId: '593e0d2f', pid: 2156063, recordedStartedAt: 1000,
+        sameProcess: true, recentWrite: true, batchWriterAt: lastWrite,
+      }] },
+    }))
+    expect(parsed.boundaries).toEqual([at])
+    expect(parsed.intervals).toEqual([expect.objectContaining({
+      start: at,
+      end: Date.parse('2026-08-21T09:08:03Z'),
+      className: ACTIVITY_CLASSES.BLOCKED_WRITER_VETO,
+    })])
+    expect(markerBoundary(JSON.stringify({ at }))).toEqual([at])
+  })
+
+  it('turns committed boundaries and pause markers into explicit state', () => {
+    const start = Date.parse('2026-08-21T08:00:00Z')
+    const end = start + 60 * 60_000
+    expect(boundaryMarkerEvidence(JSON.stringify({
+      at: start, phase: 'committed', cause: 'point', sessionId: 's1', point: 809,
+    }), { end }).intervals).toEqual([
+      expect.objectContaining({ start, end, className: ACTIVITY_CLASSES.HANDOVER }),
+    ])
+    const pause = pauseMarkerEvidence('reason: asked to stop\ncause: user-stop\nretry-after: never\n', { start, end })
+    expect(pause.intervals).toEqual([
+      expect.objectContaining({ start, end, className: ACTIVITY_CLASSES.BLOCKED_USER, cause: 'user-stop' }),
+    ])
   })
 
   it('renders threshold, evidence, totals, and UTC bounds', () => {

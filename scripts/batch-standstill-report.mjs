@@ -13,10 +13,13 @@ import {
 } from './batch-standstill-core.mjs'
 import {
   autostartEvidence,
+  autostartLastEvidence,
+  boundaryMarkerEvidence,
   declaredInputPaths,
   firstParentCommitTimes,
   readJournal,
   readText,
+  pauseMarkerEvidence,
   timestampedLogBoundaries,
   transcriptEvidence,
   transcriptFiles,
@@ -62,17 +65,21 @@ const fmtDuration = (ms) => {
 const pct = (part, total) => total > 0 ? `${(part * 100 / total).toFixed(2)}%` : '0.00%'
 
 export function gatherStandstillReport({ repo, ref = 'main', start, end, thresholdMs = STANDSTILL_THRESHOLD_MS } = {}) {
-  const paths = declaredInputPaths(repo, transcriptFiles({ repo, start }))
+  const paths = declaredInputPaths(repo, transcriptFiles({ repo, start }), ref)
   const journal = readJournal(paths.journal)
   const journalDerived = journalIntervals(journal.records, { start, end })
   const commits = firstParentCommitTimes({ repo, ref, start, end })
   const auto = autostartEvidence(readText(paths.autostartLog), { end })
+  const autoLast = autostartLastEvidence(readText(paths.autostartLast))
   const boundaryEvents = timestampedLogBoundaries(readText(paths.boundaryLog)).map((entry) => entry.at)
+  const boundaryMarker = boundaryMarkerEvidence(readText(paths.boundaryMarker), { end })
+  const pauseMarker = pauseMarkerEvidence(readText(paths.pauseMarker), { start, end })
   const verification = verificationRecordEvidence(resolve(repo, 'local', 'verify-logs'), { start, end })
   const transcripts = paths.sessionTranscripts.map((path) => transcriptEvidence(readText(path), { session: path.split(/[\\/]/).at(-1)?.replace(/\.jsonl$/, '') }))
-  const intervals = [journalDerived, auto, verification, ...transcripts].flatMap((input) => input.intervals)
+  const intervals = [journalDerived, auto, autoLast, boundaryMarker, pauseMarker, verification, ...transcripts].flatMap((input) => input.intervals)
   const boundaries = [
-    ...commits, ...journalDerived.boundaries, ...auto.boundaries, ...boundaryEvents,
+    ...commits, ...journalDerived.boundaries, ...auto.boundaries, ...autoLast.boundaries, ...boundaryEvents,
+    ...boundaryMarker.boundaries, ...pauseMarker.boundaries,
     ...verification.boundaries, ...transcripts.flatMap((input) => input.boundaries),
   ]
   const timeline = classifyTimeline({ start, end, intervals, boundaries, journalStartedAt: journal.startedAt ?? end })
