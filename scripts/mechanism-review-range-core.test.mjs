@@ -110,6 +110,27 @@ describe('authorship-cut mechanism review planning', () => {
     expect(plan.unreviewable).toEqual([plan.groups[0]])
   })
 
+  it('attributes a trailerless merge to the contribution at its merged-parent tip', () => {
+    const ledger = '.claude/mechanism-reviews.jsonl'
+    const plan = planAuthorshipGroups({
+      commits: [
+        { ...commit('a', 'GPT-5.6 Sol', ['sol-only']), parentShas: [] },
+        { ...commit('b', 'Claude Opus 5', [ledger]), parentShas: [] },
+        { sha: sha('c'), parentShas: [sha('a'), sha('b')], files: [ledger] },
+      ],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({ files: ['sol-only'], commits: [sha('a')], reviewer: 'Opus 5' }),
+      expect.objectContaining({
+        files: [ledger],
+        commits: [sha('b'), sha('c')],
+        authors: ['Claude Opus 5'],
+        reviewer: 'GPT-5.6 Sol',
+      }),
+    ])
+    expect(plan.unreviewable).toEqual([])
+  })
+
   it('requires the other vendor even when another same-vendor model is not an author', () => {
     expect(eligibleReviewer(['Claude Fable 5'])).toBe('GPT-5.6 Sol')
     expect(eligibleReviewer(['GPT-5.6 Sol'])).toBe('Opus 5')

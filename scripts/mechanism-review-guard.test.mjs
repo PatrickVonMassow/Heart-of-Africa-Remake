@@ -73,7 +73,7 @@ describe('parseMechanismLog', () => {
   // appear in a quoted-on path line, so no file name can forge a boundary.
   const REC = String.fromCharCode(0x1e)
   const FLD = String.fromCharCode(0x1f)
-  const header = (sha) => `${REC}${sha}${FLD}1723000000`
+  const header = (sha, parents = []) => `${REC}${sha}${FLD}1723000000${FLD}${parents.join(' ')}`
   const files = ['x-guard.mjs']
 
   it('keeps a path with a trailing space BYTE-EXACT, never its trimmed spelling', () => {
@@ -82,7 +82,12 @@ describe('parseMechanismLog', () => {
     expect(commits).toHaveLength(1)
     expect(commits[0].files).toEqual(['scripts/git-hooks/check '])
     expect(commits[0].files).not.toContain('scripts/git-hooks/check')
-    expect(commits[0]).toMatchObject({ sha: SHA, at: 1723000000000 })
+    expect(commits[0]).toMatchObject({ sha: SHA, at: 1723000000000, parentShas: [] })
+  })
+
+  it('carries only machine-shaped parent shas for merge attribution', () => {
+    const out = [header(SHA, [SHB, 'c'.repeat(40)]), '', 'scripts/x-guard.mjs', ''].join('\n')
+    expect(parseMechanismLog(out, files)[0].parentShas).toEqual([SHB, 'c'.repeat(40)])
   })
 
   // ROUND-1 PASS 2: the header used to carry the subject and the trailers behind
@@ -189,7 +194,7 @@ describe('the path-carrying git commands', () => {
       '-c',
       'core.quotepath=on',
       'log',
-      '--format=%x1e%H%x1f%ct',
+      '--format=%x1e%H%x1f%ct%x1f%P',
       '--name-only',
       '--no-renames',
       '--diff-merges=cc',
