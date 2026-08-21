@@ -10683,3 +10683,30 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but it is the four-eyes gate closing on itself again,
   this time through the very exit its refusal names.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 805. The push gate reads a delegated author's own commit as a red
+  (measured 21.08.2026, 07:05). A `main` push ran the full unit layer and every test passed: 357
+  files, 12344 tests, 1 skipped, NOTHING failing. The run exited non-zero anyway, at teardown, from
+  `assertRepositoryUnchanged` in `scripts/repository-integrity.mjs`:
+  `refs/heads/feat/781-main-checkout-helper` moved from 8ce92b0 to 4e83124 while the suite ran —
+  GPT-5.6 Sol committing its authoring checkpoints in its own isolated worktree, which is exactly
+  what a delegated author is instructed to do. The assertion's own text already names the case: "a
+  legitimate commit or branch operation in another worktree during the run produces the same
+  result". It says so and blocks anyway.
+  NOT THE SAME AS 803. That point covers CONTENTION — no failing test named while the measured load
+  is high — and its remedy is to wait for a quiet host. This is not load, and waiting does not
+  reach it: the ref that moved belongs to the delegated author, and it moves precisely while the
+  batch is in its normal operating state. The gate's own retry reproduced it under the same
+  conditions, as it must.
+  FINAL STATE: the integrity assertion tells a ref the suite itself may have written apart from a
+  ref that belongs to a known concurrent author. A ref the running session does not own — a
+  registered authoring branch, a worktree named in the in-flight declaration — is REPORTED in the
+  verdict and does not fail the run. A ref the suite has no business touching — `main`, `HEAD`, the
+  fixture branches of point 801 — still fails it loudly.
+  VERIFIABLE: pure tests over the assertion — a moved delegated-author branch is reported and
+  passes; a moved `main` fails; a moved fixture branch fails; and the verdict text names every ref
+  that moved in each case.
+  Criticality: medium — no product defect, but it withholds the push rule's protection for as long
+  as a delegated author runs, and leaves bookkeeping committed but unpushed, which is the exact
+  state that rule exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
