@@ -73,13 +73,17 @@ export const TIMESTAMP_RE = /^\*\*([A-Za-zÄÖÜäöüß]+, \d{2}\.\d{2}\.\d{4},
  * RESIDUAL RACE, KNOWINGLY LEFT OPEN (point 769). A turn that calls NO tool has
  * no tool result of its own, so the boundary falls in the PREVIOUS turn and the
  * text after it is that turn's already-answered reply. Lose the same write race
- * there and the guard judges a reply that is minutes old — a stale-stamp block
- * instead of the no-match block, but a false refusal either way. Only a
- * tool-less turn is exposed, and it is the rarer case here. Closing it means
- * moving the boundary to the last USER-PROMPT row, which is a different rule
- * than the one this point chose; it stays a separate decision. Until then the
- * refusal text quotes the line actually judged, so a raced block is at least
- * recognisable as one rather than reading as "your reply was wrong".
+ * there and the guard judges that older reply instead of the new one — and it
+ * mostly PASSES: the previous stamp is usually inside MINUTES_BACK, so the
+ * verdict is a false ALLOW that lets an unstamped reply through unchecked. Only
+ * once the previous turn is more than MINUTES_BACK old does it flip into a false
+ * stale-stamp refusal. The exposure is therefore the opposite of the case this
+ * point fixed — under-enforcement, not a fabricated fault — and it needs a
+ * tool-less turn, which is the rarer shape here. Closing it means moving the
+ * boundary to the last USER-PROMPT row, which is a different rule than the one
+ * this point chose; it stays a separate decision. Until then the refusal text
+ * quotes the line actually judged, so a raced block is at least recognisable as
+ * one rather than reading as "your reply was wrong".
  */
 export function inspectLastAssistantText(jsonl) {
   if (typeof jsonl !== 'string' || jsonl.trim() === '') {

@@ -182,7 +182,11 @@ describe('end-to-end guard process', () => {
 
   it('replays the measured 302 ms race without judging the intermediate narration', () => {
     const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
-    expect(Date.parse(fixture.stopFeedbackAt) - Date.parse(fixture.finalReplyRow.timestamp)).toBe(302)
+    // The 302 ms is READ OFF the two real rows, never off a copy of the figure:
+    // the reply row's own timestamp against the Stop feedback row's own.
+    expect(
+      Date.parse(fixture.stopFeedbackRow.timestamp) - Date.parse(fixture.finalReplyRow.timestamp),
+    ).toBe(302)
 
     // The fixture is a REAL slice, so the rows carry their own ids and flags and
     // the narration that was wrongly judged is genuinely in it — not implied.
@@ -200,7 +204,7 @@ describe('end-to-end guard process', () => {
     expect(
       evaluate({
         lastText: extractLastAssistantText(flushed),
-        now: new Date(fixture.stopFeedbackAt),
+        now: new Date(fixture.stopFeedbackRow.timestamp),
       }),
     ).toBe(null)
   })
@@ -208,6 +212,18 @@ describe('end-to-end guard process', () => {
   it('pins the regression: without the tool-result boundary the narration is what gets judged', () => {
     const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
     const pending = fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n')
+
+    // The slice may skip rows, but it may not skip a row that would have CHANGED
+    // the answer. The elided middle was measured, not assumed: it holds no
+    // assistant text of any kind, so the reduced fixture selects exactly what the
+    // full 1,259-row transcript selected.
+    expect(fixture.source.elidedRows).toMatchObject({
+      from: 712,
+      to: 929,
+      count: 218,
+      assistantTextRows: 0,
+      sidechainTextRows: 0,
+    })
 
     // The superseded rule verbatim: the first text block of the last assistant
     // message carrying text, with no boundary at the last tool_result.
@@ -221,13 +237,55 @@ describe('end-to-end guard process', () => {
     }
     expect(preFix).toBe(fixture.narrationText)
 
-    // …and judging it produces exactly the refusal the user was served.
-    const verdict = evaluate({ lastText: preFix, now: new Date(fixture.stopFeedbackAt) })
+    // …and judging it blocks. The refusal the user was actually served is kept
+    // verbatim in the fixture, and it is the NO-MATCH branch: it asserts the
+    // reply did not begin with the stamp and names no line it saw. Word-for-word
+    // equality is not available and would be the wrong test — this point CHANGED
+    // that wording on purpose — so what is pinned is the branch and the defect:
+    // the served text quotes nothing, the regenerated one quotes the narration.
+    const served = String(fixture.stopFeedbackRow.message.content)
+    expect(served).toContain('Your last reply does NOT begin with it.')
+    expect(served).not.toContain('Jetzt die \u00c4nderung.')
+
+    const verdict = evaluate({
+      lastText: preFix,
+      now: new Date(fixture.stopFeedbackRow.timestamp),
+    })
     expect(verdict?.decision).toBe('block')
+    expect(verdict?.reason).toContain('does NOT begin with the timestamp')
     expect(verdict?.reason).toContain('"Jetzt die \u00c4nderung."')
 
     // The landed rule returns no judgement at all on the same rows.
     expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
+  })
+
+  it('measures the residual tool-free-turn race the core documents: a false ALLOW', () => {
+    // The core's doc comment claims the leftover exposure is under-enforcement,
+    // not a fabricated fault. Prove it rather than assert it: a previous turn
+    // that ended with a tool result and a stamped reply, then a new tool-free
+    // turn whose reply has not been flushed yet.
+    const now = new Date('2026-08-20T06:15:18.706Z')
+    const recent = berlinStamp(new Date(now.getTime() - 4 * 60000))
+    const raced = [
+      line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
+      line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),
+      assistantText(`**${recent}** Vorherige Antwort.`, { id: 'prev-final' }),
+    ].join('\n')
+
+    // The previous turn's reply is what gets judged…
+    expect(extractLastAssistantText(raced)).toBe(`**${recent}** Vorherige Antwort.`)
+    // …and it passes, so the unflushed new reply is never checked at all.
+    expect(evaluate({ lastText: extractLastAssistantText(raced), now })).toBe(null)
+
+    // Only once the previous turn falls outside the window does it flip into the
+    // false refusal — the far rarer half of the residual.
+    const old = berlinStamp(new Date(now.getTime() - (MINUTES_BACK + 5) * 60000))
+    const stale = [
+      line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
+      line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),
+      assistantText(`**${old}** Vorherige Antwort.`, { id: 'prev-final' }),
+    ].join('\n')
+    expect(evaluate({ lastText: extractLastAssistantText(stale), now })?.decision).toBe('block')
   })
 
   it('still blocks genuinely unstamped and stale final replies after a tool result', () => {

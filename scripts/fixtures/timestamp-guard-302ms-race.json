@@ -3,9 +3,12 @@
     "REAL slice of the measured 302 ms Stop-hook race (session d5fcb9cf, 20.08.2026).",
     "Not reconstructed: every row below is a verbatim transcript row with its own",
     "message.id, uuid, parentUuid, isSidechain flag, timestamp and row shape kept.",
-    "Only string bodies longer than 120 characters are truncated with a trailing …,",
-    "and the 218 rows between the narration and the tail are elided (see source.elidedRows);",
-    "no row was invented, reordered or reshaped."
+    "Only string bodies longer than 120 characters are truncated with a trailing …;",
+    "the served refusal in stopFeedbackRow is kept WHOLE, because it is the evidence.",
+    "The 218 rows between the narration and the tail are elided, and what they contain",
+    "is MEASURED in source.elidedRows rather than assumed: no assistant text row of any",
+    "kind, which is why the reduced slice selects the same narration the full transcript",
+    "did. No row was invented, reordered or reshaped."
   ],
   "source": {
     "transcript": "~/.claude/projects/-workspace-hoa/d5fcb9cf-2936-4743-9502-f504f08b8ac5.jsonl",
@@ -18,12 +21,13 @@
     "elidedRows": {
       "from": 712,
       "to": 929,
-      "count": 218
+      "count": 218,
+      "assistantTextRows": 0,
+      "sidechainTextRows": 0
     },
     "truncatedStringsLongerThan": 120
   },
   "sessionId": "d5fcb9cf-2936-4743-9502-f504f08b8ac5",
-  "stopFeedbackAt": "2026-08-20T06:15:18.706Z",
   "narrationText": "Jetzt die Änderung.",
   "rowsBeforeFinalReply": [
     {
@@ -918,7 +922,7 @@
     "type": "user",
     "message": {
       "role": "user",
-      "content": "Stop hook feedback:\nChat-timestamp rule: EVERY reply to the user begins with the bold Berlin timestamp (**Wochentag, TT.…"
+      "content": "Stop hook feedback:\nChat-timestamp rule: EVERY reply to the user begins with the bold Berlin timestamp (**Wochentag, TT.MM.JJJJ, HH:MM**, German weekday, Europe/Berlin). Your last reply does NOT begin with it. Close the turn with a SHORT acknowledgement — one or two sentences naming what you just fixed, never a second copy of the answer the user has already read — beginning with exactly this line (copy it verbatim): **Donnerstag, 20.08.2026, 08:15**"
     },
     "isMeta": true,
     "uuid": "db0ec151-f358-4e78-bfd1-dfbb64a332c2",
