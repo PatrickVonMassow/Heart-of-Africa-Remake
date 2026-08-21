@@ -34,6 +34,13 @@ export function classifyContextSession({ agentId = null, sessionId = '', ownerSe
   return CONTEXT_SESSION_CLASS.ATTENDED
 }
 
+/** One budget/permit identity per real context, even when a subagent inherits its caller's session id. */
+export function contextSessionIdentity({ agentId = null, sessionId = '' } = {}) {
+  const sid = String(sessionId ?? '').trim()
+  const agent = typeof agentId === 'string' ? agentId.trim() : ''
+  return agent ? `${sid}:agent:${agent}` : sid
+}
+
 /** Direct reading tools are admitted and booked, but never denied. */
 export function contextOperationOf({ toolName = '', operation = null } = {}) {
   if (Object.values(CONTEXT_OPERATION).includes(operation)) return operation

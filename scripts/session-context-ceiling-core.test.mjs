@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   CONTEXT_OPERATION,
   CONTEXT_SESSION_CLASS,
   SESSION_CEILING_REMEDIES,
   attendedCeilingNoticeDecision,
   classifyContextSession,
+  contextSessionIdentity,
   sessionCeilingDecision,
 } from './session-context-ceiling-core.mjs'
 
@@ -76,6 +79,8 @@ describe('classification from real hook shapes', () => {
       sessionId: 'owner-session',
       ownerSessionId: 'owner-session',
     })).toBe(CONTEXT_SESSION_CLASS.SUBAGENT)
+    expect(contextSessionIdentity({ agentId: 'agent-a288e028424fe5835', sessionId: 'owner-session' }))
+      .toBe('owner-session:agent:agent-a288e028424fe5835')
   })
 
   it('identifies the batch owner from the ordinary main-thread payload and lock', () => {
@@ -121,5 +126,54 @@ describe('the attended reading notice', () => {
   it('leaves the batch owner on its existing boundary path', () => {
     expect(ask({ sessionClass: CONTEXT_SESSION_CLASS.BATCH_OWNER }))
       .toEqual({ speak: false, reason: 'batch-owner-unchanged' })
+  })
+})
+
+describe('the attended 19.08 session replay', () => {
+  const replay = JSON.parse(readFileSync(
+    resolve(process.cwd(), 'scripts', 'fixtures', 'context-ceiling-attended-2026-08-19-replay.json'),
+    'utf8',
+  ))
+  const decisions = replay.operations.map((operation) => ({
+    ...operation,
+    decision: sessionCeilingDecision({
+      sessionClass: CONTEXT_SESSION_CLASS.ATTENDED,
+      budgetDecision: { fits: operation.budgetFits },
+      operation: operation.operation,
+      mode: 'armed',
+    }),
+  }))
+
+  it('pins the measured window and the handover it kept working beyond', () => {
+    expect(replay.source).toMatchObject({
+      sessionId: '4e67c9a0-d702-4cf2-a0d6-db243bc1971a',
+      boundaryCommittedTokens: 194_613,
+      attendedReadingTokens: 265_517,
+    })
+  })
+
+  it('shows the growing calls the attended fence would have refused', () => {
+    expect(decisions.filter((entry) => entry.decision.refused).map((entry) => entry.id)).toEqual([
+      '95.write',
+      '96.audit',
+      '109.write',
+    ])
+  })
+
+  it('never refuses an answer, read, commit or push from that transcript', () => {
+    const protectedOperations = decisions.filter((entry) =>
+      entry.operation === CONTEXT_OPERATION.ANSWER ||
+      entry.operation === CONTEXT_OPERATION.READ ||
+      ['commit', 'push'].includes(entry.control),
+    )
+    expect(protectedOperations.map((entry) => entry.id)).toEqual([
+      '15.commit',
+      '15.push',
+      '73.answer',
+      '82.read',
+      '106.read',
+      '110.answer',
+    ])
+    expect(protectedOperations.every((entry) => entry.decision.allowed && !entry.decision.refused)).toBe(true)
   })
 })
