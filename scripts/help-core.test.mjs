@@ -27,4 +27,18 @@ describe('command index', () => {
     expect(usageLines('usage: tool.mjs run')).toEqual(['usage: tool.mjs run'])
     expect(usageLines('const x = 1')).toEqual([])
   })
+
+  it('removes only trailing JavaScript delimiters from harvested usage', () => {
+    expect(usageLines("const usage = 'usage: tool.mjs run | ' +")).toEqual(['usage: tool.mjs run |'])
+    expect(usageLines("throw new Error('usage: tool.mjs \"<title>\"|--text-stdin')")).toEqual([
+      'usage: tool.mjs "<title>"|--text-stdin',
+    ])
+    expect(usageLines("const usages = ['usage: tool.mjs --kind <' + KINDS.join('|') + '> \\\\',")).toEqual([
+      "usage: tool.mjs --kind <' + KINDS.join('|') + '> \\\\",
+    ])
+    expect(usageLines('console.error(`Usage: --start | --stop | --status`)')).toEqual([
+      'Usage: --start | --stop | --status',
+    ])
+    expect(usageLines('usage: tool.mjs "quoted argument"')).toEqual(['usage: tool.mjs "quoted argument"'])
+  })
 })

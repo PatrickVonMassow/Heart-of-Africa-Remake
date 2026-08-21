@@ -38,7 +38,15 @@ export function usageLines(source) {
   for (const line of String(source).split(/\r?\n/)) {
     const at = line.toLowerCase().indexOf('usage:')
     if (at < 0) continue
-    const usage = line.slice(at).trim().replace(/\\n/g, ' ').replace(/\s+/g, ' ')
+    const sourceLiteral = at > 0 && !/^\s*(?:\/\/|\/\*|\*)/.test(line)
+    let usage = line.slice(at).trim().replace(/\\n/g, ' ').replace(/\s+/g, ' ')
+    if (sourceLiteral) {
+      usage = usage
+        .replace(/\s*['"`]\s*\+\s*$/, '')
+        .replace(/\s*['"`]\s*[,)]\s*$/, '')
+        .replace(/\s*['"`]\s*$/, '')
+        .trim()
+    }
     if (usage && !out.includes(usage)) out.push(usage)
   }
   return out
