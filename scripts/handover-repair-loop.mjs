@@ -128,10 +128,13 @@ export function observeOwnerLoops(
   let claimContext = ''
   try {
     const { assessment, verdict } = readClaimVerdict(sid)
+    const claimKey = claimObservationKey(assessment)
     const advanced = advanceClaimSurvival({
       state: state.claim,
-      claimKey: claimObservationKey(assessment),
-      turnKey: readTurnKey(transcriptPath),
+      claimKey,
+      // Transcript parsing is the expensive part of this high-frequency hook;
+      // no assistant-turn identity is needed when no honoured claim stands.
+      turnKey: claimKey ? readTurnKey(transcriptPath) : '',
       verdict: verdict.verdict,
       ownsBatch,
       paused,

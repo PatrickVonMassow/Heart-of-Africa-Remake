@@ -100,6 +100,25 @@ describe('observeOwnerLoops', () => {
     expect(readHead).not.toHaveBeenCalled()
   })
 
+  it('reads the transcript only while an honoured claim stands', () => {
+    const readTurnKey = vi.fn(() => 'turn-a')
+    observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, transcriptPath: '/transcript' },
+      deps({
+        readTurnKey,
+        readClaimVerdict: () => ({ assessment: {}, verdict: { verdict: 'none' } }),
+      }),
+    )
+    expect(readTurnKey).not.toHaveBeenCalled()
+
+    observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, transcriptPath: '/transcript' },
+      deps({ readTurnKey }),
+    )
+    expect(readTurnKey).toHaveBeenCalledOnce()
+    expect(readTurnKey).toHaveBeenCalledWith('/transcript')
+  })
+
   it('surfaces a five-commit guard run once as later repairs extend it', () => {
     const guardCommit = (sha) => ({ sha, paths: ['scripts/example-guard-core.mjs'] })
     let state = {
