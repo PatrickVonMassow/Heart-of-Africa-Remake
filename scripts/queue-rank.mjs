@@ -2,7 +2,10 @@
 //
 //   node scripts/queue-rank.mjs --status                          # what is still unranked
 //   node scripts/queue-rank.mjs --ranked <N> --why "<one line>"   # last IS right, and why
+//   node scripts/queue-rank.mjs --ranked <N> --origin user --why …# the USER ranked it there
+//   node scripts/queue-rank.mjs --ahead <N> --why "<one line>"    # it stands BEFORE the release, and why
 //   node scripts/queue-rank.mjs --seed --why "<one line>"         # arm: what stands today is judged
+//   node scripts/queue-rank.mjs --seed-boundary --why "<one line>" # arm: freeze the front of the order
 //
 // WHY IT EXISTS. Append-and-defer puts a new point at the END of the work order,
 // and since the board's queue is rendered from that order (point 608) the end is
@@ -29,8 +32,12 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
-import { QUEUE_REBUILD_CMD, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
+import { QUEUE_REBUILD_CMD, RELEASE_TAG_POINT, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
+import { releaseBoundaryProblemFrom } from './queue-order-guard-core.mjs'
 import {
+  ORIGIN_MACHINE,
+  PLACE_AHEAD,
+  PLACE_LAST,
   RANK_CMD,
   RANK_RECORD_PATH,
   SEED_CMD,
@@ -40,6 +47,7 @@ import {
   pruneRankRecord,
   recordProvenanceFrom,
   recordRank,
+  seedBoundary,
   seedRecord,
   settleRecord,
 } from './queue-rank-core.mjs'
@@ -68,11 +76,16 @@ export function readRankRecord(path = RECORD) {
  * the order in the same write; one that leaves another question standing does
  * not, or the point still in question would be swallowed into the baseline.
  */
-function writeRankRecord(record, open, path = RECORD) {
+function writeRankRecord(record, open, tasksMd = '', path = RECORD) {
   // The ticks matter only where the open order is empty — see settleRecord — and
   // that is also the only case worth reading the whole archive for.
   const closed = open.length ? [] : closedPointsOf(readTasksAll())
-  const settled = settleRecord(open, record, { at: new Date().toISOString(), closed })
+  // The release boundary freezes the baseline exactly as an unranked append does
+  // (point 789), and it has to be applied HERE as well as in the guard: this
+  // command writes the record too, and a settle from either side would remember
+  // the breaching point as a survivor and end the question by forgetting it.
+  const blocked = releaseBoundaryProblemFrom(tasksMd, record).breaches.map((b) => b.point)
+  const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
   writeTextAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
   return next
@@ -172,6 +185,43 @@ function undoWrite(before, path = RECORD) {
   else writeTextAtomic(path, before)
 }
 
+/** The flags this command DISPATCHES on. Exactly one of them, exactly once. */
+export const ACTION_FLAGS = Object.freeze(['--status', '--ranked', '--ahead', '--seed', '--seed-boundary'])
+
+/** The flags that carry a value. Repeating one is the same silent loss: only the
+ *  first occurrence is ever read. */
+const VALUE_FLAGS = Object.freeze(['--why', '--origin'])
+
+/**
+ * WHICH ACTION THIS INVOCATION IS — or a refusal (cross-vendor review, fifth
+ * pass).
+ *
+ * The dispatcher used to test flags one at a time, so a command naming two of
+ * them did one and dropped the other WITHOUT SAYING SO: `--seed-boundary --ahead
+ * 60` recorded a front decision and armed nothing, and `--ahead 60 --ahead 61`
+ * answered for 60 while 61 stood unanswered. Both look like the command
+ * succeeded. Exactly one action, each flag once, decided before anything is
+ * written; no flag at all is the STATUS read, which is why '' is an answer
+ * rather than an error. `--status` counts as an action too (sixth pass): left
+ * out, `--status --ahead 60` chose the write and silently dropped the read the
+ * caller also asked for.
+ */
+export function chosenAction(argv = []) {
+  const list = Array.isArray(argv) ? argv : []
+  const times = (flag) => list.filter((a) => a === flag).length
+  for (const flag of [...ACTION_FLAGS, ...VALUE_FLAGS]) {
+    if (times(flag) > 1) throw new Error(`${flag} was given ${times(flag)} times — only the first would be read`)
+  }
+  const given = ACTION_FLAGS.filter((flag) => times(flag) === 1)
+  if (given.length > 1) {
+    throw new Error(
+      `${given.join(' and ')} are different decisions — give ONE of them, and run the command again for the ` +
+        'other. Taking one and dropping the rest is how a command reports success for work it never did.',
+    )
+  }
+  return given[0] ?? ''
+}
+
 function flagValue(argv, flag) {
   const at = argv.indexOf(flag)
   if (at < 0) return null
@@ -183,17 +233,85 @@ function flagValue(argv, flag) {
 if (isMainModule(import.meta.url)) {
   try {
     const argv = process.argv.slice(2)
-    const open = openPointsOf(readTasksOpen())
+    const tasksMd = readTasksOpen()
+    const open = openPointsOf(tasksMd)
     const record = readRankRecord()
     const why = flagValue(argv, '--why')
+    // Stated, never inferred: an omitted origin is the MACHINE's, so the user's
+    // exemption from the release boundary can only be claimed out loud.
+    const origin = flagValue(argv, '--origin') ?? ORIGIN_MACHINE
 
-    if (argv.includes('--ranked')) {
-      const point = Number(flagValue(argv, '--ranked'))
+    // TWO DECISIONS, TWO FLAGS (point 789). `--ranked` answers the APPEND gate —
+    // the end of the order is right — and `--ahead` answers the RELEASE rule —
+    // it stands in front of the release, and why it cannot wait. Neither reason
+    // answers the other question, so neither flag writes the other's record, and
+    // an invocation naming more than one action is refused before any write.
+    const action = chosenAction(argv)
+
+    if (action === '--ranked' || action === '--ahead') {
+      const ahead = action === '--ahead'
+      const point = Number(flagValue(argv, action))
       if (!open.includes(point)) throw new Error(`point ${point} is not open in the work order`)
-      writeRankRecord(recordRank(record, point, { why, at: new Date().toISOString() }), open)
-      console.log(`queue-rank: point ${point} keeps the place the work order gives it — "${why.trim()}"`)
+      const place = ahead ? PLACE_AHEAD : PLACE_LAST
+      writeRankRecord(recordRank(record, point, { why, origin, place, at: new Date().toISOString() }), open, tasksMd)
+      console.log(
+        ahead
+          ? `queue-rank: point ${point} stands BEFORE the release, filed by the ${origin} — "${why.trim()}"`
+          : `queue-rank: point ${point} keeps the place the work order gives it, filed by the ${origin} — ` +
+            `"${why.trim()}"`,
+      )
       console.log(`Recorded in ${RANK_RECORD_PATH}. Rebuild the board's queue: ${QUEUE_REBUILD_CMD}`)
-    } else if (argv.includes('--seed')) {
+    } else if (action === '--seed-boundary') {
+      // THE FRONT OF THE ORDER, FROZEN ONCE (point 789). Everything standing in
+      // front of the release point today counts as the arrangement that predates
+      // the rule; every point that reaches the front afterwards is judged on its
+      // own. Like `--seed` it is a stated decision rather than something a guard
+      // does for itself: an automatic freeze would grandfather the very breach it
+      // was looking at.
+      const before = existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : null
+      const next = writeRankRecord(
+        seedBoundary(record, open, {
+          releasePoint: RELEASE_TAG_POINT,
+          why,
+          at: new Date().toISOString(),
+          present: before !== null,
+          ...recordProvenance(),
+        }),
+        open,
+        tasksMd,
+      )
+      // A FAILED STAGING UNDOES THE WRITE (cross-vendor review, 21.08.2026).
+      // Reporting the failure while leaving the freeze on disk is the escape
+      // itself: the front — breaches included — would be exempt from the next
+      // turn on, out of a command that said it had done nothing.
+      const unstaged = stageRecord()
+      if (unstaged) {
+        undoWrite(before)
+        throw new Error(
+          `armed nothing: ${RANK_RECORD_PATH} could not be staged (${unstaged}), and a freeze git does not carry ` +
+            'is one a later removal cannot be told apart from a front that was never frozen. The checkout is ' +
+            'unchanged; fix git and run the command again.',
+        )
+      }
+      console.log(
+        `queue-rank: release front frozen with ${next.boundary.points.length} point(s) in front of ` +
+          `${RELEASE_TAG_POINT} — "${why.trim()}"`,
+      )
+      // AND THE WINDOW IS NAMED, exactly as `--seed` names its own (cross-vendor
+      // review, 21.08.2026). Staging makes the freeze visible to git, but while
+      // HEAD still holds a record WITHOUT a boundary, restoring that version
+      // leaves a tracked, present, unarmed record — and the arming would take
+      // today's front, breaches included, as legacy order. Only the commit ends
+      // that, so the command says so instead of leaving it to be discovered.
+      const headRecord = runGit(['cat-file', '-p', `HEAD:${RANK_RECORD_PATH}`])
+      if (headRecord.status !== 0 || !parseRankRecord(String(headRecord.stdout ?? '')).boundary) {
+        console.log(
+          `  COMMIT ${RANK_RECORD_PATH} NOW. Until the repository carries this freeze, restoring the version in ` +
+            'HEAD gives back a record that reads as never armed, and the next arming would grandfather whatever ' +
+            'stands in front of the release then.',
+        )
+      }
+    } else if (action === '--seed') {
       // THE ARMING BASELINE, and nothing more: the order as it stands today is
       // taken as judged, with one stated reason, so a newly armed (or freshly
       // cloned) checkout does not owe an answer for history nobody in the
@@ -210,6 +328,7 @@ if (isMainModule(import.meta.url)) {
           ...recordProvenance(),
         }),
         open,
+        tasksMd,
       )
       const unstaged = stageRecord()
       if (unstaged) {
@@ -250,6 +369,14 @@ if (isMainModule(import.meta.url)) {
         )
         console.log('  Either MOVE the point’s block inside TASKS.md to where it belongs (verbatim, with its number),')
         console.log(`  or record that last is right: ${RANK_CMD}`)
+        process.exitCode = 1
+      }
+      // The FRONT of the order, asked in the same breath as its end (point 789):
+      // the append gate says nothing about a point that ranked itself ahead of
+      // the release, and the status is where somebody looks before the guard does.
+      const boundary = releaseBoundaryProblemFrom(tasksMd, record)
+      if (boundary.reason) {
+        console.log(`queue-rank: ${boundary.reason}`)
         process.exitCode = 1
       }
     }
