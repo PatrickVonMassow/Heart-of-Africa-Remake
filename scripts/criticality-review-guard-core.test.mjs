@@ -5,6 +5,8 @@
 // blocks every tick or none) and the LEDGER READER (was the second model's
 // review real, in this history, and were its findings answered).
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   ancestorIndex,
   CLEARING_VERDICT,
@@ -16,6 +18,7 @@ import {
   newlyTicked,
   openNumbers,
   parsePointBlocks,
+  REVIEW_UNAVAILABLE_KIND,
   strictAncestorProbe,
   tickedNumbers,
 } from './criticality-review-guard-core.mjs'
@@ -238,7 +241,12 @@ describe('evaluateCriticalityReview', () => {
     // review — one merge pass row cleared a HIGH point whose other passes
     // were never recorded.
     const passRow = (index, verdict, at) =>
-      record({ verdict, at, pass: { index, total: 2, files: [`f${index}.mjs`] } })
+      record({
+        verdict,
+        at,
+        pointFiles: ['f1.mjs', 'f2.mjs'],
+        pass: { index, total: 2, files: [`f${index}.mjs`] },
+      })
     const lone = evaluateCriticalityReview({
       baseline: 'b',
       head: 'h',
@@ -264,6 +272,121 @@ describe('evaluateCriticalityReview', () => {
       records: [passRow(1, 'merge', 1_787_000_001_000), passRow(2, 'do-not-merge', 1_787_000_002_000)],
     })
     expect(refused.block).toBe(true)
+  })
+
+  it('lets a 1/1 composition clear only when review ancestry covers the point file set', () => {
+    const base = record({
+      sha: 'a'.repeat(40),
+      verdict: 'merge-with-fixes',
+      at: 1_787_000_001_000,
+      pointFiles: ['scripts/original.mjs'],
+    })
+    const final = record({
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      at: 1_787_000_002_000,
+      descendsFrom: [base.sha],
+      pointFiles: ['scripts/original.mjs', 'scripts/fix.test.mjs'],
+      pass: { index: 1, total: 1, files: ['scripts/fix.test.mjs'] },
+    })
+
+    const covered = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [base, final] })
+    expect(covered).toMatchObject({ block: false, clear: true })
+
+    const missing = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [{ ...final, descendsFrom: [] }],
+    })
+    expect(missing.block).toBe(true)
+    expect(missing.findings[0]).toMatchObject({
+      kind: 'uncovered-files',
+      uncovered: ['scripts/original.mjs'],
+    })
+    expect(formatCriticalityReviewVerdict(missing)).toContain('scripts/original.mjs')
+  })
+
+  it('keeps a 1/1 refusal standing even when its files cover the point', () => {
+    const refused = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [
+        record({
+          verdict: 'merge-with-fixes',
+          pointFiles: ['scripts/guard.mjs'],
+          pass: { index: 1, total: 1, files: ['scripts/guard.mjs'] },
+        }),
+      ],
+    })
+    expect(refused.block).toBe(true)
+    expect(refused.findings[0].kind).toBe('unresolved')
+  })
+
+  it('clears a mixed-vendor point through verified review coverage plus an explicit unavailable receipt', () => {
+    const reviewed = record({
+      sha: 'b'.repeat(40),
+      pointFiles: ['scripts/claude.mjs', 'scripts/both-vendors.mjs'],
+      pass: { index: 1, total: 1, files: ['scripts/claude.mjs'] },
+    })
+    const receipt = {
+      kind: REVIEW_UNAVAILABLE_KIND,
+      point: 500,
+      sha: 'c'.repeat(40),
+      files: ['scripts/both-vendors.mjs'],
+      reason: 'both configured vendors authored this contribution',
+      at: 1_787_000_002_000,
+      reachable: true,
+      descendsFrom: [reviewed.sha],
+      unavailableVerified: true,
+      unavailableFiles: ['scripts/both-vendors.mjs'],
+      pointFiles: ['scripts/claude.mjs', 'scripts/both-vendors.mjs'],
+    }
+    const v = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [reviewed, receipt] })
+    expect(v).toMatchObject({ block: false, clear: true })
+  })
+
+  it('does not trust an unavailable receipt itself or let one answer a refusal', () => {
+    const forged = {
+      kind: REVIEW_UNAVAILABLE_KIND,
+      point: 500,
+      sha: 'b'.repeat(40),
+      files: ['scripts/guard.mjs'],
+      reason: 'claimed unavailable by hand',
+      at: 1_787_000_002_000,
+      reachable: true,
+      unavailableVerified: false,
+      unavailableFiles: ['scripts/guard.mjs'],
+      pointFiles: ['scripts/guard.mjs'],
+    }
+    const unverified = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [forged] })
+    expect(unverified.block).toBe(true)
+    expect(unverified.findings[0].kind).toBe('no-review')
+
+    const refused = record({
+      sha: 'a'.repeat(40),
+      verdict: 'do-not-merge',
+      at: 1_787_000_001_000,
+      pointFiles: ['scripts/guard.mjs'],
+    })
+    const verified = {
+      ...forged,
+      unavailableVerified: true,
+      descendsFrom: [refused.sha],
+    }
+    const unanswered = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [refused, verified] })
+    expect(unanswered.block).toBe(true)
+    expect(unanswered.findings[0].kind).toBe('unanswered')
+  })
+
+  it('names unknown point coverage instead of clearing on pass indices alone', () => {
+    const unknown = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [record({ pass: { index: 1, total: 1, files: ['scripts/guard.mjs'] } })],
+    })
+    expect(unknown.block).toBe(true)
+    expect(unknown.findings[0]).toMatchObject({ kind: 'uncovered-files', coverageUnknown: true })
+    expect(formatCriticalityReviewVerdict(unknown)).toContain('coverage is unknown')
   })
 
   it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
@@ -407,6 +530,37 @@ describe('evaluateCriticalityReview', () => {
       })
       expect(v.block, `case ${i}`).toBe(true)
     }
+  })
+
+  it('replays point 769: covered 1/1 passes answer efa589e and the filed receipt disposes e1d242a', () => {
+    const records = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, 'fixtures/criticality-point-769.json'), 'utf8'),
+    )
+    expect(records).toHaveLength(10)
+    expect(records.at(-1)).toMatchObject({
+      kind: FINDINGS_FILED_KIND,
+      point: 769,
+      sha: 'e1d242ace15c8704ea6099c37a7cf33c67439607',
+      reviewAt: 1_787_332_607_630,
+      findingPoints: [820],
+    })
+
+    const beforeReceipt = evaluateCriticalityReview({
+      baseline: 'baseline',
+      ticks: [tick(769)],
+      openPoints: [820],
+      records: records.slice(0, -1),
+    })
+    expect(beforeReceipt.block).toBe(true)
+    expect(beforeReceipt.findings[0].records[0].sha).toBe('e1d242ace15c8704ea6099c37a7cf33c67439607')
+
+    const afterReceipt = evaluateCriticalityReview({
+      baseline: 'baseline',
+      ticks: [tick(769)],
+      openPoints: [820],
+      records,
+    })
+    expect(afterReceipt).toMatchObject({ block: false, clear: true })
   })
 
   it('cuts a mixed-authorship range by author so neither model reads its own work', () => {

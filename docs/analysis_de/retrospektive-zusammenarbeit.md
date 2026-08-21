@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1319,7 +1320,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 19:30 · Quellen-Fingerprint: `7ec4b382b2aa…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 21:11 · Quellen-Fingerprint: `21bea3a47ead…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1356,7 +1357,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 11 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 13 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1413,10 +1414,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 5 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 7ec4b382b2aacda286d9c92fcf7b9500c9510d38b3ca5d4bf45a9446404ae5b4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T17:30:40.067Z -->
+<!-- RETRO-FINGERPRINT: 21bea3a47ead4d4bce726e3fd34f113131d3671689e6c92b25c82c42d98d86c8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T19:11:04.810Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2588,3 +2589,77 @@ sonst hat sie für den häufigsten Mischfall gar keine Antwort, und die stille A
 »niemand«. Und ein Tor, das erst beim Abhaken prüft, prüft zu spät: Was die Landung verlangt,
 gehört an den Anfang des Punktes, nicht an sein Ende. Verwandt mit §3.119 (die Marke mahnt beim
 Aufhören statt beim Anfangen).
+
+### 3.154 Eine Frischemessung als Antwort auf eine Lebendigkeitsfrage
+
+Am 21.08.2026 um 17:40:28Z startete der Nachfolger, 34 Sekunden später meldete der Launcher zwei
+parallele Sitzungen, und zwei Sekunden danach pausierte der gesamte Stapel. Es lief genau eine
+Sitzung. Die zweite war der Vorgänger, der 37 Sekunden zuvor regulär übergeben hatte und dessen
+Prozess nachweislich tot war; der Batch-Doctor bestätigte Minuten später `parallelNow=1` und ein
+konsistentes Repository.
+
+Der Klassifikator stellt die richtige Frage — »fährt hier ein zweiter?« — und beantwortet sie mit
+einer anderen Größe: der Frische des letzten Werkzeugaufrufs. Das ist keine Ungenauigkeit am Rand,
+sondern ein Treffer per Konstruktion: Eine Übergabe besteht gerade darin, dass der Vorgänger seine
+letzte Handlung tut und geht, während der Nachfolger anfängt. Der Detektor feuert also am
+zuverlässigsten in dem Moment, in dem er am sichersten falsch liegt. Dass er es nicht nur einmal
+tat, steht im Protokoll: dieselbe Eskalation am 09., 13., 17., 18. und 19.08.2026, jedes Mal mit
+zehn bis zwanzig Minuten Stillstand als Preis. Die Ausnahmeliste des Klassifikators kannte die
+angemeldete Zweitsitzung bereits — der abgetretene Vorgänger gehört in dieselbe Klasse und fehlte.
+
+Zwei Dinge machen den Fall teuer statt bloß ärgerlich. Erstens eskaliert der Mechanismus mit der
+Wiederholung: Die fünfte unbeantwortete Meldung pausiert den Batch, und die Meldungen blieben
+unbeantwortet, weil niemand da war — die Eskalation ist an einen Menschen adressiert und feuert im
+unbeaufsichtigten Lauf. Zweitens hat der Mechanismus einen gebauten Ausweg, der auch stimmte: Der
+Doctor ist der vorgesehene Weg, den Alarm zu beantworten, und er tat es in einem einzigen Aufruf.
+Der Stillstand entstand nicht, weil die Prüfung fehlte, sondern weil niemand sie aufrief.
+
+**Lehre:** Wer eine Zustandsfrage stellt, muss den Zustand messen und nicht seine Spur. Eine
+Aktivitätsspur sagt, dass etwas geschehen IST, nie dass etwas noch geschieht — und die
+Verwechslung ist genau dort am wahrscheinlichsten, wo ein Übergang stattfindet. Prüffrage bei
+jedem Detektor: *Welchen Zustand behaupte ich, und wäre meine Messung auch dann noch wahr, wenn
+der Zustand gerade endet?* Und für jede Eskalation, die einen Menschen adressiert: *Was passiert,
+wenn niemand liest?* Verwandt mit §3.149 (zwei Leser, ein Datensatz, zwei Antworten).
+
+
+### 3.155 Die Übergabe trug den Zustand, aber nicht das Leben
+
+Am 21.08.2026 gegen 20:05 nahm eine frische Sitzung den Stapel auf. Die Vorgängerin war tot, und
+ihre Übergabe hatte funktioniert — jedenfalls die Hälfte, die aus Daten besteht: Die In-Flight-
+Deklaration zum laufenden Autorenlauf war sauber transferiert, der Nachfolger konnte sie
+übernehmen, und sie benannte Zweig, Arbeitsbaum, Protokoll und Prozess. Nur lief der Prozess
+nicht mehr. Er war ein Kind der gestorbenen Sitzung und mit ihr gefallen.
+
+Die Deklaration behauptete das Gegenteil, und sie hatte sogar einen Beleg dafür: Der als Nachweis
+geführte Prozess antwortete auf `kill -0`. Er war der kurzlebige Shell-Mantel um den Autorenlauf,
+nicht der Autorenlauf selbst — ein Prozess, der nur langsamer starb als sein Kind. Damit ist das
+dieselbe Wurzel wie in §3.154, eine Ebene tiefer: Dort beantwortete eine Frischemessung die Frage
+nach dem Leben einer Sitzung, hier beantwortet ein Mantelprozess die Frage nach dem Leben der
+delegierten ARBEIT. Ein Lebendnachweis ist nur so viel wert wie die Genauigkeit dessen, worauf er
+zeigt.
+
+Die zweite Hälfte des Schadens ist die lehrreichere, weil sie zeigt, wie zwei je für sich richtige
+Regeln zusammen eine Sackgasse bauen. Im Arbeitsbaum lagen zehn geänderte und zwei neue Dateien,
+unversioniert — die angefangene Arbeit des Autors im Moment seines Todes. Das Runbook sagt, nicht
+gepushte Arbeit werde zuerst gedraint; erzwungen wird das nirgends, denn ein Drain geschieht nur
+auf dem geordneten Weg, und genau den nimmt ein unerwarteter Tod nicht. Zugleich weigert sich der
+Autorenstart zu Recht, auf einem schmutzigen Baum anzufangen: Sonst ließe sich neu Geschriebenes
+nicht von Vorgefundenem unterscheiden. Ergebnis: Die geretteten Reste blockierten genau die
+Fortsetzung, zu der sie gehörten. Auflösen ließ sich das nur von Hand, mit einem Rettungs-Commit,
+der die Arbeit ungeprüft und CI-übersprungen sichert und dem Autor zugeschrieben bleibt.
+
+Am selben Abend fiel ein zweiter Mechanismus in dieselbe Kerbe wie §3.140: Das Kritikalitätstor
+nennt in seinem eigenen Verweigerungstext einen zweiten Ausweg — jeden Befund als offenen Punkt
+anlegen und eine Quittung anhängen —, und für diese Quittung existiert kein Befehl. Sie musste als
+JSON-Zeile von Hand in das Register geschrieben werden, samt der Bedingungen, die nur im Quelltext
+stehen. Dass eine falsch getroffene Quittung stillschweigend ignoriert wird, macht den Handweg
+zusätzlich gefährlich.
+
+**Lehre:** Eine Übergabe ist erst vollständig, wenn sie neben dem Zustand auch das Schicksal der
+laufenden Arbeit regelt — überlebt sie, wird sie nachweisbar am richtigen Prozess gemessen; stirbt
+sie, wird ihr Rest gesichert statt liegengelassen. Prüffragen: *Zeigt mein Lebendnachweis auf den
+Prozess, der die Arbeit tut, oder auf seine Hülle?* Und: *Was passiert mit dem, was halbfertig im
+Baum liegt, wenn niemand mehr den geordneten Weg geht?* Wo zwei Regeln einander sperren — hier
+»nicht ungeprüft committen« gegen »nicht auf schmutzigem Baum starten« —, braucht die Kreuzung
+einen eigenen benannten Weg, sonst wird sie jedes Mal von Hand aufgelöst. Verwandt mit §3.154
+(Frische statt Leben) und §3.140 (die nur behauptete Ausnahme).

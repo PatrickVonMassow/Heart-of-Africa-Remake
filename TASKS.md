@@ -255,49 +255,6 @@ put it is the mistake this line exists to stop.
   told it.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 820. The criticality gate cannot be cleared by the review shape the tooling produces, so
-  every HIGH point blocks at the exit of the session that lands it (measured 21.08.2026 while
-  landing point 769). `scripts/criticality-review-guard-core.mjs` `passShape()` requires
-  `pass.total >= 2`. A record carrying `pass 1/1` therefore matches NEITHER clean bucket — not
-  `valid.filter(r.pass === undefined)` and not the compositions — so `clean` stays empty, the
-  `!clean.length` branch refuses with kind `unresolved`, and it names a review whose findings
-  were long since answered. At 769 it named `efa589e`, although Sol's `merge` on `520d4e0`
-  descends strictly from it, is later in time and carries the right `descendsFrom`. THE COUNTER-
-  PART: `scripts/review-sol.mjs` emits exactly `pass 1/1` whenever an explicit `--since` narrows
-  a fitting range — its own usage says so — and the MECHANISM gate accepts those same records.
-  The gate rejects the normal case by construction, and its refusal text demands a re-review that
-  has already been recorded: the same fault point 769 removed from the timestamp guard, standing
-  at this gate instead.
-  THE OBVIOUS FIX IS WRONG AND WAS ALREADY REFUSED. Lowering the floor to 1 was implemented,
-  tested and reviewed on 21.08.2026 (`e1d242ac`, reverted by `864a90e7`); GPT-5.6 Sol recorded
-  DO-NOT-MERGE, receipt 8975fca1f90d035d, and the reason is decisive: the completeness loop
-  checks pass INDICES only and never compares `pass.files` against the files the HIGH point
-  actually changed, so a scoped `1/1` merge row would clear a point containing files no reviewer
-  read. That is the third-landing-round hole reopened. Do not re-attempt the one-line form.
-  SECOND HALF OF THE SAME DEFECT: a point BOTH vendors authored can obtain no unscoped clean
-  record at all. Asked for one whole-point round over 769, `review-sol` split the range by
-  authorship into 13 passes across two vendors and declared one of them UNREVIEWABLE, because
-  `.claude/mechanism-reviews.jsonl` has no discernible author vendor. For such a point the gate's
-  condition cannot be met by honest means, which is why 769 stands ticked and merged with its
-  gate still refusing.
-  FINAL STATE: a composition clears when its recorded pass FILES cover every file the point
-  changed, whatever the pass count — coverage proved against the point's own diff rather than
-  inferred from an index sequence — and a point whose file set has no single eligible reviewer
-  has a named, recorded way to be cleared that is not "record a review nobody could run". The
-  refusal text says which files are still uncovered, so it can never again demand work already
-  done.
-  VERIFIABLE: pure cases over `evaluateCriticalityReview` — a complete composition whose pass
-  files cover the point's file set clears; the same composition missing one changed file does
-  not; a `1/1` refusal keeps its individual standing; an incomplete multi-pass split still
-  refuses; and the 769 ledger is replayed as a fixture so the case pins the real event.
-  QUEUE RANK: ahead of 779 and everything behind it. Reason: it fires at the exit of every
-  session that lands a HIGH-criticality point, it demands work that is already done, and until it
-  is fixed each such landing ends on a refusal that no honest action can clear — it degrades the
-  batch while it waits, which is the standard that put 769 first.
-  Criticality: high — it is a guard, and it blocks the turn exit of every session landing a HIGH
-  point.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
   (measured 20.08.2026, all three in a single session). They are filed together because they are
   one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
@@ -11135,4 +11092,132 @@ to land than a mechanism that needs a review.
   this urgency waits for the release.
   Criticality: medium — nothing is corrupted, but the board is the user's only view and it was
   both unreadable and wrong.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 823. The parallel-session detector counts the predecessor that has just handed over, and a
+  batch pause is the price (measured 21.08.2026, 19:41). `classifyParallel`
+  (`scripts/batch-singleton.mjs:577-590`) calls a session parallel when its LAST TOOL CALL is
+  fresher than `PARALLEL_FRESH_MS`. Whether that session's PROCESS is still alive is asked
+  nowhere. That condition is met at EVERY handover by construction: the predecessor commits its
+  boundary and exits, so its final tool call is seconds old exactly while the successor starts
+  beside it.
+  MEASURED, IN ONE SEQUENCE: the successor was launched at 17:40:28Z and the launcher logged
+  `PARALLEL SESSIONS DETECTED: owner=08663d81 plus c88d67fb` at 17:41:02Z — 34 seconds later.
+  c88d67fb was pid 3168101, which `ps` showed absent, and it had handed the batch over regularly
+  37 seconds earlier (`HANDOVER accepted: c88d67fb … at point 769`). Exactly one batch session was
+  running, and the batch doctor confirmed it minutes later with `parallelNow=1` and a `consistent`
+  verdict.
+  WHAT IT COSTS: that detection was the fifth unanswered alert, so it PAUSED THE WHOLE BATCH
+  (`.claude/batch-paused`, restart clock 20 minutes). The same escalation stands in
+  `.claude/autostart.log` on 09.08., 13.08., 17.08., 18.08. and 19.08.2026 — every time 10 to 20
+  minutes of standstill bought by a phantom. The detector does not merely report imprecisely; it
+  regularly stops the batch over a session that no longer exists.
+  FINAL STATE: the classifier no longer treats freshness as sufficient. A session counts as
+  parallel only while something still shows it DRIVING — a live process for its sid, or activity
+  after its own committed boundary. A sid whose boundary marker is committed, or whose process is
+  gone, is out, the same way the claimant window is already excluded through `exclude`. The
+  exclusion is narrow: it removes the retired predecessor, not a second live driver, which is the
+  whole reason the detector exists.
+  VERIFIABLE: pure cases over the classifier — a retired predecessor with a fresh last call and a
+  dead process is NOT flagged; a second session with a live process IS flagged; a predecessor that
+  keeps making calls AFTER its committed boundary IS flagged, because that is the covert second
+  driver the detector was written for; the existing claimant exclusion keeps working unchanged.
+  Plus one case over the escalation path proving that a detection the classifier drops raises no
+  alert and starts no pause clock.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: it costs measured minutes rather
+  than correctness, and under the user's ruling of 20.08.2026 a machine-filed point of this
+  urgency waits for the release.
+  Criticality: medium — nothing is corrupted, but a false alarm halts the whole batch and the halt
+  is invisible until someone reads the pause file.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 824. A killed authoring run strands uncommitted work that nothing drains, and the handover
+  reports it as still running (measured 21.08.2026, 20:0x). The dispatching session died and took
+  its delegated GPT-5.6 Sol run with it as a child process. The handover was half-complete by
+  construction: the in-flight DECLARATION transferred correctly and the successor adopted it, but
+  the run itself was dead, and the worktree held ten modified plus two new files that no commit
+  covered. `docs/batch-owner-runbook.md` says "unpushed work drains first", and nothing enforces
+  it — a drain only happens on the orderly path, which is exactly the path an unexpected death
+  does not take.
+  TWO FAULTS COMPOUND, AND THE SECOND HIDES THE FIRST: the adopted declaration named a pid that
+  `kill -0` reported ALIVE, so the successor first judged the run to be still building. That pid
+  was the short-lived shell wrapper, not the authoring process. Liveness was therefore asserted
+  from a process that was merely dying more slowly than its child.
+  WHAT IT COSTS: `scripts/author-sol.mjs` refuses to start on a dirty tree — correctly, so new
+  work cannot be confused with pre-existing edits — so the stranded remains BLOCK the very
+  continuation they belong to. The only way forward was a hand-written rescue commit (`16f71296`,
+  `[skip ci]`, attributed to Sol) to get the tree clean again.
+  FINAL STATE: a transferred declaration proves liveness against the AUTHORING process, not a
+  wrapper, and reports a dead run as dead rather than as in flight. A worktree left dirty by a
+  dead run has a named, recorded drain the successor can run — one command that preserves the work
+  as an attributed, CI-skipped rescue commit and hands back a clean tree — instead of each
+  successor reconstructing that by hand.
+  VERIFIABLE: pure cases over the liveness judgement — a declaration whose authoring pid is gone
+  reads NOT live even while a wrapper pid survives; a genuinely running author still reads live.
+  Plus a case over the drain: a dirty worktree from a dead run yields a clean tree and a rescue
+  commit carrying `[skip ci]` and the author model's trailer, and a dirty worktree with a LIVE run
+  is refused instead of committed out from under it.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: it cost one session a manual
+  repair, not correctness, and under the user's ruling of 20.08.2026 a machine-filed point of this
+  urgency waits for the release.
+  Criticality: medium — no data is corrupted, but delegated work is stranded and the board reports
+  a run that no longer exists.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 825. The criticality gate demands a receipt that no command writes (measured 21.08.2026,
+  20:1x). The gate offers two ways out of a recorded refusal: fix the finding and record the
+  re-review, OR file every finding as an open work-order point and append a
+  `review-findings-filed` receipt naming it. Only the first has a tool.
+  `scripts/mechanism-review.mjs --record` writes verdicts and does not know the row kind,
+  `scripts/criticality-review-guard.mjs` accepts `--status` and nothing else, and
+  `FINDINGS_FILED_KIND` appears nowhere outside `scripts/criticality-review-guard-core.mjs` and
+  its own test.
+  MEASURED: clearing the refusal on point 769 required appending a hand-written JSON line to
+  `.claude/mechanism-reviews.jsonl`, including the conditions that are stated only in the source —
+  `at` must be strictly greater than `reviewAt`, every entry of `findingPoints` must be an OPEN
+  point, and `model` and `sha` must match the reviewed row exactly. It worked (the gate moved from
+  `e1d242ac` on to the next record), which is precisely why it is dangerous: a receipt written
+  slightly wrong is silently ignored, and the gate then names a refusal whose disposition the
+  author believes is recorded.
+  THIS IS THE CLASS OF RETROSPECTIVE 3.140: an exception a mechanism grants in its own refusal
+  text, but builds no path for, forces whoever takes it to reconstruct that mechanism's
+  bookkeeping by hand.
+  FINAL STATE: one command records a findings-filed disposition — it takes the reviewed sha, the
+  point, and the open points that carry the findings, derives `model` and `reviewAt` from the
+  ledger row itself rather than asking for them, refuses a closed or non-existent finding point,
+  and refuses to write a row the gate would not accept. The gate's refusal text names that command
+  the way it already names `mechanism-review.mjs`.
+  VERIFIABLE: pure cases — the command produces a row the gate accepts for the reviewed refusal; a
+  finding point that is closed or unknown is refused rather than written; a sha with no matching
+  review row is refused; and the row it writes clears exactly the refusal it names and no other.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: it is medium, and the
+  user's ruling of 20.08.2026 lets only a HIGH point stand before the release. When 820 is taken
+  up, take this with it — both rewrite the same criticality core and must not run in parallel.
+  Criticality: medium — it corrupts nothing, but the documented escape is walkable only by hand
+  and a malformed receipt fails silently.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 826. The criticality gate measures coverage against the reviewed sha, never against the
+  head it is clearing (measured 21.08.2026 while reading point 820). `attachPointFileSets` in
+  `scripts/criticality-review-guard.mjs` derives a point's file set as `commission..reviewSha`,
+  and `evaluateCriticalityReview` compares the recorded pass files against exactly that set;
+  `head` reaches the core for the message text alone. A file added by a commit made AFTER the
+  last clean review therefore never enters `expected`: it is neither covered nor reported as
+  uncovered, and the gate reads green on a file no reviewer opened. An unscoped clean review
+  (`r.pass === undefined`) skips the coverage test altogether and clears the same way.
+  BOTH BEHAVIOURS PREDATE POINT 820 and were deliberately left standing there — 820 closed the
+  index-counting hole and this is the anchoring one behind it, the same class the third landing
+  round opened.
+  FINAL STATE: coverage is measured against the point head that is being ticked rather than
+  against whichever sha happened to be read last, and files added after the last review appear
+  under "still uncovered". The review's OWN ledger commit is the ordinary case of such a late
+  addition and must not turn the gate into a loop that can never be satisfied — name how that
+  row is accounted for.
+  VERIFIABLE: pure cases over `evaluateCriticalityReview` — a composition covering everything up
+  to the reviewed sha but not a later commit's file refuses and names that file; the review's own
+  ledger row does not by itself keep the gate refusing; an unscoped clean review is held to the
+  same head coverage; and the point 769 replay keeps its recorded outcome.
+  QUEUE RANK: behind point 174, at the end of the order, and taken together with 825. Reason: it
+  is a latent gate hole rather than a blocking one — every landing today still passes — so under
+  the user's ruling of 20.08.2026 it waits for the release, and it rewrites the same criticality
+  core as 825, which must not run in parallel with it.
+  Criticality: high — it is a guard, and a green reading it has not earned is the one failure a
+  review gate may not have.
   Bundle: Session- & Repo-Hygiene.

@@ -479,12 +479,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "820": {
-      "at": "2026-08-21T17:18:26.518Z",
-      "why": "Blockiert den Zugausgang jeder Sitzung, die einen HIGH-Punkt landet, und verlangt dabei Arbeit, die schon getan ist — die Release-Punkte selbst muessen gelandet werden, es kann also nicht hinter dem Release warten",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "821": {
       "at": "2026-08-21T17:27:18.047Z",
       "why": "Guard: eine Sitzung ohne Batch-Lock kann nicht festhalten, was der Nutzer ihr gerade gesagt hat — die Anweisung reist sonst ueber den Traeger in die naechste Sitzung",
@@ -494,6 +488,30 @@
     "822": {
       "at": "2026-08-21T17:30:39.905Z",
       "why": "Hinter 174 einsortiert: Es fehlinformiert die Tafel, blockiert aber weder Batch noch Release",
+      "origin": "machine",
+      "place": "last"
+    },
+    "823": {
+      "at": "2026-08-21T17:57:36.026Z",
+      "why": "Hinter Punkt 174 ans Ende: Der Fehlalarm kostet gemessene Minuten, nicht Korrektheit, und faellt damit unter die Nutzerregel vom 20.08.2026 fuer maschinell eingereihte Punkte dieser Dringlichkeit.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "824": {
+      "at": "2026-08-21T18:34:18.366Z",
+      "why": "Bleibt hinten: es kostete eine Sitzung eine Handreparatur, nicht die Korrektheit, und faellt unter die Nutzerregel vom 20.08.2026, dass ein maschinell abgelegter Punkt dieser Dringlichkeit auf das Release wartet.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "825": {
+      "at": "2026-08-21T18:39:12.975Z",
+      "why": "Hinter 174: Kritikalitaet mittel, und die Nutzerregel vom 20.08.2026 laesst nur einen HIGH-Punkt vor dem Release stehen. Wird mit 820 zusammen angefasst, weil beide denselben Kern schreiben.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "826": {
+      "at": "2026-08-21T18:57:56.949Z",
+      "why": "Bleibt hinten und wird mit 825 zusammen angefasst: das Loch ist latent, keine heutige Landung bricht daran, und die Nutzerregel vom 20.08.2026 laesst nur einen HIGH-Punkt vor dem Release stehen.",
       "origin": "machine",
       "place": "last"
     }
@@ -552,7 +570,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T17:30:39.911Z",
+    "at": "2026-08-21T18:57:56.956Z",
     "points": [
       174,
       184,
@@ -793,9 +811,12 @@
       817,
       818,
       819,
-      820,
       821,
-      822
+      822,
+      823,
+      824,
+      825,
+      826
     ]
   }
 }
