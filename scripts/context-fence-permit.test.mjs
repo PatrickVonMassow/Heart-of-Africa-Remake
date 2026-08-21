@@ -39,6 +39,7 @@ describe('the context emergency permit', () => {
       '--reason', 'one deliberate recovery call',
       '--max-tokens', '15000',
     ], {
+      windowsHide: true,
       cwd: root,
       encoding: 'utf8',
       env: { ...process.env, HOA_REPO_ROOT: root },
@@ -114,6 +115,7 @@ describe('the context emergency permit', () => {
       caller: { toolName: 'Bash', command: 'npm test' }, toolUseId: 'tool-live',
     }, { ...live, now: () => 2_001 })
     const hook = spawnSync(process.execPath, [resolve(process.cwd(), 'scripts', 'lock-heartbeat-hook.mjs')], {
+      windowsHide: true,
       cwd: root,
       encoding: 'utf8',
       env: { ...process.env, HOA_REPO_ROOT: root },
