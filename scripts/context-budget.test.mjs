@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { admitContextCall, readPendingLedger } from './context-budget.mjs'
+import { admitContextCall, inspectContextCall, readPendingLedger } from './context-budget.mjs'
 import { issueContextPermit } from './context-fence-permit.mjs'
 
 const roots = []
@@ -123,5 +123,25 @@ describe('admitContextCall runtime transaction', () => {
     expect(exits.map((entry) => entry.id)).toEqual(['135.1', '182.1', '201.1', '216.1', '229.1', '231.1'])
     expect(exits.every((entry) => entry.state === 'exempt' && entry.block === false)).toBe(true)
     expect(decisions.filter((entry) => entry.block && entry.exit)).toEqual([])
+  })
+})
+
+describe('inspectContextCall status projection', () => {
+  it('quotes the same pending debit its own arithmetic used', () => {
+    const paths = fixture()
+    admitContextCall(call({ mode: 'observe' }), paths)
+    const seen = inspectContextCall(call(), { ledgerPath: paths.ledgerPath })
+    expect(seen.ledger.pendingDebit).toBe(10)
+    expect(seen.decision.pendingDebit).toBe(10)
+    expect(seen.decision.handoverReserve).toBe(10)
+    expect(seen.decision.remainingBeforeCall).toBe(140 - 100 - 10 - 10)
+  })
+
+  it('books nothing — a status call must not spend the budget it reports', () => {
+    const paths = fixture()
+    admitContextCall(call({ mode: 'observe' }), paths)
+    inspectContextCall(call(), { ledgerPath: paths.ledgerPath })
+    inspectContextCall(call(), { ledgerPath: paths.ledgerPath })
+    expect(readPendingLedger(paths.ledgerPath, 's').pendingDebit).toBe(10)
   })
 })

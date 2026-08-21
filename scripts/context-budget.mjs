@@ -29,6 +29,18 @@ export function readPendingLedger(path = CONTEXT_FENCE_LEDGER_PATH, sessionId = 
   }
 }
 
+/**
+ * The decision plus the two ledger terms its refusal text quotes. Both callers
+ * go through here: a status projection that omitted them printed `pending debit
+ * 0` beside its own JSON reporting the real balance.
+ */
+function decide(input, ledger) {
+  const decision = remainingBudgetDecision({ ...input, pendingDebit: ledger.pendingDebit })
+  decision.pendingDebit = ledger.pendingDebit
+  decision.handoverReserve = input?.handoverReserve ?? CONTEXT_HANDOVER_RESERVE_TOKENS
+  return decision
+}
+
 /** Compute, optionally consume a permit, and persist the exact debit atomically. */
 export function admitContextCall(input, {
   ledgerPath = CONTEXT_FENCE_LEDGER_PATH,
@@ -42,12 +54,7 @@ export function admitContextCall(input, {
       reading: input?.reading,
     })
     let ledger = reconciled.ledger
-    const decision = remainingBudgetDecision({
-      ...input,
-      pendingDebit: ledger.pendingDebit,
-    })
-    decision.pendingDebit = ledger.pendingDebit
-    decision.handoverReserve = input?.handoverReserve ?? CONTEXT_HANDOVER_RESERVE_TOKENS
+    const decision = decide(input, ledger)
 
     if (decision.unknownTypeCost) ledger = countUnknownTypeCost(ledger)
 
@@ -93,7 +100,7 @@ export function inspectContextCall(input, { ledgerPath = CONTEXT_FENCE_LEDGER_PA
     reading: input?.reading,
   })
   return {
-    decision: remainingBudgetDecision({ ...input, pendingDebit: reconciled.ledger.pendingDebit }),
+    decision: decide(input, reconciled.ledger),
     ledger: reconciled.ledger,
     reconciliation: { reconciled: reconciled.reconciled, actualGrowth: reconciled.actualGrowth },
   }
