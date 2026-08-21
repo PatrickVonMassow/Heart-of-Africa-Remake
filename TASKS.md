@@ -11053,3 +11053,66 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the integrity of the evidence every standstill measurement rests on,
   and a reused sequence is silent: nothing downstream can tell it happened.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 818. The standstill report blanks or mislabels the very time it exists to measure (found
+  21.08.2026 by the Claude reading of the GPT-5.6 Sol half of point 809's branch, commissioned by
+  point 816; every figure below was reproduced on this machine).
+  WHAT WAS MEASURED, in the order it hurts.
+  1. EVERY LAUNCHER SPAWN WRITES A BACKWARDS TIMESTAMP, and the classifier answers by blanking the
+  rest of the window. `scripts/batch-autostart.mjs` takes `now` once at module load and uses it as
+  the default `at` for every journal call, including the successor-start emitted seconds later —
+  after the singleton has already written its owner-claim with live time. The classifier treats any
+  such inversion as a total contradiction spanning inversion→window end and stops. Measured: the
+  live journal holds exactly two inversions, both owner-claim → successor-start from the launcher;
+  `--since 2h` then classifies 100 % of the time after 12:10:13Z as unknown, and the 6 h report
+  94.47 %. Any batch that spawns a successor — that is, every batch worth measuring — blanks its own
+  timeline from that moment.
+  2. FROM A LINKED WORKTREE THE REPORT READS THE WRONG `.claude` AND SAYS NOTHING. The inputs module
+  joins `<repo>/.claude/...` by hand instead of resolving the git common directory the way
+  `activityJournalPath()` does. Run from a worktree it declares a journal that does not exist, falls
+  back to "predates journal", and reports 100 % unknown WITHOUT warning that the file was missing;
+  the autostart log, the boundary log and marker and the pause marker are lost the same way. The
+  runbook's "from any checkout" is therefore only half true — the lock half holds, the checkout half
+  does not.
+  3. A STALE `committed` BOUNDARY MARKER TURNS UNBOUNDED STANDSTILL INTO `handover-transition`. The
+  handover interval runs from the marker to the window end with no successor bound and no freshness
+  check, although `markerFresh` already exists and is not called. Measured: a 24 h old marker plus an
+  explicit no-worker interval over the same 24 h yields handover 24.00 h and no-worker zero. A batch
+  dead overnight behind a leftover marker reports as "in transition" — the one mislabel this
+  mechanism exists to prevent.
+  4. FOREGROUND WORK IS SESSION-LINKED BUT NOT BATCH-LINKED. Every transcript in the project
+  directory touched since the window start is read, and each paired tool call becomes foreground work
+  with no check against the owner lock or the journal's claiming sessions. So an owner that exits at
+  10:00 and a second, unrelated session working 10:30–12:00 buries a rank-11 no-worker standstill
+  under rank-6 work. The live run declared ten transcripts as inputs, including the reviewing
+  session's own.
+  5. THE JOURNAL'S OWN FOREGROUND EVIDENCE IS INERT. The heartbeat hook writes `startedAt` from a
+  timestamp its payloads never carry: 244 of 244 live foreground records have `startedAt: null`, so
+  the bounded end equals the start and every one of those intervals is dropped. Only the unfiltered
+  transcripts of (4) actually feed the class.
+  6. A TERMINAL RECEIPT CREDITS THE WHOLE SPAN RETROACTIVELY. The verification interval ends at the
+  explicit end or else at the lease end, so a LARGE run that hangs at 09:00 and is killed at 14:00
+  has those five standstill hours classified as verification. The promise is command PLUS progress
+  lease PLUS terminal receipt; only the receipt is enforced and the command is never checked for
+  presence at all.
+  7. A CI WAIT ALREADY PENDING WHEN THE GUARD STARTS PRODUCES NO INTERVAL. The guard emits its
+  wait-start only on a state CHANGE, and the pairing needs a start record, so observation-only waits
+  vanish. The live journal already shows two starts against four finishes and reports CI wait as
+  zero.
+  FINAL STATE: each of the seven is fixed or struck with a written reason, and the report no longer
+  reports as measured what it did not measure. In particular a timestamp inversion is repaired at
+  its source rather than absorbed by the classifier, and where evidence really is contradictory the
+  report says which records collided instead of silently swallowing the remaining window. Reading
+  from a linked worktree resolves the same journal the writer used, or refuses with a named missing
+  input. A handover interval is bounded by a successor or by marker freshness. Foreground work is
+  attributed to the batch's own sessions.
+  VERIFIABLE: a test reproduces each of the seven from a synthetic journal and asserts the corrected
+  class; the linked-worktree path is covered end to end, which no test covers today; and the
+  100 %-coverage invariant of point 809 still holds afterwards on every fixture.
+  DEPENDENCY: point 817 fixes the append path of the same journal and is worked first, since a
+  reused sequence would invalidate any fixture built here.
+  FILES: scripts/batch-standstill-core.mjs, scripts/batch-standstill-inputs.mjs,
+  scripts/batch-autostart.mjs, scripts/lock-heartbeat-hook.mjs, scripts/ci-status-guard.mjs.
+  Criticality: high — the report is the instrument the batch's own scheduling decisions are now made
+  with, and today it answers "unknown" for almost everything while calling a dead night a handover.
+  Bundle: Session- & Repo-Hygiene.
