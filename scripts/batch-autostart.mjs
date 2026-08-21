@@ -49,6 +49,7 @@ import {
   revokeWriterFence,
   readFence,
   PENDING_STALE_MS,
+  LAUNCHER_TICK_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { takeoverDecision } from './batch-claim-core.mjs'
@@ -1101,6 +1102,7 @@ if (verdict === 'skip-alive') {
             cause: 'live-writer-veto',
             evidence: {
               blockedFrom: state.writerVetoSince,
+              blockedUntil: now + LAUNCHER_TICK_MS,
               lastFencedOperationAt: writer.batchWriterAt,
               writerAgeMs: writer.writerAgeMs,
               currentFence: writer.currentFence,
