@@ -59,6 +59,8 @@ import {
   CLAUDE_CLI_ENV,
   ETA_OVERDUE_ALERT_MIN,
   staleEtaLogLine,
+  launcherStartDecision,
+  launcherStartRecord,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 
@@ -66,6 +68,61 @@ const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test
 const FABLE_ON = fable('on')
 const FABLE_OFF = fable('off')
 import { isOwnSpawn } from './batch-singleton.mjs'
+
+describe('launcher start liveness — process evidence, not lock presence', () => {
+  const NOW = 1_800_000_000_000
+  const writer = { pid: 4242, startedAt: NOW - 60_000, batchWriterAt: NOW - 1_000 }
+
+  it('does not start beside a live batch-writer process when there is no lock', () => {
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { 'window-session': writer },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+    })
+    expect(decision).toMatchObject({ start: false })
+    expect(decision.reason).toContain('live batch-writer process 4242')
+    expect(decision.reason).toContain('no owner lock')
+    expect(decision.evidence.lock).toMatchObject({ present: false, assessmentReason: 'no-lock' })
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ sessionId: 'window-session', sameProcess: true })
+  })
+
+  it('starts for a stale lock when neither its process nor any batch writer is live', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'stale-owner', pid: 3131 },
+      assessment: { alive: false, reason: 'pid-dead' },
+      batchWriters: { 'stale-owner': { pid: 3131, startedAt: NOW - 60_000, batchWriterAt: NOW - 2_000 } },
+      probePid: () => ({ exists: false, startedAt: null }),
+    })
+    expect(decision).toMatchObject({ start: true })
+    expect(decision.reason).toContain('no live batch-writer process measured')
+    expect(decision.reason).toContain('pid-dead')
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ measuredExists: false, sameProcess: false })
+  })
+
+  it('does not mistake a recycled pid for the recorded batch writer', () => {
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { old: writer },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt + 10_000 }),
+    })
+    expect(decision.start).toBe(true)
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ measuredExists: true, sameProcess: false })
+  })
+
+  it('puts the measured lock and process evidence into every start record', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'stale-owner', pid: 3131 },
+      assessment: { alive: false, reason: 'pid-dead' },
+      batchWriters: {},
+      probePid: () => ({ exists: false, startedAt: null }),
+    })
+    const record = launcherStartRecord({ decision, at: NOW, head: 'abc123', pid: 5150 })
+    expect(record).toMatchObject({ at: NOW, head: 'abc123', pid: 5150, startReason: decision.reason })
+    expect(record.measured).toEqual(decision.evidence)
+    expect(record.measured.lock).toMatchObject({ present: true, pid: 3131, assessedAlive: false, assessmentReason: 'pid-dead' })
+  })
+})
 
 describe('buildSpawnOptions — the ten-minute execution is switched off', () => {
   it('THE FIX: the child carries the background-wait ceiling as 0 (wait indefinitely)', () => {
