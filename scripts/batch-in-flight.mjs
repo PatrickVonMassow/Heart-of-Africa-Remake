@@ -72,8 +72,43 @@ import {
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
 import { boardFilePath } from './dashboard-state.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 export { IN_FLIGHT_PATH }
+
+function delegatedPoint(declaration) {
+  for (const item of declaration?.evidence ?? []) {
+    const value = item?.ref ?? item?.path ?? ''
+    const match = String(value).match(/(?:^|[/\\-])(?:feat[/\\-])?(\d+)(?:[-/\\]|$)/)
+    if (match) return Number(match[1])
+  }
+  return null
+}
+
+function emitDelegated(event, declaration, { at = Date.now(), result = null } = {}) {
+  const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
+  if (!evidence.some((item) => item?.kind === 'branch' || item?.kind === 'worktree')) return false
+  const lock = readOwnerLock()
+  return emitActivity({
+    event,
+    at,
+    session: declaration.sessionId ?? lock?.sessionId ?? null,
+    point: delegatedPoint(declaration),
+    pid: declaration.pid ?? lock?.pid ?? null,
+    pidStartedAt: declaration.pidStartedAt ?? lock?.pidStartedAt ?? null,
+    generation: lock?.fence ?? null,
+    cause: 'declared-agent-work',
+    evidence: {
+      id: `delegated:${declaration.sessionId ?? 'unknown'}:${declaration.at ?? 'unknown'}`,
+      waitingOn: declaration.waitingOn ?? null,
+      items: evidence,
+      startedAt: declaration.at ?? null,
+      leaseUntil: (declaration.at ?? at) + maxAgeMs(),
+      result,
+    },
+  })
+}
 
 /** The calibratable maximum age, HOA_IN_FLIGHT_MAX_MIN in minutes. Reading it
  *  here (not in the core) keeps the decision function pure and testable. */
@@ -1062,18 +1097,17 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const assessment = adoptionAssessment({ items, checkpointStates })
   if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
   const lock = readOwnerLock(lockPath)
-  writeDeclaration(
-    {
-      ...declaration,
-      sessionId: sid,
-      pid: typeof lock?.pid === 'number' ? lock.pid : null,
-      pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
-      at: now,
-      evidence: evidence.filter((_, i) => items[i]?.ok === true),
-      adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
-    },
-    path,
-  )
+  const adopted = {
+    ...declaration,
+    sessionId: sid,
+    pid: typeof lock?.pid === 'number' ? lock.pid : null,
+    pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
+    at: now,
+    evidence: evidence.filter((_, i) => items[i]?.ok === true),
+    adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
+  }
+  writeDeclaration(adopted, path)
+  emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, adopted, { at: now })
   return {
     adopted: true,
     reason: 'adopted',
@@ -1217,7 +1251,8 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
-    const refusal = transferredMutationRefusal({ declaration: readDeclaration(), marker: readBoundaryMarker() })
+    const prior = readDeclaration()
+    const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
     if (refusal) fail(refusal)
     clearDeclaration()
     // …and the lease extension the declaration bought (point 556). The lock must
@@ -1226,6 +1261,7 @@ if (isMain) {
     // to condition it on is just a stale field. The lease ITSELF is left where it
     // stands — pulling it back would shorten a window the owner is entitled to.
     clearDeclaredWait(sid)
+    emitDelegated(ACTIVITY_EVENTS.DELEGATED_FINISH, prior, { result: 'cleared' })
     console.log('in-flight declaration cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
@@ -1373,6 +1409,7 @@ if (isMain) {
     const etaRefusal = waitEtaRefusal({ html: boardHtml, nowMinutes: berlinMinutes() })
     if (etaRefusal) fail(etaRefusal)
     writeDeclaration(declaration)
+    emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, declaration, { at: now })
     // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
     // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a
     // longer lease when work is declared"). This is the answer to the incident of

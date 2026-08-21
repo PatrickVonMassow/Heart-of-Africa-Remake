@@ -95,6 +95,13 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562, 612, 504, 515, 517, 528, 616, 617, 658, 663, 716, 719, 760 |
 | **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 519, 659 (480 IS point 351 and 488 IS point 352, pulled forward — they close together); and the PLAY-SESSION findings of 09.08.2026: 587, 577, 586, 580, 582, 588, 576, 585, 584, 579, and of 10.08.2026: 605 |
 
+Point **809** now supplies the Session- & Repo-Hygiene bundle's shared measurement
+layer: one append-only journal and one lock-free report classify new wall time
+before 811, 812, and 813 change the handover tick, writer veto, and CI wait. Its
+first 14-day run leaves the pre-journal past unknown instead of attributing work
+from commit gaps; the reproduced 21.08 incident measures 52 m 34 s of writer veto
+and 6 m 02 s of scheduler transition without double-counting the CI trigger.
+
 **Urlaubsfestigkeit** was cut on 30.07.2026 on the user's demand that the batch be
 worked for two weeks without them, surviving an outage of Claude, of their internet
 or of the machine at any moment — "auch mitten in einer kritischen Aktion". Two

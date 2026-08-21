@@ -16,6 +16,7 @@ import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
+import { parseActivityJournal } from './batch-activity-journal-core.mjs'
 import {
   assessOwner,
   classifyParallel,
@@ -979,6 +980,9 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath)).not.toBeNull()
     expect(release('s1', lockPath)).toBe(true)
     expect(readOwnerLock(lockPath)).toBeNull()
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records.map((r) => r.event)).toEqual([
+      'owner-claim', 'process-exit',
+    ])
   })
 
   it('heartbeat refreshes only the owner and never claims', () => {
@@ -1019,6 +1023,9 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(lock.handoverPoint).toBe(388)
     expect(lock.claimedAt).toBe(before) // the heartbeat is NOT bumped
     expect(lock.sessionId).toBe('s1') // and it is not a release
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records.map((r) => r.event)).toEqual([
+      'owner-claim', 'handover',
+    ])
   })
 
   // --- FINDING 1 (28.07.2026): the lock write that kept failing ---------------
@@ -1590,6 +1597,14 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
     })
     expect(readSessionProcesses({ path })['writer-session']).toMatchObject({ at: NOW, batchWriterAt: NOW + 1_000 })
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session'].generation).toBe(17)
   })
 
   it('never records an unidentifiable process or a synthetic probe as a writer', () => {
@@ -1745,9 +1760,14 @@ describe('the lock write: retried, atomic, propagating, and swept up after (poin
       bootTime: 0,
       probePidFn: (pid) => ({ exists: pid !== 7777, startedAt: null }),
     })
-    // `batch-fence.json` is written by the acquisition itself (point 434) and is
-    // NEVER swept: it is the one record that outlives the lock.
-    expect(readdirSync(dir).sort()).toEqual(['batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242'])
+    // The fence and point-809 activity journal are both written by acquisition;
+    // neither is orphan tmp litter and neither may be swept.
+    expect(readdirSync(dir).sort()).toEqual([
+      'batch-activity.jsonl', 'batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242',
+    ])
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records).toEqual([
+      expect.objectContaining({ event: 'owner-claim', session: 's1', cause: 'acquired' }),
+    ])
   })
 })
 

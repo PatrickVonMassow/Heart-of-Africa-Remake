@@ -49,9 +49,27 @@ import { fileURLToPath } from 'node:url'
 import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
 import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
+import { emitActivity } from '../batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
+const PROGRESS_LEASE_MS = 15 * 60_000
+const PROGRESS_EMIT_MS = 60_000
+const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
+
+function emitRunActivity(event, { at = Date.now(), recordPath, command, startedAt, leaseUntil = null, result = null } = {}) {
+  emitActivity({
+    event,
+    at,
+    session: process.env.CLAUDE_SESSION_ID ?? process.env.HOA_SESSION_ID ?? null,
+    pid: process.pid,
+    pidStartedAt: RUNNER_STARTED_AT,
+    generation: null,
+    cause: 'named-verification-run',
+    evidence: { id: recordPath, recordPath, command, startedAt, leaseUntil, result },
+  })
+}
 
 /** The termination signals both layers FORWARD to their child rather than
  *  dying around it — SIGHUP/SIGQUIT beside the classic two (Sol round 5), so
@@ -159,6 +177,20 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       framesWritten,
       receipt,
     })
+    emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_FINISH, {
+      at: receipt.finishedAt,
+      recordPath,
+      command: baseRecord.command,
+      startedAt: baseRecord.startedAt,
+      result: {
+        exitCode,
+        status: exitCode === 0 ? 'green' : 'red',
+        head: receipt.head,
+        branch: receipt.branch,
+        framesExpected: receipt.framesExpected,
+        framesWritten: receipt.framesWritten,
+      },
+    })
     return formatReceipt(receipt)
   } catch (err) {
     return [`── verify receipt ── unavailable (${err?.message ?? err}); the digest above and the log still stand.`]
@@ -211,6 +243,13 @@ function runVerify() {
     receipt: null,
   }
   writeRecord(recordPath, baseRecord)
+  emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_START, {
+    at: started,
+    recordPath,
+    command,
+    startedAt: started,
+    leaseUntil: started + PROGRESS_LEASE_MS,
+  })
 
   const child = spawn(process.execPath, [join(HERE, 'run-all.mjs'), ...forward], {
     windowsHide: true,
@@ -225,11 +264,23 @@ function runVerify() {
   const select = createSelector()
   let rawChars = 0
   let pending = ''
+  let lastProgressEmittedAt = started
 
   function consume(chunk) {
     const text = String(chunk)
     rawChars += text.length
     log.write(text)
+    const progressAt = Date.now()
+    if (text.length > 0 && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
+      lastProgressEmittedAt = progressAt
+      emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_PROGRESS, {
+        at: progressAt,
+        recordPath,
+        command,
+        startedAt: started,
+        leaseUntil: progressAt + PROGRESS_LEASE_MS,
+      })
+    }
     pending += text
     const parts = pending.split(/\r?\n/)
     pending = parts.pop() ?? ''

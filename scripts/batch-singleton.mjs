@@ -66,6 +66,23 @@ import {
 } from './batch-lease-core.mjs'
 import { IDLE_WINDOW_MS, ownershipVerdict } from './batch-ownership-core.mjs'
 import { markerFresh } from './batch-boundary-core.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
+
+function emitLockActivity(event, lock, { lockPath = LOCK_PATH, at = Date.now(), cause, evidence = {} } = {}) {
+  if (!lock || typeof lock !== 'object') return false
+  return emitActivity({
+    event,
+    at,
+    session: lock.sessionId ?? null,
+    point: lock.handoverPoint ?? null,
+    pid: lock.pid ?? null,
+    pidStartedAt: lock.pidStartedAt ?? null,
+    generation: lock.fence ?? null,
+    cause,
+    evidence,
+  }, lockPath === LOCK_PATH ? {} : { path: join(dirname(lockPath), 'batch-activity.jsonl') })
+}
 
 /**
  * Does a SEALED boundary marker protect the handover for THIS session right now
@@ -967,6 +984,17 @@ export function acquire(sessionId, opts = {}) {
     } catch {
       /* see above — an unrecordable fence never fails an acquisition */
     }
+    const acquired = readOwnerLock(lockPath)
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, acquired, {
+      lockPath,
+      at: now,
+      cause: takenFrom ? 'takeover' : 'acquired',
+      evidence: {
+        leaseUntil: acquired?.leaseUntil ?? null,
+        kind: acquired?.kind ?? null,
+        takenFrom,
+      },
+    })
     return true
   }
 
@@ -1393,12 +1421,17 @@ export function noteBatchWriter(sessionId, opts = {}) {
     if (!(typeof processIdentity?.pid === 'number' && processIdentity.pid > 0)) return false
     const processes = readJson(path) ?? {}
     const prior = processes[sessionId] && typeof processes[sessionId] === 'object' ? processes[sessionId] : {}
+    const owner = opts.lock ?? readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    const generation = owner?.sessionId === sessionId && typeof owner.fence === 'number'
+      ? owner.fence
+      : (typeof prior.generation === 'number' ? prior.generation : null)
     processes[sessionId] = {
       ...prior,
       pid: processIdentity.pid,
       startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
       at: typeof prior.at === 'number' ? prior.at : now,
       batchWriterAt: now,
+      ...(generation === null ? {} : { generation }),
     }
     for (const [sid, entry] of Object.entries(processes)) {
       const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)
@@ -1594,6 +1627,11 @@ export function release(sessionId, lockPath = LOCK_PATH) {
     } catch {
       /* already gone */
     }
+    emitLockActivity(ACTIVITY_EVENTS.PROCESS_EXIT, lock, {
+      lockPath,
+      cause: 'owner-release',
+      evidence: { explicit: true },
+    })
     return true
   }
   return false
@@ -1634,6 +1672,14 @@ export function markHandover(sessionId, opts = {}) {
     { ...lock, handedOver: true, handedOverAt: now, handoverPoint: opts.point ?? null },
     opts,
   )
+  if (res.ok) {
+    emitLockActivity(ACTIVITY_EVENTS.HANDOVER, { ...lock, handoverPoint: opts.point ?? null }, {
+      lockPath,
+      at: now,
+      cause: opts.point == null ? 'context-boundary' : 'point-boundary',
+      evidence: { point: opts.point ?? null },
+    })
+  }
   return {
     handed: res.ok,
     reason: res.ok ? 'ok' : 'write-failed',
@@ -1878,6 +1924,12 @@ export function convertPendingSpawn(sessionId, opts = {}) {
       fence: fence ?? recheck.fence ?? null,
       pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
       pidStartedAt: anc ? anc.startedAt : null,
+    })
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, readOwnerLock(lockPath), {
+      lockPath,
+      at: now,
+      cause: 'successor-converted-pending-spawn',
+      evidence: { leaseUntil: now + (opts.leaseMs ?? LEASE_MS), previousSession: recheck.sessionId },
     })
     return true
   } finally {

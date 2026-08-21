@@ -72,7 +72,7 @@ import { isOwnSpawn } from './batch-singleton.mjs'
 
 describe('launcher start liveness — process evidence, not lock presence', () => {
   const NOW = 1_800_000_000_000
-  const writer = { pid: 4242, startedAt: NOW - 60_000, batchWriterAt: NOW - 1_000 }
+  const writer = { pid: 4242, startedAt: NOW - 60_000, batchWriterAt: NOW - 1_000, generation: 17 }
 
   it('does not start beside a live batch-writer process when there is no lock', () => {
     const decision = launcherStartDecision({
@@ -87,7 +87,7 @@ describe('launcher start liveness — process evidence, not lock presence', () =
     expect(decision.reason).toContain('no owner lock')
     expect(decision.evidence.lock).toMatchObject({ present: false, assessmentReason: 'no-lock' })
     expect(decision.evidence.batchWriters[0]).toMatchObject({ sessionId: 'window-session', sameProcess: true })
-    expect(decision.veto).toMatchObject({ sessionId: 'window-session', pid: 4242, writerAgeMs: 1_000 })
+    expect(decision.veto).toMatchObject({ sessionId: 'window-session', generation: 17, pid: 4242, writerAgeMs: 1_000 })
   })
 
   it('stops treating a living process as a writer after two hours without a main write', () => {
