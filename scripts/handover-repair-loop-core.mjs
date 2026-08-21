@@ -1,10 +1,13 @@
 // Pure decisions for the two feedback loops measured on 20.08.2026.
 //
-// A claim used to be acted on only by the Stop hook. The measured owner never
-// produced a Stop event: every model response ended in `tool_use`, so seven
-// clean response boundaries passed while the read-only preflight correctly said
-// `claim: "release"`. `advanceClaimSurvival` counts those distinct assistant
-// responses without confusing parallel tool calls from one response for several.
+// A claim used to be acted on only by the Stop hook. On 20.08, at least seven
+// response boundaries passed while the read-only preflight correctly said
+// `claim: "release"`, but the hand-back did not run. The leading hypothesis is
+// that the owner kept ending responses in `tool_use`; its transcript was not
+// identified, however, and a stale board card stopping the Stop chain at
+// dashboard-guard before batch-progress-guard is an unexamined alternative.
+// Counting on PostToolUse fixes either path. `advanceClaimSurvival` counts
+// distinct assistant responses without confusing parallel calls for several.
 //
 // The same run repaired clear-claim-guard repeatedly. In first-parent history,
 // four consecutive commits touching one guard family is the largest other run;

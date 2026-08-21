@@ -56,12 +56,16 @@
 //     hand-written one and cannot go blind on it. It lives here for duty (5)'s
 //     reason — .claude/settings.json is a protected path an unattended session
 //     cannot edit — and with no verify run record on disk it costs one readdir.
-// (9) THE HAND-BACK AND REPAIR-LOOP BOUNDS (point 772): Stop is not a model-turn
-//     hook. The 20.08 owner ended every response in `tool_use`, so its clean
-//     claim release, implemented only in batch-progress-guard's Stop path, never
-//     ran. Count unique assistant tool-response turns here, release at the bound,
-//     and surface a same-guard commit run once when it leaves the measured
-//     ordinary range. Pure decisions live in handover-repair-loop-core.mjs.
+// (9) THE HAND-BACK AND REPAIR-LOOP BOUNDS (point 772): on 20.08, at least seven
+//     response boundaries passed while a clean claim release in
+//     batch-progress-guard's Stop path did not run. The leading hypothesis is
+//     that the owner kept ending responses in `tool_use`, but its transcript was
+//     not identified. A stale board card stopping the Stop chain at
+//     dashboard-guard before batch-progress-guard remains an unexamined
+//     alternative. PostToolUse handles either cause: count unique assistant
+//     tool-response turns here, release at the bound, and surface a same-guard
+//     commit run once outside the measured ordinary range. Pure decisions live
+//     in handover-repair-loop-core.mjs.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
