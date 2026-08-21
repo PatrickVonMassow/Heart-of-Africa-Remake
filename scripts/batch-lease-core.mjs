@@ -55,6 +55,8 @@
 import {
   expandSegments,
   isMutatingSegment,
+  directSegmentIntent,
+  headAndArgs,
   gitSubcommand,
   segmentInvokesScript,
   segmentMentionsFile,
@@ -704,9 +706,43 @@ export function fenceDecision({ fenceState, sessionId, toolName, command, filePa
 /**
  * Is this call about to write the checkout whose current branch is `main`?
  * PURE. The PreToolUse matcher already narrows the possible tools; this second
- * classification keeps reads open and treats an unreadably deep shell wrapper
- * conservatively as a write.
+ * classification keeps reads and repository gates open and treats an unreadably
+ * deep shell wrapper conservatively as a write.
  */
+const NON_TRACKED_GATE_SCRIPTS = /^(?:build|lint|test(?::.*)?|typecheck(?::.*)?)$/
+const NON_TRACKED_GATE_BINS = new Set(['vitest', 'tsc', 'vite', 'oxlint'])
+
+/**
+ * Known verification/build entry points write ignored outputs (dist, coverage,
+ * Vitest state), not tracked repository state. The shared command classifier
+ * correctly calls them state-changing for broader guards; this main-only fence
+ * has the narrower job of preventing a second tracked-state writer.
+ */
+function nonTrackedGateSegment(segment) {
+  const { head, args } = headAndArgs(segment)
+  const pos = args.map((arg) => arg.text).filter((arg) => arg && !arg.startsWith('-') && arg !== '--')
+  if (head === 'npm' || head === 'pnpm' || head === 'yarn') {
+    const sub = (pos[0] ?? '').toLowerCase()
+    const script = sub === 'run' ? pos[1] : sub === 'test' ? 'test' : head === 'yarn' ? sub : ''
+    return NON_TRACKED_GATE_SCRIPTS.test(script ?? '')
+  }
+  if (head === 'npx') return NON_TRACKED_GATE_BINS.has((pos[0] ?? '').toLowerCase())
+  return false
+}
+
+/** A gate redirected into a real file is once again an arbitrary checkout write. */
+function writesOutputFile(segment) {
+  const nullSinks = new Set(['/dev/null', '$null', 'nul', 'nul:', '/dev/zero'])
+  return (segment?.redirects ?? []).some(
+    (redirect) =>
+      redirect.op.includes('>') &&
+      !redirect.op.endsWith('&') &&
+      redirect.target &&
+      !nullSinks.has(redirect.target.toLowerCase()) &&
+      (redirect.fd === '' || redirect.fd === '1'),
+  )
+}
+
 export function mainWritingAction({ toolName, command } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Agent'].includes(tool)) {
@@ -715,7 +751,13 @@ export function mainWritingAction({ toolName, command } = {}) {
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
-  const segment = segments.find((candidate) => isMutatingSegment(candidate))
+  // `expandSegments` already yields every carried command separately. Judge the
+  // direct program so `bash -c "npm run build"` does not get denied at the shell
+  // carrier before its build leaf can receive the narrow exception below.
+  const segment = segments.find((candidate) => {
+    if (directSegmentIntent(candidate) !== 'write') return false
+    return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
+  })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
   if (tooDeep) return { writes: true, what: 'a command wrapped deeper than the main-write fence can read' }
   return { writes: false, what: '' }

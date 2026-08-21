@@ -465,6 +465,39 @@ describe('the main-write ownership fence', () => {
     })
     expect(mainWritingAction({ toolName: 'Edit' }).writes).toBe(true)
   })
+
+  it('allows build and test gates that only write ignored outputs', () => {
+    for (const command of [
+      'npm run build',
+      'npm run lint',
+      'npm run test:unit',
+      'npm test',
+      'npx vitest run scripts/batch-lease-core.test.mjs',
+      'timeout 30 npm run test:unit 2>&1',
+      'bash -lc "npm run build"',
+    ]) {
+      expect(mainWritingAction({ toolName: 'Bash', command }), command).toEqual({ writes: false, what: '' })
+      expect(decide({ ownsBatchLock: false, command }), command).toEqual({
+        block: false,
+        registerWriter: false,
+        reason: '',
+      })
+    }
+  })
+
+  it('still refuses tracked-state operations and gate output redirected to a checkout file', () => {
+    for (const command of [
+      'git commit -m x',
+      'git push',
+      'node scripts/land-point.mjs 795 --model "Opus 5"',
+      'npm run build > build-report.txt',
+      'bash -lc "git commit -m x"',
+    ]) {
+      expect(mainWritingAction({ toolName: 'Bash', command }).writes, command).toBe(true)
+      expect(decide({ ownsBatchLock: false, command }).block, command).toBe(true)
+    }
+    expect(mainWritingAction({ toolName: 'Bash', command: 'npm run build > /dev/null' }).writes).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------
