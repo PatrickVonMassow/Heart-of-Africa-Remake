@@ -557,7 +557,8 @@ export function formatAuthoringReport({
     lines.push(
       `  UNCOMMITTED SIZE: ${changedPaths} changed path(s), ${insertions} insertion(s), ${deletions} deletion(s)` +
         `${qualifications.length ? `; ${qualifications.join(', ')}` : ''}.`,
-      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'`,
+      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'` +
+        ` && git push -u origin ${branch}`,
     )
   }
   if (parsed?.ok) {

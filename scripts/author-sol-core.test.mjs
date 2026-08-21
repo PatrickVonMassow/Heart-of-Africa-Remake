@@ -470,8 +470,10 @@ describe('formatAuthoringReport', () => {
     const text = formatAuthoringReport({ point: 792, branch: 'feat/792-fable-state', judged, parsed: answered })
     expect(text).toMatch(/left UNCOMMITTED WORK/)
     expect(text).toMatch(/2 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
-    expect(text).toContain(`git add -A && git commit`)
-    expect(text).toContain(SOL_TRAILER)
+    expect(text).toContain(
+      `git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'` +
+        ` && git push -u origin feat/792-fable-state`,
+    )
     expect(text).not.toMatch(/authored NOTHING/)
   })
 
