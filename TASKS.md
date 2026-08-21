@@ -172,65 +172,6 @@ put it is the mistake this line exists to stop.
   told it.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
-  (measured 20.08.2026, all three in a single session). They are filed together because they are
-  one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
-  until it does, every asking pays for it again in tokens that then ride along in every later
-  answer of the same turn.
-  1. »WANN HAT DER NUTZER X GESAGT« HAT KEIN WERKZEUG. Answering "why is this card still on the
-     board" needed the timeline of one user answer across five session transcripts under
-     `/home/node/.claude/projects/-workspace-hoa/*.jsonl`. None of the 418 scripts reads those
-     transcripts, so the search ran as hand-written node one-liners and pulled roughly 25,000
-     tokens of raw prose into the session context — for FOUR timestamps. The same turn hand-wrote
-     the same JSONL walker twice.
-     WANTED: `scripts/user-said.mjs --grep "<term>" [--since <iso>] [--sessions N]`, printing ONE
-     line per human message (timestamp, 8-char session id, first 120 characters) and `--full` for
-     a single hit. Same source, same answer, about twenty lines instead of twenty-five thousand
-     tokens.
-  2. `batch-claim.mjs` HAS NO `--wait`. Taking the batch over is three steps: claim, wait for the
-     owner's clean release, claim again. Step two has no support — the script knows only
-     `--session`, `--status`, `--withdraw`, `--why`, `--git-path`, `--unmerged`. So the waiting
-     session writes its own poll loop against a JSON shape it has to GUESS: the first attempt here
-     keyed on a `lock` field that does not exist, reported FREE while the owner held a fresh
-     heartbeat, and cost a full extra turn (~10,000 tokens) plus a wrong statement to the user.
-     WANTED: `--wait [--timeout <min>]`, blocking until the lock is free or the claim is spent and
-     exiting 0/1, plus `--take` as the explicit second half. Nobody parses that JSON by hand again.
-  3. 418 SCRIPTS HAVE NO INDEX. To learn that removing a board card is `board.mjs vdzk-remove`, a
-     turn ran `ls scripts | grep -iE 'board|question|decision'`, took seventy lines of file names
-     into context, and then read `board.mjs --help` on top.
-     WANTED: either `node scripts/help.mjs <topic>`, resolving a topic to the owning script and its
-     usage line, or a generated `docs/command-index.md` kept honest by a unit test — one line per
-     script, name and one-sentence purpose. The cheapest correct version greps the scripts' own
-     usage strings, so nothing is maintained twice.
-  FINAL STATE: all three exist as commands, and none of them requires a caller to parse another
-  script's JSON or to list a directory to find a name.
-  VERIFIABLE: Vitest over the pure halves — the transcript reader returns one line per human
-  message and honours `--since`/`--sessions` against a fixture; `--wait` returns as soon as a
-  fixture lock frees and exits non-zero on timeout; the index (or `help.mjs`) resolves a known
-  topic to its script and goes red when a script gains or loses its usage line. Plus the measured
-  25,000-token search reproduced as a twenty-line answer.
-  Criticality: medium — no product defect, but it is the token cost the whole 738–759 programme is
-  about, in the one shape that programme does not cover: a question with no command behind it.
-  BUILT AND GREEN ON ITS BRANCH, WAITING ONLY FOR A LANDING (delegated author 21.08.2026,
-  reported after the owning session had sealed its boundary, so it could not reach this file).
-  Branch `feat/779-three-missing-commands`, head cb8aeee7, pushed and clean; all three items
-  delivered — the transcript reader repaired (`--sessions`, main-checkout fallback, corpus
-  footer, reliable non-zero exit), `batch-claim --wait/--take` added, and `help.mjs` plus a
-  generated `docs/command-index.md` with 257 entries. Gates on the final head: unit GREEN
-  (360 files, 12,372 passed, 5 skipped), build GREEN, lint GREEN, no browser suite needed. Two
-  cross-vendor reviews stand in `.claude/mechanism-reviews.jsonl`: a42515bb merge-with-fixes,
-  then cb8aeee7 MERGE. The blocking finding was real: `claimWaitDecision` counted a bare
-  reason `released` as a finished wait, and since only the acquire path clears
-  `batch-claim.json`, a stale released record survives under the next owner — so `--wait`
-  exited 0 saying "run --take now" against a fixture reporting the lock held and its owner
-  alive, which is verbatim the failure this point exists to prevent.
-  FOR THE LANDING SESSION: delete the parked branch `origin/feat/user-said-command` when this
-  lands — its only commit d7a59ef8 is an ancestor of this branch, so nothing is lost; `help.mjs`
-  indexes top-level `scripts/*.mjs` only, not `scripts/verify/*.mjs`, matching this point's own
-  framing and deliberately not charged here; and the byte-for-byte drift test goes red whenever
-  any script's FIRST COMMENT SENTENCE changes, not only its usage line, so
-  `node scripts/help.mjs --write` becomes a routine step after comment edits.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 768. Cut CLAUDE.md to its binding sentences and make the cut hold (user instruction
   20.08.2026: »Auch beim Abschnitt Tech Stack frage ich mich, ob wir den wirklich brauchen. Kürze
   CLAUDE.md soweit sinnvoll und etabliere einen Mechanismus, der das dauerhaft zusichert, damit das
@@ -4687,6 +4628,22 @@ Build order, chosen so no two parallel agents own the same file:
   spam, which is remediation and not the fix — the supervision that let them
   accumulate is unchanged, and a fresh tick spawns another whenever the pidfile's
   process is not the one it finds.
+  MEASURED AGAIN TWO WEEKS LATER (21.08.2026, 22:13, while the user stopped the
+  batch; `ps -eo pid,etime,cmd | grep chat-watcher.mjs`): ELEVEN live instances,
+  aged 1:30 min to 4 d 3 h (pids 1331164, 1682404, 1886007, 2108484, 2207049,
+  2488982, 2961835, 3272711, 3471737, 3569895, 4118465), while
+  `.claude/chat-watcher.json` named exactly ONE of them (4118465, started 21.08.
+  20:43). So nothing has changed since 08.08., and the accumulation now survives a
+  USER STOP as well: the watcher outlives a pause on purpose
+  (`scripts/chat-watcher.mjs`, comment near line 375), and after a stop there is
+  neither a live owner nor a held claim — which is exactly the state in which each
+  of the ten orphans may spawn a responder of its own. TWO QUESTIONS THIS POINT
+  ANSWERS ALONGSIDE ITS FINAL STATE: does starting a watcher actually END the
+  previous one, or is only the record overwritten; and is the spawn path guarded
+  against several concurrent watchers, or does one user message wake several
+  responders at once. The ten orphans were SIGTERM'd by hand on the user's
+  instruction at 22:31 (clean shutdown entries in the log, none had a responder
+  child) — remediation for the second time, not the fix.
   Criticality: raised to HIGH — no longer a latent risk but a fault the user sees,
   and it reaches him directly rather than through the build.
 

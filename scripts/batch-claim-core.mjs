@@ -131,6 +131,57 @@ export function ownerIsHolding({ lock = null, claimantSid = '', alive = false } 
   return alive === true
 }
 
+/**
+ * Has the hand-over reached the point a waiting caller cares about? The state is
+ * the gathered status object printed by `batch-claim.mjs --status`; no caller
+ * needs to rediscover ownership from its JSON shape.
+ */
+export function claimWaitDecision(state = {}, claimantSid = '') {
+  if (state?.lockHeld === true) return { done: false, reason: 'held' }
+  const assessment = state?.assessment ?? null
+  const spent = claimantSid !== '' &&
+    assessment?.claimantSid === claimantSid &&
+    (assessment?.reserve === true ||
+      typeof assessment?.releasedAt === 'number' ||
+      assessment?.reason === 'released' ||
+      assessment?.reason === 'released-reserved')
+  if (spent) return { done: true, reason: 'spent' }
+  return { done: true, reason: 'free' }
+}
+
+/**
+ * Wait for the first probe that sees a free lock. A released claim belonging to
+ * this waiter only changes the success message; it can never outweigh a live
+ * lock. PURE ASYNC
+ * orchestration: state reader, monotonic clock and sleep are all injected, so a
+ * fixture advances without a real timer and a successful probe returns without
+ * one trailing poll delay.
+ */
+export async function waitForClaimEnd({
+  readState,
+  claimantSid = '',
+  clock = Date.now,
+  sleep,
+  timeoutMs = CLAIM_MAX_AGE_MS,
+  pollMs = 250,
+} = {}) {
+  if (typeof readState !== 'function' || typeof sleep !== 'function') {
+    throw new TypeError('waitForClaimEnd needs readState and sleep functions')
+  }
+  const startedAt = clock()
+  let probes = 0
+  for (;;) {
+    const state = await readState()
+    probes += 1
+    const decision = claimWaitDecision(state, claimantSid)
+    if (decision.done) return { ok: true, reason: decision.reason, probes, state }
+
+    const remaining = timeoutMs - (clock() - startedAt)
+    if (!(remaining > 0)) return { ok: false, reason: 'timeout', probes, state }
+    await sleep(Math.min(pollMs, remaining))
+  }
+}
+
 /** What the git probe answers when it could not find OUT (a timeout under load, a
  *  git that would not run) — as opposed to `null`, which means it looked and found
  *  nothing half-done. The two must not collapse into one value: "I could not look"

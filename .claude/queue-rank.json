@@ -284,12 +284,6 @@
       "origin": "user",
       "place": "last"
     },
-    "745": {
-      "at": "2026-08-21T17:23:19.967Z",
-      "why": "Nutzeranweisung 21.08.2026 16:39Z im Board-Chat: die Kontext-Decke wird vor dem Release gebaut, 745 zuerst",
-      "origin": "user",
-      "place": "ahead"
-    },
     "746": {
       "at": "2026-08-21T16:06:00.699Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It only defers commissioning and rests on an estimator that does not exist yet.",
@@ -553,7 +547,6 @@
       738,
       739,
       744,
-      745,
       746,
       747,
       748,
@@ -570,7 +563,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T18:57:56.956Z",
+    "at": "2026-08-21T19:59:06.096Z",
     "points": [
       174,
       184,
@@ -769,7 +762,6 @@
       739,
       741,
       744,
-      745,
       746,
       747,
       748,
