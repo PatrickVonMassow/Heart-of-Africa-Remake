@@ -16,6 +16,8 @@ import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
+import { parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { spawnProgressed } from './batch-autostart-core.mjs'
 import {
   assessOwner,
   classifyParallel,
@@ -24,6 +26,7 @@ import {
   PROBE_SESSION_PREFIX,
   progressGuardDecision,
   acquire,
+  acquisitionExpectationMatches,
   heartbeat,
   release,
   readOwnerLock,
@@ -61,6 +64,8 @@ import {
   SESSIONS_SEEN_PATH,
   SESSION_ACTIVITY_PATH,
   noteBatchWriter,
+  retireBatchWriter,
+  revokeWriterFence,
   readSessionProcesses,
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
@@ -891,6 +896,47 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('s2')
   })
 
+  it('moves the handover generation, reservation and spawn token in one checked takeover', () => {
+    const handedOverAt = Date.now()
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'owner', kind: 'session', fence: 17, handedOver: true, handedOverAt,
+      claimedAt: handedOverAt, pid: 999999,
+    }))
+    const reservation = {
+      spawnToken: 'spawn-token', sourceGeneration: 17, sourceSpawnToken: 'before-token',
+      trigger: 'boundary', requestedAt: NOW,
+    }
+    expect(acquire('launcher', opts({
+      kind: 'pending-spawn',
+      expected: { sessionId: 'owner', fence: 17, handedOver: true },
+      extra: reservation,
+    }))).toBe('acquired')
+    expect(readOwnerLock(lockPath)).toMatchObject({
+      sessionId: 'launcher', kind: 'pending-spawn', ...reservation,
+    })
+  })
+
+  it('a stale boundary generation cannot reserve over a newer owner', () => {
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'new-owner', kind: 'session', fence: 18, handedOver: true,
+      claimedAt: Date.now(), pid: 999999,
+    }))
+    expect(acquire('launcher', opts({
+      kind: 'pending-spawn',
+      expected: { sessionId: 'old-owner', fence: 17, handedOver: true },
+      extra: { spawnToken: 'stale-token', sourceGeneration: 17 },
+    }))).toBe('stale-event')
+    expect(readOwnerLock(lockPath)).toMatchObject({ sessionId: 'new-owner', fence: 18 })
+  })
+
+  it('the expectation matcher compares only the supplied CAS fields', () => {
+    const lock = { sessionId: 'owner', fence: 17, handedOver: true, spawnToken: 'one' }
+    expect(acquisitionExpectationMatches(lock, { sessionId: 'owner', fence: 17, handedOver: true })).toBe(true)
+    expect(acquisitionExpectationMatches(lock, { fence: 18 })).toBe(false)
+    expect(acquisitionExpectationMatches(lock, { spawnToken: 'two' })).toBe(false)
+    expect(acquisitionExpectationMatches(null, { fence: 17 })).toBe(false)
+  })
+
   it('a corrupt but FRESH lock file is never reaped (mid-write protection)', () => {
     writeFileSync(lockPath, '{ torn')
     expect(acquire('s2', opts())).toBe('held')
@@ -979,6 +1025,9 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath)).not.toBeNull()
     expect(release('s1', lockPath)).toBe(true)
     expect(readOwnerLock(lockPath)).toBeNull()
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records.map((r) => r.event)).toEqual([
+      'owner-claim', 'process-exit',
+    ])
   })
 
   it('heartbeat refreshes only the owner and never claims', () => {
@@ -1004,6 +1053,25 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(lock.kind).toBe('session')
   })
 
+  it('pending-spawn conversion preserves the token which binds supervised exit to this child', () => {
+    acquire('launcher-1', opts({
+      kind: 'pending-spawn',
+      extra: {
+        spawnedPid: 555,
+        spawnToken: 'spawn-token',
+        sourceGeneration: 17,
+        sourceSpawnToken: 'before-token',
+        trigger: 'boundary',
+        requestedAt: NOW,
+      },
+    }))
+    expect(convertPendingSpawn('spawned', { lockPath, pid: 555 })).toBe(true)
+    expect(readOwnerLock(lockPath)).toMatchObject({
+      sessionId: 'spawned', kind: 'session', spawnToken: 'spawn-token',
+      sourceGeneration: 17, sourceSpawnToken: 'before-token', trigger: 'boundary', requestedAt: NOW,
+    })
+  })
+
   it('markHandover: only the owner may hand over, and it does not touch the heartbeat', () => {
     acquire('s1', opts())
     const before = readOwnerLock(lockPath).claimedAt
@@ -1019,6 +1087,9 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(lock.handoverPoint).toBe(388)
     expect(lock.claimedAt).toBe(before) // the heartbeat is NOT bumped
     expect(lock.sessionId).toBe('s1') // and it is not a release
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records.map((r) => r.event)).toEqual([
+      'owner-claim', 'handover',
+    ])
   })
 
   // --- FINDING 1 (28.07.2026): the lock write that kept failing ---------------
@@ -1575,27 +1646,212 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(
       noteBatchWriter('writer-session', {
         path,
+        lockPath,
         now: NOW,
         processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
       }),
     ).toBe(true)
     expect(readSessionProcesses({ path })).toEqual({
-      'writer-session': { pid: 4242, startedAt: NOW - 60_000, at: NOW, batchWriterAt: NOW },
+      'writer-session': {
+        pid: 4242,
+        startedAt: NOW - 60_000,
+        at: NOW,
+        batchWriterAt: NOW,
+        generation: null,
+        spawnToken: null,
+        authorityState: 'active',
+      },
     })
     // The marker survives without a lock and advances on the next main write.
     expect(existsSync(lockPath)).toBe(false)
     noteBatchWriter('writer-session', {
       path,
+      lockPath,
       now: NOW + 1_000,
       processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
     })
     expect(readSessionProcesses({ path })['writer-session']).toMatchObject({ at: NOW, batchWriterAt: NOW + 1_000 })
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session'].generation).toBe(17)
+  })
+
+  it('does not borrow another session’s spawn token and preserves its own prior token', () => {
+    const path = join(dir, 'foreign-spawn-token.json')
+    const processIdentity = { pid: 4242, startedAt: NOW - 60_000 }
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'writer-session',
+      claimedAt: NOW,
+      fence: 17,
+      spawnToken: 'writer-token',
+    }))
+    expect(noteBatchWriter('writer-session', { path, lockPath, now: NOW, processIdentity })).toBe(true)
+
+    rmSync(lockPath)
+    expect(noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity,
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session'].spawnToken).toBe('writer-token')
+
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'other-session',
+      claimedAt: NOW + 2_000,
+      fence: 18,
+      spawnToken: 'foreign-token',
+    }))
+    expect(noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity,
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      spawnToken: 'writer-token',
+    })
+
+    const newPath = join(dir, 'foreign-spawn-token-new-writer.json')
+    expect(noteBatchWriter('new-writer', {
+      path: newPath,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity,
+    })).toBe(true)
+    const batchWriters = readSessionProcesses({ path: newPath })
+    expect(batchWriters['new-writer'].spawnToken).toBe(null)
+    expect(spawnProgressed({
+      batchWriters,
+      lastSpawn: {
+        at: NOW + 2_000,
+        spawnToken: 'foreign-token',
+        pid: 9898,
+        pidStartedAt: NOW - 120_000,
+      },
+    })).toBe(false)
+  })
+
+  it('retires only the named writer generation and a later fenced write reactivates it', () => {
+    const path = join(dir, 'writer-authority.json')
+    writeFileSync(lockPath, JSON.stringify({ sessionId: 'writer-session', claimedAt: NOW, fence: 17 }))
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(retireBatchWriter('writer-session', { path, generation: 16, now: NOW + 1_000 })).toBe(false)
+    expect(readSessionProcesses({ path })['writer-session'].authorityState).toBe('active')
+    expect(retireBatchWriter('writer-session', {
+      path,
+      generation: 17,
+      now: NOW + 2_000,
+      reason: 'handover',
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      authorityState: 'retired',
+      retiredAt: NOW + 2_000,
+      retiredReason: 'handover',
+    })
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      authorityState: 'active',
+      batchWriterAt: NOW + 3_000,
+    })
+  })
+
+  it('handover and release retire authority while the process record remains', () => {
+    const path = join(dir, 'session-process.json')
+    acquire('writer-session', opts({ now: NOW, pid: 4242, pidStartedAt: NOW - 60_000 }))
+    const generation = readOwnerLock(lockPath).fence
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(markHandover('writer-session', { lockPath, now: NOW + 2_000, point: 812 }).handed).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'handover',
+    })
+
+    noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(release('writer-session', lockPath)).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation,
+      authorityState: 'retired',
+      retiredReason: 'owner-release',
+    })
+  })
+
+  it('revokes only the still-current writer fence and records the recovery', () => {
+    const fencePath = join(dir, 'writer-recovery-fence.json')
+    writeFileSync(fencePath, JSON.stringify({
+      v: 1,
+      fence: 17,
+      holder: 'writer-session',
+      at: NOW - 1_000,
+      holders: [{ sessionId: 'writer-session', fence: 17, at: NOW - 1_000 }],
+    }))
+    expect(revokeWriterFence('other', 17, { fencePath, now: NOW })).toMatchObject({
+      revoked: false,
+      reason: 'holder-changed',
+    })
+    expect(revokeWriterFence('writer-session', 16, { fencePath, now: NOW })).toMatchObject({
+      revoked: false,
+      reason: 'generation-changed',
+    })
+    expect(revokeWriterFence('writer-session', 17, {
+      fencePath,
+      now: NOW,
+      reason: 'launcher-stall-recovery',
+    })).toEqual({ revoked: true, reason: 'revoked', fence: 18 })
+    expect(readFence({ fencePath })).toMatchObject({
+      fence: 18,
+      holder: '',
+      lastTakeover: {
+        from: 'writer-session',
+        fence: 18,
+        reason: 'launcher-stall-recovery',
+        at: NOW,
+      },
+    })
+    expect(revokeWriterFence('writer-session', 17, { fencePath, now: NOW + 1 })).toMatchObject({
+      revoked: false,
+      reason: 'generation-changed',
+      fence: 18,
+    })
   })
 
   it('never records an unidentifiable process or a synthetic probe as a writer', () => {
     const path = join(dir, 'unidentified-writer-process.json')
-    expect(noteBatchWriter('writer-session', { path, processIdentity: null })).toBe(false)
-    expect(noteBatchWriter('preflight-writer', { path, processIdentity: { pid: 42, startedAt: NOW } })).toBe(false)
+    expect(noteBatchWriter('writer-session', { path, lockPath, processIdentity: null })).toBe(false)
+    expect(noteBatchWriter('preflight-writer', {
+      path,
+      lockPath,
+      processIdentity: { pid: 42, startedAt: NOW },
+    })).toBe(false)
     expect(readSessionProcesses({ path })).toEqual({})
   })
 
@@ -1745,9 +2001,14 @@ describe('the lock write: retried, atomic, propagating, and swept up after (poin
       bootTime: 0,
       probePidFn: (pid) => ({ exists: pid !== 7777, startedAt: null }),
     })
-    // `batch-fence.json` is written by the acquisition itself (point 434) and is
-    // NEVER swept: it is the one record that outlives the lock.
-    expect(readdirSync(dir).sort()).toEqual(['batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242'])
+    // The fence and point-809 activity journal are both written by acquisition;
+    // neither is orphan tmp litter and neither may be swept.
+    expect(readdirSync(dir).sort()).toEqual([
+      'batch-activity.jsonl', 'batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242',
+    ])
+    expect(parseActivityJournal(readFileSync(join(dir, 'batch-activity.jsonl'), 'utf8')).records).toEqual([
+      expect.objectContaining({ event: 'owner-claim', session: 's1', cause: 'acquired' }),
+    ])
   })
 })
 

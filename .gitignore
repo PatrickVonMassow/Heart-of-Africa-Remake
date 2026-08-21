@@ -139,6 +139,11 @@ scripts/.tile-cache
 .claude/context-fence-observations.jsonl
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
+# Point 809's append-only activity journal and its short-lived append mutex are
+# runtime evidence from this machine. Historical fixtures are tracked under
+# scripts/fixtures; a clone must never inherit live session/process identities.
+.claude/batch-activity.jsonl
+.claude/batch-activity.jsonl.lock/
 # The commissioning record (point 712): the overrides taken against the queue's
 # front and the branches parked out of the slot count. It describes THIS
 # checkout's batch, not the repository's content.

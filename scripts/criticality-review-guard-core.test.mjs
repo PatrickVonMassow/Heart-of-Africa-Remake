@@ -10,9 +10,11 @@ import {
   CLEARING_VERDICT,
   criticalityOf,
   evaluateCriticalityReview,
+  FINDINGS_FILED_KIND,
   formatCriticalityReviewVerdict,
   highTicks,
   newlyTicked,
+  openNumbers,
   parsePointBlocks,
   strictAncestorProbe,
   tickedNumbers,
@@ -20,6 +22,7 @@ import {
 
 const OPUS = 'Claude Opus 5'
 const FABLE = 'Fable 5'
+const SOL = 'GPT-5.6 Sol'
 
 /** One work-order point block, as TASKS.md/the archive really write them. */
 const point = (n, { done = false, body = 'DOES A THING', tail = '' } = {}) =>
@@ -131,6 +134,12 @@ describe('newlyTicked', () => {
   it('reports nothing when the baseline already knows everything', () => {
     expect(tickedNumbers(archived)).toEqual(new Set([500]))
     expect(newlyTicked({})).toEqual([])
+  })
+})
+
+describe('openNumbers', () => {
+  it('returns only unchecked point blocks from the current work order', () => {
+    expect(openNumbers(point(817) + point(818) + point(819, { done: true }))).toEqual(new Set([817, 818]))
   })
 })
 
@@ -347,6 +356,94 @@ describe('evaluateCriticalityReview', () => {
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('unresolved')
+  })
+
+  it('ALLOWS a refusal whose exact review is carried by a numbered OPEN point', () => {
+    const refused = record({ verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const disposition = {
+      kind: FINDINGS_FILED_KIND,
+      point: 500,
+      sha: refused.sha,
+      model: refused.model,
+      reviewAt: refused.at,
+      findingPoints: [817],
+      at: 1_787_000_002_000,
+      reachable: true,
+    }
+    const v = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      openPoints: [817],
+      records: [refused, disposition],
+    })
+    expect(v).toMatchObject({ block: false, clear: true })
+  })
+
+  it('BLOCKS a filed disposition that names nothing, a closed point, or a different review', () => {
+    const refused = record({ verdict: 'do-not-merge', at: 1_787_000_001_000 })
+    const disposition = {
+      kind: FINDINGS_FILED_KIND,
+      point: 500,
+      sha: refused.sha,
+      model: refused.model,
+      reviewAt: refused.at,
+      findingPoints: [817],
+      at: 1_787_000_002_000,
+      reachable: true,
+    }
+    const bad = [
+      { ...disposition, findingPoints: [] },
+      disposition,
+      { ...disposition, reviewAt: refused.at + 1 },
+      { ...disposition, model: OPUS },
+    ]
+    for (const [i, receipt] of bad.entries()) {
+      const openPoints = i === 1 ? [818] : [817]
+      const v = evaluateCriticalityReview({
+        baseline: 'b',
+        ticks: [tick()],
+        openPoints,
+        records: [refused, receipt],
+      })
+      expect(v.block, `case ${i}`).toBe(true)
+    }
+  })
+
+  it('cuts a mixed-authorship range by author so neither model reads its own work', () => {
+    // Point 809's exact shape: Sol reviewed the Claude contribution and Claude
+    // reviewed the Sol contribution. Each honest refusal is independently tied
+    // to the open point that carries all findings from that half.
+    const claudeHalf = record({
+      sha: 'a'.repeat(40),
+      model: SOL,
+      authoredBy: OPUS,
+      verdict: 'do-not-merge',
+      at: 1_787_000_001_000,
+    })
+    const solHalf = record({
+      sha: 'b'.repeat(40),
+      model: OPUS,
+      authoredBy: SOL,
+      verdict: 'merge-with-fixes',
+      at: 1_787_000_002_000,
+    })
+    const filed = (review, findingPoint, at) => ({
+      kind: FINDINGS_FILED_KIND,
+      point: 500,
+      sha: review.sha,
+      model: review.model,
+      reviewAt: review.at,
+      findingPoints: [findingPoint],
+      at,
+      reachable: true,
+    })
+    const v = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      openPoints: [817, 818],
+      records: [claudeHalf, solHalf, filed(claudeHalf, 817, 1_787_000_003_000), filed(solHalf, 818, 1_787_000_004_000)],
+    })
+    expect(v).toMatchObject({ block: false, clear: true })
   })
 
   it('ALLOWS once a later merge on a DESCENDANT commit answers the refusal', () => {

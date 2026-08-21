@@ -502,6 +502,8 @@ Ein neuer Riegel im Board-Werkzeug verweigert eine Veröffentlichung, wenn ein o
 
 Übrig geblieben wäre die Handbearbeitung der Board-Datei — dieselbe Handbearbeitung, an der das Board am Vortag dreimal zerbrochen ist (§3.45).
 
+Am 21.08.2026 dieselbe Bauform in einem anderen Werkzeug: `fold-point` schließt einen Punkt, der als Mitläufer auf einem fremden Zweig geliefert wurde, meldet ausdrücklich „NOT DONE: the push — run: `git push origin main`" — und genau dieser Befehl wird sofort vom `board-first-guard` verweigert, weil dasselbe `fold-point` einen Zug vorher die Übergabe-Karte gesetzt hat und die Tafel damit „hier läuft nichts mehr" behauptet. Der genannte Ausweg ist nicht falsch, er ist nur im **erzeugten** Zustand nicht mehr gangbar; der tragfähige Weg (eine `closing`-Karte, dann der Push, dann die Übergabe-Karte erneut) steht in der Verweigerung des anderen Riegels, nicht in der Anweisung, die ihn ausgelöst hat.
+
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden.
 
 ### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
@@ -673,6 +675,8 @@ Am 30.07.2026 fiel Claude für rund eine Stunde aus, mitten in einem Zug. Der Ba
 Was durchfiel, war die Übergabe an das Fenster des Nutzers. Sie ist ein Zwei-Schritt-Handschlag: Das Fenster beansprucht den Batch, der Eigentümer gibt ihn am nächsten sauberen Zugende frei, und das Fenster **holt ihn dann ab**. Die Freigabe kam um 10:16 — in eine Sitzung, die der Ausfall gerade getötet hatte. Ein Anspruch, der eingelöst werden MUSS, ist damit nur so verlässlich wie der Anspruchsteller im Moment der Freigabe, und dieser Moment ist genau der, den niemand wählt. Zwanzig Minuten später nahm der Launcher den freien Lock für sich, korrekt nach seinen Regeln und trotzdem gegen die Absicht des Nutzers.
 
 Die Klasse ist dieselbe wie beim Herzschlag, der für Fortschritt gehalten wird, nur an der Übergabe statt an der Lebendigkeit: Ein Mechanismus, der einen zweiten Schritt von der Gegenseite ERWARTET, hat für dessen Ausfall keinen Plan. Punkt 434 hatte die Schwesterlücke schon geschlossen — ein Anspruch verfällt nicht mehr, solange das Fenster lebt —, aber nur für die Zeit VOR der Freigabe; danach ist der Anspruch verbraucht und es gewinnt, wer zuerst greift.
+
+Am 21.08.2026 dieselbe Naht, nur liegt die zweite Hälfte diesmal bei DERSELBEN Sitzung: Der CI-Wartelauf ist ein selbstgetriebener Kreis — der Riegel sagt „schlaf kurz und beende den Zug noch einmal", und er läuft nur weiter, solange die Sitzung sich selbst wieder aufruft. Sitzung 6a0621ed schrieb ihre letzte Zeile um 10:15:29 in genau dieser Anweisung und kam nicht zurück. Bemerkenswert ist nicht der Ausfall, sondern was ihn verlängert hat: Der Launcher tickt alle 900 Sekunden, hätte also binnen einer Viertelstunde übernehmen können — aber das Schreiber-Veto (2 h) und die Lebendigkeitsprüfung des Locks lasen die Spuren der toten Sitzung als „da arbeitet noch jemand". Der Nachfolger startete um 11:14:05, nach 59 Minuten ohne Arbeit am Stapel. Der Rettungsweg war also nicht kaputt, er war durch die Hinterlassenschaft des Verunglückten versperrt — als Punkt 808 aufgenommen.
 
 **Lehre:** Ein Handschlag, dessen zweite Hälfte bei der Gegenseite liegt, braucht ein Zeitfenster, in dem niemand anders zugreifen darf — und die Prüfung eines Wiederanlaufs endet nicht bei „läuft es weiter?", sondern bei „läuft es dort weiter, wo es laufen sollte?". Ein Ausfall trifft nie die bequeme Stelle; jede Aktion mit zwei Hälften ist an ihrer Naht zu prüfen.
 
@@ -1314,7 +1318,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 05:36 · Quellen-Fingerprint: `04c677f1f0d9…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 18:11 · Quellen-Fingerprint: `0de000b3f0f8…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1351,9 +1355,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 11 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Bare `gh` is UNAUTHENTICATED in this container — export GH_TOKEN from .secrets/github-token, or ask the project's own CI scripts instead | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1381,6 +1384,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Priority tiers for picking the next point — token-reduction work first, then the communication mechanic, then everything else; open branches before a fresh point | 2 | mittel | lock-release-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 4 | hoch | model-guard.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1408,10 +1412,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
 
-<!-- RETRO-FINGERPRINT: 04c677f1f0d91d6446b82bf6dbc6388f35ebff6f8a97838b8661f343d3052ef7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T03:36:04.559Z -->
+<!-- RETRO-FINGERPRINT: 0de000b3f0f8459616471eb6ba925cf1932ab31f5ee370407d133e2146a0daba -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T16:11:32.255Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2398,3 +2402,152 @@ Antwort **nicht beurteilt** und ein späterer Lauf — nicht **rot**. Und die Un
 die Entscheidung des Mechanismus, nicht nur in seinen Meldetext: Ein Tor, das den Unterschied
 zwischen »Test fehlgeschlagen« und »Lauf nicht fertig geworden« bereits in Worten benennt, aber
 beide gleich behandelt, weiß mehr, als es tut.
+
+### 3.149 Zwei Leser, ein Datensatz, zwei Antworten — und der dritte fragte gar nicht
+
+Am 21.08.2026 beanspruchte das Fenster des Nutzers den Stapel um 07:46 und verlor ihn trotzdem.
+Der Launcher respektierte den Anspruch zweimal und protokollierte das auch — »skip: session … has
+CLAIMED the batch 9 min ago (reserved)«, dann dieselbe Zeile bei 24 Minuten. Bei 39 Minuten
+verschwand der Anspruch aus seiner Begründung, und fünf Minuten später übergab der Eigner regulär:
+Der Launcher startete eine frische Sitzung, statt den freien Lock für das anspruchsberechtigte
+Fenster zu halten.
+
+Die Klasse hat zwei Hälften, und die zweite ist die lehrreichere. Die sichtbare Hälfte ist der
+dritte Pfad: Übergabe, Lease-Ablauf und Boundary entscheiden dieselbe Frage, aber nur zwei von
+ihnen fragen den Anspruch überhaupt. Die unsichtbare Hälfte liegt eine Ebene tiefer — die
+gemeinsame Entscheidungsfunktion hält ihre Uhr an, solange ein lebender Eigner hält, aber diesen
+Eingang leiten nur zwei der drei Aufrufstellen ab. Die dritte übergibt ihn nicht und bekommt den
+Vorgabewert, also läuft für sie jeder Anspruch nach dreißig Minuten ab, während das
+Auskunftskommando denselben Datensatz weiter für gültig erklärt. Der Kommentar über genau dieser
+Prädikatsfunktion warnt wörtlich davor, dass zwei Leser über einen Zustand uneins werden — und die
+Aufrufstelle, die abdriftete, ist die, die den Lock in derselben Sekunde in der Hand hält.
+
+**Lehre:** Eine reine Entscheidungsfunktion vereinheitlicht nichts, solange ihre Eingänge an jeder
+Aufrufstelle einzeln zusammengebaut werden. Wer eine gemeinsame Regel wirklich will, macht den
+Eingang zur Pflicht oder leitet ihn in der Funktion selbst ab; ein Vorgabewert, der »nein« bedeutet,
+verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. Prüffrage bei jedem
+geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
+gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
+neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
+
+### 3.150 Sichtbar wird die verwaiste Arbeit nur durch den, der sie nicht mehr sichtbar machen kann
+
+Am 21.08.2026 fand die aufnehmende Sitzung zwei Zweige mit fertiger, gepushter Arbeit: einer meldete
+im eigenen Commit drei grüne Tore, der andere trug eine aufgezeichnete Gegenlesung. Beide waren
+weniger als eine Stunde alt, und auf beide zeigte nichts. Die Sitzung, die sie gebaut hatte, war ohne
+Punktgrenze und ohne In-Flight-Erklärung gestorben; die Auskunft über laufende Arbeit antwortete
+folgerichtig »nichts erklärt«. Gefunden wurden die Zweige, weil beim Prüfen auf einen halb fertigen
+Merge von Hand die Arbeitsbäume aufgelistet wurden — also durch einen Nebeneffekt, nicht durch einen
+Mechanismus.
+
+Die Klasse ist nicht »es fehlt ein Mechanismus«, denn der Mechanismus existiert: Die Parkliste macht
+genau solche Zweige sichtbar, mit Begründung und außerhalb der Platzzählung. Sie wird nur von Hand
+gefüllt — und zwar von der Sitzung, die den Zweig verlässt. Damit hängt der Rettungsschritt an
+demjenigen, der ihn im gemessenen Fall per Definition nicht mehr tun kann: Wer sauber übergibt,
+braucht die Parkliste nicht, weil die Übergabe die Arbeit ohnehin weiterreicht; wer unsauber endet,
+kommt nicht mehr dazu. Der Mechanismus deckt genau die Fälle ab, in denen er entbehrlich ist.
+
+**Lehre:** Ein Aufräumschritt, den nur die scheidende Partei ausführen kann, ist keine Absicherung
+gegen ihr Verschwinden — er ist eine Höflichkeit für den geordneten Fall. Prüffrage bei jedem
+Sicherungsnetz: *Wer muss handeln, damit es greift — und ist das ausgerechnet der, dessen Ausfall es
+abfangen soll?* Wo die Antwort ja lautet, muss die Absicherung aus dem Zustand selbst ablesbar sein
+(hier: aus den Refs), nicht aus einer gepflegten Liste.
+
+### 3.151 Der Stillstand, den nie jemand gemessen hat
+
+Am 21.08.2026 wurde zum ersten Mal gefragt, wie viel Zeit der Stapel eigentlich mit nichts verbringt.
+Die Antwort war, dass es keine Antwort gibt: Über vier Tage nahm `main` 588 Commits an, dazwischen
+liegen 65 Lücken von zwanzig Minuten und mehr, zusammen 48,8 von rund 96 Stunden — und nichts im
+Projekt kann sagen, welche dieser Stunden Arbeit waren (eine Browser-Suite, ein delegierter Autor,
+eine lange Prüfung) und welche Leerlauf. Das Startprotokoll unterscheidet nur seine eigenen
+Übersprung-Gründe, und der Punkt, der die Übergabe misst, misst die Übergabe, nicht den Stillstand.
+
+Bemerkenswert ist, was passierte, als EINE Lücke von Hand aufgeschlüsselt wurde. Sie war reiner
+Stillstand: 59 Minuten, in denen niemand am Stapel arbeitete, weil eine Sitzung im CI-Warten starb
+und der Starter ihren Nachfolger nicht startete — ein seit zwei Tagen untätiges Editor-Fenster galt
+ihm als lebender Schreiber und blockierte jeden Start, vor jeder anderen Regel und auch vor einer
+ausdrücklichen Übergabe. Der Starter SAH es und protokollierte es sogar als Eskalation, hatte aber
+keine Handlung dahinter, sondern übersprang erneut. Und die blinde Zweitlesung fand eine dritte,
+größere Ursache, nach der niemand gesucht hatte: Die Übergabe reist überhaupt nur im
+Viertelstundentakt des Schedulers — ein sauberes Punktende startet keinen Nachfolger, es wartet auf
+den nächsten Tick. Der gemessene Ausfall war also nicht die Ausnahme, sondern der sichtbar gewordene
+Teil eines Regelfalls.
+
+**Lehren:** Ein System, das seine eigene Untätigkeit nicht messen kann, optimiert zwangsläufig das,
+was es messen kann — hier die Kosten je Übergabe, während daneben Stunden verschwanden, die niemand
+je aufaddiert hatte. Die erste Lieferung eines solchen Punktes ist deshalb die MESSUNG, nicht der
+Hebel: Wer zuerst repariert, repariert die zwei Vorfälle, die jemand zufällig bemerkt hat. Und eine
+Zuordnung, die alles erklärt, ist die eigentliche Gefahr — nicht zuordenbare Zeit muss als solche
+ausgewiesen werden und ihr Anteil ist selbst ein Ergebnis. Dass ausgerechnet die größte Ursache erst
+der blinden Zweitlesung auffiel, ist der Beleg dafür, wozu das geteilte Verfahren da ist (§3.19).
+
+### 3.152 Die Regel griff nur nach vorn — der Bestand, den sie meinte, blieb liegen
+
+Am 20.08.2026 wurde ein Tor gebaut, das jeden maschinell abgelegten Punkt hinter den Release-Punkt
+einreiht, sofern er nicht hoch dringlich ist. Es funktionierte: In den achtzehn Stunden danach
+rückten von neunzehn gerankten Punkten genau zwei nach vorn, und der Vorderblock schrumpfte. Am
+21.08.2026 fragte der Nutzer trotzdem, warum wieder so viele neue Tickets vor der
+Kommunikationsmechanik stünden — und die Messung gab ihm scheinbar unrecht und in der Sache recht.
+Vor der Mechanik standen 34 Punkte, aber 32 davon trugen überhaupt keinen Rang-Eintrag. Sie hatten
+dort gestanden, bevor das Tor existierte, und niemand hatte je zurückgegriffen.
+
+Die erste Antwort auf seine Frage war zusätzlich falsch: Sie behauptete, das Tor schütze die
+Kommunikationsmechanik nicht, weil es nur die Grenze am Release-Punkt kenne. Der Nutzer stellte das
+richtig — die Mechanik steht auf den Positionen 34 bis 41, der Release-Punkt auf 49, also heißt
+»hinter den Release« bereits »hinter die Mechanik«. Die Diagnose hatte einen Mechanismus-Umbau
+vorgeschlagen, wo eine einmalige Nachräumung fällig war.
+
+**Lehren:** Eine Regel, die den Zugang regelt, sagt nichts über den Bestand, der vor ihr da war —
+und weil sie ab ihrem Inkrafttreten sauber arbeitet, sieht die Statistik gut aus, während der
+Zustand, den sie herstellen sollte, unverändert bleibt. Wer ein solches Tor baut, schuldet im selben
+Zug die Frage, was mit dem Altbestand geschieht: nachräumen, oder ausdrücklich stehen lassen und das
+schreiben. Und die Diagnose eines Fehlers, den ein Nutzer meldet, gehört gegen die tatsächliche
+Reihenfolge geprüft, bevor sie einen Umbau vorschlägt — die Zahlen lagen vor, die Positionen waren
+mit einem Befehl abfragbar, und die Fehldiagnose kostete einen ganzen Zug plus die Korrektur eines
+bereits festgehaltenen Befundes.
+
+### 3.120 Der Statussatz wurde angehängt, nicht aus dem gemessenen Zustand abgeleitet
+
+Die Punktgrenze stellt beim Übergeben fest, ob übertragbare Arbeit läuft — sie nennt den Zweig und
+den Commit sogar beim Namen. Im selben Ausdruck diktiert sie danach eine Tafel-Karte, die
+unbedingt mit »Hier läuft nichts weiter.« endet. Beide Sätze stammen aus einem Aufruf, und der
+zweite liest nicht, was der erste gerade gemessen hat. Am 21.08.2026 hat die Nachfolgesitzung
+genau das vorgefunden: Die veröffentlichte Tafel meldete Stillstand, während GPT-5.6 Sol an
+Punkt 809 weiterbaute.
+
+Die Klasse ist nicht »falscher Text«, sondern eine Ausgabe, die neben dem Zustand hergestellt wird
+statt aus ihm. Solange der Satz eine Konstante ist, kann keine Messung ihn widerlegen — er ist
+richtig, solange der häufigste Fall eintritt, und schweigend falsch im Rest. Das trifft
+ausgerechnet die Karte, die der Nutzer auf dem Handy liest, und sie wird unter dem Zeitdruck des
+Sitzungsendes wörtlich übernommen, also ohne die Ruhe, in der jemand den Widerspruch bemerkt.
+
+Die Prüfung dagegen ist billig und wurde nie gefordert: Ein diktierter Text wird mit BEIDEN
+Belegungen des Zustands erzeugt — mit laufender Arbeit und ohne — und beide Male gelesen. Wo eine
+Ausgabe zwei Fälle behaupten kann, aber nur einer je erzeugt wird, ist der zweite Fall nicht
+getestet, sondern nur noch nicht aufgefallen. Verwandt mit §3.19 (die zweite Lesung findet, was
+die erste nicht sehen konnte) und mit der Familie der diktierten Übergabe-Karte, die schon
+mehrfach an ihren eigenen Toren gescheitert ist.
+
+### 3.121 Zwei Autoren auf einem Zweig — und die Gegenlese fand nicht statt
+
+Punkt 809 ist am 21.08.2026 abgehakt worden, und das Kritikalitäts-Tor verweigerte danach jedes
+Zugende: Die Verdikt-Kartei hält für den Punkt genau einen Eintrag, die Beauftragung um 10:57Z,
+und kein Urteil. Eine Gegenlese hat es dabei nachweislich gegeben — die Punkte 810 und 815
+bezeichnen sich selbst als deren Ergebnis. Nur las sie die QUELLEN des Punktes, nicht den Zweig,
+der zusammengeführt wurde, und niemand hat sie als Urteil über den gelandeten Stand verzeichnet.
+
+Der Grund steht im Zweig selbst: Er hat ZWEI Autoren. GPT-5.6 Sol hat das meiste geschrieben,
+eine Claude-Sitzung einen Commit. Die Vier-Augen-Regel ist für einen Autor je Zweig gedacht — sie
+sagt, wer NICHT lesen darf, und lässt offen, wer bei geteilter Urheberschaft liest. Genau in
+dieser Lücke ist die Gegenlese nicht ausgefallen, sondern nie zugewiesen worden; das Tor hat den
+Fehler erst nach dem Abhaken bemerkt, also an der Stelle, an der er am teuersten ist.
+
+Die naheliegende Reparatur wäre gewesen, ein Urteil aus dem Vorhandenen zu buchen — es gab ja eine
+Lesung. Das wäre eine erfundene Quittung: Sie nennt weder den gelesenen Stand noch den Leser. Der
+Vorgang ist deshalb als eigener Punkt aktenkundig, nicht als Kartei-Eintrag.
+
+**Lehre:** Eine Regel, die Rollen über AUTORSCHAFT verteilt, muss den geteilten Zweig mitdenken —
+sonst hat sie für den häufigsten Mischfall gar keine Antwort, und die stille Antwort lautet
+»niemand«. Und ein Tor, das erst beim Abhaken prüft, prüft zu spät: Was die Landung verlangt,
+gehört an den Anfang des Punktes, nicht an sein Ende. Verwandt mit §3.119 (die Marke mahnt beim
+Aufhören statt beim Anfangen).

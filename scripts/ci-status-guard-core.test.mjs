@@ -523,10 +523,22 @@ describe('sweepTargets', () => {
     expect(got.decision).toContain('NOT yet concluded')
     expect(got.decision).toContain('origin/feat/x')
     expect(got.failedOpen).toEqual([])
+    expect(got.observations).toEqual([
+      expect.objectContaining({
+        target: branchTarget,
+        classification: expect.objectContaining({ state: 'pending' }),
+        firstSeenAt: branchTarget.at,
+        observedAt: NOW,
+        verdict: 'wait',
+      }),
+    ])
     // …and the wait is re-read from the cache without a second API call.
     const again = await sweep({ targets: [branchTarget], cache: got.cache, runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
     expect(again.asked).toEqual([])
     expect(again.decision).toContain('NOT yet concluded')
+    expect(again.observations).toEqual([
+      expect.objectContaining({ previousState: 'pending', verdict: 'wait' }),
+    ])
   })
 
   it('the wait has a CEILING — past it the guard fails open, says so, and KEEPS asking', async () => {

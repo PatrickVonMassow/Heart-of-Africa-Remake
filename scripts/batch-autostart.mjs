@@ -45,7 +45,11 @@ import {
   verdictRepeat,
   isOwnSpawn,
   readSessionProcesses,
+  retireBatchWriter,
+  revokeWriterFence,
+  readFence,
   PENDING_STALE_MS,
+  LAUNCHER_TICK_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { takeoverDecision } from './batch-claim-core.mjs'
@@ -70,13 +74,17 @@ import {
   judgePreviousSpawn,
   spawnProgressed,
   spawnBackoffMs,
+  shouldWaitForSpawnBackoff,
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
   firewallTopUpDecision,
   staleEtaLogLine,
-  launcherStartDecision,
   launcherStartRecord,
+  successorStartDecision,
+  supervisorRestartDecision,
+  supervisedExitTrigger,
+  SUCCESSOR_TRIGGERS,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -89,6 +97,9 @@ import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { ownerActivityDecision } from './batch-ownership-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -106,9 +117,14 @@ if (!(process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].r
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO = R('..')
+const SELF = fileURLToPath(import.meta.url)
 const C = (n) => join(REPO, '.claude', n)
 const LOG = C('autostart.log')
 const now = Date.now()
+const launcherStartedAt = now - Math.round(process.uptime() * 1000)
+
+const journal = (event, { at = now, session = null, point = null, pid = process.pid, pidStartedAt = launcherStartedAt, generation = null, cause, evidence = {} } = {}) =>
+  emitActivity({ event, at, session, point, pid, pidStartedAt, generation, cause, evidence })
 
 const log = (m) => {
   try { writeFileSync(LOG, `[${new Date(now).toISOString()}] ${m}\n`, { flag: 'a' }) } catch { /* ignore */ }
@@ -117,6 +133,26 @@ const log = (m) => {
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')) } catch { return null } }
 const writeJsonAtomic = (p, obj) => {
   try { const t = `${p}.tmp`; writeFileSync(t, JSON.stringify(obj, null, 2)); renameSync(t, p) } catch { /* ignore */ }
+}
+const ACTIVITY_TAIL_BYTES = 256 * 1024
+const recentActivityRecords = () => {
+  const path = C('batch-activity.jsonl')
+  try {
+    const size = statSync(path).size
+    const length = Math.min(size, ACTIVITY_TAIL_BYTES)
+    if (length <= 0) return []
+    const fd = openSync(path, 'r')
+    try {
+      const buffer = Buffer.alloc(length)
+      const bytesRead = readSync(fd, buffer, 0, length, size - length)
+      if (bytesRead !== length) return null
+      return parseActivityJournal(buffer.toString('utf8')).records
+    } finally {
+      closeSync(fd)
+    }
+  } catch {
+    return null
+  }
 }
 const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
@@ -136,12 +172,119 @@ const openPointCount = () => {
   return alarm ? -1 : open
 }
 
+const argv = process.argv.slice(2)
+const argValue = (name) => {
+  const index = argv.indexOf(name)
+  return index >= 0 && typeof argv[index + 1] === 'string' ? argv[index + 1] : null
+}
+const immediate = argv.includes('--immediate')
+const requestedKind = argValue('--cause')
+const triggerKind = Object.values(SUCCESSOR_TRIGGERS).includes(requestedKind)
+  ? requestedKind
+  : SUCCESSOR_TRIGGERS.WATCHDOG
+const requestedGeneration = Number(argValue('--generation'))
+const predecessorToken = argValue('--predecessor-token') || null
+const spawnToken = randomUUID()
+const trigger = {
+  kind: triggerKind,
+  ...(Number.isSafeInteger(requestedGeneration) && requestedGeneration >= 0 ? { generation: requestedGeneration } : {}),
+  ...(predecessorToken ? { predecessorToken } : {}),
+  ...(triggerKind === SUCCESSOR_TRIGGERS.CI_TERMINAL ? { terminal: true } : {}),
+}
+
+/** Start the short-lived watcher which owns no batch state and can only request
+ * another guarded run after this exact child identity disappears. */
+function startChildSupervisor({ pid, pidStartedAt, token }) {
+  if (!(Number.isInteger(pid) && pid > 0 && typeof token === 'string' && token)) return null
+  let out = 'ignore'
+  try { out = openSync(C('autostart-run.log'), 'a') } catch { /* the watcher still runs */ }
+  try {
+    const supervisor = spawn(
+      process.execPath,
+      [SELF, '--supervise', String(pid), String(pidStartedAt ?? ''), token],
+      { cwd: REPO, detached: true, windowsHide: true, stdio: ['ignore', out, out] },
+    )
+    supervisor.unref()
+    return { pid: supervisor.pid, startedAt: probePid(supervisor.pid)?.startedAt ?? Date.now() }
+  } catch (error) {
+    log(`supervisor failed to start for child ${pid} (${error?.message ?? error})`)
+    return null
+  }
+}
+
+/** Internal detached mode. It observes pid AND start time, so a recycled pid can
+ * never inherit an old child's exit notification. */
+if (argv[0] === '--supervise') {
+  const childPid = Number(argv[1])
+  const childStartedAt = Number(argv[2])
+  const token = argv[3] || ''
+  const sameChildAlive = () => {
+    if (!(Number.isInteger(childPid) && childPid > 0 && token)) return false
+    const seen = probePid(childPid)
+    if (seen?.exists !== true) return false
+    if (!Number.isFinite(childStartedAt) || !Number.isFinite(seen.startedAt)) return true
+    return Math.abs(seen.startedAt - childStartedAt) <= 2000
+  }
+  while (sameChildAlive()) await new Promise((resolve) => setTimeout(resolve, 250))
+  let exitTrigger = { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null }
+  try {
+    const { records } = parseActivityJournal(readFileSync(C('batch-activity.jsonl'), 'utf8'))
+    exitTrigger = supervisedExitTrigger(records, { childStartedAt })
+  } catch { /* a missing journal still means child-exit */ }
+  journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+    pid: childPid,
+    pidStartedAt: Number.isFinite(childStartedAt) ? childStartedAt : null,
+    generation: null,
+    cause: 'supervised-child-exit',
+    evidence: { spawnToken: token, detectedBy: 'child-supervisor', trigger: exitTrigger },
+  })
+  try {
+    let out = 'ignore'
+    try { out = openSync(C('autostart-run.log'), 'a') } catch { /* request still runs */ }
+    const request = spawn(
+      process.execPath,
+      [SELF, '--immediate', '--cause', exitTrigger.kind, '--predecessor-token', token],
+      { cwd: REPO, detached: true, windowsHide: true, stdio: ['ignore', out, out] },
+    )
+    request.unref()
+    log(`supervised child ${childPid} exited — requested its successor immediately`)
+  } catch (error) {
+    log(`supervised child ${childPid} exited, but its immediate request failed (${error?.message ?? error}); watchdog recovery remains armed`)
+  }
+  process.exit(0)
+}
+
 const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
 state.spawns = Array.isArray(state.spawns) ? state.spawns : []
 const lock = readOwnerLock()
 const probe = lock && lock.pid ? probePid(lock.pid) : null
 /** Every exit persists the state, so a sweep that ran is never forgotten. */
 const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); process.exit(code) }
+
+// A periodic tick is the repair path for a supervisor which died first. It
+// attaches only to the child/token still recorded on the current owner lock.
+if (!immediate) {
+  const last = readJson(C('autostart-last.json'))
+  const childProbe = last?.pid ? probePid(last.pid) : null
+  const supervisorProbe = last?.supervisorPid ? probePid(last.supervisorPid) : null
+  const repair = supervisorRestartDecision({ lastSpawn: last, lock, childProbe, supervisorProbe })
+  if (repair.restart) {
+    const supervisor = startChildSupervisor({
+      pid: last.pid,
+      pidStartedAt: last.pidStartedAt ?? childProbe?.startedAt ?? last.at,
+      token: last.spawnToken,
+    })
+    if (supervisor) {
+      writeJsonAtomic(C('autostart-last.json'), {
+        ...last,
+        supervisorPid: supervisor.pid,
+        supervisorStartedAt: supervisor.startedAt,
+        supervisorRestartedAt: now,
+      })
+      log(`restarted missing supervisor for live child ${last.pid} (supervisor ${supervisor.pid})`)
+    }
+  }
+}
 
 // --- WHAT THE PREVIOUS SPAWN SAID BEFORE IT DIED (point 444) -------------------
 // A `claude -p` refused by the usage limit prints one line and exits, and that
@@ -339,6 +482,12 @@ try {
   const leaked = reapableSpawns({ spawns: state.spawns, now, lock, probePid, isOwnSpawn })
   for (const s of leaked) {
     try { process.kill(s.pid) } catch { /* gone */ }
+    journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+      pid: s.pid,
+      pidStartedAt: s.at ?? null,
+      cause: 'leaked-spawn-reaped',
+      evidence: { ageMs: s.ageMs },
+    })
     log(`REAPED leaked spawn pid ${s.pid} (spawned ${Math.round(s.ageMs / 60000)} min ago, not the batch owner)`)
   }
   if (leaked.length > 0) {
@@ -425,6 +574,14 @@ try {
 // again, the pause returns one rung higher.
 const pause = classifyPause({ text: (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })(), now })
 let batchParked = pause.state === 'hold' || pause.state === 'wait'
+const pauseKey = batchParked ? `${pause.state}:${pause.pausedAt ?? ''}:${pause.retryAfter ?? ''}:${pause.cause ?? ''}` : ''
+if (batchParked && state.pauseJournalKey !== pauseKey) {
+  journal(ACTIVITY_EVENTS.PAUSE, {
+    cause: pause.cause ?? (pause.state === 'hold' ? 'user-hold' : 'timed-pause'),
+    evidence: { state: pause.state, reason: pause.reason ?? null, until: pause.retryAfter ?? null },
+  })
+  state.pauseJournalKey = pauseKey
+}
 if (pause.state === 'retry') {
   try { rmSync(C('batch-paused')) } catch { /* already gone — nothing to resume from */ }
   // A record that SURVIVED its removal keeps the batch parked: resuming while the
@@ -433,6 +590,11 @@ if (pause.state === 'retry') {
   batchParked = existsSync(C('batch-paused'))
   if (batchParked) log(`PAUSE CLOCK EXPIRED but ${C('batch-paused')} could not be removed — staying parked`)
   else {
+    journal(ACTIVITY_EVENTS.PAUSE_FINISH, {
+      cause: 'retry-clock-expired',
+      evidence: { prior: state.pauseJournalKey ?? null, attempt: (pause.attempt || 0) + 1 },
+    })
+    delete state.pauseJournalKey
     state.pauseAttempt = (pause.attempt || 0) + 1
     state.pauseRetryAt = now
     state.failCount = 0
@@ -445,6 +607,13 @@ if (pause.state === 'retry') {
       { key: 'pause-retry' },
     )
   }
+}
+if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
+  journal(ACTIVITY_EVENTS.PAUSE_FINISH, {
+    cause: 'pause-marker-cleared',
+    evidence: { prior: state.pauseJournalKey },
+  })
+  delete state.pauseJournalKey
 }
 
 // --- THE MESSAGE WATCHER: this tick is its supervisor (point 407) --------------
@@ -693,7 +862,14 @@ const work = assessOwnerWork({
 // in the same line it used to take the batch anyway, producing the double session.
 // The launcher is the ONLY caller that passes `work` — it is the only one that has
 // it — so every other door keeps comparing numbers.
-const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
+const ownerActivity = ownerActivityDecision({
+  lock,
+  work,
+  records: recentActivityRecords(),
+  previous: state.ownerActivity ?? null,
+})
+state.ownerActivity = ownerActivity.state
+const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work, activity: ownerActivity })
 
 // --- Verify the previous spawn ------------------------------------------------
 // LIVING IS NOT WORKING (point 433, §4 of docs/batch-resilience.md). This used to
@@ -702,7 +878,15 @@ const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work 
 // successors would burn a whole night's tokens while looking busy. The decision is
 // pure (`judgePreviousSpawn`); this only gathers the three facts.
 if (state.lastSpawnAt > 0) {
-  const progressed = spawnProgressed({ curHead, lastHead: state.lastHead, lock, lastSpawnAt: state.lastSpawnAt })
+  const previousSpawn = readJson(C('autostart-last.json'))
+  const progressed = spawnProgressed({
+    curHead,
+    lastHead: state.lastHead,
+    lock,
+    batchWriters: readSessionProcesses(),
+    lastSpawn: previousSpawn,
+    lastSpawnAt: state.lastSpawnAt,
+  })
   const proveMin = Number(process.env.HOA_SPAWN_PROVE_MIN)
   const v = judgePreviousSpawn({
     lastSpawnAt: state.lastSpawnAt,
@@ -729,6 +913,20 @@ if (state.lastSpawnAt > 0) {
   })
   if (outcome.state === 'progress' && (state.failCount || 0) > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
   if (outcome.state === 'failed') log(`${v.reason} — failCount=${outcome.failCount}`)
+  if (outcome.state === 'quota' || outcome.state === 'failed') {
+    journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+      at: now,
+      pid: state.lastPid || null,
+      pidStartedAt: state.lastSpawnAt || null,
+      cause: outcome.state === 'quota' ? 'quota-refused-spawn' : 'spawn-made-no-progress',
+      evidence: {
+        attemptedAt: state.lastSpawnAt,
+        reason: v.reason,
+        quota: outcome.quota ?? null,
+        retryAt: now + outcome.nextProbeMs,
+      },
+    })
+  }
   // Every probe and the moment work resumed go into the log, so the real reset
   // rhythm can be measured out of it instead of assumed.
   if (outcome.note) log(outcome.note)
@@ -776,6 +974,14 @@ if (
   !(lock.kind === 'pending-spawn' && lock.spawnedPid === state.lastPid)
 ) {
   try { process.kill(state.lastPid) } catch { /* gone */ }
+  journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+    session: lock?.sessionId ?? null,
+    pid: state.lastPid,
+    pidStartedAt: state.lastSpawnAt,
+    generation: lock?.fence ?? null,
+    cause: 'rogue-spawn-reaped',
+    evidence: { ownerSession: lock?.sessionId ?? null },
+  })
   log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
 }
@@ -821,25 +1027,58 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
 // kill-then-take valve — are gone. An owner whose lease ran out is not a third
 // state to be adjudicated; it is simply not the owner, and the takeover below is
 // the one this file has always performed for a dead one.
-const startDecision = launcherStartDecision({
+const batchWriters = readSessionProcesses()
+const previousBatchWriters = state.writerObservations && typeof state.writerObservations === 'object'
+  ? state.writerObservations
+  : {}
+const fenceState = readFence()
+let startDecision = successorStartDecision({
+  trigger,
+  spawnToken,
+  paused: batchParked,
+  openPoints: open,
+  formatAlarm: open === -1,
+  claimReserved: false,
   lock,
   assessment,
-  batchWriters: readSessionProcesses(),
+  batchWriters,
+  previousBatchWriters,
+  fenceState,
   probePid,
   now,
 })
-const verdict = startDecision.start ? 'spawn' : 'skip-alive'
+// The next tick compares the same generation/process record with this one. A
+// timestamp that actually advances is work; a historical timestamp merely
+// sitting beside a breathing editor is not.
+state.writerObservations = batchWriters
+let verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
+  let writerRecovered = false
+  if (startDecision.code !== 'owner-live') {
+    const previous = readJson(C('autostart-last.json')) ?? {}
+    writeJsonAtomic(C('autostart-last.json'), {
+      ...previous,
+      lastDecision: launcherStartRecord({ decision: startDecision, at: now, head: head() }),
+    })
+    log(`skip: successor decision refused (${startDecision.code}) — ${startDecision.reason}`)
+    bail()
+  }
   if (!lock || assessment.alive !== true) {
     // A separately recorded writer may outvote an inactive/missing owner lock,
     // but that is a refusal to recover, not a healthy tick. Make repetition
-    // audible just like an expired lease that keeps outvoting takeover. The key
-    // is the writer PROCESS identity (not its changing last-write timestamp), so
-    // consecutive vetoes form one episode; the core separately ages the write
-    // evidence out after WRITER_VETO_MAX_AGE_MS.
-    const writer = startDecision.veto
-    const key = writer
-      ? `writer-veto#${writer.sessionId}#${writer.pid ?? 'nopid'}#${writer.recordedStartedAt ?? 'nostart'}`
+    // audible just like an expired lease that keeps outvoting takeover. Progress
+    // starts a new episode. Two decisions over the SAME fenced-write
+    // observation therefore mean the authority is stalled; a writer which keeps
+    // advancing never reaches recovery.
+    const writers = Array.isArray(startDecision.vetoes) ? startDecision.vetoes : (startDecision.veto ? [startDecision.veto] : [])
+    const key = writers.length > 0
+      ? `writer-veto#${writers.map((writer) => [
+          writer.sessionId,
+          writer.pid ?? 'nopid',
+          writer.recordedStartedAt ?? 'nostart',
+          writer.generation ?? 'nogen',
+          writer.batchWriterAt,
+        ].join('#')).join('|')}`
       : ''
     const rep = verdictRepeat({
       key,
@@ -850,67 +1089,144 @@ if (verdict === 'skip-alive') {
     state.wedgeVerdictKey = rep.key
     state.wedgeVerdictRepeats = rep.repeats
     log(`skip: ${startDecision.reason}`)
-    if (writer && rep.escalate) {
+    if (writers.length > 0) {
+      const vetoJournalKey = writers.map((writer) =>
+        `${writer.sessionId}:${writer.pid ?? ''}:${writer.recordedStartedAt ?? ''}:${writer.generation ?? ''}:${writer.batchWriterAt}`,
+      ).join('|')
+      if (state.writerVetoJournalKey !== vetoJournalKey) {
+        for (const writer of writers) {
+          journal(ACTIVITY_EVENTS.WRITER_VETO, {
+            session: writer.sessionId,
+            pid: writer.pid,
+            pidStartedAt: writer.recordedStartedAt,
+            generation: writer.generation,
+            cause: 'live-writer-veto',
+            evidence: {
+              blockedFrom: state.writerVetoSince,
+              blockedUntil: now + LAUNCHER_TICK_MS,
+              lastFencedOperationAt: writer.batchWriterAt,
+              writerAgeMs: writer.writerAgeMs,
+              currentFence: writer.currentFence,
+              advancing: writer.advancing,
+              ownerLock: startDecision.evidence?.ownership?.lock ?? null,
+            },
+          })
+        }
+        state.writerVetoJournalKey = vetoJournalKey
+      }
+    }
+    if (writers.length > 0 && rep.escalate) {
       const blockedMinutes = Math.max(0, Math.round((now - state.writerVetoSince) / 60000))
       log(
-        `ESCALATING: session ${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has blocked launcher recovery ` +
+        `ESCALATING: ${writers.length} writer authorit${writers.length === 1 ? 'y has' : 'ies have'} blocked launcher recovery ` +
           `for ${blockedMinutes} min (${rep.repeats} consecutive ticks)`,
       )
-      await notify(
-        'Live writer blocking batch recovery',
-        `${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has vetoed a launcher start for ${blockedMinutes} minutes ` +
-          `across ${rep.repeats} consecutive ticks, although the owner lock is inactive or missing. Its last fenced ` +
-          `main write was ${Math.max(0, Math.round(writer.writerAgeMs / 60000))} minutes ago. Please look.`,
-        'high',
-      )
+      const recoveries = writers.map((writer) => {
+        const handedOverGeneration =
+          lock?.handedOver === true &&
+          lock?.fence === writer.generation &&
+          (lock?.sessionId === writer.sessionId || lock?.sessionIdBefore === writer.sessionId)
+        if (handedOverGeneration) {
+          const retired = retireBatchWriter(writer.sessionId, {
+            generation: writer.generation,
+            now,
+            reason: 'launcher-handover-recovery',
+          })
+          return { writer, action: 'retire-handed-over-generation', recovered: retired }
+        }
+        const revoked = revokeWriterFence(writer.sessionId, writer.generation, {
+          now,
+          reason: 'launcher-stalled-writer-recovery',
+        })
+        return { writer, action: 'revoke-writer-fence', recovered: revoked.revoked, detail: revoked.reason }
+      })
+      const afterWriters = readSessionProcesses()
+      const after = successorStartDecision({
+        trigger,
+        spawnToken,
+        paused: batchParked,
+        openPoints: open,
+        formatAlarm: open === -1,
+        claimReserved: false,
+        lock,
+        assessment,
+        batchWriters: afterWriters,
+        previousBatchWriters: state.writerObservations,
+        fenceState: readFence(),
+        probePid,
+        now,
+      })
+      state.writerObservations = afterWriters
+      if (recoveries.every((item) => item.recovered) && after.start) {
+        log(`RECOVERED: ${recoveries.map((item) => `${item.action} ${item.writer.sessionId}#${item.writer.generation}`).join(', ')}`)
+        startDecision = after
+        verdict = 'spawn'
+        writerRecovered = true
+        delete state.wedgeVerdictKey
+        delete state.wedgeVerdictRepeats
+        delete state.writerVetoSince
+        delete state.writerVetoJournalKey
+      } else {
+        const failed = recoveries.filter((item) => !item.recovered)
+        await notify(
+          'Writer recovery failed',
+          `The launcher executed recovery after ${rep.repeats} blocked ticks, but ${after.reason}. ` +
+            `${failed.map((item) => `${item.writer.sessionId}: ${item.detail ?? 'retirement failed'}`).join('; ') || 'The recovered authority still vetoes.'}`,
+          'urgent',
+        )
+      }
     }
+    if (!writerRecovered) {
+      writeJsonAtomic(C('autostart-state.json'), state)
+      process.exit(0)
+    }
+  }
+  if (!writerRecovered) {
+    const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
+    log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
+    // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
+    // expired lease would be the same blindness in the other direction: the morning
+    // reader must be able to see that the arithmetic said "take it" and what
+    // outvoted it, or the next incident is invisible in this log too.
+    if (assessment.detail) log(`  ${assessment.detail}`)
+    // A SKIP THAT OVERRODE AN EXPIRED LEASE IS NOT A HEALTHY TICK (four-eyes review
+    // of point 556, confirmed finding 1). It must keep ESCALATING, or the one state
+    // where the launcher deliberately declines to act would also be the one state
+    // nobody is ever told about — an owner silent past its lease with something
+    // still moving in the background would skip in silence tick after tick. The
+    // override is time-capped in the core; this is what makes the run-up audible.
+    if (assessment.reason === 'lease-expired-owner-working') {
+      const rep = verdictRepeat({
+        key: `${assessment.reason}#${ownerStateKey(lock)}`,
+        lastKey: state.wedgeVerdictKey,
+        repeats: state.wedgeVerdictRepeats,
+      })
+      state.wedgeVerdictKey = rep.key
+      state.wedgeVerdictRepeats = rep.repeats
+      if (rep.escalate) {
+        log(`ESCALATING: the same owner has outvoted its expired lease for ${rep.repeats} launcher ticks`)
+        await notify(
+          'Batch owner silent past its lease',
+          `${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has been silent past its lease for ${rep.repeats} ticks ` +
+            'running. It is NOT being taken over because its declared work keeps producing output — but if that is a ' +
+            'runaway rather than a long verification, only a person can tell. Please look.',
+          'high',
+        )
+      }
+      writeJsonAtomic(C('autostart-state.json'), state)
+      process.exit(0)
+    }
+    // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
+    // without this a later, identically-worded episode of the same owner would
+    // escalate on its second tick instead of its own count, because the key never
+    // stopped matching. The direction is harmless either way, but "escalates after N
+    // repeats" should mean N repeats of THIS episode.
+    delete state.wedgeVerdictKey
+    delete state.wedgeVerdictRepeats
+    delete state.writerVetoSince
     writeJsonAtomic(C('autostart-state.json'), state)
     process.exit(0)
   }
-  const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
-  log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
-  // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
-  // expired lease would be the same blindness in the other direction: the morning
-  // reader must be able to see that the arithmetic said "take it" and what
-  // outvoted it, or the next incident is invisible in this log too.
-  if (assessment.detail) log(`  ${assessment.detail}`)
-  // A SKIP THAT OVERRODE AN EXPIRED LEASE IS NOT A HEALTHY TICK (four-eyes review
-  // of point 556, confirmed finding 1). It must keep ESCALATING, or the one state
-  // where the launcher deliberately declines to act would also be the one state
-  // nobody is ever told about — an owner silent past its lease with something
-  // still moving in the background would skip in silence tick after tick. The
-  // override is time-capped in the core; this is what makes the run-up audible.
-  if (assessment.reason === 'lease-expired-owner-working') {
-    const rep = verdictRepeat({
-      key: `${assessment.reason}#${ownerStateKey(lock)}`,
-      lastKey: state.wedgeVerdictKey,
-      repeats: state.wedgeVerdictRepeats,
-    })
-    state.wedgeVerdictKey = rep.key
-    state.wedgeVerdictRepeats = rep.repeats
-    if (rep.escalate) {
-      log(`ESCALATING: the same owner has outvoted its expired lease for ${rep.repeats} launcher ticks`)
-      await notify(
-        'Batch owner silent past its lease',
-        `${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has been silent past its lease for ${rep.repeats} ticks ` +
-          'running. It is NOT being taken over because its declared work keeps producing output — but if that is a ' +
-          'runaway rather than a long verification, only a person can tell. Please look.',
-        'high',
-      )
-    }
-    writeJsonAtomic(C('autostart-state.json'), state)
-    process.exit(0)
-  }
-  // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
-  // without this a later, identically-worded episode of the same owner would
-  // escalate on its second tick instead of its own count, because the key never
-  // stopped matching. The direction is harmless either way, but "escalates after N
-  // repeats" should mean N repeats of THIS episode.
-  delete state.wedgeVerdictKey
-  delete state.wedgeVerdictRepeats
-  delete state.writerVetoSince
-  writeJsonAtomic(C('autostart-state.json'), state)
-  process.exit(0)
 }
 delete state.writerVetoSince
 // A LEASE THAT RAN OUT IS REPORTED, ALWAYS (docs/batch-resilience.md §5: no silent
@@ -978,6 +1294,16 @@ if (dispossessed) {
         ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
         : `owner process measured inactive (${assessment.reason}) — taking over; no live batch-writer process measured`,
   )
+  if (assessment.reason !== 'handed-over' && assessment.reason !== 'idle') {
+    journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+      session: lock.sessionId,
+      pid: lock.pid ?? null,
+      pidStartedAt: lock.pidStartedAt ?? null,
+      generation: lock.fence ?? null,
+      cause: assessment.reason,
+      evidence: { detail: assessment.detail ?? null, detectedBy: 'launcher' },
+    })
+  }
   if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
@@ -996,7 +1322,7 @@ if (dispossessed) {
 // practically nothing, so the probe rides the ordinary tick.
 const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
 const lastSpawn = readJson(C('autostart-last.json'))
-if (lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < backoffMs) {
+if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })) {
   log(
     `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
       `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +
@@ -1016,6 +1342,10 @@ const preflight = judgeSpawnPreflight({ probes: environmentProbes() })
 if (!preflight.ok) {
   state.failCount = (state.failCount || 0) + 1
   log(`PREFLIGHT REFUSED — not spawning: ${preflight.reason} (failCount=${state.failCount})`)
+  journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+    cause: 'environment-preflight',
+    evidence: { reason: preflight.reason, probes: preflight.probes ?? [], retryAt: now + spawnBackoffMs({ failCount: state.failCount }) },
+  })
   await notify(
     'Batch spawn BLOCKED',
     `The launcher would have started a successor but the environment failed its preflight (${preflight.reason}). ` +
@@ -1068,6 +1398,11 @@ if (repoVerdict.alert) {
   clearMandateMarker({ path: C('repo-mandate.json') })
 }
 if (repoVerdict.mandate) writeMandateMarker({ path: C('repo-mandate.json'), at: now, code: repo.code ?? null, reason: repoVerdict.reason })
+
+journal(ACTIVITY_EVENTS.SPAWN_ATTEMPT, {
+  cause: assessment.reason === 'handed-over' ? 'handover-successor' : 'launcher-recovery',
+  evidence: { head: curHead, openPoints: open, decision: startDecision.reason, ownerAssessment: assessment.reason },
+})
 
 /** Run the doctor and report how it went. `write` false keeps it to its read-only
  *  levels. Never throws: an unrunnable doctor is reported as such and decided
@@ -1126,9 +1461,17 @@ const acq = acquire(launcherSid, {
   // an owner that renewed in the race window keeps its lock and this tick logs
   // "held". The take is recorded on the new lock so the morning reader can see
   // whose batch this was.
-  extra: dispossessed
-    ? { takenFromExpiredLease: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
-    : undefined,
+  expected: triggerKind === SUCCESSOR_TRIGGERS.BOUNDARY && lock
+    ? { sessionId: lock.sessionId, fence: trigger.generation, handedOver: true }
+    : predecessorToken && lock?.spawnToken
+      ? { spawnToken: predecessorToken }
+      : undefined,
+  extra: {
+    ...startDecision.reservation,
+    ...(dispossessed
+      ? { takenFromExpiredLease: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
+      : {}),
+  },
 })
 if (acq !== 'acquired') {
   log(`skip: atomic acquire returned "${acq}" — a session claimed the lock in the race window; NOT spawning`)
@@ -1159,6 +1502,10 @@ if (!exe) {
   release(launcherSid)
   const searched = cliSearchSummary()
   log(`FAIL: no claude CLI found — ${searched}`)
+  journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+    cause: 'environment-cli-missing',
+    evidence: { searched, retryAt: now + spawnBackoffMs({ failCount: (state.failCount || 0) + 1 }) },
+  })
   await notify('claude CLI missing', `The autostart launcher found no claude CLI — resurrection is down. ${searched}`, 'urgent')
   // `bail`, not a bare exit (point 443 (h)). Everything this tick learned would
   // otherwise be thrown away — including `state.repoAlertAt`, which was set MINUTES
@@ -1231,28 +1578,45 @@ try {
   // speaks — the runaway ladder does the rest at the next tick.
   child.on('error', (e) => {
     log(`FAIL: could not spawn claude (${e && e.message}) — exe ${exe}`)
+    journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+      cause: 'spawn-error', evidence: { message: e?.message ?? String(e), exe, retryAt: now + spawnBackoffMs({ failCount: (state.failCount || 0) + 1 }) },
+    })
     void notify('Spawn failed', `Could not launch the claude CLI at ${exe}: ${e && e.message}`, 'urgent')
   })
   child.unref()
 } catch (e) {
   release(launcherSid)
   log(`FAIL: could not spawn claude (${e && e.message})`)
+  journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+    cause: 'spawn-threw', evidence: { message: e?.message ?? String(e), retryAt: now + spawnBackoffMs({ failCount: (state.failCount || 0) + 1 }) },
+  })
   await notify('Spawn failed', `Could not launch the claude CLI: ${e && e.message}`, 'urgent')
   bail(1) // same reason as the missing-exe path above (point 443 (h))
 }
 // Rebind the pending lock to the child so the singleton's liveness follows the
 // spawned process, and the spawned session may convert it to itself (pid-bound).
-updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: null })
+const childStartedAt = probePid(child.pid)?.startedAt ?? now
+updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: childStartedAt })
 // One-shot bind helper for the spawned session's SessionStart hook.
 writeJsonAtomic(C('autostart-authorized.json'), {
   at: now,
   pid: child.pid,
+  spawnToken,
   startReason: startDecision.reason,
   measured: startDecision.evidence,
 })
+const supervisor = startChildSupervisor({ pid: child.pid, pidStartedAt: childStartedAt, token: spawnToken })
 writeJsonAtomic(
   C('autostart-last.json'),
-  launcherStartRecord({ decision: startDecision, at: now, head: curHead, pid: child.pid }),
+  launcherStartRecord({
+    decision: startDecision,
+    at: now,
+    head: curHead,
+    pid: child.pid,
+    pidStartedAt: childStartedAt,
+    supervisorPid: supervisor?.pid,
+    supervisorStartedAt: supervisor?.startedAt,
+  }),
 )
 writeJsonAtomic(C('autostart-state.json'), {
   ...state,
@@ -1270,7 +1634,21 @@ writeJsonAtomic(C('autostart-state.json'), {
   // everything that arrived during this very tick (four-eyes review, 29.07.2026).
   chatHandedAt: nextChatHandedAt({ spawned: true, previous: state.chatHandedAt, now: Date.now() }),
 })
-log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
+journal(ACTIVITY_EVENTS.SUCCESSOR_START, {
+  session: launcherSid,
+  pid: child.pid,
+  pidStartedAt: null,
+  cause: 'spawned-successor',
+  evidence: {
+    head: curHead,
+    startReason: startDecision.reason,
+    launcherSession: launcherSid,
+    spawnToken,
+    supervisorPid: supervisor?.pid ?? null,
+    supervisorStartedAt: supervisor?.startedAt ?? null,
+  },
+})
+log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervisor ${supervisor?.pid ?? 'failed'}`)
 // A PROBE UNDER A STANDING BLOCK IS NOT NEWS (point 444). Probing every quarter of
 // an hour through a limit window would otherwise buzz an unattended phone all
 // night for a condition that repairs itself; the probes stay in the log, and the

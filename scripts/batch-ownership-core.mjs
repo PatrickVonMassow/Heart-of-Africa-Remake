@@ -216,6 +216,81 @@ export function workedSinceClaim(lock) {
   return claimed > acquired
 }
 
+const OWNER_PROGRESS_EVENTS = new Set([
+  'foreground-activity',
+  'delegated-start',
+  'delegated-finish',
+  'verification-start',
+  'verification-progress',
+  'verification-finish',
+  'ci-wait-start',
+  'ci-wait-observation',
+  'ci-wait-finish',
+])
+
+/**
+ * Has the owner produced real work across launcher decisions? PURE.
+ *
+ * A bare owner heartbeat and its pid are deliberately absent. Foreground
+ * completion, delegated/verification/durable-wait transitions, and a timestamp
+ * proved by declared work are the four admitted sources. That last source includes
+ * a matching live pid-backed declaration: `checkEvidence` stamps each successful
+ * identity probe at the observation time. The first observation establishes a
+ * baseline; two unchanged intervals after it assess the generation stalled.
+ */
+export function ownerActivityDecision({ lock = null, work = null, records = [], previous = null } = {}) {
+  const sessionId = typeof lock?.sessionId === 'string' ? lock.sessionId : null
+  const generation = Number.isSafeInteger(lock?.fence) ? lock.fence : null
+  if (!sessionId) {
+    return {
+      stalled: false,
+      progressAt: null,
+      unchangedIntervals: 0,
+      state: null,
+      reason: 'no-owner',
+    }
+  }
+  // The journal is telemetry, never a takeover guard. `null` means its reader
+  // could not establish a complete snapshot (missing, unreadable, or short read),
+  // which is categorically different from a successfully read journal containing
+  // no attributable records. Without that evidence the launcher may not advance
+  // the unchanged-interval counter in the unsafe direction.
+  if (!Array.isArray(records)) {
+    return {
+      stalled: false,
+      progressAt: null,
+      unchangedIntervals: 0,
+      state: null,
+      reason: 'activity-unassessable',
+    }
+  }
+  const attributed = (record) => {
+    if (!record || !OWNER_PROGRESS_EVENTS.has(record.event)) return false
+    if (record.session && record.session !== sessionId) return false
+    if (Number.isSafeInteger(record.generation) && generation !== null && record.generation !== generation) return false
+    return record.session === sessionId || (generation !== null && record.generation === generation)
+  }
+  const journalAt = records
+    .filter(attributed)
+    .reduce((latest, record) => Math.max(latest, Number.isFinite(record.atMs) ? record.atMs : 0), 0)
+  const outputAt = (Array.isArray(work?.items) ? work.items : [])
+    .filter((item) => item?.ok === true && Number.isFinite(item.progressAt))
+    .reduce((latest, item) => Math.max(latest, item.progressAt), 0)
+  const progressAt = Math.max(journalAt, outputAt) || null
+  const identity = `${sessionId}#${generation ?? 'nogen'}`
+  const same = previous?.identity === identity && previous?.progressAt === progressAt
+  const unchangedIntervals = same && Number.isSafeInteger(previous?.unchangedIntervals)
+    ? previous.unchangedIntervals + 1
+    : 0
+  return {
+    stalled: unchangedIntervals >= 2,
+    progressAt,
+    unchangedIntervals,
+    state: { identity, progressAt, unchangedIntervals },
+    reason: unchangedIntervals >= 2 ? 'no-real-progress' : progressAt === null ? 'no-progress-observed' : 'progress-observed',
+  }
+}
+
 /**
  * THE OWNERSHIP VERDICT. PURE, TOTAL, and the single decision point.
  *
@@ -240,6 +315,7 @@ export function ownershipVerdict({
   corroboration = null,
   work = null,
   ownerActivityAt = null,
+  activity = null,
   paused = false,
   idleWindowMs = IDLE_WINDOW_MS,
   leaseMs = LEASE_MS,
@@ -257,6 +333,19 @@ export function ownershipVerdict({
     return { settled: true, owns: false, reason: 'handed-over' }
   }
 
+  // A lease/heartbeat can be renewed without advancing the work. Once two full
+  // launcher decisions observe no foreground, delegate, verification or durable
+  // wait movement, that fresh paperwork no longer hides a stalled owner. Paused
+  // batches stand down from recovery exactly as every other ownership guard does.
+  if (activity?.stalled === true && paused !== true) {
+    return {
+      settled: true,
+      owns: false,
+      reason: 'stalled-no-progress',
+      detail: `no attributable batch progress across ${activity.unchangedIntervals} decision intervals`,
+    }
+  }
+
   const t = num(now)
   // THE OWNER'S LAST STATE CHANGE is `claimedAt`, which every completed tool call
   // stamps — the one timestamp the owner writes because it DID something. A caller
@@ -266,8 +355,10 @@ export function ownershipVerdict({
   // mtime — see `idleVerdict`. The lease is deliberately NOT folded in either,
   // because a PreToolUse renewal is written at the START of a call and would report
   // a 40-minute silence as a fresh one.
-  const activity = num(ownerActivityAt)
-  const changedAt = activity !== null && activity > lock.claimedAt ? activity : lock.claimedAt
+  const attributedActivityAt = num(ownerActivityAt)
+  const changedAt = attributedActivityAt !== null && attributedActivityAt > lock.claimedAt
+    ? attributedActivityAt
+    : lock.claimedAt
 
   // 3. A STATE CHANGE INSIDE THE WINDOW PROVES LIFE OUTRIGHT — no pid probe, and
   // a reboot does not override it (a re-claimed post-boot session writes one).

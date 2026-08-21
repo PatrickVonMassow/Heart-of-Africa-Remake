@@ -20972,3 +20972,359 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product defect, but it is a trap laid directly in front of the next
   point in the queue.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 772. An owner session repaired its own mechanism for two hours and never handed over
+  (measured 20.08.2026; the user ended it by hand at 10:38 after asking whether it was still
+  productive). A claim was recorded at 08:32. The owner then committed at 09:15, 09:23, 09:32,
+  09:44, 10:19, 10:27 and 10:37 — eight commits, every one of them a repair of the Stop hook it had
+  landed at 08:29 — and in those 126 minutes no work-order point moved: nothing landed, nothing was
+  ticked, point 614 was never begun. It also never handed over, although
+  `gatherBatchProgressInputs` computed `claim: "release"`, `inFlight: false` for its session id
+  throughout, which is the clean state that releases. At least seven of its turn ends passed
+  without the hand-back. Its board card stood at 08:30 the whole time and announced a handover that
+  never happened, while `dashboard-guard`, `dashboard-integrity-guard` and `dashboard-sync` sat in
+  the same Stop chain.
+  TWO SEPARATE QUESTIONS, and the point owes both: WHY the hand-back did not run in that session
+  when the same guard runs it here, and WHAT BOUNDS a repair loop — a mechanism whose own follow-up
+  fixes never end has to become visible as a number, rather than being noticed only because the
+  user asked.
+  FINAL STATE: a standing claim is honoured within a bounded number of the owner's turn ends or the
+  reason it is not is stated in the owner's own output; and consecutive commits that only repair
+  the same mechanism are counted and surfaced once the count leaves the ordinary range.
+  VERIFIABLE: Vitest over the pure halves — a claim that has survived N clean turn ends is
+  reported; a session whose last N commits all touch the same guard file is reported once, not
+  every turn. Plus the measured 20.08. sequence as a fixture, which must be reported by both.
+  IN FLIGHT — A BRANCH ALREADY STANDS (21.08.2026, handed over at a context boundary).
+  `feat/772-handover-and-repair-loop` carries the finished authoring by GPT-5.6 Sol at
+  `815a30d7`: a pure core `scripts/handover-repair-loop-core.mjs` beside its I/O half, both wired
+  into the EXISTING all-tools PostToolUse heartbeat rather than into a new hook, every path inside
+  try/catch so the heartbeat cannot be made to throw. The measured 20.08. sequence is one frozen
+  fixture and BOTH halves assert against it — claim survival over its seven turn ends, and the
+  eight-commit repair run reported once with count eight. "Surfaced once" is proven by remembering
+  a sha inside the live run, so a later separate run of the same mechanism still reports. Sol
+  reports test:unit and build green; lint and the audit were green under the pre-push gate.
+  THE CROSS-VENDOR REVIEW IS NOT RECORDED, so `mechanism-review-guard` still blocks the landing.
+  The delegated reader's verdict was merge-with-fixes on four findings, carried here so the next
+  session does not re-read the diff to rediscover them:
+  1. `observeOwnerLoops` reads and JSON-parses the FULL transcript on every owner tool call, as an
+     eager argument, even with no claim standing — measured ~32 ms read plus ~19 ms parse on a
+     10 MB transcript in this repository. The value is needed only when the claim observation key
+     is non-empty; gate it, or read the tail alone.
+  2. THE RECORDED "WHY" IS NOT PROVEN. Sol's stated cause is that the 20.08. owner never produced a
+     Stop event because every response ended in `tool_use`. That sits uneasily with this point's
+     own "at least seven of its turn ends passed", and the transcript examined looks like the
+     CLAIMANT window rather than the owner's — the owner's transcript was never identified. The
+     alternative this point hints at, a stale board card with `dashboard-guard` ahead of
+     `batch-progress-guard` in the Stop chain, was not examined. The mechanism survives either way,
+     because moving the hand-back onto PostToolUse is independent of the Stop chain; the recorded
+     WHY must be softened or proven before it becomes repository lore.
+  3. `guardMechanisms` recognises only `scripts/*-guard[-core][.test].mjs`, so a repair loop on a
+     non-guard mechanism is invisible. This point says "the same mechanism", not "the same guard".
+  4. NEEDS AN OWNER OPINION: the hand-back now fires MID-TURN from PostToolUse rather than at a
+     clean turn end. The release still gates on in-flight work and a git operation in progress, but
+     this is the first place the batch lock is released while the owner is still mid-response.
+  Criticality: high — the batch stood still for two hours with a live owner, and neither the
+  handover mechanism nor the board noticed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 800. The boundary hands out a handover text "verbatim", and the board's own publish gate
+  refuses exactly that text — at every point boundary (measured 20.08.2026, 23:32, closing 793).
+  WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare 793` printed the gap-card text and
+  instructed: "take this text verbatim rather than writing it again. It names NO point number on
+  purpose: it goes into the unnumbered gap card, where the topic guard reads every point reference
+  as a foreign one." Piping that exact text into `node scripts/board.mjs none --text-stdin` was
+  refused: "the handover card is the one card without a number, so its reason must NAME the point
+  the batch picks up next. The publish gate refuses a handover card that names none." The board
+  publish ran anyway on the OLD content, so the refusal also left a published board that did not
+  yet carry the card.
+  WHY IT MATTERS: this is not a one-off. Every session ends at a point boundary and every session
+  walks into the same wall, spends a turn discovering which of the two rules wins, and re-writes by
+  hand the sentence it was told not to write. Two guards in one repository disagree about one card,
+  and the one that speaks first is the one that is wrong.
+  FINAL STATE: one rule. `--prepare` emits a handover text that the publish gate accepts — it names
+  the point the successor picks up, which `--prepare` already knows as the first open point in
+  work-order order — and the topic guard tolerates that one forward reference on the unnumbered
+  card, as its own refusal message already demands. Whichever way it is resolved, the printed text
+  and the gate agree, and neither comment claims the other's rule.
+  VERIFIABLE: Vitest over the pure cores — the text `--prepare` composes for a given next point
+  passes the same predicate `board.mjs none` applies, asserted as one property over several
+  next-point numbers so the two cannot drift apart again; plus a case that the topic guard accepts
+  the forward reference on the unnumbered card; plus, for BOTH dictated forms, a case that the text
+  passes the conciseness budget and still matches every fragment `--commit` asserts.
+  ALSO COVERED — POINT 787 IS THE SAME WALL FILED FROM THE OTHER SIDE AND FOLDS INTO THIS POINT.
+  It measured two further gates on the same dictated text, and they are part of "one rule":
+  `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while the
+  dictated CLAIM form (the reserved-for-a-claiming-window variant) is 103 words in one block — so
+  the prescribed text is refused a second time, for an unrelated reason; and `--commit` afterwards
+  demands the card back, matched against EXACT fragments in `cardProofFragments` — `Der Punkt ist
+  abgeschlossen.` plus, for the claimed-window form, the literal `Der Stapel geht NICHT an eine
+  frische Sitzung` with that capitalisation — so shortening the text to fit the word budget makes
+  the boundary refuse its own handover with "THE BOARD DOES NOT CARRY THE HANDOVER CARD".
+  FINAL STATE therefore covers BOTH forms: what `--prepare` prints is accepted, as printed, by the
+  publish gate, the topic guard and the conciseness guard, and is still matched by the proof
+  fragments `--commit` asserts.
+  RELATED: point 434 (7) is where the verbatim card text came from; point 787 is the duplicate
+  filing this point supersedes.
+  THIS POINT OWNS THE TEXT RULE — THREE OPEN POINTS CARRIED THE SAME CONTRADICTION (found
+  21.08.2026 while deriving the handover chain). The dictated boundary text the publish gate
+  refuses was specified as work in points 800, 744 and 708 gap (1) at once, at queue positions 54,
+  8 and 27, so the fix would have been worked at 744 and then met twice more. THE CUT, OWED BEFORE
+  ANY OF THE THREE IS COMMISSIONED: this point keeps the text rule whole — the conciseness guard,
+  both dictated forms and the `--commit` proof fragments — and supersedes the duplicate filing
+  787. Point 744 keeps only what is uniquely its own. Point 708 strikes its gap (1) and keeps gaps
+  (2), (3) and (4). ORDER CONSEQUENCE: the dependency chain is 800 → 744 → 752, and this point
+  currently stands 46 positions behind the point that depends on it. Point 790 edits the same card
+  composer and is a rider on this branch, not a member of the chain.
+  Criticality: medium — no product defect, but it taxes every single session boundary, and the
+  instruction it contradicts is the one that says not to re-write the text.
+  Bundle: Chat & Tafel.
+
+- [x] 790. The handover card names the session id from BEFORE the `/clear`, so the reader looks for a
+  window that no longer exists (measured 20.08.2026, 19:16, while the user asked why his own window
+  had not taken the batch).
+  WHAT WAS MEASURED. The point-boundary card on the board said "Fenster c0ad5041 hat ihn beansprucht
+  … der Launcher reserviert ihn dort". The launcher's own log named the CURRENT id at the same
+  moment: "skip: session ecc312cf-… has CLAIMED the batch (reserved)". Both ids belong to the same
+  pid 2156063 (`.claude/session-process.json`) — `c0ad5041` was that window's session BEFORE the
+  `/clear`, `ecc312cf` after it. The card is therefore fed from an older source (the parallel-session
+  detection, or text dictated earlier in the session) rather than from `.claude/batch-claim.json`,
+  which is what the launcher reads.
+  WHY IT MATTERS: a session id dies with a `/clear` while the WINDOW lives on, and the card is the
+  one place a reader is told where the batch went. Naming a dead id makes a correct reservation look
+  like a lost one — the user asked exactly that question.
+  FINAL STATE: the dictated card takes its claimant from the claim record the launcher reads, and it
+  identifies the window by something that survives a `/clear` (the pid), not by the session id alone.
+  Where both are known it says so in one breath, so a reader can match what the launcher logs.
+  VERIFIABLE: pure test over the card composer — a claim record whose session id differs from the
+  one last seen in the same pid yields a card naming the CURRENT claimant, and the text never names
+  an id that no claim record carries.
+  Criticality: medium — no product defect, and the reservation itself worked; it misinforms the one
+  reader who has to decide whether to wait or take over.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 808. A session that dies inside the CI wait leaves the batch idle for up to an hour
+  (measured 21.08.2026 by the successor session, while resuming point 800).
+  WHAT WAS MEASURED. Owner session 6a0621ed wrote its last transcript line at 10:15:29 while the
+  `ci-status-guard` Stop hook told it to sleep about 90 s and end the turn again, for run
+  32462093487. It never came back. The launcher ticks every 900 s, yet successor 009b3d88 was
+  only spawned at 11:14:05, with the reason "no live batch-writer process measured; owner lock
+  assessed inactive (handed-over)" — about 59 minutes in which no session worked the batch. The
+  gap is visible on the board as the empty stretch between the 772 card (08:31-08:54) and the 800
+  card (11:14-11:24).
+  WHY IT HAPPENS: the CI wait is a SELF-DRIVEN loop. The guard's remedy is "sleep, then end the
+  turn again", so the wait only continues if the session re-invokes itself; once the turn ends
+  without that, nothing resumes it. Meanwhile the writer-veto age (2 h) and the lock's liveness
+  assessment keep the launcher from taking over on its next tick, so the one mechanism that could
+  rescue the batch is held off by the very state the dead session left behind.
+  FINAL STATE: a declared CI wait no longer depends on the waiting session staying alive. Either
+  the wait survives the session ending — something outside the session re-invokes it — or a
+  session that ends INSIDE a declared CI wait releases the lock immediately, so the very next
+  launcher tick takes the batch over. Whichever is chosen, the measured hour cannot recur: the
+  time between a session dying in the wait and a successor working is bounded by the launcher
+  interval, not by the writer-veto age.
+  VERIFIABLE: pure tests over the decision — a lock left behind by a session that ended inside a
+  declared CI wait is assessed takeable on the next launcher tick, while a lock left by a session
+  that ended normally keeps its present grace; and a still-live waiting session is never taken
+  over. Plus a case that replays the measured 21.08. state and yields a takeover within one
+  launcher interval instead of 59 minutes.
+  Criticality: medium — no product defect, but it is pure lost batch time, it recurs on every CI
+  wait, and the waits are frequent: this session alone declared three.
+  Bundle: Urlaubsfestigkeit.
+
+- [x] 809. The batch stands still between points, and no command can say which standstill was
+  work (measured 21.08.2026; the user ruled the same day that this point goes to the very FRONT
+  of the queue, ahead of 517, 744 and 752, so the tickets standing before the communication
+  mechanic are finished quickly: "Ich will, dass die Queue schnell abgearbeitet werden kann,
+  damit schnell die Tickets erledigt werden, die vor der Kommunikationsmechanik stehen").
+  WHAT WAS MEASURED. Measured 21.08.2026. Over four days main took 588 commits, and between
+  consecutive commits there are 65 gaps of 20 minutes or more, together 48.8 hours of a roughly
+  96-hour wall clock; nothing in the repository can say which of those hours were work and which
+  were standstill. Two causes were decomposed by hand. FIRST: owner session 6a0621ed wrote its
+  last transcript line at 08:15:29Z inside a ci-status-guard wait (run 32462093487 still running,
+  hook text: sleep about 90 s, then end the turn again) and never came back; nothing re-invoked
+  it. SECOND: the launcher then skipped four consecutive ticks with skip: live batch-writer
+  process 2156063 measured for session 593e0d2f independently of the owner lock - that process is
+  an idle VS Code extension window, alive since 19.08., whose last batch write was 07:08:03Z.
+  launcherStartDecision in scripts/batch-autostart-core.mjs lets a foreign live writer veto every
+  start for WRITER_VETO_MAX_AGE_MS (2 h) after its last write, ahead of every other rule including
+  an explicit handover. The successor started at 09:14:05Z, six minutes after the veto aged out:
+  59 minutes with nobody working the batch. The launcher saw it (ESCALATING ... has blocked
+  launcher recovery for 15 min) and had no remedy but to skip again. THE BLIND SECOND HALF ADDED A
+  THIRD, LARGER CAUSE: the handover travels by the 900-second scheduler tick at all - there is no
+  immediate successor start on a clean boundary or on a child exit - so every point pays scheduler
+  latency even when nothing is broken.
+  THE MEASUREMENT IS THIS POINT, THE THREE LEVERS IT AIMS ARE 811, 812 AND 813. The merged spec
+  fixed this cut in advance for the case that the whole request is too large to deliver as one
+  point, and it is: the journal, the classifier and the report are one mechanism, and each of the
+  three proven causes is another. So this point makes the standstill measurable and lands first in
+  every case; 811 (the handover stops travelling by scheduler tick), 812 (a writer may not veto by
+  existing) and 813 (the CI wait becomes durable) carry the levers and stand directly behind it.
+  Its report is what aims theirs.
+  FINAL STATE - THE STANDSTILL BECOMES MEASURABLE
+  1. A batch activity journal exists: append-only, concurrency-safe, one line per batch-state
+  transition, carrying UTC time, a monotonic sequence, the event type, the session, the point, the
+  PID together with its process start time, the ownership generation, the cause code and the
+  evidence behind it. Without it the question cannot be answered at all: commit times and the
+  launcher log alone cannot separate work from standstill.
+  2. The lifecycle emits into that journal: owner claims, foreground tool activity,
+  delegated-agent starts and finishes, verification starts and finishes, CI waits, handovers,
+  process exits, vetoes, pauses, spawn attempts, spawn failures and successor starts.
+  3. An open interval is bounded by explicit completion, by loss of process identity, or by a
+  renewable lease, so a crashed process cannot manufacture hours of apparent work. A fresh
+  heartbeat proves liveness only and never by itself classifies an interval as work.
+  4. ONE COMMAND REPORTS THE STANDSTILL and needs no batch lock: it prints every interval over a
+  threshold with start, end, duration, measured cause, the evidence behind that cause, and the
+  totals, in UTC, over a chosen window. Its declared inputs are the first-parent commit times on
+  main, .claude/autostart.log, the boundary markers, the verification run records, the session
+  transcripts and the journal of item 1. The threshold is stated where it is set, together with
+  why that number and not a smaller one.
+  5. The classifier splits overlapping evidence at event boundaries and assigns every wall-clock
+  millisecond exactly once under a documented precedence: nothing is dropped and nothing is
+  counted twice.
+  6. The classes are evidence-bound, not guessed: foreground work (session-linked transcript or
+  tool activity), delegated work (a live matching process, or branch, worktree or output-log
+  progress), verification (a named in-flight interval with command identity, progress lease and
+  result), CI wait (ref, SHA, workflow, run id, first and last observation, terminal result),
+  handover transition (from the committed handover or worker exit to the successor claiming
+  ownership), blocked by the user, blocked by quota, blocked by environment, blocked by a writer
+  veto (with the writer session, its process identity, its ownership generation, its last fenced
+  operation and the exact interval it blocked), standstill with no worker, and standstill with an
+  idle owner.
+  7. Evidence that is missing, contradictory or older than the journal stays UNKNOWN, is reported
+  with its duration and its share, and is never inferred to have been work from a commit gap, a
+  heartbeat or a living process.
+  8. The last 14 days run through the command once. The result is evidence in the point: how much
+  of the wall clock was standstill, split by class, and which classes are large enough to remove.
+  The analysis comes before the levers.
+  VERIFIABLE:
+  - CLASSIFIER: an advancing run record becomes work, the same interval without it becomes
+  idle-owner standstill, no owner plus a launcher skip becomes no-worker standstill, a pause
+  marker becomes blocked by the user, an unclassifiable interval becomes unknown and is counted as
+  such; every millisecond is covered exactly once, with no overlap.
+  - THE 21.08.2026 FIXTURE: the standstill after 08:15:29Z, the stale writer veto by session
+  593e0d2f, the remaining scheduler delay before 09:14:05Z, and totals that reconcile exactly
+  against elapsed wall time.
+  - THE FOUR-DAY FIXTURE keeps the measured 65 gaps and 48.8 hours and additionally accounts for
+  every minute by class.
+  FOUR EYES: this spec is the merged result of a blind-parallel divergent stage (CLAUDE.md §6).
+  Opus 5 wrote list A (15 entries) and GPT-5.6 Sol wrote list B (60 entries) from the same
+  evidence without seeing A; the union was folded under the decorrelated framing and counted by
+  scripts/blind-merge.mjs: 48 union entries, 38 merged, 2 only A, 35 only B, every input entry
+  accounted for. Fable 5 was unreachable as the third model (switch OFF, user instruction
+  20.08.2026), so the merge fell to GPT-5.6 Sol - the weaker same-model fallback, recorded as
+  such.
+  IMPLIED CHANGES: `docs/batch-owner-runbook.md` gains the standstill command and what its cause
+  classes mean; `docs/work-packages.md` gains the point. No design.md change. Overlaps to settle
+  when the point is cut: 517 (lease expiry and honoured claim), 744 and 752 (handover cost and
+  attribution), 795 (launcher liveness).
+  FILES AND POINTS: the journal, the classifier and the report command are new files; the emission
+  sites are scripts/batch-autostart.mjs, scripts/batch-boundary.mjs, scripts/batch-in-flight-core.mjs,
+  scripts/batch-ownership-core.mjs, scripts/ci-status-guard-core.mjs, .claude/autostart.log,
+  .claude/autostart-last.json; points 517, 744, 752, 795, 811, 812, 813.
+  Criticality: high — it is the user's own ranking decision and it governs how fast every
+  remaining point reaches him: 48.8 of 96 hours are gaps nobody can account for, one decomposed
+  gap was a full hour of nothing, and the largest cause turned out to be that the handover travels
+  by scheduler tick at all.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 811. The handover travels by the 900-second scheduler tick, so every point pays scheduler
+  latency even when nothing is broken (measured 21.08.2026 by the blind half of point 809's
+  four-eyes stage; lever 2a of that merged spec, cut as its own point because it is a mechanism of
+  its own).
+  WHAT WAS MEASURED. There is no immediate successor start on a clean boundary and none on a child
+  exit: a session that finishes its point commits its boundary and ends, and nothing runs until the
+  next 900-second tick of the OS scheduler happens to fire. On 21.08.2026 the decomposed incident
+  showed the tick as the only transport there is - the successor started at 09:14:05Z, six minutes
+  after a veto aged out, because a tick came round then and not because the handover reached
+  anyone.
+  FINAL STATE: a successful point boundary hands ownership over and requests its successor before
+  it returns; a supervisor watches the spawned child and runs the same guarded decision the moment
+  it exits, whether normally, by crash or by a Stop-hook termination. Boundary handover, supervised
+  exit and periodic recovery reach ONE pure successor-start decision that returns the precise
+  blocking evidence for every refusal, and handover generation, successor reservation and spawn
+  token move by one atomic compare-and-swap so no two paths can start two owners. The 900-second
+  tick remains the recovery watchdog for a missing supervisor or a failed spawn and is no longer
+  the normal transport; the resume prompt says so rather than promising that the next point waits
+  for the scheduler.
+  VERIFIABLE: a fake clock proves that a clean boundary, a clean child exit, a crash and a terminal
+  CI result each start exactly ONE successor without advancing the 900-second clock; a supervisor
+  restart, a concurrent tick, a duplicate boundary notification and a stale pending-spawn state all
+  recover through the same atomic decision without losing a wake or starting two writers.
+  DEPENDENCY: point 809 lands first — its journal is what makes the removed latency visible, and
+  its report states how much of the wall clock this lever is worth.
+  FILES: scripts/batch-autostart-core.mjs, scripts/batch-autostart.mjs, scripts/batch-boundary.mjs,
+  .claude/autostart-last.json; the resume prompt text.
+  Criticality: high — it is the largest of the three proven causes and it is paid on every single
+  point, not only on a broken one.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 816. Point 809 is ticked while no cross-vendor review of the merged branch is recorded, and
+  the criticality gate refuses every turn end until it is (found 21.08.2026 at the resumption that
+  followed 809's landing).
+  WHAT WAS MEASURED. `.claude/mechanism-reviews.jsonl` holds exactly one entry for the point — the
+  authoring commission of 10:57Z — and no verdict. A cross-vendor reading demonstrably happened
+  before the merge: points 810 and 815 name themselves as its output, and 810 records GPT-5.6 Sol
+  sweeping `scripts/ci-status-guard-core.mjs` and `scripts/batch-autostart-core.mjs`. But that
+  sweep read the point's SOURCES, not the branch that landed at e25ceb2c, and no receipt names a
+  reviewer or a verdict for the merged code. Recording one from the evidence that exists would be
+  inventing it, so the debt is filed rather than papered over. The branch has MIXED authorship —
+  GPT-5.6 Sol wrote most of it, Claude wrote 80b96e63 — which is the reason the review was never
+  cut cleanly in the first place.
+  FINAL STATE: the merged range of 809 carries a recorded verdict per author, cut so that no model
+  reads its own work: Claude reads the Sol commits, Sol reads the Claude commits, and every finding
+  is answered, filed as its own point, or struck with a reason. The criticality gate stops refusing
+  because the ledger holds the receipt, not because the tag was weakened.
+  VERIFIABLE: `node scripts/criticality-review-guard.mjs --status` reports point 809 cleared, and
+  the ledger entry names sha, reviewing model, verdict and mode. A mixed-authorship branch is
+  covered by a test or a documented rule that says how the range is cut, so the next one does not
+  repeat this.
+  MEASURED WHILE WORKING THIS POINT (21.08.2026). Both halves are now read and both verdicts are in
+  the ledger: GPT-5.6 Sol on the Claude commit (do-not-merge) and Claude on the nine Sol commits
+  (merge-with-fixes). Their findings are filed as points 817 and 818, which is one of the three
+  answers this point's FINAL STATE allows. The gate still refuses, because
+  `scripts/criticality-review-guard.mjs` accepts only a NON-REFUSING verdict as a clearance and has
+  no notion of "answered by filing it as its own point". So the point cannot close by recording an
+  honest verdict, and the only ways past the guard as it stands today are to weaken the tag or to
+  write a verdict nobody reached — both of which this point exists to forbid. THE GUARD IS THEREFORE
+  PART OF THE WORK: it must accept a finding that is demonstrably carried by an open point (by
+  number, checked against the work order) as answered, while still refusing a refusal that names
+  nothing. Escalated rather than guessed: no verdict was invented and no tag was touched.
+  Criticality: high — it is not a product defect, but it stands in the way of EVERY session's turn
+  end, and a HIGH-tagged point that landed unreviewed is exactly what the gate exists to prevent.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 812. A live writer process vetoes the launcher by merely existing, and an idle editor window
+  cost an hour of standstill (measured 21.08.2026 by the decomposition behind point 809; lever 2b
+  of that merged spec, cut as its own point because it is a mechanism of its own).
+  WHAT WAS MEASURED. The launcher skipped four consecutive ticks with skip: live batch-writer
+  process 2156063 measured for session 593e0d2f independently of the owner lock. That process was
+  an idle VS Code extension window, alive since 19.08., whose last batch write was 07:08:03Z.
+  launcherStartDecision lets a foreign live writer veto every start for WRITER_VETO_MAX_AGE_MS
+  (2 h) after its last write, ahead of every other rule including an explicit handover, so the
+  batch stood still for 59 minutes with nobody working it. The escalation fired (ESCALATING ... has
+  blocked launcher recovery for 15 min) and had no remedy but to skip again.
+  FINAL STATE: every writer record carries an ownership generation and an explicit active-or-retired
+  state, and an accepted handover or release retires that authority at once even while the host
+  process lives. A veto requires current fenced main-write authority or demonstrably advancing
+  work; the fixed two-hour historical-write veto goes, because it turned an idle editor window into
+  an hour of standstill. A retired generation is ignored, an unretired writer whose lock vanished
+  still vetoes, and the decision reports every simultaneously authoritative writer rather than the
+  first match. The escalation that fires after two blocked ticks executes a recovery - retiring an
+  explicitly handed-over generation or revoking its fence - rather than logging and skipping again.
+  Spawn progress counts only when it is attributed to the spawned child by token, session, PID
+  identity, generation or fenced write. A released or claimed reservation expires unless its holder
+  renews it with real batch activity, and an owner with no foreground, delegate, verification or
+  durable-wait progress across two decision intervals is assessed stalled even while its heartbeat
+  is fresh.
+  VERIFIABLE: launcherStartDecision — an advancing writer vetoes; an idle one does not; a retired
+  or handed-over writer does not; a recycled PID does not; an unretired writer whose lock vanished
+  still does; escalation cannot leave a retired writer blocking; the behaviour for the writer the
+  lock itself names stays as it is.
+  DEPENDENCY: point 809 lands first, and point 795 (launcher liveness) is the mechanism this
+  sharpens — a veto rule that ignores a live working session is the failure 795 already fixed from
+  the other side.
+  FILES: scripts/batch-autostart-core.mjs (launcherStartDecision, WRITER_VETO_MAX_AGE_MS,
+  spawnProgressed), scripts/batch-ownership-core.mjs, .claude/autostart.log.
+  Criticality: high — one measured occurrence cost a full hour, and the rule fires whenever any
+  editor window happens to be open.
+  Bundle: Session- & Repo-Hygiene.

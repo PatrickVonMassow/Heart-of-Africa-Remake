@@ -52,6 +52,7 @@ import {
   markClaimReleased,
   maxAgeMs,
   readClaim,
+  renewOwnClaim,
   writeClaim,
 } from './batch-claim.mjs'
 
@@ -106,17 +107,13 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     expect(asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS })).honour).toBe(true)
   })
 
-  it('29.07.2026 20:00: while a LIVE OWNER holds the lock the claim does NOT age out', () => {
-    // The incident (point 434 (6a)): 30 minutes is shorter than the owner's own
-    // gap between clean turn ends — this repository runs 30-40 minute suites — so
-    // a takeover recorded at the start of one lapsed unseen, and keeping it alive
-    // needed a background refresher that itself died silently (a watcher hit a
-    // 60-minute timeout; the claim would have lapsed at 20:29 with nobody the
-    // wiser). There is somebody to wait for, so nothing has to be fed.
+  it('a LIVE process does not preserve an unrenewed claimed reservation', () => {
     const longTurn = claimOf({ at: NOW - 3 * 60 * 60 * 1000 })
-    expect(asOwner(longTurn, { ownerHolding: true })).toMatchObject({ honour: true, reason: 'honour' })
-    // The bound that replaced the clock is the claiming WINDOW's own life: close
-    // it and the claim dies at once, however young it is.
+    expect(asOwner(longTurn, { ownerHolding: true })).toMatchObject({ honour: false, reason: 'expired' })
+    expect(asOwner({ ...longTurn, activityAt: NOW - 1_000 }, { ownerHolding: true })).toMatchObject({
+      honour: true,
+      reason: 'honour',
+    })
     expect(asOwner(claimOf(), { ownerHolding: true, probePid: deadClaimant }).reason).toBe('claimant-dead')
   })
 
@@ -310,14 +307,23 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     })
 
     it('counts the take-up window FROM THE RELEASE, and ends there', () => {
-      // The claim itself may be hours old — a live owner's turn is long, and that
-      // is why it does not age (bound 1). Counting the reservation from `claim.at`
-      // would expire every reservation a long-held batch produces before it began.
+      // The release starts the take-up reservation independently of claim age.
       expect(asOwner(releasedNow({ at: NOW - 5 * 60 * 60 * 1000 })).reserve).toBe(true)
       // It IS bounded, so a window left open but never taking what it asked for
       // cannot hold the batch: past the take-up window the handover applies again.
       expect(asOwner(releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS - 1 })).reserve).toBe(false)
       expect(asOwner(releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS })).reserve).toBe(true)
+    })
+
+    it('renews a released reservation only from attributable holder activity', () => {
+      const expired = releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS - 1 })
+      expect(asOwner(expired).reserve).toBe(false)
+      expect(asOwner({ ...expired, activityAt: NOW - 1_000 })).toMatchObject({
+        reserve: true,
+        reason: 'released-reserved',
+      })
+      expect(asOwner({ ...expired, activityAt: NOW + 1_000 }).reserve).toBe(false)
+      expect(asOwner({ ...expired, activityAt: expired.releasedAt - 1 }).reserve).toBe(false)
     })
 
     it('refuses a stamp nobody can reason about — a future one, or none at all', () => {
@@ -360,6 +366,39 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
       probePid: aliveClaimant,
     })
     expect(mine).toMatchObject({ honour: false, mine: true, reason: 'own-claim' })
+  })
+})
+
+describe('renewOwnClaim — foreground activity renews only its holder', () => {
+  it('writes activity for the same session or process, never a stranger', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'claim-renew-'))
+    const path = join(dir, 'batch-claim.json')
+    try {
+      writeClaim(claimOf(), path)
+      expect(renewOwnClaim('stranger', {
+        path,
+        now: NOW,
+        ancestor: { pid: 9999, startedAt: NOW - 1_000 },
+      })).toBe(false)
+      expect(readClaim(path).activityAt).toBeUndefined()
+      expect(renewOwnClaim(CLAIMANT, { path, now: NOW })).toBe(true)
+      expect(readClaim(path).activityAt).toBe(NOW)
+      expect(renewOwnClaim('after-compaction', {
+        path,
+        now: NOW + 1_000,
+        ancestor: { pid: CLAIMANT_PID, startedAt: CLAIMANT_STARTED },
+      })).toBe(true)
+      expect(readClaim(path).activityAt).toBe(NOW + 1_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('is wired before the non-owner stand-down and after pause stand-down', () => {
+    const source = readFileSync(resolve(REPO_ROOT, 'scripts', 'board-first-guard.mjs'), 'utf8')
+    expect(source.indexOf("if (existsSync(PAUSE)) process.exit(0)")).toBeLessThan(source.indexOf('renewOwnClaim('))
+    expect(source.indexOf('renewOwnClaim(')).toBeLessThan(source.indexOf('heldByOtherLiveOwner('))
+    expect(source).toMatch(/!isWorktreeCheckout\(REPO_ROOT\)[^\n]+renewOwnClaim/)
   })
 })
 

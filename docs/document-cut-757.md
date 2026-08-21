@@ -89,7 +89,7 @@ ceiling is only confirmed against the counter that enforces it.
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 333 lines / 2,095 words / 17,328 B | 334 / 2,095 | 1 line, 0 words |
-| `MEMORY.md` | 47 lines / 708 words / 5,590 B | 47 / 710 | 0 lines, 2 words |
+| `MEMORY.md` | 47 lines / 709 words / 5,598 B | 47 / 710 | 0 lines, 1 word |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, but two of them hold with nothing to spare, and that is the finding
@@ -106,8 +106,13 @@ TWO OF THESE ROWS HAVE SINCE MOVED, and the table follows the LIVING file rather
 than freezing the merge-day reading, because the unit case measures what the
 files hold today. `MEMORY.md` stood at 710 words on merge day; on 20.08.2026 a
 later session executed the ruled cut of the time-tracking entry and wrote others,
-and the count moved twice within the hour — the row above is a reading taken at
-07:33 that day, not the merge-day one.
+and the count moved twice within the hour. On 21.08.2026 it moved again: a new
+memory took the file one line and twenty words over both ceilings, and the room
+was made rather than the wall — two hooks about the same GitHub credential were
+merged into one entry and two more were tightened. The row above is the reading
+after that cut, not the merge-day one, and it shows what the pressure looks like
+from close up: one word of headroom, for a file designed to gain a line per
+memory.
 The global stub is GONE: the user released it in the same ruling and it was
 deleted on 20.08.2026 (backup `local/global-CLAUDE-before-deletion-20-08-2026.md`),
 so its row is history and `doc-budget-guard` simply skips a budget whose file no
