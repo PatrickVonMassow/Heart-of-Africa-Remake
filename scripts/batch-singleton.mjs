@@ -1448,6 +1448,9 @@ export function noteBatchWriter(sessionId, opts = {}) {
     const generation = owner?.sessionId === sessionId && typeof owner.fence === 'number'
       ? owner.fence
       : (typeof prior.generation === 'number' ? prior.generation : null)
+    const spawnToken = owner?.sessionId === sessionId && typeof owner.spawnToken === 'string' && owner.spawnToken
+      ? owner.spawnToken
+      : (typeof prior.spawnToken === 'string' && prior.spawnToken ? prior.spawnToken : null)
     processes[sessionId] = {
       ...prior,
       pid: processIdentity.pid,
@@ -1455,7 +1458,7 @@ export function noteBatchWriter(sessionId, opts = {}) {
       at: typeof prior.at === 'number' ? prior.at : now,
       batchWriterAt: now,
       generation,
-      spawnToken: typeof owner?.spawnToken === 'string' && owner.spawnToken ? owner.spawnToken : null,
+      spawnToken,
       authorityState: 'active',
     }
     for (const [sid, entry] of Object.entries(processes)) {

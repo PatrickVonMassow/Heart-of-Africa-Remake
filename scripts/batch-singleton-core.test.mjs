@@ -17,6 +17,7 @@ import { execFile } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
+import { spawnProgressed } from './batch-autostart-core.mjs'
 import {
   assessOwner,
   classifyParallel,
@@ -1645,6 +1646,7 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(
       noteBatchWriter('writer-session', {
         path,
+        lockPath,
         now: NOW,
         processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
       }),
@@ -1664,6 +1666,7 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(existsSync(lockPath)).toBe(false)
     noteBatchWriter('writer-session', {
       path,
+      lockPath,
       now: NOW + 1_000,
       processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
     })
@@ -1676,6 +1679,63 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
     })
     expect(readSessionProcesses({ path })['writer-session'].generation).toBe(17)
+  })
+
+  it('does not borrow another session’s spawn token and preserves its own prior token', () => {
+    const path = join(dir, 'foreign-spawn-token.json')
+    const processIdentity = { pid: 4242, startedAt: NOW - 60_000 }
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'writer-session',
+      claimedAt: NOW,
+      fence: 17,
+      spawnToken: 'writer-token',
+    }))
+    expect(noteBatchWriter('writer-session', { path, lockPath, now: NOW, processIdentity })).toBe(true)
+
+    rmSync(lockPath)
+    expect(noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 1_000,
+      processIdentity,
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session'].spawnToken).toBe('writer-token')
+
+    writeFileSync(lockPath, JSON.stringify({
+      sessionId: 'other-session',
+      claimedAt: NOW + 2_000,
+      fence: 18,
+      spawnToken: 'foreign-token',
+    }))
+    expect(noteBatchWriter('writer-session', {
+      path,
+      lockPath,
+      now: NOW + 2_000,
+      processIdentity,
+    })).toBe(true)
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({
+      generation: 17,
+      spawnToken: 'writer-token',
+    })
+
+    const newPath = join(dir, 'foreign-spawn-token-new-writer.json')
+    expect(noteBatchWriter('new-writer', {
+      path: newPath,
+      lockPath,
+      now: NOW + 3_000,
+      processIdentity,
+    })).toBe(true)
+    const batchWriters = readSessionProcesses({ path: newPath })
+    expect(batchWriters['new-writer'].spawnToken).toBe(null)
+    expect(spawnProgressed({
+      batchWriters,
+      lastSpawn: {
+        at: NOW + 2_000,
+        spawnToken: 'foreign-token',
+        pid: 9898,
+        pidStartedAt: NOW - 120_000,
+      },
+    })).toBe(false)
   })
 
   it('retires only the named writer generation and a later fenced write reactivates it', () => {
@@ -1786,8 +1846,12 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
 
   it('never records an unidentifiable process or a synthetic probe as a writer', () => {
     const path = join(dir, 'unidentified-writer-process.json')
-    expect(noteBatchWriter('writer-session', { path, processIdentity: null })).toBe(false)
-    expect(noteBatchWriter('preflight-writer', { path, processIdentity: { pid: 42, startedAt: NOW } })).toBe(false)
+    expect(noteBatchWriter('writer-session', { path, lockPath, processIdentity: null })).toBe(false)
+    expect(noteBatchWriter('preflight-writer', {
+      path,
+      lockPath,
+      processIdentity: { pid: 42, startedAt: NOW },
+    })).toBe(false)
     expect(readSessionProcesses({ path })).toEqual({})
   })
 
