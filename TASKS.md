@@ -298,6 +298,38 @@ put it is the mistake this line exists to stop.
   point.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 825. The criticality gate demands a receipt that no command writes (measured 21.08.2026,
+  20:1x). The gate offers two ways out of a recorded refusal: fix the finding and record the
+  re-review, OR file every finding as an open work-order point and append a
+  `review-findings-filed` receipt naming it. Only the first has a tool.
+  `scripts/mechanism-review.mjs --record` writes verdicts and does not know the row kind,
+  `scripts/criticality-review-guard.mjs` accepts `--status` and nothing else, and
+  `FINDINGS_FILED_KIND` appears nowhere outside `scripts/criticality-review-guard-core.mjs` and
+  its own test.
+  MEASURED: clearing the refusal on point 769 required appending a hand-written JSON line to
+  `.claude/mechanism-reviews.jsonl`, including the conditions that are stated only in the source —
+  `at` must be strictly greater than `reviewAt`, every entry of `findingPoints` must be an OPEN
+  point, and `model` and `sha` must match the reviewed row exactly. It worked (the gate moved from
+  `e1d242ac` on to the next record), which is precisely why it is dangerous: a receipt written
+  slightly wrong is silently ignored, and the gate then names a refusal whose disposition the
+  author believes is recorded.
+  THIS IS THE CLASS OF RETROSPECTIVE 3.140: an exception a mechanism grants in its own refusal
+  text, but builds no path for, forces whoever takes it to reconstruct that mechanism's
+  bookkeeping by hand.
+  FINAL STATE: one command records a findings-filed disposition — it takes the reviewed sha, the
+  point, and the open points that carry the findings, derives `model` and `reviewAt` from the
+  ledger row itself rather than asking for them, refuses a closed or non-existent finding point,
+  and refuses to write a row the gate would not accept. The gate's refusal text names that command
+  the way it already names `mechanism-review.mjs`.
+  VERIFIABLE: pure cases — the command produces a row the gate accepts for the reviewed refusal; a
+  finding point that is closed or unknown is refused rather than written; a sha with no matching
+  review row is refused; and the row it writes clears exactly the refusal it names and no other.
+  QUEUE RANK: with point 820, which rewrites the same gate. Reason: 820 changes what the gate
+  accepts, so building the writer beside it keeps one reading of the row format instead of two.
+  Criticality: medium — it corrupts nothing, but the documented escape is walkable only by hand
+  and a malformed receipt fails silently.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
   (measured 20.08.2026, all three in a single session). They are filed together because they are
   one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
@@ -11204,35 +11236,4 @@ to land than a mechanism that needs a review.
   urgency waits for the release.
   Criticality: medium — no data is corrupted, but delegated work is stranded and the board reports
   a run that no longer exists.
-  Bundle: Session- & Repo-Hygiene.
-- [ ] 825. The criticality gate demands a receipt that no command writes (measured 21.08.2026,
-  20:1x). The gate offers two ways out of a recorded refusal: fix the finding and record the
-  re-review, OR file every finding as an open work-order point and append a
-  `review-findings-filed` receipt naming it. Only the first has a tool.
-  `scripts/mechanism-review.mjs --record` writes verdicts and does not know the row kind,
-  `scripts/criticality-review-guard.mjs` accepts `--status` and nothing else, and
-  `FINDINGS_FILED_KIND` appears nowhere outside `scripts/criticality-review-guard-core.mjs` and
-  its own test.
-  MEASURED: clearing the refusal on point 769 required appending a hand-written JSON line to
-  `.claude/mechanism-reviews.jsonl`, including the conditions that are stated only in the source —
-  `at` must be strictly greater than `reviewAt`, every entry of `findingPoints` must be an OPEN
-  point, and `model` and `sha` must match the reviewed row exactly. It worked (the gate moved from
-  `e1d242ac` on to the next record), which is precisely why it is dangerous: a receipt written
-  slightly wrong is silently ignored, and the gate then names a refusal whose disposition the
-  author believes is recorded.
-  THIS IS THE CLASS OF RETROSPECTIVE 3.140: an exception a mechanism grants in its own refusal
-  text, but builds no path for, forces whoever takes it to reconstruct that mechanism's
-  bookkeeping by hand.
-  FINAL STATE: one command records a findings-filed disposition — it takes the reviewed sha, the
-  point, and the open points that carry the findings, derives `model` and `reviewAt` from the
-  ledger row itself rather than asking for them, refuses a closed or non-existent finding point,
-  and refuses to write a row the gate would not accept. The gate's refusal text names that command
-  the way it already names `mechanism-review.mjs`.
-  VERIFIABLE: pure cases — the command produces a row the gate accepts for the reviewed refusal; a
-  finding point that is closed or unknown is refused rather than written; a sha with no matching
-  review row is refused; and the row it writes clears exactly the refusal it names and no other.
-  QUEUE RANK: with point 820, which rewrites the same gate. Reason: 820 changes what the gate
-  accepts, so building the writer beside it keeps one reading of the row format instead of two.
-  Criticality: medium — it corrupts nothing, but the documented escape is walkable only by hand
-  and a malformed receipt fails silently.
   Bundle: Session- & Repo-Hygiene.
