@@ -189,6 +189,17 @@ put it is the mistake this line exists to stop.
   the ledger entry names sha, reviewing model, verdict and mode. A mixed-authorship branch is
   covered by a test or a documented rule that says how the range is cut, so the next one does not
   repeat this.
+  MEASURED WHILE WORKING THIS POINT (21.08.2026). Both halves are now read and both verdicts are in
+  the ledger: GPT-5.6 Sol on the Claude commit (do-not-merge) and Claude on the nine Sol commits
+  (merge-with-fixes). Their findings are filed as points 817 and 818, which is one of the three
+  answers this point's FINAL STATE allows. The gate still refuses, because
+  `scripts/criticality-review-guard.mjs` accepts only a NON-REFUSING verdict as a clearance and has
+  no notion of "answered by filing it as its own point". So the point cannot close by recording an
+  honest verdict, and the only ways past the guard as it stands today are to weaken the tag or to
+  write a verdict nobody reached — both of which this point exists to forbid. THE GUARD IS THEREFORE
+  PART OF THE WORK: it must accept a finding that is demonstrably carried by an open point (by
+  number, checked against the work order) as answered, while still refusing a refusal that names
+  nothing. Escalated rather than guessed: no verdict was invented and no tag was touched.
   Criticality: high — it is not a product defect, but it stands in the way of EVERY session's turn
   end, and a HIGH-tagged point that landed unreviewed is exactly what the gate exists to prevent.
   Bundle: Session- & Repo-Hygiene.
