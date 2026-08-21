@@ -76,6 +76,15 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/reapableSpawns\(/)
   })
 
+  it('wires process liveness into both persisted start records', () => {
+    expect(source).toMatch(
+      /launcherStartDecision\(\{[\s\S]{0,300}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,300}?probePid/,
+    )
+    const records = source.match(/launcherStartRecord\(\{/g) ?? []
+    expect(records, 'both the pre-spawn and pid-bound records carry measured evidence').toHaveLength(2)
+    expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
+  })
+
   // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
   // `assessOwnerWork` defaults to the launcher's window, but the launcher names it
   // anyway — and this pins that it does, because the window is the one input that

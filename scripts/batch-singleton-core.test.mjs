@@ -61,6 +61,8 @@ import {
   IN_FLIGHT_PATH,
   SESSIONS_SEEN_PATH,
   SESSION_ACTIVITY_PATH,
+  noteBatchWriter,
+  readSessionProcesses,
   PARALLEL_ALERT_PATH,
   DOCTOR_STATE_PATH,
   ANCESTOR_CACHE_PATH,
@@ -1599,6 +1601,35 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     // …but not forever.
     expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail, retryMs: 0 })).toBe(null)
     expect(failed).toBe(2)
+  })
+
+  it('records a batch writer process independently of the owner lock', () => {
+    const path = join(dir, 'batch-writer-process.json')
+    expect(
+      noteBatchWriter('writer-session', {
+        path,
+        now: NOW,
+        processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+      }),
+    ).toBe(true)
+    expect(readSessionProcesses({ path })).toEqual({
+      'writer-session': { pid: 4242, startedAt: NOW - 60_000, at: NOW, batchWriterAt: NOW },
+    })
+    // The marker survives without a lock and advances on the next main write.
+    expect(existsSync(lockPath)).toBe(false)
+    noteBatchWriter('writer-session', {
+      path,
+      now: NOW + 1_000,
+      processIdentity: { pid: 4242, startedAt: NOW - 60_000 },
+    })
+    expect(readSessionProcesses({ path })['writer-session']).toMatchObject({ at: NOW, batchWriterAt: NOW + 1_000 })
+  })
+
+  it('never records an unidentifiable process or a synthetic probe as a writer', () => {
+    const path = join(dir, 'unidentified-writer-process.json')
+    expect(noteBatchWriter('writer-session', { path, processIdentity: null })).toBe(false)
+    expect(noteBatchWriter('preflight-writer', { path, processIdentity: { pid: 42, startedAt: NOW } })).toBe(false)
+    expect(readSessionProcesses({ path })).toEqual({})
   })
 
   it('a PROBE gets the same answer and leaves no record behind (point 434 (8))', () => {

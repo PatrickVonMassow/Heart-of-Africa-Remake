@@ -39,12 +39,12 @@ import {
   assessOwner,
   probePid,
   bootTimeMs,
-  spawnDecision,
   detectParallel,
   raiseParallelAlert,
   ownerStateKey,
   verdictRepeat,
   isOwnSpawn,
+  readSessionProcesses,
   PENDING_STALE_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
@@ -75,6 +75,8 @@ import {
   announceSpawn,
   firewallTopUpDecision,
   staleEtaLogLine,
+  launcherStartDecision,
+  launcherStartRecord,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -819,8 +821,21 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
 // kill-then-take valve — are gone. An owner whose lease ran out is not a third
 // state to be adjudicated; it is simply not the owner, and the takeover below is
 // the one this file has always performed for a dead one.
-const verdict = lock ? spawnDecision(assessment) : 'spawn'
+const startDecision = launcherStartDecision({
+  lock,
+  assessment,
+  batchWriters: readSessionProcesses(),
+  probePid,
+})
+const verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
+  if (!lock || assessment.alive !== true) {
+    log(`skip: ${startDecision.reason}`)
+    delete state.wedgeVerdictKey
+    delete state.wedgeVerdictRepeats
+    writeJsonAtomic(C('autostart-state.json'), state)
+    process.exit(0)
+  }
   const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
   log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
   // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
@@ -928,14 +943,14 @@ if (dispossessed) {
       ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
       : assessment.reason === 'idle'
         ? `IDLE owner superseded: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) held the batch without working — spawning the successor`
-        : `owner provably dead (${assessment.reason}) — taking over`,
+        : `owner process measured inactive (${assessment.reason}) — taking over; no live batch-writer process measured`,
   )
   if (assessment.reason === 'idle' && assessment.detail) log(`  ${assessment.detail}`)
 } else {
   // The headless path leaves no lock at all: a `claude -p` that ends at a
   // boundary exits, and SessionEnd releases the lock before this tick runs. Said
   // distinctly so the handover chain can be read from this file either way.
-  log('no owner lock — taking over')
+  log('no owner lock — taking over; no live batch-writer process measured')
 }
 
 // Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
@@ -1140,7 +1155,7 @@ try {
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
-writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead })
+writeJsonAtomic(C('autostart-last.json'), launcherStartRecord({ decision: startDecision, at: now, head: curHead }))
 log(
   `RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount}` +
     `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''})`,
@@ -1196,8 +1211,16 @@ try {
 // spawned process, and the spawned session may convert it to itself (pid-bound).
 updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: null })
 // One-shot bind helper for the spawned session's SessionStart hook.
-writeJsonAtomic(C('autostart-authorized.json'), { at: now, pid: child.pid })
-writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead, pid: child.pid })
+writeJsonAtomic(C('autostart-authorized.json'), {
+  at: now,
+  pid: child.pid,
+  startReason: startDecision.reason,
+  measured: startDecision.evidence,
+})
+writeJsonAtomic(
+  C('autostart-last.json'),
+  launcherStartRecord({ decision: startDecision, at: now, head: curHead, pid: child.pid }),
+)
 writeJsonAtomic(C('autostart-state.json'), {
   ...state,
   lastHead: curHead,

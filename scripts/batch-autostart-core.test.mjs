@@ -100,6 +100,29 @@ describe('launcher start liveness — process evidence, not lock presence', () =
     expect(decision.evidence.batchWriters[0]).toMatchObject({ measuredExists: false, sameProcess: false })
   })
 
+  it('does not start when a DIFFERENT live writer survives beside a stale lock', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'stale-owner', pid: 3131 },
+      assessment: { alive: false, reason: 'pid-dead' },
+      batchWriters: { 'window-session': writer },
+      probePid: (pid) =>
+        pid === writer.pid ? { exists: true, startedAt: writer.startedAt } : { exists: false, startedAt: null },
+    })
+    expect(decision).toMatchObject({ start: false })
+    expect(decision.reason).toContain('independently of the owner lock')
+  })
+
+  it('does not let the lock owner process undo its own explicit handover', () => {
+    const decision = launcherStartDecision({
+      lock: { sessionId: 'handing-over', pid: writer.pid, handedOver: true },
+      assessment: { alive: false, reason: 'handed-over' },
+      batchWriters: { 'handing-over': writer },
+      probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+    })
+    expect(decision).toMatchObject({ start: true })
+    expect(decision.reason).toContain('handed-over')
+  })
+
   it('does not mistake a recycled pid for the recorded batch writer', () => {
     const decision = launcherStartDecision({
       assessment: { alive: false, reason: 'no-lock' },

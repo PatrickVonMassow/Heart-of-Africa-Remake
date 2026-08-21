@@ -421,7 +421,14 @@ export function launcherStartDecision({ lock = null, assessment = null, batchWri
     },
     batchWriters: writers,
   }
-  const liveWriter = writers.find((writer) => writer.sameProcess)
+  // A lock's OWN writer does not overrule an explicit handover, idle release or
+  // expired lease: those are ownership transitions the existing assessment was
+  // built to decide, and handover deliberately leaves its process alive. What
+  // this independent registry adds is the process the lock DOES NOT name — a
+  // lockless writer, or a second writer beside a stale lock.
+  const liveWriter = writers.find(
+    (writer) => writer.sameProcess && (!lock || writer.sessionId !== evidence.lock.sessionId),
+  )
   if (liveWriter) {
     return {
       start: false,

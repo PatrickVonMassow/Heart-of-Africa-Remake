@@ -1387,6 +1387,57 @@ export function ourClaudeProcess(sessionId, opts = {}) {
 }
 
 /**
+ * Record that this top-level session is actively writing the batch's main
+ * checkout. The process identity lives beside, but independently of, the owner
+ * lock: losing or releasing the lock must not erase the launcher's evidence that
+ * the writer process itself is still alive.
+ *
+ * `ourClaudeProcess` supplies the memoised identity on the real hook path;
+ * tests may inject `processIdentity`. A missing identity records nothing — a
+ * session id or PID without a start-time-qualified process is not evidence the
+ * launcher may use to suppress a start indefinitely.
+ */
+export function noteBatchWriter(sessionId, opts = {}) {
+  if (!sessionId || isProbeSessionId(sessionId)) return false
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const now = opts.now ?? Date.now()
+    const processIdentity = Object.prototype.hasOwnProperty.call(opts, 'processIdentity')
+      ? opts.processIdentity
+      : ourClaudeProcess(sessionId, { ...opts, ancestorCachePath: path })
+    if (!(typeof processIdentity?.pid === 'number' && processIdentity.pid > 0)) return false
+    const processes = readJson(path) ?? {}
+    const prior = processes[sessionId] && typeof processes[sessionId] === 'object' ? processes[sessionId] : {}
+    processes[sessionId] = {
+      ...prior,
+      pid: processIdentity.pid,
+      startedAt: typeof processIdentity.startedAt === 'number' ? processIdentity.startedAt : null,
+      at: typeof prior.at === 'number' ? prior.at : now,
+      batchWriterAt: now,
+    }
+    for (const [sid, entry] of Object.entries(processes)) {
+      const last = Math.max(Number(entry?.at) || 0, Number(entry?.batchWriterAt) || 0)
+      if (now - last > 7 * 24 * 3600 * 1000) delete processes[sid]
+    }
+    writeJsonAtomic(path, processes)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Process identities available to the launcher. Missing/torn state is empty. */
+export function readSessionProcesses(opts = {}) {
+  try {
+    const path = opts.path ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+    const processes = readJson(path)
+    return processes && typeof processes === 'object' && !Array.isArray(processes) ? processes : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
  * Ownership, by session id first and by PROCESS second. Returns
  * `{ mine, via, lock }`. A process match is deliberately READ-ONLY: ancestry
  * grants the caller permission to act for the existing owner, but never lets an

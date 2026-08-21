@@ -700,3 +700,63 @@ export function fenceDecision({ fenceState, sessionId, toolName, command, filePa
     return { block: false, reason: '', kind: null }
   }
 }
+
+/**
+ * Is this call about to write the checkout whose current branch is `main`?
+ * PURE. The PreToolUse matcher already narrows the possible tools; this second
+ * classification keeps reads open and treats an unreadably deep shell wrapper
+ * conservatively as a write.
+ */
+export function mainWritingAction({ toolName, command } = {}) {
+  const tool = String(toolName ?? '')
+  if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Agent'].includes(tool)) {
+    return { writes: true, what: `${tool} in the main checkout` }
+  }
+  if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
+  let tooDeep = false
+  const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
+  const segment = segments.find((candidate) => isMutatingSegment(candidate))
+  if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
+  if (tooDeep) return { writes: true, what: 'a command wrapped deeper than the main-write fence can read' }
+  return { writes: false, what: '' }
+}
+
+/**
+ * A main-writing session must already own the batch lock. PURE and total.
+ *
+ * This is deliberately separate from stale-fence detection: the incident came
+ * from a session that had never acquired a lock or fence, so it could not be
+ * stale by definition. A delegated worktree remains exempt, and a paused batch
+ * remains entirely ungated. The wrapper records the owning process as a batch
+ * writer when `registerWriter` is true; that independent process record is what
+ * the launcher probes if the lock later disappears.
+ */
+export function mainWriteFenceDecision({
+  paused = false,
+  worktree = false,
+  branch = '',
+  ownsBatchLock = false,
+  toolName,
+  command,
+} = {}) {
+  try {
+    if (paused === true || worktree === true || branch !== 'main') {
+      return { block: false, registerWriter: false, reason: '' }
+    }
+    const action = mainWritingAction({ toolName, command })
+    if (!action.writes) return { block: false, registerWriter: false, reason: '' }
+    if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
+    return {
+      block: true,
+      registerWriter: false,
+      reason:
+        `MAIN WRITE REFUSED — this session holds no batch lock. The call is ${action.what}. ` +
+        'The lock is registration as well as ownership: without it the launcher cannot connect this writer to ' +
+        'its live process, and could start a second session beside it. Nothing was acquired silently. ' +
+        'Take the batch through the explicit claimant path (`node scripts/batch-claim.mjs --session <this session id>`) ' +
+        'or continue on an isolated feature worktree; a current owner may keep writing main.',
+    }
+  } catch {
+    return { block: false, registerWriter: false, reason: '' }
+  }
+}

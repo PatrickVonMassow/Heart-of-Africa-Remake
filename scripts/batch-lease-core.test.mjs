@@ -33,6 +33,8 @@ import {
   inDeclaredWaitWindow,
   declaredWaitStale,
   dispossessionNotice,
+  mainWritingAction,
+  mainWriteFenceDecision,
 } from './batch-lease-core.mjs'
 import { LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 
@@ -429,6 +431,39 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(fenceDecision({ fenceState: 'x', sessionId: 3, toolName: null }).block).toBe(false)
     expect(fenceGuardedAction()).toBe(null)
     expect(fenceGuardedAction({ toolName: 'Bash', command: null })).toBe(null)
+  })
+})
+
+describe('the main-write ownership fence', () => {
+  const decide = (over = {}) =>
+    mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'git commit -m x', ...over })
+
+  it('refuses a main-writing action from a session that holds no lock, in words', () => {
+    const decision = decide({ ownsBatchLock: false })
+    expect(decision).toMatchObject({ block: true, registerWriter: false })
+    expect(decision.reason).toContain('MAIN WRITE REFUSED')
+    expect(decision.reason).toContain('holds no batch lock')
+    expect(decision.reason).toContain('Nothing was acquired silently')
+    expect(decision.reason).toContain('batch-claim.mjs')
+  })
+
+  it('allows and registers an owner before its main write', () => {
+    expect(decide({ ownsBatchLock: true })).toEqual({ block: false, registerWriter: true, reason: '' })
+  })
+
+  it('stands down for a paused batch and an isolated worktree', () => {
+    expect(decide({ paused: true })).toEqual({ block: false, registerWriter: false, reason: '' })
+    expect(decide({ worktree: true })).toEqual({ block: false, registerWriter: false, reason: '' })
+  })
+
+  it('does not conscript reads or mutations on a feature branch', () => {
+    expect(decide({ branch: 'feat/x' })).toEqual({ block: false, registerWriter: false, reason: '' })
+    expect(decide({ toolName: 'Bash', command: 'git status --short' })).toEqual({
+      block: false,
+      registerWriter: false,
+      reason: '',
+    })
+    expect(mainWritingAction({ toolName: 'Edit' }).writes).toBe(true)
   })
 })
 
