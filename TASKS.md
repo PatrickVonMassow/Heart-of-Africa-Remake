@@ -11131,3 +11131,35 @@ to land than a mechanism that needs a review.
   Criticality: high — it blocks every turn end of every session for as long as any delegated author
   is running, and the only escape the gate itself names is pausing the batch.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 820. The unit suite's repository-integrity teardown turns a fully green run red whenever a
+  delegated author commits in its own worktree (measured 21.08.2026, 15:54-15:57, while GPT-5.6 Sol
+  was authoring on `feat/812-writer-veto`).
+  WHAT WAS MEASURED. `npm run test:unit` reported 363 files, 12422 passed, 1 skipped, 0 failed — and
+  then exited non-zero with a Startup Error from `assertRepositoryUnchanged` in
+  `scripts/repository-integrity.mjs`: `refs changed: refs/heads/feat/812-writer-veto 392956ff ->
+  05e1036c`. That ref belongs to a DIFFERENT worktree and a different branch; the checkout the suite
+  ran in was untouched. The push gate takes the non-zero exit as a red, re-runs the whole layer, and
+  the delegated author commits again during the second run, so the retry cannot clear it either. The
+  push was refused with no failing test in the summary.
+  WHY IT MATTERS. Delegated authoring commits every self-contained step by house rule, and a
+  main-session push runs the full unit layer. The two are the batch's normal simultaneous state, so
+  this refusal is not an edge case: it withholds the push rule's protection precisely when work is
+  being produced, and it leaves bookkeeping committed but unpushed.
+  FINAL STATE: the integrity check judges the REFS THE SUITE COULD HAVE TOUCHED — the running
+  checkout's own HEAD, index and working tree — and does not fail a run because another worktree's
+  branch advanced. Where it still wants to report foreign movement it reports it as an observation
+  beside a green verdict, never as the run's exit code. A change to the suite's own checkout keeps
+  failing exactly as today, because that is the leakage the check exists to catch.
+  VERIFIABLE: pure tests over the decision cover a foreign worktree's branch advancing (green,
+  observation only), the running checkout's own HEAD moving (red), and a working-tree modification in
+  the running checkout (red). The live case is reproduced from a recorded ref listing rather than by
+  driving git.
+  DEPENDENCY: none. Point 803 covers the same collision from the LOAD side (a run that names no
+  failing test under high load); this point is about a run whose tests all passed, so neither
+  subsumes the other.
+  FILES: scripts/repository-integrity.mjs, scripts/repository-integrity-guard.mjs,
+  scripts/repository-integrity-guard.test.mjs.
+  Criticality: high — it blocks every push made while a delegated author is running, which is the
+  batch's normal operating state, and its own retry cannot clear it.
+  Bundle: Session- & Repo-Hygiene.
