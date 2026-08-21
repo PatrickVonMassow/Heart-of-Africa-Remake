@@ -1314,7 +1314,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 09:04 · Quellen-Fingerprint: `270a5ba9bd61…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 09:24 · Quellen-Fingerprint: `9d1d4179715c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1410,8 +1410,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
 
-<!-- RETRO-FINGERPRINT: 270a5ba9bd6197579ad148683d4fe5760d6a8abae1988a971426634a3cea439b -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T07:04:22.008Z -->
+<!-- RETRO-FINGERPRINT: 9d1d4179715c4d62b24d452f5bcada4c8dc650dd0a1ff02a8d9ed7d3f2ff97ae -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T07:24:49.429Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2425,3 +2425,26 @@ verwandelt eine vergessene Übergabe in eine stille, gegenteilige Entscheidung. 
 geteilten Mechanismus: *Wie viele Stellen rufen ihn auf, und beantworten sie alle dieselbe Frage
 gleich?* Der Vergleich der Antworten ist billig — hier hätte ein Aufruf des Auskunftskommandos
 neben dem Launcher-Protokoll den Widerspruch sofort gezeigt.
+
+### 3.150 Sichtbar wird die verwaiste Arbeit nur durch den, der sie nicht mehr sichtbar machen kann
+
+Am 21.08.2026 fand die aufnehmende Sitzung zwei Zweige mit fertiger, gepushter Arbeit: einer meldete
+im eigenen Commit drei grüne Tore, der andere trug eine aufgezeichnete Gegenlesung. Beide waren
+weniger als eine Stunde alt, und auf beide zeigte nichts. Die Sitzung, die sie gebaut hatte, war ohne
+Punktgrenze und ohne In-Flight-Erklärung gestorben; die Auskunft über laufende Arbeit antwortete
+folgerichtig »nichts erklärt«. Gefunden wurden die Zweige, weil beim Prüfen auf einen halb fertigen
+Merge von Hand die Arbeitsbäume aufgelistet wurden — also durch einen Nebeneffekt, nicht durch einen
+Mechanismus.
+
+Die Klasse ist nicht »es fehlt ein Mechanismus«, denn der Mechanismus existiert: Die Parkliste macht
+genau solche Zweige sichtbar, mit Begründung und außerhalb der Platzzählung. Sie wird nur von Hand
+gefüllt — und zwar von der Sitzung, die den Zweig verlässt. Damit hängt der Rettungsschritt an
+demjenigen, der ihn im gemessenen Fall per Definition nicht mehr tun kann: Wer sauber übergibt,
+braucht die Parkliste nicht, weil die Übergabe die Arbeit ohnehin weiterreicht; wer unsauber endet,
+kommt nicht mehr dazu. Der Mechanismus deckt genau die Fälle ab, in denen er entbehrlich ist.
+
+**Lehre:** Ein Aufräumschritt, den nur die scheidende Partei ausführen kann, ist keine Absicherung
+gegen ihr Verschwinden — er ist eine Höflichkeit für den geordneten Fall. Prüffrage bei jedem
+Sicherungsnetz: *Wer muss handeln, damit es greift — und ist das ausgerechnet der, dessen Ausfall es
+abfangen soll?* Wo die Antwort ja lautet, muss die Absicherung aus dem Zustand selbst ablesbar sein
+(hier: aus den Refs), nicht aus einer gepflegten Liste.
