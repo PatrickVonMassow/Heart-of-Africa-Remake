@@ -24,6 +24,7 @@ import {
   readinessProblems,
   SOL_MODEL_ID,
   SOL_TRAILER,
+  uncommittedSummary,
   withheldEnvNames,
 } from './author-sol-core.mjs'
 
@@ -413,6 +414,17 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
   })
 })
 
+describe('uncommittedSummary', () => {
+  it('measures text and binary changes while counting every dirty path', () => {
+    expect(
+      uncommittedSummary({
+        dirty: ' M scripts/a.mjs\n?? scripts/new.test.mjs\n?? image.png',
+        numstat: '52\t5\tscripts/a.mjs\n66\t1\tscripts/new.test.mjs\n-\t-\timage.png',
+      }),
+    ).toEqual({ changedPaths: 3, measuredPaths: 3, binaryPaths: 1, insertions: 118, deletions: 6 })
+  })
+})
+
 describe('formatAuthoringReport', () => {
   it('hands the rest of the point to the reviewer, in order', () => {
     const judged = judgeAuthoring({ outcome: okRun, commits: [solCommit('f'.repeat(40), 'Fix the loop')], parsed: answered })
@@ -439,11 +451,41 @@ describe('formatAuthoringReport', () => {
     expect(text).toContain(`--mode review --point 1 --author-framing "${framing}"`)
   })
 
-  it('offers no next step where nothing was authored', () => {
+  it('reports NOTHING only for a clean tree with no commits', () => {
     const judged = judgeAuthoring({ outcome: okRun, commits: [], parsed: answered })
     const text = formatAuthoringReport({ point: 1, branch: 'b', judged, parsed: answered })
     expect(text).toMatch(/authored NOTHING/)
     expect(text).not.toMatch(/land-point/)
     expect(text).toMatch(/NOTHING WAS COMMITTED/)
+  })
+
+  it('measures a dirty tree with no commits and offers a checkpoint instead of claiming NOTHING', () => {
+    const judged = judgeAuthoring({
+      outcome: okRun,
+      commits: [],
+      parsed: answered,
+      dirty: ' M scripts/model-guard-core.mjs\n M scripts/model-guard-core.test.mjs',
+      numstat: '52\t5\tscripts/model-guard-core.mjs\n66\t1\tscripts/model-guard-core.test.mjs',
+    })
+    const text = formatAuthoringReport({ point: 792, branch: 'feat/792-fable-state', judged, parsed: answered })
+    expect(text).toMatch(/left UNCOMMITTED WORK/)
+    expect(text).toMatch(/2 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
+    expect(text).toContain(`git add -A && git commit`)
+    expect(text).toContain(SOL_TRAILER)
+    expect(text).not.toMatch(/authored NOTHING/)
+  })
+
+  it('reports commits first even when more work remains dirty', () => {
+    const judged = judgeAuthoring({
+      outcome: okRun,
+      commits: [solCommit('a'.repeat(40), 'Save the first step')],
+      parsed: answered,
+      dirty: '?? scripts/next.mjs',
+      numstat: '7\t0\tscripts/next.mjs',
+    })
+    const text = formatAuthoringReport({ branch: 'feat/x', judged, parsed: answered })
+    expect(text).toMatch(/authored 1 commit\(s\)/)
+    expect(text).toMatch(/UNCOMMITTED SIZE: 1 changed path\(s\), 7 insertion\(s\)/)
+    expect(text).not.toMatch(/authored NOTHING/)
   })
 })

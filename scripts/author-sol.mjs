@@ -259,6 +259,33 @@ export function commitsSince(base, { cwd = process.cwd(), ref = 'HEAD' } = {}) {
     })
 }
 
+/**
+ * The line-level size of every change left outside a commit. `git diff HEAD`
+ * covers both the index and tracked worktree; untracked files need measuring
+ * separately because Git deliberately omits them from that diff.
+ */
+export function uncommittedNumstat({ cwd = process.cwd(), read = readFileSync } = {}) {
+  const rows = [git(['diff', '--numstat', 'HEAD', '--'], { cwd }) ?? '']
+  const untracked = (git(['ls-files', '--others', '--exclude-standard', '-z'], { cwd }) ?? '').split('\0').filter(Boolean)
+  for (const path of untracked) {
+    try {
+      const bytes = read(join(cwd, path))
+      if (bytes.includes(0)) rows.push('-\t-\tuntracked')
+      else {
+        let lines = 0
+        for (const byte of bytes) if (byte === 10) lines += 1
+        if (bytes.length && bytes[bytes.length - 1] !== 10) lines += 1
+        rows.push(`${lines}\t0\tuntracked`)
+      }
+    } catch {
+      // The status still counts a file that vanished or became unreadable
+      // between the two reads. A binary marker keeps that uncertainty visible.
+      rows.push('-\t-\tuntracked')
+    }
+  }
+  return rows.filter(Boolean).join('\n')
+}
+
 /** git's unit separator, so a subject holding any punctuation still parses. */
 const UNIT = String.fromCharCode(31)
 
@@ -732,13 +759,15 @@ if (isMainModule(import.meta.url)) {
       }
     }
 
+    const dirty = git(['status', '--porcelain'], { cwd }) ?? ''
     const judged = judgeAuthoring({
       outcome,
       commits,
       parsed,
       branch,
       branchAfter,
-      dirty: git(['status', '--porcelain'], { cwd }) ?? '',
+      dirty,
+      numstat: dirty ? uncommittedNumstat({ cwd }) : '',
     })
     const said = String(run.finalMessage ?? '').trim()
     if (said) console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end ---\n`)

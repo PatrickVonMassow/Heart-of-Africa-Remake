@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
-import { ledgerSnapshot, recordAuthoringCommission, restoreLedger } from './author-sol.mjs'
+import { uncommittedSummary } from './author-sol-core.mjs'
+import { ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
@@ -71,6 +72,26 @@ const gitRepo = () => {
   git(dir, 'commit', '-q', '-m', 'seed')
   return dir
 }
+
+describe('uncommittedNumstat', () => {
+  it('measures the final tracked tree and untracked text and binary files', () => {
+    const repo = gitRepo()
+    writeFileSync(join(repo, 'seed.txt'), 'seed\nnext\n')
+    git(repo, 'add', 'seed.txt')
+    writeFileSync(join(repo, 'seed.txt'), 'seed\nnext\nthird\n')
+    writeFileSync(join(repo, 'new.txt'), 'one\ntwo')
+    writeFileSync(join(repo, 'image.bin'), Buffer.from([0, 1, 2]))
+
+    const dirty = git(repo, 'status', '--porcelain')
+    expect(uncommittedSummary({ dirty, numstat: uncommittedNumstat({ cwd: repo }) })).toEqual({
+      changedPaths: 3,
+      measuredPaths: 3,
+      binaryPaths: 1,
+      insertions: 4,
+      deletions: 0,
+    })
+  })
+})
 
 afterEach(() => {
   while (dirs.length) rmSync(dirs.pop(), { recursive: true, force: true })
