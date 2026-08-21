@@ -401,14 +401,20 @@ export function withoutCodeSpans(text) {
     .map((line) => {
       const runs = []
       for (const m of line.matchAll(/`+/g)) runs.push({ start: m.index, end: m.index + m[0].length, len: m[0].length })
-      const chars = [...line]
+      // SLICED BY THE RECORDED OFFSETS, never indexed into a code-point array: matchAll
+      // reports UTF-16 code units, and one emoji before a span is two of them against
+      // one array entry — the blanking then slid and erased the prose after it, which is
+      // a false negative on a line nobody would suspect (cross-vendor review, round 4).
+      let out = ''
+      let at = 0
       for (let i = 0; i < runs.length; i++) {
         const close = runs.findIndex((r, j) => j > i && r.len === runs[i].len)
         if (close < 0) continue
-        for (let k = runs[i].start; k < runs[close].end; k++) chars[k] = ' '
+        out += line.slice(at, runs[i].start) + ' '.repeat(runs[close].end - runs[i].start)
+        at = runs[close].end
         i = close
       }
-      return chars.join('')
+      return out + line.slice(at)
     })
     .join('\n')
 }

@@ -261,6 +261,14 @@ describe('proseRationaleFindings — the file instructs, it does not argue', () 
     expect(withoutCodeSpans('``a `b` c')).toBe('``a     c')
   })
 
+  it('keeps its offsets in code UNITS, so an astral character does not slide the blanking', () => {
+    // matchAll reports UTF-16 offsets; indexing a code-point array with them moved the
+    // span left by one per emoji and erased the prose behind it (round 4).
+    expect(withoutCodeSpans('🐘🐘 `safe` because')).toBe('🐘🐘        because')
+    expect(find('- 🐘🐘 `--because` is a flag.')).toEqual([])
+    expect(find('- 🐘🐘 `flag` because it is slow.')).toHaveLength(1)
+  })
+
   it('leaves a binding condition alone — only an ADVERB may stand before the purpose', () => {
     expect(find('If the lock exists and belongs to the session, keep it.')).toEqual([])
     expect(find('Keep the record where it exists and points to a live branch.')).toEqual([])
