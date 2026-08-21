@@ -564,9 +564,13 @@ describe('URGENCY is read off what the point STATES', () => {
     expect(statesHighUrgency('Does it block a lane? It stops the batch.')).toBe(true)
     // A negation standing AFTER what it denies counts too …
     expect(statesHighUrgency('"blocks the release" is not the observed failure.')).toBe(false)
-    // … but a COMMA after the phrase introduces a CONTRAST, not a denial of it,
-    // and reading that as one refuses a point that states the block outright.
+    // … but only where it ATTACHES to the phrase. A comma after it introduces a
+    // contrast, a subordinator introduces a reason, and a denial of something
+    // ELSE in front of it denies that other thing — reading any of the three as
+    // a denial of the phrase refuses a point that states the block outright.
     expect(statesHighUrgency('It blocks the release, not a development lane.')).toBe(true)
+    expect(statesHighUrgency('It blocks the release because no artifact can be published.')).toBe(true)
+    expect(statesHighUrgency('It does not block a development lane, it blocks the release.')).toBe(true)
     // …while the condition's OWN "cannot" is not read as a denial of itself.
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
     expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)

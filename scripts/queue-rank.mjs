@@ -186,7 +186,7 @@ function undoWrite(before, path = RECORD) {
 }
 
 /** The flags this command DISPATCHES on. Exactly one of them, exactly once. */
-export const ACTION_FLAGS = Object.freeze(['--ranked', '--ahead', '--seed', '--seed-boundary'])
+export const ACTION_FLAGS = Object.freeze(['--status', '--ranked', '--ahead', '--seed', '--seed-boundary'])
 
 /** The flags that carry a value. Repeating one is the same silent loss: only the
  *  first occurrence is ever read. */
@@ -201,8 +201,10 @@ const VALUE_FLAGS = Object.freeze(['--why', '--origin'])
  * 60` recorded a front decision and armed nothing, and `--ahead 60 --ahead 61`
  * answered for 60 while 61 stood unanswered. Both look like the command
  * succeeded. Exactly one action, each flag once, decided before anything is
- * written; no action at all is the STATUS read, which is why '' is an answer
- * rather than an error.
+ * written; no flag at all is the STATUS read, which is why '' is an answer
+ * rather than an error. `--status` counts as an action too (sixth pass): left
+ * out, `--status --ahead 60` chose the write and silently dropped the read the
+ * caller also asked for.
  */
 export function chosenAction(argv = []) {
   const list = Array.isArray(argv) ? argv : []

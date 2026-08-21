@@ -133,51 +133,37 @@ export const BLOCKING_PATTERNS = Object.freeze([
  */
 const NEGATION_CUE = /\b(?:not|never|nothing|cannot|can't|won't|doesn't|without|neither|nor|no)\b/i
 
-/** How far in front of a match a negation still governs it. */
+/** How far around a match a negation can still be looking at it. */
 const NEGATION_WINDOW = 60
 
 /**
- * Where a preceding clause ENDS — a full stop, a semicolon, a colon, or the
- * contrast words that flip a sentence back to a claim.
+ * A negation ATTACHED to the matched phrase, standing in front of it.
  *
- * A COMMA IS NOT ONE, AND NEITHER IS A NEWLINE (cross-vendor review,
- * 21.08.2026). Both were, and both let a plain denial through: "It does not, in
- * practice, stop the batch" put the negation behind the last comma, and every
- * point body in this work order is HARD-WRAPPED, so "does not\nstop the batch"
- * had a line break sitting between the two halves of one clause. Read as claims,
- * those sentences excuse exactly the point the rule exists to place behind the
- * release.
+ * A WINDOW WAS THE WRONG SHAPE (cross-vendor review, sixth pass). Scanning the
+ * clause in front for any cue read "it does not block a development lane, it
+ * blocks the release" as a denial of the SECOND phrase and refused a point that
+ * states the block outright. A negation governs the verb it stands in front of,
+ * so this is what is required: the cue, then at most a few words of adverbial
+ * filler, then the phrase itself. That still catches the denial the window was
+ * added for — "it does not, in practice, stop the batch" — because "in practice"
+ * is exactly such filler, and it stops attaching once a whole other predicate
+ * has intervened.
  */
-const CLAUSE_END = /[.;:!?—]|\bbut\b|\bhowever\b/gi
+const NEGATION_BEFORE = new RegExp(`${NEGATION_CUE.source}[\\s,]*(?:[\\w'-]+[\\s,]+){0,3}$`, 'i')
 
 /**
- * The words standing in front of a match inside its OWN clause, on one line.
- *
- * The text is whitespace-collapsed first, so a wrap can never separate a
- * negation from what it denies, and only a real clause end cuts the window: a
- * negation binds to the clause it stands in, and "it does not block a lane, but
- * it stops the batch" states the second condition outright.
- */
-function clauseBefore(text, at) {
-  const window = text.slice(Math.max(0, at - NEGATION_WINDOW), at)
-  const breaks = [...window.matchAll(CLAUSE_END)]
-  const last = breaks.length ? breaks[breaks.length - 1].index + breaks[breaks.length - 1][0].length : 0
-  return window.slice(last)
-}
-
-/**
- * The rest of the match's own clause — because a negation can stand AFTER what it
- * denies (cross-vendor review, 21.08.2026): «"blocks the release" is not the
+ * Where the matched phrase's own clause ENDS on the side AFTER it — because a
+ * negation can stand there too (fifth pass): «"blocks the release" is not the
  * observed failure» reads as a claim to anything that only looks backwards.
  *
- * A COMMA ENDS IT ON THIS SIDE, though it does not on the other (fifth pass).
- * After the phrase, a comma introduces the thing being contrasted rather than a
- * denial of the phrase itself — "it blocks the release, not a development lane"
- * states the block and denies something else, and reading that as a denial
- * REFUSES a genuinely urgent point. Before the phrase there is no such
- * asymmetry: "it does not, in practice, stop the batch" denies it across two.
+ * A COMMA ENDS IT ON THIS SIDE, and so does a subordinator (fifth and sixth
+ * pass). After the phrase, both introduce something OTHER than a denial of it:
+ * "it blocks the release, not a development lane" contrasts, and "it blocks the
+ * release because no artifact can be published" gives the reason. Reading either
+ * as a denial REFUSES a point that states the block outright.
  */
-const AFTER_END = /[.;:!?—,]|\bbut\b|\bhowever\b/i
+const AFTER_END =
+  /[.;:!?—,]|\b(?:but|however|because|since|when|while|if|as|so|unless|until|after|before)\b/i
 
 function clauseAfter(text, at) {
   const window = text.slice(at, at + NEGATION_WINDOW)
@@ -221,10 +207,12 @@ export function statesHighUrgency(body) {
     // EVERY occurrence, not the first: a body that denies one blocking condition
     // and names another states the second one all the same.
     for (const m of text.matchAll(new RegExp(re.source, `${re.flags.replace(/g/g, '')}g`))) {
-      // The clause AROUND the match, minus the matched words themselves — the
+      // Both sides, and neither reading the matched words themselves — the
       // condition's own "cannot" must not read as a denial of the condition.
-      const clause = `${clauseBefore(text, m.index)} ${clauseAfter(text, m.index + m[0].length)}`
-      if (!NEGATION_CUE.test(clause)) return true
+      const before = text.slice(Math.max(0, m.index - NEGATION_WINDOW), m.index)
+      if (NEGATION_BEFORE.test(before)) continue
+      if (NEGATION_CUE.test(clauseAfter(text, m.index + m[0].length))) continue
+      return true
     }
     return false
   })

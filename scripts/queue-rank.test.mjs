@@ -146,10 +146,10 @@ describe('which action an invocation is', () => {
   it('names the single action it was given', () => {
     for (const flag of ACTION_FLAGS) expect(chosenAction([flag, '60', '--why', 'w'])).toBe(flag)
   })
-  it('reads no action at all as the STATUS question, not as an error', () => {
+  it('reads NO flag at all as the STATUS question, not as an error', () => {
     expect(chosenAction([])).toBe('')
-    expect(chosenAction(['--status'])).toBe('')
     expect(chosenAction(undefined)).toBe('')
+    expect(chosenAction(['--status'])).toBe('--status')
   })
   it('refuses two actions instead of doing one of them', () => {
     expect(() => chosenAction(['--ranked', '60', '--ahead', '61', '--why', 'w'])).toThrow(
@@ -158,6 +158,9 @@ describe('which action an invocation is', () => {
     expect(() => chosenAction(['--seed-boundary', '--ahead', '60', '--why', 'w'])).toThrow(
       /different decisions/,
     )
+    // …and the READ is an action too: left out, it chose the write and dropped
+    // the status the caller had also asked for, without a word.
+    expect(() => chosenAction(['--status', '--ahead', '60', '--why', 'w'])).toThrow(/different decisions/)
   })
   it('refuses a repeated flag, whose later occurrences nothing would read', () => {
     expect(() => chosenAction(['--ahead', '60', '--ahead', '61', '--why', 'w'])).toThrow(
