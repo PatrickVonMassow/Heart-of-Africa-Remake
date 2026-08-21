@@ -342,7 +342,20 @@ export function openPointBodies(tasksMd) {
  * before the rule existed is not re-litigated at the first turn end.
  */
 export function releaseBoundaryProblem(tasksMd, rankRecordJson) {
-  const state = releaseBoundaryState(openPointsOf(tasksMd), parseRankRecord(rankRecordJson), {
+  return releaseBoundaryProblemFrom(tasksMd, parseRankRecord(rankRecordJson))
+}
+
+/**
+ * The same judgment on a record somebody has ALREADY parsed.
+ *
+ * A caller holding a parsed record must not hand it back as JSON to be read
+ * again: the normalised shape spells its absent parts as `null`, and the parser
+ * reads a present-but-unreadable part as TORN — so a round trip through
+ * `JSON.stringify` turns a perfectly good record into an unreadable one and the
+ * rule falls silent. The CLI holds a parsed record and used to do exactly that.
+ */
+export function releaseBoundaryProblemFrom(tasksMd, record) {
+  const state = releaseBoundaryState(openPointsOf(tasksMd), record, {
     releasePoint: RELEASE_TAG_POINT,
     bodies: openPointBodies(tasksMd),
   })

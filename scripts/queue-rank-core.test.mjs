@@ -524,8 +524,10 @@ describe('URGENCY is read off what the point STATES', () => {
     expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
   })
   it('requires the QUALIFICATION the spec names, not just the word "red"', () => {
-    // "holds a red" alone matched a body that says the opposite of the condition.
+    // "holds a red" alone matched a body that says the opposite of the condition,
+    // and stopping at "cannot" matched a red that cannot do something else.
     expect(statesHighUrgency('It holds a red temporarily, but the red can otherwise close.')).toBe(false)
+    expect(statesHighUrgency('It holds a red that cannot reproduce the defect.')).toBe(false)
     expect(statesHighUrgency('It holds a red which cannot close until the lane is fixed.')).toBe(true)
   })
   it('does NOT read a DENIED blocking condition as a claim', () => {
@@ -538,6 +540,9 @@ describe('URGENCY is read off what the point STATES', () => {
     expect(statesHighUrgency('The cost is a stale reading; it does not\n  stop the batch.')).toBe(false)
     // A contrast word DOES end it, because the second half is a claim again.
     expect(statesHighUrgency('It does not block a lane, but it stops the batch.')).toBe(true)
+    // …and so does every sentence end, not only the full stop.
+    expect(statesHighUrgency('It does not block a lane! It stops the batch.')).toBe(true)
+    expect(statesHighUrgency('Does it block a lane? It stops the batch.')).toBe(true)
   })
   it('reads an ordinary point as NOT high — the tag, the prose and the silence alike', () => {
     expect(statesHighUrgency(MEDIUM)).toBe(false)
@@ -690,6 +695,19 @@ describe('ARMING the front — once, by hand, with a reason', () => {
     expect(() => seedBoundary(unarmed, [60, 90], { releasePoint: 50, why: 'w' })).toThrow(/is not in the open work order/)
   })
 
+  it('refuses to re-arm a record the repository CARRIES but the checkout is missing', () => {
+    // The removal route: refuse, move the record aside, arm again, and today's
+    // front — breaches and all — becomes the legacy order.
+    expect(() =>
+      seedBoundary(unarmed, [60, 50], { releasePoint: 50, why: 'w', tracked: true, present: false }),
+    ).toThrow(/is missing here, but this repository carries it/)
+    // A record that is THERE arms normally — it is the REMOVAL that is refused.
+    expect(
+      seedBoundary(unarmed, [60, 50], { releasePoint: 50, why: 'w', at: 't', tracked: true, present: true }).boundary
+        .points,
+    ).toEqual([60])
+  })
+
   it('refuses to write over a torn record', () => {
     expect(() => seedBoundary(parseRankRecord('{oops'), [60, 50], { releasePoint: 50, why: 'w' })).toThrow(
       TORN_RECORD_MESSAGE,
@@ -724,11 +742,30 @@ describe('the FROZEN front survives every write, and only ever shrinks', () => {
     boundary: { at: 't', why: 'legacy', points: front },
   })
 
-  it('rides through a settle, a decision and a prune', () => {
+  it('rides through a settle that WRITES, a decision and a prune', () => {
+    // The settle must actually WRITE, or this asserts nothing: 70 is appended
+    // and answered, so the baseline grows — and the front must survive that.
+    const answered = {
+      ranked: { 70: { at: '', why: 'last is right', origin: ORIGIN_MACHINE } },
+      settled: { at: 't', points: [50, 60] },
+      boundary: { at: 't', why: 'legacy', points: [60] },
+    }
+    const settled = settleRecord([60, 50, 70], answered, { at: 'now' })
+    expect(settled.changed).toBe(true)
+    expect(settled.record.settled.points).toEqual([50, 60, 70])
+    expect(settled.record.boundary).toEqual({ at: 't', why: 'legacy', points: [60] })
     const record = withFront([50, 60], [60])
-    expect(settleRecord([60, 50], record, { at: 'now' }).record?.boundary?.points ?? [60]).toEqual([60])
     expect(recordRank(record, 60, { why: 'again' }).boundary.points).toEqual([60])
     expect(pruneRankRecord(record, [60, 50]).boundary.points).toEqual([60])
+  })
+
+  it('drops a grandfathered point the work order TICKS, even with no open points left', () => {
+    // The empty-order branch carried the front through untouched, so a point that
+    // closed while the order read empty kept its exemption into its reopen.
+    const settled = settleRecord([], withFront([50, 60], [60]), { at: 'now', closed: [60] })
+    expect(settled.changed).toBe(true)
+    expect(settled.record.boundary.points).toEqual([])
+    expect(settled.record.settled.points).toEqual([50])
   })
 
   it('drops a grandfathered point that has CLOSED, so its reopen is judged', () => {

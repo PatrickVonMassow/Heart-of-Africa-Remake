@@ -92,11 +92,13 @@ export const BLOCKING_PATTERNS = Object.freeze([
   /\bstops?\s+the\s+batch\b/i,
   /\bblocks?\s+(?:a|the|every|another)\s+lane\b/i,
   /\bblocks?\s+(?:the\s+)?release\b/i,
-  // THE QUALIFICATION IS PART OF THE CONDITION (cross-vendor review, 21.08.2026).
-  // A bare "holds a red" matched "it holds a red temporarily, but the red can
-  // otherwise close" — the opposite of what the spec names, and every pattern
-  // here EXCUSES a point rather than blocking one.
-  /\bholds?\s+a\s+red\s+(?:that\s+|which\s+)?cannot\b/i,
+  // THE QUALIFICATION IS PART OF THE CONDITION, IN FULL (cross-vendor review,
+  // 21.08.2026, twice). A bare "holds a red" matched "it holds a red
+  // temporarily, but the red can otherwise close"; stopping at "cannot" then
+  // matched "holds a red that cannot reproduce the defect". Both are the
+  // opposite of what the spec names, and every pattern here EXCUSES a point
+  // rather than blocking one, so the whole condition is required.
+  /\bholds?\s+a\s+red\s+(?:that\s+|which\s+)?cannot\s+(?:otherwise\s+)?close\b/i,
 ])
 
 /**
@@ -124,7 +126,7 @@ const NEGATION_WINDOW = 60
  * those sentences excuse exactly the point the rule exists to place behind the
  * release.
  */
-const CLAUSE_END = /[.;:]|\bbut\b|\bhowever\b/gi
+const CLAUSE_END = /[.;:!?]|\bbut\b|\bhowever\b/gi
 
 /**
  * The words standing in front of a match inside its OWN clause, on one line.
@@ -558,13 +560,29 @@ export const boundaryArmedMessage = (points = []) =>
  * breach it was looking at. It is refused on an already-armed record for the same
  * reason, and refused where the release point is not in the order at all, because
  * a front nobody can see is not a front anybody may freeze.
+ *
+ * AND THE REMOVAL ROUTE IS CLOSED THE SAME WAY (cross-vendor review, 21.08.2026).
+ * "Armed once" read off the record alone is armed-until-somebody-deletes-it: the
+ * gate refuses, the record goes aside, the arming takes today's front — breaches
+ * and all — as legacy order. So this writer is handed the same evidence
+ * `seedRecord` gets: a record the repository CARRIES but the checkout is MISSING
+ * was moved aside, not never written, and arming is refused with the restore
+ * named. The deliberate residual is identical too, and it is the one this whole
+ * file accepts: deleting the `boundary` PART out of a present record cannot be
+ * told from a legitimate edit by any mechanism here — the record is TRACKED, and
+ * what answers that is the diff under review.
  */
-export function seedBoundary(record, open, { releasePoint, why = '', at = '' } = {}) {
+export function seedBoundary(
+  record,
+  open,
+  { releasePoint, why = '', at = '', tracked = false, present = true, restore = RESTORE_CMD } = {},
+) {
   const reason = String(why ?? '').replace(/\s+/g, ' ').trim()
   if (!reason) throw new Error('--why is required — one line saying why the front as it stands is the legacy order')
   const { ranked, settled, boundary, torn } = normaliseRankRecord(record)
   if (torn) throw new Error(TORN_RECORD_MESSAGE)
   if (boundary) throw new Error(boundaryArmedMessage(boundary.points))
+  if (tracked && !present) throw new Error(removedRecordMessage(restore))
   const state = releaseBoundaryState(open, { ranked, settled }, { releasePoint })
   if (state.state === 'no-boundary') {
     throw new Error(
@@ -695,10 +713,13 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [] 
     if (kept.length === settled.points.length) return { changed: false, record: null }
     const live = {}
     for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
-    // The FROZEN FRONT rides through untouched: an empty order cannot narrow it
-    // any more than it can narrow the baseline, and erasing it on a bad read
-    // would grandfather the whole front at the next arming.
-    return storedChange({ ranked: live, settled: { ...settled, points: kept }, boundary })
+    // The FROZEN FRONT loses the same PROVEN-CLOSED points, and nothing else
+    // (cross-vendor review, 21.08.2026). Carrying it through untouched here kept
+    // a grandfathered point exempt through a close-and-reopen that happened
+    // while the order read empty — the very transition the tick evidence exists
+    // to catch. Absence still narrows nothing: only a tick drops anything.
+    const front = boundary ? { ...boundary, points: boundary.points.filter((n) => !finished.has(n)) } : boundary
+    return storedChange({ ranked: live, settled: { ...settled, points: kept }, boundary: front })
   }
   const state = appendGateState(list, record)
   // A RELEASE-BOUNDARY BREACH FREEZES THE BASELINE EXACTLY AS AN UNRANKED APPEND

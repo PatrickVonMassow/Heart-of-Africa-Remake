@@ -32,7 +32,7 @@ import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { QUEUE_REBUILD_CMD, RELEASE_TAG_POINT, closedPointsOf, openPointsOf } from './board-queue-core.mjs'
-import { releaseBoundaryProblem } from './queue-order-guard-core.mjs'
+import { releaseBoundaryProblemFrom } from './queue-order-guard-core.mjs'
 import {
   ORIGIN_MACHINE,
   RANK_CMD,
@@ -81,7 +81,7 @@ function writeRankRecord(record, open, tasksMd = '', path = RECORD) {
   // (point 789), and it has to be applied HERE as well as in the guard: this
   // command writes the record too, and a settle from either side would remember
   // the breaching point as a survivor and end the question by forgetting it.
-  const blocked = releaseBoundaryProblem(tasksMd, JSON.stringify(record)).breaches.map((b) => b.point)
+  const blocked = releaseBoundaryProblemFrom(tasksMd, record).breaches.map((b) => b.point)
   const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
   const next = settled.changed ? settled.record : pruneRankRecord(record, open)
   writeTextAtomic(path, `${JSON.stringify(next, null, 2)}\n`)
@@ -217,13 +217,31 @@ if (isMainModule(import.meta.url)) {
       // own. Like `--seed` it is a stated decision rather than something a guard
       // does for itself: an automatic freeze would grandfather the very breach it
       // was looking at.
+      const before = existsSync(RECORD) ? readFileSync(RECORD, 'utf8') : null
       const next = writeRankRecord(
-        seedBoundary(record, open, { releasePoint: RELEASE_TAG_POINT, why, at: new Date().toISOString() }),
+        seedBoundary(record, open, {
+          releasePoint: RELEASE_TAG_POINT,
+          why,
+          at: new Date().toISOString(),
+          present: before !== null,
+          ...recordProvenance(),
+        }),
         open,
         tasksMd,
       )
+      // A FAILED STAGING UNDOES THE WRITE (cross-vendor review, 21.08.2026).
+      // Reporting the failure while leaving the freeze on disk is the escape
+      // itself: the front — breaches included — would be exempt from the next
+      // turn on, out of a command that said it had done nothing.
       const unstaged = stageRecord()
-      if (unstaged) throw new Error(`the boundary was armed but ${RANK_RECORD_PATH} could not be staged (${unstaged})`)
+      if (unstaged) {
+        undoWrite(before)
+        throw new Error(
+          `armed nothing: ${RANK_RECORD_PATH} could not be staged (${unstaged}), and a freeze git does not carry ` +
+            'is one a later removal cannot be told apart from a front that was never frozen. The checkout is ' +
+            'unchanged; fix git and run the command again.',
+        )
+      }
       console.log(
         `queue-rank: release front frozen with ${next.boundary.points.length} point(s) in front of ` +
           `${RELEASE_TAG_POINT} — "${why.trim()}"`,
@@ -291,7 +309,7 @@ if (isMainModule(import.meta.url)) {
       // The FRONT of the order, asked in the same breath as its end (point 789):
       // the append gate says nothing about a point that ranked itself ahead of
       // the release, and the status is where somebody looks before the guard does.
-      const boundary = releaseBoundaryProblem(tasksMd, JSON.stringify(record))
+      const boundary = releaseBoundaryProblemFrom(tasksMd, record)
       if (boundary.reason) {
         console.log(`queue-rank: ${boundary.reason}`)
         process.exitCode = 1
