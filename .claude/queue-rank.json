@@ -226,18 +226,6 @@
       "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first.",
       "place": "last"
     },
-    "790": {
-      "at": "2026-08-21T06:59:48.174Z",
-      "why": "Nutzer 21.08.2026: die fuer den Uebergabe-Beschleunigungseffekt noetigen Punkte in passender Reihenfolge nach vorn.",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "800": {
-      "at": "2026-08-21T06:59:48.061Z",
-      "why": "Nutzer 21.08.2026: die fuer den Uebergabe-Beschleunigungseffekt noetigen Punkte in passender Reihenfolge nach vorn.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "802": {
       "at": "2026-08-21T01:29:55.069Z",
       "why": "Low criticality, nothing red today, and it is blocked behind point 762 which owns the same file — so last is where it belongs; the release order puts nothing but communication-mechanic work ahead of the queue anyway.",
@@ -273,6 +261,12 @@
       "why": "Directly behind the release point 174 and before 736: it is a medium-criticality backstop, not urgent, and the two branches it would have caught are parked and visible in the meantime.",
       "origin": "machine",
       "place": "last"
+    },
+    "809": {
+      "at": "2026-08-21T10:15:42.890Z",
+      "why": "Der Nutzer hat am 21.08.2026 ausdrücklich diese Reihenfolge verlangt: der Punkt steht vor der Auslieferung, damit die Tickets vor der Kommunikationsmechanik zügig durchlaufen",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -330,7 +324,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T07:34:40.126Z",
+    "at": "2026-08-21T10:15:42.896Z",
     "points": [
       174,
       184,
@@ -555,18 +549,17 @@
       779,
       785,
       786,
-      790,
       791,
       797,
       798,
       799,
-      800,
       802,
       803,
       804,
       805,
       806,
-      807
+      807,
+      809
     ]
   }
 }

@@ -1318,7 +1318,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 11:52 · Quellen-Fingerprint: `61a0137c1553…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 12:27 · Quellen-Fingerprint: `d41a6762c7b3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1412,10 +1412,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 79 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 81 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
 
-<!-- RETRO-FINGERPRINT: 61a0137c155353973f007ce657f0abe30156a058022338146259dc5bc26e0fc7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T09:52:28.533Z -->
+<!-- RETRO-FINGERPRINT: d41a6762c7b340086de61e052044195bac58697eb969c755cb0609d33894acbe -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T10:27:31.710Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2452,3 +2452,31 @@ gegen ihr Verschwinden — er ist eine Höflichkeit für den geordneten Fall. Pr
 Sicherungsnetz: *Wer muss handeln, damit es greift — und ist das ausgerechnet der, dessen Ausfall es
 abfangen soll?* Wo die Antwort ja lautet, muss die Absicherung aus dem Zustand selbst ablesbar sein
 (hier: aus den Refs), nicht aus einer gepflegten Liste.
+
+### 3.151 Der Stillstand, den nie jemand gemessen hat
+
+Am 21.08.2026 wurde zum ersten Mal gefragt, wie viel Zeit der Stapel eigentlich mit nichts verbringt.
+Die Antwort war, dass es keine Antwort gibt: Über vier Tage nahm `main` 588 Commits an, dazwischen
+liegen 65 Lücken von zwanzig Minuten und mehr, zusammen 48,8 von rund 96 Stunden — und nichts im
+Projekt kann sagen, welche dieser Stunden Arbeit waren (eine Browser-Suite, ein delegierter Autor,
+eine lange Prüfung) und welche Leerlauf. Das Startprotokoll unterscheidet nur seine eigenen
+Übersprung-Gründe, und der Punkt, der die Übergabe misst, misst die Übergabe, nicht den Stillstand.
+
+Bemerkenswert ist, was passierte, als EINE Lücke von Hand aufgeschlüsselt wurde. Sie war reiner
+Stillstand: 59 Minuten, in denen niemand am Stapel arbeitete, weil eine Sitzung im CI-Warten starb
+und der Starter ihren Nachfolger nicht startete — ein seit zwei Tagen untätiges Editor-Fenster galt
+ihm als lebender Schreiber und blockierte jeden Start, vor jeder anderen Regel und auch vor einer
+ausdrücklichen Übergabe. Der Starter SAH es und protokollierte es sogar als Eskalation, hatte aber
+keine Handlung dahinter, sondern übersprang erneut. Und die blinde Zweitlesung fand eine dritte,
+größere Ursache, nach der niemand gesucht hatte: Die Übergabe reist überhaupt nur im
+Viertelstundentakt des Schedulers — ein sauberes Punktende startet keinen Nachfolger, es wartet auf
+den nächsten Tick. Der gemessene Ausfall war also nicht die Ausnahme, sondern der sichtbar gewordene
+Teil eines Regelfalls.
+
+**Lehren:** Ein System, das seine eigene Untätigkeit nicht messen kann, optimiert zwangsläufig das,
+was es messen kann — hier die Kosten je Übergabe, während daneben Stunden verschwanden, die niemand
+je aufaddiert hatte. Die erste Lieferung eines solchen Punktes ist deshalb die MESSUNG, nicht der
+Hebel: Wer zuerst repariert, repariert die zwei Vorfälle, die jemand zufällig bemerkt hat. Und eine
+Zuordnung, die alles erklärt, ist die eigentliche Gefahr — nicht zuordenbare Zeit muss als solche
+ausgewiesen werden und ihr Anteil ist selbst ein Ergebnis. Dass ausgerechnet die größte Ursache erst
+der blinden Zweitlesung auffiel, ist der Beleg dafür, wozu das geteilte Verfahren da ist (§3.19).
