@@ -370,6 +370,16 @@ export function pruneSpawns({ spawns, probePid } = {}) {
 // --- WHAT THE LAUNCHER MEASURED BEFORE STARTING -------------------------------
 
 /**
+ * A process identity is evidence that a main writer still exists; the time of
+ * its last fenced main write is evidence that it is still acting as one. After
+ * two hours without another tracked-state write, keeping a merely living process
+ * authoritative would stop the batch indefinitely for a session that released
+ * its lock and then lingered. Eight launcher ticks leave ample time to expose an
+ * immediate lock-loss race while putting a hard end on that failure mode.
+ */
+export const WRITER_VETO_MAX_AGE_MS = 2 * 60 * 60 * 1000
+
+/**
  * May the launcher start a batch session? PURE.
  *
  * The owner lock is an ownership registration, not a process registry. A batch
@@ -390,7 +400,14 @@ export function pruneSpawns({ spawns, probePid } = {}) {
  * writer yet. Every outcome carries the evidence used, so the start record never
  * describes a lock state as if it had measured a process.
  */
-export function launcherStartDecision({ lock = null, assessment = null, batchWriters = {}, probePid = () => null } = {}) {
+export function launcherStartDecision({
+  lock = null,
+  assessment = null,
+  batchWriters = {},
+  probePid = () => null,
+  now = Date.now(),
+  writerVetoMaxAgeMs = WRITER_VETO_MAX_AGE_MS,
+} = {}) {
   const writers = []
   for (const [sessionId, record] of Object.entries(batchWriters && typeof batchWriters === 'object' ? batchWriters : {})) {
     if (!record || typeof record !== 'object' || typeof record.batchWriterAt !== 'number') continue
@@ -401,6 +418,10 @@ export function launcherStartDecision({ lock = null, assessment = null, batchWri
     const sameProcess =
       probe?.exists === true &&
       (recordedStartedAt === null || measuredStartedAt === null || Math.abs(recordedStartedAt - measuredStartedAt) <= 2000)
+    const writerAgeMs = now - record.batchWriterAt
+    // Future-dated and old records are observations we cannot place in the
+    // current writer episode. Neither may veto; process life alone is timeless.
+    const recentWrite = writerAgeMs >= 0 && writerAgeMs <= writerVetoMaxAgeMs
     writers.push({
       sessionId,
       pid,
@@ -409,6 +430,8 @@ export function launcherStartDecision({ lock = null, assessment = null, batchWri
       measuredStartedAt,
       sameProcess,
       batchWriterAt: record.batchWriterAt,
+      writerAgeMs,
+      recentWrite,
     })
   }
   const evidence = {
@@ -427,7 +450,7 @@ export function launcherStartDecision({ lock = null, assessment = null, batchWri
   // this independent registry adds is the process the lock DOES NOT name — a
   // lockless writer, or a second writer beside a stale lock.
   const liveWriter = writers.find(
-    (writer) => writer.sameProcess && (!lock || writer.sessionId !== evidence.lock.sessionId),
+    (writer) => writer.sameProcess && writer.recentWrite && (!lock || writer.sessionId !== evidence.lock.sessionId),
   )
   if (liveWriter) {
     return {
@@ -435,6 +458,7 @@ export function launcherStartDecision({ lock = null, assessment = null, batchWri
       reason:
         `live batch-writer process ${liveWriter.pid} measured for session ${liveWriter.sessionId}` +
         (lock ? ' independently of the owner lock' : ' with no owner lock present'),
+      veto: liveWriter,
       evidence,
     }
   }

@@ -61,6 +61,7 @@ import {
   staleEtaLogLine,
   launcherStartDecision,
   launcherStartRecord,
+  WRITER_VETO_MAX_AGE_MS,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 
@@ -79,12 +80,45 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       assessment: { alive: false, reason: 'no-lock' },
       batchWriters: { 'window-session': writer },
       probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+      now: NOW,
     })
     expect(decision).toMatchObject({ start: false })
     expect(decision.reason).toContain('live batch-writer process 4242')
     expect(decision.reason).toContain('no owner lock')
     expect(decision.evidence.lock).toMatchObject({ present: false, assessmentReason: 'no-lock' })
     expect(decision.evidence.batchWriters[0]).toMatchObject({ sessionId: 'window-session', sameProcess: true })
+    expect(decision.veto).toMatchObject({ sessionId: 'window-session', pid: 4242, writerAgeMs: 1_000 })
+  })
+
+  it('stops treating a living process as a writer after two hours without a main write', () => {
+    const oldWriter = { ...writer, batchWriterAt: NOW - WRITER_VETO_MAX_AGE_MS - 1 }
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { 'former-owner': oldWriter },
+      probePid: () => ({ exists: true, startedAt: oldWriter.startedAt }),
+      now: NOW,
+    })
+    expect(WRITER_VETO_MAX_AGE_MS).toBe(2 * 60 * 60 * 1000)
+    expect(decision).toMatchObject({ start: true })
+    expect(decision.evidence.batchWriters[0]).toMatchObject({
+      sessionId: 'former-owner',
+      sameProcess: true,
+      recentWrite: false,
+      writerAgeMs: WRITER_VETO_MAX_AGE_MS + 1,
+    })
+  })
+
+  it('does not let a future-dated writer record veto forever', () => {
+    const futureWriter = { ...writer, batchWriterAt: NOW + 60_000 }
+    const decision = launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      batchWriters: { future: futureWriter },
+      probePid: () => ({ exists: true, startedAt: futureWriter.startedAt }),
+      now: NOW,
+    })
+    expect(decision.start).toBe(true)
+    expect(decision.evidence.batchWriters[0]).toMatchObject({ recentWrite: false, writerAgeMs: -60_000 })
   })
 
   it('starts for a stale lock when neither its process nor any batch writer is live', () => {
@@ -93,6 +127,7 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       assessment: { alive: false, reason: 'pid-dead' },
       batchWriters: { 'stale-owner': { pid: 3131, startedAt: NOW - 60_000, batchWriterAt: NOW - 2_000 } },
       probePid: () => ({ exists: false, startedAt: null }),
+      now: NOW,
     })
     expect(decision).toMatchObject({ start: true })
     expect(decision.reason).toContain('no live batch-writer process measured')
@@ -107,6 +142,7 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       batchWriters: { 'window-session': writer },
       probePid: (pid) =>
         pid === writer.pid ? { exists: true, startedAt: writer.startedAt } : { exists: false, startedAt: null },
+      now: NOW,
     })
     expect(decision).toMatchObject({ start: false })
     expect(decision.reason).toContain('independently of the owner lock')
@@ -118,6 +154,7 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       assessment: { alive: false, reason: 'handed-over' },
       batchWriters: { 'handing-over': writer },
       probePid: () => ({ exists: true, startedAt: writer.startedAt }),
+      now: NOW,
     })
     expect(decision).toMatchObject({ start: true })
     expect(decision.reason).toContain('handed-over')
@@ -128,6 +165,7 @@ describe('launcher start liveness — process evidence, not lock presence', () =
       assessment: { alive: false, reason: 'no-lock' },
       batchWriters: { old: writer },
       probePid: () => ({ exists: true, startedAt: writer.startedAt + 10_000 }),
+      now: NOW,
     })
     expect(decision.start).toBe(true)
     expect(decision.evidence.batchWriters[0]).toMatchObject({ measuredExists: true, sameProcess: false })

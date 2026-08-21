@@ -826,13 +826,44 @@ const startDecision = launcherStartDecision({
   assessment,
   batchWriters: readSessionProcesses(),
   probePid,
+  now,
 })
 const verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
   if (!lock || assessment.alive !== true) {
+    // A separately recorded writer may outvote an inactive/missing owner lock,
+    // but that is a refusal to recover, not a healthy tick. Make repetition
+    // audible just like an expired lease that keeps outvoting takeover. The key
+    // is the writer PROCESS identity (not its changing last-write timestamp), so
+    // consecutive vetoes form one episode; the core separately ages the write
+    // evidence out after WRITER_VETO_MAX_AGE_MS.
+    const writer = startDecision.veto
+    const key = writer
+      ? `writer-veto#${writer.sessionId}#${writer.pid ?? 'nopid'}#${writer.recordedStartedAt ?? 'nostart'}`
+      : ''
+    const rep = verdictRepeat({
+      key,
+      lastKey: state.wedgeVerdictKey,
+      repeats: state.wedgeVerdictRepeats,
+    })
+    if (key !== state.wedgeVerdictKey || typeof state.writerVetoSince !== 'number') state.writerVetoSince = now
+    state.wedgeVerdictKey = rep.key
+    state.wedgeVerdictRepeats = rep.repeats
     log(`skip: ${startDecision.reason}`)
-    delete state.wedgeVerdictKey
-    delete state.wedgeVerdictRepeats
+    if (writer && rep.escalate) {
+      const blockedMinutes = Math.max(0, Math.round((now - state.writerVetoSince) / 60000))
+      log(
+        `ESCALATING: session ${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has blocked launcher recovery ` +
+          `for ${blockedMinutes} min (${rep.repeats} consecutive ticks)`,
+      )
+      await notify(
+        'Live writer blocking batch recovery',
+        `${writer.sessionId} (pid ${writer.pid ?? 'unknown'}) has vetoed a launcher start for ${blockedMinutes} minutes ` +
+          `across ${rep.repeats} consecutive ticks, although the owner lock is inactive or missing. Its last fenced ` +
+          `main write was ${Math.max(0, Math.round(writer.writerAgeMs / 60000))} minutes ago. Please look.`,
+        'high',
+      )
+    }
     writeJsonAtomic(C('autostart-state.json'), state)
     process.exit(0)
   }
@@ -877,9 +908,11 @@ if (verdict === 'skip-alive') {
   // repeats" should mean N repeats of THIS episode.
   delete state.wedgeVerdictKey
   delete state.wedgeVerdictRepeats
+  delete state.writerVetoSince
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
+delete state.writerVetoSince
 // A LEASE THAT RAN OUT IS REPORTED, ALWAYS (docs/batch-resilience.md §5: no silent
 // recovery). The take itself happens through the ordinary atomic acquire further
 // down; this says WHO lost the batch, for how long it had been quiet and what it
