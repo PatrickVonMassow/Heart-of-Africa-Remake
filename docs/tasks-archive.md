@@ -21292,3 +21292,39 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is not a product defect, but it stands in the way of EVERY session's turn
   end, and a HIGH-tagged point that landed unreviewed is exactly what the gate exists to prevent.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 812. A live writer process vetoes the launcher by merely existing, and an idle editor window
+  cost an hour of standstill (measured 21.08.2026 by the decomposition behind point 809; lever 2b
+  of that merged spec, cut as its own point because it is a mechanism of its own).
+  WHAT WAS MEASURED. The launcher skipped four consecutive ticks with skip: live batch-writer
+  process 2156063 measured for session 593e0d2f independently of the owner lock. That process was
+  an idle VS Code extension window, alive since 19.08., whose last batch write was 07:08:03Z.
+  launcherStartDecision lets a foreign live writer veto every start for WRITER_VETO_MAX_AGE_MS
+  (2 h) after its last write, ahead of every other rule including an explicit handover, so the
+  batch stood still for 59 minutes with nobody working it. The escalation fired (ESCALATING ... has
+  blocked launcher recovery for 15 min) and had no remedy but to skip again.
+  FINAL STATE: every writer record carries an ownership generation and an explicit active-or-retired
+  state, and an accepted handover or release retires that authority at once even while the host
+  process lives. A veto requires current fenced main-write authority or demonstrably advancing
+  work; the fixed two-hour historical-write veto goes, because it turned an idle editor window into
+  an hour of standstill. A retired generation is ignored, an unretired writer whose lock vanished
+  still vetoes, and the decision reports every simultaneously authoritative writer rather than the
+  first match. The escalation that fires after two blocked ticks executes a recovery - retiring an
+  explicitly handed-over generation or revoking its fence - rather than logging and skipping again.
+  Spawn progress counts only when it is attributed to the spawned child by token, session, PID
+  identity, generation or fenced write. A released or claimed reservation expires unless its holder
+  renews it with real batch activity, and an owner with no foreground, delegate, verification or
+  durable-wait progress across two decision intervals is assessed stalled even while its heartbeat
+  is fresh.
+  VERIFIABLE: launcherStartDecision — an advancing writer vetoes; an idle one does not; a retired
+  or handed-over writer does not; a recycled PID does not; an unretired writer whose lock vanished
+  still does; escalation cannot leave a retired writer blocking; the behaviour for the writer the
+  lock itself names stays as it is.
+  DEPENDENCY: point 809 lands first, and point 795 (launcher liveness) is the mechanism this
+  sharpens — a veto rule that ignores a live working session is the failure 795 already fixed from
+  the other side.
+  FILES: scripts/batch-autostart-core.mjs (launcherStartDecision, WRITER_VETO_MAX_AGE_MS,
+  spawnProgressed), scripts/batch-ownership-core.mjs, .claude/autostart.log.
+  Criticality: high — one measured occurrence cost a full hour, and the rule fires whenever any
+  editor window happens to be open.
+  Bundle: Session- & Repo-Hygiene.
