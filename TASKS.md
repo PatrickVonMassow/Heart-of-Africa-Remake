@@ -10652,3 +10652,34 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product defect, but it withholds the push rule's protection exactly when
   a delegated agent is running, which is the normal operating state of this batch.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 804. Merge attribution survives only while the merged parent stays in the analysed commit set
+  (found 21.08.2026 while reviewing point 784 on `main`). Point 784 taught
+  `scripts/mechanism-review-range-core.mjs` to attribute a trailerless merge to the contributions it
+  merges: the resolver reads the merge's non-first parents out of `parentShas` and takes their
+  authorship. It resolves the parent only through the commit list it was handed, so a merge whose
+  parent is NOT in that list falls back to unknown and the group is `UNREVIEWABLE` again.
+  TWO CALLERS REDUCE THAT LIST TODAY. `scripts/mechanism-review-guard.mjs` re-plans over
+  `commitsForContributions(debt.outstanding)`, so once a pass record clears the parent's own
+  contribution — same file, different sha — the parent drops out and the still-outstanding merge
+  loses its attribution. And `scripts/review-sol.mjs --since <ref>` narrows the range by
+  construction: a narrowing that keeps the merge but cuts its parent produces exactly the refusal
+  the narrowing was advertised to escape.
+  WHY IT MATTERS: the second case is a closed loop. The refusal text point 784 added tells the
+  operator to narrow with `--since`, and for this shape narrowing is what CAUSES the refusal — the
+  documented exit leads back to the door. The guard case is milder: the unreviewable group only
+  swaps the refusal headline (`formatMechanismReviewVerdict`), it does not block by itself. Neither
+  is a product defect, and both are the four-eyes gate reporting less than it knows: the parent's
+  trailer is still in git, one `git show` away, at the moment the plan is built.
+  FINAL STATE: a merge's authorship does not depend on which commits happen to be in the analysed
+  set. Either the resolver is given a way to read a parent outside that set — the pure layer keeps
+  its purity through an injected lookup, the callers supply the trailers they already read — or a
+  narrowing that would orphan a merge is refused BEFORE the plan, naming the parent it needs.
+  Whichever is chosen, `--since` never advises a narrowing that cannot succeed.
+  VERIFIABLE: Vitest over the pure layer — a merge planned together with its parent and the SAME
+  merge planned without it reach the same attribution; a narrowing that cuts a parent is reported
+  as such rather than as an unattributable contribution. Plus the real repository: clearing a
+  merged parent's contribution first, then planning the remaining debt, keeps the merge reviewable.
+  Criticality: medium — no product defect, but it is the four-eyes gate closing on itself again,
+  this time through the very exit its refusal names.
+  Bundle: Session- & Repo-Hygiene.
