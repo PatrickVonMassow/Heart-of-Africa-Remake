@@ -48,8 +48,13 @@
 // The LINE ceiling is nevertheless LOWERED to the measured fit: the document had drifted 7
 // lines under the old 409 and rides that slack, so 408 is the exact count and 417 would have
 // been room for a whole future entry — the four-eyes review caught precisely that.
+// LOWERED again on 21.08.2026: two new lessons — a rescue step only the departing side can take,
+// and a shared function that still answers twice because each call site builds its own inputs —
+// were FOLDED into the two existing entries whose remedy they sharpen, rather than added as
+// entries of their own, and three neighbouring entries were tightened to pay for the words. The
+// guide came out SMALLER than before, so the ceilings follow it down to the measured 429 / 3828.
 export const LIMITS = {
-  maxLines: 431,
+  maxLines: 429,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -115,7 +120,7 @@ export const LIMITS = {
   // against the guide's measured 425 / 3773, and the ceilings move by exactly
   // that to the 431 / 3832 fit, with zero slack. Nothing was removed to fit it,
   // and no existing entry grew.
-  maxWords: 3832,
+  maxWords: 3828,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
