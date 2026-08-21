@@ -210,6 +210,15 @@ if (isMainModule(import.meta.url)) {
       // — it stands in front of the release, and why it cannot wait. Neither
       // reason answers the other question, so neither flag writes the other's
       // record.
+      // BOTH FLAGS IS NOT A DECISION (cross-vendor review, 21.08.2026). It used
+      // to record the `--ahead` one and drop the other without a word, so a
+      // command that named two points answered for one of them.
+      if (argv.includes('--ranked') && argv.includes('--ahead')) {
+        throw new Error(
+          '--ranked and --ahead are two different decisions — the end of the order is right, or the front is. ' +
+            'Give one of them, and run the command twice where both are meant.',
+        )
+      }
       const ahead = argv.includes('--ahead')
       const point = Number(flagValue(argv, ahead ? '--ahead' : '--ranked'))
       if (!open.includes(point)) throw new Error(`point ${point} is not open in the work order`)

@@ -562,6 +562,29 @@ describe('URGENCY is read off what the point STATES', () => {
     // …and so does every sentence end, not only the full stop.
     expect(statesHighUrgency('It does not block a lane! It stops the batch.')).toBe(true)
     expect(statesHighUrgency('Does it block a lane? It stops the batch.')).toBe(true)
+    // A negation standing AFTER what it denies counts too.
+    expect(statesHighUrgency('"blocks the release" is not the observed failure.')).toBe(false)
+    // …while the condition's OWN "cannot" is not read as a denial of itself.
+    expect(statesHighUrgency('It holds a red that cannot otherwise close.')).toBe(true)
+    expect(statesHighUrgency('It blocks a lane — no Sol-authored point can be served.')).toBe(true)
+  })
+
+  it('cannot let a point through even where the reading is WRONG', () => {
+    // THE STATED RESIDUAL. No cue list closes every English construction — a
+    // denial split across sentences still reads as a claim. It costs nothing it
+    // must not cost: a point wrongly read as high is still refused, because the
+    // gate wants an explicit FRONT decision and this one has none. The false
+    // reading only changes which remedy the refusal names first.
+    const split = 'Does it block the release? No.'
+    expect(statesHighUrgency(split)).toBe(true)
+    const record = {
+      ranked: {},
+      settled: { at: 't', points: [50] },
+      boundary: { at: 't', why: 'legacy', points: [] },
+    }
+    expect(releaseBoundaryBreaches([60, 50], record, { releasePoint: 50, bodies: { 60: split } })).toEqual([
+      { point: 60, cause: 'unrecorded' },
+    ])
   })
   it('reads an ordinary point as NOT high — the tag, the prose and the silence alike', () => {
     expect(statesHighUrgency(MEDIUM)).toBe(false)
@@ -641,9 +664,15 @@ describe('THE RELEASE BOUNDARY — what may stand in front of the release', () =
     expect(breach([50, 90, 60], armed(), { 60: MEDIUM })).toEqual([])
   })
 
-  it('exempts a point the USER ranked there, however unurgent it reads', () => {
-    const record = armed({ 60: { at: '', why: 'Der Nutzer will es zuerst.', origin: ORIGIN_USER } })
+  it('exempts a point the USER ranked to the FRONT, however unurgent it reads', () => {
+    const record = armed({
+      60: { at: '', why: 'Der Nutzer will es zuerst.', origin: ORIGIN_USER, place: PLACE_AHEAD },
+    })
     expect(breach([60, 50, 90], record, { 60: MEDIUM })).toEqual([])
+    // The exemption is a decision about the FRONT like any other: a user-origin
+    // "last is right" entry does not carry it across the two gates.
+    const stale = armed({ 60: { at: '', why: 'Der Nutzer will es zuerst.', origin: ORIGIN_USER, place: PLACE_LAST } })
+    expect(breach([60, 50, 90], stale, { 60: MEDIUM })).toEqual([{ point: 60, cause: 'not-high' }])
   })
 
   it('moves the boundary with the release point rather than remembering an index', () => {
@@ -688,7 +717,7 @@ describe('THE RELEASE BOUNDARY — what may stand in front of the release', () =
         'the release. Point(s) 60 do state high urgency, but nothing records why they cannot wait: MOVE the block ' +
         'inside TASKS.md to BEHIND point 50, or record the reason in one line — node scripts/queue-rank.mjs ' +
         '--ahead <N> --why "<why it cannot wait for the release>". A point the USER asked for ' +
-        'is exempt, and says so: node scripts/queue-rank.mjs --ranked <N> --origin user --why "<one line>". And ' +
+        'is exempt, and says so: node scripts/queue-rank.mjs --ahead <N> --origin user --why "<one line>". And ' +
         'where the move lands the block at the END of the order, the append gate asks about that placement in ' +
         'the same turn — answer it with node scripts/queue-rank.mjs --ranked <N> --why "<one line>".',
     )

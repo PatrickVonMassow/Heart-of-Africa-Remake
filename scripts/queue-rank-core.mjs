@@ -94,8 +94,11 @@ export const PLACE_AHEAD = 'ahead'
  *  the only thing `--ranked` ever meant before the release rule existed. */
 export const PLACES = Object.freeze([PLACE_LAST, PLACE_AHEAD])
 
-/** Record that a point standing there is the USER's own ranking. */
-export const USER_RANK_CMD = 'node scripts/queue-rank.mjs --ranked <N> --origin user --why "<one line>"'
+/** Record that a point standing in FRONT of the release is the USER's own
+ *  ranking. It is a decision about the FRONT like any other, so it is recorded
+ *  as one: an exemption inherited from a "last is right" entry would cross the
+ *  two gates in both directions (cross-vendor review, 21.08.2026). */
+export const USER_RANK_CMD = 'node scripts/queue-rank.mjs --ahead <N> --origin user --why "<one line>"'
 
 /** Arm the release rule: freeze the front of the order as it stands today. */
 export const BOUNDARY_SEED_CMD = 'node scripts/queue-rank.mjs --seed-boundary --why "<one line>"'
@@ -145,7 +148,7 @@ const NEGATION_WINDOW = 60
  * those sentences excuse exactly the point the rule exists to place behind the
  * release.
  */
-const CLAUSE_END = /[.;:!?]|\bbut\b|\bhowever\b/gi
+const CLAUSE_END = /[.;:!?—]|\bbut\b|\bhowever\b/gi
 
 /**
  * The words standing in front of a match inside its OWN clause, on one line.
@@ -163,6 +166,17 @@ function clauseBefore(text, at) {
 }
 
 /**
+ * The rest of the match's own clause — because a negation can stand AFTER what it
+ * denies (cross-vendor review, 21.08.2026): «"blocks the release" is not the
+ * observed failure» reads as a claim to anything that only looks backwards.
+ */
+function clauseAfter(text, at) {
+  const window = text.slice(at, at + NEGATION_WINDOW)
+  const end = window.search(CLAUSE_END)
+  return end < 0 ? window : window.slice(0, end)
+}
+
+/**
  * Does the point itself STATE high urgency?
  *
  * Two readings, both off the point's own text and never off an impression: the
@@ -170,6 +184,18 @@ function clauseBefore(text, at) {
  * that convention), or one of the blocking conditions named above. A point
  * stating neither is not high — that is the whole decision, and it is the reason
  * the answer cannot be argued into the record by whoever files the point.
+ *
+ * THE RESIDUAL, STATED RATHER THAN CHASED (cross-vendor review, fourth pass).
+ * This reads English prose by cue, and no cue list closes every construction: a
+ * denial split across sentences — "Does it block the release? No." — still reads
+ * as a claim. The regress stops here because of what a wrong reading can and
+ * cannot do. It CANNOT let a point through: reading it as high only moves the
+ * refusal from `not-high` to `unrecorded`, and the gate still demands an explicit
+ * `--ahead` decision with a stated reason before anything stands in front of the
+ * release. So the worst a false reading costs is a refusal that names the other
+ * remedy first — and a human recording a front reason for a point that is not
+ * urgent is an edit to a TRACKED record under review, which is where this file
+ * puts that class of question everywhere else.
  */
 export function statesHighUrgency(body) {
   const raw = String(body ?? '')
@@ -181,7 +207,10 @@ export function statesHighUrgency(body) {
     // EVERY occurrence, not the first: a body that denies one blocking condition
     // and names another states the second one all the same.
     for (const m of text.matchAll(new RegExp(re.source, `${re.flags.replace(/g/g, '')}g`))) {
-      if (!NEGATION_CUE.test(clauseBefore(text, m.index))) return true
+      // The clause AROUND the match, minus the matched words themselves — the
+      // condition's own "cannot" must not read as a denial of the condition.
+      const clause = `${clauseBefore(text, m.index)} ${clauseAfter(text, m.index + m[0].length)}`
+      if (!NEGATION_CUE.test(clause)) return true
     }
     return false
   })
@@ -542,11 +571,14 @@ export function releaseBoundaryState(open, record, { releasePoint, bodies = {} }
   const breaches = []
   for (const n of ahead) {
     if (grandfathered.has(n)) continue
-    if (originOf({ ranked }, n) === ORIGIN_USER) continue
-    if (!statesHighUrgency(bodies[n])) breaches.push({ point: n, cause: 'not-high' })
     // ONLY a decision about the FRONT counts here — a "last is right" reason
-    // carried forward by a later move explains nothing about standing here.
-    else if (ranked[n]?.place !== PLACE_AHEAD) breaches.push({ point: n, cause: 'unrecorded' })
+    // carried forward by a later move explains nothing about standing here, and
+    // that holds for the USER's exemption exactly as it holds for the urgency.
+    const entry = ranked[n]
+    const front = entry && entry.place === PLACE_AHEAD ? entry : null
+    if (front && front.origin === ORIGIN_USER) continue
+    if (!statesHighUrgency(bodies[n])) breaches.push({ point: n, cause: 'not-high' })
+    else if (!front) breaches.push({ point: n, cause: 'unrecorded' })
   }
   return { state: breaches.length ? 'breach' : 'ok', breaches, ahead }
 }

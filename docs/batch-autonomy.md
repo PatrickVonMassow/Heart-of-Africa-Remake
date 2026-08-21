@@ -2085,7 +2085,9 @@ right" and afterwards moved to the front used to arrive carrying a reason that
 said nothing about the front. The urgency is read off the POINT, never off the reason, so it cannot be
 argued into the record by whoever files the ticket; the ORIGIN is read off the
 record and defaults to the machine, so the user's exemption
-(`--origin user`) can only ever be claimed out loud. The boundary is wherever the
+(`--ahead <N> --origin user`) can only ever be claimed out loud — and it is a
+decision about the FRONT like any other, so a "last is right" entry never carries
+it across. The boundary is wherever the
 release point CURRENTLY stands in `TASKS.md`, so re-sequencing moves it, and a
 breach freezes the provenance baseline exactly as an unranked append does — a
 gate that could be answered by forgetting the question would have a one-turn

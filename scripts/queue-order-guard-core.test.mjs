@@ -669,7 +669,7 @@ describe('rule 1d — the release boundary (point 789)', () => {
   })
 
   it('exempts a point the USER ranked there', () => {
-    const byUser = armed({ 900: { at: '', why: 'Der Nutzer will es zuerst.', origin: 'user' } })
+    const byUser = armed({ 900: { at: '', why: 'Der Nutzer will es zuerst.', origin: 'user', place: 'ahead' } })
     expect(evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: byUser }).block).toBe(false)
   })
 
