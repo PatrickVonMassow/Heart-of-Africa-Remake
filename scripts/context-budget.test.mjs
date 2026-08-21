@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
-import { admitContextCall, inspectContextCall, readPendingLedger } from './context-budget.mjs'
+import { dirname, resolve } from 'node:path'
+import { admitContextCall, contextLedgerPath, inspectContextCall, readPendingLedger } from './context-budget.mjs'
 import { issueContextPermit } from './context-fence-permit.mjs'
+import { CONTEXT_SESSION_CLASS } from './session-context-ceiling-core.mjs'
 
 const roots = []
 afterEach(() => {
@@ -24,7 +25,7 @@ const fixture = () => {
     },
   }
 }
-const SERIES = { byKind: [{ kind: 'read', p: 10 }, { kind: 'agent', p: 20 }] }
+const SERIES = { byKind: [{ kind: 'browser-suite', p: 10 }, { kind: 'read', p: 10 }, { kind: 'agent', p: 20 }] }
 const call = (overrides = {}) => ({
   sessionId: 's',
   point: 745,
@@ -32,9 +33,9 @@ const call = (overrides = {}) => ({
   ceiling: 140,
   handoverReserve: 10,
   series: SERIES,
-  toolName: 'Read',
-  toolInput: { file_path: 'large.log' },
-  caller: { toolName: 'Read', filePath: 'large.log' },
+  toolName: 'Bash',
+  toolInput: { command: 'npm test' },
+  caller: { toolName: 'Bash', command: 'npm test' },
   toolUseId: 'tool-1',
   ...overrides,
 })
@@ -76,6 +77,57 @@ describe('admitContextCall runtime transaction', () => {
     })
   })
 
+  it.each(Object.values(CONTEXT_SESSION_CLASS))('a permit admits exactly one refused %s call', (sessionClass) => {
+    const paths = fixture()
+    issueContextPermit(
+      { sessionId: 's', point: 745, reason: 'one emergency call', maxTokens: 10 },
+      { ...paths.permitPaths, now: () => 1_000, id: () => `p-${sessionClass}`, head: () => 'abc' },
+    )
+    const admittedPaths = { ...paths, permitPaths: { ...paths.permitPaths, now: () => 1_001 } }
+    expect(admitContextCall(call({
+      sessionClass,
+      mode: 'armed',
+      reading: { tokens: 125, at: 1 },
+    }), admittedPaths)).toMatchObject({ block: false, permitted: true })
+    expect(admitContextCall(call({
+      sessionClass,
+      mode: 'armed',
+      reading: { tokens: 125, at: 1 },
+      toolUseId: 'tool-2',
+    }), admittedPaths)).toMatchObject({ block: true, permitted: false })
+  })
+
+  it('books a large read even when it cannot fit, but never refuses it', () => {
+    const paths = fixture()
+    const result = admitContextCall(call({
+      mode: 'armed',
+      reading: { tokens: 125, at: 1 },
+      toolName: 'Read',
+      toolInput: { file_path: 'large.log' },
+      caller: { toolName: 'Read', filePath: 'large.log' },
+    }), paths)
+    expect(result).toMatchObject({
+      block: false,
+      observed: false,
+      sessionPolicy: { conversationSafe: true },
+      decision: { fits: false, kind: 'read' },
+      ledger: { pendingDebit: 10 },
+    })
+  })
+
+  it('keeps inherited parent and subagent pending debits in separate ledgers', () => {
+    const paths = fixture()
+    const base = resolve(dirname(paths.ledgerPath), 'legacy-ledger.json')
+    const ownerId = 'parent-session'
+    const agentId = `${ownerId}:agent:agent-a`
+    const ownerPaths = { ...paths, ledgerPath: contextLedgerPath(ownerId, base) }
+    const agentPaths = { ...paths, ledgerPath: contextLedgerPath(agentId, base) }
+    expect(admitContextCall(call({ sessionId: ownerId, mode: 'armed' }), ownerPaths).ledger.pendingDebit).toBe(10)
+    expect(admitContextCall(call({ sessionId: agentId, mode: 'armed' }), agentPaths).ledger.pendingDebit).toBe(10)
+    expect(admitContextCall(call({ sessionId: ownerId, mode: 'armed', toolUseId: 'owner-2' }), ownerPaths).ledger.pendingDebit).toBe(20)
+    expect(readPendingLedger(agentPaths.ledgerPath, agentId).pendingDebit).toBe(10)
+  })
+
   it('counts an unknown classified start even when armed mode refuses it', () => {
     const paths = fixture()
     const result = admitContextCall(call({ mode: 'armed', series: { byKind: [] }, toolName: 'Agent', toolInput: {} }), paths)
@@ -106,7 +158,12 @@ describe('admitContextCall runtime transaction', () => {
           caller: { toolName: operation.toolName, ...operation.toolInput },
           toolUseId: operation.id,
         }, paths)
-        decisions.push({ ...operation, state: result.decision.state, block: result.block })
+        decisions.push({
+          ...operation,
+          state: result.decision.state,
+          block: result.block,
+          conversationSafe: result.sessionPolicy.conversationSafe,
+        })
       }
     }
 
@@ -116,9 +173,13 @@ describe('admitContextCall runtime transaction', () => {
       handoverTokens: 311_039,
     })
     expect(decisions.find((entry) => entry.block)?.id).toBe('36.2')
-    expect(decisions.filter((entry) => entry.block).map((entry) => entry.id)).toEqual(
-      expect.arrayContaining(['36.2', '128.1', '141.1']),
-    )
+    expect(decisions.filter((entry) => entry.block).map((entry) => entry.id)).toEqual(['36.2', '141.1'])
+    expect(decisions.find((entry) => entry.id === '128.1')).toMatchObject({
+      toolName: 'Read',
+      state: 'insufficient',
+      block: false,
+      conversationSafe: true,
+    })
     const exits = decisions.filter((entry) => entry.exit)
     expect(exits.map((entry) => entry.id)).toEqual(['135.1', '182.1', '201.1', '216.1', '229.1', '231.1'])
     expect(exits.every((entry) => entry.state === 'exempt' && entry.block === false)).toBe(true)

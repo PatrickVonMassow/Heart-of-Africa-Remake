@@ -34,13 +34,11 @@
 // HANDOVER threshold still belongs to the boundary/Stop chain; this guard owns
 // prospective admission against the ceiling and the reserved exit cost.
 //
-// WHO IT BINDS: only the batch lock's OWNER. A session that does not own
-// `.claude/batch-lock.json` has no batch to hand over and no `--prepare
-// --context` it could run, so fencing it would trap it — it passes. A paused
-// batch passes. A WORKTREE-ISOLATED delegated agent passes too (point 440's
-// rule): its tool calls carry the PARENT session id, so the measurement would
-// be the parent's expensive transcript while the agent's own context is small
-// — the deny would hit exactly the worker the handover machinery keeps alive.
+// WHO IT BINDS: every session class. `agent_id` on the real hook payload marks
+// a subagent; without it, lock equality distinguishes the batch owner from an
+// attended main window. The arithmetic is shared. Only the remedy differs: a
+// subagent returns what it has, the owner takes its existing boundary, and an
+// attended window asks for `/clear`. A paused batch still passes.
 //
 // THE DENY REPEATS, deliberately (unlike board-first's once-per-turn nudge):
 // repeating the suite start is exactly what the measured session of 17.08.2026
@@ -50,7 +48,6 @@ import { appendFileSync, existsSync, readFileSync, realpathSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
-import { isWorktreeCheckout } from './board-first-core.mjs'
 import { fenceMode, gatherWatermark, triggerTokens } from './context-watermark.mjs'
 import { CONTEXT_CEILING_TOKENS, watermarkDecision } from './context-watermark-core.mjs'
 import { resolveThroughAncestors } from './context-fence-core.mjs'
@@ -59,6 +56,7 @@ import { admitContextCall, inspectContextCall } from './context-budget.mjs'
 import { readSeries } from './context-incidents.mjs'
 import { summarizeSeries } from './context-incidents-core.mjs'
 import { FOCUS_PATH, readJson } from './dashboard-state.mjs'
+import { classifyContextSession, contextSessionIdentity } from './session-context-ceiling-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
@@ -206,10 +204,15 @@ try {
   }
   if (!payload) process.exit(0)
   if (existsSync(PAUSE)) process.exit(0)
-  if (isWorktreeCheckout(REPO_ROOT)) process.exit(0)
   const sid = payload.session_id || ''
+  if (!sid) process.exit(0)
   const lock = readOwnerLock()
-  if (!sid || !lock || lock.sessionId !== sid) process.exit(0) // not the batch owner → no fence
+  const sessionClass = classifyContextSession({
+    agentId: payload.agent_id,
+    sessionId: sid,
+    ownerSessionId: lock?.sessionId,
+  })
+  const contextSessionId = contextSessionIdentity({ agentId: payload.agent_id, sessionId: sid })
   // THE MEASUREMENT AND LEDGER BOOKING HAPPEN IN BOTH MODES — that is what
   // observation mode IS. The boundary's handover state is read beside them.
   const mode = fenceMode()
@@ -221,7 +224,8 @@ try {
   const reading = wm.tokens === null ? null : { tokens: wm.tokens, at: wm.readingAt }
   const point = currentPoint()
   const verdict = admitContextCall({
-    sessionId: sid,
+    sessionId: contextSessionId,
+    sessionClass,
     point,
     reading,
     series: costSeries(),
@@ -246,6 +250,8 @@ try {
     recordObservation({
       at: new Date().toISOString(),
       sessionId: sid,
+      contextSessionId,
+      sessionClass,
       mode,
       refused: verdict.block,
       permitted: verdict.permitted,
@@ -272,8 +278,9 @@ try {
           permissionDecisionReason: contextBudgetRefusal({
             decision: verdict.decision,
             reading,
-            sessionId: sid,
+            sessionId: contextSessionId,
             point,
+            sessionClass,
           }),
         },
       }),

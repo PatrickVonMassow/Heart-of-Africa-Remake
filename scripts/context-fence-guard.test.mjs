@@ -13,6 +13,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symli
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { CONTEXT_CEILING_TOKENS, CONTEXT_TRIGGER_TOKENS } from './context-watermark-core.mjs'
+import { contextLedgerPath } from './context-budget.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const REPLAY = JSON.parse(readFileSync(
@@ -25,7 +26,7 @@ let repo
 const lockPath = () => resolve(repo, '.claude', 'batch-lock.json')
 const transcriptPath = () => resolve(repo, 'transcript.jsonl')
 const observationsPath = () => resolve(repo, '.claude', 'context-fence-observations.jsonl')
-const ledgerPath = () => resolve(repo, '.claude', 'context-fence-ledger.json')
+const ledgerPath = (sessionId = SID) => contextLedgerPath(sessionId, resolve(repo, '.claude', 'context-fence-ledger.json'))
 const focusPath = () => resolve(repo, '.claude', 'current-focus.json')
 // Point 742's OVERSHOOT SERIES — a different file, written by a different
 // mechanism (the boundary), and point 747 recalibrates the ceiling from it. The
@@ -59,7 +60,14 @@ const writeTranscript = (tokens) =>
     ].join('\n') + '\n',
   )
 
-function callGuard(toolName, toolInput = {}, { guardPath, cwd = repo, sessionId = SID, transcript, env = ARMED } = {}) {
+function callGuard(toolName, toolInput = {}, {
+  guardPath,
+  cwd = repo,
+  sessionId = SID,
+  agentId = null,
+  transcript,
+  env = ARMED,
+} = {}) {
   const r = spawnSync(process.execPath, [guardPath ?? resolve(repo, 'scripts', 'context-fence-guard.mjs')], {
     windowsHide: true,
     cwd,
@@ -76,6 +84,7 @@ function callGuard(toolName, toolInput = {}, { guardPath, cwd = repo, sessionId 
     },
     input: JSON.stringify({
       session_id: sessionId,
+      ...(agentId ? { agent_id: agentId, agent_type: 'general-purpose' } : {}),
       hook_event_name: 'PreToolUse',
       transcript_path: transcript ?? transcriptPath(),
       tool_name: toolName,
@@ -223,8 +232,9 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     }
   })
 
-  it('admits a large Read against the same budget and intercepts it when it does not fit', () => {
-    expect(denial(callGuard('Read', { file_path: 'TASKS.md' }))).toContain('projected read cost 10956')
+  it('admits and books a large Read against the same budget without silencing the conversation', () => {
+    expect(callGuard('Read', { file_path: 'TASKS.md' }).stdout.trim()).toBe('')
+    expect(JSON.parse(readFileSync(ledgerPath(), 'utf8')).pendingDebit).toBe(10_956)
   })
 
   it('allows measured calls that fit and refuses one that does not, without a global refusal mark', () => {
@@ -250,10 +260,12 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     expect(r.stderr).toContain('CONTEXT FENCE FAIL-OPEN: NO CONTEXT READING COULD BE TAKEN')
   })
 
-  it('binds ONLY the batch owner — a foreign or absent lock passes', () => {
-    expect(callGuard('Agent', {}, { sessionId: 'some-other-window' }).stdout.trim()).toBe('')
+  it('binds an attended main window and names /clear instead of the batch boundary', () => {
+    const attended = denial(callGuard('Agent', {}, { sessionId: 'some-other-window' }))
+    expect(attended).toContain('/clear')
+    expect(attended).not.toContain('Finish and hand over')
     rmSync(lockPath(), { force: true })
-    expect(callGuard('Agent', {}).stdout.trim()).toBe('')
+    expect(denial(callGuard('Agent', {}))).toContain('/clear')
   })
 
   it('stands down for a paused batch', () => {
@@ -266,14 +278,18 @@ describe('context-fence-guard, ARMED (spawned)', () => {
     }
   })
 
-  it('stands down in a worktree checkout — a delegated agent is never fenced on its parent id', () => {
+  it('fences a worktree subagent on its agent_id and tells it to return what it has', () => {
     const wt = resolve(repo, '.claude', 'worktrees', 'agent-x')
     cpSync(resolve(repo, 'scripts'), resolve(wt, 'scripts'), { recursive: true })
     mkdirSync(resolve(wt, '.claude'), { recursive: true })
     writeJson(resolve(wt, '.claude', 'batch-lock.json'), { v: 2, sessionId: SID, claimedAt: Date.now(), pid: process.pid })
-    const r = callGuard('Agent', {}, { guardPath: resolve(wt, 'scripts', 'context-fence-guard.mjs'), cwd: wt })
+    const r = callGuard('Agent', {}, {
+      guardPath: resolve(wt, 'scripts', 'context-fence-guard.mjs'),
+      cwd: wt,
+      agentId: 'agent-worktree-x',
+    })
     expect(r.status, r.stderr).toBe(0)
-    expect(r.stdout.trim()).toBe('')
+    expect(denial(r)).toMatch(/return what you have/i)
   })
 
   it('fails OPEN on no stdin and on junk stdin', () => {

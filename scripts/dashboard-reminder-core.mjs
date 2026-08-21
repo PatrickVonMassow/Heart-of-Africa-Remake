@@ -101,6 +101,10 @@ export const PROMPT_ENFORCED_CLAIMS = [
 export const CONTEXT_LEVEL_CHAR_BUDGET = 80
 export const PROMPT_CHAR_BUDGET = REMINDER_CHAR_BUDGET + 1 + CONTEXT_LEVEL_CHAR_BUDGET
 
+/** A one-shot warning has its own budget; it is not part of the text re-sent on
+ * every prompt. Raising this still needs a reason, just as the standing text. */
+export const ATTENDED_CEILING_NOTICE_CHAR_BUDGET = 430
+
 /** The non-owner message is output through the same formatter as the owner's
  * reminder so the context level cannot disappear in stand-down sessions. */
 export const STAND_DOWN_TEXT =
@@ -130,9 +134,26 @@ export function contextLevelInstruction(tokens) {
 
 /** Everything the UserPromptSubmit hook writes, selected without I/O so Vitest
  * can pin the owner and stand-down branches to the same context measurement. */
-export function hookInjectionText({ standDown = false, mtimeNote = '', contextTokens = null } = {}) {
+export function hookInjectionText({
+  standDown = false,
+  mtimeNote = '',
+  contextTokens = null,
+  ceilingNotice = '',
+} = {}) {
   const body = standDown ? `${STAND_DOWN_TEXT}\n` : promptInjectionText(mtimeNote)
-  return contextLevelInstruction(contextTokens) + body
+  return contextLevelInstruction(contextTokens) + body + String(ceilingNotice ?? '')
+}
+
+/** Asking form while the fence observes; the armed PreToolUse refusal carries
+ * the same sole attended remedy. The current answer remains explicitly open. */
+export function attendedCeilingNoticeText({ tokens, ceiling, mode } = {}) {
+  const observing = String(mode).toLowerCase() !== 'armed'
+  return (
+    `[context-ceiling] Dieses BEAUFSICHTIGTE Hauptfenster liegt bei ${groupThousands(tokens)} Tokens und damit ` +
+    `über der Decke von ${groupThousands(ceiling)}. Der Zaun ist ${observing ? 'OBSERVE und verweigert noch nichts' : 'ARMED'}. ` +
+    'Teile dem Benutzer jetzt mit, dass vor weiteren wachsenden Aufrufen `/clear` nötig ist. Beantworte die ' +
+    'aktuelle Nachricht trotzdem; Antworten werden nie verweigert. Diese Meldung erscheint in dieser Sitzung einmal.\n'
+  )
 }
 
 /**

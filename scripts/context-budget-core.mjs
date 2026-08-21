@@ -17,6 +17,7 @@ import {
   CONTEXT_CEILING_TOKENS,
   CONTEXT_HANDOVER_RESERVE_TOKENS,
 } from './context-watermark-core.mjs'
+import { CONTEXT_SESSION_CLASS, SESSION_CEILING_REMEDIES } from './session-context-ceiling-core.mjs'
 
 /**
  * Control operations whose output is bounded by construction. This is an
@@ -319,7 +320,14 @@ export function remainingBudgetDecision({
 export { CALL_KINDS }
 
 /** The armed refusal explains the complete inequality and its one-use escape. */
-export function contextBudgetRefusal({ decision, reading, ceiling = CONTEXT_CEILING_TOKENS, sessionId, point } = {}) {
+export function contextBudgetRefusal({
+  decision,
+  reading,
+  ceiling = CONTEXT_CEILING_TOKENS,
+  sessionId,
+  point,
+  sessionClass = CONTEXT_SESSION_CLASS.BATCH_OWNER,
+} = {}) {
   const unknown = decision?.unknownTypeCost
     ? ' No p90 exists for this already-classified start, so the conservative emergency brake fired.'
     : ''
@@ -327,11 +335,14 @@ export function contextBudgetRefusal({ decision, reading, ceiling = CONTEXT_CEIL
     ? ` Emergency only: \`node scripts/context-fence-override.mjs --session ${String(sessionId).trim()} ` +
       `--point ${Number(point)} --reason "<why>" --max-tokens ${decision?.projectedCost}\` issues one short-lived permit.`
     : ' No point-bound permit can be used until this session has a declared numeric focus.'
-  return (
+  const arithmetic = (
     `THIS CALL DOES NOT FIT UNDER THE CONTEXT CEILING: reading ${reading?.tokens ?? 'unreadable'} + ` +
     `pending debit ${Math.max(0, Number(decision?.pendingDebit) || 0)} + projected ${decision?.kind ?? 'unknown'} ` +
     `cost ${decision?.projectedCost ?? 'unknown'} + handover reserve ${decision?.handoverReserve ?? CONTEXT_HANDOVER_RESERVE_TOKENS} ` +
-    `would exceed ${ceiling} by ${Math.max(0, -(Number(decision?.remainingAfterCall) || 0))} tokens.${unknown}` +
-    ` Finish and hand over; bounded commit, push, board, focus and boundary calls remain allowed.${permit}`
+    `would exceed ${ceiling} by ${Math.max(0, -(Number(decision?.remainingAfterCall) || 0))} tokens.${unknown}`
   )
+  if (sessionClass === CONTEXT_SESSION_CLASS.SUBAGENT || sessionClass === CONTEXT_SESSION_CLASS.ATTENDED) {
+    return `${arithmetic} ${SESSION_CEILING_REMEDIES[sessionClass].text} Answers, reads, commits and pushes remain allowed.${permit}`
+  }
+  return `${arithmetic} Finish and hand over; bounded commit, push, board, focus and boundary calls remain allowed.${permit}`
 }
