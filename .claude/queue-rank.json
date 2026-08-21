@@ -2,183 +2,288 @@
   "ranked": {
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
-      "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work."
+      "why": "Not release-blocking: the closing run proves the build with two full regressions rather than relying on a released red, and 643 refines a mechanism that only landed today. It waits behind the release work.",
+      "place": "last"
     },
     "646": {
       "at": "2026-08-11T18:08:06.988Z",
-      "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik"
+      "why": "Zweite Tuer zum selben Loeschen wie 629 — hinter den Spielfehlern, aber vor der Release-Mechanik",
+      "place": "last"
     },
     "647": {
       "at": "2026-08-11T18:08:07.037Z",
-      "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor"
+      "why": "Der unerklaerte Rot-Lauf ist auf einem Zweig, nicht auf main; das Fast-Gate steht davor",
+      "place": "last"
     },
     "652": {
       "at": "2026-08-11T21:10:35.758Z",
-      "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release."
+      "why": "Last is right: it is a guard over the session's own answers, which costs nothing the deployed game shows — and 174 gates the release.",
+      "place": "last"
     },
     "653": {
       "at": "2026-08-11T21:10:45.801Z",
-      "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway."
+      "why": "Last is right for the mechanism; the ONE stale section it names (criterion 7) is corrected inside point 174, which gates the release anyway.",
+      "place": "last"
     },
     "663": {
       "at": "2026-08-12T20:20:48.210Z",
-      "why": "Infrastruktur-Aergernis mit Retry als Sofort-Handgriff; hinter den Release-Punkten bei den Infrastruktur-Nachbarn"
+      "why": "Infrastruktur-Aergernis mit Retry als Sofort-Handgriff; hinter den Release-Punkten bei den Infrastruktur-Nachbarn",
+      "place": "last"
     },
     "668": {
       "at": "2026-08-13T12:07:50.425Z",
-      "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes"
+      "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes",
+      "place": "last"
     },
     "669": {
       "at": "2026-08-13T13:50:49.371Z",
-      "why": "Blocks the supervising session's turn ends on every Sol run, so it belongs right behind the lane that causes it"
+      "why": "Blocks the supervising session's turn ends on every Sol run, so it belongs right behind the lane that causes it",
+      "place": "last"
     },
     "670": {
       "at": "2026-08-13T15:12:02.801Z",
-      "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes"
+      "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes",
+      "place": "last"
     },
     "676": {
       "at": "2026-08-13T17:13:15.401Z",
-      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab"
+      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab",
+      "place": "last"
     },
     "677": {
       "at": "2026-08-13T17:13:15.449Z",
-      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor"
+      "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor",
+      "place": "last"
     },
     "678": {
       "at": "2026-08-13T18:14:11.985Z",
-      "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt"
+      "why": "Vor dem Release gehen die Release-Punkte vor; die akute Haelfte — die Rettung ungesicherter Arbeit — fuehre ich bis dahin von Hand aus, und die leere Spur ist ab jetzt bekannt",
+      "place": "last"
     },
     "680": {
       "at": "2026-08-13T18:48:25.602Z",
-      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor"
+      "why": "Es blockiert 666 nicht sofort — die Diagnose kann auch aus dem Seed nachgestellt werden —, aber jeder weitere Bericht dieser Art bleibt ohne es undiagnostizierbar; Release-Punkte gehen trotzdem vor",
+      "place": "last"
     },
     "683": {
       "at": "2026-08-13T20:19:36.791Z",
-      "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt"
+      "why": "Letzter Rest eines Siegels, das gegen jede andere Mutation haelt — hinter die Release-Bugfixes gestellt",
+      "place": "last"
     },
     "694": {
       "at": "2026-08-14T01:20:00.398Z",
-      "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor."
+      "why": "Es erbt nur die Freigabe eines seltenen, bekannten Rots und hat keinen Spieler-Effekt; die Bugfixes und fast fertigen Punkte davor gehen vor.",
+      "place": "last"
     },
     "696": {
       "at": "2026-08-14T05:13:27.358Z",
-      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for"
+      "why": "Sits with the other infrastructure fixes filed the same night (693-695), behind the communication-slice points the release is cut for",
+      "place": "last"
     },
     "698": {
       "at": "2026-08-17T09:12:55.330Z",
-      "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird."
+      "why": "Kalibrierung, kein Defekt: Sie gehoert hinter die uebrigen Sprachpunkte, weil 688-691 die Mechanik noch aendern und die Dichte erst danach sinnvoll eingestellt wird.",
+      "place": "last"
     },
     "699": {
       "at": "2026-08-17T09:44:54.861Z",
-      "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht."
+      "why": "Kosmetisch und eng verwandt mit 628: Sie wartet hinter den gemeldeten Fehlern und den fast fertigen Punkten, wie es die Warteschlangenregel fuer Fundstuecke vorsieht.",
+      "place": "last"
     },
     "704": {
       "at": "2026-08-17T13:43:56.910Z",
-      "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos"
+      "why": "Tafel-Fix aus dem heutigen 429; klein und eigenstaendig, die Reihung hinter den laufenden Punkten ist folgenlos",
+      "place": "last"
     },
     "705": {
       "at": "2026-08-17T14:29:14.631Z",
-      "why": "Ursache der Tafel-Drosselung, aber die Lesesite (704) faengt den Nutzer schon ab; die Reihung hinter den laufenden Punkten ist folgenlos"
+      "why": "Ursache der Tafel-Drosselung, aber die Lesesite (704) faengt den Nutzer schon ab; die Reihung hinter den laufenden Punkten ist folgenlos",
+      "place": "last"
     },
     "706": {
       "at": "2026-08-17T14:29:14.683Z",
-      "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig"
+      "why": "Kleiner Argument-Fehler in einem Hilfsbefehl; nichts haengt daran, letzte Stelle ist richtig",
+      "place": "last"
     },
     "708": {
       "at": "2026-08-17T14:29:14.792Z",
-      "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht"
+      "why": "Groesserer Umbau der Ablaeufe; er lohnt erst nach 707, das dieselbe Vorabpruefung braucht",
+      "place": "last"
     },
     "715": {
       "at": "2026-08-17T22:08:35.893Z",
-      "why": "Filed directly beside 714 in the process-fix block, not appended last: it is the class the whole Stop chain rests on and the check meant to catch it currently certifies it."
+      "why": "Filed directly beside 714 in the process-fix block, not appended last: it is the class the whole Stop chain rests on and the check meant to catch it currently certifies it.",
+      "place": "last"
     },
     "716": {
       "at": "2026-08-18T13:41:45.936Z",
-      "why": "Batch autonomy defect with a known workaround (the successor adopts the strand); it waits behind the token and communication blocks the user ordered first."
+      "why": "Batch autonomy defect with a known workaround (the successor adopts the strand); it waits behind the token and communication blocks the user ordered first.",
+      "place": "last"
     },
     "722": {
       "at": "2026-08-18T16:54:33.891Z",
-      "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first"
+      "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first",
+      "place": "last"
     },
     "724": {
       "at": "2026-08-19T01:04:46.783Z",
-      "why": "Hygiene of the branch pool, not a bugfix or a requested extension — the queue takes those first, and the debris it names is already parked, so nothing waits on it."
+      "why": "Hygiene of the branch pool, not a bugfix or a requested extension — the queue takes those first, and the debris it names is already parked, so nothing waits on it.",
+      "place": "last"
     },
     "725": {
       "at": "2026-08-19T02:12:32.321Z",
-      "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright."
+      "why": "An unverified review claim about one frame of one animal: it waits behind the queued fixes and the finding blocks, and its first step is a measurement that may close it outright.",
+      "place": "last"
     },
     "728": {
       "at": "2026-08-19T09:07:16.285Z",
-      "why": "Neu angelegter Fehlerbefund vom 19.08.2026 (dreifache Chat-Antwort neben lebendem Besitzer). Er bleibt hinten: der Fehler kostet den Nutzer Lesezeit, korrumpiert aber nichts, und die vorderen Punkte sind entweder vom Nutzer vorgezogen oder bereits im Bau. Vor die grossen Finder-Punkte gehoert er trotzdem, was die Anhaengeposition ohnehin leistet."
+      "why": "Neu angelegter Fehlerbefund vom 19.08.2026 (dreifache Chat-Antwort neben lebendem Besitzer). Er bleibt hinten: der Fehler kostet den Nutzer Lesezeit, korrumpiert aber nichts, und die vorderen Punkte sind entweder vom Nutzer vorgezogen oder bereits im Bau. Vor die grossen Finder-Punkte gehoert er trotzdem, was die Anhaengeposition ohnehin leistet.",
+      "place": "last"
     },
     "729": {
       "at": "2026-08-19T09:26:29.525Z",
-      "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf."
+      "why": "Kleiner, alter Defekt aus dem 727-Lauf: meldet ein gruenes Gate als rot, nie umgekehrt. Er bleibt hinten — er kostet eine Diagnose, blockiert aber nichts und faellt beim naechsten Autorenlauf ohnehin auf.",
+      "place": "last"
     },
     "730": {
       "at": "2026-08-19T10:37:26.991Z",
-      "why": "Der Nutzer hat 730 ausdrücklich vorgezogen (Tafel-Chat 19.08.2026, 12:36: »Ziehe 730 vor.«) — die Schätzungen sind das, wonach er die Tafel liest, und 713 läuft bereits auf seinem Zweig."
+      "why": "Der Nutzer hat 730 ausdrücklich vorgezogen (Tafel-Chat 19.08.2026, 12:36: »Ziehe 730 vor.«) — die Schätzungen sind das, wonach er die Tafel liest, und 713 läuft bereits auf seinem Zweig.",
+      "place": "last"
     },
     "733": {
       "at": "2026-08-19T11:53:10.666Z",
-      "why": "Direkt hinter 732, das den Befund erst sichtbar gemacht hat: Solange startup rot ist, ist die Suite rot, an der jeder andere Lauf gemessen wird."
+      "why": "Direkt hinter 732, das den Befund erst sichtbar gemacht hat: Solange startup rot ist, ist die Suite rot, an der jeder andere Lauf gemessen wird.",
+      "place": "last"
     },
     "734": {
       "at": "2026-08-19T12:28:33.652Z",
-      "why": "Es entwaffnet das Tor, das die Bildpruefung ehrlich haelt: Solange ein nicht abschliessbarer Lauf im Fenster steht, kommt jede Render-Aenderung nur per Hand-Waiver durch."
+      "why": "Es entwaffnet das Tor, das die Bildpruefung ehrlich haelt: Solange ein nicht abschliessbarer Lauf im Fenster steht, kommt jede Render-Aenderung nur per Hand-Waiver durch.",
+      "place": "last"
     },
     "736": {
       "at": "2026-08-19T13:52:29.970Z",
-      "why": "Nutzerentscheidung 19.08.2026: 736 vor 735 — gemessen adressiert 736 79 Prozent des Fable-Wochenverbrauchs, 735 rund 0,5 Prozent der Tokens."
+      "why": "Nutzerentscheidung 19.08.2026: 736 vor 735 — gemessen adressiert 736 79 Prozent des Fable-Wochenverbrauchs, 735 rund 0,5 Prozent der Tokens.",
+      "place": "last"
     },
     "741": {
       "at": "2026-08-19T17:02:06.150Z",
-      "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately."
+      "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately.",
+      "place": "last"
     },
     "754": {
       "at": "2026-08-19T19:59:31.708Z",
-      "why": "Rangfolge bleibt hinter der Deckenprogramm-Kette; Gruppe A ist zwar hoch kritisch, aber der Modell-Verstoss wird von model-guard nachtraeglich gefangen — die Sitzung ist am Kontext-Zaun und darf den Work Order nicht mehr umschichten (Punkt 751), deshalb ordnet der Nachfolger die Gruppe A gegebenenfalls vor"
+      "why": "Rangfolge bleibt hinter der Deckenprogramm-Kette; Gruppe A ist zwar hoch kritisch, aber der Modell-Verstoss wird von model-guard nachtraeglich gefangen — die Sitzung ist am Kontext-Zaun und darf den Work Order nicht mehr umschichten (Punkt 751), deshalb ordnet der Nachfolger die Gruppe A gegebenenfalls vor",
+      "place": "last"
     },
     "755": {
       "at": "2026-08-19T20:42:12.049Z",
-      "why": "Es ist der Nachfolger von 751 in derselben Kontext-Programm-Reihe; die vorderen Punkte 743/742/744 stehen davor, und 755 blockiert nichts, was vor ihm liegt"
+      "why": "Es ist der Nachfolger von 751 in derselben Kontext-Programm-Reihe; die vorderen Punkte 743/742/744 stehen davor, und 755 blockiert nichts, was vor ihm liegt",
+      "place": "last"
     },
     "756": {
       "at": "2026-08-19T21:23:30.975Z",
-      "why": "Shares the fence's classifier files with the running context-ceiling programme, so it must not run beside it; the defect has a working workaround (reword the card), so it waits behind 755 rather than displacing anything"
+      "why": "Shares the fence's classifier files with the running context-ceiling programme, so it must not run beside it; the defect has a working workaround (reword the card), so it waits behind 755 rather than displacing anything",
+      "place": "last"
     },
     "759": {
       "at": "2026-08-20T01:05:34.270Z",
-      "why": "Vorbedingung des Wiederscharfschaltens in 747: solange der Ausstieg nicht feuert, stellt ein scharfer Zaun die Blockade delegierter Agenten vollstaendig wieder her."
+      "why": "Vorbedingung des Wiederscharfschaltens in 747: solange der Ausstieg nicht feuert, stellt ein scharfer Zaun die Blockade delegierter Agenten vollstaendig wieder her.",
+      "place": "last"
     },
     "763": {
       "at": "2026-08-20T05:42:49.579Z",
-      "why": "Documentation and memory hygiene on rules the user has already released — nothing depends on it and nothing breaks while it waits, so last is where it belongs."
+      "why": "Documentation and memory hygiene on rules the user has already released — nothing depends on it and nothing breaks while it waits, so last is where it belongs.",
+      "place": "last"
     },
     "765": {
       "at": "2026-08-20T05:43:43.591Z",
-      "why": "The carrier defect drops rulings silently, but its one known case is already re-filed and landed, so nothing is waiting on it."
+      "why": "The carrier defect drops rulings silently, but its one known case is already re-filed and landed, so nothing is waiting on it.",
+      "place": "last"
     },
     "766": {
       "at": "2026-08-20T06:03:28.398Z",
-      "why": "The register is unfillable for those lessons but nothing is blocked by it today; it waits behind the cut re-check that produced it."
+      "why": "The register is unfillable for those lessons but nothing is blocked by it today; it waits behind the cut re-check that produced it.",
+      "place": "last"
     },
     "767": {
       "at": "2026-08-20T06:03:57.318Z",
-      "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night."
+      "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night.",
+      "place": "last"
     },
     "785": {
       "at": "2026-08-20T15:51:25.029Z",
-      "why": "Last is right: it improves what the header REPORTS, while 764 first has to make the suffix mandatory at all — until that lands there is nothing requiring a truer value, and both edit the same header path, so they must not run in parallel anyway."
+      "why": "Last is right: it improves what the header REPORTS, while 764 first has to make the suffix mandatory at all — until that lands there is nothing requiring a truer value, and both edit the same header path, so they must not run in parallel anyway.",
+      "place": "last"
     },
     "786": {
       "at": "2026-08-20T16:16:13.001Z",
-      "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first."
+      "why": "Last is right: it corrects how we REPORT the batch, not what the batch delivers, so no queued point waits on it — and it reads the same archive history the review-planner points 783/784 edit, which should settle first.",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      515,
+      553,
+      581,
+      595,
+      596,
+      597,
+      598,
+      633,
+      659,
+      660,
+      663,
+      669,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      720,
+      730,
+      733,
+      734,
+      735,
+      736,
+      737,
+      738,
+      739,
+      744,
+      745,
+      746,
+      747,
+      748,
+      749,
+      750,
+      752,
+      759,
+      760,
+      762,
+      764,
+      768,
+      769,
+      772,
+      779,
+      781,
+      784,
+      789,
+      794,
+      795,
+      796
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-20T20:29:30.652Z",
+    "at": "2026-08-21T00:55:14.983Z",
     "points": [
       174,
       184,
@@ -406,16 +511,16 @@
       784,
       785,
       786,
-      787,
       789,
       790,
       791,
-      792,
-      793,
       794,
       795,
       796,
-      797
+      797,
+      798,
+      799,
+      800
     ]
   }
 }

@@ -115,48 +115,6 @@ put it is the mistake this line exists to stop.
   hand for eight points.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 800. The boundary hands out a handover text "verbatim", and the board's own publish gate
-  refuses exactly that text — at every point boundary (measured 20.08.2026, 23:32, closing 793).
-  WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare 793` printed the gap-card text and
-  instructed: "take this text verbatim rather than writing it again. It names NO point number on
-  purpose: it goes into the unnumbered gap card, where the topic guard reads every point reference
-  as a foreign one." Piping that exact text into `node scripts/board.mjs none --text-stdin` was
-  refused: "the handover card is the one card without a number, so its reason must NAME the point
-  the batch picks up next. The publish gate refuses a handover card that names none." The board
-  publish ran anyway on the OLD content, so the refusal also left a published board that did not
-  yet carry the card.
-  WHY IT MATTERS: this is not a one-off. Every session ends at a point boundary and every session
-  walks into the same wall, spends a turn discovering which of the two rules wins, and re-writes by
-  hand the sentence it was told not to write. Two guards in one repository disagree about one card,
-  and the one that speaks first is the one that is wrong.
-  FINAL STATE: one rule. `--prepare` emits a handover text that the publish gate accepts — it names
-  the point the successor picks up, which `--prepare` already knows as the first open point in
-  work-order order — and the topic guard tolerates that one forward reference on the unnumbered
-  card, as its own refusal message already demands. Whichever way it is resolved, the printed text
-  and the gate agree, and neither comment claims the other's rule.
-  VERIFIABLE: Vitest over the pure cores — the text `--prepare` composes for a given next point
-  passes the same predicate `board.mjs none` applies, asserted as one property over several
-  next-point numbers so the two cannot drift apart again; plus a case that the topic guard accepts
-  the forward reference on the unnumbered card; plus, for BOTH dictated forms, a case that the text
-  passes the conciseness budget and still matches every fragment `--commit` asserts.
-  ALSO COVERED — POINT 787 IS THE SAME WALL FILED FROM THE OTHER SIDE AND FOLDS INTO THIS POINT.
-  It measured two further gates on the same dictated text, and they are part of "one rule":
-  `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while the
-  dictated CLAIM form (the reserved-for-a-claiming-window variant) is 103 words in one block — so
-  the prescribed text is refused a second time, for an unrelated reason; and `--commit` afterwards
-  demands the card back, matched against EXACT fragments in `cardProofFragments` — `Der Punkt ist
-  abgeschlossen.` plus, for the claimed-window form, the literal `Der Stapel geht NICHT an eine
-  frische Sitzung` with that capitalisation — so shortening the text to fit the word budget makes
-  the boundary refuse its own handover with "THE BOARD DOES NOT CARRY THE HANDOVER CARD".
-  FINAL STATE therefore covers BOTH forms: what `--prepare` prints is accepted, as printed, by the
-  publish gate, the topic guard and the conciseness guard, and is still matched by the proof
-  fragments `--commit` asserts.
-  RELATED: point 434 (7) is where the verbatim card text came from; point 787 is the duplicate
-  filing this point supersedes.
-  Criticality: medium — no product defect, but it taxes every single session boundary, and the
-  instruction it contradicts is the one that says not to re-write the text.
-  Bundle: Chat & Tafel.
-
 - [ ] 794. The user ruled on the guide's size budget: raise the ceiling, drop no pitfall
   (USER-ANSWERED(2026-08-20), given at 21:10 and first executed against the wrong mechanism).
   WHAT WAS ASKED. `docs/analysis_de/vibe-coding-anleitung.md` stands exactly at its ceiling — 415
@@ -240,80 +198,6 @@ put it is the mistake this line exists to stop.
   Criticality: high — the message invites destroying finished work, and it was one diff read away
   from doing so.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 797. The watermark only speaks at the END of the turn, so it warns after the expensive turn
-  has already run (measured 20.08.2026, 22:20).
-  WHAT WAS MEASURED. The user had to point at the context level twice within one hour ("du bist
-  inzwischen weit über 150k, also abgeben"). The session has NO reading of its own while a turn
-  runs: the number in the chat header comes from the `UserPromptSubmit` hook and is a value from the
-  START of the turn, it ages while the turn works, and nothing refreshes it. The watermark check
-  hangs off the `Stop` hook, so it fires only once the whole turn is spent — this session climbed
-  from 160k to 236k inside a SINGLE turn, and the warning arrived at its end.
-  WHY IT MATTERS: the turns that break the ceiling are the long ones, and those are exactly the
-  turns for which an end-of-turn signal is too late. The cost the watermark exists to bound is
-  incurred before it may speak, and the gap is closed today by the user watching the number for us.
-  FINAL STATE: a session can measure its own context DURING a turn — one project command reads the
-  transcript and reports the current size, so a long turn can ask before its next expensive step —
-  and the header instruction states that its figure is from the turn's start rather than presenting
-  it as the current level.
-  VERIFIABLE: a unit case that the command reports a transcript's measured size and fails loudly
-  where none can be read; and a case over the header instruction that its wording names the reading
-  as a start-of-turn value.
-  RELATED: point 785 is the other half — it is about whether the START value is TRUE, this one about
-  whether it is ever refreshed. They share the header path and are read together.
-  Criticality: medium — no product defect, but context above the watermark is the batch's dominant
-  cost and the user is currently the mechanism that catches it.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 798. The doctor's quarantine says nothing about having swept away a finished finding, and its
-  verdict still reads "consistent" (measured 20.08.2026, 22:22, at the session restart).
-  WHAT WAS MEASURED. The SessionStart hook reported the tree as unclean and demanded
-  `node scripts/batch-doctor.mjs --repair`, with the instruction to follow its verdict. The repair
-  found two uncommitted files — `TASKS.md` and `docs/work-packages.md` — classified them as
-  "uncommitted concurrent edits", moved them into a stash, and closed with
-  "VERDICT: consistent — the batch may continue". What it swept away was not a half state: it was
-  the fully written finding 797 together with its bundle line, appended by the interrupted
-  predecessor and never committed.
-  WHY IT MATTERS: "consistent" reads as an all-clear, and the hook tells the session to take it at
-  its word. A session that does works on, and the finding sits in a stash nobody looks at again.
-  Here it survived only because the stash diff was read before any work began. That is the class of
-  point 796 — a finished delivery reported as a non-delivery, and whoever believes the report throws
-  it away.
-  FINAL STATE: the quarantine says WHAT it swept away as soon as the content is recognisably a
-  delivery — a new work-order point, an archive entry, a bundle line — and that case appears in the
-  VERDICT itself rather than only in a log line above it. "consistent" may not stand while a
-  quarantined block holds an appended point; a named "quarantined, read the stash" belongs there.
-  VERIFIABLE: pure cases over the quarantine path — a stash body carrying a new `- [ ] <N>.` block is
-  named in the verdict and one without it is not; and the verdict does not stay at "consistent" once
-  such a block was named.
-  RELATED: point 796 is the same class one step earlier — the authoring run that reported nothing
-  written over 118 finished lines. Both are about a report that turns a delivery into a
-  non-delivery, so they are read together.
-  Criticality: medium — no product defect, but the loss is final and goes unnoticed.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 799. `watcherSupervision` can no longer return `stop`, but the launcher still handles it and the
-  docstring still promises it (found 20.08.2026 while reviewing point 793).
-  WHAT WAS MEASURED. Point 793 removed the single `action: 'stop'` return from `watcherSupervision`
-  (`scripts/chat-watcher-core.mjs`): a paused batch now keeps its inbox listener, because user mail
-  is the one input that can end the pause. Two leftovers of the old shape stayed behind. The
-  docstring above the function still states `Returns { action: 'start' | 'stop' | 'none', reason,
-  pid }`, and `scripts/batch-autostart.mjs` still carries an `else if (sup.action === 'stop')` branch
-  that kills `sup.pid` — a branch no input can now reach.
-  WHY IT MATTERS: nothing misbehaves today, and that is the whole risk. The comments in this
-  repository are load-bearing: the next reader of the supervision protocol is told a stop exists,
-  goes looking for the case that produces it, and finds the launcher apparently proving him right.
-  A dead branch that kills a pid is also the wrong thing to reanimate by accident.
-  FINAL STATE: the documented union matches what the function can return. Either the union narrows
-  to `'start' | 'none'` and the launcher's stop branch goes with it, or the stop path is stated in
-  the docstring as deliberately held in reserve, naming who would produce it.
-  VERIFIABLE: Vitest over the pure core — no input to `watcherSupervision` yields `stop` (the paused,
-  alive, missing-record and stranger-pid cases together), and the launcher handles exactly the
-  actions the function documents.
-  RELATED: point 793 is the change that created it; the review that found it is recorded in
-  `.claude/mechanism-reviews.jsonl` against `9db2216`.
-  Criticality: low — no behaviour is wrong; the cost is a misleading protocol for the next reader.
-  Bundle: Chat & Tafel.
 
 - [ ] 784. A trailer-less merge commit is permanently unreviewable, and it stops the review planner
   before any pass can run (measured 20.08.2026 while reviewing point 783 on `main`).
@@ -3469,6 +3353,122 @@ put it is the mistake this line exists to stop.
   tag plus `poc` dynamically, but a tag push alone does not trigger it. Then VERIFY
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
+
+- [ ] 797. The watermark only speaks at the END of the turn, so it warns after the expensive turn
+  has already run (measured 20.08.2026, 22:20).
+  WHAT WAS MEASURED. The user had to point at the context level twice within one hour ("du bist
+  inzwischen weit über 150k, also abgeben"). The session has NO reading of its own while a turn
+  runs: the number in the chat header comes from the `UserPromptSubmit` hook and is a value from the
+  START of the turn, it ages while the turn works, and nothing refreshes it. The watermark check
+  hangs off the `Stop` hook, so it fires only once the whole turn is spent — this session climbed
+  from 160k to 236k inside a SINGLE turn, and the warning arrived at its end.
+  WHY IT MATTERS: the turns that break the ceiling are the long ones, and those are exactly the
+  turns for which an end-of-turn signal is too late. The cost the watermark exists to bound is
+  incurred before it may speak, and the gap is closed today by the user watching the number for us.
+  FINAL STATE: a session can measure its own context DURING a turn — one project command reads the
+  transcript and reports the current size, so a long turn can ask before its next expensive step —
+  and the header instruction states that its figure is from the turn's start rather than presenting
+  it as the current level.
+  VERIFIABLE: a unit case that the command reports a transcript's measured size and fails loudly
+  where none can be read; and a case over the header instruction that its wording names the reading
+  as a start-of-turn value.
+  RELATED: point 785 is the other half — it is about whether the START value is TRUE, this one about
+  whether it is ever refreshed. They share the header path and are read together.
+  Criticality: medium — no product defect, but context above the watermark is the batch's dominant
+  cost and the user is currently the mechanism that catches it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 798. The doctor's quarantine says nothing about having swept away a finished finding, and its
+  verdict still reads "consistent" (measured 20.08.2026, 22:22, at the session restart).
+  WHAT WAS MEASURED. The SessionStart hook reported the tree as unclean and demanded
+  `node scripts/batch-doctor.mjs --repair`, with the instruction to follow its verdict. The repair
+  found two uncommitted files — `TASKS.md` and `docs/work-packages.md` — classified them as
+  "uncommitted concurrent edits", moved them into a stash, and closed with
+  "VERDICT: consistent — the batch may continue". What it swept away was not a half state: it was
+  the fully written finding 797 together with its bundle line, appended by the interrupted
+  predecessor and never committed.
+  WHY IT MATTERS: "consistent" reads as an all-clear, and the hook tells the session to take it at
+  its word. A session that does works on, and the finding sits in a stash nobody looks at again.
+  Here it survived only because the stash diff was read before any work began. That is the class of
+  point 796 — a finished delivery reported as a non-delivery, and whoever believes the report throws
+  it away.
+  FINAL STATE: the quarantine says WHAT it swept away as soon as the content is recognisably a
+  delivery — a new work-order point, an archive entry, a bundle line — and that case appears in the
+  VERDICT itself rather than only in a log line above it. "consistent" may not stand while a
+  quarantined block holds an appended point; a named "quarantined, read the stash" belongs there.
+  VERIFIABLE: pure cases over the quarantine path — a stash body carrying a new `- [ ] <N>.` block is
+  named in the verdict and one without it is not; and the verdict does not stay at "consistent" once
+  such a block was named.
+  RELATED: point 796 is the same class one step earlier — the authoring run that reported nothing
+  written over 118 finished lines. Both are about a report that turns a delivery into a
+  non-delivery, so they are read together.
+  Criticality: medium — no product defect, but the loss is final and goes unnoticed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 799. `watcherSupervision` can no longer return `stop`, but the launcher still handles it and the
+  docstring still promises it (found 20.08.2026 while reviewing point 793).
+  WHAT WAS MEASURED. Point 793 removed the single `action: 'stop'` return from `watcherSupervision`
+  (`scripts/chat-watcher-core.mjs`): a paused batch now keeps its inbox listener, because user mail
+  is the one input that can end the pause. Two leftovers of the old shape stayed behind. The
+  docstring above the function still states `Returns { action: 'start' | 'stop' | 'none', reason,
+  pid }`, and `scripts/batch-autostart.mjs` still carries an `else if (sup.action === 'stop')` branch
+  that kills `sup.pid` — a branch no input can now reach.
+  WHY IT MATTERS: nothing misbehaves today, and that is the whole risk. The comments in this
+  repository are load-bearing: the next reader of the supervision protocol is told a stop exists,
+  goes looking for the case that produces it, and finds the launcher apparently proving him right.
+  A dead branch that kills a pid is also the wrong thing to reanimate by accident.
+  FINAL STATE: the documented union matches what the function can return. Either the union narrows
+  to `'start' | 'none'` and the launcher's stop branch goes with it, or the stop path is stated in
+  the docstring as deliberately held in reserve, naming who would produce it.
+  VERIFIABLE: Vitest over the pure core — no input to `watcherSupervision` yields `stop` (the paused,
+  alive, missing-record and stranger-pid cases together), and the launcher handles exactly the
+  actions the function documents.
+  RELATED: point 793 is the change that created it; the review that found it is recorded in
+  `.claude/mechanism-reviews.jsonl` against `9db2216`.
+  Criticality: low — no behaviour is wrong; the cost is a misleading protocol for the next reader.
+  Bundle: Chat & Tafel.
+
+- [ ] 800. The boundary hands out a handover text "verbatim", and the board's own publish gate
+  refuses exactly that text — at every point boundary (measured 20.08.2026, 23:32, closing 793).
+  WHAT WAS MEASURED. `node scripts/batch-boundary.mjs --prepare 793` printed the gap-card text and
+  instructed: "take this text verbatim rather than writing it again. It names NO point number on
+  purpose: it goes into the unnumbered gap card, where the topic guard reads every point reference
+  as a foreign one." Piping that exact text into `node scripts/board.mjs none --text-stdin` was
+  refused: "the handover card is the one card without a number, so its reason must NAME the point
+  the batch picks up next. The publish gate refuses a handover card that names none." The board
+  publish ran anyway on the OLD content, so the refusal also left a published board that did not
+  yet carry the card.
+  WHY IT MATTERS: this is not a one-off. Every session ends at a point boundary and every session
+  walks into the same wall, spends a turn discovering which of the two rules wins, and re-writes by
+  hand the sentence it was told not to write. Two guards in one repository disagree about one card,
+  and the one that speaks first is the one that is wrong.
+  FINAL STATE: one rule. `--prepare` emits a handover text that the publish gate accepts — it names
+  the point the successor picks up, which `--prepare` already knows as the first open point in
+  work-order order — and the topic guard tolerates that one forward reference on the unnumbered
+  card, as its own refusal message already demands. Whichever way it is resolved, the printed text
+  and the gate agree, and neither comment claims the other's rule.
+  VERIFIABLE: Vitest over the pure cores — the text `--prepare` composes for a given next point
+  passes the same predicate `board.mjs none` applies, asserted as one property over several
+  next-point numbers so the two cannot drift apart again; plus a case that the topic guard accepts
+  the forward reference on the unnumbered card; plus, for BOTH dictated forms, a case that the text
+  passes the conciseness budget and still matches every fragment `--commit` asserts.
+  ALSO COVERED — POINT 787 IS THE SAME WALL FILED FROM THE OTHER SIDE AND FOLDS INTO THIS POINT.
+  It measured two further gates on the same dictated text, and they are part of "one rule":
+  `dashboard-conciseness-guard` budgets the card at 90 words and demands paragraphs, while the
+  dictated CLAIM form (the reserved-for-a-claiming-window variant) is 103 words in one block — so
+  the prescribed text is refused a second time, for an unrelated reason; and `--commit` afterwards
+  demands the card back, matched against EXACT fragments in `cardProofFragments` — `Der Punkt ist
+  abgeschlossen.` plus, for the claimed-window form, the literal `Der Stapel geht NICHT an eine
+  frische Sitzung` with that capitalisation — so shortening the text to fit the word budget makes
+  the boundary refuse its own handover with "THE BOARD DOES NOT CARRY THE HANDOVER CARD".
+  FINAL STATE therefore covers BOTH forms: what `--prepare` prints is accepted, as printed, by the
+  publish gate, the topic guard and the conciseness guard, and is still matched by the proof
+  fragments `--commit` asserts.
+  RELATED: point 434 (7) is where the verbatim card text came from; point 787 is the duplicate
+  filing this point supersedes.
+  Criticality: medium — no product defect, but it taxes every single session boundary, and the
+  instruction it contradicts is the one that says not to re-write the text.
+  Bundle: Chat & Tafel.
 
 - [ ] 710. The remaining forty-five sequences of the multi-step analysis are worked into the
   order, bundle-first (the blind-parallel stage of 17.08.2026, run on the user's instruction).
