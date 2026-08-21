@@ -24,7 +24,8 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { activityRecord, parseActivityJournal } from './batch-activity-journal-core.mjs'
 
 /** All linked worktrees write one machine journal in the main checkout. */
-export function activityJournalPath({ repo = REPO_ROOT, exec = execFileSync } = {}) {
+export function activityJournalPath({ repo = REPO_ROOT, exec = execFileSync, explicit = process.env.HOA_ACTIVITY_JOURNAL_PATH } = {}) {
+  if (typeof explicit === 'string' && explicit.trim()) return explicit.trim()
   try {
     const common = exec('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
       encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'],

@@ -62,7 +62,9 @@ describe('batch activity journal append protocol', () => {
     expect(activityJournalPath({
       repo: '/main/.claude/worktrees/point',
       exec: () => '/main/.git\n',
+      explicit: '',
     })).toBe(join('/main', '.claude', 'batch-activity.jsonl'))
+    expect(activityJournalPath({ explicit: '/fixture/activity.jsonl' })).toBe('/fixture/activity.jsonl')
   })
 
   it('allocates monotonic sequences and appends one JSON object per line', () => {
