@@ -104,6 +104,7 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(vetoBranch).toMatch(/writer\.sessionId/)
     expect(vetoBranch).toMatch(/writer\.pid/)
     expect(vetoBranch).toMatch(/blockedMinutes/)
+    expect(vetoBranch).toMatch(/blockedUntil:\s*now \+ LAUNCHER_TICK_MS/)
   })
 
   // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
