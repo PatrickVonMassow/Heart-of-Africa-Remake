@@ -4687,6 +4687,22 @@ Build order, chosen so no two parallel agents own the same file:
   spam, which is remediation and not the fix — the supervision that let them
   accumulate is unchanged, and a fresh tick spawns another whenever the pidfile's
   process is not the one it finds.
+  MEASURED AGAIN TWO WEEKS LATER (21.08.2026, 22:13, while the user stopped the
+  batch; `ps -eo pid,etime,cmd | grep chat-watcher.mjs`): ELEVEN live instances,
+  aged 1:30 min to 4 d 3 h (pids 1331164, 1682404, 1886007, 2108484, 2207049,
+  2488982, 2961835, 3272711, 3471737, 3569895, 4118465), while
+  `.claude/chat-watcher.json` named exactly ONE of them (4118465, started 21.08.
+  20:43). So nothing has changed since 08.08., and the accumulation now survives a
+  USER STOP as well: the watcher outlives a pause on purpose
+  (`scripts/chat-watcher.mjs`, comment near line 375), and after a stop there is
+  neither a live owner nor a held claim — which is exactly the state in which each
+  of the ten orphans may spawn a responder of its own. TWO QUESTIONS THIS POINT
+  ANSWERS ALONGSIDE ITS FINAL STATE: does starting a watcher actually END the
+  previous one, or is only the record overwritten; and is the spawn path guarded
+  against several concurrent watchers, or does one user message wake several
+  responders at once. The ten orphans were SIGTERM'd by hand on the user's
+  instruction at 22:31 (clean shutdown entries in the log, none had a responder
+  child) — remediation for the second time, not the fix.
   Criticality: raised to HIGH — no longer a latent risk but a fault the user sees,
   and it reaches him directly rather than through the build.
 
