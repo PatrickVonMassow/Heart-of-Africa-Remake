@@ -19,7 +19,6 @@ import {
   formatReviewMaterial,
   formatReviewReport,
   isUnknownModelRefusal,
-  mainCheckoutFrom,
   modelsInTrailerField,
   newFilePathsIn,
   OUTCOME,
@@ -815,21 +814,17 @@ describe('the model-id probe receipt', () => {
 })
 
 describe('the saved login survives what it has to survive', () => {
-  it('finds the same MAIN checkout from that checkout and from an isolation worktree', () => {
-    const common = '/workspace/hoa/.git'
-    expect(mainCheckoutFrom(common, '/workspace/hoa')).toBe('/workspace/hoa')
-    expect(mainCheckoutFrom(common, '/workspace/hoa/.claude/worktrees/point-773')).toBe('/workspace/hoa')
-  })
-
   it('is kept in the MAIN checkout, not in a worktree that gets deleted', () => {
     expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa/.claude/worktrees/agent-1')).toBe(
       '/workspace/hoa/local/codex-auth.json',
     )
+    expect(savedAuthPathFrom('/workspace/hoa/.git', '/workspace/hoa')).toBe('/workspace/hoa/local/codex-auth.json')
   })
 
   it('falls back to the current checkout when git answers nothing', () => {
     expect(savedAuthPathFrom('', '/repo')).toBe('/repo/local/codex-auth.json')
     expect(savedAuthPathFrom('   \n', '/repo')).toBe('/repo/local/codex-auth.json')
+    expect(savedAuthPathFrom('/srv/hoa.git', '/repo')).toBe('/repo/local/codex-auth.json')
   })
 
   it('handles a windows path and a trailing separator', () => {

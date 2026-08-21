@@ -63,6 +63,7 @@ const SCRIPT_FILES = [
   // looks like (point 667), so that one does too.
   'blind-merge-core.mjs',
   'model-guard-core.mjs',
+  'main-checkout-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
