@@ -386,16 +386,31 @@ export function fenceTracker() {
 /**
  * `text` with every inline code span blanked. PURE.
  *
- * A span is delimited by a run of backticks and closed by a run of EXACTLY that length,
- * so ``--because`` is code exactly like `--because` is (cross-vendor review, round 1:
- * the single-backtick pattern left the longer form's content exposed and reported it as
- * an argument). The lookarounds are what make the run EXACT: without them a two-backtick
- * opener closed on the first two backticks of a three-backtick run, which CommonMark
- * does not do, and the text between them was blanked unread (round 2). Spans do not
- * cross a line, so an unclosed run is left alone rather than swallowing the document.
+ * A span opens on a run of backticks and closes on a run of EXACTLY that length. Both
+ * halves of that rule cost a cross-vendor round: the single-backtick pattern left
+ * ``--because`` exposed and reported a flag name as an argument (round 1), and a regex
+ * with a `(?!\1)` body could not traverse a LONGER run inside a valid span, so
+ * ``cmd ``` --because`` left its content exposed instead (round 3). The scan below is
+ * explicit for that reason — the rule is about run LENGTHS, which a backreference
+ * cannot express, and an unmatched opener stays literal so the next run may still open
+ * a span. Spans do not cross a line, so an unclosed run swallows nothing.
  */
 export function withoutCodeSpans(text) {
-  return String(text ?? '').replace(/(?<!`)(`+)(?:(?!\1)[^\n])*?\1(?!`)/g, ' ')
+  return String(text ?? '')
+    .split('\n')
+    .map((line) => {
+      const runs = []
+      for (const m of line.matchAll(/`+/g)) runs.push({ start: m.index, end: m.index + m[0].length, len: m[0].length })
+      const chars = [...line]
+      for (let i = 0; i < runs.length; i++) {
+        const close = runs.findIndex((r, j) => j > i && r.len === runs[i].len)
+        if (close < 0) continue
+        for (let k = runs[i].start; k < runs[close].end; k++) chars[k] = ' '
+        i = close
+      }
+      return chars.join('')
+    })
+    .join('\n')
 }
 
 /**

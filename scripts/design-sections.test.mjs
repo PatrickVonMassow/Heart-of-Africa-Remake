@@ -193,14 +193,25 @@ describe('CLAUDE.md references into design.md', () => {
     return out
   }
   const citedIn = (text) => [...new Set([...text.matchAll(RUN)].flatMap((m) => expand(m[1])))]
-  // THE CRITERION ESCAPE HATCH IS CLAUDE.md's ALONE (cross-vendor review, round 2).
-  // A bare `§22` in the build order may mean acceptance criterion 22, which is a list
-  // item no section resolver reaches — but in the detail document every `§` means a
-  // design.md section, and letting criteria 1–32 absorb those numbers made the deletion
-  // of design §8, §9 or §10 read green.
-  const dangling = (cited, { criteriaResolve = false } = {}) =>
+  // WHAT A BARE NUMBER MAY RESOLVE THROUGH DEPENDS ON WHO WROTE IT (cross-vendor review,
+  // rounds 2 and 3). In CLAUDE.md a bare `§22` may mean acceptance criterion 22 — a list
+  // item no section resolver reaches — and a `§9` may mean its own heading, so both
+  // escapes are open there ('all').
+  //
+  // In the DETAIL document almost every `§` means a design.md section, and design.md
+  // numbers its top-level sections with the same INTEGERS CLAUDE.md does: with the
+  // escapes open, deleting design §8, §9 or §10 read green through a same-numbered
+  // criterion or heading. So integers must resolve in design.md and nowhere else there.
+  // A DOTTED id is unambiguous — design.md has no §7.1 — and the detail document does
+  // cite the build order's own §7.1 once, legitimately, which is why 'dotted' exists
+  // rather than a flat refusal that would have to be papered over.
+  const dangling = (cited, { claudeResolve = false, criteriaResolve = false } = {}) =>
     cited.filter(
-      (id) => homesOf(id).length === 0 && !claude.has(id) && !(criteriaResolve && criteria.has(Number(id))),
+      (id) =>
+        homesOf(id).length === 0 &&
+        !(claudeResolve === 'all' && claude.has(id)) &&
+        !(claudeResolve === 'dotted' && id.includes('.') && claude.has(id)) &&
+        !(criteriaResolve && criteria.has(Number(id))),
     )
 
   it('reads every number of a multi-section citation', () => {
@@ -215,10 +226,17 @@ describe('CLAUDE.md references into design.md', () => {
     expect(citedIn('see §§17.1–19.2')).toEqual(['17.1', '19.2'])
   })
 
-  it('does not let an acceptance-criterion number cover a missing design section', () => {
-    // §8 in a document whose §§ mean design.md sections is design §8, never criterion 8.
-    expect(dangling(['999'], { criteriaResolve: true })).toEqual(['999'])
-    expect(dangling(['8'], { criteriaResolve: false })).toEqual(homesOf('8').length ? [] : ['8'])
+  it('lets neither a criterion NOR a CLAUDE.md heading cover a missing design section', () => {
+    // Both escapes are real: 9 is an acceptance criterion AND a CLAUDE.md heading, so a
+    // design §9 deleted under the detail document's feet must still be reported.
+    expect(criteria.has(9)).toBe(true)
+    expect(claude.has('9')).toBe(true)
+    const withoutDesign = (id) => (homesOf(id).length === 0 ? [id] : [])
+    expect(dangling(['9'], { claudeResolve: 'dotted' })).toEqual(withoutDesign('9'))
+    // A DOTTED build-order id still resolves there, and only a dotted one.
+    expect(dangling(['7.1'], { claudeResolve: 'dotted' })).toEqual([])
+    // …while the build order's own citations keep both escapes, which is why they are flags.
+    expect(dangling(['999'], { claudeResolve: 'all', criteriaResolve: true })).toEqual(['999'])
   })
 
   it('resolves every § it cites', () => {
@@ -228,7 +246,7 @@ describe('CLAUDE.md references into design.md', () => {
     // 768 cut those conditions to docs/acceptance-criteria-detail.md, which is checked
     // below, and the citations left in the always-loaded file are a handful.
     expect(cited.length).toBeGreaterThan(3)
-    const bad = dangling(cited, { criteriaResolve: true })
+    const bad = dangling(cited, { claudeResolve: 'all', criteriaResolve: true })
     expect(bad, `CLAUDE.md cites sections nothing holds: ${bad.join(', ')}`).toEqual([])
   })
 
@@ -240,7 +258,7 @@ describe('CLAUDE.md references into design.md', () => {
     const detail = readFileSync(resolve(REPO_ROOT, 'docs/acceptance-criteria-detail.md'), 'utf8')
     const cited = citedIn(detail)
     expect(cited.length).toBeGreaterThan(50)
-    const bad = dangling(cited)
+    const bad = dangling(cited, { claudeResolve: 'dotted' })
     expect(bad, `docs/acceptance-criteria-detail.md cites sections nothing holds: ${bad.join(', ')}`).toEqual([])
   })
 

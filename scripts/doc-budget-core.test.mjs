@@ -9,6 +9,7 @@ import {
   measure,
   evaluateDocBudgets,
   fenceTracker,
+  withoutCodeSpans,
   formatDocBudgetVerdict,
   proseRationaleFindings,
   workOrderPoints,
@@ -247,6 +248,17 @@ describe('proseRationaleFindings — the file instructs, it does not argue', () 
     // the text between them was never code and is read (round 2).
     expect(find('- Run ``--because``` here.')).toHaveLength(1)
     expect(find('- Run ``--because`` here.')).toEqual([])
+  })
+
+  it('lets a LONGER run stand inside a valid span, which is what it is for', () => {
+    // ``cmd ``` --because`` is one two-backtick span; a matcher that cannot traverse the
+    // three-backtick run inside it leaves the code exposed as prose (round 3).
+    expect(find('- Run ``cmd ``` --because`` here.')).toEqual([])
+    expect(withoutCodeSpans('a ``x ``` y`` b')).toBe('a             b')
+  })
+
+  it('leaves an unmatched opener literal and still finds the span after it', () => {
+    expect(withoutCodeSpans('``a `b` c')).toBe('``a     c')
   })
 
   it('leaves a binding condition alone — only an ADVERB may stand before the purpose', () => {
