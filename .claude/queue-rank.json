@@ -297,6 +297,12 @@
       "why": "It blocks every session's turn end until it is settled, so it cannot wait behind the release: the criticality gate refuses the answer of any session that inherits it.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "817": {
+      "at": "2026-08-21T13:06:43.801Z",
+      "why": "Es gehört hinter 816, das die Prüfung erst kommissioniert hat, und hinter 815, das denselben Tagebuch-Kern anfasst; vor der Freigabe muss es nicht stehen, weil die doppelte Nummer die bereits gemessenen Urteile nicht rückwirkend verfälscht.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -354,7 +360,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T12:55:57.116Z",
+    "at": "2026-08-21T13:06:43.808Z",
     "points": [
       174,
       184,
@@ -595,7 +601,8 @@
       813,
       814,
       815,
-      816
+      816,
+      817
     ]
   }
 }
