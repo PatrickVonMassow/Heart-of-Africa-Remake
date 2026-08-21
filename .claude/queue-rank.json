@@ -273,6 +273,24 @@
       "why": "Hinten ist richtig: Jeder der sechzehn Verdachtsfälle sitzt in Code, den der vorderste Punkt ohnehin neu schreibt — vorher geprüft hieße zweimal prüfen",
       "origin": "machine",
       "place": "last"
+    },
+    "811": {
+      "at": "2026-08-21T10:51:46.988Z",
+      "why": "Hebel 2a/2b/2c aus dem zusammengeführten Vier-Augen-Spec von 809, dessen vorab festgelegter Schnitt sie als eigene Punkte vorsieht; sie stehen direkt hinter 809, weil der Nutzer die Queue-Geschwindigkeit selbst zur Spitze erklärt hat und genau diese drei Ursachen sie kosten.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "812": {
+      "at": "2026-08-21T10:51:47.056Z",
+      "why": "Hebel 2a/2b/2c aus dem zusammengeführten Vier-Augen-Spec von 809, dessen vorab festgelegter Schnitt sie als eigene Punkte vorsieht; sie stehen direkt hinter 809, weil der Nutzer die Queue-Geschwindigkeit selbst zur Spitze erklärt hat und genau diese drei Ursachen sie kosten.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "813": {
+      "at": "2026-08-21T10:51:47.128Z",
+      "why": "Hebel 2a/2b/2c aus dem zusammengeführten Vier-Augen-Spec von 809, dessen vorab festgelegter Schnitt sie als eigene Punkte vorsieht; sie stehen direkt hinter 809, weil der Nutzer die Queue-Geschwindigkeit selbst zur Spitze erklärt hat und genau diese drei Ursachen sie kosten.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -330,7 +348,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T10:35:17.653Z",
+    "at": "2026-08-21T10:51:47.135Z",
     "points": [
       174,
       184,
@@ -566,7 +584,10 @@
       806,
       807,
       809,
-      810
+      810,
+      811,
+      812,
+      813
     ]
   }
 }
