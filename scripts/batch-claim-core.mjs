@@ -21,13 +21,10 @@
 // whole apparatus exists to prevent (the e9407cae incident).
 //
 // FOUR BOUNDS, each measurable rather than a matter of taste:
-//   1. IT IS BOUNDED BY THE THING IT WAITS FOR, not by a clock somebody has to
-//      feed (point 434 (6), 30.07.2026 — see `assessClaim`). A claim file left by
-//      a window that was closed must never hand the batch to nobody, and the
-//      reader that answers that is the pid probe of bound 2, not the calendar.
-//      The wall clock survives only where there is nobody left to wait for: with
-//      the lock free and the claim untaken, `CLAIM_MAX_AGE_MS` is the TAKE-UP
-//      window after which the ordinary handover takes over again.
+//   1. IT IS BOUNDED BY REAL CLAIMANT ACTIVITY. A living editor window does not
+//      reserve the batch indefinitely: `CLAIM_MAX_AGE_MS` runs from the claim,
+//      release, or a newer attributable `activityAt`. Re-running the claimant's
+//      own command refreshes the claim; mere process existence does not.
 //   2. THE CLAIMANT MUST BE ALIVE, and alive by IDENTITY: the recorded pid must
 //      exist AND have started when the claim says it did. A reused pid is a
 //      stranger. This is the same rule `checkEvidence` applies to a declared
@@ -111,8 +108,8 @@ export function claimIsBounded(claim) {
 }
 
 /**
- * IS THERE ANYBODY TO WAIT FOR — the input `assessClaim` suspends its clock on.
- * PURE, so both readers derive it the same way and cannot drift apart.
+ * IS THERE A LIVE SESSION OWNER? PURE. Callers retain this context for release
+ * and diagnostics; reservation expiry itself no longer pauses on this answer.
  *
  * IT IS NOT LOCK EXISTENCE (four-eyes review, Fable 5, 30.07.2026, finding 1).
  * Derived as `!!lock?.sessionId` it also matched the LAUNCHER's `pending-spawn`
@@ -120,11 +117,9 @@ export function claimIsBounded(claim) {
  * `claude -p` still booting. That produced a loop out of the crash path: the
  * launcher reads the claim with no owner (`ownerHolding` false), finds it
  * expired, reaps the dead owner and spawns — and the successor's resume hook
- * then read `ownerHolding` off the launcher's OWN pending lock, honoured the
- * claim with no aging, stood down without converting the pending spawn, and the
- * next tick spawned again. Two readers disagreeing about one state is the
- * disease this point was written for, so the predicate demands what the words
- * mean: a LIVE SESSION owner, and never the claimant itself.
+ * then read `ownerHolding` off the launcher's OWN pending lock and stood down
+ * without converting it. The predicate still demands what the words mean: a
+ * LIVE SESSION owner, and never the claimant itself.
  *
  * `alive` is the caller's `assessOwner(...).alive` — the lock's own liveness
  * rule, not a second one invented here.
@@ -187,11 +182,7 @@ export function claimantLiveness({ claim, probePid = null, tolerance = PID_START
  *               session, so the owner's own claim would otherwise read as a
  *               stranger's and it would release the batch to itself.
  *   ownerSid  — who holds the lock right now, when known
- *   ownerHolding — is a live owner still holding the lock, i.e. is there anybody
- *               to WAIT for? While there is, the claim does not age (point 434
- *               (6a)); once there is not, `maxAgeMs` is the take-up window. It
- *               defaults to FALSE, so a caller that cannot answer gets the
- *               bounded reading — the direction that can never strand the batch.
+ *   ownerHolding — retained caller context; it does not suspend reservation age.
  *   now, maxAgeMs, probePid, tolerance
  *
  * Returns { honour, reserve, mine, reason, ageMs, claimantSid, releasedAt }.
@@ -257,6 +248,13 @@ export function assessClaim({
   // A claim from the future is a clock nobody here can reason about → ignore it.
   // Costs one re-claim; the other direction hands the batch over on a bad stamp.
   if (!(ageMs >= 0)) return out(false, 'clock-skew', { ...base, ageMs })
+  // A holder may renew its reservation only with an attributable activity stamp.
+  // A future stamp proves nothing; the original claim remains the baseline.
+  const activityAt = typeof claim.activityAt === 'number' && claim.activityAt >= claim.at && claim.activityAt <= now
+    ? claim.activityAt
+    : null
+  const renewedAt = Math.max(claim.at, activityAt ?? 0)
+  const renewalAgeMs = now - renewedAt
 
   // Ours? By the lock's own identity rules — session id first, the claude process
   // second — so a compaction that mints a new id never orphans a claim this very
@@ -269,8 +267,8 @@ export function assessClaim({
 
   // ALREADY HANDED OVER → never honourable again, for everybody but its own
   // writer (see above). It still RESERVES the free lock while its claimant is
-  // provably alive (point 461): the same identity probe, no second notion of
-  // liveness, and no deadline anybody has to feed.
+  // provably alive and its activity window holds (point 461): the same identity
+  // probe and the same renewable bound as a pending claim.
   if (base.releasedAt !== null || (typeof claim.releasedBy === 'string' && claim.releasedBy.trim() !== '')) {
     // An ERRAND claim's pid names its ISSUER rather than its taker, so it proves
     // nobody is waiting. Asked first: it needs no probe at all.
@@ -283,7 +281,10 @@ export function assessClaim({
     // reading that cannot strand the batch is the one that reserves nothing.
     // Checked BEFORE the probe: a long-expired record then costs no OS call
     // (four-eyes review, Fable 5, 30.07.2026, finding 4).
-    const sinceRelease = base.releasedAt === null ? null : now - base.releasedAt
+    const releasedRenewedAt = activityAt !== null && base.releasedAt !== null && activityAt >= base.releasedAt
+      ? activityAt
+      : base.releasedAt
+    const sinceRelease = releasedRenewedAt === null ? null : now - releasedRenewedAt
     if (sinceRelease === null || !(sinceRelease >= 0) || sinceRelease > maxAgeMs) {
       return out(false, 'released', { ...base, ageMs })
     }
@@ -297,9 +298,10 @@ export function assessClaim({
   const live = claimantLiveness({ claim, probePid, tolerance })
   if (!live.alive) return out(false, live.reason, { ...base, ageMs })
 
-  // THE CLOCK, where and only where nothing else bounds the wait: an errand claim
-  // that carries its own issuer, or a claim with no live owner left to wait for.
-  if ((claimIsBounded(claim) || ownerHolding !== true) && ageMs > maxAgeMs) {
+  // A breathing window is not activity. Pending claims expire too unless their
+  // holder refreshes the record; otherwise an idle editor can reserve the batch
+  // for as long as its host process happens to live.
+  if (renewalAgeMs > maxAgeMs) {
     return out(false, 'expired', { ...base, ageMs })
   }
   return out(true, 'honour', { ...base, ageMs })
@@ -444,7 +446,7 @@ export function takeoverDecision({
  * MAY THIS SESSION RECORD A CLAIM? PURE.
  *
  * 'refresh' — the pending claim is already ours (re-stating the wait is free)
- * 'refuse'  — another live session claimed first; first claim wins while it lives
+ * 'refuse'  — another renewed live session claimed first
  * 'write'   — nothing honourable is pending
  *
  * The refusal is what keeps two returning windows from both being told the batch
