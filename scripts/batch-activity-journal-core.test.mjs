@@ -93,7 +93,7 @@ describe('batch activity journal append protocol', () => {
       `for (let i=0;i<12;i++) appendActivity({event:ACTIVITY_EVENTS.FOREGROUND_ACTIVITY,cause:'test',evidence:{i}}, {path:${JSON.stringify(path)}})`,
     ].join(';')
     const children = Array.from({ length: 6 }, () => new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, ['--input-type=module', '--eval', code], { stdio: 'ignore' })
+      const child = spawn(process.execPath, ['--input-type=module', '--eval', code], { stdio: 'ignore', windowsHide: true })
       child.once('error', reject)
       child.once('exit', (exitCode) => exitCode === 0 ? resolve() : reject(new Error(`writer exited ${exitCode}`)))
     }))
