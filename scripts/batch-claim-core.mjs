@@ -226,6 +226,9 @@ export function assessClaim({
   probePid = null,
   tolerance = PID_START_TOLERANCE_MS,
 } = {}) {
+  // Kept in the public input shape for callers which also report whether an
+  // owner stands; it no longer suspends the renewable reservation clock.
+  void ownerHolding
   const out = (honour, reason, extra = {}) => ({
     honour,
     reserve: false,
