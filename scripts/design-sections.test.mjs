@@ -116,14 +116,30 @@ describe('CLAUDE.md references into design.md', () => {
   // and are cited as bare `§22` / `pt. 30` — point-brief-core resolves them the
   // same way, so this test accepts them exactly as the brief generator does.
   const criteria = acceptanceCriteriaFrom(claude)
+  const citedIn = (text) => [...new Set([...text.matchAll(/§\s?(\d+(?:\.\d+)*)/g)].map((m) => m[1]))]
+  const dangling = (cited) =>
+    cited.filter((id) => homesOf(id).length === 0 && !claude.has(id) && !criteria.has(Number(id)))
 
   it('resolves every § it cites', () => {
-    const cited = [...new Set([...claudeText.matchAll(/§\s?(\d+(?:\.\d+)*)/g)].map((m) => m[1]))]
-    expect(cited.length).toBeGreaterThan(50) // the extraction itself must not silently find nothing
-    const dangling = cited.filter(
-      (id) => homesOf(id).length === 0 && !claude.has(id) && !criteria.has(Number(id)),
-    )
-    expect(dangling, `CLAUDE.md cites sections nothing holds: ${dangling.join(', ')}`).toEqual([])
+    const cited = citedIn(claudeText)
+    // The floor is a sentinel against an extraction that silently finds nothing, not a
+    // size target. It stood at 50 while §7.1 carried one condition per criterion; point
+    // 768 cut those conditions to docs/acceptance-criteria-detail.md, which is checked
+    // below, and the citations left in the always-loaded file are a handful.
+    expect(cited.length).toBeGreaterThan(3)
+    expect(dangling(cited), `CLAUDE.md cites sections nothing holds: ${dangling(cited).join(', ')}`).toEqual([])
+  })
+
+  // THE CHECK FOLLOWS THE TEXT IT WAS WRITTEN FOR (point 768). The §7.1 conditions were
+  // where CLAUDE.md cited design.md by number, and the cut moved them rather than
+  // deleting them — so the resolution check moves with them, or the cut would buy the
+  // per-turn saving by dropping the guard on dozens of references.
+  it('resolves every § the acceptance-criteria detail cites, where those conditions now live', () => {
+    const detail = readFileSync(resolve(REPO_ROOT, 'docs/acceptance-criteria-detail.md'), 'utf8')
+    const cited = citedIn(detail)
+    expect(cited.length).toBeGreaterThan(50)
+    const bad = dangling(cited)
+    expect(bad, `docs/acceptance-criteria-detail.md cites sections nothing holds: ${bad.join(', ')}`).toEqual([])
   })
 
   it('finds the acceptance criteria it needs to resolve the bare numbers', () => {

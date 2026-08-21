@@ -9,6 +9,7 @@ import {
   measure,
   evaluateDocBudgets,
   formatDocBudgetVerdict,
+  proseRationaleFindings,
   workOrderPoints,
 } from './doc-budget-core.mjs'
 import { docBudgetPath } from './doc-budget-guard.mjs'
@@ -35,7 +36,7 @@ describe('measure', () => {
 })
 
 describe('evaluateDocBudgets', () => {
-  const budgets = [{ path: 'X.md', maxLines: 3, maxWords: 5, why: 'because' }]
+  const budgets = [{ path: 'X.md', maxLines: 3, maxWords: 5, slackWords: 5, why: 'because' }]
 
   it('passes a document inside its budget', () => {
     expect(evaluateDocBudgets([{ path: 'X.md', text: 'a b\nc\n' }], budgets).block).toBe(false)
@@ -49,7 +50,7 @@ describe('evaluateDocBudgets', () => {
   it('blocks a memory entry that grows past the hook-only ceiling', () => {
     const v = evaluateDocBudgets(
       [{ path: 'MEMORY.md', text: '- short hook\n- this entry has far too many words for its index line\n' }],
-      [{ path: 'MEMORY.md', maxLines: 4, maxWords: 20, maxEntryWords: 4, why: 'hook only' }],
+      [{ path: 'MEMORY.md', maxLines: 4, maxWords: 20, slackWords: 20, maxEntryWords: 4, why: 'hook only' }],
     )
     expect(v.findings.map((f) => f.kind)).toEqual(['entry words (line 2)'])
   })
@@ -67,6 +68,126 @@ describe('evaluateDocBudgets', () => {
   })
 })
 
+describe('the ratchet — headroom cannot be banked', () => {
+  // ONE ceiling, THREE sizes: the point of the ratchet is that both directions refuse.
+  const budgets = [{ path: 'X.md', maxLines: 999, maxWords: 100, slackWords: 10, why: 'read constantly' }]
+  const doc = (words) => ({ path: 'X.md', text: Array.from({ length: words }, (_, i) => 'w' + i).join(' ') })
+
+  it('refuses a document ABOVE its ceiling, exactly as it always did', () => {
+    const v = evaluateDocBudgets([doc(101)], budgets)
+    expect(v.block).toBe(true)
+    expect(v.findings.map((f) => f.kind)).toEqual(['words'])
+  })
+
+  it('refuses a document more than the slack BELOW its ceiling, and says to lower it', () => {
+    const v = evaluateDocBudgets([doc(89)], budgets)
+    expect(v.block).toBe(true)
+    expect(v.findings.map((f) => f.kind)).toEqual(['headroom'])
+    expect(v.findings[0].actual).toBe('11 words below its ceiling of 100')
+    expect(v.findings[0].budget).toBe('at most 10')
+    expect(formatDocBudgetVerdict(v)).toContain('LOWER THE CEILING TO WHAT YOU ACHIEVED')
+  })
+
+  it('passes a document inside the slack, at both ends of it', () => {
+    expect(evaluateDocBudgets([doc(100)], budgets).block).toBe(false)
+    expect(evaluateDocBudgets([doc(90)], budgets).block).toBe(false)
+  })
+
+  it('reads the slack PER DOCUMENT rather than deriving it from the size', () => {
+    // Same text, same ceiling, different declared slack — only the declaration decides.
+    const generous = [{ ...budgets[0], slackWords: 40 }]
+    expect(evaluateDocBudgets([doc(70)], generous).block).toBe(false)
+    expect(evaluateDocBudgets([doc(70)], budgets).block).toBe(true)
+    // And a ceiling ten times the size does not grant ten times the slack: a fraction
+    // would let the big document drift while the small one could not.
+    const big = [{ ...budgets[0], maxWords: 1000, slackWords: 10 }]
+    expect(evaluateDocBudgets([{ path: 'X.md', text: doc(989).text }], big).block).toBe(true)
+  })
+
+  it('refuses a budget that declares no usable slack, rather than switching the ratchet off', () => {
+    for (const slackWords of [undefined, null, -1, 12.5, '10', NaN]) {
+      const broken = [{ ...budgets[0], slackWords }]
+      const v = evaluateDocBudgets([doc(100)], broken)
+      expect(v.block, String(slackWords) + ' must refuse').toBe(true)
+      expect(v.findings[0].kind).toBe('ratchet slack is not a whole number of words')
+    }
+  })
+
+  it('reports the outgrown ceiling ALONE when the document is over it', () => {
+    // A document above its ceiling is not also "too far below" it — one refusal, one remedy.
+    const v = evaluateDocBudgets([doc(200)], budgets)
+    expect(v.findings.map((f) => f.kind)).toEqual(['words'])
+  })
+
+  it('every shipped budget declares a slack, so no document can quietly stop ratcheting', () => {
+    for (const budget of DOC_BUDGETS) {
+      expect(Number.isInteger(budget.slackWords), budget.path + ' declares no slackWords').toBe(true)
+      expect(budget.slackWords, budget.path).toBeGreaterThanOrEqual(0)
+    }
+  })
+})
+
+describe('proseRationaleFindings — the file instructs, it does not argue', () => {
+  const find = (text) => proseRationaleFindings(text, { path: 'CLAUDE.md', why: 'read every turn' })
+
+  it('reports an ARGUING line', () => {
+    const v = find('- Push after every commit, because a session that dies takes the tree with it.')
+    expect(v).toHaveLength(1)
+    expect(v[0].kind).toContain('prose rationale (line 1')
+    expect(v[0].kind).toContain('because')
+  })
+
+  it('does NOT report the instructing form of the same rule', () => {
+    expect(find('- Push after every commit; report a failed push.')).toEqual([])
+  })
+
+  it('reports each of the argument constructions it watches for', () => {
+    const arguing = [
+      'The reason for the tier map is the cost of a browser run.',
+      'That is why the branch ends at the merge.',
+      'This guard exists to stop the file growing back.',
+      'The ceiling is tight so that nobody banks headroom.',
+      'Historically the work order held finished points.',
+      'We learned this from the 434k session.',
+      'It turned out the guard hung in no chain.',
+      'The archive used to hold open points.',
+      'The floor, measured 20.08.2026, stood at 58,000 tokens.',
+    ]
+    for (const line of arguing) expect(find(line), line).toHaveLength(1)
+  })
+
+  it('leaves a contrast between two instructions alone — "rather than" is not an argument', () => {
+    expect(find('- Use TSL rather than raw GLSL/WGSL; do not make game behavior Chrome-only.')).toEqual([])
+  })
+
+  it('ignores fenced blocks and inline code, which are commands and not prose', () => {
+    expect(find('```\nnode scripts/x.mjs --because\n```\n')).toEqual([])
+    expect(find('- Run `git commit --because-flag` before pushing.')).toEqual([])
+  })
+
+  it('reports one finding per line, at the first marker, and names the line number', () => {
+    const v = find('fine line\n- It exists to explain, because it argues twice.')
+    expect(v).toHaveLength(1)
+    expect(v[0].kind).toContain('line 2')
+  })
+
+  it('is total on missing input', () => {
+    expect(proseRationaleFindings(undefined)).toEqual([])
+  })
+
+  it('is wired into the budget only for the document that declares it', () => {
+    const arguing = { path: 'X.md', text: 'a rule, because of a reason' }
+    const watched = [{ path: 'X.md', maxLines: 9, maxWords: 9, slackWords: 9, noProseRationale: true, why: 'w' }]
+    const unwatched = [{ path: 'X.md', maxLines: 9, maxWords: 9, slackWords: 9, why: 'w' }]
+    expect(evaluateDocBudgets([arguing], watched).block).toBe(true)
+    expect(evaluateDocBudgets([arguing], unwatched).block).toBe(false)
+  })
+
+  it('is declared for CLAUDE.md, the document the user named', () => {
+    expect(DOC_BUDGETS.find((b) => b.path === 'CLAUDE.md').noProseRationale).toBe(true)
+  })
+})
+
 describe('formatDocBudgetVerdict', () => {
   it('says nothing when everything fits', () => {
     expect(formatDocBudgetVerdict({ block: false, findings: [] })).toBe('')
@@ -75,7 +196,7 @@ describe('formatDocBudgetVerdict', () => {
   it('names the file, the numbers and BOTH ways out', () => {
     const text = formatDocBudgetVerdict(
       evaluateDocBudgets([{ path: 'X.md', text: 'a b c\nd e f\ng h i\nj k l\n' }], [
-        { path: 'X.md', maxLines: 3, maxWords: 5, why: 'because' },
+        { path: 'X.md', maxLines: 3, maxWords: 5, slackWords: 5, why: 'because' },
       ]),
     )
     expect(text).toContain('X.md')
@@ -131,6 +252,7 @@ describe('the per-point ceiling of the work order', () => {
       until: /^## Checklist/,
       maxLines: 999,
       maxWords: 9999,
+      slackWords: 9999,
       why: 'preamble',
       perPoint: { maxWords: 20, why: 'a brief pays a point spec in full at every delegation' },
     },

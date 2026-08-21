@@ -29,21 +29,62 @@
 //     the archive (reference material, read on demand — their size costs
 //     nothing per turn), and the retrospective (its job is to hold every
 //     problem class; capping it would trade the wrong thing away).
+//
+// A CEILING ALONE IS NOT A RATCHET (user 20.08.2026, work-order point 768): "etabliere
+// einen Mechanismus, der das dauerhaft zusichert, damit das Dokument nicht wieder
+// ausufert." A ceiling only ever falls BY HAND, so every cut leaves headroom the next
+// writer may quietly spend, and the sum of honest single additions walks the file back
+// up to the line the last cut was made at. That is exactly how CLAUDE.md grew back
+// between its cuts. So `slackWords` turns the ceiling into a floor as well: a document
+// measuring more than its stated slack BELOW its ceiling is refused too, with the
+// remedy "lower the ceiling to what you achieved". Headroom cannot be banked, and each
+// document can only ever ratchet DOWN.
+//
+// THE SLACK IS AN ABSOLUTE WORD COUNT PER DOCUMENT, never a fraction of its size. A
+// percentage gives the largest documents the largest licence — design.md would carry
+// hundreds of free words while the six-line global stub carried none — and it moves
+// every time the document does, so ordinary editing would thrash against it. The number
+// is written per document beside its ceiling, for that document's editing rhythm.
+//
+// AND NO PROSE RATIONALE IN CLAUDE.md (same instruction: "z. B. gehören da keine
+// Prosa-Begründungen rein"). A reason belongs beside the switch it governs — in the code
+// that implements it or in the document under docs/ that holds its mechanics — not in
+// the file every session and every subagent pays for before it does anything. The check
+// is deliberately in the SAME SHAPE as the budget: one pure judgement, one finding per
+// offending line, one Stop-chain refusal.
 
 /**
  * The budgets. `headingRe` limits the measurement to the part of a file BEFORE
  * that heading — used for the work order's preamble.
+ *
+ * `slackWords` is the ratchet described above: the largest gap between the measured
+ * size and the ceiling this document may carry. Declaring it is mandatory — an entry
+ * with no usable slack is a finding, for the reason the per-point ceiling learned the
+ * hard way below: a check that switches itself off in silence is the failure the guard
+ * exists to prevent, one layer up.
+ *
+ * `noProseRationale` marks a document whose lines must instruct rather than argue.
  */
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    // LOWERED after the 20.08.2026 three-document cut: 786 lines / 6585 words
-    // became 333 / 2095 by this guard's tokenizer after the Fable-switch pointer. Guard mechanics, owner operation and why-history now
-    // live at their named destinations; §7.1 keeps one condition per criterion.
-    // The line margin remains; the word ceiling is now exact. Leaving the former
-    // ceiling would invite all 4493 words back.
-    maxLines: 334,
-    maxWords: 2095,
+    // LOWERED to the 21.08.2026 four-eyes cut (work-order point 768): 333 lines /
+    // 2095 words became 188 / 1294 by this guard's tokenizer. §7.1 is now number and
+    // title only, with the condition and the evidence under the same number in
+    // docs/acceptance-criteria-detail.md and docs/acceptance-evidence.md; §3 keeps its
+    // binding sentences and leaves the mechanics to docs/render-architecture.md and
+    // docs/tts-architecture.md; every rule a PreToolUse guard refuses before the act
+    // became a pointer, with that guard's assertion checked one by one.
+    // The line margin remains; the word ceiling is exact. Leaving the former ceiling
+    // standing would hand the next writer the 801 words this cut just bought — which
+    // is what the slack below now refuses.
+    maxLines: 189,
+    maxWords: 1294,
+    // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
+    // every session and every subagent, so twenty words is the whole licence between
+    // one cut and the next. A larger edit than that lowers the ceiling with it.
+    slackWords: 20,
+    noProseRationale: true,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
@@ -57,6 +98,9 @@ export const DOC_BUDGETS = [
     maxLines: 47,
     maxWords: 710,
     maxEntryWords: 22,
+    // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
+    // so the slack cannot hide one, and re-wording an existing hook is free.
+    slackWords: 15,
     why: 'loaded at every turn; the index is one hook line per surviving topic',
   },
   {
@@ -68,6 +112,9 @@ export const DOC_BUDGETS = [
     // Live rules moved into project CLAUDE.md.
     maxLines: 6,
     maxWords: 36,
+    // Five words on a six-line stub pending deletion; anything larger would be licence
+    // for the stub to become a document again.
+    slackWords: 5,
     why: 'loaded at every turn although this repository is its only reader',
   },
   {
@@ -86,6 +133,9 @@ export const DOC_BUDGETS = [
     // moved rules without giving their always-loaded source room to regrow.
     maxLines: 581,
     maxWords: 5616,
+    // Forty words for thirty-two criteria — the destination of the §7.1 cut edits one
+    // criterion at a time, and one criterion's rewording is well inside that.
+    slackWords: 40,
     why: 'the destination of the §7.1 cut — uncapped, it would simply refill what the cut bought',
   },
   {
@@ -93,6 +143,9 @@ export const DOC_BUDGETS = [
     until: /^## Checklist/,
     maxLines: 70,
     maxWords: 620,
+    // Thirty words on the preamble alone: it is framing that changes rarely, and a new
+    // framing rule is a sentence, which must be paid for rather than absorbed.
+    slackWords: 30,
     why: 'the preamble only; the points below it may grow, its framing may not',
     // A CAP PER POINT, not on the file (point 614). A line limit on the whole
     // work order would punish appending, which is what the order is for — so the
@@ -189,6 +242,11 @@ export const DOC_BUDGETS = [
     // NOT yet confirmed by the user: the rule above wants his yes for a raise,
     // and the alternative is 102 words found elsewhere in design.md.
     maxWords: 28488,
+    // A hundred words across 28k: design.md is edited section by section and a genuine
+    // new decision runs 40–215 measured words, so the slack absorbs the rewording that
+    // accompanies one and refuses the disappearance of a whole section without a
+    // corresponding lowering.
+    slackWords: 100,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]
@@ -257,6 +315,70 @@ export function workOrderPoints(text) {
   }))
 }
 
+/**
+ * The turns of phrase that ARGUE rather than INSTRUCT.
+ *
+ * No mechanism here can read prose, and none pretends to. What it can do is notice the
+ * handful of constructions that exist only to justify: a causal clause, a claim about
+ * what something is for, a narrated past state, an incident date offered as evidence.
+ * A rule never needs one of them — "run build and lint always" carries no `because` —
+ * so a line that does is either a reason (which belongs beside its switch) or a rule
+ * that can be written as one.
+ *
+ * The list is deliberately SHORT and literal. `rather than` is not here: it contrasts
+ * two instructions ("use TSL rather than raw GLSL") and is the commonest way this file
+ * states a choice. `since` is not here either — it is a date word as often as a causal
+ * one. The cost of being narrow is a rationale that slips through; the cost of being
+ * broad is a guard that cries wolf on binding text, and a guard nobody believes is
+ * worse than no guard.
+ */
+export const RATIONALE_MARKERS = Object.freeze([
+  Object.freeze({ re: /\bbecause\b/i, marker: 'because' }),
+  Object.freeze({ re: /\b(?:which|that) is why\b/i, marker: 'which/that is why' }),
+  Object.freeze({ re: /\b(?:the|one|another) reason\b/i, marker: 'the reason' }),
+  Object.freeze({ re: /\bexists?\s+(?:to|because)\b/i, marker: 'exists to/because' }),
+  Object.freeze({ re: /\bso that\b/i, marker: 'so that' }),
+  Object.freeze({ re: /\bhistorically\b/i, marker: 'historically' }),
+  Object.freeze({ re: /\bwe (?:learned|found|measured|discovered|saw)\b/i, marker: 'we learned/found' }),
+  Object.freeze({ re: /\bit turned out\b/i, marker: 'it turned out' }),
+  Object.freeze({ re: /\bused to\b/i, marker: 'used to' }),
+  Object.freeze({ re: /\bmeasured\b[^.]{0,80}\d{1,2}\.\d{1,2}\.\d{4}/i, marker: 'an incident date as evidence' }),
+])
+
+/**
+ * Every line of `text` that argues instead of instructing. PURE.
+ *
+ * Fenced blocks are skipped and inline code spans are blanked first: a command, a path
+ * or an identifier is not prose, and `--because` in a flag name is not an argument.
+ * One finding per line, at the first marker that matches — naming a second marker on
+ * the same line tells the writer nothing the first did not.
+ */
+export function proseRationaleFindings(text, { path = '', why = '' } = {}) {
+  const findings = []
+  const lines = String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+  let fenced = false
+  for (const [index, raw] of lines.entries()) {
+    if (/^ {0,3}(?:```|~~~)/.test(raw)) {
+      fenced = !fenced
+      continue
+    }
+    if (fenced) continue
+    const line = raw.replace(/`[^`]*`/g, ' ')
+    const hit = RATIONALE_MARKERS.find((m) => m.re.test(line))
+    if (!hit) continue
+    findings.push({
+      path,
+      kind: `prose rationale (line ${index + 1}, "${hit.marker}")`,
+      actual: raw.trim().slice(0, 90),
+      budget: 'a rule, not the argument for it',
+      why,
+    })
+  }
+  return findings
+}
+
 /** Lines and words of `text`, optionally only up to `until`. */
 export function measure(text, until = null) {
   const lines = String(text ?? '')
@@ -295,6 +417,29 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         kind: 'words',
         actual: m.words,
         budget: budget.maxWords,
+        why: budget.why,
+      })
+    }
+    // THE RATCHET. A ceiling only falls by hand, so banked headroom is spendable
+    // headroom — the same shape as the per-point ceiling below, and refused the same
+    // way: an entry that declares no usable slack is a finding rather than a silently
+    // disabled check, because a ratchet that switches itself off is the growth it
+    // exists to stop, wearing the guard's own green.
+    const slack = budget.slackWords
+    if (!(Number.isInteger(slack) && slack >= 0)) {
+      findings.push({
+        path: budget.path,
+        kind: 'ratchet slack is not a whole number of words',
+        actual: slack === undefined ? '(no slackWords)' : String(slack),
+        budget: 'a non-negative integer, written per document',
+        why: 'a ratchet that cannot be read is a ceiling nobody ever lowers again',
+      })
+    } else if (m.words <= budget.maxWords && budget.maxWords - m.words > slack) {
+      findings.push({
+        path: budget.path,
+        kind: 'headroom',
+        actual: `${budget.maxWords - m.words} words below its ceiling of ${budget.maxWords}`,
+        budget: `at most ${slack}`,
         why: budget.why,
       })
     }
@@ -338,6 +483,9 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         })
       }
     }
+    if (budget.noProseRationale) {
+      findings.push(...proseRationaleFindings(doc.text, { path: budget.path, why: budget.why }))
+    }
     if (Number.isFinite(budget.maxEntryWords)) {
       const lines = String(doc.text).replace(/\r\n/g, '\n').split('\n')
       for (const [index, line] of lines.entries()) {
@@ -357,22 +505,46 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
   return { block: findings.length > 0, findings }
 }
 
-/** The refusal: what grew, by how much, and the two honest ways out. */
+/** The refusal: what grew, by how much, and the honest ways out of each kind. */
 export function formatDocBudgetVerdict(verdict) {
   if (!verdict?.block) return ''
-  const lines = ['doc-budget-guard: a document that is read constantly has outgrown its budget.', '']
-  for (const f of verdict.findings) {
+  const findings = verdict.findings ?? []
+  const lines = ['doc-budget-guard: a document that is read constantly is outside its budget.', '']
+  for (const f of findings) {
     lines.push(`  ${f.path}: ${f.actual} ${f.kind} > ${f.budget}`)
     lines.push(`      ${f.why}`)
   }
-  lines.push(
-    '',
-    'Two ways out, and only two. CUT: move the detail where it belongs — evidence chains',
-    'to docs/acceptance-evidence.md, project experience to the retrospective, finished',
-    'points to docs/tasks-archive.md — or delete what no longer holds. Or RAISE the budget',
-    'in scripts/doc-budget-core.mjs, by the measured size of genuinely new content and',
-    'with the reason written into the comment beside it. Raising it to fit a longer',
-    'telling of something already there is the failure this guard exists to prevent.',
-  )
+  if (findings.some((f) => f.kind === 'lines' || f.kind === 'words' || String(f.kind).startsWith('point '))) {
+    lines.push(
+      '',
+      'OUTGROWN — two ways out, and only two. CUT: move the detail where it belongs —',
+      'evidence chains to docs/acceptance-evidence.md, project experience to the',
+      'retrospective, finished points to docs/tasks-archive.md — or delete what no longer',
+      'holds. Or RAISE the budget in scripts/doc-budget-core.mjs, by the measured size of',
+      'genuinely new content and with the reason written into the comment beside it.',
+      'Raising it to fit a longer telling of something already there is the failure this',
+      'guard exists to prevent.',
+    )
+  }
+  if (findings.some((f) => f.kind === 'headroom')) {
+    lines.push(
+      '',
+      'HEADROOM — LOWER THE CEILING TO WHAT YOU ACHIEVED. A cut that leaves its ceiling',
+      'standing hands the next writer the words it just bought, and the file walks back up',
+      'to the old line one honest addition at a time. Set maxLines and maxWords in',
+      'scripts/doc-budget-core.mjs to the size measured NOW, in the same commit as the cut,',
+      'with the reason beside them. The budgets only ratchet down.',
+    )
+  }
+  if (findings.some((f) => String(f.kind).startsWith('prose rationale'))) {
+    lines.push(
+      '',
+      'PROSE RATIONALE — this document instructs; it does not argue. Move the reason to',
+      'where its switch lives: the comment above the code that implements it, or the',
+      'document under docs/ that holds its mechanics. Then state the rule as a rule. If the',
+      'line is genuinely binding and only reads as an argument, rewrite it as the',
+      'instruction it is.',
+    )
+  }
   return lines.join('\n')
 }
