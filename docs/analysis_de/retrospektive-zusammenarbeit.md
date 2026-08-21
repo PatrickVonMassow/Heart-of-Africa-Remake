@@ -676,6 +676,8 @@ Was durchfiel, war die Übergabe an das Fenster des Nutzers. Sie ist ein Zwei-Sc
 
 Die Klasse ist dieselbe wie beim Herzschlag, der für Fortschritt gehalten wird, nur an der Übergabe statt an der Lebendigkeit: Ein Mechanismus, der einen zweiten Schritt von der Gegenseite ERWARTET, hat für dessen Ausfall keinen Plan. Punkt 434 hatte die Schwesterlücke schon geschlossen — ein Anspruch verfällt nicht mehr, solange das Fenster lebt —, aber nur für die Zeit VOR der Freigabe; danach ist der Anspruch verbraucht und es gewinnt, wer zuerst greift.
 
+Am 21.08.2026 dieselbe Naht, nur liegt die zweite Hälfte diesmal bei DERSELBEN Sitzung: Der CI-Wartelauf ist ein selbstgetriebener Kreis — der Riegel sagt „schlaf kurz und beende den Zug noch einmal", und er läuft nur weiter, solange die Sitzung sich selbst wieder aufruft. Sitzung 6a0621ed schrieb ihre letzte Zeile um 10:15:29 in genau dieser Anweisung und kam nicht zurück. Bemerkenswert ist nicht der Ausfall, sondern was ihn verlängert hat: Der Launcher tickt alle 900 Sekunden, hätte also binnen einer Viertelstunde übernehmen können — aber das Schreiber-Veto (2 h) und die Lebendigkeitsprüfung des Locks lasen die Spuren der toten Sitzung als „da arbeitet noch jemand". Der Nachfolger startete um 11:14:05, nach 59 Minuten ohne Arbeit am Stapel. Der Rettungsweg war also nicht kaputt, er war durch die Hinterlassenschaft des Verunglückten versperrt — als Punkt 808 aufgenommen.
+
 **Lehre:** Ein Handschlag, dessen zweite Hälfte bei der Gegenseite liegt, braucht ein Zeitfenster, in dem niemand anders zugreifen darf — und die Prüfung eines Wiederanlaufs endet nicht bei „läuft es weiter?", sondern bei „läuft es dort weiter, wo es laufen sollte?". Ein Ausfall trifft nie die bequeme Stelle; jede Aktion mit zwei Hälften ist an ihrer Naht zu prüfen.
 
 ### 3.71 Das Verschlucken, gegen das kein Fail-Open hilft
@@ -1316,7 +1318,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 21.08.2026, 11:35 · Quellen-Fingerprint: `9c66a438588e…`
+Zuletzt aktualisiert: Freitag, 21.08.2026, 11:52 · Quellen-Fingerprint: `61a0137c1553…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1410,10 +1412,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 78 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 79 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 9c66a438588edc6a3b0957d23c913a2cb545c731e958ec0944f6036a9ef9726a -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-21T09:35:52.088Z -->
+<!-- RETRO-FINGERPRINT: 61a0137c155353973f007ce657f0abe30156a058022338146259dc5bc26e0fc7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-21T09:52:28.533Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

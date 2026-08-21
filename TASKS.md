@@ -10779,3 +10779,32 @@ to land than a mechanism that needs a review.
   one, a session that repairs itself for two hours while nothing in the work order moves.
   Bundle: Session- & Repo-Hygiene.
 
+
+- [ ] 808. A session that dies inside the CI wait leaves the batch idle for up to an hour
+  (measured 21.08.2026 by the successor session, while resuming point 800).
+  WHAT WAS MEASURED. Owner session 6a0621ed wrote its last transcript line at 10:15:29 while the
+  `ci-status-guard` Stop hook told it to sleep about 90 s and end the turn again, for run
+  32462093487. It never came back. The launcher ticks every 900 s, yet successor 009b3d88 was
+  only spawned at 11:14:05, with the reason "no live batch-writer process measured; owner lock
+  assessed inactive (handed-over)" — about 59 minutes in which no session worked the batch. The
+  gap is visible on the board as the empty stretch between the 772 card (08:31-08:54) and the 800
+  card (11:14-11:24).
+  WHY IT HAPPENS: the CI wait is a SELF-DRIVEN loop. The guard's remedy is "sleep, then end the
+  turn again", so the wait only continues if the session re-invokes itself; once the turn ends
+  without that, nothing resumes it. Meanwhile the writer-veto age (2 h) and the lock's liveness
+  assessment keep the launcher from taking over on its next tick, so the one mechanism that could
+  rescue the batch is held off by the very state the dead session left behind.
+  FINAL STATE: a declared CI wait no longer depends on the waiting session staying alive. Either
+  the wait survives the session ending — something outside the session re-invokes it — or a
+  session that ends INSIDE a declared CI wait releases the lock immediately, so the very next
+  launcher tick takes the batch over. Whichever is chosen, the measured hour cannot recur: the
+  time between a session dying in the wait and a successor working is bounded by the launcher
+  interval, not by the writer-veto age.
+  VERIFIABLE: pure tests over the decision — a lock left behind by a session that ended inside a
+  declared CI wait is assessed takeable on the next launcher tick, while a lock left by a session
+  that ended normally keeps its present grace; and a still-live waiting session is never taken
+  over. Plus a case that replays the measured 21.08. state and yields a takeover within one
+  launcher interval instead of 59 minutes.
+  Criticality: medium — no product defect, but it is pure lost batch time, it recurs on every CI
+  wait, and the waits are frequent: this session alone declared three.
+  Bundle: Session- & Repo-Hygiene.
