@@ -11096,3 +11096,38 @@ to land than a mechanism that needs a review.
   Criticality: high — the report is the instrument the batch's own scheduling decisions are now made
   with, and today it answers "unknown" for almost everything while calling a dead night a handover.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 819. The CI gate cannot be satisfied while a delegated author is pushing checkpoints, because
+  every checkpoint cancels the previous run and a cancellation is read as red (measured 21.08.2026,
+  15:36-15:43, during the parallel authoring of points 812 and 816).
+  WHAT WAS MEASURED. `scripts/author-sol.mjs` pushes the authoring branch roughly every two minutes
+  while its run continues. Each push starts a CI run on that branch and GitHub's concurrency group
+  cancels the run still in flight. Within seven minutes three runs concluded `cancelled`
+  (32487661412, 32487714919, 32488065013) and a fourth (32488078308) was cancelled while the guard
+  was being re-checked. `ci-status-guard` reads each of them as RED and refuses the turn end, and
+  its own remedy — re-run the workflow — is defeated by the next checkpoint push, which cancels the
+  re-run too. Two of those cancellations were additionally attributed to `origin/main`, because the
+  branch tip still carried main's head sha at that moment and the guard matched the run by sha
+  rather than by ref. The only mechanical escape the gate offers is `.claude/batch-paused`, which
+  means the batch would have to be stopped to satisfy a gate about its own CI.
+  WHY IT MATTERS. Delegated authoring with checkpoint pushes is the batch's normal mode of work,
+  and the durability rule that produces those pushes is not negotiable. A gate that turns the
+  normal mode into a permanent refusal spends every session's turn end on a red that says nothing
+  about the code.
+  FINAL STATE: a run that was cancelled and has been SUPERSEDED by a newer run for the same
+  (ref, workflow) is not a red — the verdict for a ref belongs to its newest run, and a cancelled
+  run with no successor stays red exactly as today. A run is attributed to the ref it actually ran
+  on: a feature-branch run is never reported as a red of `origin/main` merely because the two share
+  a head sha. The guard names, in its refusal, which run it judged and which ref it belongs to.
+  VERIFIABLE: pure tests over the guard's decision cover a cancelled run superseded by a newer
+  queued/in-progress/successful run of the same ref and workflow (not red), a cancelled run that is
+  the newest for its ref (red), and two refs sharing one head sha where only the branch run was
+  cancelled (main stays green). The live case is reproduced from a recorded run listing rather than
+  from the network.
+  DEPENDENCY: none. Point 813 rewrites how a CI WAIT survives its turn; this point is about how a
+  concluded run is JUDGED, so the two do not overlap.
+  FILES: scripts/ci-status-guard-core.mjs, scripts/ci-status-guard-core.test.mjs,
+  scripts/ci-status-guard.mjs.
+  Criticality: high — it blocks every turn end of every session for as long as any delegated author
+  is running, and the only escape the gate itself names is pausing the batch.
+  Bundle: Session- & Repo-Hygiene.
