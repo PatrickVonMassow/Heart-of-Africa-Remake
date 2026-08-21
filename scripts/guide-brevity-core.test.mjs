@@ -14,6 +14,7 @@ import { gatherGuideBrevityInputs } from './guide-brevity-guard.mjs'
 
 // Vitest rewrites import.meta.url, so resolve from the repo root it runs in.
 const GUIDE = resolve(process.cwd(), 'docs/analysis_de/vibe-coding-anleitung.md')
+const CORE = resolve(process.cwd(), 'scripts/guide-brevity-core.mjs')
 
 const entry = (title, riskLines, withPrompt = true) =>
   [
@@ -263,5 +264,20 @@ describe('the real vibe-coding guide', () => {
       maxLines: measured.lines,
       maxWords: measured.words,
     })
+  })
+})
+
+describe('the guide-budget escalation instruction', () => {
+  it('finishes a justified raise in the code record and produces no decision card', () => {
+    const source = readFileSync(CORE, 'utf8')
+    const instruction = source.slice(
+      source.indexOf('// The budget caps NARRATIVE growth'),
+      source.indexOf('export const PROJECT_MARKERS'),
+    )
+
+    expect(instruction).toContain('its final step is the written')
+    expect(instruction).toContain('It produces no decision card')
+    expect(instruction).not.toContain('Recorded as a decision card')
+    expect(instruction).not.toContain('last step of a raise belongs')
   })
 })

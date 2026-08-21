@@ -69,9 +69,10 @@ export const LIMITS = {
   // NO per-entry split is recorded here ON PURPOSE: two review rounds each
   // invalidated the previous breakdown, because every internal repayment moves
   // it while the totals stay put. The split lives in the review ledger, which is
-  // dated and never rewritten. Recorded as a decision card besides, because the
-  // standing rule is shorten-before-raise and the last step of a raise belongs
-  // to the user.
+  // dated and never rewritten. The standing rule is shorten-before-raise; when
+  // genuinely new content still needs a raise, its final step is the written
+  // justification here. It produces no decision card: the user withdrew the
+  // ask-before-raising requirement generally on 10.08.2026.
   //
   // RAISED to 3677 on 11.08.2026 by the 97 measured words of two genuinely new
   // decisions, and NOT escalated to the user — he withdrew that requirement
