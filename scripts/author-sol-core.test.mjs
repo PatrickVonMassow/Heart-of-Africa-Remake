@@ -406,11 +406,14 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
       commits: [solCommit('e'.repeat(40))],
       parsed: { ok: false, error: 'no closing lines' },
       dirty: ' M scripts/x.mjs',
+      numstat: '118\t6\tscripts/x.mjs',
     })
     expect(j.delivered).toBe(true)
     expect(j.clean).toBe(false)
     expect(j.problems.join(' ')).toMatch(/did not finish cleanly/)
-    expect(j.problems.join(' ')).toMatch(/UNCOMMITTED changes/)
+    expect(j.problems.join(' ')).toMatch(/UNCOMMITTED changes behind: 1 changed path\(s\), 118 insertion\(s\), 6 deletion\(s\)/)
+    expect(j.problems.join(' ')).toMatch(/CHECKPOINT IT NOW/)
+    expect(j.problems.join(' ')).not.toMatch(/discard/i)
   })
 })
 

@@ -493,7 +493,10 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
     }
   }
   if (uncommitted.changedPaths) {
-    problems.push('the run left UNCOMMITTED changes behind — commit or discard them before the review')
+    problems.push(
+      `the run left UNCOMMITTED changes behind: ${uncommitted.changedPaths} changed path(s), ` +
+        `${uncommitted.insertions} insertion(s), ${uncommitted.deletions} deletion(s) — run CHECKPOINT IT NOW before the review`,
+    )
   }
   if (!outcome?.ok) problems.push(`the codex run did not finish cleanly: ${outcome?.cause || 'no cause was reported'}`)
   else if (!parsed?.ok) problems.push(`the run gave no usable closing report (${parsed?.error || 'no reason given'})`)
