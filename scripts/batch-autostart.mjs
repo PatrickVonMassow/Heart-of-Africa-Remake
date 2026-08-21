@@ -77,6 +77,7 @@ import {
   staleEtaLogLine,
   launcherStartDecision,
   launcherStartRecord,
+  WRITER_VETO_MAX_AGE_MS,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -89,6 +90,8 @@ import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -109,6 +112,10 @@ const REPO = R('..')
 const C = (n) => join(REPO, '.claude', n)
 const LOG = C('autostart.log')
 const now = Date.now()
+const launcherStartedAt = now - Math.round(process.uptime() * 1000)
+
+const journal = (event, { at = now, session = null, point = null, pid = process.pid, pidStartedAt = launcherStartedAt, generation = null, cause, evidence = {} } = {}) =>
+  emitActivity({ event, at, session, point, pid, pidStartedAt, generation, cause, evidence })
 
 const log = (m) => {
   try { writeFileSync(LOG, `[${new Date(now).toISOString()}] ${m}\n`, { flag: 'a' }) } catch { /* ignore */ }
@@ -339,6 +346,12 @@ try {
   const leaked = reapableSpawns({ spawns: state.spawns, now, lock, probePid, isOwnSpawn })
   for (const s of leaked) {
     try { process.kill(s.pid) } catch { /* gone */ }
+    journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+      pid: s.pid,
+      pidStartedAt: s.at ?? null,
+      cause: 'leaked-spawn-reaped',
+      evidence: { ageMs: s.ageMs },
+    })
     log(`REAPED leaked spawn pid ${s.pid} (spawned ${Math.round(s.ageMs / 60000)} min ago, not the batch owner)`)
   }
   if (leaked.length > 0) {
@@ -425,6 +438,14 @@ try {
 // again, the pause returns one rung higher.
 const pause = classifyPause({ text: (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })(), now })
 let batchParked = pause.state === 'hold' || pause.state === 'wait'
+const pauseKey = batchParked ? `${pause.state}:${pause.pausedAt ?? ''}:${pause.retryAfter ?? ''}:${pause.cause ?? ''}` : ''
+if (batchParked && state.pauseJournalKey !== pauseKey) {
+  journal(ACTIVITY_EVENTS.PAUSE, {
+    cause: pause.cause ?? (pause.state === 'hold' ? 'user-hold' : 'timed-pause'),
+    evidence: { state: pause.state, reason: pause.reason ?? null, until: pause.retryAfter ?? null },
+  })
+  state.pauseJournalKey = pauseKey
+}
 if (pause.state === 'retry') {
   try { rmSync(C('batch-paused')) } catch { /* already gone — nothing to resume from */ }
   // A record that SURVIVED its removal keeps the batch parked: resuming while the
@@ -433,6 +454,11 @@ if (pause.state === 'retry') {
   batchParked = existsSync(C('batch-paused'))
   if (batchParked) log(`PAUSE CLOCK EXPIRED but ${C('batch-paused')} could not be removed — staying parked`)
   else {
+    journal(ACTIVITY_EVENTS.PAUSE_FINISH, {
+      cause: 'retry-clock-expired',
+      evidence: { prior: state.pauseJournalKey ?? null, attempt: (pause.attempt || 0) + 1 },
+    })
+    delete state.pauseJournalKey
     state.pauseAttempt = (pause.attempt || 0) + 1
     state.pauseRetryAt = now
     state.failCount = 0
@@ -445,6 +471,13 @@ if (pause.state === 'retry') {
       { key: 'pause-retry' },
     )
   }
+}
+if (!batchParked && pause.state !== 'retry' && state.pauseJournalKey) {
+  journal(ACTIVITY_EVENTS.PAUSE_FINISH, {
+    cause: 'pause-marker-cleared',
+    evidence: { prior: state.pauseJournalKey },
+  })
+  delete state.pauseJournalKey
 }
 
 // --- THE MESSAGE WATCHER: this tick is its supervisor (point 407) --------------
@@ -729,6 +762,20 @@ if (state.lastSpawnAt > 0) {
   })
   if (outcome.state === 'progress' && (state.failCount || 0) > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
   if (outcome.state === 'failed') log(`${v.reason} — failCount=${outcome.failCount}`)
+  if (outcome.state === 'quota' || outcome.state === 'failed') {
+    journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+      at: now,
+      pid: state.lastPid || null,
+      pidStartedAt: state.lastSpawnAt || null,
+      cause: outcome.state === 'quota' ? 'quota-refused-spawn' : 'spawn-made-no-progress',
+      evidence: {
+        attemptedAt: state.lastSpawnAt,
+        reason: v.reason,
+        quota: outcome.quota ?? null,
+        retryAt: now + outcome.nextProbeMs,
+      },
+    })
+  }
   // Every probe and the moment work resumed go into the log, so the real reset
   // rhythm can be measured out of it instead of assumed.
   if (outcome.note) log(outcome.note)
@@ -776,6 +823,14 @@ if (
   !(lock.kind === 'pending-spawn' && lock.spawnedPid === state.lastPid)
 ) {
   try { process.kill(state.lastPid) } catch { /* gone */ }
+  journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+    session: lock?.sessionId ?? null,
+    pid: state.lastPid,
+    pidStartedAt: state.lastSpawnAt,
+    generation: lock?.fence ?? null,
+    cause: 'rogue-spawn-reaped',
+    evidence: { ownerSession: lock?.sessionId ?? null },
+  })
   log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
 }
@@ -850,6 +905,25 @@ if (verdict === 'skip-alive') {
     state.wedgeVerdictKey = rep.key
     state.wedgeVerdictRepeats = rep.repeats
     log(`skip: ${startDecision.reason}`)
+    if (writer) {
+      const vetoJournalKey = `${writer.sessionId}:${writer.pid ?? ''}:${writer.recordedStartedAt ?? ''}:${writer.batchWriterAt}`
+      if (state.writerVetoJournalKey !== vetoJournalKey) {
+        journal(ACTIVITY_EVENTS.WRITER_VETO, {
+          session: writer.sessionId,
+          pid: writer.pid,
+          pidStartedAt: writer.recordedStartedAt,
+          cause: 'live-writer-veto',
+          evidence: {
+            blockedFrom: state.writerVetoSince,
+            blockedUntil: writer.batchWriterAt + WRITER_VETO_MAX_AGE_MS,
+            lastFencedOperationAt: writer.batchWriterAt,
+            writerAgeMs: writer.writerAgeMs,
+            ownerLock: startDecision.evidence?.lock ?? null,
+          },
+        })
+        state.writerVetoJournalKey = vetoJournalKey
+      }
+    }
     if (writer && rep.escalate) {
       const blockedMinutes = Math.max(0, Math.round((now - state.writerVetoSince) / 60000))
       log(
@@ -1016,6 +1090,10 @@ const preflight = judgeSpawnPreflight({ probes: environmentProbes() })
 if (!preflight.ok) {
   state.failCount = (state.failCount || 0) + 1
   log(`PREFLIGHT REFUSED — not spawning: ${preflight.reason} (failCount=${state.failCount})`)
+  journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+    cause: 'environment-preflight',
+    evidence: { reason: preflight.reason, probes: preflight.probes ?? [], retryAt: now + spawnBackoffMs({ failCount: state.failCount }) },
+  })
   await notify(
     'Batch spawn BLOCKED',
     `The launcher would have started a successor but the environment failed its preflight (${preflight.reason}). ` +
@@ -1068,6 +1146,11 @@ if (repoVerdict.alert) {
   clearMandateMarker({ path: C('repo-mandate.json') })
 }
 if (repoVerdict.mandate) writeMandateMarker({ path: C('repo-mandate.json'), at: now, code: repo.code ?? null, reason: repoVerdict.reason })
+
+journal(ACTIVITY_EVENTS.SPAWN_ATTEMPT, {
+  cause: assessment.reason === 'handed-over' ? 'handover-successor' : 'launcher-recovery',
+  evidence: { head: curHead, openPoints: open, decision: startDecision.reason, ownerAssessment: assessment.reason },
+})
 
 /** Run the doctor and report how it went. `write` false keeps it to its read-only
  *  levels. Never throws: an unrunnable doctor is reported as such and decided
@@ -1159,6 +1242,10 @@ if (!exe) {
   release(launcherSid)
   const searched = cliSearchSummary()
   log(`FAIL: no claude CLI found — ${searched}`)
+  journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+    cause: 'environment-cli-missing',
+    evidence: { searched, retryAt: now + spawnBackoffMs({ failCount: (state.failCount || 0) + 1 }) },
+  })
   await notify('claude CLI missing', `The autostart launcher found no claude CLI — resurrection is down. ${searched}`, 'urgent')
   // `bail`, not a bare exit (point 443 (h)). Everything this tick learned would
   // otherwise be thrown away — including `state.repoAlertAt`, which was set MINUTES
@@ -1231,12 +1318,18 @@ try {
   // speaks — the runaway ladder does the rest at the next tick.
   child.on('error', (e) => {
     log(`FAIL: could not spawn claude (${e && e.message}) — exe ${exe}`)
+    journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+      cause: 'spawn-error', evidence: { message: e?.message ?? String(e), exe, retryAt: now + spawnBackoffMs({ failCount: (state.failCount || 0) + 1 }) },
+    })
     void notify('Spawn failed', `Could not launch the claude CLI at ${exe}: ${e && e.message}`, 'urgent')
   })
   child.unref()
 } catch (e) {
   release(launcherSid)
   log(`FAIL: could not spawn claude (${e && e.message})`)
+  journal(ACTIVITY_EVENTS.SPAWN_FAILURE, {
+    cause: 'spawn-threw', evidence: { message: e?.message ?? String(e), retryAt: now + spawnBackoffMs({ failCount: (state.failCount || 0) + 1 }) },
+  })
   await notify('Spawn failed', `Could not launch the claude CLI: ${e && e.message}`, 'urgent')
   bail(1) // same reason as the missing-exe path above (point 443 (h))
 }
@@ -1269,6 +1362,13 @@ writeJsonAtomic(C('autostart-state.json'), {
   // of the tick, from BEFORE the chat poll, so using it here would re-deliver
   // everything that arrived during this very tick (four-eyes review, 29.07.2026).
   chatHandedAt: nextChatHandedAt({ spawned: true, previous: state.chatHandedAt, now: Date.now() }),
+})
+journal(ACTIVITY_EVENTS.SUCCESSOR_START, {
+  session: launcherSid,
+  pid: child.pid,
+  pidStartedAt: null,
+  cause: 'spawned-successor',
+  evidence: { head: curHead, startReason: startDecision.reason, launcherSession: launcherSid },
 })
 log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
 // A PROBE UNDER A STANDING BLOCK IS NOT NEWS (point 444). Probing every quarter of

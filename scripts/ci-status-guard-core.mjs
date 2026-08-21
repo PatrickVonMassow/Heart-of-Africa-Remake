@@ -367,6 +367,7 @@ export async function sweepTargets({
   const nextNotified = { ...notified }
   const nextFamine = { ...famine }
   const failedOpen = []
+  const observations = []
   // The waiver clocks this sweep touched, applied once at the end so the order
   // of the targets cannot decide them.
   const judgedNames = new Set()
@@ -392,6 +393,14 @@ export async function sweepTargets({
       // holds the turn.
       if (refVerdict({ state: 'pending', at: Number(entry.firstSeenAt) || now, now }) === 'wait') {
         waiting ??= entry.reason
+        observations.push({
+          target,
+          classification: { state: 'pending', runId: entry.runId ?? null, workflowName: entry.workflowName ?? null },
+          firstSeenAt: Number(entry.firstSeenAt) || now,
+          observedAt: now,
+          previousState: entry.state,
+          verdict: 'wait',
+        })
       }
       continue
     }
@@ -407,6 +416,7 @@ export async function sweepTargets({
     }
     const classification = classifyRuns(runs, target.sha)
     const verdict = refVerdict({ state: classification.state, at, now })
+    observations.push({ target, classification, firstSeenAt: at, observedAt: now, previousState: entry?.state ?? null, verdict })
     dirty = true
 
     if (verdict === 'green') {
@@ -438,7 +448,10 @@ export async function sweepTargets({
     if (verdict === 'wait') {
       const reason = waitReason(target, classification)
       waiting ??= reason
-      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now, reason }
+      nextCache[target.sha] = {
+        state: 'pending', firstSeenAt: at, checkedAt: now, reason,
+        runId: classification.runId ?? null, workflowName: classification.workflowName ?? null,
+      }
       continue
     }
     if (verdict === 'pass') {
@@ -500,6 +513,7 @@ export async function sweepTargets({
     notified: nextNotified,
     famine: nextFamine,
     failedOpen,
+    observations,
     dirty,
   }
 }

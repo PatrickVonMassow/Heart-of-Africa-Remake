@@ -77,6 +77,8 @@ import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.m
 import { repoPath } from './repo-paths.mjs'
 import { armWaitMarker } from './wait-marker.mjs'
 import { observeOwnerLoops } from './handover-repair-loop.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -104,6 +106,7 @@ const sid = data.session_id || ''
 // true exactly for the session named in the batch lock, and it is already paid
 // for here — no second lock read on the hot path.
 let ownsBatch = false
+let callAt = null
 try {
   if (sid) {
     const input = data.tool_input ?? data.toolInput ?? {}
@@ -118,10 +121,39 @@ try {
     // and it then cancelled the boundary 117 ms after it was written. Where the
     // payload carries the call's own time, `heartbeat` compares it; where it does
     // not, the settle window does the same job.
-    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives, callAt: hookCallTimestamp(data) }) === true
+    callAt = hookCallTimestamp(data)
+    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives, callAt }) === true
   }
 } catch {
   /* no lock dir / unreadable — nothing to do */
+}
+
+// A PostToolUse transition is foreground evidence only when both ends are
+// known. With no call timestamp the journal still records the event boundary,
+// but the classifier assigns no duration; the transcript may later pair it.
+try {
+  if (sid && ownsBatch) {
+    const lock = readJson(repoPath('.claude', 'batch-lock.json'))
+    const finishedAt = Date.now()
+    emitActivity({
+      event: ACTIVITY_EVENTS.FOREGROUND_ACTIVITY,
+      at: finishedAt,
+      session: sid,
+      point: null,
+      pid: lock?.pid ?? null,
+      pidStartedAt: lock?.pidStartedAt ?? null,
+      generation: lock?.fence ?? null,
+      cause: 'completed-tool-call',
+      evidence: {
+        tool: data.tool_name ?? data.toolName ?? null,
+        startedAt: callAt,
+        finishedAt,
+        transcript: data.transcript_path ?? data.transcriptPath ?? null,
+      },
+    })
+  }
+} catch {
+  /* journal telemetry never breaks a tool call */
 }
 
 // (2) per-session presence for the parallel-session detector

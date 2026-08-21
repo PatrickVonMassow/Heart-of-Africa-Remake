@@ -127,8 +127,8 @@ export function classifyTimeline({ start, end, intervals = [], boundaries = [], 
 }
 
 function boundedEnd(record, fallbackEnd) {
-  const candidates = [record?.evidence?.finishedAt, record?.evidence?.leaseUntil, fallbackEnd].filter(finite)
-  return Math.min(...candidates)
+  const candidates = [record?.evidence?.finishedAt, record?.evidence?.leaseUntil].filter(finite)
+  return candidates.length > 0 ? Math.min(...candidates) : fallbackEnd
 }
 
 function identityMatches(a, b) {
@@ -141,18 +141,23 @@ function identityMatches(a, b) {
 
 const eventId = (record) => String(record?.evidence?.id ?? record?.evidence?.runId ?? record?.evidence?.command ?? '')
 
-function pairedIntervals(records, { starts, progresses = [], finishes, className, defaultCause }) {
+function pairedIntervals(records, { starts, progresses = [], finishes, className, defaultCause, matchIdentity = true }) {
   const out = []
   for (const record of records.filter((item) => starts.includes(item.event))) {
     const id = eventId(record)
-    const related = records.filter((item) => item.seq > record.seq && eventId(item) === id && identityMatches(record, item))
+    const related = records.filter((item) =>
+      item.seq > record.seq && eventId(item) === id && (!matchIdentity || identityMatches(record, item)),
+    )
     const finish = related.find((item) => finishes.includes(item.event))
     const renewable = [record, ...related.filter((item) => progresses.includes(item.event))]
       .map((item) => item.evidence?.leaseUntil)
       .filter(finite)
     const leaseEnd = renewable.length > 0 ? Math.max(...renewable) : null
     const explicitEnd = finite(finish?.atMs) ? finish.atMs : null
-    const end = explicitEnd === null ? leaseEnd : leaseEnd === null ? explicitEnd : Math.min(explicitEnd, leaseEnd)
+    // A lease bounds an OPEN run. Once an explicit terminal record exists it
+    // proves the real interval retrospectively, even if the last renewable lease
+    // elapsed before the process managed to write its completion receipt.
+    const end = explicitEnd ?? leaseEnd
     if (!finite(end) || end <= record.atMs) continue
     out.push(evidenceInterval({
       start: finite(record.evidence?.startedAt) ? record.evidence.startedAt : record.atMs,
@@ -233,14 +238,14 @@ export function journalIntervals(records = [], { start, end } = {}) {
   }))
   intervals.push(...pairedIntervals(ordered, {
     starts: [ACTIVITY_EVENTS.CI_WAIT_START], progresses: [ACTIVITY_EVENTS.CI_WAIT_OBSERVATION],
-    finishes: [ACTIVITY_EVENTS.CI_WAIT_FINISH], className: ACTIVITY_CLASSES.CI_WAIT, defaultCause: 'ci-run',
+    finishes: [ACTIVITY_EVENTS.CI_WAIT_FINISH], className: ACTIVITY_CLASSES.CI_WAIT, defaultCause: 'ci-run', matchIdentity: false,
   }))
 
   for (const record of ordered.filter((item) => item.event === ACTIVITY_EVENTS.HANDOVER)) {
     const successor = ordered.find((item) => item.seq > record.seq && (
       item.event === ACTIVITY_EVENTS.SUCCESSOR_START || item.event === ACTIVITY_EVENTS.OWNER_CLAIM
     ))
-    const transitionEnd = successor?.atMs ?? record.evidence?.leaseUntil
+    const transitionEnd = successor?.atMs ?? record.evidence?.leaseUntil ?? end
     intervals.push(evidenceInterval({
       start: record.atMs, end: transitionEnd, className: ACTIVITY_CLASSES.HANDOVER,
       cause: record.cause, evidence: { ...record.evidence, fromSession: record.session, successor: successor?.session ?? null },
@@ -252,6 +257,19 @@ export function journalIntervals(records = [], { start, end } = {}) {
     intervals.push(evidenceInterval({
       start: record.atMs, end: finish?.atMs ?? record.evidence?.until ?? end,
       className: ACTIVITY_CLASSES.BLOCKED_USER, cause: record.cause, evidence: record.evidence,
+    }))
+  }
+  for (const record of ordered.filter((item) => item.event === ACTIVITY_EVENTS.PROCESS_EXIT)) {
+    const successor = ordered.find((item) => item.seq > record.seq && (
+      item.event === ACTIVITY_EVENTS.SUCCESSOR_START || item.event === ACTIVITY_EVENTS.OWNER_CLAIM
+    ))
+    intervals.push(evidenceInterval({
+      start: record.atMs,
+      end: successor?.atMs ?? end,
+      className: null,
+      state: 'no-worker',
+      cause: 'process-identity-lost',
+      evidence: { session: record.session, pid: record.pid, pidStartedAt: record.pidStartedAt, exitCause: record.cause },
     }))
   }
   return { intervals: intervals.filter(Boolean), boundaries }
@@ -272,4 +290,3 @@ export function commitGapSummary(commitTimes = [], thresholdMs = STANDSTILL_THRE
   }
   return { commits: times.length, gaps, gapMs: gaps.reduce((sum, gap) => sum + gap.durationMs, 0) }
 }
-

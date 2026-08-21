@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ACTIVITY_EVENTS, activityRecord, parseActivityJournal } from './batch-activity-journal-core.mjs'
-import { appendActivity, emitActivity } from './batch-activity-journal.mjs'
+import { activityJournalPath, appendActivity, emitActivity } from './batch-activity-journal.mjs'
 
 const dirs = []
 const fixture = () => {
@@ -58,6 +58,13 @@ describe('batch activity journal records', () => {
 })
 
 describe('batch activity journal append protocol', () => {
+  it('routes linked worktrees to the main checkout journal', () => {
+    expect(activityJournalPath({
+      repo: '/main/.claude/worktrees/point',
+      exec: () => '/main/.git\n',
+    })).toBe(join('/main', '.claude', 'batch-activity.jsonl'))
+  })
+
   it('allocates monotonic sequences and appends one JSON object per line', () => {
     const path = fixture()
     appendActivity({ event: ACTIVITY_EVENTS.OWNER_CLAIM, cause: 'acquired', evidence: {} }, { path, now: () => 1000 })

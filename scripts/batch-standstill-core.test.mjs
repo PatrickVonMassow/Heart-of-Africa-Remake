@@ -38,12 +38,37 @@ describe('standstill classifier', () => {
     ])
   })
 
+  it('uses a completed foreground tool interval but never a bare heartbeat', () => {
+    const records = [
+      rec(1, 2, ACTIVITY_EVENTS.FOREGROUND_ACTIVITY, {
+        evidence: { startedAt: START + 60_000, finishedAt: START + 2 * 60_000, tool: 'Bash' },
+      }),
+      rec(2, 3, ACTIVITY_EVENTS.FOREGROUND_ACTIVITY, { cause: 'heartbeat-only', evidence: {} }),
+    ]
+    const derived = journalIntervals(records, { start: START, end: START + 4 * 60_000 })
+    const timeline = classifyTimeline({ start: START, end: START + 4 * 60_000, ...derived, journalStartedAt: START })
+    expect(timeline.find((item) => item.start === START + 60_000)?.className).toBe(ACTIVITY_CLASSES.FOREGROUND)
+    expect(timeline.find((item) => item.start === START + 3 * 60_000)?.className).toBe(ACTIVITY_CLASSES.UNKNOWN)
+  })
+
   it('makes a launcher skip with no owner no-worker standstill', () => {
     const skip = evidenceInterval({
       start: START, end: START + 20 * 60_000, className: null, state: 'no-worker',
       cause: 'launcher-skip', evidence: { owner: null },
     })
     expect(classifyTimeline({ start: START, end: START + 20 * 60_000, intervals: [skip], journalStartedAt: START })[0].className).toBe(ACTIVITY_CLASSES.NO_WORKER)
+  })
+
+  it('bounds no-worker standstill by process loss and the successor start', () => {
+    const records = [
+      rec(1, 1, ACTIVITY_EVENTS.PROCESS_EXIT, { cause: 'crash' }),
+      rec(2, 4, ACTIVITY_EVENTS.SUCCESSOR_START, { session: 'successor', pid: 99, pidStartedAt: 2000 }),
+    ]
+    const derived = journalIntervals(records, { start: START, end: START + 5 * 60_000 })
+    const timeline = classifyTimeline({ start: START, end: START + 5 * 60_000, ...derived, journalStartedAt: START })
+    const gap = timeline.filter((item) => item.start >= START + 60_000 && item.end <= START + 4 * 60_000)
+    expect(gap.every((item) => item.className === ACTIVITY_CLASSES.NO_WORKER)).toBe(true)
+    expect(gap.reduce((sum, item) => sum + item.durationMs, 0)).toBe(3 * 60_000)
   })
 
   it('gives an explicit user pause precedence over work', () => {
@@ -91,4 +116,3 @@ describe('measured commit gaps', () => {
     expect(summary.gapMs).toBe(21 * 60_000)
   })
 })
-

@@ -18,12 +18,26 @@ import {
   statSync,
   writeSync,
 } from 'node:fs'
-import { dirname } from 'node:path'
-import { repoPath } from './repo-paths.mjs'
+import { execFileSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
 import { activityRecord, parseActivityJournal } from './batch-activity-journal-core.mjs'
 
-export const ACTIVITY_JOURNAL_PATH = repoPath('.claude/batch-activity.jsonl')
-export const ACTIVITY_JOURNAL_LOCK_PATH = repoPath('.claude/batch-activity.jsonl.lock')
+/** All linked worktrees write one machine journal in the main checkout. */
+export function activityJournalPath({ repo = REPO_ROOT, exec = execFileSync } = {}) {
+  try {
+    const common = exec('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      encoding: 'utf8', windowsHide: true, timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    if (common && /[/\\]\.git$/.test(common)) return join(dirname(common), '.claude', 'batch-activity.jsonl')
+  } catch {
+    /* a non-git fixture journals beside its explicit repository root */
+  }
+  return join(repo, '.claude', 'batch-activity.jsonl')
+}
+
+export const ACTIVITY_JOURNAL_PATH = activityJournalPath()
+export const ACTIVITY_JOURNAL_LOCK_PATH = `${ACTIVITY_JOURNAL_PATH}.lock`
 export const JOURNAL_LOCK_STALE_MS = 30_000
 export const JOURNAL_LOCK_WAIT_MS = 2_000
 const RETRY_MS = 5
@@ -105,4 +119,3 @@ export function emitActivity(input, options = {}) {
 export function appendRawForTest(path, text) {
   appendFileSync(path, text)
 }
-

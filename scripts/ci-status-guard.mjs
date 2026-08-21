@@ -57,6 +57,8 @@ import {
 } from './pages-deploy-unblock-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 const STATE = repoPath('.claude/ci-status-guard-state.json')
@@ -488,6 +490,35 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
       : ({ target, classification, standDown }) =>
           notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
+
+  if (!readOnly) {
+    for (const observation of swept.observations ?? []) {
+      const state = observation.classification?.state
+      const event = state === 'pending'
+        ? (observation.previousState === 'pending' ? ACTIVITY_EVENTS.CI_WAIT_OBSERVATION : ACTIVITY_EVENTS.CI_WAIT_START)
+        : ACTIVITY_EVENTS.CI_WAIT_FINISH
+      emitActivity({
+        event,
+        at: observation.observedAt,
+        session: sessionId || null,
+        pid: process.pid,
+        pidStartedAt: Date.now() - Math.round(process.uptime() * 1000),
+        generation: null,
+        cause: `github-actions-${state}`,
+        evidence: {
+          id: `ci:${observation.target?.ref ?? 'unknown'}:${observation.target?.sha ?? 'unknown'}`,
+          ref: observation.target?.ref ?? null,
+          sha: observation.target?.sha ?? null,
+          workflow: observation.classification?.workflowName ?? null,
+          runId: observation.classification?.runId ?? null,
+          firstObservationAt: observation.firstSeenAt,
+          lastObservationAt: observation.observedAt,
+          leaseUntil: state === 'pending' ? observation.observedAt + 2 * 60_000 : null,
+          terminal: state === 'pending' ? null : { state, verdict: observation.verdict },
+        },
+      })
+    }
+  }
 
   if (!readOnly && (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified))) {
     writeJsonAtomic(STATE, {
