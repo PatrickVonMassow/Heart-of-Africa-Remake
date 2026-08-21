@@ -152,8 +152,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
   das Bild entstand vor der fertigen Szene.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
-  unter einer erreichbaren Bedingung geprüft wurde — und das Bild entsteht erst, wenn die
-  Darstellung steht." *(≈ 1,5x.)* *(Sieht das für einen Menschen richtig aus?)*
+  unter einer erreichbaren Bedingung geprüft wurde." *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
@@ -195,11 +194,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
-  ist nur dort grün, wo er lief — das Werkzeug nur dort, wo es geschrieben wurde.
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last, oder er
+  ist nur dort grün, wo er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen nach gemessener Last.
-  Vor dem Abgeben: ‚auch im **Hauptstand** grün — und einmal **von dem Ort aus** geprüft, an dem es
-  wirklich läuft?'"
+  Vor dem Abgeben: ‚auch im **Hauptstand** grün, und **von dem Ort aus** geprüft, an dem es läuft?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -210,12 +208,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim
   Start, was **lokal fertig, aber nirgends angekommen** ist."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
-  und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird geglaubt, deckt
-  nur einen Teil.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
+  Satz: Sie feuert, wird geglaubt, deckt nur einen Teil.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den
-  Satz**." *(einmalig hoch)*
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den Satz**."
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -270,8 +266,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
-  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
-  Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
+  Auch eine *geteilte* Funktion antwortet zweimal, wenn jede Aufrufstelle ihre Eingaben selbst baut.
+  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert. Lass alle
+  **Aufrufstellen** dieselbe Frage einmal beantworten; mach den Eingang zur **Pflicht**, statt
+  einen Vorgabewert still entscheiden zu lassen."
 
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das immer
@@ -289,9 +287,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei **zwei Hälften**, deren
   zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede Seite korrektes Verhalten.
-  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** bei jedem Start.
-  Prüf die Erholung mit Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo
-  es sollte?'"
+  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** beim **Start des
+  Nachfolgers** — nie am Ende des Vorgängers, der ja gerade ausfällt. Prüf die Erholung mit
+  Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo es sollte?'"
 
 - **Was außerhalb des Repositorys liegt, kommt nicht mit — und geht nicht zurück.** Das Projekt
   zieht um, die Mechanik nicht; wer dort etwas ändert, hat kein `git`.
@@ -428,4 +426,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 04c677f1f0d91d6446b82bf6dbc6388f35ebff6f8a97838b8661f343d3052ef7 -->
+<!-- GUIDE-FINGERPRINT: 600ed1311ac951c1ceed80e91ebab2363db844194ab16dc75027397e69df1b71 -->

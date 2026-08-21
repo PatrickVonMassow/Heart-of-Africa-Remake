@@ -267,6 +267,12 @@
       "why": "Nachgelagerte Verschaerfung des gerade gelandeten 772; kein Blocker, gehoert ans Ende der Ordnung.",
       "origin": "machine",
       "place": "last"
+    },
+    "807": {
+      "at": "2026-08-21T07:34:40.121Z",
+      "why": "Directly behind the release point 174 and before 736: it is a medium-criticality backstop, not urgent, and the two branches it would have caught are parked and visible in the meantime.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -324,7 +330,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T07:03:38.932Z",
+    "at": "2026-08-21T07:34:40.126Z",
     "points": [
       174,
       184,
@@ -559,7 +565,8 @@
       803,
       804,
       805,
-      806
+      806,
+      807
     ]
   }
 }
