@@ -255,49 +255,6 @@ put it is the mistake this line exists to stop.
   told it.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 820. The criticality gate cannot be cleared by the review shape the tooling produces, so
-  every HIGH point blocks at the exit of the session that lands it (measured 21.08.2026 while
-  landing point 769). `scripts/criticality-review-guard-core.mjs` `passShape()` requires
-  `pass.total >= 2`. A record carrying `pass 1/1` therefore matches NEITHER clean bucket — not
-  `valid.filter(r.pass === undefined)` and not the compositions — so `clean` stays empty, the
-  `!clean.length` branch refuses with kind `unresolved`, and it names a review whose findings
-  were long since answered. At 769 it named `efa589e`, although Sol's `merge` on `520d4e0`
-  descends strictly from it, is later in time and carries the right `descendsFrom`. THE COUNTER-
-  PART: `scripts/review-sol.mjs` emits exactly `pass 1/1` whenever an explicit `--since` narrows
-  a fitting range — its own usage says so — and the MECHANISM gate accepts those same records.
-  The gate rejects the normal case by construction, and its refusal text demands a re-review that
-  has already been recorded: the same fault point 769 removed from the timestamp guard, standing
-  at this gate instead.
-  THE OBVIOUS FIX IS WRONG AND WAS ALREADY REFUSED. Lowering the floor to 1 was implemented,
-  tested and reviewed on 21.08.2026 (`e1d242ac`, reverted by `864a90e7`); GPT-5.6 Sol recorded
-  DO-NOT-MERGE, receipt 8975fca1f90d035d, and the reason is decisive: the completeness loop
-  checks pass INDICES only and never compares `pass.files` against the files the HIGH point
-  actually changed, so a scoped `1/1` merge row would clear a point containing files no reviewer
-  read. That is the third-landing-round hole reopened. Do not re-attempt the one-line form.
-  SECOND HALF OF THE SAME DEFECT: a point BOTH vendors authored can obtain no unscoped clean
-  record at all. Asked for one whole-point round over 769, `review-sol` split the range by
-  authorship into 13 passes across two vendors and declared one of them UNREVIEWABLE, because
-  `.claude/mechanism-reviews.jsonl` has no discernible author vendor. For such a point the gate's
-  condition cannot be met by honest means, which is why 769 stands ticked and merged with its
-  gate still refusing.
-  FINAL STATE: a composition clears when its recorded pass FILES cover every file the point
-  changed, whatever the pass count — coverage proved against the point's own diff rather than
-  inferred from an index sequence — and a point whose file set has no single eligible reviewer
-  has a named, recorded way to be cleared that is not "record a review nobody could run". The
-  refusal text says which files are still uncovered, so it can never again demand work already
-  done.
-  VERIFIABLE: pure cases over `evaluateCriticalityReview` — a complete composition whose pass
-  files cover the point's file set clears; the same composition missing one changed file does
-  not; a `1/1` refusal keeps its individual standing; an incomplete multi-pass split still
-  refuses; and the 769 ledger is replayed as a fixture so the case pins the real event.
-  QUEUE RANK: ahead of 779 and everything behind it. Reason: it fires at the exit of every
-  session that lands a HIGH-criticality point, it demands work that is already done, and until it
-  is fixed each such landing ends on a refusal that no honest action can clear — it degrades the
-  batch while it waits, which is the standard that put 769 first.
-  Criticality: high — it is a guard, and it blocks the turn exit of every session landing a HIGH
-  point.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 779. Three repeated questions have no command, so each one is paid as a context dump
   (measured 20.08.2026, all three in a single session). They are filed together because they are
   one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
