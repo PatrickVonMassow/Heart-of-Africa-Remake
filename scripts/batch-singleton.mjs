@@ -919,6 +919,16 @@ function exitReapMutex(mutexPath) {
  * fence file AND onto the lock, which is what lets the mark be re-seeded upward
  * if the fence file is ever lost.
  */
+export function acquisitionExpectationMatches(lock, expected) {
+  if (!expected || typeof expected !== 'object') return true
+  if (!lock || typeof lock !== 'object') return false
+  if (typeof expected.sessionId === 'string' && lock.sessionId !== expected.sessionId) return false
+  if (Number.isSafeInteger(expected.fence) && lock.fence !== expected.fence) return false
+  if (typeof expected.spawnToken === 'string' && lock.spawnToken !== expected.spawnToken) return false
+  if (expected.handedOver === true && lock.handedOver !== true) return false
+  return true
+}
+
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
   // A PROBE IS NOT A SESSION (point 434 (8)): it may never own the batch. See
@@ -1006,10 +1016,12 @@ export function acquire(sessionId, opts = {}) {
 
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
+    if (opts.expected) return 'stale-event'
     if (claim()) return 'acquired'
   }
 
   const lock = readOwnerLock(lockPath)
+  if (opts.expected && !acquisitionExpectationMatches(lock, opts.expected)) return 'stale-event'
   if (lock && typeof lock.fence === 'number') priorFence = lock.fence
   // Ours by id, or permission by PROCESS to act for the recorded owner. Process
   // ancestry never changes identity; a genuine compaction has already used
@@ -1048,6 +1060,7 @@ export function acquire(sessionId, opts = {}) {
   if (!enterReapMutex(mutexPath)) return 'held'
   try {
     const recheck = readOwnerLock(lockPath)
+    if (opts.expected && !acquisitionExpectationMatches(recheck, opts.expected)) return 'stale-event'
     if (recheck) {
       if (recheck.sessionId === sessionId) {
         heartbeat(sessionId, { lockPath, now })
@@ -1924,6 +1937,11 @@ export function convertPendingSpawn(sessionId, opts = {}) {
       fence: fence ?? recheck.fence ?? null,
       pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
       pidStartedAt: anc ? anc.startedAt : null,
+      ...(typeof recheck.spawnToken === 'string' ? { spawnToken: recheck.spawnToken } : {}),
+      ...(typeof recheck.sourceGeneration === 'number' ? { sourceGeneration: recheck.sourceGeneration } : {}),
+      ...(typeof recheck.sourceSpawnToken === 'string' ? { sourceSpawnToken: recheck.sourceSpawnToken } : {}),
+      ...(typeof recheck.trigger === 'string' ? { trigger: recheck.trigger } : {}),
+      ...(typeof recheck.requestedAt === 'number' ? { requestedAt: recheck.requestedAt } : {}),
     })
     emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, readOwnerLock(lockPath), {
       lockPath,

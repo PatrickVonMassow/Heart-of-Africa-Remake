@@ -41,6 +41,7 @@ import {
   judgePreviousSpawn,
   spawnProgressed,
   spawnBackoffMs,
+  shouldWaitForSpawnBackoff,
   SPAWN_PROVE_MS,
   SPAWN_BACKOFF_BASE_MS,
   SPAWN_BACKOFF_CAP_MS,
@@ -61,6 +62,10 @@ import {
   staleEtaLogLine,
   launcherStartDecision,
   launcherStartRecord,
+  successorStartDecision,
+  supervisorRestartDecision,
+  supervisedExitTrigger,
+  SUCCESSOR_TRIGGERS,
   WRITER_VETO_MAX_AGE_MS,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
@@ -185,6 +190,175 @@ describe('launcher start liveness — process evidence, not lock presence', () =
   })
 })
 
+describe('the immediate successor decision — one door for every transport', () => {
+  const NOW = 1_800_000_000_000
+  const TOKEN = 'spawn-2'
+  const start = (over = {}) => successorStartDecision({
+    trigger: { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+    spawnToken: TOKEN,
+    openPoints: 4,
+    assessment: { alive: false, reason: 'no-lock' },
+    now: NOW,
+    ...over,
+  })
+
+  it('a clean boundary starts without advancing the 900-second watchdog clock', () => {
+    let clock = NOW
+    const lock = { sessionId: 'old', kind: 'session', fence: 17, handedOver: true }
+    const decision = start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      lock,
+      assessment: { alive: false, reason: 'handed-over' },
+      now: clock,
+    })
+    expect(decision).toMatchObject({ start: true, code: 'start' })
+    expect(decision.reservation).toMatchObject({ spawnToken: TOKEN, sourceGeneration: 17, trigger: 'boundary' })
+    expect(clock).toBe(NOW)
+  })
+
+  it.each([
+    ['clean child exit', { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' }],
+    ['crash', { kind: SUCCESSOR_TRIGGERS.CRASH, predecessorToken: 'spawn-1' }],
+    ['terminal CI result', { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: true }],
+  ])('%s starts immediately from the same decision', (_label, trigger) => {
+    let clock = NOW
+    expect(start({ trigger, lock: null, now: clock })).toMatchObject({ start: true, code: 'start' })
+    expect(clock).toBe(NOW)
+  })
+
+  it('returns precise evidence for every policy refusal', () => {
+    expect(start({ paused: true })).toMatchObject({ start: false, code: 'paused', evidence: { policy: { paused: true } } })
+    expect(start({ openPoints: 0 })).toMatchObject({ start: false, code: 'batch-complete' })
+    expect(start({ formatAlarm: true })).toMatchObject({ start: false, code: 'work-order-unreadable' })
+    expect(start({ claimReserved: true })).toMatchObject({ start: false, code: 'claim-reserved' })
+    const live = start({
+      lock: { sessionId: 'owner', pid: 44 },
+      assessment: { alive: true, reason: 'pid-alive' },
+    })
+    expect(live).toMatchObject({ start: false, code: 'owner-live' })
+    expect(live.evidence.ownership.lock).toMatchObject({ sessionId: 'owner', assessmentReason: 'pid-alive' })
+  })
+
+  it('rejects a duplicate boundary and stale child/CI notifications by generation or spawn token', () => {
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 16 },
+      lock: { sessionId: 'old', fence: 17, handedOver: true },
+    })).toMatchObject({ start: false, code: 'stale-generation' })
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' },
+      lock: { sessionId: 'new', spawnToken: 'spawn-2' },
+    })).toMatchObject({ start: false, code: 'stale-spawn' })
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: false },
+    })).toMatchObject({ start: false, code: 'ci-not-terminal' })
+  })
+
+  it('a concurrent watchdog and duplicate notification reserve exactly one writer', () => {
+    // Both decisions see the same handed-over generation. The IO half then does
+    // an exclusive compare-and-swap; this tiny fake models that single atomic
+    // boundary without advancing the watchdog clock.
+    let lock = { sessionId: 'old', kind: 'session', fence: 17, handedOver: true }
+    let version = 1
+    const observedVersion = version
+    const boundary = start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      spawnToken: 'boundary-token', lock, assessment: { alive: false, reason: 'handed-over' },
+    })
+    const tick = start({ spawnToken: 'tick-token', lock, assessment: { alive: false, reason: 'handed-over' } })
+    const reserve = (decision, expectedVersion) => {
+      if (!decision.start || version !== expectedVersion) return false
+      lock = { kind: 'pending-spawn', spawnToken: decision.reservation.spawnToken }
+      version += 1
+      return true
+    }
+    expect([reserve(boundary, observedVersion), reserve(tick, observedVersion)]).toEqual([true, false])
+    expect(lock.spawnToken).toBe('boundary-token')
+  })
+
+  it('a stale pending-spawn is recoverable through the same decision', () => {
+    const decision = start({
+      lock: { sessionId: 'old-launcher', kind: 'pending-spawn', spawnToken: 'lost-token' },
+      assessment: { alive: false, reason: 'pending-stale' },
+    })
+    expect(decision).toMatchObject({ start: true, code: 'start' })
+    expect(decision.evidence.observed).toMatchObject({ lockKind: 'pending-spawn', lockSpawnToken: 'lost-token' })
+  })
+})
+
+describe('supervisor restart decision', () => {
+  const lastSpawn = {
+    pid: 70,
+    pidStartedAt: 1000,
+    spawnToken: 'spawn-1',
+    supervisorPid: 80,
+    supervisorStartedAt: 1100,
+  }
+  const lock = { sessionId: 'child', kind: 'session', spawnToken: 'spawn-1' }
+
+  it('restarts a missing supervisor only for the current live owner child', () => {
+    expect(supervisorRestartDecision({
+      lastSpawn,
+      lock,
+      childProbe: { exists: true, startedAt: 1000 },
+      supervisorProbe: { exists: false },
+    })).toMatchObject({ restart: true, reason: 'the live owner child has no live supervisor' })
+  })
+
+  it('does not duplicate a live supervisor or attach to a newer owner', () => {
+    expect(supervisorRestartDecision({
+      lastSpawn, lock, childProbe: { exists: true }, supervisorProbe: { exists: true, startedAt: 1100 },
+    }).restart).toBe(false)
+    expect(supervisorRestartDecision({
+      lastSpawn,
+      lock: { ...lock, spawnToken: 'spawn-2' },
+      childProbe: { exists: true },
+      supervisorProbe: { exists: false },
+    }).restart).toBe(false)
+  })
+
+  it('restarts when the supervisor pid was recycled by another process', () => {
+    const decision = supervisorRestartDecision({
+      lastSpawn,
+      lock,
+      childProbe: { exists: true, startedAt: 1000 },
+      supervisorProbe: { exists: true, startedAt: 9000 },
+    })
+    expect(decision).toMatchObject({
+      restart: true,
+      evidence: { supervisorAlive: false, supervisorStartedAt: 1100, measuredSupervisorStartedAt: 9000 },
+    })
+  })
+
+  it('never attaches a supervisor to a recycled child pid', () => {
+    expect(supervisorRestartDecision({
+      lastSpawn,
+      lock,
+      childProbe: { exists: true, startedAt: 9000 },
+      supervisorProbe: { exists: false },
+    })).toMatchObject({ restart: false, reason: 'the recorded child has already exited', evidence: { childAlive: false } })
+  })
+})
+
+describe('supervised exit trigger', () => {
+  it('carries a terminal CI result into the immediate decision', () => {
+    expect(supervisedExitTrigger([
+      { seq: 3, atMs: 1500, event: 'ci-wait-finish', evidence: { terminal: { state: 'success', verdict: 'green' } } },
+    ], { childStartedAt: 1000 })).toEqual({
+      kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+      terminal: true,
+      evidence: { seq: 3, result: { state: 'success', verdict: 'green' } },
+    })
+  })
+
+  it('does not attribute an older CI result to this child, and treats every other exit alike', () => {
+    expect(supervisedExitTrigger([
+      { seq: 2, atMs: 999, event: 'ci-wait-finish', evidence: { terminal: { state: 'failure' } } },
+      { seq: 3, atMs: 1500, event: 'foreground-activity', evidence: {} },
+    ], { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
+    expect(supervisedExitTrigger(null, { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
+  })
+})
+
 describe('buildSpawnOptions — the ten-minute execution is switched off', () => {
   it('THE FIX: the child carries the background-wait ceiling as 0 (wait indefinitely)', () => {
     const opts = buildSpawnOptions({ cwd: '/repo', stdio: ['ignore', 1, 1], env: { PATH: '/bin' } })
@@ -256,6 +430,14 @@ describe('the resume prompt', () => {
   it('still carries the point boundary and the stand-down instruction', () => {
     expect(RESUME_PROMPT).toMatch(/batch-boundary\.mjs/)
     expect(RESUME_PROMPT).toMatch(/STAND DOWN/)
+  })
+
+  it('names immediate handover as transport and the 900-second tick only as recovery', () => {
+    expect(RESUME_PROMPT).toMatch(/Nachfolger SOFORT/)
+    expect(RESUME_PROMPT).toMatch(/Child-Supervisor/)
+    expect(RESUME_PROMPT).toMatch(/900-Sekunden-OS-Tick bleibt nur der Recovery-Watchdog/)
+    expect(RESUME_PROMPT).toMatch(/NICHT der normale Transport/)
+    expect(RESUME_PROMPT).not.toMatch(/OS-Task startet die naechste Session/)
   })
 
   it('points the landing at the ONE command (point 594)', () => {
@@ -672,6 +854,18 @@ describe('spawnBackoffMs — the ladder rises instead of hammering', () => {
     for (const failCount of [-5, NaN, 'many', null, undefined]) {
       expect(spawnBackoffMs({ failCount })).toBe(SPAWN_BACKOFF_BASE_MS)
     }
+  })
+
+  it('keeps failure-triggered immediate requests on the ladder but exempts a clean boundary', () => {
+    const now = 1_784_900_000_000
+    const recent = {
+      lastSpawnAt: now - 60_000,
+      now,
+      backoffMs: SPAWN_BACKOFF_BASE_MS,
+    }
+    expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.CRASH })).toBe(true)
+    expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.CHILD_EXIT })).toBe(true)
+    expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.BOUNDARY })).toBe(false)
   })
 })
 

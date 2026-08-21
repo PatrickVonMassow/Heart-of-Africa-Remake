@@ -70,13 +70,17 @@ import {
   judgePreviousSpawn,
   spawnProgressed,
   spawnBackoffMs,
+  shouldWaitForSpawnBackoff,
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
   firewallTopUpDecision,
   staleEtaLogLine,
-  launcherStartDecision,
   launcherStartRecord,
+  successorStartDecision,
+  supervisorRestartDecision,
+  supervisedExitTrigger,
+  SUCCESSOR_TRIGGERS,
   WRITER_VETO_MAX_AGE_MS,
   RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
@@ -91,7 +95,7 @@ import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
-import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
+import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -109,6 +113,7 @@ if (!(process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].r
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO = R('..')
+const SELF = fileURLToPath(import.meta.url)
 const C = (n) => join(REPO, '.claude', n)
 const LOG = C('autostart.log')
 const now = Date.now()
@@ -143,12 +148,119 @@ const openPointCount = () => {
   return alarm ? -1 : open
 }
 
+const argv = process.argv.slice(2)
+const argValue = (name) => {
+  const index = argv.indexOf(name)
+  return index >= 0 && typeof argv[index + 1] === 'string' ? argv[index + 1] : null
+}
+const immediate = argv.includes('--immediate')
+const requestedKind = argValue('--cause')
+const triggerKind = Object.values(SUCCESSOR_TRIGGERS).includes(requestedKind)
+  ? requestedKind
+  : SUCCESSOR_TRIGGERS.WATCHDOG
+const requestedGeneration = Number(argValue('--generation'))
+const predecessorToken = argValue('--predecessor-token') || null
+const spawnToken = randomUUID()
+const trigger = {
+  kind: triggerKind,
+  ...(Number.isSafeInteger(requestedGeneration) && requestedGeneration >= 0 ? { generation: requestedGeneration } : {}),
+  ...(predecessorToken ? { predecessorToken } : {}),
+  ...(triggerKind === SUCCESSOR_TRIGGERS.CI_TERMINAL ? { terminal: true } : {}),
+}
+
+/** Start the short-lived watcher which owns no batch state and can only request
+ * another guarded run after this exact child identity disappears. */
+function startChildSupervisor({ pid, pidStartedAt, token }) {
+  if (!(Number.isInteger(pid) && pid > 0 && typeof token === 'string' && token)) return null
+  let out = 'ignore'
+  try { out = openSync(C('autostart-run.log'), 'a') } catch { /* the watcher still runs */ }
+  try {
+    const supervisor = spawn(
+      process.execPath,
+      [SELF, '--supervise', String(pid), String(pidStartedAt ?? ''), token],
+      { cwd: REPO, detached: true, windowsHide: true, stdio: ['ignore', out, out] },
+    )
+    supervisor.unref()
+    return { pid: supervisor.pid, startedAt: probePid(supervisor.pid)?.startedAt ?? Date.now() }
+  } catch (error) {
+    log(`supervisor failed to start for child ${pid} (${error?.message ?? error})`)
+    return null
+  }
+}
+
+/** Internal detached mode. It observes pid AND start time, so a recycled pid can
+ * never inherit an old child's exit notification. */
+if (argv[0] === '--supervise') {
+  const childPid = Number(argv[1])
+  const childStartedAt = Number(argv[2])
+  const token = argv[3] || ''
+  const sameChildAlive = () => {
+    if (!(Number.isInteger(childPid) && childPid > 0 && token)) return false
+    const seen = probePid(childPid)
+    if (seen?.exists !== true) return false
+    if (!Number.isFinite(childStartedAt) || !Number.isFinite(seen.startedAt)) return true
+    return Math.abs(seen.startedAt - childStartedAt) <= 2000
+  }
+  while (sameChildAlive()) await new Promise((resolve) => setTimeout(resolve, 250))
+  let exitTrigger = { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null }
+  try {
+    const { records } = parseActivityJournal(readFileSync(C('batch-activity.jsonl'), 'utf8'))
+    exitTrigger = supervisedExitTrigger(records, { childStartedAt })
+  } catch { /* a missing journal still means child-exit */ }
+  journal(ACTIVITY_EVENTS.PROCESS_EXIT, {
+    pid: childPid,
+    pidStartedAt: Number.isFinite(childStartedAt) ? childStartedAt : null,
+    generation: null,
+    cause: 'supervised-child-exit',
+    evidence: { spawnToken: token, detectedBy: 'child-supervisor', trigger: exitTrigger },
+  })
+  try {
+    let out = 'ignore'
+    try { out = openSync(C('autostart-run.log'), 'a') } catch { /* request still runs */ }
+    const request = spawn(
+      process.execPath,
+      [SELF, '--immediate', '--cause', exitTrigger.kind, '--predecessor-token', token],
+      { cwd: REPO, detached: true, windowsHide: true, stdio: ['ignore', out, out] },
+    )
+    request.unref()
+    log(`supervised child ${childPid} exited — requested its successor immediately`)
+  } catch (error) {
+    log(`supervised child ${childPid} exited, but its immediate request failed (${error?.message ?? error}); watchdog recovery remains armed`)
+  }
+  process.exit(0)
+}
+
 const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
 state.spawns = Array.isArray(state.spawns) ? state.spawns : []
 const lock = readOwnerLock()
 const probe = lock && lock.pid ? probePid(lock.pid) : null
 /** Every exit persists the state, so a sweep that ran is never forgotten. */
 const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); process.exit(code) }
+
+// A periodic tick is the repair path for a supervisor which died first. It
+// attaches only to the child/token still recorded on the current owner lock.
+if (!immediate) {
+  const last = readJson(C('autostart-last.json'))
+  const childProbe = last?.pid ? probePid(last.pid) : null
+  const supervisorProbe = last?.supervisorPid ? probePid(last.supervisorPid) : null
+  const repair = supervisorRestartDecision({ lastSpawn: last, lock, childProbe, supervisorProbe })
+  if (repair.restart) {
+    const supervisor = startChildSupervisor({
+      pid: last.pid,
+      pidStartedAt: last.pidStartedAt ?? childProbe?.startedAt ?? last.at,
+      token: last.spawnToken,
+    })
+    if (supervisor) {
+      writeJsonAtomic(C('autostart-last.json'), {
+        ...last,
+        supervisorPid: supervisor.pid,
+        supervisorStartedAt: supervisor.startedAt,
+        supervisorRestartedAt: now,
+      })
+      log(`restarted missing supervisor for live child ${last.pid} (supervisor ${supervisor.pid})`)
+    }
+  }
+}
 
 // --- WHAT THE PREVIOUS SPAWN SAID BEFORE IT DIED (point 444) -------------------
 // A `claude -p` refused by the usage limit prints one line and exits, and that
@@ -876,7 +988,13 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
 // kill-then-take valve — are gone. An owner whose lease ran out is not a third
 // state to be adjudicated; it is simply not the owner, and the takeover below is
 // the one this file has always performed for a dead one.
-const startDecision = launcherStartDecision({
+const startDecision = successorStartDecision({
+  trigger,
+  spawnToken,
+  paused: batchParked,
+  openPoints: open,
+  formatAlarm: open === -1,
+  claimReserved: false,
   lock,
   assessment,
   batchWriters: readSessionProcesses(),
@@ -885,6 +1003,15 @@ const startDecision = launcherStartDecision({
 })
 const verdict = startDecision.start ? 'spawn' : 'skip-alive'
 if (verdict === 'skip-alive') {
+  if (startDecision.code !== 'owner-live') {
+    const previous = readJson(C('autostart-last.json')) ?? {}
+    writeJsonAtomic(C('autostart-last.json'), {
+      ...previous,
+      lastDecision: launcherStartRecord({ decision: startDecision, at: now, head: head() }),
+    })
+    log(`skip: successor decision refused (${startDecision.code}) — ${startDecision.reason}`)
+    bail()
+  }
   if (!lock || assessment.alive !== true) {
     // A separately recorded writer may outvote an inactive/missing owner lock,
     // but that is a refusal to recover, not a healthy tick. Make repetition
@@ -1081,7 +1208,7 @@ if (dispossessed) {
 // practically nothing, so the probe rides the ordinary tick.
 const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
 const lastSpawn = readJson(C('autostart-last.json'))
-if (lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < backoffMs) {
+if (shouldWaitForSpawnBackoff({ triggerKind, lastSpawnAt: lastSpawn?.at, now, backoffMs })) {
   log(
     `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
       `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +
@@ -1220,9 +1347,17 @@ const acq = acquire(launcherSid, {
   // an owner that renewed in the race window keeps its lock and this tick logs
   // "held". The take is recorded on the new lock so the morning reader can see
   // whose batch this was.
-  extra: dispossessed
-    ? { takenFromExpiredLease: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
-    : undefined,
+  expected: triggerKind === SUCCESSOR_TRIGGERS.BOUNDARY && lock
+    ? { sessionId: lock.sessionId, fence: trigger.generation, handedOver: true }
+    : predecessorToken && lock?.spawnToken
+      ? { spawnToken: predecessorToken }
+      : undefined,
+  extra: {
+    ...startDecision.reservation,
+    ...(dispossessed
+      ? { takenFromExpiredLease: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
+      : {}),
+  },
 })
 if (acq !== 'acquired') {
   log(`skip: atomic acquire returned "${acq}" — a session claimed the lock in the race window; NOT spawning`)
@@ -1346,17 +1481,28 @@ try {
 }
 // Rebind the pending lock to the child so the singleton's liveness follows the
 // spawned process, and the spawned session may convert it to itself (pid-bound).
-updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: null })
+const childStartedAt = probePid(child.pid)?.startedAt ?? now
+updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: childStartedAt })
 // One-shot bind helper for the spawned session's SessionStart hook.
 writeJsonAtomic(C('autostart-authorized.json'), {
   at: now,
   pid: child.pid,
+  spawnToken,
   startReason: startDecision.reason,
   measured: startDecision.evidence,
 })
+const supervisor = startChildSupervisor({ pid: child.pid, pidStartedAt: childStartedAt, token: spawnToken })
 writeJsonAtomic(
   C('autostart-last.json'),
-  launcherStartRecord({ decision: startDecision, at: now, head: curHead, pid: child.pid }),
+  launcherStartRecord({
+    decision: startDecision,
+    at: now,
+    head: curHead,
+    pid: child.pid,
+    pidStartedAt: childStartedAt,
+    supervisorPid: supervisor?.pid,
+    supervisorStartedAt: supervisor?.startedAt,
+  }),
 )
 writeJsonAtomic(C('autostart-state.json'), {
   ...state,
@@ -1379,9 +1525,16 @@ journal(ACTIVITY_EVENTS.SUCCESSOR_START, {
   pid: child.pid,
   pidStartedAt: null,
   cause: 'spawned-successor',
-  evidence: { head: curHead, startReason: startDecision.reason, launcherSession: launcherSid },
+  evidence: {
+    head: curHead,
+    startReason: startDecision.reason,
+    launcherSession: launcherSid,
+    spawnToken,
+    supervisorPid: supervisor?.pid ?? null,
+    supervisorStartedAt: supervisor?.startedAt ?? null,
+  },
 })
-log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
+log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervisor ${supervisor?.pid ?? 'failed'}`)
 // A PROBE UNDER A STANDING BLOCK IS NOT NEWS (point 444). Probing every quarter of
 // an hour through a limit window would otherwise buzz an unattended phone all
 // night for a condition that repairs itself; the probes stay in the log, and the

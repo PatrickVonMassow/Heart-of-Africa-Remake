@@ -509,6 +509,63 @@ export function boundaryHandover({
   return { ...cardInput, card: boundaryCardText(cardInput) }
 }
 
+/** Ask the shared launcher decision to start the successor now. The launcher is
+ * still the only spawner; this is merely an event transport into that door. */
+export function requestImmediateSuccessor({ generation, cause = 'boundary', run = execFileSync } = {}) {
+  if (!Number.isSafeInteger(generation) || generation < 0) {
+    return { requested: false, reason: 'handover-generation-unreadable' }
+  }
+  try {
+    run(
+      process.execPath,
+      [repoPath('scripts/batch-autostart.mjs'), '--immediate', '--cause', cause, '--generation', String(generation)],
+      {
+        cwd: repoPath('.'),
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 180_000,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+    return { requested: true, reason: 'requested', generation }
+  } catch (error) {
+    return { requested: false, reason: 'request-failed', generation, error }
+  }
+}
+
+/** Mark this generation handed over, then synchronously place its immediate
+ * request before the boundary command returns. */
+export function handoverAndRequest({
+  sid,
+  point = null,
+  mark = markHandover,
+  readLock = readOwnerLock,
+  request = requestImmediateSuccessor,
+} = {}) {
+  const handed = mark(sid, { point })
+  if (!handed?.handed) return handed
+  const lock = readLock()
+  const generation = lock?.sessionId === sid && Number.isSafeInteger(lock?.fence) ? lock.fence : null
+  const successor = request({ generation, cause: 'boundary' })
+  if (!successor?.requested) {
+    return {
+      ...handed,
+      successor,
+      successorFailure: successor?.reason ?? 'unknown request failure',
+    }
+  }
+  return { ...handed, successor }
+}
+
+/** A failed eager request does not undo the durable handover. Tell the closing
+ * session which recovery path remains without turning the boundary into an
+ * error or inviting an impossible retry. */
+export function successorRequestFailureLine(result) {
+  if (result?.handed !== true || result?.successor?.requested !== false) return ''
+  const reason = result.successorFailure ?? result.successor.reason ?? 'unknown request failure'
+  return `the immediate successor request failed (${reason}); the 900-second watchdog remains armed`
+}
+
 /**
  * THE COMMIT'S WRITE ORDER, extracted so a test can prove it (Sol re-review of
  * cd6faaa, finding 4): the transfer is recorded FIRST and the marker LAST — a
@@ -726,10 +783,11 @@ if (isMain) {
       // `commitSealedBoundary` pins the order, and a failed transfer refuses
       // before anything is recorded.
       let transferred = null
+      let handoverResult = null
       try {
         transferred = commitSealedBoundary({
           transfer,
-          handover: () => markHandover(sid, { point: null }),
+          handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -772,6 +830,8 @@ if (isMain) {
               'with `node scripts/batch-in-flight.mjs --adopt`.'
             : ''),
       )
+      const successorFailureLine = successorRequestFailureLine(handoverResult)
+      if (successorFailureLine) console.log(successorFailureLine)
       // The distance is a NUMBER somebody reads, not a claim (point 700): a
       // commit further past the ceiling than the stated margin owes the
       // closing report a sentence. Admission above used the trigger; overshoot
@@ -922,10 +982,11 @@ if (isMain) {
     // Transfer FIRST, marker LAST (Sol review of 807c2bf, finding 1) —
     // `commitSealedBoundary` pins the order.
     let transferred = null
+    let handoverResult = null
     try {
       transferred = commitSealedBoundary({
         transfer,
-        handover: () => markHandover(sid, { point }),
+        handover: () => (handoverResult = handoverAndRequest({ sid, point })),
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,
@@ -966,6 +1027,8 @@ if (isMain) {
         '(withdraw deliberately with `node scripts/batch-boundary.mjs --clear` if you truly must work again).' +
         transferLine,
     )
+    const successorFailureLine = successorRequestFailureLine(handoverResult)
+    if (successorFailureLine) console.log(successorFailureLine)
     // Point 700: a boundary further past the ceiling than the stated margin —
     // or one whose context could not be measured — owes the closing report a
     // line. The trigger in wmPoint is for admission, not this overshoot record.
