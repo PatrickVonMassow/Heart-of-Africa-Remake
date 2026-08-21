@@ -43,6 +43,7 @@ const emptyClaimState = () => ({
   lastTurnKey: '',
   reasonReported: false,
   releaseReported: false,
+  releaseDeferred: false,
 })
 
 /**

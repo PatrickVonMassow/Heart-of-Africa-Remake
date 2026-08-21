@@ -58,13 +58,13 @@ export function commitsBetween(previousHead, currentHead, { runGit = git } = {})
   }
 }
 
-/** Did this successful tool call have a path that can create a commit? */
+/** Could this call create, land, or publish a commit? */
 export function callMayCreateCommit({ toolName = '', command = '' } = {}) {
   if (toolName !== 'Bash' && toolName !== 'PowerShell') return false
   try {
     return expandSegments(command).some(
       (segment) =>
-        ['commit', 'merge', 'cherry-pick', 'revert'].includes(gitSubcommand(segment)) ||
+        ['commit', 'merge', 'push', 'cherry-pick', 'revert'].includes(gitSubcommand(segment)) ||
         segmentInvokesScript(segment, ['land-point.mjs']),
     )
   } catch {
@@ -140,9 +140,30 @@ export function observeOwnerLoops(
       ownsBatch,
       paused,
     })
-    nextClaim = mayAct || !advanced.report ? advanced.state : state.claim
-    if (advanced.report && mayAct) {
-      if (advanced.kind === 'release') {
+    const releaseWasDeferred =
+      state.claim?.claimKey === claimKey && state.claim?.releaseDeferred === true
+    const releaseDue =
+      verdict.verdict === 'release' &&
+      ((advanced.report && advanced.kind === 'release') || releaseWasDeferred)
+    const commitCreatingCall = callMayCreateCommit({ toolName, command })
+
+    if (releaseDue && commitCreatingCall) {
+      // This deferral is load-bearing. After a landing creates its merge commit,
+      // MERGE_HEAD can be absent before the completing push; releasing there lets
+      // the ownership fence reject that push and leaves the landing half-done.
+      nextClaim = { ...advanced.state, releaseReported: false, releaseDeferred: true }
+      if (mayAct) {
+        claimContext =
+          `HAND-BACK WAIT EXPOSED: the claim reached ${advanced.count} clean tool-response turns, but ` +
+          'release is deferred because this call belongs to a landing or commit-creating sequence. ' +
+          'Releasing between a merge commit and its completing push can leave a half-landed point; the ' +
+          'hand-back is due on the next observed call outside that sequence.'
+      }
+    } else if (releaseDue) {
+      if (!mayAct) {
+        nextClaim = state.claim
+      } else {
+        nextClaim = { ...advanced.state, releaseReported: true, releaseDeferred: false }
         let result = { released: false, stamped: false }
         try {
           result = handBack(sid, assessment.claim)
@@ -161,7 +182,10 @@ export function observeOwnerLoops(
           : `HAND-BACK BOUND REACHED: the standing claim survived ${advanced.count} clean tool-response ` +
             'turns because this session never reached its Stop hook. The release was attempted but the lock ' +
             'no longer named this session; state that reason in the next response and stop batch work.'
-      } else {
+      }
+    } else {
+      nextClaim = mayAct || !advanced.report ? advanced.state : state.claim
+      if (advanced.report && mayAct) {
         claimContext =
           `HAND-BACK WAIT EXPOSED: a claim survived ${advanced.state.turns} tool-response turns and cannot ` +
           `be released yet (${verdict.reason}). State that reason in the next response, finish only the work ` +

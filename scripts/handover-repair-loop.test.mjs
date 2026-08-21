@@ -67,6 +67,40 @@ describe('observeOwnerLoops', () => {
     expect(result.context).toContain('pickup reservation is unproven')
   })
 
+  it('defers a bounded release through a landing call, then releases on the next ordinary call', () => {
+    const handBack = vi.fn(() => ({ released: true, stamped: true }))
+    let state
+    for (const turn of ['turn-a', 'turn-b']) {
+      state = observeOwnerLoops(
+        { sid: 'owner', ownsBatch: true, state },
+        deps({ readTurnKey: () => turn, handBack }),
+      ).state
+    }
+
+    const deferred = observeOwnerLoops(
+      {
+        sid: 'owner',
+        ownsBatch: true,
+        state,
+        toolName: 'Bash',
+        command: 'node scripts/land-point.mjs 700',
+      },
+      deps({ readTurnKey: () => 'turn-c', handBack }),
+    )
+    expect(handBack).not.toHaveBeenCalled()
+    expect(deferred.state.claim).toMatchObject({ cleanTurns: 3, releaseDeferred: true })
+    expect(deferred.context).toContain('HAND-BACK WAIT EXPOSED')
+    expect(deferred.context).toContain('landing or commit-creating sequence')
+
+    const released = observeOwnerLoops(
+      { sid: 'owner', ownsBatch: true, state: deferred.state, toolName: 'Read' },
+      deps({ readTurnKey: () => 'turn-c', handBack }),
+    )
+    expect(handBack).toHaveBeenCalledOnce()
+    expect(released.state.claim.releaseDeferred).toBe(false)
+    expect(released.context).toContain('HAND-BACK BOUND REACHED')
+  })
+
   it('defers a report when another heartbeat duty already owns stdout', () => {
     let state
     for (const turn of ['turn-a', 'turn-b']) {
@@ -208,7 +242,15 @@ describe('commitsBetween', () => {
 
 describe('callMayCreateCommit', () => {
   it('recognises history writes without matching quoted mentions', () => {
-    expect(callMayCreateCommit({ toolName: 'Bash', command: 'git commit -m done' })).toBe(true)
+    for (const command of [
+      'git commit -m done',
+      'git merge topic',
+      'git push origin main',
+      'git cherry-pick abc123',
+      'git revert abc123',
+    ]) {
+      expect(callMayCreateCommit({ toolName: 'Bash', command })).toBe(true)
+    }
     expect(callMayCreateCommit({ toolName: 'Bash', command: 'node scripts/land-point.mjs 700' })).toBe(true)
     expect(callMayCreateCommit({ toolName: 'Bash', command: 'rg "git commit" docs' })).toBe(false)
     expect(callMayCreateCommit({ toolName: 'Read', command: 'git commit -m done' })).toBe(false)
