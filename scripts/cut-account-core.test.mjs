@@ -24,20 +24,21 @@ import {
   wiredGuards,
 } from './cut-account-core.mjs'
 import { DOC_BUDGETS, measure } from './doc-budget-core.mjs'
-import { mainCheckoutFrom } from './review-sol-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { execFileSync } from 'node:child_process'
 
 const ROOT = resolve(process.cwd())
 // Floor transcripts record the main checkout or one of ITS worktrees. Vitest
 // itself runs in an isolated point worktree, so process.cwd() is the source for
 // tracked fixtures but cannot be the root used to classify those transcripts.
-const MAIN_ROOT = mainCheckoutFrom(
-  execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-    encoding: 'utf8',
-    windowsHide: true,
-  }),
-  ROOT,
-)
+const MAIN_ROOT =
+  mainCheckoutFrom(
+    execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }),
+    ROOT,
+  ) ?? ROOT
 const ACCOUNT_PATH = resolve(ROOT, 'docs/document-cut-757.md')
 const MEMORY_DIR = resolve(homedir(), '.claude', 'projects', '-workspace-hoa', 'memory')
 const MEMORY_PATH = resolve(MEMORY_DIR, 'MEMORY.md')

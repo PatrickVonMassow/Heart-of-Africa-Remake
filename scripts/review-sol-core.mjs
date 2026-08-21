@@ -22,6 +22,7 @@
 
 import { BLIND_REVIEWER, blindReviewerAdmission, modelFromTrailers, sameModel, VERDICTS } from './mechanism-review-core.mjs'
 import { fableIsOn } from './fable-switch-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import {
   assembleMaterial,
   formatPassFiles,
@@ -40,6 +41,11 @@ export { BLIND_REVIEWER, blindReviewerAdmission }
 // (review-material-core.mjs); re-exported here because this is where every
 // caller of the review command already looks for them.
 export { MATERIAL_BUDGET_CHARS, PATCH_SHARE }
+
+// Compatibility export for callers that already reach the repository path
+// decision through this review core. Its implementation and null contract are
+// shared with worktree bootstrap.
+export { mainCheckoutFrom } from './main-checkout-core.mjs'
 
 /** The model id `codex exec -m` is given, and the name a record calls it by. */
 export const SOL_MODEL_ID = 'gpt-5.6-sol'
@@ -744,19 +750,8 @@ export function probeFreshness(receipt, now = Date.now(), maxAgeMs = PROBE_MAX_A
  * git answer the current checkout is the honest fallback.
  */
 export function savedAuthPathFrom(gitCommonDir, repoRoot, { sep = '/' } = {}) {
-  return `${mainCheckoutFrom(gitCommonDir, repoRoot)}${sep}local${sep}codex-auth.json`
-}
-
-/**
- * The MAIN checkout, given git's common dir — the directory the login above and the
- * share switch (scripts/sol-share-core.mjs) both belong in, for the same reason: they
- * are the MACHINE's state, and a delegated agent's worktree is deleted when its point
- * lands. With no git answer the current checkout is the honest fallback.
- */
-export function mainCheckoutFrom(gitCommonDir, repoRoot) {
-  const common = String(gitCommonDir ?? '').trim().replace(/[/\\]+$/, '')
-  const base = /(?:^|[/\\])\.git$/.test(common) ? common.replace(/[/\\]\.git$/, '') : String(repoRoot ?? '')
-  return base || String(repoRoot ?? '')
+  const owner = mainCheckoutFrom(gitCommonDir, repoRoot) ?? String(repoRoot ?? '')
+  return `${owner}${sep}local${sep}codex-auth.json`
 }
 
 /** Shell-quote one value for the record command line we print. */

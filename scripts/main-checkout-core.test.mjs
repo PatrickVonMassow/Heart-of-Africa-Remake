@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { resolve } from 'node:path'
 import { mainCheckoutFrom, samePath } from './main-checkout-core.mjs'
+import { mainCheckoutFrom as reviewMainCheckoutFrom } from './review-sol-core.mjs'
 import { mainCheckoutFrom as bootstrapMainCheckoutFrom } from './worktree-bootstrap-core.mjs'
 
 describe('the distinct main checkout contract', () => {
   const callers = [
     ['shared path core', mainCheckoutFrom],
     ['worktree bootstrap', bootstrapMainCheckoutFrom],
+    ['review tooling', reviewMainCheckoutFrom],
   ]
   const cases = [
     {

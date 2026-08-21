@@ -22,6 +22,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   authorRoundHistory,
@@ -36,7 +37,7 @@ import {
 import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 import { readTasksOpen } from './tasks-source.mjs'
 import { appendRecord, gitToplevel, readRecords, recordsPathFor } from './mechanism-review.mjs'
-import { classifyOutcome, mainCheckoutFrom } from './review-sol-core.mjs'
+import { classifyOutcome } from './review-sol-core.mjs'
 import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
@@ -599,7 +600,9 @@ if (isMainModule(import.meta.url)) {
       // `feat/` branch passed, so a run for one point could commit and push onto
       // another point's branch.
       point,
-      mainCheckout: mainCheckoutFrom(common, REPO_ROOT),
+      // Readiness needs the owning checkout so equality can refuse a run in
+      // main; the shared resolver deliberately returns null for that case.
+      mainCheckout: mainCheckoutFrom(common, REPO_ROOT) ?? REPO_ROOT,
       dirty: git(['status', '--porcelain'], { cwd }) ?? '',
     })
     // A DRY RUN IS STILL SHOWN THE REFUSALS, but is not stopped by them: it
