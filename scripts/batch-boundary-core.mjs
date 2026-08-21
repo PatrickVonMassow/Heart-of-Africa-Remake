@@ -1023,9 +1023,13 @@ export function boundaryCardText({
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW) {
     const currentSid = typeof claimantSid === 'string' ? claimantSid.trim() : ''
     const stablePid = Number(claimantPid)
-    if (!currentSid || !Number.isInteger(stablePid) || stablePid <= 0) {
-      throw new Error('boundary card: a claiming-window handover needs the current claim session and pid')
+    if (!currentSid) {
+      throw new Error('boundary card: a claiming-window handover needs the current claim session')
     }
+    const claimantIdentity =
+      Number.isInteger(stablePid) && stablePid > 0
+        ? `Fenster mit PID ${stablePid} (aktuelle Sitzung ${currentSid})`
+        : `Fenster der aktuellen Sitzung ${currentSid} (PID unbekannt)`
     // The reservation is stated with its LIMIT, not as a promise. It survives the
     // release now (point 461 — the freed lock stays that window's while its
     // process lives), so the card no longer has to warn about losing a race; but
@@ -1037,8 +1041,8 @@ export function boundaryCardText({
       ? NO_FOLLOW_ON_WORK
       : `Dort wird mit Punkt ${followOn} weitergearbeitet, sobald das Fenster den Anspruch einlöst.`
     return (
-      `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster mit PID ${stablePid} (aktuelle Sitzung ` +
-      `${currentSid}) hat ihn beansprucht; der Launcher hält den Start deshalb zurück. ${followOnSentence} ` +
+      `${head} Der Stapel geht NICHT an eine frische Sitzung: ${claimantIdentity} hat ihn beansprucht; der ` +
+      `Launcher hält den Start deshalb zurück. ${followOnSentence} ` +
       'Die Reservierung bleibt bis zum ' +
       'Ende der Übernahmefrist oder bis zum Schließen des Fensters bestehen.\n\n' +
       'Danach greift die gewöhnliche Übergabe; der Stapel bleibt nie ohne Eigentümer. Hier läuft nichts weiter.'

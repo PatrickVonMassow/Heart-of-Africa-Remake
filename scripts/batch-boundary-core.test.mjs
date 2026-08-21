@@ -717,6 +717,17 @@ describe('the boundary card names where the batch actually goes', () => {
     expect(text).not.toContain(previousSid)
   })
 
+  it('keeps the current claimant session when its pid is unavailable', () => {
+    const text = boundaryCardText({
+      destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW,
+      claimantSid: 'abc-123',
+      claimantPid: null,
+      nextPoint: NEXT_POINT,
+    })
+    expect(text).toContain('Fenster der aktuellen Sitzung abc-123 (PID unbekannt)')
+    expect(text).toContain(`Punkt ${NEXT_POINT}`)
+  })
+
   // POINT 470: the printed instruction must be a command that WORKS. Printing
   // `done <n> --none` for a point whose card was already archived left the
   // session with no working command at all, so it hand-edited the board file —
