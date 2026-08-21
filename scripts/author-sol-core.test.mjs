@@ -293,10 +293,24 @@ describe('judgeAuthoring — what GIT says, not what the run claimed', () => {
     expect(j.problems).toEqual([])
   })
 
-  it('calls a run that committed NOTHING what it is, however well it reported', () => {
+  it('keeps the clean-tree no-commit problem unchanged', () => {
     const j = judgeAuthoring({ outcome: okRun, commits: [], parsed: answered })
     expect(j.delivered).toBe(false)
-    expect(j.problems.join(' ')).toMatch(/NOTHING WAS COMMITTED/)
+    expect(j.problems[0]).toBe('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+  })
+
+  it('does not erase dirty work from the no-commit problem', () => {
+    const j = judgeAuthoring({
+      outcome: okRun,
+      commits: [],
+      parsed: answered,
+      dirty: ' M scripts/a.mjs\n?? scripts/b.mjs',
+      numstat: '4\t1\tscripts/a.mjs\n1\t0\tscripts/b.mjs',
+    })
+    expect(j.problems[0]).toBe(
+      'NOTHING WAS COMMITTED — the commits are missing, but the work is not; see its measured UNCOMMITTED SIZE and run CHECKPOINT IT NOW before the review',
+    )
+    expect(j.problems[0]).not.toMatch(/nothing to review/i)
   })
 
   it('catches a commit that names the wrong author, or none', () => {

@@ -473,7 +473,11 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
   const uncommitted = uncommittedSummary({ dirty, numstat })
   const problems = []
   if (!list.length) {
-    problems.push('NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review')
+    problems.push(
+      uncommitted.changedPaths
+        ? 'NOTHING WAS COMMITTED — the commits are missing, but the work is not; see its measured UNCOMMITTED SIZE and run CHECKPOINT IT NOW before the review'
+        : 'NOTHING WAS COMMITTED — the branch is where it started, so there is nothing to review',
+    )
   }
   // THE RUN MUST END WHERE IT STARTED (cross-vendor review, P1). Nothing stops a
   // sandbox-less run from checking out another branch, and `base..HEAD` would
