@@ -796,15 +796,22 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [] 
   if (!list.length) {
     const finished = new Set(pointList(closed))
     const kept = settled.points.filter((n) => !finished.has(n))
-    if (kept.length === settled.points.length) return { changed: false, record: null }
-    const live = {}
-    for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
     // The FROZEN FRONT loses the same PROVEN-CLOSED points, and nothing else
     // (cross-vendor review, 21.08.2026). Carrying it through untouched here kept
     // a grandfathered point exempt through a close-and-reopen that happened
     // while the order read empty — the very transition the tick evidence exists
     // to catch. Absence still narrows nothing: only a tick drops anything.
-    const front = boundary ? { ...boundary, points: boundary.points.filter((n) => !finished.has(n)) } : boundary
+    //
+    // AND IT IS COMPUTED BEFORE THE UNCHANGED TEST (ninth pass). The baseline and
+    // the front hold DIFFERENT sets — the front is what stood ahead of the
+    // release, which the baseline need not remember — so a closure that narrows
+    // only the front left the baseline the same length, and the early return
+    // threw the narrowing away. The point stayed grandfathered into its reopen.
+    const front = boundary ? { ...boundary, points: boundary.points.filter((n) => !finished.has(n)) } : null
+    const frontShrank = Boolean(boundary) && front.points.length !== boundary.points.length
+    if (kept.length === settled.points.length && !frontShrank) return { changed: false, record: null }
+    const live = {}
+    for (const [key, value] of Object.entries(ranked)) if (!finished.has(Number(key))) live[key] = value
     return storedChange({ ranked: live, settled: { ...settled, points: kept }, boundary: front })
   }
   const state = appendGateState(list, record)
@@ -838,10 +845,15 @@ export function settleRecord(open, record, { at = '', closed = [], blocked = [] 
     // An extra question costs ONE command and is always answerable; a silent
     // permanent exemption is the failure this whole mechanism exists to prevent.
     // So a placement stays a live reading, and only a HUMAN writes a decision.
-    if (kept.length === settled.points.length) return { changed: false, record: null }
+    // The FRONT is narrowed FIRST here too, and for the same reason: the two sets
+    // are not the same set, so "the baseline did not change" is no evidence that
+    // the front did not (ninth pass).
+    const narrowed = pruneRankRecord({ ranked, boundary }, list)
+    const frontShrank = Boolean(boundary) && narrowed.boundary.points.length !== boundary.points.length
+    if (kept.length === settled.points.length && !frontShrank) return { changed: false, record: null }
     // The baseline keeps its own `at`/`why`: this is the same settlement, minus
     // what has since closed, not a new one.
-    return storedChange({ ...pruneRankRecord({ ranked, boundary }, list), settled: { ...settled, points: kept } })
+    return storedChange({ ...narrowed, settled: { ...settled, points: kept } })
   }
   const points = [...list].sort((a, b) => a - b)
   const next = { ...pruneRankRecord({ ranked, boundary }, list), settled: { at: String(at ?? '').trim(), points } }

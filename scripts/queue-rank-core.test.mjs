@@ -866,6 +866,29 @@ describe('the FROZEN front survives every write, and only ever shrinks', () => {
     expect(settled.record.boundary.points).toEqual([])
   })
 
+  it('drops a closed front member even when the BASELINE did not change', () => {
+    // The two sets are not the same set — the front is what stood ahead of the
+    // release, which the baseline need not remember. So a closure that narrows
+    // only the front used to hit the "nothing changed" return and be thrown
+    // away, and the point walked back into the front on its reopen.
+    const record = {
+      ranked: {},
+      settled: { at: 't', points: [50] },
+      boundary: { at: 't', why: 'legacy', points: [60] },
+    }
+    const settled = settleRecord([50], record, { at: 'now' })
+    expect(settled.changed).toBe(true)
+    expect(settled.record.settled.points).toEqual([50])
+    expect(settled.record.boundary.points).toEqual([])
+    // …and the same through the EMPTY-order branch, where a tick is the evidence.
+    const empty = settleRecord([], record, { at: 'now', closed: [60] })
+    expect(empty.changed).toBe(true)
+    expect(empty.record.settled.points).toEqual([50])
+    expect(empty.record.boundary.points).toEqual([])
+    // A record with nothing to narrow on either side still writes nothing.
+    expect(settleRecord([], record, { at: 'now', closed: [] })).toEqual({ changed: false, record: null })
+  })
+
   it('narrows nothing from an order that reads as EMPTY', () => {
     // Absence proves nothing about a work order — the same rule the baseline has.
     expect(pruneRankRecord(withFront([50, 60], [60]), []).boundary.points).toEqual([60])
