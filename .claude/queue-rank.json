@@ -502,6 +502,12 @@
       "why": "Filed by the machine from the cross-vendor review of its own point 768; the user's ruling of 20.08.2026 keeps such a point behind the release, and the ratchet works in the common direction today.",
       "origin": "machine",
       "place": "last"
+    },
+    "833": {
+      "at": "2026-08-22T09:58:47.024Z",
+      "why": "Last is right: the machine filed this point from its own gate run, and the user ruled on 20.08.2026 that such a point does not overtake the release.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -553,7 +559,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T09:24:28.807Z",
+    "at": "2026-08-22T09:58:47.032Z",
     "points": [
       174,
       184,
@@ -797,7 +803,8 @@
       829,
       830,
       831,
-      832
+      832,
+      833
     ]
   }
 }
