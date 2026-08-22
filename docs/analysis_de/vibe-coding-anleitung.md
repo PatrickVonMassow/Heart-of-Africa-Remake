@@ -164,14 +164,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
   nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
 
-- **Zwei Helfer, die sich für den einzigen halten.** Du lässt nur einen gleichzeitig schreiben,
-  und die Regel hält auch — bis einer aus einer anderen Arbeitskopie startet und dort seine
-  **eigene** Sperrdatei anlegt. Beide sehen sich als Besitzer, keiner sieht den anderen.
-  → *Prompt:* „Alles, was **einmalig** sein soll — Sperre, Zustand, Marker —, muss auf einen
-  **festen Ort** zeigen, nicht auf einen relativen Pfad neben dem Arbeitsverzeichnis. Und wer
-  fragt, ob noch jemand arbeitet, fragt das **Repository** (letzte Commits, bewegte Zweige),
-  nicht eine Anmeldeliste."
-
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
   verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
@@ -381,9 +373,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
   es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
 
-- **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
-  Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
-  → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
+- **Der Pfad entscheidet, welches Projekt gemeint ist.** Wer seinen Zielpfad am Quellort statt an
+  der Umgebung nimmt, schreibt ins eigene Projekt; eine Sperre daneben gilt je Arbeitskopie.
+  → *Prompt:* „Färb einen Lauf rot, sobald er sein Projekt verändert; was **einmalig** sein soll, zeigt auf einen **festen** Ort".
 
 - **Grün über einem Programm, das gar nicht startet.** Der Testlader ist milder als der echte.
   → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
