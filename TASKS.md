@@ -10979,3 +10979,36 @@ to land than a mechanism that needs a review.
   a firewall that seals the container; the additive top-up and the never-flush rule are what the
   test pins.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 829. The calibration suite measures the repository it is running in, so it goes red for the
+  checkout rather than for the code (measured 22.08.2026, 07:30, on main 46585af). Three cases in
+  `scripts/queue-calibration-cli.test.mjs` — the store's denominators, the cards an apply moves,
+  and the second run's division — assert that the correction actually applied to something. They
+  do not build that something: they run `scripts/queue-calibration.mjs` against the LIVE checkout,
+  whose landings come out of `git log --first-parent main` and whose per-landing span comes out of
+  `git log <merge>^1..<merge>^2`. On a developer machine that history is there and all three pass.
+  In CI the checkout was two commits deep, every merge parent was missing, every span read as
+  unknown, no class produced a factor, `applied` came back empty and no card moved — three
+  assertions of `expected 0 to be greater than 0`. Reproduced exactly in a `--depth 2` clone of
+  main: the command exits 0, prints `585 landed point(s)`, and every row's merge column is `none`.
+  main was red from 04:19 on 22.08.2026 until the checkout was deepened.
+  ALREADY DONE, AND NOT THE FIX: the `fast` job now checks out `fetch-depth: 0` with
+  `filter: blob:none` — measured, the pack is 7.4 GiB of which commits and trees are ~8 MiB, so the
+  whole history costs nothing and the blobs stay on demand. That removes the symptom. It does not
+  remove the dependency: the suite still measures whatever history the machine happens to have, so
+  a quiet fortnight, a rewritten history or a future checkout change reddens it again for reasons
+  that are not the command's.
+  FINAL STATE: the three cases stand on a FIXTURE the test builds — a throwaway git repository with
+  a synthesized first-parent chain of merges and tick commits, whose landings, spans and classes
+  are chosen by the test — so the assertions are true or false because of the command, never
+  because of the checkout. Where a case genuinely needs the real repository, it says so and states
+  what it would take as sufficient history instead of assuming it.
+  VERIFIABLE: the suite passes in a `--depth 2` clone of main and in the full checkout, with the
+  same assertions and no skips; and a deliberately broken correction (one that applies to nothing)
+  still fails it in both.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: the machine filed this point
+  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. The
+  red it describes is already closed by the deepened checkout, so nothing waits on it.
+  Criticality: medium — it is test infrastructure, and its dangerous direction is a suite that
+  passes by skipping; the fixture and the "still fails when the correction is broken" case are what
+  the point pins.
+  Bundle: Testinfrastruktur.
