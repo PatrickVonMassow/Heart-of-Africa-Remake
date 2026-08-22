@@ -21959,3 +21959,53 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
   but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
   on its own branch; the shared branch lands 595 and 598 alone.
+
+- [x] 835. The output budget kills every command it intercepts when `CLAUDE_PROJECT_DIR` is unset
+  (MEASURED 22.08.2026, 12:26-12:36, in an interactive VS Code session, minutes after 8964bab9
+  "Merge branch feat/597-tool-output-budget" landed at 12:24). Every Bash call whose command text
+  the intercept matches dies BEFORE it runs and produces no output of its own — the module error
+  replaces it entirely:
+    `Error: Cannot find module '/scripts/tool-output-budget.mjs'` → exit 1
+  Reproduced with `command head -2 package.json`, `grep -c hooks .claude/settings.json`,
+  `node scripts/batch-claim.mjs --status | head -20` and `node scripts/finding.mjs --record … |
+  tail -4`; the same commands without `head`, `tail` or `grep` succeed. A background poll loop of
+  this session died on it and reported nothing but exit 1, with no hint that a hook was
+  responsible.
+  CAUSE, read at `scripts/tool-output-intercept-core.mjs:44-45`: the hook command is built as
+  `node "$CLAUDE_PROJECT_DIR/scripts/tool-output-budget.mjs"`. In this session that variable is
+  UNSET — measured in both the tool environment and in node — so the path resolves to
+  `/scripts/tool-output-budget.mjs`, which does not exist. Some launch paths export the variable
+  and some do not; the intercept treats it as guaranteed.
+  WHY IT MATTERS: the mechanism built to BOUND tool output instead DESTROYS the tool call, and it
+  fails in the direction that costs work rather than context. It hits exactly the producers point
+  597 lists — `git diff`, `grep`, file reads, `npm ls`, `gh run view` — and a session whose launch
+  path DOES export the variable never sees it, which is how it reaches the next session that does
+  not.
+  FINAL STATE:
+  1. The hook resolves its own script path from a source that cannot be empty — the hook file's own
+     location — and never from an environment variable it does not set itself.
+  2. The intercept FAILS OPEN, BUT ONLY WHERE THE BUDGET NEVER STARTED. If the budget script
+     cannot be found or cannot be launched, the untouched command passes through with a named
+     warning: an unbudgeted output is a cost, a dead tool call is a defect. A GENUINE OVER-BUDGET
+     RESULT NEVER FAILS OPEN — that is the case point 597 exists for — and a budget that dies AFTER
+     consuming output fails LOUD and attributed rather than passing a truncated stream off as
+     whole, because the command cannot simply be run again (Sol A12/A13, 22.08.2026). A fail-open
+     that repeats is a degradation, not a transient: it is counted and surfaced, never silently
+     normal.
+  2b. THE WARNING HAS A CHANNEL. It goes to stderr or another out-of-band path, never to stdout,
+     where it would corrupt the very pipelines this hook sits in; and it must remain visible where
+     stderr is swallowed, or the failure is unattributed again (Sol A14).
+  3. A failure of the budget is ATTRIBUTED. Whatever the caller sees must name the hook, so a dead
+     command can never again read as the command's own failure.
+  VERIFIABLE: Vitest over the pure command builder — an unset, empty and relative
+  `CLAUDE_PROJECT_DIR` each still yield a runnable absolute path, and a path containing spaces
+  survives the shell; plus SUBPROCESS cases, since the script is invoked as `node <script>` and
+  "non-executable" is not the real failure mode (Sol A15): a missing script, an unreadable one and
+  one that dies of a syntax error each leave the command's own output and exit code intact while
+  emitting the named warning on its own channel, and a budget killed after consuming output
+  produces a loud, attributed failure instead of a truncated pass.
+  QUEUE RANK: at the very front, before point 716. Reason: it is live on `main` right now and
+  breaks every session that starts without the variable, including the one that found it.
+  Criticality: high — a guard that silently destroys the tool calls it was built to bound costs
+  work in every session and teaches its callers to distrust their own commands.
+  Bundle: Session- & Repo-Hygiene.
