@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sieben Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1320,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 06:52 · Quellen-Fingerprint: `1bb3fceb9080…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 09:50 · Quellen-Fingerprint: `b24f10099c4c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1414,10 +1415,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 83 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 84 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 1bb3fceb908019340fd933774511af791733f3b9dee98bb5bfcb678e7cb6c0ff -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T04:52:58.613Z -->
+<!-- RETRO-FINGERPRINT: b24f10099c4cbf7d4e020511608326708b2511911d275180e59bd4bc25baea4c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T07:50:16.674Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2663,3 +2664,32 @@ Baum liegt, wenn niemand mehr den geordneten Weg geht?* Wo zwei Regeln einander 
 »nicht ungeprüft committen« gegen »nicht auf schmutzigem Baum starten« —, braucht die Kreuzung
 einen eigenen benannten Weg, sonst wird sie jedes Mal von Hand aufgelöst. Verwandt mit §3.154
 (Frische statt Leben) und §3.140 (die nur behauptete Ausnahme).
+
+### 3.156 Ein Mechanismus, der weiter greift als seine Regel, entscheidet mit
+
+Beim Kürzen der Bauordnung (Punkt 768) trug ein Vier-Augen-Lauf 56 gezählte Einträge zusammen,
+und genau einer davon wurde bewusst nicht ausgeführt: der Vorschlag, den Satz über das Handeln
+nach gefestigtem Urteil aus §6 zu streichen. Der Grund war kein inhaltlicher. Zwölf Dateien tragen
+einen Stempel der Modell-Regel, und die Signatur dafür beginnt bei der Modell-Regel und läuft bis
+zur nächsten LEERZEILE — in einem Abschnitt, dessen Aufzählungspunkte ohne Leerzeile aufeinander
+folgen, sind das sieben weitere Regeln. Wer eine davon anfasst, macht zwölf Dateien schal, obwohl
+sich die gestempelte Regel nicht geändert hat. Der Schnitt hat sich davor gebeugt und den Eintrag
+liegen lassen.
+
+Das ist die eigentliche Beobachtung: Der Mechanismus hat nicht bloß gestört, er hat mitentschieden.
+Eine Absicherung, deren Reichweite größer ist als die Regel, die sie absichert, verteuert jede
+Änderung in ihrem Schatten — und zwar unsichtbar, denn niemand schreibt auf, was er wegen einer
+Signatur NICHT getan hat. Die Kosten fallen nicht dort an, wo der Mechanismus gebaut wurde, sondern
+irgendwann später, in einer Entscheidung, die leiser ausfällt als sie sollte. Nach demselben Muster
+lief am selben Tag der Prüfstand der Warteschlangen-Kalibrierung rot: Er misst die Historie des
+Auslieferungszweigs, auf einem Feature-Zweig existiert diese Referenz gar nicht, und die Suite
+starb an der Umgebung statt am Code — auch das eine Reichweite, die niemand gemeint hatte.
+
+**Lehre:** Eine Signatur, ein Budget, ein Wächter braucht eine Reichweite, die genau die Regel
+deckt, die er nennt — nicht die Textumgebung, in der die Regel zufällig steht. Prüffragen: *Wo
+genau endet das, was mein Mechanismus als „seine" Stelle betrachtet — und habe ich dieses Ende
+selbst gesetzt oder von einer Formatierung geerbt?* Und: *Welche Änderung wird durch ihn teurer,
+obwohl sie ihn nichts angeht?* Wo ein Eintrag einer Analyse nur wegen des Mechanismus liegen
+bleibt, ist nicht der Eintrag das Ergebnis, sondern der Mechanismus der Befund — er gehört als
+eigener Punkt aufgeschrieben, sonst entscheidet er beim nächsten Mal wieder mit. Verwandt mit
+§3.134 (die behauptete, nie geprüfte Wächterdeckung) und §3.140 (die nur behauptete Ausnahme).

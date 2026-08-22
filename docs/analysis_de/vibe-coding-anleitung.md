@@ -209,9 +209,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Start, was **lokal fertig, aber nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz: Sie feuert, wird geglaubt, deckt nur einen Teil.
+  Satz und deckt nur einen Teil — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den Satz**."
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz** und
+  setz seine Reichweite selbst — bis zur nächsten Regel, nicht bis zur nächsten Leerzeile."
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -426,4 +427,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 1bb3fceb908019340fd933774511af791733f3b9dee98bb5bfcb678e7cb6c0ff -->
+<!-- GUIDE-FINGERPRINT: b24f10099c4cbf7d4e020511608326708b2511911d275180e59bd4bc25baea4c -->

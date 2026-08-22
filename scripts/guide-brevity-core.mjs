@@ -54,8 +54,22 @@
 // own inputs. Both were FOLDED into the two existing entries whose remedy they sharpen rather than
 // added as entries of their own, and three neighbouring entries were tightened to pay for the
 // words. The guide came out SMALLER than before, so the ceilings follow it down to 429 / 3828.
+// Raised on 22.08.2026 by ONE genuinely new lesson, and by the smallest amount it
+// could be had for: a guard whose REACH is inherited from the formatting rather
+// than set on purpose — it fires on neighbours it has no business with, and the
+// cost is not the false alarm but the change that silently does not happen
+// (measured on this project: a counted cut left an entry standing because
+// touching a neighbouring rule would have staled twelve stamped files). It was
+// NOT added as an entry of its own. The existing "Regeln und Wächter verrotten"
+// entry already names the opposite direction — a guard narrower than its sentence
+// — so the new direction was FOLDED into it, risk half and prompt, which is the
+// shortening step this rule demands before any raise. What remains is +1 line /
+// +21 words against the measured 429 / 3828, and the ceilings move by exactly
+// that, with zero slack. No existing claim was dropped to fit it. Not escalated
+// to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
+// this written justification is the last step.
 export const LIMITS = {
-  maxLines: 429,
+  maxLines: 430,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -121,7 +135,7 @@ export const LIMITS = {
   // against the guide's measured 425 / 3773, and the ceilings move by exactly
   // that to the 431 / 3832 fit, with zero slack. Nothing was removed to fit it,
   // and no existing entry grew.
-  maxWords: 3828,
+  maxWords: 3849,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
