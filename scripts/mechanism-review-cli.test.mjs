@@ -28,7 +28,7 @@ import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.m
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
-const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs']
+const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
 const installFableSwitch = (repo, state = 'on') => {
   for (const file of FABLE_FILES) copyFileSync(resolve(process.cwd(), 'scripts', file), join(repo, 'scripts', file))
   mkdirSync(join(repo, '.claude'), { recursive: true })

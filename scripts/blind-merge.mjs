@@ -25,6 +25,7 @@ import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { mergeFallbackReason, mergePromptFraming, mergerModel } from './fable-switch-core.mjs'
+import { isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import {
   accountUnion,
@@ -116,18 +117,50 @@ if (isMainModule(import.meta.url)) {
     if (!fableState.ok) throw new Error(fableState.problem)
     const a = parseListText('A', readText(pathA))
     const b = parseListText('B', readText(pathB))
-    // The flag wins over the file, and the line form has only the flag.
-    if (modelA) a.model = modelA
-    if (modelB) b.model = modelB
+    // A TRACKED HALF NAMES ITS OWN AUTHOR AND THE FLAG MAY NOT OVERRULE IT. The flag
+    // exists for the line form, which carries no model field; letting it rewrite a
+    // tracked file's author would hand back exactly the hole the tracked check closes
+    // — point at the real half, then rename its author (four-eyes review, point 834).
+    const trackedA = isTrackedInGit(pathA)
+    const trackedB = isTrackedInGit(pathB)
+    const overruled = []
+    for (const [name, list, flag, tracked] of [
+      ['a', a, modelA, trackedA],
+      ['b', b, modelB, trackedB],
+    ]) {
+      const stated = String(list.model ?? '').trim()
+      if (flag && tracked && stated && !sameModel(flag, stated)) {
+        overruled.push(
+          `--model-${name} "${flag}" contradicts the tracked half, which says "${stated}" — ` +
+            'a tracked half names its own author and the flag cannot rename it',
+        )
+      } else if (flag) list.model = flag
+    }
+    if (overruled.length) {
+      console.error('blind-merge: refusing to rename a tracked half\'s author.\n')
+      for (const e of overruled) console.error(`  · ${e}`)
+      process.exit(1)
+    }
     // AFTER the authors are known, never before: the merger is the model that wrote
     // NEITHER half, so naming it needs both halves' authors in hand.
-    const expectedMerger = mergerModel(fableState, [a.model, b.model])
+    // ONLY TRACKED HALVES DECIDE THE MERGER. An untracked path is caller-written, so
+    // its author field settles nothing and the switch's own answer stands — the same
+    // boundary the recorder applies, so the two commands cannot give opposite answers.
+    const deciding = trackedA && trackedB ? [a.model, b.model] : []
+    const expectedMerger = mergerModel(fableState, deciding)
     // WHETHER THE SELECTION IS A THIRD MODEL OR THE FALLBACK, because the two owe
     // opposite sentences. Where every roster model wrote a half, selection keeps the
     // switch's answer and that model DID write one — saying "it wrote neither half"
     // there states a false condition instead of naming the recorded fallback
     // (four-eyes finding 3 on this change).
-    const mergerWroteAHalf = [a.model, b.model].some((author) => sameModel(expectedMerger, author))
+    // Where the halves decide, ask them. Where they do not — untracked, so their
+    // author fields settle nothing — fall back to the switch-only reading, which
+    // assumes the off-switch merger wrote a half and therefore owes the recorded
+    // two-model fallback. Unknown authorship must not read as "wrote neither".
+    const mergerWroteAHalf =
+      deciding.length === 2
+        ? deciding.some((author) => sameModel(expectedMerger, author))
+        : Boolean(mergeFallbackReason(fableState))
     const mergerBecause = mergerWroteAHalf
       ? 'it wrote a half itself — the recorded two-model fallback'
       : 'it wrote neither half'
@@ -161,7 +194,7 @@ if (isMainModule(import.meta.url)) {
         )
       }
       console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/fable-switch.mjs --status)`)
-      const framing = mergePromptFraming(fableState, [a.model, b.model])
+      const framing = mergePromptFraming(fableState, deciding)
       if (framing) console.log(`\n${framing}`)
       console.log(
         '\nThese pairs are a RANKING, not the merge: read BOTH lists in full and pair anything\n' +

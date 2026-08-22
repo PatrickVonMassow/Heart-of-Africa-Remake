@@ -35,6 +35,8 @@ The union is `docs/handover-architecture.md`; work-order points 676 and 834 buil
 
 RECOVERED on 22.08.2026 from the origin session's scratchpad and `local/`, both of them
 untracked; the halves had never been versioned, which is why the rule above now exists.
+The primary evidence for the recovery and for the authorship claim below — quoted from the
+origin transcript, with its limits stated — is `676-provenance.md`.
 
 **The provenance of `docs/handover-architecture.md` names the wrong author for half A.**
 It says list A is "by Claude (Opus 5)" and offers Fable 5 as the untainted third model.

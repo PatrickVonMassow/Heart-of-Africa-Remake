@@ -39,6 +39,7 @@ import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { isTrackedInGit } from './git-tracked.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
 import {
@@ -100,23 +101,6 @@ export const RECORDS_PATH = recordsPathFor()
 // arguments directly — there is no shell to inject into.
 const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
-/**
- * Is this path a TRACKED repository artefact? The merger question may only be
- * decided by halves that are — an arbitrary path is caller-written, and a
- * caller who may write the halves may name authors that leave itself untainted
- * (four-eyes finding on this change: as first written, this was WEAKER than the
- * commit-trailer proxy it replaced, not stricter). Tracked does not make a half
- * unforgeable; it makes a forgery a commit somebody can read.
- */
-const isTrackedInGit = (path) => {
-  if (!String(path ?? '').trim()) return false
-  const probe = spawnSync('git', ['ls-files', '--error-unmatch', '--', path], {
-    windowsHide: true,
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  })
-  return probe.status === 0
-}
 
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */
