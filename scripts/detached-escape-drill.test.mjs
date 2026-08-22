@@ -10,6 +10,7 @@ import {
   BEAT_MS,
   DEAD_STATES,
   LIVE_STATES,
+  labelFor,
   MAX_GAP_BEATS,
   MIN_BASELINE_BEATS,
   probeAlive,
@@ -332,6 +333,42 @@ describe('probeAlive', () => {
 
   it('is total on a missing pid', () => {
     expect(probeAlive(NaN, { readProc: () => null, signal: () => 'exists' }).alive).toBe(false)
+  })
+})
+
+describe('labelFor', () => {
+  // THE PRINTED LABEL AND THE PRINTED REASON MUST AGREE. They did not: a run that
+  // was both unreadable and badly baselined printed INCONCLUSIVE beside a reason
+  // that said liveness was unknown, because the CLI inferred its own precedence.
+  it('gives each outcome its own name, in the reading\'s own order', () => {
+    expect(labelFor({ escaped: true, dead: false })).toBe('ESCAPED')
+    expect(labelFor({ dead: true, unmeasurable: true })).toBe('DIED')
+    expect(labelFor({ unknownLiveness: true, unmeasurable: true })).toBe('UNKNOWN')
+    expect(labelFor({ unmeasurable: true })).toBe('INCONCLUSIVE')
+    expect(labelFor({})).toBe('STALLED')
+  })
+
+  it('agrees with the reason readOutcome gave, for every shape of run', () => {
+    const cases = [
+      [{ shape: 'files', alive: true, ...healthy }, 'ESCAPED', /still working/],
+      [{ shape: 'pipes', alive: false, ...healthy, lastLine: 'raised: EPIPE' }, 'DIED', /pipe whose reader/],
+      [{ shape: 'files', alive: false, unknownLiveness: true, ...healthy }, 'UNKNOWN', /liveness could not be established/],
+      [
+        { shape: 'files', alive: true, startedObserving: 0, killedAt: 0, observedUntil: WINDOW, beatTimes: [100, 2000] },
+        'INCONCLUSIVE',
+        /measures nothing/,
+      ],
+      [
+        { shape: 'files', alive: true, ...healthy, beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS, BEAT_MS, 800)] },
+        'STALLED',
+        /silent for/,
+      ],
+    ]
+    for (const [input, label, reason] of cases) {
+      const out = readOutcome(input)
+      expect(labelFor(out), JSON.stringify(input.shape + ' ' + out.why)).toBe(label)
+      expect(out.why).toMatch(reason)
+    }
   })
 })
 

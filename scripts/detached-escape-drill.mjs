@@ -139,6 +139,7 @@ export function readOutcome({
     escaped,
     progressed,
     dead,
+    unknownLiveness: Boolean(unknownLiveness),
     unmeasurable,
     alive: Boolean(alive),
     beatsBefore,
@@ -149,6 +150,21 @@ export function readOutcome({
     jitter,
     why,
   }
+}
+
+/**
+ * ONE LABELLING RULE, shared by the reading and the printing.
+ *
+ * The CLI used to infer its own label and disagreed with `why`: a run that was
+ * both unreadable and badly baselined printed INCONCLUSIVE beside a reason that
+ * said liveness was unknown. The precedence lives here now, once.
+ */
+export function labelFor(outcome = {}) {
+  if (outcome.escaped) return 'ESCAPED'
+  if (outcome.dead) return 'DIED'
+  if (outcome.unknownLiveness) return 'UNKNOWN'
+  if (outcome.unmeasurable) return 'INCONCLUSIVE'
+  return 'STALLED'
 }
 
 /** The verdict over both shapes: the drill proves its point only if they DIFFER. */
@@ -379,12 +395,21 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
     observedUntil,
     lastLine: after.at(-1) ?? '',
   })
-  if (Number.isFinite(pid)) {
+  // CLEANUP MAY ONLY KILL WHAT THIS DRILL SPAWNED. `Number.isFinite(pid)` was
+  // true for the zero this function starts with, and `process.kill(0, …)`
+  // signals the CALLER'S OWN PROCESS GROUP — the batch session running the
+  // drill. And even a real pid may have been recycled by now, in which case the
+  // signal would hit a stranger. So the identity is re-checked at the moment of
+  // the kill, and anything it cannot vouch for is left alone and reported.
+  const reapable = pid > 1 && probeAlive(pid, { startedAt, requireIdentity: true })
+  if (reapable && (reapable.alive || reapable.unknown === undefined)) {
     try {
-      process.kill(pid, 'SIGKILL')
+      if (reapable.alive) process.kill(pid, 'SIGKILL')
     } catch {
       /* already gone */
     }
+  } else if (pid > 1) {
+    outcome.leftAlone = `pid ${pid} not reaped: ${reapable ? reapable.how : 'no identity'}`
   }
   return outcome
 }
@@ -405,11 +430,9 @@ export async function runDrill(opts = {}) {
 if (isMainModule(import.meta.url)) {
   const result = await runDrill()
   for (const o of result.outcomes) {
-    // FOUR OUTCOMES, NOT TWO. Labelling every non-escape "DIED" reported an
-    // undecidable probe and an unmeasurable host as deaths — the two readings
-    // this drill added precisely so that they would not be mistaken for one.
-    const label = o.escaped ? 'ESCAPED' : o.dead ? 'DIED' : o.unmeasurable ? 'INCONCLUSIVE' : 'UNKNOWN'
-    console.log(`${o.shape}: ${label} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
+    // FIVE OUTCOMES, NOT TWO, and the same precedence the reading used.
+    console.log(`${o.shape}: ${labelFor(o)} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
+    if (o.leftAlone) console.log(`  ${o.leftAlone}`)
   }
   console.log(result.ok ? `VERDICT: ${result.note}` : `VERDICT: ${result.note}`)
   process.exit(result.ok ? 0 : 1)

@@ -399,11 +399,25 @@ compensation, and the design owes all three parts:
   Reconciliation quarantines exactly those, and nothing else: confirmed history stays history,
   including transferred workers.
 
-  **What makes that tolerable rather than a hole is that the unverifiable set is local-only.** A
-  published act is decided at the remote by the credential lease, not by journal order, so an
-  entry whose position cannot be proven is by construction a local mutation — journalled, marked,
-  and reversible. "The fence in force at position i" therefore remains the last transition at or
-  before i for the confirmed prefix, and the tail is not read as a fact at all.
+  **THE UNVERIFIED TAIL IS NOT LOCAL-ONLY, AND RECONCILIATION MUST GO AND LOOK.** Claiming it was
+  local by construction was wrong in both directions: a push can land and its journal entry follow
+  before the crash, and an intent entry can precede a push that then succeeded. Either leaves an
+  unverified entry describing an act that is published and uncompensable. So the journal is
+  written in a way that makes the question ANSWERABLE, and reconciliation answers it against the
+  remote rather than assuming:
+
+  - **Intent precedes the act.** Before any publishing act the daemon appends an intent entry
+    naming the credential `seq` that push will use and the refs it will move. The entry exists
+    before the push can, so no landed push lacks a record.
+  - **Recovery reads the remote.** For every unverified entry that names a publishing intent,
+    reconciliation fetches and asks whether that `seq` is the one the credential ref carries and
+    whether the named refs moved. Landed is recorded as landed; not landed is recorded as
+    abandoned; the intent is never quarantined on a guess.
+  - **Only entries with no publishing intent are quarantined locally,** and those are the ones the
+    local-and-reversible argument actually covers.
+
+  "The fence in force at position i" therefore remains the last transition at or before i for the
+  confirmed prefix, and the tail is resolved by evidence rather than read as a fact.
 
 **EVERY PUBLISHED MUTATION IS UNCOMPENSABLE, and there are two of them.** A pushed merge can
 already have been fetched, read or built on, and "reverting" it is a new commit, not a reversal.
@@ -423,9 +437,19 @@ carries exactly that pair. Acquisition advances it; every publishing act then go
 atomic push carrying both the work and the credential:
 
 ```
-git push --atomic --force-with-lease=refs/hoa/coordinator:<the oid I acquired under> \
+git push --atomic --force-with-lease=refs/hoa/coordinator:<the oid of my current credential> \
     origin <branch or main> refs/hoa/coordinator
 ```
+
+**THE CREDENTIAL REF MUST ACTUALLY MOVE ON EVERY PUBLICATION.** If the pushed value equals the
+one already there, git may classify the ref as up to date and leave it out of the remote
+transaction altogether — and then the lease is not evaluated as part of it. A predecessor that
+advertised while the ref still named it, and then spent a minute uploading a pack, could still
+land its branch update after the successor had advanced the ref. So the credential is
+`(generation, fence, seq)` and **`seq` increments on every publishing act**: each push is a real
+update of that ref under a lease on its own previous value, inside the same atomic transaction as
+the work. A publication whose credential update is a no-op is a publication with no fence, and the
+command that builds it refuses to construct one.
 
 The lease is a compare-and-swap on the credential ref. A coordinator whose successor has ALREADY
 advanced that ref pushes a lease that no longer matches; the lease fails and `--atomic` means the
@@ -536,17 +560,33 @@ operation. The single-thread argument covers the current owner and says nothing 
 one, and re-reading the lock "immediately before" the irreversible act only moves the race — it
 does not remove it.
 
-**So the question is answered by asking what a legacy operation can actually do irreversibly, and
-there are only two kinds.** It can PUBLISH, and publication is decided at the remote by the
-credential lease above, which needs no clock and no local re-read: a dispossessed operation's push
-fails the moment the successor's advance has landed, and before that it is still the one named
-publisher. Or it can mutate LOCAL state, which is not published, is journalled with the credential
-it ran under, and is therefore detectable and compensable exactly like a daemon mutation.
+**Half of it has a real answer, and the other half is a LIMIT that is stated rather than argued
+away.** What a legacy operation can do irreversibly is publish, or mutate local state.
 
-The `daemon` field is itself a local mutation of that kind. So B writing it while A is still
-inside a legacy operation is not a correctness failure: A's local work is attributable and
-reversible, and A's published work is fenced by the ref. What the earlier draft claimed — an
-exclusion — does not exist and is not needed.
+Publication is answered: it is decided at the remote by the credential lease above, which needs no
+clock and no local re-read. A dispossessed operation's push fails once the successor's advance has
+landed, and before that it is still the one named publisher.
+
+Local state is NOT answered, and the previous draft's claim that it is "journalled with the
+credential it ran under, and therefore reversible" was false twice. A legacy operation that began
+before the daemon existed cannot journal through it, and letting legacy code append directly would
+break the one-writer rule the section above depends on. Nor does local imply reversible —
+terminating a process is local and final.
+
+**So the honest statement is a scope limit.** For an operation that began on the old path, this
+design changes nothing: it has exactly today's guarantees, no better and no worse, and the new
+mechanisms neither protect nor endanger it. What the design must therefore avoid is CREATING that
+situation, and the one restriction that actually holds is narrow:
+
+- **A daemon may be started only as the FIRST act of a session that has just acquired the lock,**
+  before that session has begun any operation of its own. Then no legacy operation of the starting
+  session can be in flight, because it has not started one.
+- **A former owner's legacy operation is out of scope,** and that is written down rather than
+  covered: it runs under today's rules, its published acts are refused by the credential ref once
+  the successor has advanced it, and its local acts are exactly as recoverable as they are today.
+
+The exclusion the earlier drafts claimed does not exist. Naming the residue is what keeps the rest
+of this section true.
 
 A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
 handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with
