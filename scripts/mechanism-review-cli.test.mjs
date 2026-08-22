@@ -318,6 +318,49 @@ describe('the mode round-trips into the ledger', () => {
     expect(own.errors.join('\n')).toMatch(/may not merge them/i)
   })
 
+  it('says the halves were not read when a merge refusal rests on the trailer proxy', () => {
+    // MEASURED 22.08.2026: a fold by the model that wrote neither half was refused,
+    // and the message argued about the merger's identity without ever saying where
+    // that identity came from — the recording commit, because a valid fold IS a
+    // commit by the third model. The refusal now names what it read and the one
+    // flag triple that replaces the proxy with the halves themselves.
+    const refused = build({ mode: 'blind-parallel', ...merged, mergedBy: 'Opus 5' })
+    expect(refused.ok).toBe(false)
+    const text = refused.errors.join('\n')
+    expect(text).toMatch(/the two halves were NOT read/)
+    expect(text).toMatch(/--union <U\.json> --list-a <A> --list-b <B>/)
+  })
+
+  it('does not blame the proxy where the halves themselves were read', () => {
+    // The counterpart: with tracked halves handed over, a refusal is about the
+    // halves, so the proxy hint would be a false explanation. It stays absent.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-proxy-'))
+    try {
+      const w = (name, value) => {
+        const path = join(dir, name)
+        writeFileSync(path, JSON.stringify(value))
+        return path
+      }
+      const listA = w('A.json', { model: 'Fable 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
+      const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first' }] })
+      const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect, both said it' }] })
+      const selfMerged = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Fable 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        isTracked: () => true,
+      })
+      expect(selfMerged.ok).toBe(false)
+      const text = (selfMerged.errors ?? []).join('\n')
+      expect(text).toMatch(/authored one of the two lists \(Fable 5\)/)
+      expect(text).not.toMatch(/the two halves were NOT read/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('COUNTS the union itself when handed the files, instead of believing a line', () => {
     // A typed receipt is a claim; given the three files the recorder measures it
     // (four-eyes review, third round).

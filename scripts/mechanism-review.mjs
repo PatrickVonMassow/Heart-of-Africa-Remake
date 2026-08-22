@@ -43,6 +43,7 @@ import { isTrackedInGit } from './git-tracked.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
 import {
+  BLIND_PARALLEL,
   formatArgErrors,
   KNOWN_FLAGS,
   ledgerPathFrom,
@@ -366,6 +367,21 @@ export function buildRecord({
     passFiles,
   })
   const errors = [...merge.errors, ...check.errors]
+  // A REFUSAL HAS TO SAY WHAT IT READ. Where the halves were not handed over, every
+  // identity above was decided from the RECORDING COMMIT's trailers, and that proxy
+  // condemns the one case the rule exists for: a fold committed by the third model
+  // names that model as an author of the material. Measured 22.08.2026 on this very
+  // stage — a valid Fable fold was refused, and the message blamed the merger's
+  // identity without ever saying the halves had not been read. The remedy is one
+  // flag triple, so the refusal names it rather than leaving it to be rediscovered.
+  if (errors.length && mode === BLIND_PARALLEL && halfAuthors.length !== 2) {
+    errors.push(
+      'the two halves were NOT read for this check: the identities above come from the recording ' +
+        "commit's trailers, which name the merger as an author whenever it committed its own union. " +
+        'Hand the tracked files over — --union <U.json> --list-a <A> --list-b <B> — and the merger is ' +
+        'judged against the halves themselves.',
+    )
+  }
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block
   // the real one while the ledger LOOKED like it held the answer.
