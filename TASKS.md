@@ -77,6 +77,31 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 828. `chat-reply.mjs` publishes an unrecognised flag AS the message, so a reply to the user
+  can be the word `--text-stdin` (user report 22.08.2026, 02:40: »Deine Ausgabe ist kaputt. Du
+  hast gerade das hier geantwortet: Agent:--text-stdin«). MEASURED in the same turn: the session
+  answered a real question with `node scripts/chat-reply.mjs --text-stdin <<'EOF' …`, the script
+  took `--text-stdin` as its positional message, signed it, published it, and exited 0 with a
+  receipt. The answer itself was never sent and nothing anywhere said so — the send LOOKED
+  successful at every layer.
+  WHY THE MISTAKE IS THE PROJECT'S, NOT THE SESSION'S: `scripts/board.mjs` accepts `--text-stdin`
+  for exactly this purpose and its usage line advertises it — »Any "<text>" may be replaced by
+  --text-stdin and piped in — use that for German prose.« The two commands that carry German
+  prose to the same reader therefore disagree about how prose is handed in, and the one that
+  disagrees fails SILENTLY and OUTWARD, in front of the user.
+  FINAL STATE: (1) `chat-reply.mjs` REFUSES an argument beginning with `-` that it does not
+  recognise, naming it and naming the two ways in (a quoted argument, or a pipe on stdin), and
+  exits non-zero WITHOUT publishing; (2) it ACCEPTS `--text-stdin` as the synonym for the pipe it
+  already supports, so the flag that reads correctly at every other prose-carrying command reads
+  correctly here too; (3) an empty or whitespace-only message is refused the same way rather than
+  published.
+  VERIFIABLE: Vitest over the pure argument parse — a bare quoted message publishes, `--text-stdin`
+  with piped input publishes THAT input, an unknown `--flag` refuses and names both ways in, an
+  empty stdin refuses, and no refusal path reaches the transport.
+  Criticality: high — it is the only channel the user reads the batch's answers on, and its
+  failure mode is a confidently signed reply with the wrong content and a clean exit code.
+  Bundle: Chat & Tafel.
+
 - [ ] 821. The main-write fence judges the session, not the target path, so an unlocked session
   cannot even write its own scratchpad (measured 21.08.2026, 16:34, in a chat session holding no
   batch lock). A `Write` to
@@ -11007,28 +11032,3 @@ to land than a mechanism that needs a review.
   a firewall that seals the container; the additive top-up and the never-flush rule are what the
   test pins.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 828. `chat-reply.mjs` publishes an unrecognised flag AS the message, so a reply to the user
-  can be the word `--text-stdin` (user report 22.08.2026, 02:40: »Deine Ausgabe ist kaputt. Du
-  hast gerade das hier geantwortet: Agent:--text-stdin«). MEASURED in the same turn: the session
-  answered a real question with `node scripts/chat-reply.mjs --text-stdin <<'EOF' …`, the script
-  took `--text-stdin` as its positional message, signed it, published it, and exited 0 with a
-  receipt. The answer itself was never sent and nothing anywhere said so — the send LOOKED
-  successful at every layer.
-  WHY THE MISTAKE IS THE PROJECT'S, NOT THE SESSION'S: `scripts/board.mjs` accepts `--text-stdin`
-  for exactly this purpose and its usage line advertises it — »Any "<text>" may be replaced by
-  --text-stdin and piped in — use that for German prose.« The two commands that carry German
-  prose to the same reader therefore disagree about how prose is handed in, and the one that
-  disagrees fails SILENTLY and OUTWARD, in front of the user.
-  FINAL STATE: (1) `chat-reply.mjs` REFUSES an argument beginning with `-` that it does not
-  recognise, naming it and naming the two ways in (a quoted argument, or a pipe on stdin), and
-  exits non-zero WITHOUT publishing; (2) it ACCEPTS `--text-stdin` as the synonym for the pipe it
-  already supports, so the flag that reads correctly at every other prose-carrying command reads
-  correctly here too; (3) an empty or whitespace-only message is refused the same way rather than
-  published.
-  VERIFIABLE: Vitest over the pure argument parse — a bare quoted message publishes, `--text-stdin`
-  with piped input publishes THAT input, an unknown `--flag` refuses and names both ways in, an
-  empty stdin refuses, and no refusal path reaches the transport.
-  Criticality: high — it is the only channel the user reads the batch's answers on, and its
-  failure mode is a confidently signed reply with the wrong content and a clean exit code.
-  Bundle: Chat & Tafel.
