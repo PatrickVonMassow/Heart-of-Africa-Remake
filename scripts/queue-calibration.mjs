@@ -36,6 +36,7 @@ import {
   inheritanceDefaults,
   inheritedEstimateForClass,
   pictureBearingPoints,
+  pictureConfounded,
   promiseMedians,
   laneForAttribution,
   ledgerAfterApply,
@@ -221,7 +222,12 @@ try {
     `  LIMIT: ${QUEUE_DATA_PATH} and .batch-dashboard.html are both untracked, so estimates older than this ledger are unrecoverable; ` +
       'the ledger begins with this command’s first run.',
   )
-  if (provenance.snapshot === 0) console.log('  NO FACTOR CAN BE MEASURED YET: this window contains zero landing-time snapshots.')
+  if (provenance.snapshot === 0) {
+    console.log(
+      '  NO RATIO CAN BE MEASURED YET: this window contains zero landing-time snapshots, so every estimate-versus-actual ' +
+        'figure above is empty. The correction below rests on MEASURED ELAPSED TIME instead, and says so per card.',
+    )
+  }
   console.log(
     `SPAN PROVENANCE         ${spans.measured} measured (${spans.inferredMeasured} via a merge inferred from the landing sequence) · ` +
       `${spans.inferred} inferred attribution(s) total · ${spans.noBranch} explicitly no-branch · ` +
@@ -263,7 +269,10 @@ try {
   console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
   for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}`)
 
-  const promises = promiseMedians({ cards, open, criticality, ledger })
+  const declaredPicture = pictureBearingPoints(tasksAll)
+  const confounded = pictureConfounded(reading)
+  const pictureBearing = confounded ? declaredPicture : new Set()
+  const promises = promiseMedians({ cards, open, criticality, ledger, exclude: pictureBearing })
   for (const c of reading.byAxis.criticality) {
     const promise = promises.get(c.name)
     if (!c.comparable && c.elapsedComparable && promise) {
@@ -273,8 +282,16 @@ try {
     }
   }
 
-  const pictureBearing = pictureBearingPoints(tasksAll)
-  const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing })
+  const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing: declaredPicture })
+  // COUNTED FROM THE PLAN ITSELF, never from the marker set: the markers span the
+  // whole work order, closed points included, and only an OPEN card can be held out.
+  const heldOut = plan.filter((p) => p.reason?.includes('picture proof')).length
+  if (heldOut) {
+    console.log(
+      `  ${heldOut} open card(s) asking for a rendered proof are held out of BOTH the correction and its denominator, ` +
+        'because no landing in this window has an established picture check to measure them against.',
+    )
+  }
   const changed = plan.filter((p) => p.changed)
   const kept = plan.filter((p) => !p.changed)
   console.log('')
@@ -331,6 +348,11 @@ try {
     window: { from: iso(window.from), to: iso(window.to), landings: window.landings, since: window.since, limit },
     // What a NEWLY FILED card inherits, in hours, per criticality class.
     defaults,
+    // …and the two facts that decide whether a freshly filed card may inherit at
+    // all: the points that owe a rendered proof, and whether the measurement is
+    // still blind to what one costs.
+    pictureBearing: [...declaredPicture].sort((a, b) => a - b),
+    pictureConfounded: confounded,
     factors: reading.factors,
     globalFactor: reading.decision,
     cadence: reading.cadence,

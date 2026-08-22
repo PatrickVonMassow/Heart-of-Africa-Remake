@@ -54,7 +54,7 @@ import {
   untranslatedTitlePoints,
 } from './board-queue-core.mjs'
 import { withBoardEditLock } from './board-edit-lock.mjs'
-import { CALIBRATION_PATH, parseCriticality } from './queue-calibration-core.mjs'
+import { CALIBRATION_PATH, parseCriticality, pictureBearingPoints } from './queue-calibration-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
 import { gateReport, gateSets } from './user-gate-core.mjs'
@@ -145,9 +145,19 @@ function calibration(tasksText) {
   try {
     const file = resolve(REPO_ROOT, CALIBRATION_PATH)
     if (!existsSync(file)) return null
-    const { defaults } = JSON.parse(readFileSync(file, 'utf8')) ?? {}
+    const { defaults, pictureConfounded } = JSON.parse(readFileSync(file, 'utf8')) ?? {}
     if (!defaults || typeof defaults !== 'object') return null
-    return { defaults, criticality: parseCriticality(tasksText) }
+    return {
+      defaults,
+      criticality: parseCriticality(tasksText),
+      // The measurement's own limit travels with its medians: while it is blind
+      // to what a picture check costs, a point that owes one inherits nothing.
+      // Read from the WORK ORDER rather than the stored list, so a point filed
+      // since the last measurement is judged too. A store without the flag is
+      // treated as confounded — the older, safer reading.
+      pictureBearing: pictureBearingPoints(tasksText),
+      pictureConfounded: pictureConfounded !== false,
+    }
   } catch {
     return null
   }

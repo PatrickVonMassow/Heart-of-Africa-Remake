@@ -624,10 +624,16 @@ export function factorForCard(reading, criticality, { promiseMedian = null } = {
  * the first one did instead of compounding its own writing. An inherited class
  * median is not a promise anybody made and is left out.
  */
-export function promiseMedians({ cards = {}, open = [], criticality = new Map(), ledger = {} } = {}) {
+export function promiseMedians({ cards = {}, open = [], criticality = new Map(), ledger = {}, exclude = new Set() } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
+  // THE DENOMINATOR MUST HOLD THE SAME CARDS THE NUMERATOR SPEAKS FOR. A render
+  // point's promise is larger than a process point's, so leaving the excluded
+  // cards in would carry their weight into the factor applied to everything
+  // else — reintroducing the very confounder the exclusion exists to keep out.
+  const skip = exclude instanceof Set ? exclude : new Set(exclude ?? [])
   const groups = new Map()
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0)) {
+    if (skip.has(point)) continue
     const from = cards?.[point]?.estimate ?? null
     const baseline = ledgerEntry(ledger, point)?.baseline ?? from
     if (String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)) continue
@@ -659,7 +665,29 @@ export function promiseMedians({ cards = {}, open = [], criticality = new Map(),
  * mention of pictures. A process point that discusses the picture lane is not a
  * render point, and excluding it would quietly shrink the correction.
  */
-export const PICTURE_PROOF_MARKERS = [/\bboth backends\b/i, /\bbrowser frame\b/i, /\bscreenshots?\b/i]
+export const PICTURE_VERIFIED = 'picture-verified'
+
+export const PICTURE_PROOF_MARKERS = [
+  /\bboth backends\b/i,
+  /\bbrowser frames?\b/i,
+  /\bscreenshots?\b/i,
+  // "picture check" and "picture proof" name a DEMAND. "picture verification",
+  // by contrast, is how the process talks about itself, and taking it marked
+  // every process point that mentions the lane as a render point.
+  /\bpicture[- ](check|proof)\b/i,
+  /\brendered proof\b/i,
+  /\bam Bild\b/i,
+]
+
+/**
+ * A mention that DENIES the proof rather than demanding it. Narrow on purpose:
+ * it exists so "no screenshot is required here" does not mark a process point as
+ * a render point, and it is not a general-purpose negation parser.
+ */
+export const PICTURE_PROOF_DENIALS = [
+  /\b(no|without|kein|keine|ohne)\s+(\w+\s+){0,2}(screenshots?|browser frames?|picture[- ]\w+)/i,
+  /\bnot\s+(\w+\s+){0,2}picture[- ]verified\b/i,
+]
 
 export function pictureBearingPoints(text) {
   const out = new Set()
@@ -670,9 +698,24 @@ export function pictureBearingPoints(text) {
     else if (/^- \[/.test(line)) point = null
     if (point === null || out.has(point)) continue
     // The head line carries the point's title, and a title can name the proof.
+    if (PICTURE_PROOF_DENIALS.some((re) => re.test(line))) continue
     if (PICTURE_PROOF_MARKERS.some((re) => re.test(line))) out.add(point)
   }
   return out
+}
+
+/**
+ * DOES THE READING'S OWN EVIDENCE STILL FORBID CARRYING A FACTOR TO A RENDER POINT?
+ *
+ * Point 730's confounder is a statement about a MEASUREMENT, not a permanent
+ * rule: its window held no render landing, so nothing in it said what a picture
+ * check costs. The moment the picture axis has an established, measurable class,
+ * that silence ends and a render card is correctable like any other. Reporting
+ * the confounder after it has lapsed would be a false reason on every card.
+ */
+export function pictureConfounded(reading) {
+  const rows = reading?.byAxis?.picture ?? []
+  return !rows.some((c) => c.name === PICTURE_VERIFIED && (c.comparable || c.elapsedComparable))
 }
 
 /**
@@ -748,8 +791,11 @@ export function estimateForLanding(ledger, point, currentEstimate) {
  */
 export function rewritePlan(reading, { cards = {}, open = [], criticality = new Map(), ledger = {}, pictureBearing = new Set() } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
-  const picture = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
-  const promises = promiseMedians({ cards, open, criticality: crit, ledger })
+  const declared = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
+  // The exclusion lives and dies with the evidence. Once the picture axis has a
+  // measurable class of its own, these cards are corrected like any other.
+  const picture = pictureConfounded(reading) ? declared : new Set()
+  const promises = promiseMedians({ cards, open, criticality: crit, ledger, exclude: picture })
   const plan = []
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b)) {
     const from = cards?.[point]?.estimate ?? null
@@ -898,7 +944,14 @@ export function inheritedEstimateForClass(label, defaults = {}) {
  * Null when its class was never measured, which is what keeps the existing
  * "no estimate yet" marker alive for the case where no class fits.
  */
-export function inheritedEstimate(point, { defaults = {}, criticality = new Map() } = {}) {
+export function inheritedEstimate(point, { defaults = {}, criticality = new Map(), pictureBearing = new Set(), pictureConfounded: confounded = false } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
+  // The medians are measured from landings whose picture is not established, so
+  // while the confounder holds they say nothing about a point that owes a
+  // rendered proof. Such a card keeps the "no estimate yet" marker rather than
+  // inheriting a number measured on other work — the same rule the rewrite
+  // follows, applied at the other door into the queue.
+  const declared = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
+  if (confounded && declared.has(Number(point))) return null
   return inheritedEstimateForClass(crit.get(Number(point)) ?? UNTAGGED, defaults)
 }

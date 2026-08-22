@@ -28,6 +28,7 @@ import {
   parseFirstParentChain,
   parseTickEvents,
   pictureBearingPoints,
+  pictureConfounded,
   pictureVerifiedPoints,
   promiseMedians,
   rewritePlan,
@@ -697,5 +698,155 @@ describe('the confounder that forbids carrying the factor to render points', () 
     expect(plan[0].reason).toMatch(/picture proof/)
     // The point beside it, owing no picture, still moves.
     expect(plan[1]).toMatchObject({ point: 20, changed: true })
+  })
+})
+
+
+describe('the render exclusion cannot leak into the number it protects', () => {
+  const process6 = (crit) =>
+    Array.from({ length: 6 }, (_, i) => landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: crit }))
+  const reading = calibrationReading(process6('medium'))
+
+  it('keeps an excluded card OUT of the denominator it would otherwise inflate', () => {
+    const cards = { 10: { estimate: '~2 h' }, 11: { estimate: '~2 h' }, 20: { estimate: '~20 h' } }
+    const criticality = new Map([[10, 'medium'], [11, 'medium'], [20, 'medium']])
+    const withRender = promiseMedians({ cards, open: [10, 11, 20], criticality })
+    const without = promiseMedians({ cards, open: [10, 11, 20], criticality, exclude: new Set([20]) })
+    expect(withRender.get('medium')).toBe(2)
+    // The render card's 20 h would drag the median up as soon as it outnumbers.
+    expect(without.get('medium')).toBe(2)
+    const heavy = { ...cards, 21: { estimate: '~30 h' }, 22: { estimate: '~40 h' } }
+    const open = [10, 11, 20, 21, 22]
+    const crit2 = new Map([...criticality, [21, 'medium'], [22, 'medium']])
+    expect(promiseMedians({ cards: heavy, open, criticality: crit2 }).get('medium')).toBe(20)
+    expect(
+      promiseMedians({ cards: heavy, open, criticality: crit2, exclude: new Set([20, 21, 22]) }).get('medium'),
+    ).toBe(2)
+  })
+
+  it('applies the SAME exclusion to the factor a plan uses', () => {
+    const cards = { 10: { estimate: '~2 h' }, 20: { estimate: '~30 h' }, 21: { estimate: '~40 h' } }
+    const criticality = new Map([[10, 'medium'], [20, 'medium'], [21, 'medium']])
+    const plan = rewritePlan(reading, { cards, open: [10, 20, 21], criticality, pictureBearing: new Set([20, 21]) })
+    // Denominator is card 10's own 2 h, not the 30/40 h the render cards promise.
+    expect(plan.find((p) => p.point === 10)).toMatchObject({ to: '~1 h', changed: true })
+  })
+})
+
+describe('the confounder lapses when the evidence arrives', () => {
+  const withRenderLandings = calibrationReading([
+    ...Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium', picture: false }),
+    ),
+    ...Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 700 + i, elapsedHours: 3, estimateHours: null, criticality: 'medium', picture: true }),
+    ),
+  ])
+  const blind = calibrationReading(
+    Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium', picture: false }),
+    ),
+  )
+
+  it('is confounded while no render landing is established', () => {
+    expect(pictureConfounded(blind)).toBe(true)
+  })
+
+  it('is NOT confounded once the picture axis has a measurable class', () => {
+    expect(pictureConfounded(withRenderLandings)).toBe(false)
+  })
+
+  it('CORRECTS a render card once the window can measure one', () => {
+    const args = {
+      cards: { 20: { estimate: '~4 h' } },
+      open: [20],
+      criticality: new Map([[20, 'medium']]),
+      pictureBearing: new Set([20]),
+    }
+    expect(rewritePlan(blind, args)[0].changed).toBe(false)
+    expect(rewritePlan(withRenderLandings, args)[0].changed).toBe(true)
+  })
+
+  it('never reports the confounder as the reason once it has lapsed', () => {
+    const plan = rewritePlan(withRenderLandings, {
+      cards: { 20: { estimate: '~4 h' } },
+      open: [20],
+      criticality: new Map([[20, 'medium']]),
+      pictureBearing: new Set([20]),
+    })
+    expect(plan[0].reason).not.toMatch(/picture proof/)
+  })
+})
+
+describe('reading a rendered proof out of a point\'s own spec', () => {
+  const block = (n, ...lines) => [`- [ ] ${n}. A point.`, ...lines.map((l) => `  ${l}`), ''].join('\n')
+
+  it('takes the demands the old marker set missed', () => {
+    const tasks = [
+      block(30, 'VERIFIABLE: a picture check of the deployed build.'),
+      block(31, 'VERIFIABLE: a rendered proof of the new water.'),
+      block(32, 'VERIFIABLE: die Wirkung ist am Bild zu prüfen.'),
+    ].join('\n')
+    const found = pictureBearingPoints(tasks)
+    expect([...found].sort((a, b) => a - b)).toEqual([30, 31, 32])
+  })
+
+  it('leaves the process talking about its own picture LANE alone', () => {
+    const tasks = [
+      block(33, 'The picture verification of a landing sits after the merge.'),
+      block(34, 'The picture lane was broken and unnoticed for a day.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)]).toEqual([])
+  })
+
+  it('does not take a mention that DENIES the proof', () => {
+    const tasks = [
+      block(40, 'No screenshot is required here; the change is pure arithmetic.'),
+      block(41, 'This point needs no browser frame at all.'),
+      block(42, 'Kein Screenshot nötig — es ist reine Buchhaltung.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)]).toEqual([])
+  })
+
+  it('still takes the point when a later line demands what an earlier one denied', () => {
+    const tasks = block(50, 'No screenshot of the menu is needed.', 'VERIFIABLE: a browser frame of the river, on both backends.')
+    expect(pictureBearingPoints(tasks).has(50)).toBe(true)
+  })
+})
+
+describe('what a newly filed render card inherits', () => {
+  const defaults = { medium: 1 }
+
+  it('inherits nothing while the measurement is blind to a picture check', () => {
+    expect(
+      inheritedEstimate(20, {
+        defaults,
+        criticality: new Map([[20, 'medium']]),
+        pictureBearing: new Set([20]),
+        pictureConfounded: true,
+      }),
+    ).toBeNull()
+  })
+
+  it('inherits its class median once the confounder has lapsed', () => {
+    expect(
+      inheritedEstimate(20, {
+        defaults,
+        criticality: new Map([[20, 'medium']]),
+        pictureBearing: new Set([20]),
+        pictureConfounded: false,
+      }),
+    ).toMatch(/Klassenmedian/)
+  })
+
+  it('leaves a point that owes no picture untouched by the rule', () => {
+    expect(
+      inheritedEstimate(10, {
+        defaults,
+        criticality: new Map([[10, 'medium']]),
+        pictureBearing: new Set([20]),
+        pictureConfounded: true,
+      }),
+    ).toMatch(/Klassenmedian/)
   })
 })
