@@ -69,14 +69,24 @@ export const DEAD_STATES = new Set(['Z', 'X', 'x'])
 export function readOutcome({
   shape,
   alive,
+  unknownLiveness = false,
   beatsBefore = 0,
   beatTimes = [],
   killedAt = 0,
   observedUntil = 0,
   lastLine = '',
 } = {}) {
-  const after = beatTimes.filter((t) => Number(t) > killedAt).map(Number).sort((a, b) => a - b)
-  const limit = BEAT_MS * MAX_GAP_BEATS
+  const all = beatTimes.map(Number).filter(Number.isFinite).sort((a, b) => a - b)
+  const after = all.filter((t) => t > killedAt)
+  const before = all.filter((t) => t <= killedAt)
+  // THE TOLERANCE IS CALIBRATED BY THE RUN ITSELF. A fixed 600 ms was a guess
+  // about a loaded host, and a healthy worker starved by the scheduler for
+  // longer would have made the drill lie in the other direction. So the same
+  // worker's OWN jitter before the kill sets the bar: twice its worst pre-kill
+  // pause, never below the three-period floor.
+  const gapsIn = (marks) => marks.slice(1).map((t, i) => t - marks[i])
+  const jitter = Math.max(0, ...gapsIn(before))
+  const limit = Math.max(BEAT_MS * MAX_GAP_BEATS, jitter * 2)
   // The first gap is measured from the KILL, so a worker that goes quiet at the
   // moment its parent dies and only resumes later cannot hide in the average.
   // Every mark, including a kill stamped at 0: filtering on truthiness dropped
@@ -86,25 +96,35 @@ export function readOutcome({
   for (let i = 1; i < marks.length; i += 1) maxGap = Math.max(maxGap, marks[i] - marks[i - 1])
   const gained = after.length
   const progressed = gained > 0 && maxGap <= limit
-  const escaped = Boolean(alive) && progressed
+  // A HOST TOO LOADED TO MEASURE IS NOT A RESULT. If the worker could not hold
+  // its beat even BEFORE the kill, this run says nothing about what the kill did.
+  const unmeasurable = before.length > 1 && jitter > BEAT_MS * MAX_GAP_BEATS
+  const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness
   const why = escaped
     ? 'still running and still working after the kill'
-    : !alive && /EPIPE/i.test(lastLine)
-      ? 'died writing to a pipe whose reader went with the parent'
-      : !alive
-        ? 'died with the parent, cause not recorded in its own log'
-        : gained === 0
-          ? 'still running but never beat again — a survivor that stopped is not a lane'
-          : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
+    : unmeasurable
+      ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
+      : unknownLiveness
+        ? 'liveness could not be established, and an unreadable probe is not a survivor'
+        : !alive && /EPIPE/i.test(lastLine)
+          ? 'died writing to a pipe whose reader went with the parent'
+          : !alive
+            ? 'died with the parent, cause not recorded in its own log'
+            : gained === 0
+              ? 'still running but never beat again — a survivor that stopped is not a lane'
+              : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
   return {
     shape,
     escaped,
     progressed,
+    unmeasurable,
     alive: Boolean(alive),
     beatsBefore,
     beatsAfter: beatsBefore + gained,
     gained,
     maxGap,
+    limit,
+    jitter,
     why,
   }
 }
@@ -176,10 +196,19 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
  * Where that file does not exist the signal probe is all there is, and the
  * limitation travels with the answer rather than being silently assumed away.
  */
-export function probeAlive(pid, { readProc = defaultReadProc, signal = defaultSignal } = {}) {
+export function probeAlive(pid, { startedAt = 0, readProc = defaultReadProc, signal = defaultSignal } = {}) {
   if (!Number.isFinite(pid)) return { alive: false, how: 'no pid' }
   const stat = readProc(pid)
   if (stat != null) {
+    // A BARE PID IS NOT AN IDENTITY. Between the kill and the probe the number
+    // can belong to something else entirely, and an unrelated process would
+    // satisfy the liveness half of the verdict. Field 22 of /proc/<pid>/stat is
+    // the start time in clock ticks; captured after the spawn and compared here,
+    // it tells the worker apart from its successor at the same number.
+    const now = startTicksOf(stat)
+    if (startedAt && now && now !== startedAt) {
+      return { alive: false, how: `pid ${pid} was recycled — start ${now} is not the ${startedAt} we spawned` }
+    }
     // The state letter is the field after the ")" that closes the comm field —
     // parsed from the right, because a process name may itself contain ")".
     const state = stat.slice(stat.lastIndexOf(')') + 1).trim().charAt(0)
@@ -189,7 +218,26 @@ export function probeAlive(pid, { readProc = defaultReadProc, signal = defaultSi
     // "alive" for an unrecognised state is the one that greens a dead lane.
     return { alive: false, how: `unrecognised /proc state ${state || '(none)'} — read as dead` }
   }
-  return { alive: signal(pid), how: 'signal probe only — a zombie reads as alive here' }
+  // FAIL CLOSED WHERE /proc CANNOT BE READ. The signal probe answers true for a
+  // corpse, and `verdict` consumes only the boolean — so a transient read failure
+  // would have greened a dead lane. A drill that cannot see the truth reports
+  // that it cannot, and `signal` is kept only to distinguish "gone" from
+  // "unreadable" in the explanation.
+  // A pid the signal probe cannot find at all is GONE, not unknown: there is no
+  // corpse for /proc to have hidden. Only a pid that still answers the signal
+  // while /proc stays unreadable is genuinely undecidable here.
+  if (!signal(pid)) return { alive: false, how: 'no such process' }
+  return { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable and a signal probe cannot tell a corpse apart' }
+}
+
+/** Field 22 of /proc/<pid>/stat — start time in clock ticks since boot. The
+ *  fields are counted AFTER the comm field, because a process name may contain
+ *  spaces and parentheses; field 3 (state) is the first one after it. */
+export function startTicksOf(stat) {
+  const rest = String(stat ?? '').slice(String(stat ?? '').lastIndexOf(')') + 1).trim().split(/\s+/)
+  // rest[0] is field 3 (state), so field 22 is rest[19].
+  const ticks = Number(rest[19])
+  return Number.isFinite(ticks) ? ticks : 0
 }
 
 const defaultReadProc = (pid) => {
@@ -232,6 +280,9 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   const lines = (path) => readFileSync(path, 'utf8').split('\n').filter(Boolean)
   const beatsBefore = lines(beat).length
   const pid = Number(readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0])
+  // The worker's start time, taken while it is provably still the process we
+  // spawned, so a recycled pid cannot pass the liveness probe after the kill.
+  const startedAt = startTicksOf(defaultReadProc(pid) ?? '')
   let killedAt = 0
   try {
     process.kill(-parent.pid, 'SIGKILL')
@@ -244,9 +295,11 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   const after = lines(beat)
   const observedUntil = Date.now()
   const beatTimes = after.filter((l) => l.startsWith('beat ')).map((l) => Number(l.slice('beat '.length)))
+  const live = probeAlive(pid, { startedAt })
   const outcome = readOutcome({
     shape,
-    alive: probeAlive(pid).alive,
+    alive: live.alive,
+    unknownLiveness: Boolean(live.unknown),
     beatsBefore,
     beatTimes,
     killedAt,

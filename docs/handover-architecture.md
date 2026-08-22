@@ -377,29 +377,54 @@ compensation, and the design owes all three parts:
   accepts must therefore DECLARE its compensation, and a mutation without one cannot be
   registered — that is a case in step 1's command table, not a convention.
 - **Refuse it downstream.** Every journal entry carries the fence it was written under, AND the
-  journal records every fence transition, so an entry is legitimate exactly when its fence is the
-  one in force at its own position in the journal. Reconciliation (step 8) quarantines the entries
-  that fail THAT test, not everything below the successor's own fence — the first draft said the
-  latter and would have quarantined all legitimate predecessor history, transferred workers
-  included, at every ordinary handover.
+  journal records every fence transition. An entry is legitimate exactly when its fence is the one
+  in force at its own position in the journal, and reconciliation (step 8) quarantines the entries
+  that fail THAT test — not everything below the successor's own fence, which is what the third
+  answer said and which would have quarantined all legitimate predecessor history, transferred
+  workers included, at every ordinary handover.
 
-**ONE MUTATION CLASS HAS NO HONEST COMPENSATION, and it is named rather than covered.** A landed
-merge is pushed; it can already have been fetched, read or built on, and "reverting" it is a new
-commit, not a reversal. So landing does not rest on compensation at all, and it is the one place
-where the mechanism is exclusion instead:
+  **What makes that test decidable is that the daemon writes the transition itself.** The lock file
+  is written by other processes, so a new fence can become authoritative there before anyone has
+  recorded it — and then an old-fence mutation could be appended before the transition and read as
+  legitimate. So the daemon does not treat the lock file as the transition. The FIRST time it
+  validates a fence it has not seen, it appends the transition record before the mutation it is
+  validating, in its own serial write order. The journal's order is therefore total and
+  self-contained, and "the fence in force at position i" is simply the last transition at or
+  before i. The lock file remains what the daemon READS; the journal is what makes the reading a
+  fact a later reader can re-derive.
 
-- Landing is serial under the batch-wide landing lock (step 9), which the daemon grants under the
-  fence and which is held across the whole merge and push.
-- The fence is re-validated immediately BEFORE the irreversible act, with the lock still held, so
-  the window that remains is one push rather than a whole landing.
-- What closes even that window is not ours: the remote ref update is git's own atomic
-  compare-and-swap. A push from a dispossessed coordinator fails as a non-fast-forward the moment
-  the rightful owner has pushed, and step 9's revalidation against the current base is what makes
-  that failure the normal, recoverable outcome rather than a surprise.
+**EVERY PUBLISHED MUTATION IS UNCOMPENSABLE, and there are two of them.** A pushed merge can
+already have been fetched, read or built on, and "reverting" it is a new commit, not a reversal.
+The same is true of a worker's checkpoint push (M40), which the earlier draft overlooked while
+naming landing as the only case. Neither can rest on compensation, and both need the same thing:
+a check that is not separate from the act.
 
-The landing's safety therefore comes from serialization plus the remote's own atomicity, and the
-fence is what stops a dispossessed coordinator from ACQUIRING the landing lock in the first place.
-Claiming compensation for it would have been a lie.
+**Non-fast-forward rejection does not supply it.** A stale coordinator that still holds the
+landing lock keeps the rightful successor from pushing at all; the target ref therefore never
+moves, and the stale push stays fast-forwardable and succeeds. Git's atomicity fences concurrent
+ref MOVEMENT, not a dispossessed pusher — that was the hole in the third answer.
+
+**THE FENCE THEREFORE LIVES ON THE REMOTE, where both parties actually meet.** The coordinator
+credential is a pair — a random `generation`, minted when the fence store is created, and the
+monotone `fence` within it — and it is published as a ref, `refs/hoa/coordinator`, whose blob
+carries exactly that pair. Acquisition advances it; every publishing act then goes out as ONE
+atomic push carrying both the work and the credential:
+
+```
+git push --atomic --force-with-lease=refs/hoa/coordinator:<the oid I acquired under> \
+    origin <branch or main> refs/hoa/coordinator
+```
+
+The lease is a compare-and-swap on the credential ref. A coordinator that was dispossessed pushes
+a lease that no longer matches, the lease fails, and `--atomic` means the branch or `main` update
+does not happen either. Nothing lands under a credential that has been superseded, whether or not
+the work itself would have fast-forwarded, and whether or not the rightful owner has pushed yet.
+Worker checkpoint pushes use the identical form, so M40's "check the lease before pushing" becomes
+a check that IS the push rather than one that precedes it.
+
+The landing's safety therefore comes from serialization plus a fenced remote update, and the local
+fence is what stops a dispossessed coordinator from acquiring the landing lock in the first place.
+Claiming compensation for either of these would have been a lie.
 
 The honest claim is therefore narrower than the first draft's: the fence makes a dispossessed
 coordinator's work DETECTABLE AND REVERSIBLE within one mutation, not impossible.
@@ -422,10 +447,19 @@ first draft left out: **a missing or checksum-failing journal itself prohibits m
 fence file beside a lost journal would otherwise find no higher value and cheerfully hand out a
 reused number — the comparison would pass precisely because the evidence was gone. In that state
 the daemon refuses every mutation and raises an alert, and recovery is an OPERATOR act, never an
-automatic one: the fence is re-seeded strictly above the highest number found in any surviving
-record — journal, sealed snapshot, `.claude/boundary.log`, and the fences carried in pushed
-commits, which live in a repository that is replicated off this host. A batch that cannot prove
-who owns it must stop, not guess.
+automatic one.
+
+**RECOVERY MINTS A NEW GENERATION; IT DOES NOT RESEED A COUNTER.** Reseeding above the highest
+surviving number is worthless in exactly the case that requires recovery: if every durable record
+is gone, there is no highest number to be above, and a credential someone still holds can collide
+with the new one. That is why the credential is a PAIR. Recreating the fence store mints a fresh
+random `generation`, and a credential from any earlier generation matches nothing — the number
+never has to be proven unique, because the generation already is. The published
+`refs/hoa/coordinator` carries the pair, so an erased-but-still-held credential fails its lease at
+the remote as well, which is the one place a lost local store cannot hide it. Its acceptance test
+is in step 1's schema table: a push under a previous generation is refused, and a fence store that
+has lost its generation refuses to mint rather than inventing one. A batch that cannot prove who
+owns it must stop, not guess.
 
 **Split-brain prevention.** Two sessions cannot hold the lock; that is the existing test-and-set,
 and it is the only exclusion primitive in the design. The case the lock alone never covered is a
@@ -446,13 +480,24 @@ be STARTED.** The regime is then a fact about the world rather than a setting �
 
 That forbids two daemons. It does NOT by itself forbid a legacy caller that read "no daemon",
 began an old-path operation, and was still inside it when a daemon started — and an exclusive
-create the legacy path never touches cannot see that caller. So the daemon's lifecycle is confined
-to the one window in which no legacy operation can be in flight: **a daemon may be started and
-stopped only by the session holding the batch lock, in the boundary window, after `--prepare` has
-proved that nothing is in flight.** That is not an extra mechanism; it is the state the two-phase
-boundary already establishes and already checks. A start attempted at any other moment is refused
-and says why. A daemon then persists across the sessions that follow, which is the whole point of
-it, and the regime changes only where the batch has already proved itself quiet. Rollback is then a single operation with
+create the legacy path never touches cannot see that caller. Confining the start to the boundary
+window does not fix it either: `--prepare` proves quiescence at an INSTANT, and proving is not
+reserving; the same lock-owning session could begin a legacy operation immediately afterwards.
+
+**So the daemon is not a second record at all: its existence is a FIELD OF THE BATCH LOCK.**
+`start` writes a `daemon` field — pid, pid start time, generation — into `.claude/batch-lock.json`
+through the same atomic test-and-set that already governs the lock, and `stop` clears it the same
+way. The consequences follow without any new primitive:
+
+- **"Is there a daemon?" and "may I work?" are answered by ONE record,** read in one act, so the
+  two can never disagree and no caller can observe a state the other half contradicts.
+- **Only the lock owner can start or stop one,** because only the lock owner can write the lock.
+- **A legacy operation and a daemon start cannot overlap,** because both belong to the lock owner
+  and a session is one thread of control: it is either inside a legacy operation or writing the
+  lock, never both. The overlap the earlier answers left open needed two actors; there is only one.
+
+A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
+handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with
 nothing to interleave: `node scripts/batch-daemon.mjs stop --drain` refuses new mutations,
 completes the at most one mutation in flight (they are serialized, so the wait is bounded by a
 single operation), cancels its workers through the cancellation path that preserves their branches
