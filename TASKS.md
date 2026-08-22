@@ -105,6 +105,47 @@ put it is the mistake this line exists to stop.
   told it.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 827. The firewall that cuts Sol off is the image's copy, and nothing compares it with the
+  repository (measured 22.08.2026, 01:57-02:05, after the user said the recurring Sol outage is
+  ours to fix rather than his). The container boots the INSTALLED firewall script at
+  `/usr/local/bin` (`postStartCommand`, `/workspace/.devcontainer/devcontainer.json:86`), and that
+  script is BAKED INTO THE IMAGE by the Dockerfile (line 154, from the read-only outer
+  `/workspace/.devcontainer` copy). The repository's own `.devcontainer/init-firewall.sh` is a
+  DIFFERENT file and is never executed. Diffed on the day, the installed copy is missing exactly
+  the hosts the repository added on 11.08.2026 after the previous outage — `auth.openai.com`,
+  `api.openai.com`, `chatgpt.com`, plus `us.aws.cdn.hf.co` and `cdn.jsdelivr.net` — and nothing
+  else differs. THAT IS THE WHOLE RECURRENCE: every container start rebuilds the ipset from the
+  stale copy without Sol's hosts, a session tops it up by hand with `scripts/firewall-allow.mjs`,
+  and the next VS Code restart throws the top-up away. The repository fix of 11.08. has therefore
+  never taken effect once.
+  WHAT ALREADY HAPPENED AND WHAT DID NOT: the live top-up ran, all three OpenAI hosts answer, and
+  `node scripts/review-sol.mjs --probe` passes, so Sol works in the container that measured this.
+  Installing the repository copy over the one at `/usr/local/bin` was refused by the main-write
+  fence (point 821's subject) because that window held no batch lock, so the executed script is
+  still the stale one and the NEXT RESTART BREAKS SOL AGAIN.
+  FINAL STATE: (1) the executed firewall script is RECONCILED with the repository's copy rather
+  than trusted — either the boot path runs the repository's file, or a session-start step installs
+  it when the two differ — so a rebuilt image cannot silently reintroduce an old allowlist; (2) the
+  drift is DETECTED AND NAMED, never silently repaired, because a divergence between the file we
+  edit and the file that runs is the class of defect that has now cost this project its authoring
+  lane twice; (3) the reconciliation can never seal the container: it installs, and where the
+  running ipset lacks hosts the installed script names, it tops up ADDITIVELY through
+  `scripts/firewall-allow.mjs` — never a flush.
+  VERIFIABLE without a restart: Vitest over the pure comparison — identical files reconcile to
+  nothing, a missing host is reported by name, an unreadable installed script fails soft — plus an
+  assertion that the additive top-up is the only repair the reconciliation performs.
+  NOTE FOR WHOEVER TAKES IT: the container has passwordless root (`sudo -n -l` reports NOPASSWD
+  ALL), so the install itself is one command; the work is the detection and the test, not the
+  privilege.
+  QUEUE RANK: second, directly behind point 821, whose main-write fence is what refused the repair
+  when it was measured. Reason: every container restart silently removes the OpenAI hosts, and a
+  batch that loses its authoring lane pauses — this is the cheapest point in the queue that keeps
+  the other lane alive.
+  Criticality: medium — it installs a file the container boots from, so its dangerous direction is
+  a firewall that seals the container; the additive top-up and the never-flush rule are what the
+  test pins.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 768. Cut CLAUDE.md to its binding sentences and make the cut hold (user instruction
   20.08.2026: »Auch beim Abschnitt Tech Stack frage ich mich, ob wir den wirklich brauchen. Kürze
   CLAUDE.md soweit sinnvoll und etabliere einen Mechanismus, der das dauerhaft zusichert, damit das
