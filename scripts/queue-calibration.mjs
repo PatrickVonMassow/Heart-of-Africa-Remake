@@ -35,9 +35,9 @@ import {
   ELAPSED_BIAS_BASIS,
   inheritanceDefaults,
   inheritedEstimateForClass,
+  PICTURE_HOLDOUT_REASON,
   PICTURE_VERIFIED,
   pictureBearingPoints,
-  pictureConfounded,
   promiseMedians,
   laneForAttribution,
   ledgerAfterApply,
@@ -188,10 +188,6 @@ try {
   const cadenceHours = rows.slice(1).map((r, i) => (r.landedAt - rows[i].landedAt) / HOUR)
   const window = { from: rows[0].landedAt, to: rows[rows.length - 1].landedAt, landings: rows.length, since: options.since, limit }
   const reading = calibrationReading(rows, { cadenceHours, window })
-  // Whether this window can say anything about a render point decides BOTH the
-  // rewrite below and the confounder line printed with the limits, so it is read
-  // once, here, and never restated as a standing fact.
-  const confounded = pictureConfounded(reading)
 
   console.log(`WINDOW  ${iso(window.from)} → ${iso(window.to)} UTC · ${window.landings} landed point(s)` + (limit ? ` (--limit ${limit})` : ` (--since ${window.since})`))
   console.log('')
@@ -240,18 +236,12 @@ try {
   )
   console.log('CLASSIFICATION LIMIT — LANE: only a merge subject naming the point’s branch establishes delegated; every other row is lane-unestablished.')
   console.log('CLASSIFICATION LIMIT — PICTURE: render-verify-state.json is git-ignored, bounded to 40 runs and clearedHeads is pruned at branch end; only a retained branch entry establishes picture verification.')
-  if (confounded) {
-    console.log(
-      'CONFOUNDER: this window has no landing with an established picture check, so it says nothing about what one costs; ' +
-        'its factor is not carried to a point that owes a rendered proof.',
-    )
-  } else {
-    const render = reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED)
-    console.log(
-      `CONFOUNDER LAPSED: ${render.elapsed.n} landing(s) with an established picture check are now measurable ` +
-        `(median ${fmt(render.elapsed.median, ' h')}), so a point owing a rendered proof is corrected from THAT class.`,
-    )
-  }
+  console.log(
+    'CONFOUNDER: a point that owes a rendered proof is HELD OUT of the correction and of its denominator. ' +
+      'Lifting that holdout needs a measurable render class, and the picture evidence above cannot supply one: ' +
+      `${reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED)?.elapsed.n ?? 0} landing(s) survive in a store ` +
+      'that is capped and pruned at branch end. It is a decision with its own measurement behind it, not a switch this command flips.',
+  )
   console.log('CONFOUNDER: point 713 still stands at 14 do-not-merge rounds, so the review loop is not universally healed.')
   console.log('')
   console.log(`ELAPSED PER POINT (h)   ${five(reading.overall.elapsed, ' h')}`)
@@ -288,8 +278,8 @@ try {
   console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
   for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}`)
 
-  const declaredPicture = pictureBearingPoints(tasksAll)
-  const pictureBearing = confounded ? declaredPicture : new Set()
+  const pictureBearing = pictureBearingPoints(tasksAll)
+  // The SAME exclusion the plan uses, so the printed factor is the applied one.
   const promises = promiseMedians({ cards, open, criticality, ledger, exclude: pictureBearing })
   for (const c of reading.byAxis.criticality) {
     const promise = promises.get(c.name)
@@ -300,10 +290,10 @@ try {
     }
   }
 
-  const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing: declaredPicture })
+  const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing })
   // COUNTED FROM THE PLAN ITSELF, never from the marker set: the markers span the
   // whole work order, closed points included, and only an OPEN card can be held out.
-  const heldOut = plan.filter((p) => p.reason?.includes('picture proof')).length
+  const heldOut = plan.filter((p) => p.reason?.includes(PICTURE_HOLDOUT_REASON)).length
   if (heldOut) {
     console.log(
       `  ${heldOut} open card(s) asking for a rendered proof are held out of BOTH the correction and its denominator, ` +
@@ -366,11 +356,9 @@ try {
     window: { from: iso(window.from), to: iso(window.to), landings: window.landings, since: window.since, limit },
     // What a NEWLY FILED card inherits, in hours, per criticality class.
     defaults,
-    // …and the two facts that decide whether a freshly filed card may inherit at
-    // all: the points that owe a rendered proof, and whether the measurement is
-    // still blind to what one costs.
-    pictureBearing: [...declaredPicture].sort((a, b) => a - b),
-    pictureConfounded: confounded,
+    // …and the points that may NOT inherit it: the ones owing a rendered proof,
+    // which this measurement is blind to.
+    pictureBearing: [...pictureBearing].sort((a, b) => a - b),
     factors: reading.factors,
     globalFactor: reading.decision,
     cadence: reading.cadence,

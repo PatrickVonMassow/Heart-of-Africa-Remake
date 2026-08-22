@@ -579,13 +579,9 @@ export function calibrationReading(landings, { cadenceHours = [], window = null,
  * cannot be read off a queued card, so they inform the DECISION above and never
  * a card's own number.
  */
-export function factorForCard(reading, criticality, { promiseMedian = null, measuredFrom = null } = {}) {
+export function factorForCard(reading, criticality, { promiseMedian = null } = {}) {
   const label = criticality ?? UNTAGGED
-  // `measuredFrom` overrides WHICH measured class supplies the elapsed numerator.
-  // A card that owes a rendered proof belongs to the render class the moment that
-  // class can be measured; correcting it from the pooled criticality median would
-  // aim it at a centre mixed from work that never rendered anything.
-  const ownClass = measuredFrom ?? (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
+  const ownClass = (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
   const ratioComparable = Boolean(ownClass?.comparable) && (ownClass?.ratio?.n ?? 0) >= MIN_CLASS_SAMPLES
   if (ratioComparable) {
     if (reading?.decision?.adopted && asNumber(reading.decision.factor)) {
@@ -605,7 +601,7 @@ export function factorForCard(reading, criticality, { promiseMedian = null, meas
   const promise = asNumber(promiseMedian)
   const measured = asNumber(ownClass?.elapsed?.median)
   if (ownClass?.elapsedComparable && promise > 0 && measured > 0) {
-    return { factor: measured / promise, basis: `${ELAPSED_BIAS_BASIS}:${ownClass.name ?? label}`, label, reason: null }
+    return { factor: measured / promise, basis: `${ELAPSED_BIAS_BASIS}:${label}`, label, reason: null }
   }
   if (!ratioComparable) {
     return {
@@ -671,8 +667,14 @@ export function promiseMedians({ cards = {}, open = [], criticality = new Map(),
  */
 export const PICTURE_VERIFIED = 'picture-verified'
 
+/**
+ * WHY A CARD WAS HELD OUT — one string, so the plan's reason and the count the
+ * report prints beside it can never drift apart into two different truths.
+ */
+export const PICTURE_HOLDOUT_REASON =
+  'the point asks for a rendered proof, and no landing this measurement can establish carries one'
+
 export const PICTURE_PROOF_MARKERS = [
-  /\bboth backends\b/i,
   /\bbrowser frames?\b/i,
   /\bscreenshots?\b/i,
   // "picture check" and "picture proof" name a DEMAND. "picture verification",
@@ -682,6 +684,15 @@ export const PICTURE_PROOF_MARKERS = [
   /\brendered proof\b/i,
   /\bam Bild\b/i,
 ]
+
+/**
+ * "on both backends" is NOT a proof demand by itself — a guard, a worker or a
+ * shader path is implemented on both backends without anybody looking at a
+ * picture. It counts only where the same clause also names something VISUAL,
+ * which is how a render point's VERIFIABLE actually reads.
+ */
+export const PICTURE_BACKEND_MARKER = /\bboth backends\b/i
+export const PICTURE_VISUAL_COMPANION = /\b(picture|screenshot|frame|render|rendered|visual|look|Bild|Ansicht)\w*/i
 
 /**
  * A mention that DENIES the proof rather than demanding it. Narrow on purpose:
@@ -702,6 +713,16 @@ export const PICTURE_PROOF_DENIALS = [
   /\bnot\s+(\w+\s+){0,2}picture[- ]verified\b/i,
 ]
 
+/** Does ONE clause demand a rendered proof? */
+export function clauseDemandsPicture(clause) {
+  const text = String(clause ?? '')
+  // A denial suppresses its OWN clause only. "No screenshot is required; provide
+  // a browser frame" is a demand, and reading the whole line at once lost it.
+  if (PICTURE_PROOF_DENIALS.some((re) => re.test(text))) return false
+  if (PICTURE_PROOF_MARKERS.some((re) => re.test(text))) return true
+  return PICTURE_BACKEND_MARKER.test(text) && PICTURE_VISUAL_COMPANION.test(text)
+}
+
 export function pictureBearingPoints(text) {
   const out = new Set()
   let point = null
@@ -711,24 +732,9 @@ export function pictureBearingPoints(text) {
     else if (/^- \[/.test(line)) point = null
     if (point === null || out.has(point)) continue
     // The head line carries the point's title, and a title can name the proof.
-    if (PICTURE_PROOF_DENIALS.some((re) => re.test(line))) continue
-    if (PICTURE_PROOF_MARKERS.some((re) => re.test(line))) out.add(point)
+    if (line.split(/[;.]/).some(clauseDemandsPicture)) out.add(point)
   }
   return out
-}
-
-/**
- * DOES THE READING'S OWN EVIDENCE STILL FORBID CARRYING A FACTOR TO A RENDER POINT?
- *
- * Point 730's confounder is a statement about a MEASUREMENT, not a permanent
- * rule: its window held no render landing, so nothing in it said what a picture
- * check costs. The moment the picture axis has an established, measurable class,
- * that silence ends and a render card is correctable like any other. Reporting
- * the confounder after it has lapsed would be a false reason on every card.
- */
-export function pictureConfounded(reading) {
-  const rows = reading?.byAxis?.picture ?? []
-  return !rows.some((c) => c.name === PICTURE_VERIFIED && (c.comparable || c.elapsedComparable))
 }
 
 /**
@@ -804,28 +810,21 @@ export function estimateForLanding(ledger, point, currentEstimate) {
  */
 export function rewritePlan(reading, { cards = {}, open = [], criticality = new Map(), ledger = {}, pictureBearing = new Set() } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
-  const declared = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
-  // The exclusion lives and dies with the evidence. Once the picture axis has a
-  // measurable class of its own, these cards stop being held out — and are then
-  // corrected from THAT class, numerator and denominator both, never from the
-  // pooled criticality median that mixes in work which rendered nothing.
-  const confounded = pictureConfounded(reading)
-  const picture = confounded ? declared : new Set()
-  // A card belongs in a denominator only if it is corrected from that numerator.
-  // A card owing a rendered proof is corrected from the RENDER class or not at
-  // all — never from the criticality class — so it stays out of the criticality
-  // denominator in BOTH states. Letting it back in when the confounder lapses
-  // would quietly restore the mixing the holdout was built to end.
-  const promises = promiseMedians({ cards, open, criticality: crit, ledger, exclude: declared })
-  const renderClass = confounded ? null : (reading?.byAxis?.picture ?? []).find((c) => c.name === PICTURE_VERIFIED)
-  const renderPromise = renderClass
-    ? summarise(
-        [...declared]
-          .filter((n) => open.map(Number).includes(Number(n)))
-          .map((n) => parseEstimateHours(ledgerEntry(ledger, Number(n))?.baseline ?? cards?.[Number(n)]?.estimate ?? null))
-          .filter((h) => h),
-      ).median
-    : null
+  // A POINT THAT OWES A RENDERED PROOF IS HELD OUT, FULL STOP.
+  //
+  // This is the spec's own confounder and it is a statement about EVIDENCE: the
+  // measurement knows nothing about what a picture check costs. An earlier draft
+  // let the holdout lapse as soon as the picture axis became measurable — but the
+  // evidence it would have lapsed on is `render-verify-state.json`, which is
+  // git-ignored, capped at 40 runs and pruned at branch end. A switch that flips
+  // on evidence the tool itself reports as unreliable is worse than no switch:
+  // it would correct render cards from a class of four surviving rows and call
+  // that measured. So the holdout stands, the report says what would be needed
+  // to lift it, and lifting it is a decision with its own measurement behind it.
+  const picture = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
+  // A card belongs in a denominator only where it is corrected from that
+  // numerator. These cards are corrected from nothing, so they weigh on nothing.
+  const promises = promiseMedians({ cards, open, criticality: crit, ledger, exclude: picture })
   const plan = []
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b)) {
     const from = cards?.[point]?.estimate ?? null
@@ -844,10 +843,8 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     }
     const hours = parseEstimateHours(baseline)
     const label0 = crit.get(point) ?? UNTAGGED
-    const render = Boolean(renderClass) && declared.has(point)
     const { factor, basis, label, reason: factorReason } = factorForCard(reading, crit.get(point), {
-      promiseMedian: render ? renderPromise : (promises.get(label0) ?? null),
-      measuredFrom: render ? renderClass : null,
+      promiseMedian: promises.get(label0) ?? null,
     })
     if (hours && picture.has(point)) {
       plan.push({
@@ -856,8 +853,7 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
         baseline,
         to: from,
         changed: false,
-        reason:
-          'the point asks for a picture proof and the measured window holds no render landing — the confounder forbids carrying this factor here, so the estimate is kept',
+        reason: `${PICTURE_HOLDOUT_REASON} — the confounder forbids carrying this factor here, so the estimate is kept`,
       })
       continue
     }
@@ -976,14 +972,13 @@ export function inheritedEstimateForClass(label, defaults = {}) {
  * Null when its class was never measured, which is what keeps the existing
  * "no estimate yet" marker alive for the case where no class fits.
  */
-export function inheritedEstimate(point, { defaults = {}, criticality = new Map(), pictureBearing = new Set(), pictureConfounded: confounded = false } = {}) {
+export function inheritedEstimate(point, { defaults = {}, criticality = new Map(), pictureBearing = new Set() } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
   // The medians are measured from landings whose picture is not established, so
-  // while the confounder holds they say nothing about a point that owes a
-  // rendered proof. Such a card keeps the "no estimate yet" marker rather than
-  // inheriting a number measured on other work — the same rule the rewrite
-  // follows, applied at the other door into the queue.
+  // they say nothing about a point that owes a rendered proof. Such a card keeps
+  // the "no estimate yet" marker rather than inheriting a number measured on
+  // other work — the same holdout the rewrite applies, at the other door in.
   const declared = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
-  if (confounded && declared.has(Number(point))) return null
+  if (declared.has(Number(point))) return null
   return inheritedEstimateForClass(crit.get(Number(point)) ?? UNTAGGED, defaults)
 }

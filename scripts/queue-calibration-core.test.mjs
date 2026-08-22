@@ -27,9 +27,10 @@ import {
   parseEstimateHours,
   parseFirstParentChain,
   parseTickEvents,
+  clauseDemandsPicture,
+  PICTURE_HOLDOUT_REASON,
   PICTURE_VERIFIED,
   pictureBearingPoints,
-  pictureConfounded,
   pictureVerifiedPoints,
   promiseMedians,
   rewritePlan,
@@ -696,7 +697,7 @@ describe('the confounder that forbids carrying the factor to render points', () 
       pictureBearing: new Set([10]),
     })
     expect(plan[0]).toMatchObject({ point: 10, to: '~4 h', changed: false })
-    expect(plan[0].reason).toMatch(/picture proof/)
+    expect(plan[0].reason).toMatch(/rendered proof/)
     // The point beside it, owing no picture, still moves.
     expect(plan[1]).toMatchObject({ point: 20, changed: true })
   })
@@ -734,8 +735,13 @@ describe('the render exclusion cannot leak into the number it protects', () => {
   })
 })
 
-describe('the confounder lapses when the evidence arrives', () => {
-  const withRenderLandings = calibrationReading([
+describe('the holdout does not lift itself on evidence the tool cannot keep', () => {
+  // A window where the picture axis LOOKS measurable: six render landings.
+  // `render-verify-state.json` is git-ignored, capped at 40 runs and pruned at
+  // branch end, so in production this class is a handful of survivors — never a
+  // measurement of what a picture check costs. Correcting render cards from it
+  // would be a guess wearing the word "measured".
+  const withRenderRows = calibrationReading([
     ...Array.from({ length: 6 }, (_, i) =>
       landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium', picture: false }),
     ),
@@ -743,39 +749,28 @@ describe('the confounder lapses when the evidence arrives', () => {
       landing({ point: 700 + i, elapsedHours: 3, estimateHours: null, criticality: 'medium', picture: true }),
     ),
   ])
-  const blind = calibrationReading(
-    Array.from({ length: 6 }, (_, i) =>
-      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium', picture: false }),
-    ),
-  )
 
-  it('is confounded while no render landing is established', () => {
-    expect(pictureConfounded(blind)).toBe(true)
-  })
-
-  it('is NOT confounded once the picture axis has a measurable class', () => {
-    expect(pictureConfounded(withRenderLandings)).toBe(false)
-  })
-
-  it('CORRECTS a render card once the window can measure one', () => {
-    const args = {
-      cards: { 20: { estimate: '~4 h' } },
-      open: [20],
-      criticality: new Map([[20, 'medium']]),
-      pictureBearing: new Set([20]),
-    }
-    expect(rewritePlan(blind, args)[0].changed).toBe(false)
-    expect(rewritePlan(withRenderLandings, args)[0].changed).toBe(true)
-  })
-
-  it('never reports the confounder as the reason once it has lapsed', () => {
-    const plan = rewritePlan(withRenderLandings, {
-      cards: { 20: { estimate: '~4 h' } },
+  it('STILL holds the render card out, and still says why', () => {
+    const plan = rewritePlan(withRenderRows, {
+      cards: { 20: { estimate: '~6 h' } },
       open: [20],
       criticality: new Map([[20, 'medium']]),
       pictureBearing: new Set([20]),
     })
-    expect(plan[0].reason).not.toMatch(/picture proof/)
+    expect(plan[0]).toMatchObject({ point: 20, to: '~6 h', changed: false })
+    expect(plan[0].reason).toMatch(/rendered proof/)
+  })
+
+  it('keeps that card out of the criticality denominator in this state too', () => {
+    const plan = rewritePlan(withRenderRows, {
+      cards: { 10: { estimate: '~4 h' }, 20: { estimate: '~40 h' } },
+      open: [10, 20],
+      criticality: new Map([[10, 'medium'], [20, 'medium']]),
+      pictureBearing: new Set([20]),
+    })
+    // Pooled median 2 h against card 10's own 4 h — the 40 h render promise
+    // never reaches the denominator.
+    expect(plan[0]).toMatchObject({ point: 10, to: '~2 h', changed: true })
   })
 })
 
@@ -818,84 +813,23 @@ describe('reading a rendered proof out of a point\'s own spec', () => {
 describe('what a newly filed render card inherits', () => {
   const defaults = { medium: 1 }
 
-  it('inherits nothing while the measurement is blind to a picture check', () => {
+  it('inherits nothing — the measurement is blind to what a picture check costs', () => {
     expect(
-      inheritedEstimate(20, {
-        defaults,
-        criticality: new Map([[20, 'medium']]),
-        pictureBearing: new Set([20]),
-        pictureConfounded: true,
-      }),
+      inheritedEstimate(20, { defaults, criticality: new Map([[20, 'medium']]), pictureBearing: new Set([20]) }),
     ).toBeNull()
   })
 
-  it('inherits its class median once the confounder has lapsed', () => {
+  it('leaves a point that owes no rendered proof untouched by the holdout', () => {
     expect(
-      inheritedEstimate(20, {
-        defaults,
-        criticality: new Map([[20, 'medium']]),
-        pictureBearing: new Set([20]),
-        pictureConfounded: false,
-      }),
+      inheritedEstimate(10, { defaults, criticality: new Map([[10, 'medium']]), pictureBearing: new Set([20]) }),
     ).toMatch(/Klassenmedian/)
   })
 
-  it('leaves a point that owes no picture untouched by the rule', () => {
-    expect(
-      inheritedEstimate(10, {
-        defaults,
-        criticality: new Map([[10, 'medium']]),
-        pictureBearing: new Set([20]),
-        pictureConfounded: true,
-      }),
-    ).toMatch(/Klassenmedian/)
+  it('keeps inheriting where no holdout is passed at all', () => {
+    expect(inheritedEstimate(20, { defaults, criticality: new Map([[20, 'medium']]) })).toMatch(/Klassenmedian/)
   })
 })
 
-
-describe('a render card is corrected from render work, never from a pooled median', () => {
-  // Six process landings at 1 h and six RENDER landings at 3 h. The pooled
-  // criticality median is 2 h and belongs to neither lane.
-  const rows = [
-    ...Array.from({ length: 6 }, (_, i) =>
-      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium', picture: false }),
-    ),
-    ...Array.from({ length: 6 }, (_, i) =>
-      landing({ point: 700 + i, elapsedHours: 3, estimateHours: null, criticality: 'medium', picture: true }),
-    ),
-  ]
-  const reading = calibrationReading(rows)
-
-  it('has both a pooled median and a separate render median', () => {
-    expect(reading.byAxis.criticality.find((c) => c.name === 'medium').elapsed.median).toBe(2)
-    expect(reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED).elapsed.median).toBe(3)
-  })
-
-  it('aims the render card at the RENDER median, not the pooled one', () => {
-    const plan = rewritePlan(reading, {
-      cards: { 20: { estimate: '~6 h' } },
-      open: [20],
-      criticality: new Map([[20, 'medium']]),
-      pictureBearing: new Set([20]),
-    })
-    // Render median 3 h over the render cards' own promise of 6 h → 0.5×, so ~3 h.
-    // The pooled median of 2 h would have produced ~2 h instead.
-    expect(plan[0]).toMatchObject({ point: 20, to: '~3 h', changed: true })
-    expect(plan[0].basis).toBe(`${ELAPSED_BIAS_BASIS}:${PICTURE_VERIFIED}`)
-  })
-
-  it('leaves a non-render card on its criticality class', () => {
-    const plan = rewritePlan(reading, {
-      cards: { 10: { estimate: '~4 h' }, 20: { estimate: '~6 h' } },
-      open: [10, 20],
-      criticality: new Map([[10, 'medium'], [20, 'medium']]),
-      pictureBearing: new Set([20]),
-    })
-    expect(plan[0].basis).toBe(`${ELAPSED_BIAS_BASIS}:medium`)
-    // …and its denominator is its own promise, with the render card left out.
-    expect(plan[0]).toMatchObject({ point: 10, to: '~2 h' })
-  })
-})
 
 describe('a denial the old guard read the wrong way round', () => {
   const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
@@ -912,5 +846,58 @@ describe('a denial the old guard read the wrong way round', () => {
   it('does NOT read a demand as a denial just because it contains a negation', () => {
     const tasks = block(63, 'VERIFIABLE: a browser frame on both backends; it may not be skipped.')
     expect(pictureBearingPoints(tasks).has(63)).toBe(true)
+  })
+})
+
+
+describe('a clause, not a line, decides', () => {
+  it('lets a demand survive a denial standing beside it', () => {
+    const tasks = ['- [ ] 70. A point.', '  No screenshot is required; provide a browser frame.', ''].join('\n')
+    expect(pictureBearingPoints(tasks).has(70)).toBe(true)
+  })
+
+  it('reads each clause on its own', () => {
+    expect(clauseDemandsPicture('No screenshot is required')).toBe(false)
+    expect(clauseDemandsPicture(' provide a browser frame')).toBe(true)
+  })
+})
+
+describe('"both backends" is not a proof demand by itself', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('leaves ordinary cross-backend work alone', () => {
+    const tasks = [
+      block(80, 'The guard must behave identically on both backends.'),
+      block(81, 'The worker is started on both backends and torn down with the scene.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)]).toEqual([])
+  })
+
+  it('takes it where the same clause names something visual', () => {
+    const tasks = [
+      block(82, 'VERIFIABLE: the rendered river checked on both backends.'),
+      block(83, 'VERIFIABLE: das Bild auf both backends geprüft.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)].sort((a, b) => a - b)).toEqual([82, 83])
+  })
+})
+
+
+describe('the holdout reason and the count that reports it are one string', () => {
+  it('a held-out card carries exactly the reason the report counts', () => {
+    const reading = calibrationReading(
+      Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+      ),
+    )
+    const plan = rewritePlan(reading, {
+      cards: { 20: { estimate: '~4 h' } },
+      open: [20],
+      criticality: new Map([[20, 'medium']]),
+      pictureBearing: new Set([20]),
+    })
+    // The report counts by this substring; a reworded reason would silently
+    // report zero held-out cards while still holding them out.
+    expect(plan[0].reason).toContain(PICTURE_HOLDOUT_REASON)
   })
 })
