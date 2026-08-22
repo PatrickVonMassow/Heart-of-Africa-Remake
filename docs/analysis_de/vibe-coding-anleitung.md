@@ -266,19 +266,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
-  getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
-  Auch eine *geteilte* Funktion antwortet zweimal, wenn jede Aufrufstelle ihre Eingaben selbst baut.
-  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert. Lass alle
-  **Aufrufstellen** dieselbe Frage einmal beantworten; mach den Eingang zur **Pflicht**, statt
-  einen Vorgabewert still entscheiden zu lassen."
+  getrennt — eines schreibt, eines prüft — und blockieren so alle Arbeit.
+  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert. Alle
+  Aufrufstellen beantworten dieselbe Frage einmal; der Eingang ist **Pflicht**, kein Vorgabewert."
 
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
-  → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das immer
-  schreibt, und eine Prüfung, die einen Zug **nicht enden lässt**, der untersucht und nichts
-  hinterlassen hat."
+  → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
+  die keinen Zug enden lässt, der untersucht und nichts hinterlassen hat."
 
-- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm klaglos
-  einen Ersatz ein — der Folgefehler taucht weit weg auf.
+- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm klaglos einen
+  Ersatz ein, und der Folgefehler taucht weit weg auf.
   → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet und
   scheitert **sichtbar**; jeder Rückfall wird **gemeldet**, mit dem Befehl, der ihn behebt."
 
@@ -286,11 +283,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein ‚nicht
   zusammenführen' erledigt erst ein **späteres** Urteil über den korrigierten Stand."
 
-- **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei **zwei Hälften**, deren
-  zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede Seite korrektes Verhalten.
-  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** beim **Start des
-  Nachfolgers** — nie am Ende des Vorgängers, der ja gerade ausfällt. Prüf die Erholung mit
-  Abbrüchen zu **zufälligen** Zeiten und frag: ‚läuft es **dort** weiter, wo es sollte?'"
+- **Der Ausfall kommt nie an der bequemen Stelle** — am tückischsten mitten zwischen zwei Hälften,
+  wo danach jede Seite korrektes Verhalten meldet.
+  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt beim Start des
+  Nachfolgers**, nie am Ende des Vorgängers, und prüf ihn mit Abbrüchen zu zufälligen Zeiten."
 
 - **Was außerhalb des Repositorys liegt, kommt nicht mit — und geht nicht zurück.** Das Projekt
   zieht um, die Mechanik nicht; wer dort etwas ändert, hat kein `git`.
@@ -383,10 +379,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
-- **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.** Fenster enden, und
-  mit ihnen jede Nachricht, die nur im Fenster stand — auch die sorgfältig formulierte.
-  → *Prompt:* „Halte jeden Auftrag, der eine Sitzung überdauern soll, in einer Datei fest, die dein
-  Werkzeug beim nächsten Start von sich aus liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
+- **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
+  → *Prompt:* „Jeder Auftrag, der eine Sitzung überdauern soll, gehört in eine Datei, die dein
+  Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
   baut aber weder Zustand noch Befehl dafür. Der ehrliche Ausnahmefall muss die Form des
