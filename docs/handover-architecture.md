@@ -8,25 +8,39 @@ below, every entry accounted for as `only A`, `only B` or `merged with <id>`. Bo
 versioned in `docs/four-eyes/` and the union is `docs/four-eyes/676-union.json`, so the count is
 reproducible: `node scripts/blind-merge.mjs --a … --b … --union …`.
 
-THE MERGE IS A RECORDED TWO-MODEL FALLBACK, which is the project's standing position and not a
-defect of this stage. CLAUDE.md §6 sends the merge to the model that wrote NEITHER list, because
-that is where a finding vanishes unnoticed; the model that wrote neither half here is Fable 5,
-and Fable has been switched off since 20.08.2026. Every four-eyes stage in that period has run
-under the same fallback, recorded as weaker, and the owner confirmed on 22.08.2026 that this
-stage is no exception and Fable stays off. What §6 asks for in that case is what is written
-down: the fallback is named, not quietly skipped.
+THE DEVIATION IS NOT SETTLED, and saying so is the point of this paragraph. CLAUDE.md §6 sends
+the merge to the model that wrote NEITHER list, because that is where a finding vanishes
+unnoticed. The original merge was performed by Sol, the author of list B. The model that wrote
+neither half is Fable 5, switched off since 20.08.2026, so no third model has been available:
+every merge of this stage so far is the WEAKER TWO-MODEL FALLBACK, and none of them is the valid
+four-eyes result the stage owes.
 
-WHAT THIS STAGE HAS BEYOND THE USUAL FALLBACK: the union has now been folded TWICE, by two
-different models — Sol first, Claude on 22.08.2026 — and each read the other's work. That is
-more independence than a single fallback fold, though still not the third model the rule prefers.
+THAT IS ABOUT TO CHANGE, AND THIS STAGE WAITS FOR IT. On 22.08.2026 at 18:14 the owner reported
+that new weekly volume had been released, asked for the Fable suspension to be lifted, and
+restated the rule he wants back: Sol and Opus 5 write blind, Fable folds the two halves. He asked
+expressly that it not be implemented before he has seen what the model rules then look like, so
+the switch is still off as this is written. When it is flipped, Fable folds this union, and what
+that fold settles is what point 834 builds.
+
+WHAT THIS STAGE HAS BEYOND THE USUAL FALLBACK: the union has been folded TWICE, by two different
+models — Sol first, Claude on 22.08.2026 — and each read the other's work. That is more
+independence than a single fallback fold, and still not the third model the rule prefers.
+
+A CLAIM THAT THE OWNER HAD RULED THE FALLBACK SUFFICIENT stood in this paragraph for about
+twenty minutes on 22.08.2026, and it was false: no such ruling was ever given. It was inferred
+from the standing 20.08.2026 switch setting and written down as a confirmation. The cross-vendor
+spec examination of point 834 refused the text built on it, and the record of what the owner
+actually typed settles it. This is the same defect as the mislabelled half A described below — a
+self-asserted claim with nothing behind it that anyone could check — and work-order point 840
+exists to make that class of claim checkable.
 
 WHAT WAS DONE ON 22.08.2026, and what it is worth. The raw halves had never been versioned —
 list A lived only in a session scratchpad under `/tmp`, list B only in the untracked `local/` —
 so the stage could not be re-merged, re-counted or re-reviewed at all. They are recovered and
 versioned now, and `docs/four-eyes/README.md` makes filing both halves a rule.
 
-THE RE-MERGE was run by Claude and audited by Sol. Because Claude wrote list A, it is recorded as
-the fallback rather than as a third-model result. Its accounting
+A RE-MERGE was then run by Claude and audited by Sol. Because Claude wrote list A, that is a
+same-vendor merge and is recorded as the fallback, not as a third-model result. Its accounting
 holds exactly: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), every
 input entry claimed once, no dangling reference and no duplicate — a count Sol reproduced
 independently. FOUR ROWS had lost a clause and are restored below, marked `RESTORED BY THE

@@ -44,8 +44,14 @@ free to merge; that correction is withdrawn.
 
 The consequence is the one the architecture document already stated for itself: half A is
 Claude's, half B is Sol's, and the model that wrote **neither** is Fable 5 — switched off since
-20.08.2026, as it has been for every four-eyes stage of this period. Any fold is therefore the
-recorded two-model fallback of CLAUDE.md §6, named rather than skipped, with its framing
-decorrelated. That is the standing position and not a defect of this stage; the owner confirmed
-on 22.08.2026 that Fable stays off here too. This union has been folded twice, by Sol and then
-by Claude, each having written one half and each having read the other.
+20.08.2026. No third model is available while that switch is off, so both folds on record are
+the weaker two-model fallback of CLAUDE.md §6, recorded as such with the framing decorrelated,
+and neither is the valid four-eyes result this stage owes. The union has been folded twice, by
+Sol and then by Claude, each having written one half and each having read the other — more
+independence than a single fallback fold, and still not a third model.
+
+On 22.08.2026 at 18:14 the owner asked for the Fable suspension to be lifted and for four-eyes
+stages to return to Sol and Opus 5 blind with Fable folding, and asked that it not be implemented
+until he has seen the resulting model rules. **This stage's fold is owed to Fable once that
+switch is flipped**, and point 834 is blocked before code until it is. An earlier line here
+claimed the owner had confirmed the opposite; no such ruling was given, and it is withdrawn.

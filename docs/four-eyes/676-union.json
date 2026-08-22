@@ -437,5 +437,5 @@
    "defect": "Retain drain-before-boundary as the explicit safe fallback whenever any active lane is not transferable."
   }
  ],
- "mergedByNote": "RECORDED TWO-MODEL FALLBACK. Fable 5 wrote neither half and has been switched off since 20.08.2026, as every four-eyes stage of this period has been; the owner confirmed on 22.08.2026 that Fable stays off for this stage too. Sol folded the union first and Claude re-folded it on 22.08.2026, each having written one half and each having read the other. See docs/handover-architecture.md."
+ "mergedByNote": "NONE. Fable 5 wrote neither half and has been switched off since 20.08.2026, so this stage has no valid merger: Sol folded it first and Claude re-folded it on 22.08.2026, and each wrote one of the halves. The owner asked on 22.08.2026 at 18:14 for the Fable suspension to be lifted, not yet implemented at his own instruction; the fold is owed to Fable once it is. See docs/handover-architecture.md."
 }
