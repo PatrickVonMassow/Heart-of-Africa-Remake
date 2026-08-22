@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 19:13 · Quellen-Fingerprint: `577d916f182c…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 21:40 · Quellen-Fingerprint: `e69e10176cf2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1418,8 +1418,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 577d916f182c248b5eb15869e7f0deeb62115e520b9a07f39f3b45c708be7719 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T17:13:04.645Z -->
+<!-- RETRO-FINGERPRINT: e69e10176cf20ea9ecd8f516894ff9c4d06a186f5392fa6c02e8eb3a0e5f319c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T19:40:00.637Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2780,3 +2780,39 @@ entschiedenen ist keine zweite Meinung, sondern ein Widerspruch mit Alarmrecht. 
 zusammenfällt?* Und: *Hat mein eigener Mechanismus über diesen Fall schon geurteilt?* Verwandt mit
 §3.154 (die Frischemessung auf eine Lebendigkeitsfrage) und §3.149 (zwei Leser, ein Datensatz,
 zwei Antworten).
+
+### 3.159 Das grüne Tor stand über einer Datei, die gar nicht mehr lud
+
+Am 22.08.2026 holte `scripts/batch-autostart.mjs` eine Funktion aus einem Modul, das sie nicht
+exportiert. Node weist so etwas beim VERLINKEN ab, vor der ersten ausgeführten Zeile: Der
+Launcher — der 900-Sekunden-Wiederanlauf, das Einzige, was einen toten Stapel neu startet — wäre
+mit einem Syntaxfehler gestorben, sobald der nächste Tick ihn aufgerufen hätte. Alle 12.859
+Unit-Fälle blieben grün, Lint blieb grün, das Landungs-Gate blieb grün.
+
+Der Grund ist kein übersehener Testfall, sondern ein Unterschied zwischen zwei Ladewegen. Vitest
+lädt Module über die SSR-Transformation von Vite; dort wird ein benannter Import, den das Ziel
+nicht hergibt, still zu `undefined`. Node verweigert denselben Import. Das Tor maß also
+zuverlässig — nur eben eine andere Umgebung als die, in der die Datei läuft. Es gab sogar einen
+Test, der genau diese Datei importierte, und er war grün, weil er unter derselben Transformation
+lief wie alles andere.
+
+Diese Klasse ist tückischer als eine Lücke in der Abdeckung, denn sie schweigt nicht, sie
+BESTÄTIGT. Eine unbetestete Datei sieht man in der Abdeckung; eine Datei, deren Test unter einem
+milderen Lader grün wird, sieht aus wie geprüft. Betroffen ist alles, was das Produktionssystem
+anders lädt als der Prüfstand: Auflösung von Modulen, Bedingungen im `exports`-Feld, native
+Erweiterungen, Umgebungsvariablen zur Ladezeit.
+
+Der Zeuge dafür war selbst nicht leicht zu bauen, und das gehört zur Lehre. Die erste Fassung
+importierte den echten Launcher in einem Kindprozess und verließ sich darauf, dass dessen eigene
+CLI-Wache die Nebenwirkungen abfängt — ein Test, der bei einer Regression dieser Wache eine echte
+Batch-Sitzung gestartet hätte. Erst die Fassung, die den Prüfling gar nicht lädt, sondern seine
+Import-Anweisungen nachbildet und nur deren Ziele verlinkt, ist gefahrlos. Vier
+Gegenlesungs-Runden brauchte es dorthin, jede mit einem echten Befund; drei Restlücken des
+Scanners stehen als eigener Punkt im Arbeitsauftrag statt als offene Verweigerung.
+
+**Lehre:** Ein grüner Prüfstand beweist nur, was der Prüfstand lädt. Wo Produktion und Prüfstand
+verschiedene Lader haben, braucht die Produktionsumgebung einen eigenen, kleinen Zeugen — und der
+Zeuge darf seine Sicherheit nicht von dem Mechanismus borgen, den er prüft. Prüffragen: *Lädt
+mein Test die Datei so, wie sie im Betrieb geladen wird?* Und: *Wenn das, was diesen Test
+absichert, kaputtginge — wäre der Test dann noch harmlos?* Verwandt mit §3.157 (das Etikett als
+einziger Beweis) und §3.156 (ein Mechanismus, der weiter greift als seine Regel).
