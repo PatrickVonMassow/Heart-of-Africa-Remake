@@ -9,6 +9,7 @@ import {
   interceptToolOutput,
   interceptionEnvelope,
 } from './tool-output-intercept-core.mjs'
+import { preToolUseEnvelope } from './path-scope-guard.mjs'
 
 const call = (tool_name, tool_input) => interceptToolOutput({ tool_name, tool_input }, { expandSegments, headAndArgs })
 
@@ -124,5 +125,22 @@ describe('PreToolUse output interception', () => {
     expect(output.permissionDecision).toBe('allow')
     expect(output.updatedInput.command).toContain('tool-output-budget.mjs')
     expect(Buffer.from(output.updatedInput.command.split(' ').at(-1), 'base64url').toString('utf8')).toBe('git diff')
+  })
+
+  it('still budgets a named producer when path enforcement stands down for a paused batch', () => {
+    const envelope = preToolUseEnvelope(
+      {
+        session_id: 'paused-session',
+        tool_name: 'Bash',
+        tool_input: { command: 'git diff' },
+        cwd: process.cwd(),
+      },
+      { gather: () => ({ applicable: false, why: 'the batch is paused' }) },
+    )
+    expect(envelope?.hookSpecificOutput).toMatchObject({
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'allow',
+    })
+    expect(envelope.hookSpecificOutput.updatedInput.command).toContain('tool-output-budget.mjs')
   })
 })
