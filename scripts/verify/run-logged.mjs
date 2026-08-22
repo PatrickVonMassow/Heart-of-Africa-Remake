@@ -51,6 +51,7 @@ import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-c
 import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
 import { emitActivity } from '../batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
+import { budgetToolOutput } from '../tool-output-budget-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -97,6 +98,11 @@ function parseOwnArgs(argv) {
   if (!Number.isFinite(own.tail)) own.tail = DEFAULTS.tailLines
   if (!Number.isFinite(own.max)) own.max = 400
   if (!Number.isFinite(own.keep)) own.keep = DEFAULTS.maxKeptLines
+  // `--show --max 999999` must not turn the selective reader back into a full
+  // reload. The character budget below is the final ceiling; this line cap is
+  // the cheap first bound.
+  own.tail = Math.max(0, Math.min(Math.trunc(own.tail), 400))
+  own.max = Math.max(0, Math.min(Math.trunc(own.max), 400))
   return { own, forward }
 }
 
@@ -129,11 +135,27 @@ function showLog(path) {
     return 1
   }
   const all = text.split(/\r?\n/)
-  const win = showWindow(all, { grep: own.grep, tail: own.tail, max: own.max })
-  const what = own.grep ? `${win.matched} line(s) matching /${own.grep}/i of ${all.length}` : `${all.length} line(s)`
-  console.log(`── ${forDisplay(full)} — ${what}; showing the last ${win.lines.length}${win.truncated > 0 ? ` (${win.truncated} not shown)` : ''}`)
-  for (const l of win.lines) console.log(l)
-  return 0
+  const shown = forDisplay(full)
+  try {
+    const win = showWindow(all, { grep: own.grep, tail: own.tail, max: own.max })
+    const what = own.grep ? `${win.matched} line(s) matching /${own.grep}/i of ${all.length}` : `${all.length} line(s)`
+    const selected = [
+      `── ${shown} — ${what}; showing the last ${win.lines.length}${win.truncated > 0 ? ` (${win.truncated} not shown)` : ''}`,
+      ...win.lines,
+    ].join('\n')
+    process.stdout.write(budgetToolOutput({ text: selected, exitCode: 0, logPath: shown, command: 'run-logged --show' }).text)
+    return 0
+  } catch (error) {
+    process.stdout.write(
+      budgetToolOutput({
+        text: `ERROR: could not select a log window: ${error?.message ?? String(error)}`,
+        exitCode: 1,
+        logPath: shown,
+        command: 'run-logged --show',
+      }).text,
+    )
+    return 1
+  }
 }
 
 /**
