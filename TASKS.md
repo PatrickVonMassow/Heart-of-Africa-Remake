@@ -360,56 +360,6 @@ put it is the mistake this line exists to stop.
   Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
   ends, which is how the batch stalls.
 
-- [ ] 737. The review's pass plan cuts per COMMIT and file, so a diff that fits in one round is
-  split into thirteen (measured 19.08.2026 while commissioning point 730's fourth round). The net
-  diff `main...feat/730-measured-queue-estimates` is 103,576 characters and fits TWICE into the
-  200,000-character budget of a single round. `scripts/review-sol.mjs` nevertheless reports
-  1,226,989 characters of "outstanding material" and demands THIRTEEN passes, because it cuts by
-  (commit × file) contribution rather than by file: `scripts/queue-calibration.mjs` alone stands in
-  passes 3, 6, 7, 8, 9, 11, 12 and 13 — the same current file content eight times over, because
-  eight commits touched it. A CONVERGENT review judges ONE artefact (CLAUDE.md §6), and the
-  intermediate state of a commit that a later commit overwrote is not an artefact of its own: it
-  no longer exists in the range's end state and nothing can be merged from it. THE COST IS NOT
-  THEORETICAL: point 730 must go to the SCARCEST model, because Sol wrote its last three commits
-  under a hostile-tester commission and may not review its own work — so the explosion buys
-  thirteen Fable passes for a diff that fits in one round, at the exact moment the Fable pool is
-  the constraint point 736 measures.
-  RE-VERIFIED 20.08.2026 AND IT STANDS — BUT NOT WHERE A READER WOULD LOOK FIRST. The SIZE
-  planner is already right: `planPasses` in `scripts/review-material-core.mjs` cuts through the
-  file set over the range's end state (point 714, landed 18.08.2026; its case "CUTS THROUGH THE
-  FILE SET so every file lands in exactly one pass"), so that half must not be rebuilt. The
-  per-(commit × file) cut this point measured lives one layer up, in
-  `scripts/mechanism-review-range-core.mjs`: `contributionsIn` enumerates every changed
-  (commit, file) pair and `planAuthorshipGroups` keeps a per-FILE group only while every
-  contribution to that file came from one vendor — a mixed-vendor file falls back to
-  commit-level cuts, which is exactly how one file reached eight passes. That module is
-  unchanged since 18.08.2026, before the measurement, so the explosion reproduces.
-  FINAL STATE:
-  - THE PLAN CUTS BY FILE OVER THE RANGE'S END STATE, never by commit contribution. A pass carries
-    the CURRENT content of its files plus the range's net diff for exactly those files, so the
-    number of passes is bounded by the size of the changed files and not by how many commits
-    touched them. A file whose end state equals main's is not material at all and is dropped
-    with that reason named.
-  - NOTHING IS REVIEWED LESS. Every changed file still appears in exactly one pass and the
-    coverage line still accounts for each; the saving comes only from not re-reading a file once
-    per commit. A file too large for one pass is still split, and that split is reported as it is
-    today.
-  - A RECORDED PASS CLEARS WHAT IT READ, in the terms of the new cut: a pass records the files it
-    covered and the end-state sha it covered them at, so a later commit to one of those files owes
-    a new pass for THAT FILE and not for the whole range. The existing per-commit clearing is
-    replaced, not kept beside it.
-  - THE PLAN SAYS WHAT IT DROPPED. Where the new cut removes material the old one would have sent,
-    the plan names it and why — an end state identical to the base, an intermediate state
-    superseded within the range — so no reader mistakes a smaller plan for a narrower review.
-  VERIFIABLE: Vitest over the pure planner — a range where eight commits touch one file yields ONE
-  pass for that file; a file reverted to its base state within the range is dropped with its
-  reason; a file larger than the budget still splits; the coverage accounting still reaches 100 %
-  of the changed files; and the recorded-pass clearing owes a new pass after a later commit to a
-  covered file but not after a commit that touched only other files. Plus the real proof: point
-  730's plan falls from thirteen passes to one or two.
-  Criticality: medium — it changes no player-visible behaviour, but it multiplies the cost of
-  every review of a long-lived branch and it spends that multiple on the scarcest pool.
-  Bundle: Modell & Wächter.
 - [ ] 720. The findings carrier rings through the delivery that already runs on every tool
   call, instead of waiting for a turn end the batch owner does not have (user
   18.08.2026, 15:16).
