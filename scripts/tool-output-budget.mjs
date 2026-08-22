@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { budgetToolOutput } from './tool-output-budget-core.mjs'
 import { pruneCaptureLogs } from './tool-output-log-retention.mjs'
+import { shellInvocation } from './tool-output-shell.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
@@ -27,13 +28,6 @@ function logPathFor() {
 function displayPath(path) {
   const rel = relative(ROOT, path)
   return rel && !rel.startsWith('..') ? rel.replace(/\\/g, '/') : path
-}
-
-function shellInvocation(command) {
-  if (process.platform === 'win32') {
-    return { file: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', command] }
-  }
-  return { file: process.env.SHELL || '/bin/bash', args: ['-lc', command] }
 }
 
 async function run() {

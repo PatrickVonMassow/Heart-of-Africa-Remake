@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ERROR_OUTPUT_BUDGET, ORDINARY_OUTPUT_BUDGET } from './tool-output-budget-core.mjs'
 import { CAPTURE_LOG_MAX_AGE_MS, pruneCaptureLogs } from './tool-output-log-retention.mjs'
+import { shellInvocation } from './tool-output-shell.mjs'
 
 const RUNNER = join(dirname(fileURLToPath(import.meta.url)), 'tool-output-budget.mjs')
 
@@ -70,6 +71,22 @@ describe('tool-output-budget runner', () => {
     expect(result.stdout).toContain('missing --encoded-command')
     expect(result.stdout).not.toContain('at run')
     expect(result.stdout.length).toBeLessThanOrEqual(ERROR_OUTPUT_BUDGET)
+  })
+})
+
+describe('tool output shell invocation', () => {
+  it('uses the configured POSIX shell without login-profile flags', () => {
+    expect(shellInvocation('git diff', { platform: 'linux', shell: '/bin/zsh' })).toEqual({
+      file: '/bin/zsh',
+      args: ['-c', 'git diff'],
+    })
+  })
+
+  it('keeps PowerShell non-interactive and profile-free on Windows', () => {
+    expect(shellInvocation('git diff', { platform: 'win32', shell: 'ignored' })).toEqual({
+      file: 'powershell.exe',
+      args: ['-NoProfile', '-NonInteractive', '-Command', 'git diff'],
+    })
   })
 })
 
