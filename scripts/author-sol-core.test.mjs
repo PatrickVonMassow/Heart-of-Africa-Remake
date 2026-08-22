@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest'
 import { evaluateCommitTrailers, allowedTrailers } from './model-guard-core.mjs'
 import {
   AUTHOR_TIMEOUT_MS,
+  authorCommitMessage,
+  authorCompletionMessage,
   authoringCodexArgs,
   buildAuthoringPrompt,
   buildSpecExaminationPrompt,
@@ -27,6 +29,7 @@ import {
   uncommittedSummary,
   withheldEnvNames,
 } from './author-sol-core.mjs'
+import { evaluateCommitMessage } from './commit-scope-guard-core.mjs'
 
 const solCommit = (sha, subject = 'Do a thing') => ({ sha, subject, trailers: 'GPT-5.6 Sol <noreply@openai.com>' })
 const okRun = { ok: true, kind: 'ok', cause: '' }
@@ -37,6 +40,32 @@ describe('the commit trailer of the lane', () => {
     expect(SOL_TRAILER).toBe('Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
     expect(allowedTrailers()).toContain(SOL_TRAILER)
     expect(evaluateCommitTrailers(`Do a thing\n\n${SOL_TRAILER}\n`).block).toBe(false)
+  })
+})
+
+describe('author commit messages', () => {
+  it('marks an interim checkpoint with both halves of the rescue convention', () => {
+    const message = authorCommitMessage({ subject: 'Add branch selection', rescue: 'the guard tests are still in progress' })
+    expect(message.split('\n')[0]).toBe('Add branch selection [skip ci]')
+    expect(message).toContain('\nRescue: the guard tests are still in progress\n')
+    expect(message).toContain(SOL_TRAILER)
+    expect(evaluateCommitMessage(message).block).toBe(false)
+  })
+
+  it('keeps both rescue halves out of the final completion commit', () => {
+    const message = authorCommitMessage({
+      subject: 'Complete the authored changes [skip ci]',
+      rescue: 'this must be ignored',
+      final: true,
+    })
+    expect(message).not.toMatch(/\[skip ci\]|^Rescue:/m)
+    expect(message).toContain(SOL_TRAILER)
+    expect(evaluateCommitMessage(message).block).toBe(false)
+  })
+
+  it('offers no completion commit when the author run dies', () => {
+    expect(authorCompletionMessage({ clean: false, outcome: { cause: 'timeout' } })).toBe(null)
+    expect(authorCompletionMessage({ clean: true })).toBe(authorCommitMessage({ final: true }))
   })
 })
 
