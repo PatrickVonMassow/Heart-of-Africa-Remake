@@ -27,6 +27,8 @@ import { currentFableState } from './fable-switch.mjs'
 import { mergeFallbackReason, mergePromptFraming, mergerModel } from './fable-switch-core.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
+import { checkAuthorshipFile } from './authorship-check-io.mjs'
+import { authorshipRefusesPermission, formatAuthorship } from './authorship-check-core.mjs'
 import {
   accountUnion,
   candidatePairs,
@@ -69,6 +71,12 @@ export const FLAG_SPEC = Object.freeze({
   // an author would pass as the third model (four-eyes review, second round).
   '--model-a': true,
   '--model-b': true,
+  // ORIGIN EVIDENCE for those two claims. A tracked JSON half may carry the
+  // same values under `authorship.{at,transcript}`; explicit flags win.
+  '--author-at-a': true,
+  '--author-at-b': true,
+  '--author-transcript-a': true,
+  '--author-transcript-b': true,
 })
 
 /** Parse argv into { ok, values, errors } — an unknown flag is refused, never dropped. */
@@ -98,6 +106,8 @@ export const usage = () =>
   'usage: node scripts/blind-merge.mjs --a <A> --b <B>                      (what to decide)\n' +
   '       node scripts/blind-merge.mjs --a <A> --b <B> --union <U.json> \\\n' +
   '           [--merged-by "<switch-selected model>"] [--model-a "<model>"] [--model-b "<model>"] \\\n' +
+  '           [--author-at-a <ISO> --author-transcript-a <session.jsonl>] \\\n' +
+  '           [--author-at-b <ISO> --author-transcript-b <session.jsonl>] \\\n' +
   '           [--fallback "<switch-generated reason>"]                     (the count)\n' +
   '\nThe merge of a blind-parallel stage goes to the model that wrote NEITHER list\n' +
   '(CLAUDE.md §6), selected by node scripts/fable-switch.mjs --status. A balanced run prints the mechanism-review.mjs command to record,\n' +
@@ -112,7 +122,19 @@ if (isMainModule(import.meta.url)) {
       console.error(`\n${usage()}`)
       process.exit(2)
     }
-    const { a: pathA, b: pathB, union: pathU, mergedBy = '', fallback = '', modelA = '', modelB = '' } = parsed.values
+    const {
+      a: pathA,
+      b: pathB,
+      union: pathU,
+      mergedBy = '',
+      fallback = '',
+      modelA = '',
+      modelB = '',
+      authorAtA = '',
+      authorAtB = '',
+      authorTranscriptA = '',
+      authorTranscriptB = '',
+    } = parsed.values
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
     const a = parseListText('A', readText(pathA))
@@ -165,12 +187,33 @@ if (isMainModule(import.meta.url)) {
       ? 'it wrote a half itself — the recorded two-model fallback'
       : 'it wrote neither half'
 
+    const authorship = {
+      A: checkAuthorshipFile({
+        claimedModel: a.model,
+        artefactAt: authorAtA || a.authoredAt,
+        transcriptPath: authorTranscriptA || a.transcript,
+      }),
+      B: checkAuthorshipFile({
+        claimedModel: b.model,
+        artefactAt: authorAtB || b.authoredAt,
+        transcriptPath: authorTranscriptB || b.transcript,
+      }),
+    }
+
     // A list that cannot be counted is refused BEFORE the merge, not after: a
     // missing or repeated ID makes every number below meaningless.
     const inputs = validateInputs(a, b)
     if (!inputs.ok) {
       console.error('blind-merge: these lists cannot be accounted for.\n')
       for (const e of inputs.errors) console.error(`  · ${e}`)
+      process.exit(1)
+    }
+
+    for (const name of ['A', 'B']) console.log(formatAuthorship(authorship[name], `list ${name} authorship`))
+    const contradictions = Object.entries(authorship).filter(([, result]) => authorshipRefusesPermission(result))
+    if (contradictions.length) {
+      console.error('\nblind-merge: refusing four-eyes permission because claimed authorship contradicts the session transcript.')
+      for (const [name, result] of contradictions) console.error(`  \u2717 ${formatAuthorship(result, `list ${name}`)}`)
       process.exit(1)
     }
 
@@ -251,8 +294,13 @@ if (isMainModule(import.meta.url)) {
       console.log(`\nrecorded as a WEAKER TWO-MODEL fallback: ${mergerReason}`)
     }
     if (!result.ok || !merger.ok) process.exit(1)
+    const reviewerAt = authorAtB || b.authoredAt
+    const reviewerTranscript = authorTranscriptB || b.transcript
     console.log(
       `\nrecord it: node scripts/mechanism-review.mjs --record <sha> --model "<the second model>" \\\n` +
+        `${reviewerAt ? `    --model-at "${reviewerAt}"` : ''}` +
+        `${reviewerTranscript ? ` --model-transcript "${reviewerTranscript}"` : ''}` +
+        `${reviewerAt || reviewerTranscript ? ' \\\n' : ''}` +
         `    --verdict merge --mode blind-parallel --merged-by "${expectedMerger}"` +
         `${merger.fallback ? ` --merge-fallback "${mergerReason}"` : ''} \\\n` +
         `    --accounting "${summaryLine(result)}" --evidence "<what the stage found>"`,

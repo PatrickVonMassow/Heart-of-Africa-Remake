@@ -50,7 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
-| 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831) |
+| 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 17:32 · Quellen-Fingerprint: `347d7d4d7c55…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 22:26 · Quellen-Fingerprint: `19f3ef5195f7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1354,7 +1354,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1402,6 +1402,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| vdzk-answer.mjs CLI refuses in SDK-driven sessions; record via its exported functions with the real transcript uuid | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
@@ -1415,10 +1416,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 85 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
+Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 347d7d4d7c55888a4c8c21984114b163dafe47fa86b3898dff27930c1704914a -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T15:32:23.993Z -->
+<!-- RETRO-FINGERPRINT: 19f3ef5195f74f661cd51d67e1a358f9d4c1ddf3d453621b942c83621e5df172 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T20:26:03.711Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2747,3 +2748,98 @@ beide Darstellungen der Vorlage identisch — waren grün, während die Vorlage 
 war und die Verfasserangabe falsch. Eine Zählung beweist, dass nichts verschwunden ist, nicht dass
 etwas stimmt. Verwandt mit §3.153 (die Freigabe, die unsere Werkzeuge nicht ausstellen können) und
 §3.140 (die nur behauptete Ausnahme).
+
+
+### 3.158 Der Wächter hatte die Antwort schon gegeben — und fragte sich nicht
+
+Am 22.08.2026 um 18:23 nannte `.claude/parallel-alert.json` die Sitzung 60142e49 als zweite
+Batch-Sitzung. Sie war die interaktive Chat-Sitzung des Nutzers, und derselbe Singleton hatte ihr
+im selben Zeitraum ausdrücklich STAND DOWN bescheinigt: kein Batch-Arbeiter, beantwortet nur den
+Nutzer. Fünf eskalierende Meldungen blieben unbeantwortet, um 18:23 pausierte der Stapel sich
+selbst, und erst eine Diagnose von Hand hob die Pause um 18:37 wieder auf.
+
+Der Fall sieht aus wie §3.154 und ist ein anderer. Dort maß der Detektor eine Spur statt eines
+Zustands, und die Lehre lautete, den Zustand zu messen. Hier ist die Zustandsmessung richtig: Die
+Chat-Sitzung lebt, ihr Prozess läuft, ihre Werkzeugaufrufe sind echt und frisch. Falsch ist die
+EIGENSCHAFT. Gefragt war »fährt hier ein zweiter am Batch?«, gemessen wurde »ist hier eine zweite
+Sitzung wach?«. Wer den Fix von §3.154 einbaut — tote Prozesse und abgetretene Vorgänger auslassen
+—, fängt diesen Fall nicht: An dieser Sitzung ist nichts tot.
+
+Das Unangenehme liegt eine Ebene darüber. Der Mechanismus hatte die richtige Antwort bereits
+ausgesprochen. Der Stand-down ist eine Entscheidung des Singletons selbst, über genau diese
+Sitzung, im selben Zeitraum, und sie lautet: »du fährst den Batch nicht«. Zwei Teile desselben
+Wächters urteilten damit gegenläufig über dieselbe Sitzung, und keiner las den anderen. Die
+Ausnahmeliste des Klassifikators, die es längst gibt, hätte den Eintrag nur entgegennehmen müssen.
+Solange das nicht geschieht, ist der Alarm reproduzierbar: Er feuert jedes Mal, wenn der Nutzer
+zusieht und dabei schreibt — also genau dann, wenn ein pausierter Stapel am meisten kostet.
+
+**Lehre:** Bevor ein Detektor eine Eigenschaft schätzt, gehört die Frage gestellt, ob das System
+sie an anderer Stelle schon ENTSCHIEDEN hat. Eine geschätzte Antwort neben einer vorhandenen
+entschiedenen ist keine zweite Meinung, sondern ein Widerspruch mit Alarmrecht. Prüffragen:
+*Welche Eigenschaft brauche ich wirklich — messe ich sie, oder nur eine, die meistens mit ihr
+zusammenfällt?* Und: *Hat mein eigener Mechanismus über diesen Fall schon geurteilt?* Verwandt mit
+§3.154 (die Frischemessung auf eine Lebendigkeitsfrage) und §3.149 (zwei Leser, ein Datensatz,
+zwei Antworten).
+
+### 3.159 Das grüne Tor stand über einer Datei, die gar nicht mehr lud
+
+Am 22.08.2026 holte `scripts/batch-autostart.mjs` eine Funktion aus einem Modul, das sie nicht
+exportiert. Node weist so etwas beim VERLINKEN ab, vor der ersten ausgeführten Zeile: Der
+Launcher — der 900-Sekunden-Wiederanlauf, das Einzige, was einen toten Stapel neu startet — wäre
+mit einem Syntaxfehler gestorben, sobald der nächste Tick ihn aufgerufen hätte. Alle 12.859
+Unit-Fälle blieben grün, Lint blieb grün, das Landungs-Gate blieb grün.
+
+Der Grund ist kein übersehener Testfall, sondern ein Unterschied zwischen zwei Ladewegen. Vitest
+lädt Module über die SSR-Transformation von Vite; dort wird ein benannter Import, den das Ziel
+nicht hergibt, still zu `undefined`. Node verweigert denselben Import. Das Tor maß also
+zuverlässig — nur eben eine andere Umgebung als die, in der die Datei läuft. Es gab sogar einen
+Test, der genau diese Datei importierte, und er war grün, weil er unter derselben Transformation
+lief wie alles andere.
+
+Diese Klasse ist tückischer als eine Lücke in der Abdeckung, denn sie schweigt nicht, sie
+BESTÄTIGT. Eine unbetestete Datei sieht man in der Abdeckung; eine Datei, deren Test unter einem
+milderen Lader grün wird, sieht aus wie geprüft. Betroffen ist alles, was das Produktionssystem
+anders lädt als der Prüfstand: Auflösung von Modulen, Bedingungen im `exports`-Feld, native
+Erweiterungen, Umgebungsvariablen zur Ladezeit.
+
+Der Zeuge dafür war selbst nicht leicht zu bauen, und das gehört zur Lehre. Die erste Fassung
+importierte den echten Launcher in einem Kindprozess und verließ sich darauf, dass dessen eigene
+CLI-Wache die Nebenwirkungen abfängt — ein Test, der bei einer Regression dieser Wache eine echte
+Batch-Sitzung gestartet hätte. Erst die Fassung, die den Prüfling gar nicht lädt, sondern seine
+Import-Anweisungen nachbildet und nur deren Ziele verlinkt, ist gefahrlos. Vier
+Gegenlesungs-Runden brauchte es dorthin, jede mit einem echten Befund; drei Restlücken des
+Scanners stehen als eigener Punkt im Arbeitsauftrag statt als offene Verweigerung.
+
+**Lehre:** Ein grüner Prüfstand beweist nur, was der Prüfstand lädt. Wo Produktion und Prüfstand
+verschiedene Lader haben, braucht die Produktionsumgebung einen eigenen, kleinen Zeugen — und der
+Zeuge darf seine Sicherheit nicht von dem Mechanismus borgen, den er prüft. Prüffragen: *Lädt
+mein Test die Datei so, wie sie im Betrieb geladen wird?* Und: *Wenn das, was diesen Test
+absichert, kaputtginge — wäre der Test dann noch harmlos?* Verwandt mit §3.157 (das Etikett als
+einziger Beweis) und §3.156 (ein Mechanismus, der weiter greift als seine Regel).
+
+### 3.160 Die Entscheidung war getroffen, aufgeschrieben — und wurde trotzdem wieder gefragt
+
+Am 10.08.2026 hat der Nutzer allgemein zurückgezogen, dass ich ihn bei Anhebungen einer
+gemessenen Obergrenze frage: Ich entscheide selbst, als letztes Mittel, mit schriftlicher
+Begründung im Commit. Die Regel steht seitdem korrekt im Gedächtnis, mit seinen eigenen
+Worten. Am 22.08.2026 stand trotzdem wieder eine Karte auf der Tafel, die ihn genau danach
+fragte — und seine Antwort benannte die Ursache schärfer, als der Vorfall es getan hätte:
+„Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend."
+
+Die Klasse ist nicht „Regel vergessen". Die Regel war da, richtig formuliert und auffindbar.
+Sie hat nur keinen Ort, an dem sie WIRKT: Ein Gedächtniseintrag wird gelesen, wenn eine
+Sitzung ihn zufällig erinnert, und nichts verweigert die Frage in dem Moment, in dem sie
+gestellt wird. Damit steht sie schwächer da als jede unserer Bau-Regeln, die alle einen
+Wächter an genau der Stelle haben, an der man gegen sie verstößt. Das gilt für jede
+getroffene Entscheidung des Nutzers, nicht nur für diese: Der Zähler in Anhang A stand bei
+drei Anläufen, und der dritte kostete ihn dieselbe Minute wie der erste.
+
+Bemerkenswert ist auch, dass die Karte inhaltlich sauber argumentiert war — sie nannte die
+Regel, nannte den Rückzug vom 10.08. und fragte trotzdem. Eine gute Begründung ersetzt keine
+Verweigerung; sie macht die überflüssige Frage nur höflicher.
+
+**Lehre:** Eine Entscheidung des Nutzers gehört nicht ins Gedächtnis, sondern an das Tor, an
+dem man sie sonst erneut stellt — mit seinen Worten, sodass die Abweisung ihn zitiert statt
+mich. Prüffrage bei jeder Karte in „Von dir zu klären": *Hat er das schon einmal entschieden
+— und wenn ja, warum steht die Frage überhaupt noch offen?* Verwandt mit §3.112 (der
+verdrahtete, aber wirkungslose Mechanismus).

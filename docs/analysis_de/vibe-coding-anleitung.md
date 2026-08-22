@@ -211,19 +211,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz und deckt nur einen Teil — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz** und
-  setz seine Reichweite selbst."
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz**."
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
-  wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet —
-  nie eine Uhr. Schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
+  wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet, nie
+  eine Uhr — und schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt nur, wo er
   schreibt.
   → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
-  Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört. Berührt eine
-  Änderung das Design, aktualisiere Doc und Code im **selben** Commit."
+  Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört; Doc und Code
+  ändern sich im **selben** Commit."
 
 - **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet.
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
@@ -251,14 +250,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze**. Blockiert sie: kürzen, **zusammenführen**, auslagern — anheben ist das
-  **letzte** Mittel."
+  Obergrenze**. Blockiert sie: kürzen, **zusammenführen**, auslagern — anheben zuletzt."
 
-- **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende
-  passiert trotzdem nichts — dazwischen hat niemand nachgesehen.
-  → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch**
-  und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
-  etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
+- **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende passiert
+  trotzdem nichts — dazwischen hat niemand nachgesehen.
+  → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch** und lies das
+  Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch etwas ausführt, melde
+  ein Scheitern im selben Atemzug wie die Freigabe."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
   Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
@@ -356,12 +354,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
   unterbindet, verbiegt alles andere mit.
   → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
-  die Kur gegen gesunde Fälle. Ist sie teurer als der Fehler, **buche** ihn mit Zahlen und
-  verworfener Kur — verschweigen gilt nicht, still beheben auch nicht."
+  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener
+  Kur — verschweigen gilt nicht, still beheben auch nicht."
 
 - **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
-  Zweige liegen. Prüfungen der Sortierung sind grün: Sie prüfen die Liste, nie den Punkt, an
-  dem gearbeitet wird.
+  Zweige liegen; die Sortierprüfungen bleiben grün, denn sie prüfen die Liste, nie den Punkt in
+  Arbeit.
   → *Prompt:* „Vor jedem **neuen** Punkt: nenn ihn, den vordersten offenen und jeden älteren
   angefangenen Zweig. Weichst du ab, **begründe es**; leere Angefangenes zuerst."
 
@@ -379,13 +377,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
+- **Grün über einem Programm, das gar nicht startet.** Der Testlader ist milder als der echte.
+  → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
+  Zeugen — der seine Sicherheit nicht von dem borgt, was er prüft."
+
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Jeder Auftrag, der eine Sitzung überdauern soll, gehört in eine Datei, die dein
   Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
-  baut aber weder Zustand noch Befehl dafür. Der ehrliche Ausnahmefall muss die Form des
-  Normalfalls nachahmen, und nur eine irreführende Formulierung besteht dessen Prüfung.
+  baut aber weder Zustand noch Befehl dafür — dann muss der ehrliche Ausnahmefall den Normalfall
+  nachahmen, und nur eine irreführende Formulierung besteht die Prüfung.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
@@ -427,4 +429,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 347d7d4d7c55888a4c8c21984114b163dafe47fa86b3898dff27930c1704914a -->
+<!-- GUIDE-FINGERPRINT: 19f3ef5195f74f661cd51d67e1a358f9d4c1ddf3d453621b942c83621e5df172 -->

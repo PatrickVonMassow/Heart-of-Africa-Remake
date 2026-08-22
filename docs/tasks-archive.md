@@ -22145,3 +22145,130 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — it changes no player-visible behaviour, but it multiplies the cost of
   every review of a long-lived branch and it spends that multiple on the scarcest pool.
   Bundle: Modell & Wächter.
+
+- [x] 840. A model label passes as proof of authorship, and authorship decides who may merge
+  (measured 22.08.2026 while recovering the blind halves of the 13.08.2026 handover stage for point
+  834). Half A of that stage carries the heading `# Proposal A — Fable 5, written 13.08.2026 before
+  seeing any other proposal`, and the origin session repeated `written blind by Fable 5` when it
+  handed the two lists to the merge. Both are FALSE. The transcript's per-message `model` field
+  shows `claude-opus-5` generated the tool call that wrote the file; the session ran two models that
+  day and switched exactly once, at 12:49:10Z; the blind stage is first mentioned at 15:33:16Z, two
+  hours and forty-four minutes after Fable's last message; and the transcript holds no sidechain
+  entries, so nothing was delegated either.
+  THE COST WAS PAID TWICE. The mislabel stood for five days and was restated in
+  `docs/handover-architecture.md`. Then this session BELIEVED it, rewrote that document's correct
+  attribution on its strength, concluded that Claude was free to merge a stage Claude had written
+  half of, performed that merge and recorded it — and only the cross-vendor review, which refused to
+  accept a label as evidence, forced the reading that overturned it. Four commits of the branch are
+  that correction and its withdrawal.
+  WHY IT MATTERS BEYOND ONE STAGE: authorship decides a PERMISSION here — who may fold a
+  blind-parallel union, who may review a range — and `scripts/blind-merge.mjs`,
+  `scripts/mechanism-review.mjs` and `scripts/fable-switch-core.mjs` all take the answer from a
+  `model` field the reviewed party writes. A self-asserted label is exactly as trustworthy as
+  whoever benefits from it, and today nothing anywhere compares one against the metadata of the
+  messages that produced the text.
+  FINAL STATE: a claimed author can be checked, and is. A command reads `message.model` from the
+  session transcript at the timestamp of the artefact — per message, never per session, because one
+  session switching models makes the session-level answer worthless — and reports agreement,
+  disagreement or an unreadable transcript. Where a half's claimed author disagrees with the
+  metadata, the four-eyes tooling refuses rather than proceeds. Where the transcript is gone, that
+  is SAID, and the claim is recorded as unverified rather than silently trusted.
+  VERIFIABLE: the command answers correctly for the 676 halves — half A disagrees with its heading
+  and half B agrees with its own — and its cases cover a session with a model switch, a delegated
+  sidechain, a missing transcript and a half whose heading names no model at all.
+  QUEUE RANK: directly behind point 834, whose precondition it guards. Reason: 834's re-merge cannot
+  be trusted until a claimed author can be checked, and this session already spent a full cycle
+  proving that by getting it wrong.
+  Criticality: high — it decides a permission in the rule the project relies on to catch what a
+  single model misses, and it has already produced one invalid recorded merge.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 517. The lease-expiry takeover ignores an honoured claim (measured
+  05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
+  minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
+  successor, although a claim from the user's own window d68e8df9 had stood since
+  14:14 with `honour: true` — the same tick had still respected that claim at
+  12:36Z ("reserved — the user is working in that window"). The boundary path knows
+  the CLAIMING_WINDOW target (`boundaryHandover` in `scripts/batch-boundary.mjs`);
+  the lease-expiry path in `scripts/batch-launcher-core.mjs` does not, and spawns a
+  successor unconditionally. The consequence is that a user who wants to take over
+  WITHOUT forcing anything can wait arbitrarily long: the batch moves from session
+  to session past him.
+  FINAL STATE:
+  1. On lease expiry the launcher reads the claim state before it decides. With an
+     HONOURED claim standing, the lock is RELEASED and RESERVED for the claiming
+     window instead of being handed to a new successor — the same target the
+     boundary path already resolves.
+  2. Both paths reach that decision through ONE shared function, so a future change
+     cannot fix one and leave the other behind; the boundary path keeps its current
+     behaviour byte for byte.
+  3. A claim that is expired, or whose claimant is dead, still yields a successor —
+     the reservation follows the claim's own `honour` verdict, nothing else.
+  4. The reservation is bounded: a claiming window that never takes the lock does
+     not stall the batch forever, and what the bound is, is stated where the
+     reservation is written.
+  MEASURED AGAIN ON A SECOND TRIGGER (06.08.2026, 02:22Z): the same tick took the
+  batch from session 898cbf40 with "LEASE EXPIRED — has not renewed for 55 min", in
+  the same breath as its own reading "declared work advancing — branch
+  refs/heads/feat/483-adults-teach-landscape — tip 2 min old; worktree … active 0 min
+  ago". The owner was alive and stayed alive: two minutes AFTER the takeover it
+  started a `polish` run that rewrote 34 verification frames inside the very worktree
+  the new owner was merging from. The lease renews BEFORE each call, so an owner that
+  legitimately WAITS inside ONE long call — on a delegated agent, on a browser suite —
+  cannot renew at all; the in-flight declaration exists to hold the lock for exactly
+  that case, but it lapses after 45 minutes and nothing extends it while its own
+  evidence is still moving. The lease arithmetic itself is not in question (user
+  30.07.2026) — what is missing is a renewal that runs OUTSIDE the blocked session.
+  FINAL STATE (continued):
+  5. The launcher tick, which already re-reads a declaration's evidence every cycle,
+     EXTENDS the lease while that evidence is provably advancing, and stops the
+     moment it is not. Ownership therefore stays arithmetic — a standstill still
+     loses the batch, because quiet evidence renews nothing — but a wait that is
+     genuinely working keeps it however long the call runs. The 45-minute lapse
+     remains the backstop for a declaration whose evidence went quiet.
+  6. Items 1 and 5 are the same decision and reach it through the shared function of
+     item 2: one place decides what an expired lease means.
+  VERIFIABLE: pure Vitest on the launcher's decision (lease expired + honoured claim
+  → reserve, never spawn; lease expired + no claim → spawn; lease expired + expired
+  claim → spawn; the bound elapses → spawn; lease expired + a declaration whose
+  evidence still advances → renew, never spawn; lease expired + a declaration whose
+  evidence has gone quiet → spawn), and the boundary path's existing tests stay green
+  unchanged.
+  MEASURED AGAIN 21.08.2026, AND IT ADDS A THIRD PATH AND AN EARLIER CAUSE. The user's own
+  window claimed the batch at 07:46 and lost it anyway. `.claude/autostart.log` honoured the
+  claim twice — 05:55:24Z "skip: session 593e0d2f has CLAIMED the batch 9 min ago (reserved)"
+  and the same line at 24 min — then at 06:25:29Z, with the claim 39 minutes old, the claim
+  vanished from the tick's reasoning and it logged only "skip: owner alive". At 06:30:03Z the
+  owner handed over regularly and the launcher logged "HANDOVER accepted: 388cea5f handed the
+  batch over — spawning the successor", starting a FRESH session that then owned the batch.
+  (a) THE HANDOVER BRANCH IS THE THIRD PATH. `scripts/batch-autostart.mjs` spawns
+  unconditionally when the owner hands over; it never asks the claim. This point's item 2
+  already forbids fixing one path and leaving another behind, so this branch joins the same
+  shared decision rather than getting one of its own. Point 752's stage 2b names the missing
+  resolver (`resolveBoundaryDestination`); a grep over `scripts/` shows it does not exist yet,
+  so nothing today redirects a handover to a claiming window.
+  (b) THE LAUNCHER'S CLAIM READING EXPIRES EARLY, which is why (a) never even saw a live claim.
+  `assessClaim` suspends its clock on `ownerHolding` (`scripts/batch-claim-core.mjs:302`), and
+  two readers derive that input through the pure `ownerIsHolding` predicate
+  (`scripts/batch-claim.mjs:150`, `scripts/batch-resume-hook.mjs:318`). The launcher does not:
+  `scripts/batch-autostart.mjs:658` calls `takeoverDecision` with claim, now, maxAgeMs and
+  probePid only, so `ownerHolding` defaults false and every claim expires for the launcher at
+  `CLAIM_MAX_AGE_MS` — while `node scripts/batch-claim.mjs --status` kept answering `honour`
+  for the same record at 21 and at 44 minutes. The comment over `ownerIsHolding` says the
+  predicate is pure so both readers "cannot drift apart" and calls two readers disagreeing
+  about one state "the disease this point was written for". The launcher is the reader that
+  drifted, and it holds the lock in hand at that moment — it reads it a few lines later for
+  the handover branch.
+  FINAL STATE (continued):
+  7. The handover branch reaches the SAME shared decision as items 1 and 5, so an honoured
+     claim reserves the freed lock for the claiming window instead of spawning a successor.
+  8. Every reader of a claim derives `ownerHolding` through `ownerIsHolding`, the launcher
+     included, so no door judges the same record differently from `--status`.
+  VERIFIABLE, added: a case that a claim older than `CLAIM_MAX_AGE_MS` with a LIVE owner
+  holding is honoured by the launcher's own decision exactly as `--status` honours it; a case
+  that a handover with an honoured claim reserves and does not spawn; and a case that a
+  handover with no claim, or a dead claimant, still spawns at once.
+  Criticality: high — it hands the batch past the window that asked for it, so the user cannot
+  take over without forcing something, and it defeats the claim mechanism the whole handover
+  protocol rests on.
+  Bundle: Session- & Repo-Hygiene.

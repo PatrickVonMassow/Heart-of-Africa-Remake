@@ -69,7 +69,7 @@
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
 export const LIMITS = {
-  maxLines: 430,
+  maxLines: 432,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -147,8 +147,28 @@ export const LIMITS = {
   // repository - real history, real main branch - rather than the code went into
   // the existing "Der Test hing an seiner Umgebung" entry, which already owns the
   // environment-dependency class; two verbose entries were tightened to pay for it,
-  // so the guide measures 430 / 3841 and the word ceiling drops by one more.
-  maxWords: 3841,
+  // so the guide measured 430 / 3841 and the word ceiling dropped by one more.
+  // LOWERED ONCE MORE the same evening: the detector that estimates a property the
+  // system has already DECIDED (retrospective 3.158) was read against the guide and
+  // deliberately NOT added - every entry was already one or two sentences at the
+  // ceiling, so buying room would have meant deleting a beginner lesson to make
+  // space for a refinement, and the retrospective is where that belongs. Four
+  // entries were tightened anyway, so the guide measured 428 / 3826 and BOTH
+  // ceilings followed it down to the exact fit. A ceiling still RISES only by the
+  // measured size of genuinely new tips, as the rule above allows and the +1 line
+  // / +21 words of 22.08.2026 did; what never happens is a ceiling left standing
+  // above a guide that has shrunk.
+  // RAISED the same evening by ONE genuinely new lesson, and this one earns the
+  // room the detector class of the morning did not: a test harness that loads code
+  // more permissively than the runtime, so a green suite stands over a program that
+  // will not start at all (retrospective 3.159, measured on our own launcher). It is
+  // a beginner trap in the exact sense this guide is for - the suite CONFIRMS rather
+  // than stays silent. Written first at four lines, then cut to three before the
+  // raise, as the shortening step this rule demands; what remains is +4 lines /
+  // +40 words against the measured 428 / 3826, and the ceilings move by exactly
+  // that, with zero slack. No existing entry was dropped to fit it. Not escalated
+  // to the user, under his general withdrawal of ask-before-raising of 10.08.2026.
+  maxWords: 3866,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

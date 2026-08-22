@@ -7,14 +7,8 @@
       "place": "last"
     },
     "515": {
-      "at": "2026-08-21T16:06:01.796Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. The measured false pauses were lifted and the nine-part repair is not blocking the batch now.",
-      "origin": "user",
-      "place": "last"
-    },
-    "517": {
-      "at": "2026-08-21T16:05:59.371Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for SPEED: the launcher dispossesses a live owner mid-work and hands the batch past the claiming window.",
+      "at": "2026-08-22T16:44:06.898Z",
+      "why": "User 22.08.2026 18:41: pull forward, place after 720",
       "origin": "user",
       "place": "ahead"
     },
@@ -274,10 +268,10 @@
       "place": "last"
     },
     "749": {
-      "at": "2026-08-21T16:06:01.041Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It removes a wrong board card: no speed, no tokens, no blocked work.",
+      "at": "2026-08-22T16:44:06.971Z",
+      "why": "User 22.08.2026 18:41: pull forward, place after 720",
       "origin": "user",
-      "place": "last"
+      "place": "ahead"
     },
     "750": {
       "at": "2026-08-21T16:06:01.118Z",
@@ -516,10 +510,28 @@
       "origin": "machine",
       "place": "last"
     },
-    "840": {
-      "at": "2026-08-22T15:32:19.560Z",
-      "why": "It cannot wait because point 834 does not: 834 stands before the release by the user's 22.08.2026 ruling, and its own spec forbids building until the union has been folded by a model that wrote neither half — a question only a checkable authorship answer can settle. Left behind the release, 834 either stalls with it or proceeds on a label this session already proved false once.",
+    "841": {
+      "at": "2026-08-22T17:12:36.005Z",
+      "why": "The machine filed it, so the user's rule of 20.08.2026 keeps it behind the release; it is worked with 823, which edits the same classifier",
       "origin": "machine",
+      "place": "last"
+    },
+    "842": {
+      "at": "2026-08-22T19:14:46.139Z",
+      "why": "Ein Melder-Blindfleck hinter dem behobenen Defekt: der Launcher-Fehler, für den der Prüfer gebaut wurde, ist gefangen und grün, also darf der Rest warten.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "843": {
+      "at": "2026-08-22T20:07:51.458Z",
+      "why": "Append-and-defer: der Besitzer hat den Mechanismus verlangt, aber keine Vorziehung; die Regel selbst gilt ab sofort auch ohne ihn",
+      "origin": "machine",
+      "place": "last"
+    },
+    "844": {
+      "at": "2026-08-22T20:09:27.269Z",
+      "why": "User request 22.08.2026, 21:19: he asked for the ticket himself and placed it directly behind point 598",
+      "origin": "user",
       "place": "ahead"
     }
   },
@@ -570,7 +582,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T15:32:19.566Z",
+    "at": "2026-08-22T20:09:27.280Z",
     "points": [
       174,
       184,
@@ -649,7 +661,6 @@
       511,
       514,
       515,
-      517,
       518,
       519,
       520,
@@ -817,7 +828,10 @@
       837,
       838,
       839,
-      840
+      841,
+      842,
+      843,
+      844
     ]
   }
 }

@@ -362,6 +362,10 @@ export const MERGE_ACCOUNTING_SINCE = Date.UTC(2026, 7, 11)
  */
 export const MODE_REQUIRED_SINCE = Date.UTC(2026, 7, 8)
 
+/** New ledger rows after point 840's recorded commission owe an explicit
+ * transcript verdict. The exact boundary preserves every earlier 22.08 row. */
+export const AUTHORSHIP_CHECK_SINCE = 1_787_415_913_284
+
 /**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
  *
@@ -601,6 +605,8 @@ export function modelsFromTrailers(field) {
 export const FLAG_SPEC = Object.freeze({
   '--record': true,
   '--model': true,
+  '--model-at': true,
+  '--model-transcript': true,
   '--verdict': true,
   '--evidence': true,
   '--point': true,
@@ -634,6 +640,8 @@ export const KNOWN_FLAGS = new Set(Object.keys(FLAG_SPEC))
 const VALUE_KEY = Object.freeze({
   '--record': 'sha',
   '--model': 'model',
+  '--model-at': 'modelAt',
+  '--model-transcript': 'modelTranscript',
   '--verdict': 'verdict',
   '--evidence': 'evidence',
   '--point': 'point',
@@ -1144,6 +1152,13 @@ export function reviewRecordWellFormed(record = {}) {
   const mode = String(record.mode ?? '').trim()
   const at = Number(record.at)
   if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE)) return false
+  if (at >= AUTHORSHIP_CHECK_SINCE) {
+    const authorship = record.reviewerAuthorship
+    if (!authorship || typeof authorship !== 'object') return false
+    if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
+    if (!sameModel(authorship.claimedModel, record.model)) return false
+    if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
+  }
   return record.carried === undefined || record.carriedVerified === true
 }
 

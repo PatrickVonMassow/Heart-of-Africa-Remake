@@ -10,6 +10,7 @@ import { resolve } from 'node:path'
 import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
+  AUTHORSHIP_CHECK_SINCE,
   evaluateMechanismReview,
   formatArgErrors,
   formatMechanismReviewVerdict,
@@ -388,6 +389,32 @@ describe('evaluateMechanismReview', () => {
     expect(text).toMatch(/FOUR-EYES GATE ON MECHANISMS/)
     expect(text).toContain('scripts/pre-push-gate-core.mjs')
     expect(text).toMatch(/mechanism-review\.mjs --record/)
+  })
+
+  it('requires every new review row to record an agreement or explicit unverified authorship claim', () => {
+    const base = record({ at: AUTHORSHIP_CHECK_SINCE + 1 })
+    const covered = commit({ coveringRecordShas: ['c'.repeat(40)] })
+    expect(evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [base] }).block).toBe(true)
+
+    const unverified = {
+      ...base,
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'Fable 5', reason: 'transcript expired' },
+    }
+    expect(
+      evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [unverified] }).block,
+    ).toBe(false)
+
+    const contradicted = {
+      ...base,
+      reviewerAuthorship: {
+        status: 'disagreement',
+        claimedModel: 'Fable 5',
+        actualModel: 'Claude Opus 5',
+      },
+    }
+    expect(
+      evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [contradicted] }).block,
+    ).toBe(true)
   })
 
   it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {

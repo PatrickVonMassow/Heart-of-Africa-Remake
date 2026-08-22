@@ -58,6 +58,8 @@ import {
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
+import { authorshipRefusesPermission } from './authorship-check-core.mjs'
+import { checkAuthorshipFile } from './authorship-check-io.mjs'
 
 // Re-exported so the flag surface has ONE definition (the pure parser's) and one
 // import path for its callers.
@@ -202,6 +204,8 @@ export function countUnionFiles({ unionPath, listAPath, listBPath }) {
 export function buildRecord({
   sha = '',
   model = '',
+  modelAt = '',
+  modelTranscript = '',
   verdict = '',
   evidence = '',
   point = '',
@@ -278,6 +282,12 @@ export function buildRecord({
   // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
   // sha, the pass scope and the point comes verified from the source reading.
   if (String(carriedFrom ?? '').trim()) {
+    if (String(modelAt ?? '').trim() || String(modelTranscript ?? '').trim()) {
+      return {
+        ok: false,
+        errors: ['--carried-from copies the source review identity and cannot carry fresh --model-at/--model-transcript evidence'],
+      }
+    }
     return buildCarriedRecord({
       sha: ref,
       carriedFrom,
@@ -338,6 +348,13 @@ export function buildRecord({
   const mergeAuthors = halfAuthors.length === 2
     ? halfAuthors
     : [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])]
+  // This identity grants the second-model permission, so it is evidence-backed
+  // wherever the transcript still exists. Expired evidence stays explicit.
+  const reviewerAuthorship = checkAuthorshipFile({
+    claimedModel: model,
+    artefactAt: modelAt,
+    transcriptPath: modelTranscript,
+  })
   const merge = resolveMergePolicy({
     mode,
     mergedBy,
@@ -382,6 +399,12 @@ export function buildRecord({
         'judged against the halves themselves.',
     )
   }
+  if (authorshipRefusesPermission(reviewerAuthorship)) {
+    errors.push(
+      `the claimed review model "${reviewerAuthorship.claimedModel}" disagrees with transcript message.model ` +
+        `"${reviewerAuthorship.actualModel}" at the review artefact timestamp — four-eyes permission is refused`,
+    )
+  }
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block
   // the real one while the ledger LOOKED like it held the answer.
@@ -402,6 +425,23 @@ export function buildRecord({
       subject: commit.subject,
       authoredBy: commit.authoredBy,
       model: String(model).trim(),
+      // A missing transcript is a durable UNVERIFIED result, not an omitted
+      // check that later readers mistake for trust.
+      reviewerAuthorship: {
+        status: reviewerAuthorship.status,
+        claimedModel: reviewerAuthorship.claimedModel,
+        ...(reviewerAuthorship.actualModel ? { actualModel: reviewerAuthorship.actualModel } : {}),
+        ...(reviewerAuthorship.artefactAt != null
+          ? { artefactAt: reviewerAuthorship.artefactAt, artefactAtIso: new Date(reviewerAuthorship.artefactAt).toISOString() }
+          : {}),
+        ...(reviewerAuthorship.messageAt != null
+          ? { messageAt: reviewerAuthorship.messageAt, messageAtIso: new Date(reviewerAuthorship.messageAt).toISOString() }
+          : {}),
+        ...(reviewerAuthorship.messageId ? { messageId: reviewerAuthorship.messageId } : {}),
+        ...(reviewerAuthorship.sidechain ? { sidechain: true } : {}),
+        ...(reviewerAuthorship.transcript ? { transcript: reviewerAuthorship.transcript } : {}),
+        ...(reviewerAuthorship.reason ? { reason: reviewerAuthorship.reason } : {}),
+      },
       verdict: String(verdict).trim(),
       evidence: String(evidence).trim(),
       // The four-eyes MODE travels with the verdict (point 541). Rows written
@@ -566,6 +606,11 @@ export function buildCarriedRecord({
       subject: commit.subject,
       authoredBy: commit.authoredBy,
       model: String(src.model).trim(),
+      reviewerAuthorship: src.reviewerAuthorship ?? {
+        status: 'unverified',
+        claimedModel: String(src.model).trim(),
+        reason: 'the source review predates transcript-backed authorship records',
+      },
       verdict: String(src.verdict).trim(),
       evidence: copiedEvidence,
       mode: String(src.mode).trim(),
@@ -712,6 +757,7 @@ export function resolveCommit(sha, { run = git } = {}) {
 export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
   `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
+  `           [--model-at <ISO timestamp> --model-transcript <session.jsonl>] \\\n` +
   `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `           [--author-framing "<one line>" | --spec-examination <sound|amended>]\n` +
   `           [--merged-by "<switch-selected model>"] --accounting "<the blind-merge summary line>" \\\n` +
@@ -725,6 +771,9 @@ export const usage = () =>
   `                       same inputs without seeing each other's result\n` +
   `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
   `       belongs to blind-parallel alone.\n` +
+  `--model-at and --model-transcript check that claimed model against message.model\n` +
+  `       at the review artefact timestamp. A disagreement refuses permission; a missing\n` +
+  `       transcript is recorded as unverified rather than silently trusted.\n` +
   `--author-framing records the hostile-tester stance of a re-authoring commission\n` +
   `       beside the review that followed it. Rounds zero and one have none.\n` +
   `--spec-examination records the one cross-vendor reading before Fable escalation:\n` +
@@ -820,6 +869,7 @@ if (isMainModule(import.meta.url)) {
             `\n      ${oneLine(r.evidence ?? '')}${r.framing ? `\n      framing: ${oneLine(r.framing)}` : ''}` +
             `${r.authorFraming ? `\n      author framing: ${oneLine(r.authorFraming)}` : ''}` +
             `${r.specExamination ? `\n      spec examination: ${oneLine(r.specExamination)}` : ''}` +
+            `${r.reviewerAuthorship ? `\n      reviewer authorship: ${oneLine(r.reviewerAuthorship.status)}${r.reviewerAuthorship.actualModel ? ` (message.model: ${oneLine(r.reviewerAuthorship.actualModel)})` : ''}` : ''}` +
             `${r.mergedBy ? `\n      union merged by: ${oneLine(r.mergedBy)}${r.mergeFallback ? ` (two-model fallback: ${oneLine(r.mergeFallback)})` : ''}` : ''}` +
             `${r.accounting ? `\n      accounting: ${oneLine(r.accounting)}` : ''}` +
             // Quoted like every structural path list (round-2 pass 3): a path
