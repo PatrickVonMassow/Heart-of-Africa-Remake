@@ -267,7 +267,7 @@
 | `tool-output-budget-core.mjs` | Pure output-budget logic for the PreToolUse interception in path-scope-guard.mjs. | — |
 | `tool-output-budget.mjs` | Generic spill-to-log runner used by the path-scope PreToolUse hook. | — |
 | `tool-output-intercept-core.mjs` | Pure PreToolUse input rewriting for the large producers named by the output budget. | — |
-| `tool-output-log-retention.mjs` | Tests and support for tool-output-log-retention. | — |
+| `tool-output-log-retention.mjs` | Retention for the tool-output budget's spill logs. | — |
 | `tool-output-shell.mjs` | Re-run the intercepted command in the caller's configured shell without turning it into a login session. | — |
 | `user-gate-core.mjs` | THE USER GATE — a point that waits on the user never jams the queue (point 450). | — |
 | `user-said-core.mjs` | WHAT THE USER SAID, AND WHEN — the pure half of scripts/user-said.mjs. | — |

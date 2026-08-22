@@ -1,3 +1,7 @@
+// Retention for the tool-output budget's spill logs. Every intercepted call
+// writes one capture file, so without an age rule the directory grows for as
+// long as the project runs; 30 days keeps a recent failure's full output
+// reachable and lets the rest go.
 import { readdirSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
