@@ -28,6 +28,8 @@ import {
   parseFirstParentChain,
   parseTickEvents,
   clauseDemandsPicture,
+  estimateProvenance,
+  isComparedSnapshot,
   heldOutForPicture,
   owesRenderedProof,
   PICTURE_HOLDOUT_REASON,
@@ -1285,5 +1287,84 @@ describe('a mention of a proof is not a demand for one', () => {
     // purpose so they cannot swallow it.
     expect(pictureBearingPoints(block(119, 'Add a screenshot test for the river.')).has(119)).toBe(true)
     expect(pictureBearingPoints(block(120, 'VERIFIABLE: a browser frame.')).has(120)).toBe(true)
+  })
+})
+
+describe('a snapshot counts as compared only where it produced a ratio', () => {
+  const row = (o) => ({ estimateSource: 'snapshot', elapsedHours: 2, estimateHours: 4, ...o })
+
+  it('takes a snapshot with both halves', () => {
+    expect(isComparedSnapshot(row({}))).toBe(true)
+  })
+
+  it('refuses one whose estimate does not parse and one whose span is unknown', () => {
+    expect(isComparedSnapshot(row({ estimateHours: null }))).toBe(false)
+    expect(isComparedSnapshot(row({ elapsedHours: null }))).toBe(false)
+  })
+
+  it('counts the uncomparable snapshots separately instead of claiming them', () => {
+    // THE CLAIM AND THE NUMBER IT IS CHECKED AGAINST: with one comparable row,
+    // "snapshot(s) compared" must read 1, not 3, because ACTUAL ÷ ESTIMATE has
+    // exactly one entry to show.
+    const p = estimateProvenance([
+      row({}),
+      row({ estimateHours: null }),
+      row({ elapsedHours: null }),
+      { estimateSource: 'unreconstructable', elapsedHours: 1, estimateHours: null },
+      { estimateSource: null, elapsedHours: 1, estimateHours: null },
+    ])
+    expect(p).toEqual({ snapshot: 1, snapshotUncomparable: 2, unreconstructable: 1, none: 1 })
+  })
+})
+
+describe('the ledger may be advanced one card at a time', () => {
+  // WHY THIS IS THE PROPERTY THAT MATTERS: each queue write commits on its own,
+  // so the ledger has to be persisted after every card rather than once at the
+  // end. That is only safe if advancing it card by card lands on exactly the
+  // ledger the whole list would have produced.
+  const entry = (point, factor) => ({ point, baseline: `~${point} h`, to: `~${point / 2} h`, factor, basis: 'x' })
+
+  it('lands on the same ledger as one batch', () => {
+    const plan = [entry(10, 0.5), entry(11, 0.5), entry(12, 0.5)]
+    const batch = ledgerAfterApply({}, plan, { now: 7 })
+    let incremental = {}
+    for (const p of plan) incremental = ledgerAfterApply(incremental, [p], { now: 7 })
+    expect(incremental).toEqual(batch)
+  })
+
+  it('remembers every card written before one that never was', () => {
+    // The apply loop stops here; what it already wrote must be on the ledger,
+    // because those cards now hold a corrected estimate.
+    let ledger = {}
+    for (const p of [entry(10, 0.5), entry(11, 0.5)]) ledger = ledgerAfterApply(ledger, [p], { now: 7 })
+    expect(Object.keys(ledger).sort()).toEqual(['10', '11'])
+    expect(ledger['10'].baseline).toBe('~10 h')
+    expect(ledger['10'].applied.estimate).toBe('~5 h')
+  })
+})
+
+describe('a class the landing window never saw takes no factor at all', () => {
+  // ANSWERS A REVIEW FINDING (22.08.2026) that an open class absent from the
+  // reading could receive the global factor without appearing in the report.
+  // It cannot: a factor needs the class's own landings, so a class with none is
+  // refused before any global branch is reached, and the plan keeps its cards.
+  const landed = (point) => landing({ point, elapsedHours: 1, estimateHours: null, criticality: 'medium' })
+
+  it('refuses the factor rather than falling through to the global one', () => {
+    const reading = calibrationReading(Array.from({ length: 8 }, (_, i) => landed(600 + i)))
+    expect(reading.byAxis.criticality.map((c) => c.name)).toEqual(['medium'])
+    expect(factorForCard(reading, 'maximum', { promiseMedian: 8 }).factor).toBe(null)
+  })
+
+  it('keeps the card of such a class, so the report can omit no applied factor', () => {
+    const reading = calibrationReading(Array.from({ length: 8 }, (_, i) => landed(600 + i)))
+    const plan = rewritePlan(reading, {
+      cards: { 40: { estimate: '~8 h' } },
+      open: [40],
+      criticality: new Map([[40, 'maximum']]),
+    })
+    expect(plan[0].changed).toBe(false)
+    expect(plan[0].factor).toBeUndefined()
+    expect(plan[0].reason).toMatch(/no landed comparable/)
   })
 })

@@ -32,6 +32,7 @@ import {
   calibrationReading,
   elapsedHoursToTick,
   estimateForLanding,
+  estimateProvenance,
   ELAPSED_BIAS_BASIS,
   factorForCard,
   inheritanceDefaults,
@@ -196,21 +197,23 @@ try {
   console.log(`WINDOW  ${iso(window.from)} → ${iso(window.to)} UTC · ${window.landings} landed point(s)` + (limit ? ` (--limit ${limit})` : ` (--since ${window.since})`))
   console.log('')
   console.log('PER POINT — first branch commit to the TICK; cadence is TICK → TICK for the same reader-visible reason')
-  console.log('  point  crit      lane                  picture                  merge     src       context   actual   ratio')
+  // "picture" is the RETAINED VERIFICATION class; "owed" is what actually holds a
+  // landing out of the correction. They are different facts, and printing only
+  // the first left the exclusion unreadable per landing.
+  console.log('  point  crit      lane                  picture                  owed  merge     src       context   actual   ratio')
   for (const r of rows) {
     console.log(
       `  ${String(r.point).padEnd(6)} ${String(r.criticality ?? 'untagged').padEnd(9)} ` +
-        `${String(r.lane).padEnd(21)} ${String(r.pictureClass).padEnd(24)} ${String(r.attribution).padEnd(9)} ` +
+        `${String(r.lane).padEnd(21)} ${String(r.pictureClass).padEnd(24)} ${(r.owesPicture ? 'yes' : 'no').padEnd(5)} ` +
+        `${String(r.attribution).padEnd(9)} ` +
         `${(r.estimateSource === 'snapshot' ? 'snapshot' : r.estimateSource === 'unreconstructable' ? 'context' : '—').padEnd(9)} ` +
         `${fmt(r.contextEstimateHours, ' h').padStart(8)}  ${fmt(r.elapsedHours, ' h').padStart(8)}  ` +
         `${r.elapsedHours !== null && r.estimateHours ? fmt(r.elapsedHours / r.estimateHours, '×') : '—'}`,
     )
   }
-  const provenance = {
-    snapshot: rows.filter((r) => r.estimateSource === 'snapshot').length,
-    unreconstructable: rows.filter((r) => r.estimateSource === 'unreconstructable').length,
-    none: rows.filter((r) => !r.estimateSource).length,
-  }
+  // COMPARED MEANS A RATIO WAS COMPUTED — the rule lives in the core, where it is
+  // tested without a repository, because it is what the printed claim rests on.
+  const provenance = estimateProvenance(rows)
   const spans = {
     measured: rows.filter((r) => r.spanBasis === SPAN_MEASURED).length,
     noBranch: rows.filter((r) => r.spanBasis === SPAN_NO_BRANCH).length,
@@ -220,8 +223,9 @@ try {
   }
   console.log('')
   console.log(
-    `ESTIMATE PROVENANCE     ${provenance.snapshot} snapshot(s) compared · ${provenance.unreconstructable} live value(s) shown only as context, ` +
-      `NOT compared · ${provenance.none} unestimated`,
+    `ESTIMATE PROVENANCE     ${provenance.snapshot} snapshot(s) compared · ` +
+      `${provenance.snapshotUncomparable} snapshot(s) carrying no ratio (unreadable estimate or unmeasured span) · ` +
+      `${provenance.unreconstructable} live value(s) shown only as context, NOT compared · ${provenance.none} unestimated`,
   )
   console.log(
     `  LIMIT: ${QUEUE_DATA_PATH} and .batch-dashboard.html are both untracked, so estimates older than this ledger are unrecoverable; ` +
@@ -311,6 +315,7 @@ try {
         `${withEstimate} carry an estimate that is kept as it stands, ${held.length - withEstimate} carry none at all. ` +
         'This measurement cannot establish what a picture check costs, so it does not price one.',
     )
+    console.log(`  held out: ${held.map((p) => p.point).join(', ')}`)
   }
   const changed = plan.filter((p) => p.changed)
   const kept = plan.filter((p) => !p.changed)
@@ -325,6 +330,73 @@ try {
   console.log('')
   console.log(`INHERITED BY A NEW CARD (median hours per class) → ${CALIBRATION_PATH}`)
   for (const [name] of Object.entries(defaults)) console.log(`  ${name.padEnd(13)} ${inheritedEstimateForClass(name, defaults)}`)
+
+  // THE STORE, MINUS THE ONE FIELD THAT MOVES WHILE THE APPLY RUNS.
+  //
+  // Written through `persist` so the ledger on disk can never lag behind the
+  // queue: each `board-queue set` commits on its own, so the baseline it
+  // overwrote must already be recorded when the NEXT card is written. Before,
+  // the ledger was written once at the very end, and a child that failed in the
+  // middle — or a failing final write — left corrected cards whose promise
+  // nothing remembered, so the next run measured its own correction.
+  const storeBase = {
+    measuredAt: new Date().toISOString(),
+    window: {
+      from: iso(window.from),
+      to: iso(window.to),
+      // The printed window is minute-truncated; these are the seconds the
+      // reading actually used, so the calculation can be reconstructed.
+      fromAt: window.from,
+      toAt: window.to,
+      landings: window.landings,
+      since: window.since,
+      limit,
+    },
+    // What a NEWLY FILED card inherits, in hours, per criticality class.
+    defaults,
+    // …and the points that may NOT inherit it: the ones owing a rendered proof,
+    // which this measurement is blind to.
+    pictureBearing: [...pictureBearing].sort((a, b) => a - b),
+    // WHICH OPEN CARDS THE HOLDOUT ACTUALLY REACHED — the plan's own answer, not
+    // the marker set, because only an open card can be held out.
+    heldOut: held.map((h) => h.point).sort((a, b) => a - b),
+    factors: reading.factors,
+    globalFactor: reading.decision,
+    cadence: reading.cadence,
+    elapsed: reading.overall.elapsed,
+    provenance: { estimates: provenance, spans },
+    // EVERY ROW THE READING WAS TAKEN FROM. The aggregates above are summaries;
+    // without the rows behind them a recorded factor cannot be re-derived, and
+    // an audit could only take the summary's word for it.
+    rows: rows.map((r) => ({
+      point: r.point,
+      landedAt: r.landedAt,
+      landedAtIso: iso(r.landedAt),
+      criticality: r.criticality,
+      lane: r.lane,
+      attribution: r.attribution,
+      spanBasis: r.spanBasis,
+      elapsedHours: r.elapsedHours,
+      estimateSource: r.estimateSource,
+      estimateHours: r.estimateHours,
+      contextEstimateHours: r.contextEstimateHours,
+      pictureClass: r.pictureClass,
+      owesPicture: r.owesPicture,
+    })),
+    // The denominator each class factor was measured against.
+    promiseMedians: Object.fromEntries(promises),
+    // …and the factor each class received, with the basis that produced it.
+    applied: Object.fromEntries(
+      reading.byAxis.criticality
+        .map((c) => {
+          const { factor, basis } = factorForCard(reading, c.name, { promiseMedian: promises.get(c.name) ?? null })
+          return factor ? [c.name, { factor, basis }] : null
+        })
+        .filter(Boolean),
+    ),
+  }
+  const persist = (estimatesNow) =>
+    writeTextAtomic(storeFile, `${JSON.stringify({ ...storeBase, estimates: estimatesNow }, null, 2)}\n`)
 
   let estimates = ledger
   if (options.apply) {
@@ -342,6 +414,11 @@ try {
           env: { ...process.env, HOA_QUEUE_DATA_FILE: dataFile },
         })
         written.push(p)
+        // THE LEDGER FOLLOWS THE CARD IMMEDIATELY, not the whole run. The write
+        // above is already committed; if the next child throws, this card's
+        // promise is on disk regardless.
+        estimates = ledgerAfterApply(estimates, [p])
+        persist(estimates)
       } catch (e) {
         if (e.status === 3) {
           refused.push({ ...p, detail: String(e.stderr ?? '').trim() })
@@ -350,7 +427,9 @@ try {
         throw new Error(`board-queue set failed for ${p.point}: ${String(e.stderr ?? e.message).trim()}`)
       }
     }
-    estimates = ledgerAfterApply(ledger, [...written, ...plan.filter((p) => p.factor && !p.changed)])
+    // The cards that carry a factor but did not move keep their baseline too.
+    estimates = ledgerAfterApply(estimates, plan.filter((p) => p.factor && !p.changed))
+    persist(estimates)
     console.log('')
     console.log(`APPLIED: ${written.length} estimate(s) written to ${QUEUE_DATA_PATH}. Render them: node scripts/board-queue.mjs`)
     for (const p of written) console.log(`  ${p.point} ${p.from} → ${p.to}`)
@@ -363,24 +442,11 @@ try {
     console.log('Nothing was written to the queue data — re-run with --apply to store the rewrite.')
   }
 
-  const store = {
-    measuredAt: new Date().toISOString(),
-    window: { from: iso(window.from), to: iso(window.to), landings: window.landings, since: window.since, limit },
-    // What a NEWLY FILED card inherits, in hours, per criticality class.
-    defaults,
-    // …and the points that may NOT inherit it: the ones owing a rendered proof,
-    // which this measurement is blind to.
-    pictureBearing: [...pictureBearing].sort((a, b) => a - b),
-    factors: reading.factors,
-    globalFactor: reading.decision,
-    cadence: reading.cadence,
-    elapsed: reading.overall.elapsed,
-    provenance: { estimates: provenance, spans },
-    // The baseline ledger — the promise each card carried before any correction,
-    // and what the last apply wrote. Without it a re-run corrects a corrected card.
-    estimates,
-  }
-  writeTextAtomic(storeFile, `${JSON.stringify(store, null, 2)}\n`)
+  // The baseline ledger — the promise each card carried before any correction,
+  // and what the last apply wrote. Without it a re-run corrects a corrected card.
+  // An apply has persisted it after every card already; this covers the read-only
+  // run, where nothing moved and the store is written once.
+  persist(estimates)
 } catch (e) {
   console.error(`queue-calibration: ${e.message}`)
   process.exitCode = 1

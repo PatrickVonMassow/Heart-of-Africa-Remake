@@ -1131,6 +1131,29 @@ export function applicableChanges(plan, liveCards = {}) {
  * baseline it came from and the factor that was used, which is what makes the
  * next run recognise its own writing instead of correcting it a second time.
  */
+/**
+ * WHAT A SNAPSHOT ACTUALLY CONTRIBUTED — compared, or merely stored.
+ *
+ * A landing counts as COMPARED only where a ratio could be computed from it: a
+ * frozen promise that parses AND a measured span. Counting every stored snapshot
+ * let the report claim comparisons while `ACTUAL ÷ ESTIMATE` read n=0, which is
+ * the one number a reader checks the claim against.
+ */
+export function isComparedSnapshot(row) {
+  return row?.estimateSource === 'snapshot' && row?.elapsedHours !== null && row?.elapsedHours !== undefined && Boolean(row?.estimateHours)
+}
+
+/** The four provenance counts, over the rows a reading was taken from. */
+export function estimateProvenance(rows = []) {
+  const all = Array.isArray(rows) ? rows : []
+  return {
+    snapshot: all.filter((r) => isComparedSnapshot(r)).length,
+    snapshotUncomparable: all.filter((r) => r?.estimateSource === 'snapshot' && !isComparedSnapshot(r)).length,
+    unreconstructable: all.filter((r) => r?.estimateSource === 'unreconstructable').length,
+    none: all.filter((r) => !r?.estimateSource).length,
+  }
+}
+
 export function ledgerAfterApply(ledger, plan, { now = Math.floor(Date.now() / 1000) } = {}) {
   const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
   for (const p of Array.isArray(plan) ? plan : []) {
