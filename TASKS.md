@@ -11153,4 +11153,4 @@ to land than a mechanism that needs a review.
   release.
   Criticality: low — it costs no product behaviour, but the board is what the user plans against,
   and a front stage priced above its own whole makes that plan wrong.
-  Bundle: unbundled (batch autonomy).
+  Bundle: Chat & Tafel.

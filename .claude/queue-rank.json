@@ -510,15 +510,74 @@
       "origin": "user",
       "place": "ahead"
     },
-    "835": {
-      "at": "2026-08-22T10:35:33.074Z",
-      "why": "Live on main since 12:24 and it kills every intercepted tool call in any session started without CLAUDE_PROJECT_DIR — it costs work in every turn it is not fixed.",
+    "836": {
+      "at": "2026-08-22T12:10:43.694Z",
+      "why": "Machine-filed from its own run; the user's 20.08.2026 ruling keeps such a point behind the release",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
+    },
+    "837": {
+      "at": "2026-08-22T12:10:43.779Z",
+      "why": "Machine-filed from its own preflight; the gate is suspended rather than failing, so it waits behind the release like every self-filed point",
+      "origin": "machine",
+      "place": "last"
+    },
+    "838": {
+      "at": "2026-08-22T12:10:43.859Z",
+      "why": "Queue bookkeeping, not delivery — the user's 20.08.2026 ruling keeps it behind the release",
+      "origin": "machine",
+      "place": "last"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      515,
+      553,
+      581,
+      595,
+      596,
+      598,
+      633,
+      659,
+      660,
+      663,
+      669,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      720,
+      733,
+      734,
+      735,
+      736,
+      737,
+      738,
+      739,
+      744,
+      746,
+      747,
+      749,
+      750,
+      752,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-22T10:35:33.229Z",
+    "at": "2026-08-22T12:10:43.866Z",
     "points": [
       174,
       184,
@@ -764,54 +823,9 @@
       832,
       833,
       834,
-      835
+      836,
+      837,
+      838
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      515,
-      553,
-      581,
-      595,
-      596,
-      598,
-      633,
-      659,
-      660,
-      663,
-      669,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      713,
-      715,
-      719,
-      720,
-      733,
-      734,
-      735,
-      736,
-      737,
-      738,
-      739,
-      744,
-      746,
-      747,
-      749,
-      750,
-      752,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
