@@ -515,6 +515,12 @@
       "why": "The machine filed it, so the user's rule of 20.08.2026 keeps it behind the release; it is worked with 823, which edits the same classifier",
       "origin": "machine",
       "place": "last"
+    },
+    "842": {
+      "at": "2026-08-22T19:14:46.139Z",
+      "why": "Ein Melder-Blindfleck hinter dem behobenen Defekt: der Launcher-Fehler, für den der Prüfer gebaut wurde, ist gefangen und grün, also darf der Rest warten.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -564,7 +570,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T18:26:46.160Z",
+    "at": "2026-08-22T19:14:46.146Z",
     "points": [
       174,
       184,
@@ -810,7 +816,8 @@
       837,
       838,
       839,
-      841
+      841,
+      842
     ]
   }
 }
