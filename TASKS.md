@@ -10991,12 +10991,17 @@ to land than a mechanism that needs a review.
   assertions of `expected 0 to be greater than 0`. Reproduced exactly in a `--depth 2` clone of
   main: the command exits 0, prints `585 landed point(s)`, and every row's merge column is `none`.
   main was red from 04:19 on 22.08.2026 until the checkout was deepened.
-  ALREADY DONE, AND NOT THE FIX: the `fast` job now checks out `fetch-depth: 0` with
-  `filter: blob:none` — measured, the pack is 7.4 GiB of which commits and trees are ~8 MiB, so the
-  whole history costs nothing and the blobs stay on demand. That removes the symptom. It does not
-  remove the dependency: the suite still measures whatever history the machine happens to have, so
-  a quiet fortnight, a rewritten history or a future checkout change reddens it again for reasons
-  that are not the command's.
+  ALREADY DONE, AND NOT THE FIX: the three cases now declare their precondition — they skip where
+  `git rev-parse --is-shallow-repository` says the checkout cannot supply merge parents, and say
+  why — so main is green again and every developer checkout still runs them in full. That is a
+  stated gap, not a repair: the cases no longer run in the one place that guards the branch.
+  DEEPENING CI WAS MEASURED AND REJECTED, both directions, so nobody spends the afternoon again:
+  (a) `fetch-depth: 0` with `filter: blob:none` checks out in six seconds — the pack is 7.4 GiB of
+  which commits and trees are only ~8 MiB — but the command reads a file OUT OF HISTORY per
+  landing, every read becomes a lazy fetch, and the unit step ran past the fifteen-minute job
+  timeout instead of its usual five; (b) `--depth 600` with blobs is a 1.4 GiB clone, and the
+  fixture's own `--limit 30` reaches back over ~227 first-parent commits, so nothing much cheaper
+  would cover it either.
   FINAL STATE: the three cases stand on a FIXTURE the test builds — a throwaway git repository with
   a synthesized first-parent chain of merges and tick commits, whose landings, spans and classes
   are chosen by the test — so the assertions are true or false because of the command, never
