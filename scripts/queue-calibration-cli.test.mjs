@@ -24,7 +24,7 @@ import { join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { openPointsOf } from './board-queue-core.mjs'
-import { isComparedSnapshot, pictureBearingPoints } from './queue-calibration-core.mjs'
+import { isComparedSnapshot, parseCriticality, pictureBearingPoints, promiseMedians } from './queue-calibration-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'queue-calibration.mjs')
 const SEEDED_ESTIMATE = '~3 h'
@@ -76,9 +76,11 @@ describe('the report and the store are one reading', () => {
   let out = ''
   let store = null
   let seeded = []
+  let stateDir = ''
 
   beforeAll(() => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-'))
+    stateDir = dir
     seeded = seedQueueData(dir)
     const result = run(dir)
     expect(result.status, result.stderr).toBe(0)
@@ -124,12 +126,16 @@ describe('the report and the store are one reading', () => {
   })
 
   it('holds out exactly the open cards that owe a proof, and names them', () => {
-    // Derived from the work order, not from the store: `heldOut: []` fails here.
+    // READ OFF THE WORK ORDER, not off the command's own marker set: taking
+    // membership from `store.pictureBearing` would let a run that reports and
+    // holds out the same wrong set agree with itself.
+    const owed = pictureBearingPoints(readTasksAll())
     const expected = openPointsOf(readTasksOpen())
-      .filter((p) => store.pictureBearing.includes(p))
+      .filter((p) => owed.has(p))
       .sort((a, b) => a - b)
     expect(expected.length).toBeGreaterThan(0)
     expect(store.heldOut).toEqual(expected)
+    expect(store.pictureBearing).toEqual([...owed].sort((a, b) => a - b))
     expect(out).toContain(`held out: ${expected.join(', ')}`)
   })
 
@@ -161,9 +167,21 @@ describe('the report and the store are one reading', () => {
       expect(typeof basis).toBe('string')
       // Every factor the store records is one the report printed…
       expect(out).toMatch(new RegExp(`^\\s+${name}\\s+\\S+\\s+\\(${basis.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'm'))
-      // …and the promise it was measured against is kept with it.
-      expect(typeof store.promiseMedians[name]).toBe('number')
     }
+    // THE DENOMINATOR, RE-DERIVED FROM THE SEEDED QUEUE. An arbitrary number
+    // satisfied the old check; this one has to be the median promise of the open
+    // cards of that class, with the render cards excluded exactly as the
+    // correction excludes them.
+    const owed = pictureBearingPoints(readTasksAll())
+    const expected = promiseMedians({
+      cards: JSON.parse(readFileSync(join(stateDir, 'board-queue.json'), 'utf8')).points,
+      open: openPointsOf(readTasksOpen()),
+      criticality: parseCriticality(readTasksAll()),
+      ledger: {},
+      exclude: owed,
+    })
+    expect(store.promiseMedians).toEqual(Object.fromEntries(expected))
+    for (const name of classes) expect(store.promiseMedians[name]).toBeGreaterThan(0)
   })
 })
 
@@ -204,16 +222,29 @@ describe('an apply accounts for every card it moves', () => {
     expect(moved.every((p) => seeded.includes(p))).toBe(true)
   }, 120_000)
 
-  it('does not correct its own correction when it runs again', () => {
-    // The whole purpose of the ledger, end to end: the second run divides by the
-    // same promise the first one did instead of compounding its own writing.
+  it('still divides by the promise that was actually made, on the second run', () => {
+    // A STABLE QUEUE PROVES NOTHING HERE: the correction moves a class onto its
+    // measured median, so a second run over corrected values would land on a
+    // factor of one and leave the cards alone either way. What distinguishes the
+    // two is the BASELINE — the promise the card was measured against. If the
+    // second run snapshotted the corrected estimate as a fresh promise, the
+    // ledger would say so, and every later reading would divide by the tool's
+    // own writing.
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-twice-'))
     seedQueueData(dir)
     const dataFile = join(dir, 'board-queue.json')
+    const storeFile = join(dir, 'queue-calibration.json')
     expect(run(dir, '--apply').status).toBe(0)
     const afterFirst = estimatesOf(dataFile)
+    const moved = [...afterFirst.entries()].filter(([, v]) => v !== SEEDED_ESTIMATE).map(([p]) => p)
+    expect(moved.length).toBeGreaterThan(0)
+
     expect(run(dir, '--apply').status).toBe(0)
     const afterSecond = estimatesOf(dataFile)
+    const store = JSON.parse(readFileSync(storeFile, 'utf8'))
     expect([...afterSecond.entries()]).toEqual([...afterFirst.entries()])
+    for (const point of moved) {
+      expect(store.estimates[String(point)].baseline, `point ${point} keeps its original promise`).toBe(SEEDED_ESTIMATE)
+    }
   }, 180_000)
 })

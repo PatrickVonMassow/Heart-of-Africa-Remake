@@ -796,11 +796,6 @@ export const PICTURE_PROOF_DENIALS = [
   // screenshot." The fragment names no proof at all, so nothing marked it as a
   // denial and the bare noun behind the colon read as a demand.
   /^\s*(not|no longer|nicht|kein|keine)\s+(required|needed|necessary|nötig|noetig|erforderlich)\s*$/i,
-  // A NEGATIVE CONTINUATION: "No screenshot is required, NOR is a browser frame
-  // required." The denial in front of it has finished its own sentence, so it can
-  // lend nothing — but "nor" carries the negation itself, and reading the clause
-  // as a fresh demand turned a doubled denial into a render point.
-  new RegExp(`^\\s*(nor|noch)\\b[^.;:]{0,60}${PROOF_NOUN}`, 'i'),
 ]
 
 /**
@@ -865,7 +860,8 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  * what is not glue here is the shared PREDICATE, and lending that out is the
  * separate licence `LIST_TAIL_GLUE` grants.
  */
-const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das|or|and|nor|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+const LIST_GLUE =
+  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 /**
  * The tail of a coordinated list may carry the predicate the whole list shares:
@@ -878,7 +874,7 @@ const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das|or|and|nor|oder|und
  * without one.
  */
 const LIST_TAIL_GLUE =
-  /^(?:\s|\b(?:a|an|the|ein|eine|or|and|nor|oder|und|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|oder|und|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 /**
  * The conjunction that shows a fragment finishes a coordinated list. It may
@@ -903,6 +899,17 @@ const DENIAL_CARRIES_PREDICATE =
   /\b(is|are|was|were|be|been)\b[^,;:]{0,30}\b(required|needed|necessary)\b|\bnot\s+(\w+\s+){0,2}(required|needed|necessary|require|requires|need|needs)\b|\bnicht\s+(nötig|noetig|erforderlich)\b|\b(nicht|kein|keine)\s+(nötig|noetig|erforderlich)\b/i
 
 export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
+
+/**
+ * A NEGATIVE CONTINUATION — "No screenshot is required, NOR is a browser frame
+ * required." The denial in front has finished its own sentence and can lend
+ * nothing, but "nor" carries the negation itself.
+ *
+ * It only counts BEHIND a denial. On its own, "Noch einen Screenshot anhängen"
+ * is an ordinary German demand for one more screenshot, and reading the word as
+ * a negation wherever it appeared admitted a render card for correction.
+ */
+export const NEGATIVE_CONTINUATION = /^\s*(nor|noch)\b/i
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS, { allowPredicate = true } = {}) => {
   const text = String(fragment ?? '')
@@ -947,6 +954,9 @@ export function lineDemandsPicture(line) {
   // …and whether a denial may still lend its predicate to what trails it.
   let open = false
   for (const fragment of splitClauses(line)) {
+    // "…, nor is a browser frame required": the negation carries on by itself,
+    // but only where there is one to carry.
+    if (suppressed && NEGATIVE_CONTINUATION.test(fragment)) continue
     if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
       suppressed = true
       open = denialIsOpen(fragment)

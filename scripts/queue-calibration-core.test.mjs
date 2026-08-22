@@ -1524,6 +1524,14 @@ describe('a denial can be continued as well as finished', () => {
     expect(pictureBearingPoints(block(141, 'Kein Screenshot ist nötig, noch ein browser frame.')).has(141)).toBe(false)
   })
 
+  it('only lets it continue a denial that is actually there', () => {
+    // "Noch einen Screenshot anhängen" is an ordinary German demand for one MORE
+    // screenshot. Read as a negation wherever the word appeared, it admitted a
+    // render card for correction.
+    expect(pictureBearingPoints(block(147, 'Noch einen Screenshot anhängen.')).has(147)).toBe(true)
+    expect(pictureBearingPoints(block(148, 'Noch ein browser frame wird gebraucht.')).has(148)).toBe(true)
+  })
+
   it('leaves a real demand standing behind a denial that merely ended', () => {
     expect(pictureBearingPoints(block(142, 'No screenshot is required. Attach a browser frame.')).has(142)).toBe(true)
   })
@@ -1537,6 +1545,15 @@ describe('one housekeeping verb may govern several objects', () => {
     expect(pictureBearingPoints(block(144, 'Delete the screenshot, the browser frame and the picture proof.')).has(144)).toBe(
       false,
     )
+  })
+
+  it('reaches its German objects past a comma too', () => {
+    // The glue has to know the case forms the housekeeping gap already accepted;
+    // without "den"/"dem"/"einen" the second fragment became a demand of its own.
+    expect(
+      pictureBearingPoints(block(149, 'Lösche den Screenshot, den Browser Frame und den picture proof.')).has(149),
+    ).toBe(false)
+    expect(pictureBearingPoints(block(150, 'Entferne einen Screenshot und einen browser frame.')).has(150)).toBe(false)
   })
 
   it('stops at the second verb, which is where the demand begins', () => {
