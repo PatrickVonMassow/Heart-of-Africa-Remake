@@ -373,9 +373,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
   es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
 
-- **Der Pfad entscheidet, welches Projekt gemeint ist.** Wer seinen Zielpfad am Quellort statt an
-  der Umgebung nimmt, schreibt ins eigene Projekt; eine Sperre daneben gilt je Arbeitskopie.
-  → *Prompt:* „Färb einen Lauf rot, sobald er sein Projekt verändert; was **einmalig** sein soll, zeigt auf einen **festen** Ort".
+- **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
+  Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
+  → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
 - **Grün über einem Programm, das gar nicht startet.** Der Testlader ist milder als der echte.
   → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
@@ -429,4 +429,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 700d677c61ecc1fcfcebe485b9e19356f014ca272130df3ad029fc9440faab4d -->
+<!-- GUIDE-FINGERPRINT: 19f3ef5195f74f661cd51d67e1a358f9d4c1ddf3d453621b942c83621e5df172 -->
