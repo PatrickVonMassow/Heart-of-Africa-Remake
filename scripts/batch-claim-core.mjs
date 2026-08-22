@@ -364,11 +364,12 @@ export function assessClaim({
 /**
  * MAY THE OWNER RELEASE NOW? PURE.
  *
- * A merge, a delegated agent still building and a running verification are all
- * things that must never be cut in half, so an honoured claim WAITS for them
- * rather than overriding them. The in-flight evidence is the existing one
- * (`assessInFlight().live`) — this file does not invent a second way to ask
- * whether work is still running.
+ * A merge and uncheckpointed delegated work must never be cut in half, so an
+ * honoured claim WAITS for them. A declared agent with committed-and-pushed
+ * checkpoints is different: point 716 makes release an ownership boundary, and
+ * that work transfers to the claiming successor through the same adoption record
+ * as a landed boundary. The in-flight and transfer verdicts are the existing
+ * ones — this file does not invent a second way to measure either.
  *
  * An UNVERIFIABLE git state waits too. A probe that timed out under load says
  * nothing about the checkout, and reading it as "nothing half-done" is precisely
@@ -378,15 +379,15 @@ export function assessClaim({
  *
  * Returns { verdict: 'none' | 'wait' | 'release', reason }.
  */
-export function releaseDecision({ assessment, inFlightLive = false, gitOperation = null } = {}) {
+export function releaseDecision({ assessment, inFlightLive = false, inFlightTransferable = false, gitOperation = null } = {}) {
   if (!assessment || assessment.honour !== true) {
     return { verdict: 'none', reason: assessment?.reason ?? 'no-claim' }
   }
-  if (inFlightLive === true) return { verdict: 'wait', reason: 'work-in-flight' }
+  if (inFlightLive === true && inFlightTransferable !== true) return { verdict: 'wait', reason: 'work-in-flight' }
   const op = typeof gitOperation === 'string' && gitOperation.trim() ? gitOperation.trim() : null
   if (op === GIT_STATE_UNVERIFIABLE) return { verdict: 'wait', reason: 'git-state-unverifiable' }
   if (op) return { verdict: 'wait', reason: `git-${op}` }
-  return { verdict: 'release', reason: 'clean' }
+  return { verdict: 'release', reason: inFlightLive === true ? 'work-transferable' : 'clean' }
 }
 
 /**

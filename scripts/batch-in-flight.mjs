@@ -1072,6 +1072,16 @@ export function gatherStandDownBoundary(
 ) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return {
+      action: 'block',
+      reason: 'declaration-unreadable',
+      declaration: null,
+      agentCheck: { reason: 'output-unmeasurable', detail: 'the in-flight declaration could not be read' },
+      command: 'node scripts/batch-in-flight.mjs --status',
+      message: 'the in-flight declaration exists but could not be read',
+    }
+  }
   const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
   const transfer = gatherHandoverTransfer(sid, { cwd, lockPath, now })
   const decision = standDownBoundaryDecision({
@@ -1108,7 +1118,15 @@ export function gatherStandDownBoundary(
 
 /** Child-aware orientation for a session that now owns the batch. */
 export function gatherSuccessorAgentOrientation(sid, { lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {}) {
-  const declaration = readDeclaration(statePathsFor(lockPath).inFlightPath)
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return (
+      'PREDECESSOR CHILD STATE UNKNOWN: the in-flight declaration exists but could not be read. The lock does not ' +
+      'answer for children, so do not call an agent dead. Inspect `node scripts/batch-in-flight.mjs --status`, then ' +
+      'probe each named worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.'
+    )
+  }
   const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
   return successorAgentOrientation({ declaration, sid, agentCheck, command: agentCheck.command })
 }

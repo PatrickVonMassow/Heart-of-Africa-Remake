@@ -1023,6 +1023,26 @@ describe('the stand-down boundary — declared children cross ownership', () => 
       rmSync(dir, { recursive: true, force: true })
     }
   })
+
+  it('calls an unreadable declaration UNKNOWN and names the probes on both sides', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-unknown-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const path = statePathsFor(lockPath).inFlightPath
+    try {
+      writeFileSync(path, '{not json')
+      expect(gatherStandDownBoundary(SID, { lockPath })).toMatchObject({
+        action: 'block',
+        reason: 'declaration-unreadable',
+        command: 'node scripts/batch-in-flight.mjs --status',
+      })
+      const text = gatherSuccessorAgentOrientation('session-successor', { lockPath })
+      expect(text).toContain('STATE UNKNOWN')
+      expect(text).toContain('--agent-check')
+      expect(text).not.toContain('provably dead')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------
