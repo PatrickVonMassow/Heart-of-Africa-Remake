@@ -53,6 +53,11 @@ scripts/.tile-cache
 # The derived queue's prose and order (point 400, delta C) — session state that
 # belongs beside the board it renders, not in the source history.
 .claude/board-queue.json
+# The measured queue calibration (point 730) — the reading `queue-calibration.mjs`
+# takes off the merge history, serving the estimates on the file above. Derived
+# state: it is re-measured on demand, never carried in the source history.
+.claude/queue-calibration.json
+.claude/queue-calibration.json.tmp-*
 # The chat channel's shared SECRET and its runtime state. The secret is what
 # stands between a PUBLIC board page and a session with permissions pre-granted,
 # so it is never committed — and neither is a topic name derived from it.
