@@ -30,6 +30,7 @@ import {
   applyCorrections,
   clauseDemandsPicture,
   denialIsOpen,
+  finishesDeniedList,
   PICTURE_PROOF_DENIALS,
   estimateProvenance,
   isComparedSnapshot,
@@ -1475,14 +1476,15 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     expect(denialIsOpen('No screenshot is required')).toBe(false)
     expect(denialIsOpen('Kein Screenshot nötig')).toBe(false)
     expect(denialIsOpen('Nicht erforderlich')).toBe(false)
-    // …and one that ends ON the denied noun is open however complete it reads,
-    // because a coordinated item may still follow: "The change does not require
-    // a browser frame, or a screenshot" denies both. The licence still needs a
-    // conjunction, so an ordinary sentence behind it is unaffected.
-    expect(denialIsOpen('The change does not require a browser frame')).toBe(true)
-    expect(pictureBearingPoints(block(164, 'The change does not require a browser frame, or a screenshot.')).has(164)).toBe(
-      false,
-    )
+    // ENDING ON THE NOUN IS NOT ENOUGH. "The change does not require a browser
+    // frame" ends there and is a whole sentence; read as open it lent its
+    // predicate to "and a screenshot is required" behind it and suppressed a
+    // real demand. A coordinated item may still follow it — that is what the
+    // negative-list rule is for, and it works without the denial being open.
+    expect(denialIsOpen('The change does not require a browser frame')).toBe(false)
+    expect(
+      pictureBearingPoints(block(164, 'The change does not require a browser frame, and a screenshot is required.')).has(164),
+    ).toBe(true)
     expect(pictureBearingPoints(block(165, 'The change does not require a browser frame. Provide a screenshot.')).has(165)).toBe(
       true,
     )
@@ -1501,6 +1503,25 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     ]) {
       expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
     }
+  })
+
+  it('denies the tail of a list without reading its predicate', () => {
+    // The predicate the whole list shares is not matched against anything: what
+    // marks the item as belonging to the list stands in FRONT of its noun.
+    // "…, oder picture proof MUSS ERSTELLT WERDEN" and "…, or picture proof IS
+    // REQUIRED" are one shape, and only a word list could tell them apart.
+    for (const [n, line] of [
+      [166, 'Kein Screenshot, Browser Frame oder picture proof muss erstellt werden.'],
+      [167, 'No screenshot, browser frame or picture proof is required.'],
+      [168, 'Kein Screenshot, Browser Frame oder picture proof wird je gebraucht werden.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(false)
+    }
+    expect(finishesDeniedList(' or picture proof is required')).toBe(true)
+    expect(finishesDeniedList(' oder picture proof muss erstellt werden')).toBe(true)
+    // …but a fragment that says something of its own before its noun does not
+    // belong to the list at all.
+    expect(finishesDeniedList(' and please attach a browser frame')).toBe(false)
   })
 
   it('needs no vocabulary at all, in either language', () => {

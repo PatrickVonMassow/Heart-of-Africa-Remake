@@ -856,25 +856,14 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  * that carries a word of its own ("provide a browser frame") does state
  * something, and the clause before it does not reach that far.
  *
- * The conjunction that JOINS an item is glue like the article that carries it;
- * what is not glue here is the shared PREDICATE, and lending that out is the
- * separate licence `LIST_TAIL_GLUE` grants.
+ * The conjunction that JOINS an item is glue like the article that carries it.
+ * The shared PREDICATE is not glue and is listed nowhere: the item that finishes
+ * a negative list is recognised by what stands in FRONT of its noun
+ * (`finishesDeniedList`), so the predicate behind it is never read.
  */
 const LIST_GLUE =
   /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
-/**
- * The tail of a coordinated list may carry the predicate the whole list shares:
- * "No screenshot, browser frame, or picture proof IS REQUIRED" — the last item
- * finishes the sentence the denial began. That licence belongs to the shared
- * predicate alone; "and a browser frame MUST BE SUPPLIED" says something new.
- *
- * The conjunctions are glue here too, because the item that finishes the list
- * carries the one that joins it — leading after an Oxford comma, and INTERNAL
- * without one.
- */
-const LIST_TAIL_GLUE =
-  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 /**
  * The conjunction that shows a fragment finishes a coordinated list. It may
@@ -920,8 +909,21 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * admitting a render card prices a rendered proof from a population containing
  * none.
  */
-export const denialIsOpen = (fragment) =>
-  PICTURE_PROOF_MARKERS.some((re) => new RegExp(`(?:${re.source})\\s*$`, 'i').test(String(fragment ?? '')))
+const NEGATION_GLUE =
+  /^(?:\s|\b(?:no|not|without|kein|keine|keinen|keinem|keiner|ohne|nicht|a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+
+export const denialIsOpen = (fragment) => {
+  // The fragment is the negation and the noun it denies, and NOTHING else — no
+  // verb, no complement, no modifier. Anything more and the sentence has said
+  // what it had to say. Ending ON the noun is not enough: "The change does not
+  // require a browser frame" ends there and is complete, and reading it as open
+  // let "and a screenshot is required" behind it be suppressed as denied.
+  const bare = PICTURE_PROOF_MARKERS.reduce(
+    (acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '),
+    String(fragment ?? ''),
+  )
+  return NEGATION_GLUE.test(bare)
+}
 
 /**
  * A NEGATIVE CONTINUATION — "No screenshot is required, NOR is a browser frame
@@ -950,18 +952,44 @@ export const continuesDenial = (fragment) => {
   const text = String(fragment ?? '')
   const lead = NEGATIVE_CONTINUATION.exec(text)
   if (!lead) return false
-  return isListContinuation(text, PICTURE_PROOF_MARKERS, { allowPredicate: /^nor$/i.test(lead[1]) })
+  // "NOR is a browser frame required" puts the shared predicate in FRONT of its
+  // noun, and the word itself carries the negation — naming a proof behind it is
+  // enough. German "noch" negates nothing, so only a bare item continues there.
+  if (/^nor$/i.test(lead[1])) return PICTURE_PROOF_MARKERS.some((re) => re.test(text))
+  return isListContinuation(text)
 }
 
-export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS, { allowPredicate = true } = {}) => {
-  const text = String(fragment ?? '')
+export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
   // Nothing but the proof noun and the words that carry it: no statement of its
   // own. A fragment that says something ("provide …", "must be supplied") is a
   // statement and ends whatever the fragment before it decided — a leading "and"
   // does not turn it back into a list item.
-  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text)
-  const glue = allowPredicate && LIST_CONJUNCTION.test(text) ? LIST_TAIL_GLUE : LIST_GLUE
-  return glue.test(bare)
+  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), String(fragment ?? ''))
+  return LIST_GLUE.test(bare)
+}
+
+/**
+ * THE ITEM THAT FINISHES A NEGATIVE LIST, without reading its predicate.
+ *
+ * "No screenshot, browser frame or picture proof IS REQUIRED" and "Kein
+ * Screenshot, Browser Frame oder picture proof MUSS ERSTELLT WERDEN" are the
+ * same shape, and the only reason the second failed was that the predicate was
+ * matched against a list of words — one more vocabulary that could be missing a
+ * language or a mood. What identifies the tail stands entirely in FRONT of its
+ * last proof noun: a conjunction joining it to the list, and nothing but glue
+ * besides. Whatever follows that noun is the predicate the whole list shares,
+ * and it is never read.
+ */
+export const finishesDeniedList = (fragment, markers = PICTURE_PROOF_MARKERS) => {
+  const text = String(fragment ?? '')
+  if (!LIST_CONJUNCTION.test(text)) return false
+  let last = -1
+  for (const re of markers) {
+    for (const hit of text.matchAll(new RegExp(re.source, 'gi'))) if (hit.index > last) last = hit.index
+  }
+  if (last < 0) return false
+  const before = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text.slice(0, last))
+  return LIST_GLUE.test(before)
 }
 
 /** Does ONE clause demand a rendered proof? */
@@ -1002,6 +1030,11 @@ export function lineDemandsPicture(line) {
     // "…, nor is a browser frame required": the negation carries on by itself,
     // but only behind a real denial and only where it adds nothing of its own.
     if (denied && continuesDenial(fragment)) continue
+    // The item that ends the list takes its shared predicate with it.
+    if (denied && open && finishesDeniedList(fragment)) {
+      open = false
+      continue
+    }
     if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
       denied = true
       upkept = false
@@ -1010,7 +1043,7 @@ export function lineDemandsPicture(line) {
     }
     // A bare list item INHERITS the decision in front of it: suppressed after a
     // denial or a housekeeping clause, and a demand of its own where nothing did.
-    if (isListContinuation(fragment, PICTURE_PROOF_MARKERS, { allowPredicate: open })) {
+    if (isListContinuation(fragment)) {
       if (denied || upkept) continue
       if (clauseDemandsPicture(fragment)) return true
       continue
