@@ -52,12 +52,14 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // something else.
     const stored = JSON.parse(read(UNION))
     expect(stored.entries).toEqual(unionFromDocument(read(DOC)))
-    // THIS UNION HAS NO VALID MERGER and must not claim one. Half A is Claude's and
-    // half B is Sol's, so the model that wrote neither is Fable — switched off. Both
-    // folds on record were made by an author of the material.
+    // THIS UNION MUST NOT CLAIM A THIRD-MODEL MERGER. Half A is Claude's and half B
+    // is Sol's, so the model that wrote neither is Fable — switched off since
+    // 20.08.2026, as it has been for every four-eyes stage of this period. Both folds
+    // on record were made by an author of the material, and the note says so instead
+    // of naming a merger the rule would have to refuse.
     expect(stored.mergedBy).toBeUndefined()
-    expect(stored.mergedByNote).toMatch(/no valid merger/i)
-    expect(read(DOC)).toMatch(/WEAKER TWO-MODEL FALLBACK/)
+    expect(stored.mergedByNote).toMatch(/TWO-MODEL FALLBACK/i)
+    expect(read(DOC)).toMatch(/TWO-MODEL FALLBACK/)
   })
 
   it('keeps half B\'s verbatim text and its parsed form the same list', () => {

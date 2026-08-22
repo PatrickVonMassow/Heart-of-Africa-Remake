@@ -43,6 +43,9 @@ stage began. `676-provenance.md` carries the reading. A correction filed earlier
 free to merge; that correction is withdrawn.
 
 The consequence is the one the architecture document already stated for itself: half A is
-Claude's, half B is Sol's, and the model that wrote **neither** is Fable 5 — switched off.
-No third model is available, so any re-merge is the weaker two-model fallback of
-CLAUDE.md §6 and is recorded as such, with its framing decorrelated.
+Claude's, half B is Sol's, and the model that wrote **neither** is Fable 5 — switched off since
+20.08.2026, as it has been for every four-eyes stage of this period. Any fold is therefore the
+recorded two-model fallback of CLAUDE.md §6, named rather than skipped, with its framing
+decorrelated. That is the standing position and not a defect of this stage; the owner confirmed
+on 22.08.2026 that Fable stays off here too. This union has been folded twice, by Sol and then
+by Claude, each having written one half and each having read the other.
