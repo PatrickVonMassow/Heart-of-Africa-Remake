@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 12:40 · Quellen-Fingerprint: `6011ae5790cc…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 13:55 · Quellen-Fingerprint: `96a567951f40…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1417,8 +1417,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 85 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 6011ae5790cc370e0fe7d9aa1b5ef4b1b82dc80a91f104549897f1995ced8506 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T10:40:11.861Z -->
+<!-- RETRO-FINGERPRINT: 96a567951f40be6b9bce28c2c928863999afc86f0db9d68bf5bb3471aafa1210 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T11:55:28.286Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
