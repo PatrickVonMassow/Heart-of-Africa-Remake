@@ -969,14 +969,38 @@ describe('the stand-down boundary — declared children cross ownership', () => 
 
   it('writes the transfer at stand-down, and the successor sees and adopts it', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-'))
+    const repo = join(dir, 'repo')
+    const remote = join(dir, 'remote.git')
     const lockPath = join(dir, 'batch-lock.json')
     const path = statePathsFor(lockPath).inFlightPath
+    const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
+    const git = (cwd, ...args) =>
+      execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+        cwd,
+        env: gitEnv,
+        encoding: 'utf8',
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
     try {
-      // `main` is a local+origin checkpoint in this checkout. The declaration is
-      // written directly because the test exercises the handover seam, not the
-      // CLI's separate self-reference refusal.
+      // The checkpoint belongs to this case, never to the checkout running it:
+      // immediately after a landing, that checkout's main is necessarily ahead
+      // of origin/main. A bare remote gives the fixture the pushed equality the
+      // transfer contract requires in every repository state.
+      git(dir, 'init', '-q', '--bare', remote)
+      git(dir, 'init', '-q', '--initial-branch=main', repo)
+      writeFileSync(join(repo, 'agent.txt'), 'moving work\n')
+      git(repo, 'add', 'agent.txt')
+      git(repo, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'checkpoint')
+      git(repo, 'remote', 'add', 'origin', remote)
+      git(repo, 'push', '-q', '-u', 'origin', 'main')
+      expect(git(repo, 'rev-parse', 'main')).toBe(git(repo, 'rev-parse', 'origin/main'))
+
+      // The declaration is written directly because the test exercises the
+      // handover seam, not the CLI's separate self-reference refusal.
       writeDeclaration(declaration({ evidence: [{ kind: 'branch', ref: 'main' }] }), path)
       const boundary = gatherStandDownBoundary(SID, {
+        cwd: repo,
         lockPath,
         now: NOW,
         agentProbes: { branchProbe: () => NOW - 60_000 },
@@ -994,6 +1018,7 @@ describe('the stand-down boundary — declared children cross ownership', () => 
       expect(orientation).not.toContain('provably dead')
 
       const adopted = adoptTransferred('session-successor', {
+        cwd: repo,
         lockPath,
         now: NOW + 1,
         probeSet: { refTipAt: () => NOW, probePid: () => null, worktreeActiveAt: () => null, mtimeOf: () => null },
