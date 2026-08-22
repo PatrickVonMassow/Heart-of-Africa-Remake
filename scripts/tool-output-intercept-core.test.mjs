@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parseSegments } from './command-classify-core.mjs'
+import { expandSegments, headAndArgs } from './command-classify-core.mjs'
 import {
   GREP_RESULT_BUDGET,
   READ_LINE_BUDGET,
@@ -10,7 +10,7 @@ import {
   interceptionEnvelope,
 } from './tool-output-intercept-core.mjs'
 
-const call = (tool_name, tool_input) => interceptToolOutput({ tool_name, tool_input }, { parseSegments })
+const call = (tool_name, tool_input) => interceptToolOutput({ tool_name, tool_input }, { expandSegments, headAndArgs })
 
 function decodedCommand(interception) {
   const encoded = interception.updatedInput.command.match(/--encoded-command ([A-Za-z0-9_-]+)$/)?.[1]
@@ -57,6 +57,15 @@ describe('PreToolUse output interception', () => {
   it('does not mistake producer names in quoted prose for an executed producer', () => {
     expect(call('Bash', { command: 'node -e "console.log(\'git diff and npm ls\')"' })).toBeNull()
     expect(call('Bash', { command: 'echo "grep needle"' })).toBeNull()
+  })
+
+  it.each([
+    ['env CI=1 git diff', 'git diff'],
+    ['sudo npm ls --all', 'npm ls'],
+    ['bash -c "gh run view 123 --log"', 'gh run view'],
+    ['echo $(grep -R needle src)', 'grep'],
+  ])('cannot bypass interception through a shell carrier: %s', (command, producer) => {
+    expect(call('Bash', { command })?.producer).toBe(producer)
   })
 
   it('emits the documented PreToolUse updatedInput envelope', () => {

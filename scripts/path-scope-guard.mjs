@@ -20,7 +20,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { evaluate, DEFAULT_CONTEXT } from './path-scope-core.mjs'
-import { parseSegments } from './command-classify-core.mjs'
+import { expandSegments, headAndArgs, parseSegments } from './command-classify-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -106,7 +106,7 @@ if (isMainModule(import.meta.url)) {
     }
 
     const subject = subjectFrom(payload)
-    const interception = interceptToolOutput(payload, { parseSegments })
+    const interception = interceptToolOutput(payload, { expandSegments, headAndArgs })
     if (!subject && !interception) process.exit(0)
 
     const gathered = gatherPathScope({ sessionId: payload.session_id || '' })

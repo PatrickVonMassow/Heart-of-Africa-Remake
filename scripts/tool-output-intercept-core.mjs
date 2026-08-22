@@ -5,25 +5,19 @@
 export const READ_LINE_BUDGET = 200
 export const GREP_RESULT_BUDGET = 100
 
-const base = (word) => String(word ?? '').replace(/\\/g, '/').split('/').pop().toLowerCase()
-
-function wordsOf(segment) {
-  return (segment?.words ?? []).map((word) => String(word.text ?? ''))
-}
-
 /** The named shell producer in parsed command segments, or null. Quoted prose
  * is safe because the parser keeps it as an operand of its real command. */
-export function shellProducer(command, { parseSegments } = {}) {
-  if (typeof parseSegments !== 'function') return null
-  for (const segment of parseSegments(String(command ?? ''))) {
-    const words = wordsOf(segment)
-    const head = base(words[0])
-    const lower = words.map((word) => word.toLowerCase())
+export function shellProducer(command, { expandSegments, headAndArgs } = {}) {
+  if (typeof expandSegments !== 'function' || typeof headAndArgs !== 'function') return null
+  for (const segment of expandSegments(String(command ?? ''))) {
+    const split = headAndArgs(segment)
+    const head = String(split.head ?? '').toLowerCase()
+    const lower = (split.args ?? []).map((word) => String(word.text ?? '').toLowerCase())
     if (head === 'grep' || head === 'egrep' || head === 'fgrep') return 'grep'
-    if (head === 'git' && lower.slice(1).includes('diff')) return 'git diff'
-    if (head === 'npm' && lower.slice(1).some((word) => word === 'ls' || word === 'list')) return 'npm ls'
+    if (head === 'git' && lower.includes('diff')) return 'git diff'
+    if (head === 'npm' && lower.some((word) => word === 'ls' || word === 'list')) return 'npm ls'
     if (head === 'gh') {
-      const positionals = lower.slice(1).filter((word) => !word.startsWith('-'))
+      const positionals = lower.filter((word) => !word.startsWith('-'))
       if (positionals[0] === 'run' && positionals[1] === 'view') return 'gh run view'
     }
   }
@@ -46,13 +40,13 @@ const positiveInt = (value) => Number.isInteger(value) && value > 0
  * files remain the complete on-disk copy. Shell producers are captured whole by
  * the spill runner and selectively readable with run-logged --show.
  */
-export function interceptToolOutput(payload, { parseSegments } = {}) {
+export function interceptToolOutput(payload, { expandSegments, headAndArgs } = {}) {
   if (!payload || typeof payload !== 'object') return null
   const toolName = payload.tool_name
   const input = payload.tool_input && typeof payload.tool_input === 'object' ? payload.tool_input : {}
 
   if ((toolName === 'Bash' || toolName === 'PowerShell') && typeof input.command === 'string') {
-    const producer = shellProducer(input.command, { parseSegments })
+    const producer = shellProducer(input.command, { expandSegments, headAndArgs })
     if (!producer) return null
     return {
       producer,
