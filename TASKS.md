@@ -147,6 +147,27 @@ put it is the mistake this line exists to stop.
       checkable. The branch documents of this point — `docs/four-eyes/README.md`, the union's
       `mergedByNote` and `docs/handover-architecture.md` — were written before the flip and
       still say the switch is off; the fold corrects them where it lands.
+  (c) THE FOLD IS DONE BUT UNRECORDED, AND THE LEDGER GATE IS WHAT REFUSES IT (measured
+      22.08.2026, 22:20, on `feat/834-durable-authoring-lane`). Fable 5 folded the two blind
+      halves — 14 A + 56 B into 61 union entries, every input entry accounted for, commits
+      81e1062a and eb10461d, pushed. Recording it is REFUSED: `node scripts/mechanism-review.mjs
+      --record 81e1062a --merged-by "Fable 5"` answers that Fable 5 authored one of the two lists
+      and may not merge them. It did not: the halves' tracked model fields are `Claude Opus 5` and
+      `GPT-5.6 Sol`, and Fable's two commits touch only `docs/four-eyes/676-union.json`,
+      `docs/four-eyes/README.md` and `docs/handover-architecture.md` — neither half file. The
+      identity the refusal quotes is an EMAIL form, so `validateMerger`
+      (`scripts/mechanism-review-core.mjs`) is fed the authors of the RECORDED COMMIT RANGE
+      instead of the authors of the two halves. That makes the rule self-defeating for the one
+      case it exists for: a valid fold IS a commit by the third model, so recording any valid
+      fold trips the check. A SECOND route to the same wrong answer must be closed in the same
+      pass: the raw half A `.md` still carries a false `Fable 5` heading, which
+      `docs/four-eyes/676-provenance.md` settles as Claude Opus 5's from the transcript metadata.
+      FINAL STATE: the merger check reads the authorship of the HALVES it is asked to fold, never
+      the authorship of the recording commit; the false heading is corrected at its source; a unit
+      case pins a third-model fold as recordable and a genuine half-author fold as refused; and
+      the fold of this point stands in the four-eyes ledger, so the two superseded fallback folds
+      are no longer its newest rows. This precedes the code steps, because an unrecorded fold is
+      an unproven authorization for everything built on it.
   THE READ-ONLY TEST MAPPING IS DONE, since it is one of the two things safe before the fold. The
   union's "Ordered work" names `scripts/__tests__/<name>.test.mjs` and `tests/<name>.spec.ts`;
   NEITHER convention exists in this repository. Vitest lives beside its subject as
@@ -11127,4 +11148,35 @@ to land than a mechanism that needs a review.
   terms; and the guard registered in `.claude/settings.json` under the authoritative inventory.
   Criticality: medium — no work is lost, but the owner is asked to re-decide what he decided, and
   he has now reported the same class twice.
+  Bundle: Chat & Tafel.
+
+- [ ] 845. A unit test pins the size of a file that lives outside the repository, so an unrelated
+  memory edit reddens the suite (measured 22.08.2026, 22:20, in the `point-834` worktree: `npm run
+  test:unit` reported 12,851 passed, 5 skipped and ONE failure — `scripts/cut-account-core.test.mjs`,
+  case "quotes the landed line and word counts the guard tokenizer reports"). The ceilings table in
+  `docs/document-cut-757.md` quotes a landed measurement of `MEMORY.md`, and `MEMORY.md` is the
+  user's auto-memory at `~/.claude/projects/-workspace-hoa/memory/MEMORY.md` — OUTSIDE the working
+  tree, written by any session that saves a memory, and not covered by any commit. The failure that
+  exposed this was staleness, not drift: that worktree's copy of the table was ten commits behind
+  main. But the same row went red once before, on 20.08.2026, from a genuine memory edit, and the
+  table's own text records that history. The defect is structural: a tracked test asserts a
+  property of an untracked file, so the suite of every unrelated point can turn red because someone
+  wrote down something worth remembering, and the red is charged to whatever point happened to be
+  in flight.
+  FINAL STATE: the tracked suite no longer fails because an untracked file changed size. Which way
+  it is settled is the question this point answers, and the two candidates are named so the answer
+  is a choice and not a drift: EITHER the landed measurement of `MEMORY.md` stops being pinned by
+  the unit layer and moves to the place that already watches that file live — `doc-budget-guard`
+  owns its CEILING today and is the honest home for its CURRENT size, with the table quoting the
+  ceiling alone — OR the row keeps its measurement and gains a refresh command that a memory write
+  runs, so the number is maintained rather than merely asserted. The first is preferred: a number
+  in a document is a snapshot, and only the ceiling is a rule. Whichever is chosen, the CEILING
+  stays enforced exactly as it is today — the ceiling is a user ruling and this point does not
+  reopen it — and the two rows for the two in-repo cut documents (`CLAUDE.md`, global `CLAUDE.md`)
+  keep their pinned measurements, because those files ARE tracked and their rows catch real drift.
+  VERIFIABLE: Vitest showing the suite green after a simulated size change of the out-of-tree
+  memory file, the two in-tree rows still red when THEIR files drift, and `doc-budget-guard` still
+  refusing a `MEMORY.md` that exceeds its ceiling.
+  Criticality: low — no product behaviour and no lost work; it costs a false red on unrelated
+  points, which is a verification-trust problem rather than a defect.
   Bundle: Chat & Tafel.
