@@ -2617,21 +2617,21 @@ The repair is a path that does not depend on where the session stands:
     node "$CLAUDE_PROJECT_DIR/scripts/x.mjs"          # POSIX shell, the default form
     node -e "const p=require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/x.mjs');process.argv.splice(1,0,p);import(require('url').pathToFileURL(p).href)"
 
-The second form is the fallback for a shell that does not expand `$VAR` the
-POSIX way — `cmd.exe` leaves it literal and PowerShell expands its own (unset)
-variable to nothing, and both failures are silent. It resolves the directory
-inside node, so no shell touches it, it contains no `$`, and with the env var
-missing it degrades to today's behaviour rather than to something worse. THREE
-traps, all measured on 07.08.2026 rather than reasoned about: `process.argv
-.splice(1,0,p)` is load-bearing, because `isMainModule` compares against
-`argv[1]` and a bootstrap without it imports the guard and runs NOTHING (exit 0,
-no output — indistinguishable from a clean turn); an argument after `node -e`
-needs a `--` separator or node claims it as its own option; and the quotes must
-be DOUBLE — `node '$CLAUDE_PROJECT_DIR/scripts/x.mjs'` reaches node as that
-literal string and fires from no directory at all, which is why the check reads
-a single-quoted expansion as relative. A hardcoded absolute
-path is the last resort only: `.claude/settings.json` is committed, and it would
-bind every checkout to one machine.
+These anchored forms apply to the hook's own invocation. A command a hook emits
+for a later tool shell instead resolves from the hook file's own location;
+`tool-output-intercept-core.mjs`'s `toolOutputCommand` is the worked example.
+
+The second form handles shells that do not expand `$VAR` the POSIX way:
+`cmd.exe` leaves it literal and PowerShell expands its unset variable to nothing.
+Node resolves the directory without shell expansion and falls back to the current
+cwd when the environment variable is absent. THREE traps were measured on
+07.08.2026: `process.argv.splice(1,0,p)` is load-bearing because `isMainModule`
+compares against `argv[1]`; without it the import runs NOTHING (exit 0, no output).
+An argument after `node -e` needs `--` or node treats it as its own option. Quotes
+must be DOUBLE: `node '$CLAUDE_PROJECT_DIR/scripts/x.mjs'` sends node the literal
+string, so the check treats a single-quoted expansion as relative. A hardcoded
+absolute path is the last resort: committed `.claude/settings.json` would bind
+every checkout to one machine.
 
 THE ROLLOUT IS STAGED, and the staging is the point: one harmless
 high-frequency line first (`lock-heartbeat-hook`), verified in a NEW session
