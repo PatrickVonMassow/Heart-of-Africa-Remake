@@ -14,7 +14,7 @@ import { sameModel } from './mechanism-review-core.mjs'
 const MODEL_IN_HEADING =
   /\b(GPT[\s-]*\d+(?:\.\d+)?[\s-]*Sol|Sol(?:[\s-]*\d+(?:\.\d+)?)?|Claude[\s-]+(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?|(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?)\b/i
 
-/** The claimed model in a machine-readable half or its first markdown heading. */
+/** The claimed model in a machine-readable half or a markdown heading. */
 export function claimedModelFromArtifact(text) {
   const raw = String(text ?? '')
   try {
@@ -23,8 +23,11 @@ export function claimedModelFromArtifact(text) {
   } catch {
     // A prose artefact is expected to be non-JSON.
   }
-  const heading = raw.split(/\r?\n/).find((line) => /^\s*#(?:\s|$)/.test(line)) ?? ''
-  return (heading.match(MODEL_IN_HEADING)?.[1] ?? '').trim()
+  for (const heading of raw.split(/\r?\n/).filter((line) => /^\s*#(?:\s|$)/.test(line))) {
+    const claim = heading.match(MODEL_IN_HEADING)?.[1]
+    if (claim) return claim.trim()
+  }
+  return ''
 }
 
 /** One timestamp in the transcript/CLI domain, or null when it is unusable. */
@@ -49,6 +52,11 @@ export function readTranscriptMessages(text) {
   const messages = []
   const eventTimes = []
   let malformedLines = 0
+  // Codex writes the selected model on each turn_context and the answer as a
+  // later response_item. This is the Sol lane's per-turn equivalent of Claude
+  // Code's message.model; retaining it is what makes the second 676 half
+  // verifiable from its own transcript too.
+  let codexTurnModel = ''
   for (const line of String(text ?? '').split(/\r?\n/)) {
     if (!line.trim()) continue
     let entry
@@ -60,12 +68,18 @@ export function readTranscriptMessages(text) {
     }
     const at = parseArtifactTime(entry?.timestamp)
     if (at !== null) eventTimes.push(at)
+    if (entry?.type === 'turn_context' && typeof entry?.payload?.model === 'string') {
+      codexTurnModel = entry.payload.model.trim()
+      continue
+    }
     const model = typeof entry?.message?.model === 'string' ? entry.message.model.trim() : ''
-    if (at === null || !model || entry?.message?.role !== 'assistant') continue
+    const codexAssistant = entry?.type === 'response_item' && entry?.payload?.role === 'assistant'
+    const actualModel = model || (codexAssistant ? codexTurnModel : '')
+    if (at === null || !actualModel || (entry?.message?.role !== 'assistant' && !codexAssistant)) continue
     messages.push({
       at,
-      model,
-      messageId: String(entry?.message?.id ?? entry?.uuid ?? '').trim(),
+      model: actualModel,
+      messageId: String(entry?.message?.id ?? entry?.payload?.id ?? entry?.uuid ?? '').trim(),
       sidechain: entry?.isSidechain === true,
     })
   }

@@ -21,6 +21,9 @@ describe('transcript-backed authorship', () => {
   it('reads a JSON model or the first markdown heading without inventing an unnamed author', () => {
     expect(claimedModelFromArtifact('{"model":"GPT-5.6 Sol","entries":[]}')).toBe('GPT-5.6 Sol')
     expect(claimedModelFromArtifact('# Proposal A — Fable 5, written blind\n\nBody')).toBe('Fable 5')
+    expect(
+      claimedModelFromArtifact('# Proposal A — written blind\n\n    # Proposal A — Fable 5, original heading'),
+    ).toBe('Fable 5')
     expect(claimedModelFromArtifact('# Proposal A — written blind\n\nBody')).toBe('')
   })
 
@@ -47,12 +50,21 @@ describe('transcript-backed authorship', () => {
 
   it('accepts the 676 half-B claim when its producing message says Sol', () => {
     const text = transcript(
-      entry({ at: '2026-08-13T15:33:30.000Z', model: 'gpt-5.6-sol', id: 'writes-half-b' }),
-      entry({ at: '2026-08-13T15:34:00.000Z', role: 'user' }),
+      JSON.stringify({
+        timestamp: '2026-08-13T15:33:32.265Z',
+        type: 'turn_context',
+        payload: { turn_id: 'sol-turn', model: 'gpt-5.6-sol' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-13T15:36:56.233Z',
+        type: 'response_item',
+        payload: { type: 'message', role: 'assistant', id: 'writes-half-b', content: [] },
+      }),
+      JSON.stringify({ timestamp: '2026-08-13T15:36:56.284Z', type: 'event_msg', payload: {} }),
     )
     const result = checkAuthorship({
       claimedModel: 'GPT-5.6 Sol',
-      artifactAt: '2026-08-13T15:33:30.000Z',
+      artifactAt: '2026-08-13T15:36:56.233Z',
       transcriptText: text,
     })
     expect(result.status).toBe('agreement')

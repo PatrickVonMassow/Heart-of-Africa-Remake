@@ -368,6 +368,53 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
+  it('records verified reviewer authorship and refuses contradictory metadata', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-review-authorship-'))
+    try {
+      const at = '2026-08-13T15:34:26.009Z'
+      const transcript = join(dir, 'session.jsonl')
+      const line = (model) =>
+        [
+          JSON.stringify({
+            timestamp: at,
+            type: 'assistant',
+            message: { role: 'assistant', model, id: 'review-result' },
+          }),
+          JSON.stringify({ timestamp: '2026-08-13T15:34:27.000Z', type: 'user', message: { role: 'user' } }),
+        ].join('\n')
+
+      writeFileSync(transcript, line('claude-fable-5'))
+      const agreed = build({ mode: 'review', modelAt: at, modelTranscript: transcript })
+      expect(agreed.ok, (agreed.errors ?? []).join('\n')).toBe(true)
+      expect(agreed.record.reviewerAuthorship).toMatchObject({
+        status: 'agreement',
+        claimedModel: 'Fable 5',
+        actualModel: 'claude-fable-5',
+        messageId: 'review-result',
+      })
+
+      writeFileSync(transcript, line('claude-opus-5'))
+      const contradicted = build({ mode: 'review', modelAt: at, modelTranscript: transcript })
+      expect(contradicted.ok).toBe(false)
+      expect(contradicted.errors.join('\n')).toMatch(/disagrees with transcript message\.model.*permission is refused/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('records a missing reviewer transcript as unverified', () => {
+    const built = build({
+      mode: 'review',
+      modelAt: '2026-08-13T15:34:26.009Z',
+      modelTranscript: '/transcript/that/is/gone.jsonl',
+    })
+    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
+    expect(built.record.reviewerAuthorship).toMatchObject({
+      status: 'unverified',
+      reason: expect.stringMatching(/cannot read transcript/),
+    })
+  })
+
   it('COUNTS AND RECORDS THROUGH THE SPAWNED COMMAND, flags, exit code and ledger', () => {
     // The build layer above proves the logic; this proves the COMMAND — its flag
     // parsing, its plumbing and its exit code (four-eyes review, fourth round).
@@ -379,6 +426,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'authorship-check-core.mjs',
+        'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         // the AUTHOR allowlist, which answers what a model trailer is (point 667)
@@ -453,6 +502,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'authorship-check-core.mjs',
+        'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         'model-guard-core.mjs',
@@ -678,6 +729,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'authorship-check-core.mjs',
+        'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         'model-guard-core.mjs',
@@ -769,6 +822,8 @@ describe('the mode round-trips into the ledger', () => {
       for (const f of [
         'mechanism-review.mjs',
         'mechanism-review-core.mjs',
+        'authorship-check-core.mjs',
+        'authorship-check-io.mjs',
         'mandatory-duty-core.mjs',
         'blind-merge-core.mjs',
         'model-guard-core.mjs',

@@ -11,10 +11,10 @@
 import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import {
-  checkAuthorship,
   claimedModelFromArtifact,
   formatAuthorship,
 } from './authorship-check-core.mjs'
+import { checkAuthorshipFile } from './authorship-check-io.mjs'
 
 export const FLAG_SPEC = Object.freeze({
   '--artifact': true,
@@ -65,15 +65,6 @@ export const usage = () =>
   '\nThe comparison uses message.model at the artefact timestamp, per message and including\n' +
   'delegated sidechains. A missing transcript is printed as UNVERIFIED, never agreement.'
 
-export function readOptional(path) {
-  if (!String(path ?? '').trim()) return null
-  try {
-    return readFileSync(path, 'utf8')
-  } catch {
-    return null
-  }
-}
-
 if (isMainModule(import.meta.url)) {
   const parsed = parseArgs(process.argv.slice(2))
   if (!parsed.ok) {
@@ -89,10 +80,10 @@ if (isMainModule(import.meta.url)) {
     console.error(`authorship-check: cannot read ${artifact}: ${(error && error.message) || error}`)
     process.exit(2)
   }
-  const result = checkAuthorship({
+  const result = checkAuthorshipFile({
     claimedModel: claimed || claimedModelFromArtifact(artifactText),
     artifactAt: at,
-    transcriptText: readOptional(transcript),
+    transcriptPath: transcript,
   })
   console.log(json ? JSON.stringify({ artifact, transcript: transcript || null, ...result }, null, 2) : formatAuthorship(result, artifact))
   process.exit(result.status === 'agreement' ? 0 : result.status === 'disagreement' ? 1 : 2)

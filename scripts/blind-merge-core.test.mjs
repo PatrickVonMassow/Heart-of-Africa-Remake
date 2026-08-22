@@ -69,6 +69,19 @@ describe('reading and validating the two input lists', () => {
     expect(readList('A', null).entries).toEqual([])
   })
 
+  it('retains tracked origin evidence for the permission check', () => {
+    expect(
+      readList('A', {
+        model: 'Opus 5',
+        authorship: { at: '2026-08-13T15:34:26.009Z', transcript: '~/.claude/projects/session.jsonl' },
+        entries: [],
+      }),
+    ).toMatchObject({
+      authoredAt: '2026-08-13T15:34:26.009Z',
+      transcript: '~/.claude/projects/session.jsonl',
+    })
+  })
+
   it('reads the line form the review prompt asks for, bullets and table pipes and all', () => {
     const text = [
       'Here is what I found:',
