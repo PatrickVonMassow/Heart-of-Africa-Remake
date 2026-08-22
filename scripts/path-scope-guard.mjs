@@ -12,7 +12,8 @@
 // This wrapper only reads the hook payload and is fail-OPEN: no stdin, garbled
 // JSON, an unjudgeable tool, any throw at all → allow. It also STANDS DOWN for a
 // paused batch and for a session that does not own the batch lock, like every
-// guard in this chain.
+// ENFORCEMENT guard in this chain. The output-budget rewrite does not stand
+// down: it protects the context of paused and foreign sessions too.
 //
 // Manual check (and the four-eyes review's way in):
 //   node scripts/path-scope-guard.mjs --check 'ls ~/Downloads'
@@ -20,10 +21,11 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { evaluate, DEFAULT_CONTEXT } from './path-scope-core.mjs'
-import { parseSegments } from './command-classify-core.mjs'
+import { expandSegments, headAndArgs, parseSegments } from './command-classify-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { interceptToolOutput, interceptionEnvelope } from './tool-output-intercept-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -80,6 +82,33 @@ export function gatherPathScope({ sessionId = '' } = {}) {
   return { applicable: true, inputs: { ctx: machineContext() } }
 }
 
+/** Resolve the registered hook's two independent concerns. Path enforcement
+ * stands down with the batch guard; output budgeting still rewrites an allowed
+ * named producer in that same circumstance. `gather` is injectable so the
+ * stand-down branch is covered without writing the live pause marker. */
+export function preToolUseEnvelope(payload, { gather = gatherPathScope } = {}) {
+  const subject = subjectFrom(payload)
+  const interception = interceptToolOutput(payload, { expandSegments, headAndArgs })
+  if (!subject && !interception) return null
+
+  const gathered = gather({ sessionId: payload.session_id || '' })
+  if (!gathered.applicable) return interceptionEnvelope(interception)
+
+  const verdict = subject
+    ? evaluate({ ...subject, ctx: gathered.inputs.ctx, parseSegments })
+    : { block: false }
+  if (verdict.block) {
+    return {
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: verdict.reason,
+      },
+    }
+  }
+  return interceptionEnvelope(interception)
+}
+
 if (isMainModule(import.meta.url)) {
   try {
     const argv = process.argv
@@ -104,24 +133,8 @@ if (isMainModule(import.meta.url)) {
       process.exit(0) // no/garbled stdin (manual run) — nothing to judge
     }
 
-    const subject = subjectFrom(payload)
-    if (!subject) process.exit(0)
-
-    const gathered = gatherPathScope({ sessionId: payload.session_id || '' })
-    if (!gathered.applicable) process.exit(0)
-
-    const verdict = evaluate({ ...subject, ctx: gathered.inputs.ctx, parseSegments })
-    if (verdict.block) {
-      process.stdout.write(
-        JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: 'PreToolUse',
-            permissionDecision: 'deny',
-            permissionDecisionReason: verdict.reason,
-          },
-        }),
-      )
-    }
+    const envelope = preToolUseEnvelope(payload)
+    if (envelope) process.stdout.write(JSON.stringify(envelope))
     process.exit(0)
   } catch (e) {
     console.error(`path-scope-guard error (allowing the call): ${e && e.message}`)

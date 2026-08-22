@@ -11,6 +11,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { commandNamesRun } from '../batch-in-flight.mjs'
+import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
+import { MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
 
 const WRAPPER = join(dirname(fileURLToPath(import.meta.url)), 'run-logged.mjs')
 
@@ -22,6 +24,26 @@ function runShow(args, logDir) {
     env: { ...process.env, VERIFY_LOG_DIR: logDir },
   })
 }
+
+describe('run-logged argument budgets', () => {
+  it('clamps both selective reads and verify digest lines before output is assembled', () => {
+    const parsed = parseRunLoggedArgs([
+      '--tail',
+      '999999',
+      '--max',
+      '999999',
+      '--keep',
+      '999999',
+      'world',
+    ])
+    expect(parsed.own).toMatchObject({
+      tail: MAX_SELECTED_LINES,
+      max: MAX_SELECTED_LINES,
+      keep: MAX_SELECTED_LINES,
+    })
+    expect(parsed.forward).toEqual(['world'])
+  })
+})
 
 describe('run-logged --show', () => {
   it('reads a bounded window and starts NOTHING', () => {
@@ -54,6 +76,32 @@ describe('run-logged --show', () => {
     expect(res.stdout).toContain('no such log')
     expect(readdirSync(dir)).toEqual([])
   })
+
+  it('keeps an oversized line and caller-raised max inside the absolute output budget', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-runlogged-'))
+    const logFile = join(dir, 'huge.log')
+    writeFileSync(logFile, `HEAD ${'x'.repeat(40_000)} TAIL`)
+    const res = runShow(['--show', logFile, '--tail', '999999', '--max', '999999'], dir)
+    expect(res.status).toBe(0)
+    expect(res.stdout.length).toBeLessThanOrEqual(ORDINARY_OUTPUT_BUDGET)
+    expect(res.stdout).toContain('HEAD')
+    expect(res.stdout).toContain('TAIL')
+    expect(res.stdout).toContain('OMITTED')
+    expect(res.stdout).toContain('--tail 120')
+    expect(readdirSync(dir)).toEqual(['huge.log'])
+  })
+
+  it('bounds an invalid selective query error instead of leaking an exception stack on stderr', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-runlogged-'))
+    const logFile = join(dir, 'sample.log')
+    writeFileSync(logFile, 'one\ntwo\n')
+    const res = runShow(['--show', logFile, '--grep', '['], dir)
+    expect(res.status).toBe(1)
+    expect(res.stderr).toBe('')
+    expect(res.stdout).toContain('could not select a log window')
+    expect(res.stdout.length).toBeLessThanOrEqual(ORDINARY_OUTPUT_BUDGET)
+    expect(readdirSync(dir)).toEqual(['sample.log'])
+  })
 })
 
 describe('run-logged default launch — the run-identity re-exec (point 700, Sol round 4)', () => {
@@ -74,6 +122,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         env: { ...process.env, VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
       })
       expect(res.status, res.stderr).toBe(1) // the shim forwards the child's exit code
+      expect(res.stdout).toContain('── tool error digest ── run-logged verify digest')
       const recordName = readdirSync(dir).find((n) => n.endsWith('.run.json'))
       expect(recordName, `log dir held ${readdirSync(dir).join(', ')}`).toBeTruthy()
       const record = JSON.parse(readFileSync(join(dir, recordName), 'utf8'))
