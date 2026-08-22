@@ -1197,3 +1197,32 @@ describe('a coordinated list of denied nouns stays denied', () => {
     expect(pictureBearingPoints(block(98, 'No screenshot is required, provide a browser frame.')).has(98)).toBe(true)
   })
 })
+
+
+describe('the two cross-cases the seams hid', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('keeps a stale ORDINARY baseline out of the denominator when the card shows an inherited one', () => {
+    // The plan refuses this card a correction, so its old promise may not weigh
+    // on the factor every other card receives.
+    const cards = { 10: { estimate: `~2 h ${INHERITED_ESTIMATE_NOTE}` }, 11: { estimate: '~2 h' } }
+    const ledger = { 10: { baseline: '~40 h' } }
+    const criticality = new Map([[10, 'medium'], [11, 'medium']])
+    expect(promiseMedians({ cards, open: [10, 11], criticality, ledger }).get('medium')).toBe(2)
+    const reading = calibrationReading(
+      Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+      ),
+    )
+    // …and the plan does refuse it, which is what makes the exclusion right.
+    expect(rewritePlan(reading, { cards, open: [10, 11], criticality, ledger })[0].changed).toBe(false)
+  })
+
+  it('lets a conjunction introduce a real demand, not only a list item', () => {
+    expect(pictureBearingPoints(block(101, 'No screenshot is required, and a browser frame must be supplied.')).has(101)).toBe(true)
+  })
+
+  it('still lets the shared predicate of a negative list stay denied', () => {
+    expect(pictureBearingPoints(block(102, 'No screenshot, browser frame, or picture proof is required.')).has(102)).toBe(false)
+  })
+})

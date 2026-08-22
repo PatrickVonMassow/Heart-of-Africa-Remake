@@ -706,7 +706,16 @@ export function promiseMedians({ cards = {}, open = [], criticality = new Map(),
     // had been removed and let them weigh on the denominator.
     if (from === null || from === undefined) continue
     const baseline = ledgerEntry(ledger, point)?.baseline ?? from
-    if (String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)) continue
+    // BOTH values, exactly as the plan tests them. A card showing an inherited
+    // class median while the ledger still remembers an older ordinary promise is
+    // refused a correction — so that old promise may not weigh on the factor the
+    // other cards get either.
+    if (
+      String(from ?? '').includes(INHERITED_ESTIMATE_NOTE) ||
+      String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)
+    ) {
+      continue
+    }
     const hours = parseEstimateHours(baseline)
     if (!hours) continue
     const label = crit.get(point) ?? UNTAGGED
@@ -808,17 +817,28 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  */
 const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
+/**
+ * The tail of a coordinated list may carry the predicate the whole list shares:
+ * "No screenshot, browser frame, or picture proof IS REQUIRED" — the last item
+ * finishes the sentence the denial began. That licence belongs to the shared
+ * predicate alone; "and a browser frame MUST BE SUPPLIED" says something new.
+ */
+const LIST_TAIL_GLUE =
+  /^(?:\s|\b(?:a|an|the|ein|eine|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+
 /** "…, or picture proof is required" — a fragment openly hanging off the last. */
 const LIST_CONJUNCTION = /^\s*(or|and|nor|oder|und)\b/i
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
   const text = String(fragment ?? '')
-  if (LIST_CONJUNCTION.test(text)) return true
+  const conjunction = LIST_CONJUNCTION.exec(text)
+  const rest = conjunction ? text.slice(conjunction[0].length) : text
   // Nothing but the proof noun and the words that carry it: no statement of its
-  // own. A fragment that says something ("provide …", "required") is a statement
-  // and ends whatever the fragment before it decided.
-  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text)
-  return LIST_GLUE.test(bare)
+  // own. A fragment that says something ("provide …", "must be supplied") is a
+  // statement and ends whatever the fragment before it decided — a leading "and"
+  // does not turn it back into a list item.
+  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), rest)
+  return (conjunction ? LIST_TAIL_GLUE : LIST_GLUE).test(bare)
 }
 
 /** Does ONE clause demand a rendered proof? */
