@@ -515,6 +515,12 @@
       "why": "Behind point 174 by the user's rule of 20.08.2026: the machine filed this point itself, so it does not overtake the release — its own QUEUE RANK clause says so and states the cost of the delay",
       "origin": "machine",
       "place": "last"
+    },
+    "840": {
+      "at": "2026-08-22T15:32:19.560Z",
+      "why": "It cannot wait because point 834 does not: 834 stands before the release by the user's 22.08.2026 ruling, and its own spec forbids building until the union has been folded by a model that wrote neither half — a question only a checkable authorship answer can settle. Left behind the release, 834 either stalls with it or proceeds on a label this session already proved false once.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -564,7 +570,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T14:01:36.728Z",
+    "at": "2026-08-22T15:32:19.566Z",
     "points": [
       174,
       184,
@@ -810,7 +816,8 @@
       836,
       837,
       838,
-      839
+      839,
+      840
     ]
   }
 }
