@@ -114,12 +114,14 @@ if (isMainModule(import.meta.url)) {
     const { a: pathA, b: pathB, union: pathU, mergedBy = '', fallback = '', modelA = '', modelB = '' } = parsed.values
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
-    const expectedMerger = mergerModel(fableState)
     const a = parseListText('A', readText(pathA))
     const b = parseListText('B', readText(pathB))
     // The flag wins over the file, and the line form has only the flag.
     if (modelA) a.model = modelA
     if (modelB) b.model = modelB
+    // AFTER the authors are known, never before: the merger is the model that wrote
+    // NEITHER half, so naming it needs both halves' authors in hand.
+    const expectedMerger = mergerModel(fableState, [a.model, b.model])
 
     // A list that cannot be counted is refused BEFORE the merge, not after: a
     // missing or repeated ID makes every number below meaningless.
@@ -149,8 +151,8 @@ if (isMainModule(import.meta.url)) {
             `      ${p.b}: ${y?.file ?? ''} — ${y?.defect ?? ''}`,
         )
       }
-      console.log(`\nMERGING MODEL — ${expectedMerger} (from node scripts/fable-switch.mjs --status)`)
-      const framing = mergePromptFraming(fableState)
+      console.log(`\nMERGING MODEL — ${expectedMerger} (it wrote neither half; node scripts/fable-switch.mjs --status)`)
+      const framing = mergePromptFraming(fableState, [a.model, b.model])
       if (framing) console.log(`\n${framing}`)
       console.log(
         '\nThese pairs are a RANKING, not the merge: read BOTH lists in full and pair anything\n' +
@@ -176,7 +178,7 @@ if (isMainModule(import.meta.url)) {
     if (declared && !sameModel(declared, expectedMerger)) {
       merger.ok = false
       merger.errors.push(
-        `merger "${declared}" contradicts the Fable switch: ${expectedMerger} owns this merge ` +
+        `merger "${declared}" is not the model that wrote neither half: ${expectedMerger} owns this merge ` +
           '(node scripts/fable-switch.mjs --status)',
       )
     }

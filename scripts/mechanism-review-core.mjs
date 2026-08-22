@@ -455,12 +455,12 @@ export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', au
   if (m !== BLIND_PARALLEL || fableState === undefined) {
     return { mergedBy: String(mergedBy ?? '').trim(), mergeFallback: String(mergeFallback ?? '').trim(), errors: [] }
   }
-  const expected = mergerModel(fableState)
+  const expected = mergerModel(fableState, authors)
   const declared = String(mergedBy ?? '').trim()
   const errors = []
   if (declared && !sameModel(declared, expected)) {
     errors.push(
-      `--merged-by "${declared}" contradicts the Fable switch: ${expected} owns this merge ` +
+      `--merged-by "${declared}" is not the model that wrote neither list: ${expected} owns this merge ` +
         '(node scripts/fable-switch.mjs --status)',
     )
   }

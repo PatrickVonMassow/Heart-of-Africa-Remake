@@ -126,7 +126,7 @@ describe('the command', () => {
   it('refuses a merger that contradicts the switch', () => {
     const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Opus 5')
     expect(r.status).toBe(1)
-    expect(r.out).toMatch(/contradicts the Fable switch/)
+    expect(r.out).toMatch(/is not the model that wrote neither half/)
   })
 
   it('refuses a hand-stated outage in place of the switch-owned merger reason', () => {
@@ -142,7 +142,7 @@ describe('the command', () => {
       'GPT-5.6 Sol was unreachable in this session',
     )
     expect(r.status).toBe(1)
-    expect(r.out).toMatch(/contradicts the Fable switch/)
+    expect(r.out).toMatch(/is not the model that wrote neither half/)
     expect(r.out).toMatch(/stated fallback contradicts/)
   })
 
@@ -155,6 +155,7 @@ describe('the command', () => {
   })
 
   it('selects Sol while off, decorrelates its prompt, and records the switch fallback as weaker', () => {
+    // B names no author here, so self-merge cannot be ruled out and the framing is owed.
     const prompt = runOff('--a', p('A.json'), '--b', p('B.txt'))
     expect(prompt.status).toBe(0)
     expect(prompt.out).toContain('MERGING MODEL — GPT-5.6 Sol')
