@@ -3,30 +3,48 @@
 PROVENANCE. This is the result of the blind-parallel four-eyes stage of 13.08.2026 (CLAUDE.md
 §6) on the question: how can the batch keep three authoring lanes busy AND hand the session over
 on context, when today a handover kills every worker the session spawned. Two lists were written
-blind — list A by Claude (Opus 5), list B by GPT-5.6 Sol (`local/sol-blind-proposal.md`, not
-versioned) — and merged into the counted union below, every entry accounted for as `only A`,
-`only B` or `merged with <id>`.
+blind — **list A by Fable 5, list B by GPT-5.6 Sol** — and merged into the counted union below,
+every entry accounted for as `only A`, `only B` or `merged with <id>`. Both raw halves are
+versioned in `docs/four-eyes/` and the union is `docs/four-eyes/676-union.json`, so the count is
+reproducible: `node scripts/blind-merge.mjs --a … --b … --union …`.
 
-DEVIATION, NAMED RATHER THAN INHERITED SILENTLY: CLAUDE.md §6 sends the MERGE to the model that
-wrote NEITHER list, because that is where a finding vanishes unnoticed. This merge was performed
-by Sol, the author of list B, while a third model (Fable 5) existed. The union is therefore
-usable as a specification but NOT yet a valid four-eyes result: before implementation begins the
-merge is re-run by the model that wrote neither list, against list B and the A entries preserved
-in the table below. This is work-order point 676's first step, not a footnote.
+THE DEVIATION IS SETTLED (22.08.2026). The original merge was performed by Sol, the author of
+list B, which CLAUDE.md §6 forbids: the merge is where a finding vanishes unnoticed. That
+deviation is now repaired, and two errors in how it was described are repaired with it.
+
+First, this section named the wrong author for list A. It said Claude (Opus 5) and offered Fable
+5 as the untainted third model, so the remedy it prescribed for itself was impossible — Fable
+wrote list A. The origin session's own commands say so verbatim (`# Proposal A — Fable 5, written
+13.08.2026 before seeing any other proposal`). The model that wrote NEITHER half is therefore
+Claude (Opus 5), and the re-merge did not wait on the Fable switch.
+
+Second, the raw halves had never been versioned — list A lived only in a session scratchpad under
+`/tmp`, list B only in the untracked `local/`. Recovering them is what made the re-merge possible
+at all; `docs/four-eyes/README.md` now makes filing both halves a rule.
+
+THE RE-MERGE, by Claude (Opus 5), 22.08.2026, against the recovered raw halves. The accounting
+holds exactly: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), every
+input entry claimed once, no dangling reference and no duplicate. Fifty-seven rows are faithful.
+FOUR ROWS LOST A CLAUSE and are restored below, marked `RESTORED BY THE RE-MERGE` — three of them
+list-A clauses dropped by list B's own author, which is the failure the third-model rule exists
+to catch. One of the three is demonstrably consequential: A5b had already pointed at the existing
+batch lock and its fence as the thing a coordinator lease must be reconciled with, M8 dropped it,
+no union row mentioned a lock or a migration afterwards, and Sol's audit of 22.08.2026 had to
+raise the missing migration rule again from scratch.
 
 The rejected alternatives are kept deliberately: they are the cheap-looking answers this stage
 ruled out, and an implementer who does not see them re-proposes them.
 
 | Union entry | Sources | Disposition and merged meaning |
 |---|---|---|
-| M1 | A1+B1 merged | The conflict is caused by session-bound process lifetime, not by parallelism itself; handover must preserve active work. |
+| M1 | A1+B1 merged | The conflict is caused by session-bound process lifetime, not by parallelism itself; handover must preserve active work. RESTORED BY THE RE-MERGE (A1): the successor already has the information it needs — the in-flight declaration names branch, worktree, pid and log — and lacks only a live process, so the adoption record extends an existing channel rather than opening a new one. |
 | M2 | only A2 | Retain the reported 13 August 2026 detached-Sol survival result as motivating evidence, but mark it unverified because its logs were not attached. |
 | M3 | A3a+B3 merged | Durable authoring uses the detached `author-sol.mjs` contract—isolated branch/worktree, checkpoints, pushes, heartbeat, log and terminal status—not Agent-tool children. |
 | M4 | A3b+B16 merged | Extend the in-flight declaration into a transferable adoption record with batch, job, attempt and process-start identity; PID alone is insufficient. |
-| M5 | A3c+B33 merged | A planned boundary may occur before landing begins or after the landing journal says `landed`, never during landing; authors need only checkpoint. |
-| M6 | A4+B26 merged | A successor must adopt supervision by stable job identity, query and control workers, classify results and land them without process reparenting. |
+| M5 | A3c+B33 merged | A planned boundary may occur before landing begins or after the landing journal says `landed`, never during landing; authors need only checkpoint. RESTORED BY THE RE-MERGE (B33): after an UNPLANNED crash the successor repeats any human judgment whose completion cannot be proven. M40 journals evidence for crash recovery but never states this rule, so nothing else carried it. |
+| M6 | A4+B26 merged | A successor must adopt supervision by stable job identity, query and control workers, classify results and land them without process reparenting. RESTORED BY THE RE-MERGE (A4): completion has to be noticed WITHOUT a harness notification, because the successor did not spawn the process and no notification is owed to it. |
 | M7 | A5a+B17 merged | A transferred declaration remains probeable and must alert, rather than silently unblock, when its evidence expires or becomes inconsistent. |
-| M8 | A5b+B29 merged | A batch-wide renewable coordinator lease, epoch and fence prevent two sessions from adopting or mutating the same batch. |
+| M8 | A5b+B29 merged | A batch-wide renewable coordinator lease, epoch and fence prevent two sessions from adopting or mutating the same batch. RESTORED BY THE RE-MERGE (A5b): today's batch lock and its fence ALREADY serialise ownership, so the lease is a migration of an existing mechanism and owes a rule relating the two; without it, lock ownership and daemon mutation authority can disagree. |
 | M9 | only A5c | Every unattended detached run remains visible on the progress board with point, owner state, heartbeat and ETA. |
 | M10 | only A6a | **REJECTED:** Raising the three-worker cap does not fix the serial 30–90-minute landing bottleneck and can enlarge the review queue. |
 | M11 | A6b+B43 merged | **REJECTED:** Refilling session-bound Agent children merely to keep a session busy preserves the fatal lifetime dependency and grows context. |
@@ -184,72 +202,16 @@ Neither blind list fully specified schema upgrades, durable-write semantics, com
 - Enforce configurable CPU, memory and disk headroom in addition to the three-process cap.
 - Record sampling method, batch mix, eligible intervals and exclusions so context and throughput comparisons cannot be selected after the fact.
 
-## List B, as written blind (index)
+## The raw blind halves
 
-B1 | CLAUDE.md | The parallelism/handover conflict is a session-lifetime artefact; handover must preserve active durable work.
-B2 | CLAUDE.md | Retain the reported 13 August 2026 detached-Sol survival result as unverified motivating evidence because its logs were not attached.
-B3 | scripts/author-sol.mjs | Make detached Sol the reference authoring contract with isolated worktree, checkpoints, pushes, heartbeat, log and terminal status.
-B4 | scripts/batch-in-flight.mjs | Turn in-flight declarations into adoption records with batch, job, attempt and process-start identities.
-B5 | scripts/land-point.mjs | Permit planned boundaries only before landing begins or after the landing journal reaches landed.
-B6 | scripts/batch-reconcile.mjs | Let successors adopt, inspect, control and land durable jobs by stable identity without process reparenting.
-B7 | scripts/batch-in-flight.mjs | Make expired or inconsistent transferred declarations alert loudly rather than silently unblock.
-B8 | scripts/batch-daemon.mjs | Use one renewable coordinator lease, epoch and fence per batch to prevent double adoption.
-B9 | scripts/batch-board.mjs | Keep every unattended run visible with point, state, heartbeat and ETA.
-B10 | CLAUDE.md | REJECTED: raising the worker cap does not fix serial landing throughput and can enlarge the review backlog.
-B11 | CLAUDE.md | REJECTED: continuous refill with session-bound Agent children preserves destructive handover coupling.
-B12 | CLAUDE.md | REJECTED: authoring workers must not own review judgment, picture verification, landing, bookkeeping or the board.
-B13 | CLAUDE.md | Separate short-lived dispatcher and lander coordinator epochs so neither carries the other role’s history.
-B14 | scripts/measure-context-cost.mjs | Measure full-day median handover context, spend above 150k and points landed per day.
-B15 | CLAUDE.md | Split coordination from session-independent authoring workers.
-B16 | scripts/detached-agent.mjs | Provide a model-neutral adapter and grant transferability only to implementations satisfying the complete durable contract.
-B17 | CLAUDE.md | Treat unsupported Agent-tool children as session-bound and block boundaries until they finish or stop safely.
-B18 | scripts/batch-daemon.mjs | Make the daemon the process parent and lifecycle owner of transferable workers.
-B19 | scripts/detached-agent.mjs | Persist stable run identity, branch, worktree, base SHA, PID, log, heartbeat and launcher lease.
-B20 | scripts/batch-daemon.mjs | Enforce a global three-author limit across coordinator sessions.
-B21 | scripts/batch-dispatch.mjs | Refill only from a bounded pre-authorized queue of concrete dependency-ordered points.
-B22 | scripts/batch-dispatch.mjs | Keep selection and scope decisions with the coordinator; the daemon only starts authorized entries.
-B23 | scripts/batch-dispatch.mjs | Journal a reason and duration whenever three eligible lanes exist but fewer than three run.
-B24 | scripts/batch-dispatch.mjs | Stop refill at an explicit completed-review backlog limit.
-B25 | <git-common-dir>/codex-batches/<batch-id>/events.jsonl | Store the append-only checksummed coordination source of truth outside worktrees and transcripts.
-B26 | <git-common-dir>/codex-batches/<batch-id>/snapshot.json | Maintain an atomically replaced resume snapshot derived from the journal.
-B27 | <git-common-dir>/codex-batches/<batch-id>/snapshot.json | Record explicit point states, actor, epoch, timestamps and local/pushed commit identities.
-B28 | scripts/batch-checkpoint.mjs | Before handover require every durable worker to acknowledge a committed-and-pushed checkpoint, not point completion.
-B29 | scripts/batch-checkpoint.mjs | Make checkpoint timeout render a worker non-transferable and block handover with explicit recovery choices.
-B30 | scripts/batch-boundary.mjs | Implement prepare as a noncommitting health, bookkeeping, lock and checkpoint validation phase.
-B31 | scripts/batch-boundary.mjs | Implement commit as the final old-session action that seals state, advances epoch, creates the marker and obtains a durable receipt.
-B32 | CLAUDE.md | Forbid all tool work and bookkeeping after successful boundary commit.
-B33 | scripts/batch-daemon.mjs | Fence the old epoch on commit and reject every later mutation from it.
-B34 | scripts/batch-daemon.mjs | Record and monitor marker creation, deletion, old-session exit, successor start and successor-ready acknowledgment.
-B35 | scripts/resume-batch.mjs | Resume from durable state, launcher records, declarations and branch SHAs without the predecessor transcript.
-B36 | scripts/batch-reconcile.mjs | Classify every lane before dispatch and quarantine unresolved mismatches in a red board state.
-B37 | scripts/batch-reconcile.mjs | Refill only after reconciliation and global-cap acquisition.
-B38 | CLAUDE.md | Prefer a fresh coordinator after each landing or earlier at a conservative context watermark.
-B39 | scripts/land-point.mjs | Preserve serial landing through a batch-wide landing lock.
-B40 | scripts/land-point.mjs | Journal every landing stage and its evidence so a crash is detectable and recoverable.
-B41 | scripts/land-point.mjs | Persist both main-session graphics-backend judgments and artifact hashes.
-B42 | scripts/land-point.mjs | Revalidate ready branches against the current landing base and route conflicts or changed gates to rework.
-B43 | scripts/detached-agent.mjs | Permit ready-for-review only for a clean worktree, recorded checks and a terminal commit visible remotely.
-B44 | scripts/detached-agent.mjs | Convert heartbeat, exit, push, cleanliness or evidence failures into named alerted states.
-B45 | scripts/detached-agent.mjs | Prevent duplicate writers with attempt leases, process-start identity and fail-closed worktree locks.
-B46 | scripts/detached-agent.mjs | Require lease validation before every checkpoint and push, stopping fenced attempts without deleting their branches.
-B47 | scripts/batch-reconcile.mjs | Reconstruct only provable facts after registry damage and quarantine uncertainty.
-B48 | scripts/batch-boundary.mjs | Refuse handover when daemon, durable state, remote push or successor launch is unhealthy.
-B49 | scripts/batch-dispatch.mjs | Cancel through the daemon while recording reason and last pushed SHA and preserving the branch.
-B50 | CLAUDE.md | REJECTED: routinely draining all lanes before every boundary defeats parallelism and recreates the idle tail.
-B51 | CLAUDE.md | REJECTED: durability of only one lane is insufficient while any active lane remains session-bound.
-B52 | CLAUDE.md | REJECTED: opaque child handles and copied transcripts provide neither durable ownership nor context reduction.
-B53 | CLAUDE.md | REJECTED: PID, log, marker or local commit alone cannot prove a worker is safely transferable.
-B54 | CLAUDE.md | REJECTED: arbitrary post-marker work makes the sealed handover state stale and must fail visibly.
-B55 | scripts/batch-metrics.mjs | Generate canonical metrics from durable events, launcher times, reason codes, receipts and context samples.
-B56 | scripts/batch-metrics.mjs | Report eligible three-lane utilization with every excluded interval individually recorded.
-B57 | scripts/batch-metrics.mjs | Report checkpoint wait, successor-ready latency, carried workers, landing duration and high-context spend.
-B58 | progress board | REJECTED AS SOLE TEST: the numeric latency and utilization targets require baseline throughput and safety checks to prevent gaming.
-B59 | progress board | Fail the trial for any lost attempt, duplicate writer, overlapping coordinator lease, unaccounted idle interval or silent boundary miss.
-B60 | CLAUDE.md | Roll out the proven Sol adapter first and gate every later adapter on the full failure-drill suite.
-B61 | CLAUDE.md | Retain drain-before-boundary as the explicit fallback whenever any active lane is non-transferable.
-B62 | scripts/batch-state.mjs | Version journal and snapshot schemas and use durable write-flush-rename semantics with tested migration.
-B63 | scripts/batch-daemon.mjs | Authenticate local control, restrict state permissions and never execute commands derived from mutable worker output.
-B64 | scripts/batch-daemon.mjs | Define auditable retention and safe pruning for terminal logs, receipts, branches and worktrees.
-B65 | scripts/batch-dispatch.mjs | Apply configurable CPU, memory and disk headroom alongside the process-count cap.
-B66 | scripts/batch-metrics.mjs | Fix the baseline, sampling method, batch mix and exclusion rules before evaluating results.
-B67 | scripts/batch-daemon.mjs | Give every mutating daemon, checkpoint and boundary request an idempotency key so retries cannot duplicate actions.
+They are versioned, not reproduced here. A section of this document once claimed to be "List B,
+as written blind"; it was not. It carried 67 entries against list B's 56, and all 56 comparable
+rows disagreed with the raw text — it was the union itself, renumbered, with `B<n>` standing for
+`M<n>`. That is what made the stage look unrecoverable, and it is removed rather than corrected,
+because the raw halves now have a home that cannot drift from them:
+
+| Half | Model | Entries | File |
+|---|---|---|---|
+| A | Fable 5 | 14 | `docs/four-eyes/676-blind-a-fable5.json` / `.md` |
+| B | GPT-5.6 Sol | 56 | `docs/four-eyes/676-blind-b-sol.json` / `.md` |
+| Union | merged by Claude (Opus 5) | 61 | `docs/four-eyes/676-union.json` |
