@@ -976,11 +976,14 @@ describe('the count the report prints is the plan it printed', () => {
       pictureBearing: new Set([20, 30]),
     })
     const held = heldOutForPicture(plan)
-    expect(held.map((p) => p.point)).toEqual([20])
-    // Card 30 owes a proof too but carries no estimate, so it is NOT counted as
-    // held back — the report says that difference out loud rather than hiding it.
-    expect(plan.find((p) => p.point === 30).reason).toMatch(/no stored estimate/)
+    // BOTH render cards are held out — owing a proof is a property of the point,
+    // not of what its card happens to hold. The report separates them by whether
+    // there was an estimate to keep, and the two numbers add up to this set.
+    expect(held.map((p) => p.point)).toEqual([20, 30])
+    expect(held.filter((p) => p.from !== null && p.from !== undefined)).toHaveLength(1)
     expect(held.every((p) => p.reason.includes(PICTURE_HOLDOUT_REASON))).toBe(true)
+    // The card owing nothing is untouched by the holdout and is corrected.
+    expect(plan.find((p) => p.point === 10).changed).toBe(true)
   })
 })
 
@@ -1053,15 +1056,29 @@ describe('a held-out card is held out whatever kind of estimate it carries', () 
     expect(heldOutForPicture(plan)).toHaveLength(1)
   })
 
-  it('still reports a render card with NO estimate as having none', () => {
+  it('holds out a render card with no estimate at all, and shows it carries none', () => {
     const plan = rewritePlan(reading, {
       cards: {},
       open: [30],
       criticality: new Map([[30, 'medium']]),
       pictureBearing: new Set([30]),
     })
-    expect(plan[0].reason).toMatch(/no stored estimate/)
-    expect(heldOutForPicture(plan)).toHaveLength(0)
+    expect(plan[0]).toMatchObject({ point: 30, from: null, changed: false })
+    expect(heldOutForPicture(plan)).toHaveLength(1)
+  })
+
+  it('holds it out on a STALE LEDGER BASELINE too, rather than correcting from it', () => {
+    // The card is empty now, but the ledger remembers what it once promised.
+    // Testing the live estimate let exactly this card through to a correction.
+    const plan = rewritePlan(reading, {
+      cards: {},
+      open: [30],
+      criticality: new Map([[30, 'medium']]),
+      pictureBearing: new Set([30]),
+      ledger: { 30: { baseline: '~8 h' } },
+    })
+    expect(plan[0]).toMatchObject({ point: 30, changed: false })
+    expect(plan[0].reason).toContain(PICTURE_HOLDOUT_REASON)
   })
 
   it('leaves a NON-render card with an inherited estimate on its own branch', () => {
@@ -1071,5 +1088,24 @@ describe('a held-out card is held out whatever kind of estimate it carries', () 
       criticality: new Map([[10, 'medium']]),
     })
     expect(plan[0].reason).toMatch(/inherited class median/)
+  })
+})
+
+
+describe('a default is published only from the population it is measured on', () => {
+  it('refuses a class made eligible by render rows it does not measure', () => {
+    // Five RATED render landings make the class whole-class comparable; one
+    // correctable landing is all the median would rest on.
+    const rows = [
+      ...Array.from({ length: 5 }, (_, i) =>
+        landing({ point: 700 + i, elapsedHours: 9, estimateHours: 3, criticality: 'medium', owesPicture: true }),
+      ),
+      landing({ point: 800, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+    ]
+    const reading = calibrationReading(rows)
+    const medium = reading.byAxis.criticality.find((c) => c.name === 'medium')
+    expect(medium.comparable).toBe(true)
+    expect(medium.elapsedComparable).toBe(false)
+    expect(inheritanceDefaults(reading)).toEqual({})
   })
 })

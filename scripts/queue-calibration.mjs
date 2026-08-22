@@ -33,6 +33,7 @@ import {
   elapsedHoursToTick,
   estimateForLanding,
   ELAPSED_BIAS_BASIS,
+  factorForCard,
   inheritanceDefaults,
   inheritedEstimateForClass,
   heldOutForPicture,
@@ -279,36 +280,35 @@ try {
     )
   }
   console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
-  if (reading.decision.adopted && reading.decision.factor) {
-    // A card takes the GLOBAL factor whenever one was adopted, whatever its own
-    // class ratio reads. Printing the per-class ratios here said otherwise.
-    console.log(`  ALL CLASSES  ${fmt(reading.decision.factor, '×')}  (one global factor adopted — the classes do not differ enough to separate)`)
-  } else {
-    for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}  (ratio)`)
-  }
-
   const pictureBearing = pictureBearingPoints(tasksAll)
   // The SAME exclusion the plan uses, so the printed factor is the applied one.
   const promises = promiseMedians({ cards, open, criticality, ledger, exclude: pictureBearing })
+  // ASKED OF THE SAME FUNCTION THE PLAN ASKS. Every earlier version of this block
+  // re-derived which branch a class would take and drifted from it; the report
+  // cannot disagree with the correction now, because it is the same answer.
   for (const c of reading.byAxis.criticality) {
-    const promise = promises.get(c.name)
-    if (!c.comparable && c.elapsedComparable && promise) {
-      console.log(
-        `  ${c.name.padEnd(13)} ${fmt(c.correctable.median / promise, '×')}  (${ELAPSED_BIAS_BASIS}: median ${fmt(c.correctable.median, ' h')} ` +
-          `over ${c.correctable.n} landing(s) that owed no rendered proof, measured against the ${fmt(promise, ' h')} its open cards promise)`,
-      )
-    }
+    const promise = promises.get(c.name) ?? null
+    const { factor, basis } = factorForCard(reading, c.name, { promiseMedian: promise })
+    if (!factor) continue
+    const detail =
+      basis === `${ELAPSED_BIAS_BASIS}:${c.name}`
+        ? `median ${fmt(c.correctable.median, ' h')} over ${c.correctable.n} landing(s) that owed no rendered proof, ` +
+          `measured against the ${fmt(promise, ' h')} its open cards promise`
+        : basis === 'global'
+          ? 'one global factor adopted — the classes do not differ enough to separate'
+          : `${c.correctableRatio.n} landing(s) measured against the promise each carried`
+    console.log(`  ${String(c.name).padEnd(13)} ${fmt(factor, '×')}  (${basis}: ${detail})`)
   }
 
   const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing })
   // COUNTED FROM THE PLAN ITSELF, never from the marker set: the markers span the
   // whole work order, closed points included, and only an OPEN card can be held out.
-  const heldOut = heldOutForPicture(plan).length
-  const declaredOpen = plan.filter((p) => pictureBearing.has(p.point)).length
-  if (declaredOpen) {
+  const held = heldOutForPicture(plan)
+  const withEstimate = held.filter((p) => p.from !== null && p.from !== undefined).length
+  if (held.length) {
     console.log(
-      `  ${declaredOpen} open card(s) ask for a rendered proof and are held out of the correction AND of its denominator; ` +
-        `${heldOut} of them carry an estimate that is kept as it stands; the remaining ${declaredOpen - heldOut} carry none at all. ` +
+      `  ${held.length} open card(s) ask for a rendered proof and are held out of the correction AND of its denominator; ` +
+        `${withEstimate} carry an estimate that is kept as it stands, ${held.length - withEstimate} carry none at all. ` +
         'This measurement cannot establish what a picture check costs, so it does not price one.',
     )
   }

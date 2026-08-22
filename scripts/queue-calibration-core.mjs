@@ -893,10 +893,11 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     const from = cards?.[point]?.estimate ?? null
     const entry = ledgerEntry(ledger, point)
     const baseline = entry?.baseline ?? from
-    // BEFORE the inherited-note branch: a card owing a rendered proof is held out
-    // whatever kind of estimate it carries, so the reported count means what it
-    // says — every open card owing a proof and carrying one is in it.
-    if (from !== null && from !== undefined && picture.has(point)) {
+    // BEFORE EVERY OTHER BRANCH: owing a rendered proof is a property of the
+    // POINT, not of what its card happens to hold right now. Testing the live
+    // estimate let a render card with an empty card but a surviving ledger
+    // baseline fall through and be corrected from that stale baseline.
+    if (picture.has(point)) {
       plan.push({
         point,
         from,
@@ -1009,8 +1010,11 @@ export function inheritanceDefaults(reading) {
   for (const c of reading?.byAxis?.criticality ?? []) {
     // Measured elapsed time is the default's whole content, so a class settles
     // this the moment it HAS measured landings — a ratio snapshot adds nothing
-    // to a median the git history already answers.
-    if (!c.comparable && !c.elapsedComparable) continue
+    // to a median the git history already answers. The test is `elapsedComparable`
+    // ALONE: it is the eligibility of the correctable population, which is the
+    // population the median below is taken from. Accepting whole-class rated
+    // eligibility here published a median drawn from as little as one row.
+    if (!c.elapsedComparable) continue
     // The SAME population the eligibility was judged on. Taking the pooled median
     // here handed a new card a number measured partly on render work that no
     // card of this kind is ever corrected from.
