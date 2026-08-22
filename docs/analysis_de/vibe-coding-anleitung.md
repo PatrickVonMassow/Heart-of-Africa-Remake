@@ -190,6 +190,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Aufgabe, und bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
   festhalten, was mich braucht, weitergehen. Jedes Warten bricht auch beim **Fehler** ab."
 
+- **Das Warten stirbt mit dem Wartenden.** Der Lauf wartet auf ein Ergebnis — und der, der
+  wartet, geht unter. Danach wartet niemand mehr, und alles steht bis zum nächsten Weckruf,
+  obwohl das Ergebnis längst da ist.
+  → *Prompt:* „Ein Wartezustand gehört in eine **Datei**, nicht in einen laufenden Prozess: Wer
+  nach einem Ausfall übernimmt, muss ihm ansehen können, **worauf** gewartet wird und **wie
+  weit** es ist, und dort weiterwarten statt neu anzufangen. Der Notfall-Weckruf ist die
+  Rückfallebene, nie der normale Weg."
+
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
@@ -427,4 +435,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b24f10099c4cbf7d4e020511608326708b2511911d275180e59bd4bc25baea4c -->
+<!-- GUIDE-FINGERPRINT: aeaf19c67340ecb9cf8597d0b3afd2c0df69f42b2249300b569c1c09a5c0a7ec -->
