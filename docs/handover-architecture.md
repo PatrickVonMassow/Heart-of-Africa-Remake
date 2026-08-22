@@ -739,7 +739,9 @@ asked first, because a copy no write order could have produced says nothing abou
 must not be resolved by it. Only then does the record's own probe decide, because the record is
 the authority on existence: a dead record is COLD whatever the copy says, and the copy's staleness
 is part of that resolution rather than a reading competing with it. An unprobed record is read
-exactly like a dead one — this table never treats "not asked" as "alive".
+exactly like a dead one — this table never treats "not asked" as "alive", and a probe that
+carries no AFFIRMATIVE verdict is "not asked": a failed or partial probe returns an identity
+without an answer, and un-negated is not the same as confirmed.
 
 | Record | Copy | Probe | Reading | Resolution |
 |---|---|---|---|---|

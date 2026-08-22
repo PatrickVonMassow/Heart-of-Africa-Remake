@@ -236,6 +236,9 @@ describe('the daemon pair — record and the lock copy of it', () => {
       'impossible-copy',
     ],
     ['record with no generation', { record: { ...record, generation: undefined }, copy, probe: alive }, 'impossible-copy'],
+    // A probe that found the identity and never answered is an unprobed record.
+    ['probe without a verdict', { record, copy, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'stale-copy'],
+    ['probe without a verdict, no copy', { record, copy: null, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'cold-record'],
   ]
 
   it('decides every input state, and produces every reading it declares', () => {
@@ -385,9 +388,14 @@ describe('mutation validation — the fence IS the coordinator epoch', () => {
     expect(validateMutation({ presented, lock, probe, now: NOW + 120_000 }).reason).toMatch(/lease has expired/)
   })
 
-  it('does not accept a probe that reported the owner DEAD, or no probe at all', () => {
+  it('requires an AFFIRMATIVE live verdict, not merely the absence of a dead one', () => {
     expect(validateMutation({ presented, lock, probe: { ...probe, live: false }, now: NOW }).ok).toBe(false)
     expect(validateMutation({ presented, lock, probe: null, now: NOW }).reason).toMatch(/not probed live/)
+    // A probe that found the identity but never answered the question: matching pid
+    // and start time, no verdict. That is a failed probe, not a live owner.
+    const { live: _unanswered, ...noVerdict } = probe
+    expect(validateMutation({ presented, lock, probe: noVerdict, now: NOW }).ok).toBe(false)
+    expect(validateMutation({ presented, lock, probe: { ...probe, live: 'yes' }, now: NOW }).ok).toBe(false)
   })
 
   it('refuses a lock whose lease is missing or unreadable rather than treating it as unexpiring', () => {

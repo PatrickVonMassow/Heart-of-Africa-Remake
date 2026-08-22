@@ -310,7 +310,9 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null } 
     }
   }
 
-  const live = Boolean(probe) && probe.live !== false && sameProcess(record, probe)
+  // The same affirmative rule as `validateMutation`: a probe without a verdict is
+  // an unprobed record, and this table never reads "not asked" as "alive".
+  const live = probe?.live === true && sameProcess(record, probe)
   if (!live) {
     if (!copy) return reading('cold-record')
     // A dead record is cold whichever copy stands beside it. `stale-copy` is the
@@ -463,7 +465,10 @@ export function validateMutation({ presented = {}, lock = null, probe = null, no
   // Liveness is the probe's own answer AND the identity match. A probe that says
   // `live: false`, or none at all, is not evidence of a live owner — reading only
   // pid and start time from it would accept a process it just reported dead.
-  if (!probe || probe.live === false) return { ok: false, reason: 'the lock owner was not probed live' }
+  // AFFIRMATIVE, not merely un-negated: `live !== false` accepts a probe that never
+  // answered, and a probe object carrying an identity but no verdict is exactly what
+  // a failed or partial probe returns.
+  if (probe?.live !== true) return { ok: false, reason: 'the lock owner was not probed live' }
   if (!sameProcess(lock, { pid: probe.pid, pidStartedAt: probe.startedAt })) {
     return { ok: false, reason: 'the probed process is not the one the lock names' }
   }
