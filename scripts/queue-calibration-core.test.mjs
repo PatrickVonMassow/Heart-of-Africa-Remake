@@ -1471,8 +1471,22 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
   it('separates an open denial from a closed one', () => {
     expect(denialIsOpen('No screenshot')).toBe(true)
     expect(denialIsOpen('No screenshot is required')).toBe(false)
+    expect(denialIsOpen('Kein Screenshot nötig')).toBe(false)
     expect(denialIsOpen('Nicht erforderlich')).toBe(false)
     expect(denialIsOpen('The change does not require a browser frame')).toBe(false)
+  })
+
+  it('does not close a denial on a requirement word that qualifies its NOUN', () => {
+    // "No screenshot showing the REQUIRED state" is still an open negative list:
+    // the word describes what the screenshot would show, not what the sentence
+    // demands. Read as closure it took the licence off the item that finishes
+    // the list, and "or picture proof is needed" became a demand.
+    expect(denialIsOpen('No screenshot showing the required state')).toBe(true)
+    expect(
+      pictureBearingPoints(
+        block(156, 'No screenshot showing the required state, browser frame, or picture proof is needed.'),
+      ).has(156),
+    ).toBe(false)
   })
 
   it('reads a positive coordinated demand behind a closed denial as a demand', () => {

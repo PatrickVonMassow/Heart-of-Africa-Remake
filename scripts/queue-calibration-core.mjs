@@ -895,13 +895,15 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * behind it is a new sentence with a predicate of its own, and reading it as the
  * tail of the negative list turned a demand into a denial.
  */
-// This is only ever asked of a fragment already known to be a DENIAL, so the
-// bare presence of the requirement word is the predicate: "Kein Screenshot
-// nötig" has said it as plainly as "No screenshot is required". Reading only the
-// English shapes left the German denials open, and an open denial lends its
-// predicate to the clause behind it — which swallowed "Noch ein Browser Frame
-// erforderlich".
-const DENIAL_CARRIES_PREDICATE = /\b(required|needed|necessary|require|requires|need|needs|nötig|noetig|erforderlich)\b/i
+// The requirement word has to BE the predicate, not merely appear in the clause:
+// "No screenshot showing the REQUIRED state, browser frame, or picture proof is
+// needed" is an open negative list, and reading the bare word as closure turned
+// its last item into a demand. Three shapes say it — a copula reaching the word
+// in either language, an English "does not require", and the predicative
+// adjective that ends a clause, which is how German states it ("Kein Screenshot
+// nötig") and how the bare forms read ("Not required", "Nicht erforderlich").
+const DENIAL_CARRIES_PREDICATE =
+  /\b(is|are|was|were|be|been|ist|sind|war|waren|wird|werden)\b[^,;:]{0,30}\b(required|needed|necessary|nötig|noetig|erforderlich)\b|\bnot\s+(\w+\s+){0,2}(require|requires|need|needs|required|needed|necessary)\b|\b(required|needed|necessary|nötig|noetig|erforderlich)\s*$/i
 
 export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
 
