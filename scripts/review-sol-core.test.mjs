@@ -596,21 +596,19 @@ describe('the record the command prints', () => {
     expect(report).toContain('--pass 1/3')
     expect(report).toContain('--pass-files "scripts/a.mjs,scripts/b.mjs"')
     expect(report).toContain('PASS 1/3')
-    expect(report).toMatch(/NOT cleared until every pass 1\.\.3 is recorded/)
+    expect(report).toContain('clears the listed files at aaaaaaa')
   })
 
-  it('prints a bounded one-round record as scoped contribution coverage', () => {
-    const commit = 'b'.repeat(40)
+  it('prints a bounded one-round record as scoped end-state coverage', () => {
     const report = formatReviewReport({
       decision: decideReview(okRun()),
       sha: 'a'.repeat(40),
       mode: 'review',
-      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], commits: [commit] },
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], endState: 'a'.repeat(40) },
     })
     expect(report).toContain('--pass 1/1')
-    expect(report).toContain(`--pass-commits "${commit}"`)
     expect(report).toContain('SCOPED PASS')
-    expect(report).toContain('clears only the listed commit/file contributions')
+    expect(report).toContain('clears the listed files at aaaaaaa')
     expect(report).not.toContain('range too large')
   })
 
@@ -626,7 +624,7 @@ describe('the record the command prints', () => {
         mode: 'review',
         pass: { index, total: 3, files: ['scripts/c.mjs'] },
       })
-      expect(report).toMatch(/NOT cleared until every pass 1\.\.3 is recorded/)
+      expect(report).toContain('clears the listed files at aaaaaaa')
       expect(report).toContain('mechanism-review.mjs --list')
       expect(report).not.toMatch(/next: --pass/)
     }

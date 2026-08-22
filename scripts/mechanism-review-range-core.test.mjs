@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  commitsForContributions,
+  commitsForFiles,
   endStateArtifacts,
   newestReading,
   eligibleReviewer,
-  outstandingContributions,
+  outstandingFiles,
   planAuthorshipGroups,
   summarizeReviewDebt,
   vendorOf,
@@ -33,19 +33,19 @@ describe('authorship-cut mechanism review planning', () => {
     ])
   })
 
-  it('keeps a mixed-vendor file as one end-state artefact', () => {
+  it('keeps a historically mixed-vendor file as one artefact routed by its final author', () => {
     const file = 'scripts/shared-guard.mjs'
     const plan = planAuthorshipGroups({
       commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'GPT-5.6 Sol', [file])],
     })
-    expect(plan.mixedFiles).toEqual([file])
+    expect(plan.mixedFiles).toEqual([])
     expect(plan.groups).toEqual([
       expect.objectContaining({
         kind: 'files',
-        vendor: 'anthropic+openai',
+        vendor: 'openai',
         commits: [sha('a'), sha('b')],
         files: [file],
-        reviewer: '',
+        reviewer: 'Opus 5',
       }),
     ])
   })
@@ -176,302 +176,191 @@ describe('authorship-cut mechanism review planning', () => {
   })
 })
 
-describe('per-contribution review baseline', () => {
-  const commits = [
-    commit('a', 'Claude Opus 5', ['a', 'shared']),
-    commit('b', 'GPT-5.6 Sol', ['b', 'shared']),
-  ]
+describe('per-file end-state review baseline', () => {
   const usable = () => true
-
-  it('retires only the commit/file pairs a scoped pass actually read', () => {
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [
-        {
-          sha: sha('b'),
-          model: 'GPT-5.6 Sol',
-          verdict: 'merge',
-          containedShas: new Set([sha('a'), sha('b')]),
-          pass: { files: ['a', 'shared'], commits: [sha('a')] },
-        },
-      ],
-    })
-    expect(result.covered.map((c) => [c.sha, c.file])).toEqual([
-      [sha('a'), 'a'],
-      [sha('a'), 'shared'],
-    ])
-    expect(result.outstanding.map((c) => [c.sha, c.file])).toEqual([
-      [sha('b'), 'b'],
-      [sha('b'), 'shared'],
-    ])
-  })
-
-  it('clears a bounded one-pass scope and no contribution outside it', () => {
-    const before = commit('a', 'Claude Opus 5', ['shared', 'before'])
-    const inside = commit('b', 'Claude Opus 5', ['shared', 'inside'])
-    const after = commit('c', 'Claude Opus 5', ['shared', 'after'])
-    const result = outstandingContributions({
-      commits: [before, inside, after],
-      recordUsable: usable,
-      records: [
-        {
-          sha: after.sha,
-          model: 'GPT-5.6 Sol',
-          verdict: 'merge',
-          containedShas: [before.sha, inside.sha, after.sha],
-          pass: { index: 1, total: 1, files: ['shared', 'inside'], commits: [inside.sha] },
-        },
-      ],
-    })
-    expect(result.covered.map((c) => [c.sha, c.file])).toEqual([
-      [inside.sha, 'shared'],
-      [inside.sha, 'inside'],
-    ])
-    expect(result.outstanding.map((c) => [c.sha, c.file])).toEqual([
-      [before.sha, 'shared'],
-      [before.sha, 'before'],
-      [after.sha, 'shared'],
-      [after.sha, 'after'],
-    ])
-  })
-
-  it('does not let a reviewer retire its own contribution to a mixed file', () => {
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [
-        {
-          sha: sha('b'),
-          model: 'GPT-5.6 Sol',
-          verdict: 'merge',
-          containedShas: new Set([sha('a'), sha('b')]),
-          pass: { files: ['shared'], commits: [sha('a'), sha('b')] },
-        },
-      ],
-    })
-    expect(result.covered.map((c) => c.sha)).toEqual([sha('a')])
-    expect(result.outstanding.some((c) => c.sha === sha('b') && c.file === 'shared')).toBe(true)
-  })
-
-  it('keeps a read refusal visible and owed', () => {
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [
-        {
-          sha: sha('b'),
-          model: 'Opus 5',
-          verdict: 'do-not-merge',
-          containedShas: [sha('b')],
-          pass: { files: ['b'], commits: [sha('b')] },
-        },
-      ],
-    })
-    expect(result.refusals).toHaveLength(1)
-    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
-  })
-
-  it('lets a later refusal overturn an earlier clearance of the same contribution', () => {
-    const row = (verdict, at) => ({
-      sha: sha('b'),
-      model: 'Opus 5',
-      verdict,
-      at,
-      containedShas: [sha('b')],
-      pass: { files: ['b'], commits: [sha('b')] },
-    })
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [row('merge', 100), row('do-not-merge', 200)],
-    })
-    // The gate blocks on the newest verdict, so the plan must still owe this
-    // file — counting the older clearance would hide it from every later plan.
-    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
-    expect(result.covered.some((c) => c.file === 'b')).toBe(false)
-    expect(result.refusals).toHaveLength(1)
-  })
-
-  it('lets a later clearance settle a contribution an earlier round refused', () => {
-    const row = (verdict, at) => ({
-      sha: sha('b'),
-      model: 'Opus 5',
-      verdict,
-      at,
-      containedShas: [sha('b')],
-      pass: { files: ['b'], commits: [sha('b')] },
-    })
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [row('do-not-merge', 100), row('merge', 200)],
-    })
-    expect(result.covered.some((c) => c.file === 'b')).toBe(true)
-    expect(result.refusals).toHaveLength(0)
-  })
-
-  it('reads the clock, not the ledger position, when the rows arrive out of order', () => {
-    const row = (verdict, at) => ({
-      sha: sha('b'),
-      model: 'Opus 5',
-      verdict,
-      at,
-      containedShas: [sha('b')],
-      pass: { files: ['b'], commits: [sha('b')] },
-    })
-    // The refusal is the NEWER reading but stands FIRST in the array.
-    const result = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [row('do-not-merge', 200), row('merge', 100)],
-    })
-    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
-    expect(result.refusals).toHaveLength(1)
-  })
-
-  it('lets the last line win an equal timestamp, in both directions', () => {
-    const row = (verdict) => ({
-      sha: sha('b'),
-      model: 'Opus 5',
-      verdict,
-      at: 100,
-      containedShas: [sha('b')],
-      pass: { files: ['b'], commits: [sha('b')] },
-    })
-    const cleared = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [row('do-not-merge'), row('merge')],
-    })
-    expect(cleared.covered.some((c) => c.file === 'b')).toBe(true)
-    const refused = outstandingContributions({
-      commits,
-      recordUsable: usable,
-      records: [row('merge'), row('do-not-merge')],
-    })
-    expect(refused.outstanding.some((c) => c.file === 'b')).toBe(true)
-  })
-
-  // An unreadable clock used to decide every later comparison: `NaN >= NaN` is
-  // false, so the first such row won forever and a clearance could bury the
-  // refusal that came after it. A numeric string and an absent stamp were worse
-  // than unreadable — they were silently READ as a time and as the epoch.
-  const row = (verdict, at) => ({
-    sha: sha('b'),
-    model: 'Opus 5',
+  const row = ({ head, files, contained, verdict = 'merge', at = 100, model = 'GPT-5.6 Sol' }) => ({
+    sha: head,
+    model,
     verdict,
-    ...(at === undefined ? {} : { at }),
-    containedShas: [sha('b')],
-    pass: { files: ['b'], commits: [sha('b')] },
+    at,
+    containedShas: contained,
+    pass: { index: 1, total: 1, files, endState: head },
   })
-  const owed = (records) => outstandingContributions({ commits, recordUsable: usable, records })
 
-  for (const [name, at] of [
-    ['NaN', Number.NaN],
-    ['an infinite stamp', Number.POSITIVE_INFINITY],
-    ['a negative infinite stamp', Number.NEGATIVE_INFINITY],
-    ['a string', 'yesterday'],
-    ['a numeric string', '300'],
-    ['an explicit null', null],
-    ['no stamp at all', undefined],
-  ]) {
-    it(`does not let a clearance carrying ${name} bury the refusal appended after it`, () => {
-      const result = owed([row('merge', at), row('do-not-merge', 200)])
-      expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
-      expect(result.refusals).toHaveLength(1)
+  it('keeps a covered file clear after a later commit touches only another file', () => {
+    const first = commit('a', 'Claude Opus 5', ['covered'])
+    const later = commit('b', 'Claude Opus 5', ['other'])
+    const result = outstandingFiles({
+      commits: [first, later],
+      endStateFiles: ['covered', 'other'],
+      recordUsable: usable,
+      records: [row({ head: first.sha, files: ['covered'], contained: [first.sha] })],
     })
+    expect(result.covered.map((artifact) => artifact.file)).toEqual(['covered'])
+    expect(result.outstanding.map((artifact) => artifact.file)).toEqual(['other'])
+  })
 
-    it(`lets a reading appended later settle a refusal carrying ${name}`, () => {
-      // The counter-danger to the one above: a rule that let an unplaceable
-      // refusal win would freeze this contribution as owed for good, and an
-      // unsatisfiable gate is what this point exists to remove.
-      const result = owed([row('do-not-merge', at), row('merge', 500)])
-      expect(result.covered.some((c) => c.file === 'b')).toBe(true)
-      expect(result.refusals).toHaveLength(0)
+  it('owes only a covered file changed by a later commit', () => {
+    const first = commit('a', 'Claude Opus 5', ['covered'])
+    const later = commit('b', 'Claude Opus 5', ['covered'])
+    const result = outstandingFiles({
+      commits: [first, later],
+      endStateFiles: ['covered'],
+      recordUsable: usable,
+      records: [row({ head: first.sha, files: ['covered'], contained: [first.sha] })],
     })
-  }
+    expect(result.covered).toEqual([])
+    expect(result.outstanding.map((artifact) => artifact.file)).toEqual(['covered'])
+  })
 
-  it('does not let an unclocked row between them bury the refusal the clock calls newest', () => {
-    // The pairwise comparison this replaced was no order at all: the unclocked
-    // middle row beat the refusal on ledger position, the last clearance beat
-    // that row the same way, and the scan cleared what the clock says is
-    // refused. The same three rows in any arrangement must owe.
-    const rows = [row('do-not-merge', 300), row('merge', undefined), row('merge', 100)]
-    for (const records of [rows, [rows[2], rows[1], rows[0]], [rows[1], rows[0], rows[2]]]) {
-      const result = owed(records)
-      expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
-      expect(result.refusals).toHaveLength(1)
+  it('does not accept a same-vendor reviewer for the file\'s final author', () => {
+    const changes = [
+      commit('a', 'Claude Opus 5', ['shared']),
+      commit('b', 'GPT-5.6 Sol', ['shared']),
+    ]
+    const result = outstandingFiles({
+      commits: changes,
+      endStateFiles: ['shared'],
+      recordUsable: usable,
+      records: [row({
+        head: changes[1].sha,
+        files: ['shared'],
+        contained: changes.map((change) => change.sha),
+        model: 'GPT-5.6 Sol',
+      })],
+    })
+    expect(result.covered).toEqual([])
+    expect(result.outstanding.map((artifact) => artifact.file)).toEqual(['shared'])
+  })
+
+  it('does not keep the historical contribution-scoped clearing beside the new model', () => {
+    const change = commit('a', 'Claude Opus 5', ['shared'])
+    const legacy = {
+      ...row({ head: change.sha, files: ['shared'], contained: [change.sha] }),
+      pass: { index: 1, total: 1, files: ['shared'], commits: [change.sha] },
     }
+    expect(outstandingFiles({
+      commits: [change],
+      endStateFiles: ['shared'],
+      recordUsable: usable,
+      records: [legacy],
+    }).outstanding.map((artifact) => artifact.file)).toEqual(['shared'])
   })
 
-  it('reads a ledger a branch merge reordered by the clock, not by the line', () => {
-    // Concurrent branches append independently and a merge may place an older
-    // clearance after a newer refusal; both carry clocks, so the clock rules.
-    const result = owed([row('do-not-merge', 900), row('merge', 100)])
-    expect(result.outstanding.some((c) => c.file === 'b')).toBe(true)
+  it('keeps a newer refusal visible and lets a later clearance settle it', () => {
+    const change = commit('a', 'Claude Opus 5', ['guard'])
+    const base = { head: change.sha, files: ['guard'], contained: [change.sha] }
+    const refused = outstandingFiles({
+      commits: [change],
+      endStateFiles: ['guard'],
+      recordUsable: usable,
+      records: [row({ ...base, verdict: 'merge', at: 100 }), row({ ...base, verdict: 'do-not-merge', at: 200 })],
+    })
+    expect(refused.refusals).toHaveLength(1)
+    expect(refused.outstanding).toHaveLength(1)
+    const cleared = outstandingFiles({
+      commits: [change],
+      endStateFiles: ['guard'],
+      recordUsable: usable,
+      records: [row({ ...base, verdict: 'do-not-merge', at: 100 }), row({ ...base, verdict: 'merge', at: 200 })],
+    })
+    expect(cleared.refusals).toEqual([])
+    expect(cleared.covered).toHaveLength(1)
   })
 
-  it('still lets a lone record with no clock rule its contribution', () => {
-    const result = owed([row('merge', undefined)])
-    expect(result.covered.some((c) => c.file === 'b')).toBe(true)
-    expect(result.refusals).toHaveLength(0)
-  })
-
-  it('rebuilds the next plan with only still-owed files', () => {
-    const debt = outstandingContributions({ commits, records: [], recordUsable: usable })
-    const rebuilt = commitsForContributions(debt.outstanding.filter((c) => c.file === 'shared'))
-    expect(rebuilt.map((c) => [c.sha, c.files])).toEqual([
+  it('rebuilds authorship history for only the still-owed files', () => {
+    const commits = [
+      commit('a', 'Claude Opus 5', ['shared', 'done']),
+      commit('b', 'Claude Opus 5', ['shared']),
+    ]
+    const debt = outstandingFiles({ commits, endStateFiles: ['shared', 'done'], records: [], recordUsable: usable })
+    const rebuilt = commitsForFiles(debt.outstanding.filter((artifact) => artifact.file === 'shared'))
+    expect(rebuilt.map((change) => [change.sha, change.files])).toEqual([
       [sha('a'), ['shared']],
       [sha('b'), ['shared']],
     ])
   })
 
-  it('removes a recorded scoped file from the mechanism gate\'s next demand', () => {
-    const head = sha('b')
-    const record = {
-      sha: head,
-      model: 'GPT-5.6 Sol',
-      verdict: 'merge',
-      evidence: 'checked file a against its complete contribution patch',
-      mode: 'review',
-      at: 1_787_000_000_000,
-      pass: { index: 1, total: 2, files: ['a'], commits: [sha('a')] },
+  it('lets one recorded pass clear its files in the mechanism gate', () => {
+    const head = sha('a')
+    const pending = {
+      ...commit('a', 'Claude Opus 5', ['a', 'shared']),
+      subject: 'change two mechanism files',
+      coveringRecordShas: [head],
     }
-    const verdict = evaluateMechanismReview({
+    const record = {
+      ...row({ head, files: ['a'], contained: [head], at: 1_787_000_000_000 }),
+      evidence: 'checked file a against its complete end-state patch',
+      mode: 'review',
+    }
+    const partial = evaluateMechanismReview({
       baseline: sha('0'),
       head,
       records: [record],
-      pendingCommits: [
-        {
-          ...commits[0],
-          subject: 'change two mechanism files',
-          coveringRecordShas: [head],
-        },
-      ],
+      pendingCommits: [pending],
+      endStateFiles: ['a', 'shared'],
     })
-    expect(verdict.block).toBe(true)
-    expect(verdict.findings[0].commit.files).toEqual(['shared'])
-  })
+    expect(partial.block).toBe(true)
+    expect(partial.findings.map((finding) => finding.commit.files)).toEqual([['shared']])
 
-  it('clears a commit once scoped passes have read each file', () => {
-    const head = sha('b')
-    const rows = ['a', 'shared'].map((file, index) => ({
-      sha: head,
-      model: 'GPT-5.6 Sol',
-      verdict: 'merge',
-      evidence: `checked ${file} against its complete contribution patch`,
-      mode: 'review',
-      at: 1_787_000_000_000 + index,
-      pass: { index: index + 1, total: 2, files: [file], commits: [sha('a')] },
-    }))
-    const verdict = evaluateMechanismReview({
+    const second = {
+      ...record,
+      at: record.at + 1,
+      pass: { index: 2, total: 2, files: ['shared'], endState: head },
+      evidence: 'checked shared against its complete end-state patch',
+    }
+    expect(evaluateMechanismReview({
       baseline: sha('0'),
       head,
-      records: rows,
-      pendingCommits: [{ ...commits[0], coveringRecordShas: [head] }],
+      records: [record, second],
+      pendingCommits: [pending],
+      endStateFiles: ['a', 'shared'],
+    }).block).toBe(false)
+  })
+
+  it('keeps that gate clearance after another file changes, but not after this file changes', () => {
+    const reviewed = sha('a')
+    const record = {
+      ...row({ head: reviewed, files: ['covered'], contained: [reviewed], at: 1_787_000_000_000 }),
+      evidence: 'checked covered against its complete end-state patch',
+      mode: 'review',
+    }
+    const first = {
+      ...commit('a', 'Claude Opus 5', ['covered']),
+      coveringRecordShas: [reviewed],
+    }
+    const other = { ...commit('b', 'Claude Opus 5', ['other']), coveringRecordShas: [] }
+    const afterOther = evaluateMechanismReview({
+      baseline: sha('0'),
+      head: other.sha,
+      records: [record],
+      pendingCommits: [first, other],
+      endStateFiles: ['covered', 'other'],
     })
-    expect(verdict.block).toBe(false)
+    expect(afterOther.findings.map((finding) => finding.commit.files)).toEqual([['other']])
+
+    const changedAgain = { ...commit('c', 'Claude Opus 5', ['covered']), coveringRecordShas: [] }
+    const afterSame = evaluateMechanismReview({
+      baseline: sha('0'),
+      head: changedAgain.sha,
+      records: [record],
+      pendingCommits: [first, changedAgain],
+      endStateFiles: ['covered'],
+    })
+    expect(afterSame.findings.map((finding) => finding.commit.files)).toEqual([['covered']])
+  })
+
+  it('demands nothing for a path reverted out of the end state', () => {
+    expect(evaluateMechanismReview({
+      baseline: sha('0'),
+      head: sha('b'),
+      records: [],
+      pendingCommits: [
+        commit('a', 'Claude Opus 5', ['reverted']),
+        commit('b', 'Claude Opus 5', ['reverted']),
+      ],
+      endStateFiles: [],
+    }).block).toBe(false)
   })
 })
 

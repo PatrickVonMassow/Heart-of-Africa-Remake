@@ -210,7 +210,6 @@ export function buildRecord({
   listBPath = '',
   pass = '',
   passFiles = '',
-  passCommits = '',
   carriedFrom = '',
   now = Date.now(),
   resolve = resolveCommit,
@@ -238,7 +237,6 @@ export function buildRecord({
         accounting,
         pass,
         passFiles,
-        passCommits,
       }).errors,
     }
   }
@@ -263,7 +261,6 @@ export function buildRecord({
       accounting,
       pass,
       passFiles,
-      passCommits,
     }).errors.filter((e) => !/--record\b/.test(e))
     return {
       ok: false,
@@ -273,14 +270,6 @@ export function buildRecord({
   // A CARRY IS ITS OWN FLOW (delta rounds, 18.08.2026): everything but the
   // sha, the pass scope and the point comes verified from the source reading.
   if (String(carriedFrom ?? '').trim()) {
-    if (String(passCommits ?? '').trim()) {
-      return {
-        ok: false,
-        errors: [
-          '--pass-commits cannot be carried: contribution boundaries are tied to the authorship plan that was actually reviewed',
-        ],
-      }
-    }
     return buildCarriedRecord({
       sha: ref,
       carriedFrom,
@@ -343,7 +332,6 @@ export function buildRecord({
     accounting: receipt,
     pass,
     passFiles,
-    passCommits,
   })
   const errors = [...merge.errors, ...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -354,30 +342,11 @@ export function buildRecord({
     errors.push('--point <N>: the work-order point this review settles, as a plain number')
   }
   if (errors.length) return { ok: false, errors }
-  let passField = validatePass({ pass, passFiles, passCommits }).pass
-  // A CONTRIBUTION BOUNDARY IS STORED WHOLE. The flag accepts a 7–40 character
-  // sha, but the gate matches a record's commits against the range's FULL shas
-  // by exact string — an abbreviated boundary therefore covered NOTHING while
-  // the record looked complete, the silent shape point 714 exists to refuse. So
-  // the boundary is resolved here, and a sha this repository cannot resolve is
-  // a refusal rather than a row nobody can act on.
-  if (passField?.commits) {
-    const resolved = []
-    for (const boundary of passField.commits) {
-      try {
-        resolved.push(resolve(boundary).sha)
-      } catch (e) {
-        return { ok: false, errors: [`--pass-commits ${boundary}: ${(e && e.message) || e}`] }
-      }
-    }
-    if (new Set(resolved).size !== resolved.length) {
-      return {
-        ok: false,
-        errors: ['--pass-commits: two boundaries resolve to the same commit; each contribution is named once'],
-      }
-    }
-    passField = { ...passField, commits: resolved }
-  }
+  const parsedPass = validatePass({ pass, passFiles }).pass
+  // The pass stores the immutable end state it actually read. This is redundant
+  // with the containing row's sha by design: it distinguishes the new file-
+  // scoped record from historical contribution-scoped rows in the ledger.
+  const passField = parsedPass ? { ...parsedPass, endState: commit.sha } : null
   return {
     ok: true,
     record: {
@@ -405,10 +374,9 @@ export function buildRecord({
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.
       ...(String(receipt).trim() ? { accounting: String(receipt).trim(), accountingSource: source } : {}),
-      // WHICH PASS OF WHICH SPLIT, AND OVER WHICH FILES (point 714). A range no
-      // single round can hold is reviewed in passes over the file set; the gate
-      // clears it only once every pass of the same total is on record, so this
-      // field is what turns several partial verdicts into one coverage.
+      // WHICH PASS, WHICH FILES, AND WHICH END STATE (points 714 and 737). Each
+      // pass clears the files it read at this sha; untouched files do not return
+      // merely because a later commit moved HEAD elsewhere.
       ...(passField ? { pass: passField } : {}),
       // MACHINE-READABLE SCOPE BESIDE THE VERDICT (point 684). A pass is a
       // partial review of the range even when its own material fitted perfectly;
@@ -509,6 +477,7 @@ export function buildCarriedRecord({
       r.sha === source.sha &&
       r.pass &&
       Array.isArray(r.pass.files) &&
+      !Array.isArray(r.pass.commits) &&
       reviewFileSetKey(r.pass.files) === wantedSet &&
       VERDICTS.includes(String(r.verdict)) &&
       // The source must be the ORIGINAL reading: blob identity is transitive,
@@ -545,7 +514,7 @@ export function buildCarriedRecord({
       verdict: String(src.verdict).trim(),
       evidence: copiedEvidence,
       mode: String(src.mode).trim(),
-      pass: passCheck.pass,
+      pass: { ...passCheck.pass, endState: commit.sha },
       partialReview: true,
       carried: { from: source.sha },
       ...(wanted ? { point: Number(wanted) } : {}),
@@ -610,6 +579,7 @@ export function verifyCarried(records, allRecords = null) {
             s.carried === undefined &&
             String(s.sha) === from &&
             Array.isArray(s.pass?.files) &&
+            !Array.isArray(s.pass?.commits) &&
             reviewFileSetKey(s.pass.files) === wantedSet &&
             String(s.model) === String(r.model) &&
             String(s.verdict) === String(r.verdict) &&
@@ -711,17 +681,15 @@ export const usage = () =>
   `       --union <U.json> --list-a <A> --list-b <B>   (preferred; --accounting then\n` +
   `       needs no value). Or run node scripts/blind-merge.mjs first and pass the line\n` +
   `       it prints as --accounting "<summary>".\n` +
-  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded contribution scope, or one\n` +
+  `--pass <k>/<n> --pass-files "<a,b,c>" records ONE bounded end-state file scope, or one\n` +
   `       pass of a range whose material no single review round can hold. The passes cut\n` +
-  `       through the FILE SET, and the gate\n` +
-  `       clears the range only once EVERY pass of the same total is recorded — a pass on\n` +
-  `       its own covers the files it names and nothing else. review-sol.mjs prints them.\n` +
+  `       through the FILE SET. A recorded pass clears the files it names at the reviewed\n` +
+  `       end state; the rest of the range stays owed. review-sol.mjs prints the plan.\n` +
   `       A path holding a comma, a quote or edge whitespace is written C-QUOTED, exactly\n` +
   `       as git prints it; nothing is ever trimmed into a different path.\n` +
-  `       A scoped or authorship-cut pass adds --pass-commits "<sha,sha>" so a mixed-vendor\n` +
-  `       file is credited only at the commit boundaries this reviewer actually read.\n` +
-  `       A commit written to answer a finding is still a NEW contribution by design: the\n` +
-  `       confirming clean pass must review and record it. This convergence cost is accepted.\n` +
+  `       The record stores the reviewed head as the files' end-state sha. A later commit to\n` +
+  `       one of those files owes a fresh pass for that file; a commit touching only other\n` +
+  `       files leaves this clearance intact.\n` +
   `--carried-from <sha> carries an EARLIER round's pass to this head where every file it\n` +
   `       read is byte-identical there: the recorder verifies the blob identity and the\n` +
   `       source reading, and COPIES its verdict/model/evidence — do not pass them. The\n` +
@@ -782,9 +750,9 @@ if (isMainModule(import.meta.url)) {
           index >= 1 &&
           index <= total &&
           Array.isArray(p?.files)
-        const commits = Array.isArray(p?.commits) ? p.commits.map((sha) => oneLine(sha)).join(', ') : ''
+        const endState = /^[0-9a-f]{40}$/i.test(String(p?.endState ?? '')) ? String(p.endState).slice(0, 7) : ''
         return shaped
-          ? `\n      PARTIAL REVIEW — pass ${index}/${total} over: ${files}${commits ? `\n      contribution commits: ${commits}` : ''}`
+          ? `\n      PARTIAL REVIEW — pass ${index}/${total} over: ${files}${endState ? `\n      end state: ${endState}` : ''}`
           : `\n      pass (MALFORMED claim ${oneLine(JSON.stringify({ index: p?.index, total: p?.total, files: Array.isArray(p?.files) ? undefined : p?.files })).slice(0, 100)}) over: ${files}`
       }
       for (const r of records) {

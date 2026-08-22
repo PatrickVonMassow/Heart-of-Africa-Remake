@@ -1,9 +1,9 @@
 // Pure planning core for end-state mechanism reviews.
 //
 // A convergent review judges the range's artefact at HEAD, not every historical
-// version that led there. Each net-changed path therefore appears once, carrying
-// every author who contributed to its current state. Intermediate versions are
-// named as superseded, and paths whose final state equals the base are dropped.
+// version that led there. Each net-changed path therefore appears once, routed
+// by the author of its final change. Intermediate versions are named as
+// superseded, and paths whose final state equals the base are dropped.
 import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
@@ -206,9 +206,9 @@ export function endStateArtifacts({ commits = [], endStateFiles = null } = {}) {
       })
       continue
     }
-    const authors = uniq(changes.flatMap((change) => change.authors))
-    const vendors = uniq(authors.map(vendorOf))
     const latest = changes.at(-1)
+    const authors = latest.authors
+    const vendors = uniq(authors.map(vendorOf))
     artifacts.push({
       file,
       authors,
@@ -331,27 +331,38 @@ export function newestReading(readings = []) {
 const clockOf = (row) => (typeof row?.at === 'number' && Number.isFinite(row.at) ? row.at : null)
 
 /**
- * Remove only contribution pairs actually read by a valid authorship-scoped
- * pass.  The caller supplies `recordUsable`, because ledger-era validation is
- * owned by mechanism-review-core; this function owns coverage, not trust.
+ * Remove only end-state files actually read by a valid file-scoped pass.
+ *
+ * A record covers a file when it names that file, stores its own reviewed sha as
+ * `pass.endState`, and contains the file's latest change. A later commit touching
+ * another path leaves that fact true; a later change to this path moves the
+ * latest-change boundary beyond the record and makes only this file owed again.
  */
-export function outstandingContributions({ commits = [], records = [], recordUsable = () => true } = {}) {
-  const contributions = contributionsIn(commits)
-  // THE LATEST READING OF A CONTRIBUTION RULES IT, and only it. A pair read
-  // twice — cleared once, refused later — is still refused: the gate blocks on
-  // the newest verdict, so a plan that counted the older clearance would hide
-  // the very file the gate is blocking on and leave the block unresolvable.
+export function outstandingFiles({
+  commits = [],
+  endStateFiles = null,
+  records = [],
+  recordUsable = () => true,
+} = {}) {
+  const state = endStateArtifacts({ commits, endStateFiles })
   const latest = new Map()
   for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
-    const commitsRead = Array.isArray(record?.pass?.commits) ? record.pass.commits.map(String) : []
-    if (!files.length || !commitsRead.length) continue
-    for (const contribution of contributions) {
-      if (!recordUsable(record, contribution.commit)) continue
-      if (!files.includes(contribution.file) || !commitsRead.includes(contribution.sha)) continue
-      if (!contained(record, contribution.sha)) continue
-      if (contribution.authors.some((author) => sameModel(record.model, author))) continue
-      const key = keyFor(contribution.sha, contribution.file)
+    // New records say which end state they read. Historical `pass.commits`
+    // rows described intermediate contributions and deliberately clear nothing
+    // under the replacement model.
+    if (!files.length || String(record?.pass?.endState ?? '') !== String(record?.sha ?? '')) continue
+    for (const artifact of state.artifacts) {
+      const latestChange = artifact.changes.at(-1)
+      if (!recordUsable(record, latestChange.commit)) continue
+      if (!files.includes(artifact.file) || !contained(record, artifact.endStateSha)) continue
+      const reviewerVendor = vendorOf(record.model)
+      if (
+        reviewerVendor === 'unknown' ||
+        artifact.vendors.includes('unknown') ||
+        artifact.vendors.includes(reviewerVendor)
+      ) continue
+      const key = artifact.file
       // A CLOCK IS A NUMBER OR IT IS NOTHING. `Number(record.at ?? 0)` read a
       // numeric STRING as a time and an absent stamp as the epoch, so a row
       // whose clock nobody wrote still outranked one that had it; and `NaN`
@@ -361,32 +372,36 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
       if (!latest.has(key)) latest.set(key, [])
       // Pushed in ledger order: the position in this list IS the line, so no
       // reading carries a line of its own that could go missing.
-      latest.get(key).push({ record, at, contribution })
+      latest.get(key).push({ record, at, artifact })
     }
   }
   const covered = new Set()
   const refusals = []
   for (const [key, readings] of latest) {
     const read = newestReading(readings)
-    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ contribution: read.contribution, record: read.record })
+    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ artifact: read.artifact, record: read.record })
     else covered.add(key)
   }
   return {
-    outstanding: contributions.filter((c) => !covered.has(keyFor(c.sha, c.file))),
-    covered: contributions.filter((c) => covered.has(keyFor(c.sha, c.file))),
+    outstanding: state.artifacts.filter((artifact) => !covered.has(artifact.file)),
+    covered: state.artifacts.filter((artifact) => covered.has(artifact.file)),
     refusals,
+    dropped: state.dropped,
+    superseded: state.superseded,
   }
 }
 
-/** Rebuild commit input from an outstanding contribution list. */
-export function commitsForContributions(contributions = []) {
+/** Rebuild commit input from an outstanding end-state file list. */
+export function commitsForFiles(artifacts = []) {
   const bySha = new Map()
-  for (const contribution of contributions ?? []) {
-    if (!bySha.has(contribution.sha)) {
-      bySha.set(contribution.sha, { ...contribution.commit, sha: contribution.sha, files: [] })
+  for (const artifact of artifacts ?? []) {
+    for (const contribution of artifact.changes ?? []) {
+      if (!bySha.has(contribution.sha)) {
+        bySha.set(contribution.sha, { ...contribution.commit, sha: contribution.sha, files: [] })
+      }
+      const commit = bySha.get(contribution.sha)
+      if (!commit.files.includes(artifact.file)) commit.files.push(artifact.file)
     }
-    const commit = bySha.get(contribution.sha)
-    if (!commit.files.includes(contribution.file)) commit.files.push(contribution.file)
   }
   return [...bySha.values()]
 }

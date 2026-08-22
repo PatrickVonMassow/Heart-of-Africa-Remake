@@ -430,8 +430,8 @@ describe('evaluateMechanismReview', () => {
       },
     })
     expect(text).toContain('MIXES AUTHORSHIP')
-    expect(text).toContain('anthropic-authored files → openai reviewer GPT-5.6 Sol')
-    expect(text).toContain('openai-authored files → anthropic reviewer Opus 5')
+    expect(text).toContain('anthropic-authored end-state files → openai reviewer GPT-5.6 Sol')
+    expect(text).toContain('openai-authored end-state files → anthropic reviewer Opus 5')
     expect(text).toContain('review-sol.mjs --sha hhhhhhh')
     expect(text).not.toContain('reviewing the branch head is enough')
   })
@@ -1415,12 +1415,12 @@ describe('the flag surface itself', () => {
   it('knows the pass flags, and lands their values where the record reads them', () => {
     const p = parseArgs([
       '--record', 'abc1234', '--pass', '1/3', '--pass-files', 'a.mjs,b.mjs',
-      '--pass-commits', 'aaaaaaa,bbbbbbb',
     ])
     expect(p.ok).toBe(true)
     expect(p.values.pass).toBe('1/3')
     expect(p.values.passFiles).toBe('a.mjs,b.mjs')
-    expect(p.values.passCommits).toBe('aaaaaaa,bbbbbbb')
+    expect(p.values).not.toHaveProperty('passCommits')
+    expect(parseArgs(['--record', 'abc1234', '--pass-commits', 'aaaaaaa']).ok).toBe(false)
   })
 })
 
@@ -1467,20 +1467,6 @@ describe('validatePass', () => {
     expect(v.pass).toEqual({ index: 2, total: 4, files: ['scripts/a.mjs', 'scripts/b.mjs'] })
   })
 
-  it('records the commit boundaries of an authorship-cut pass', () => {
-    const a = 'a'.repeat(40)
-    const b = 'b'.repeat(40)
-    const v = validatePass({ pass: '2/4', passFiles: 'shared.mjs', passCommits: `${a},${b}` })
-    expect(v.ok).toBe(true)
-    expect(v.pass).toEqual({ index: 2, total: 4, files: ['shared.mjs'], commits: [a, b] })
-  })
-
-  it('refuses malformed, duplicate or pass-less contribution boundaries', () => {
-    expect(validatePass({ pass: '1/2', passFiles: 'a', passCommits: 'HEAD' }).ok).toBe(false)
-    expect(validatePass({ pass: '1/2', passFiles: 'a', passCommits: 'aaaaaaa,aaaaaaa' }).ok).toBe(false)
-    expect(validatePass({ passCommits: 'aaaaaaa' }).ok).toBe(false)
-  })
-
   it('is silent on an ordinary record, which names no pass at all', () => {
     expect(validatePass({})).toEqual({ ok: true, errors: [], pass: null })
     expect(validatePass({ pass: '', passFiles: '' }).pass).toBeNull()
@@ -1498,16 +1484,11 @@ describe('validatePass', () => {
     expect(v.errors.join('\n')).toContain('--pass')
   })
 
-  it('REFUSES a one-pass scope without contribution boundaries', () => {
-    expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs' }).ok).toBe(false)
-  })
-
-  it('accepts a bounded one-pass scope with its exact contribution boundaries', () => {
-    const boundary = 'a'.repeat(40)
-    expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs', passCommits: boundary })).toEqual({
+  it('accepts a bounded one-pass end-state file scope', () => {
+    expect(validatePass({ pass: '1/1', passFiles: 'scripts/a.mjs' })).toEqual({
       ok: true,
       errors: [],
-      pass: { index: 1, total: 1, files: ['scripts/a.mjs'], commits: [boundary] },
+      pass: { index: 1, total: 1, files: ['scripts/a.mjs'] },
     })
   })
 

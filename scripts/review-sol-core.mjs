@@ -781,18 +781,14 @@ export function formatRecordCommand({
     `--mode ${mode}`,
   ]
   if (String(point ?? '').trim()) parts.push(`--point ${String(point).trim()}`)
-  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (point 714). The range was too
-  // large for one round, so this verdict covers the files of this pass alone —
-  // and the gate clears the range only once every pass of the same total is on
-  // record, which is what makes a composition a coverage rather than a claim.
+  // A PASS RECORD NAMES WHAT IT ACTUALLY READ (points 714 and 737). The record's
+  // sha is the end state at which those files were read; no commit boundaries
+  // travel, because intermediate file states are not review artefacts.
   // The list is written in the ONE round-trippable representation (a path with
   // a comma, a quote or edge whitespace travels C-quoted, as git prints it), so
   // what the recorder stores is byte-identical to what this pass read.
   if (pass) {
     parts.push(`--pass ${pass.index}/${pass.total}`, `--pass-files ${q(formatPassFiles(pass.files ?? []))}`)
-    if (Array.isArray(pass.commits) && pass.commits.length) {
-      parts.push(`--pass-commits ${q(pass.commits.join(','))}`)
-    }
   }
   return parts.join(' ')
 }
@@ -894,28 +890,19 @@ export function formatReviewReport({
     point,
     pass,
   })
-  // EVERY pass template carries the not-cleared warning — the fallback and
-  // role-swap templates included (round-5 pass 6) — and the way to the
-  // remainder consults the LEDGER, not the pass number (round-4 pass 6):
-  // passes run in any order, so "next: k+1" recommended recorded passes and
-  // fell silent on unrecorded ones. This formatter is pure and cannot read
-  // the ledger, so it points at the listing that can.
+  // Every pass says exactly what its record clears. Passes run in any order, so
+  // the remainder is discovered from the ledger rather than a guessed number.
   const passWarning = pass
-    ? Number(pass.total) === 1
-      ? [
-          '',
-          '  This SCOPED record clears only the listed commit/file contributions; work outside them remains owed.',
-        ]
-      : [
+    ? [
         '',
-        `  The range is NOT cleared until every pass 1..${pass.total} is recorded — ` +
-          'node scripts/mechanism-review.mjs --list shows which already are.',
-        ]
+        `  This record clears the listed files at ${String(sha).slice(0, 7)}; unchanged files stay cleared, ` +
+          'and node scripts/mechanism-review.mjs --list shows the remaining file debt.',
+      ]
     : []
   if (!decision.fellBack) {
     const scope = pass
       ? Number(pass.total) === 1
-        ? ` (SCOPED PASS — ${(pass.files ?? []).length} file(s), ${(pass.commits ?? []).length} commit contribution(s))`
+        ? ` (SCOPED PASS — ${(pass.files ?? []).length} end-state file(s))`
         : ` (PASS ${pass.index}/${pass.total} — ${(pass.files ?? []).length} file(s) of a range too large for one round)`
       : ''
     return [

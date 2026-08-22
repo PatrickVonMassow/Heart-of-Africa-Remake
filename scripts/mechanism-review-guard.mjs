@@ -42,9 +42,9 @@ import {
   reviewRecordWellFormed,
 } from './mechanism-review-core.mjs'
 import {
-  commitsForContributions,
+  commitsForFiles,
   mechanismLogCommand,
-  outstandingContributions,
+  outstandingFiles,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
   summarizeReviewDebt,
@@ -357,6 +357,12 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   // turn end is a hook people switch off.
   // Carried rows are RE-MEASURED on every read (delta rounds, 18.08.2026):
   // the blob-identity stamp is the wrapper's, never the ledger's own word.
+  let endStateFiles = null
+  try {
+    endStateFiles = gitRawFile(rangeFilesCommand(base, head)).split('\0').filter(Boolean)
+  } catch {
+    // An unmeasured end state can only demand more below; it never drops a path.
+  }
   const records = verifyCarried(attachCoverage({
     pendingCommits,
     allRecords: pendingCommits.length ? readRecords() : [],
@@ -377,16 +383,19 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
   }))
 
-  // A scoped pass advances only the commit/file contribution it actually read.
-  // The remaining contribution list is both the gate's debt and the next pass
-  // plan's input; a cleared file therefore never returns merely because HEAD
-  // moved elsewhere in the range.
-  const debt = outstandingContributions({
+  // A scoped pass advances the end-state files it actually read. The remaining
+  // file list is both the gate's debt and the next pass plan's input; a cleared
+  // file therefore never returns merely because HEAD moved elsewhere.
+  const debt = outstandingFiles({
     commits,
+    endStateFiles,
     records,
     recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
   })
-  const authorshipPlan = planAuthorshipGroups({ commits: commitsForContributions(debt.outstanding) })
+  const authorshipPlan = planAuthorshipGroups({
+    commits: commitsForFiles(debt.outstanding),
+    endStateFiles: debt.outstanding.map((artifact) => artifact.file),
+  })
 
   return {
     applicable: true,
@@ -405,6 +414,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       sessionId,
       fence: guardDuty({ sessionId }),
       authorshipPlan,
+      endStateFiles,
     },
     commits,
     debt,
@@ -552,7 +562,7 @@ if (isMainModule(import.meta.url)) {
           statusPlan = buildAuthorshipPassPlan({
             sha: gathered.head,
             base: gathered.rangeBase,
-            commits: commitsForContributions(gathered.debt.outstanding),
+            commits: commitsForFiles(gathered.debt.outstanding),
           })
         } catch {
           /* the status names an unavailable plan instead of inventing a count */
@@ -581,7 +591,7 @@ if (isMainModule(import.meta.url)) {
       )
       for (const group of debtStatus.groups.length ? debtStatus.groups : gathered.authorshipPlan?.groups ?? []) {
         console.log(
-          `  ${(group.authorshipKind ?? group.kind) === 'commit' ? `commit ${group.commits[0].slice(0, 7)}` : `${group.vendor ?? 'authored'} files`} → ` +
+          `  ${group.vendor ?? 'authored'} end-state files → ` +
             `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
             `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )

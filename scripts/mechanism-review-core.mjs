@@ -610,11 +610,6 @@ export const FLAG_SPEC = Object.freeze({
   // the file set, and each pass records what it actually read (point 714).
   '--pass': true,
   '--pass-files': true,
-  // Authorship-cut passes also name the commits whose contributions they read.
-  // A mixed-vendor path may occur in two passes, one per authoring commit; the
-  // commit list makes those two readings distinct and lets the gate advance the
-  // baseline for exactly the contribution that was seen.
-  '--pass-commits': true,
   // A pass of an EARLIER round carries forward to a new head where every file
   // it read is byte-identical there (delta-scoped rounds, user decision
   // 18.08.2026): the recorder verifies the blob identity and the source
@@ -646,7 +641,6 @@ const VALUE_KEY = Object.freeze({
   '--list-b': 'listBPath',
   '--pass': 'pass',
   '--pass-files': 'passFiles',
-  '--pass-commits': 'passCommits',
   '--carried-from': 'carriedFrom',
 })
 
@@ -949,7 +943,7 @@ export function validateMode({ mode, framing } = {}) {
  *
  * Returns { ok, errors, pass } with `pass` the parsed record field, or null.
  */
-export function validatePass({ pass, passFiles, passCommits } = {}) {
+export function validatePass({ pass, passFiles } = {}) {
   const spec = String(pass ?? '').trim()
   // The list is parsed RAW (fourth cross-vendor round): trimming it here strips
   // the FIRST token's leading and the LAST token's trailing whitespace before
@@ -958,9 +952,7 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
   // the trimmed view; the bytes go to the parser untouched, which fails loud.
   const listed = String(passFiles ?? '')
   const hasList = listed.trim() !== ''
-  const commitList = String(passCommits ?? '').trim()
-  const hasCommits = commitList !== ''
-  if (!spec && !hasList && !hasCommits) return { ok: true, errors: [], pass: null }
+  if (!spec && !hasList) return { ok: true, errors: [], pass: null }
   const errors = []
   if (!spec) {
     errors.push('--pass-files without --pass <k>/<n>: a file list belongs to a pass, and this record names none')
@@ -970,9 +962,6 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
       '--pass <k>/<n> without --pass-files: a pass verdict covers the files it actually read, and a ' +
         'record that does not name them claims a coverage nobody can check',
     )
-  }
-  if (!spec && hasCommits) {
-    errors.push('--pass-commits without --pass <k>/<n>: commit scope belongs to a pass, and this record names none')
   }
   const parsed = spec ? parsePassSpec(spec) : { ok: false, errors: [] }
   errors.push(...parsed.errors)
@@ -985,23 +974,11 @@ export function validatePass({ pass, passFiles, passCommits } = {}) {
   if (hasList && list.ok && !list.files.length) {
     errors.push('--pass-files "<a,b,c>": the paths this pass reviewed, comma-separated')
   }
-  const commits = commitList ? commitList.split(',') : []
-  if (parsed.ok && parsed.total === 1 && !hasCommits) {
-    errors.push(
-      '--pass 1/1 is a scoped review and needs --pass-commits: without contribution boundaries it would claim the whole range',
-    )
-  }
-  if (hasCommits && commits.some((sha) => !/^[0-9a-f]{7,40}$/i.test(sha))) {
-    errors.push('--pass-commits "<sha,sha>": every contribution boundary must be a 7–40 character commit sha')
-  }
-  if (hasCommits && uniqStrings(commits).length !== commits.length) {
-    errors.push('--pass-commits: each commit is named once; duplicate boundaries do not add coverage')
-  }
   if (errors.length) return { ok: false, errors, pass: null }
   return {
     ok: true,
     errors: [],
-    pass: { index: parsed.index, total: parsed.total, files: list.files, ...(hasCommits ? { commits } : {}) },
+    pass: { index: parsed.index, total: parsed.total, files: list.files },
   }
 }
 
@@ -1030,7 +1007,6 @@ export function validateRecord({
   authors,
   pass,
   passFiles,
-  passCommits,
   fableState,
 } = {}) {
   const errors = []
@@ -1058,7 +1034,7 @@ export function validateRecord({
   if (examination && authorFrame) {
     errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
   }
-  errors.push(...validatePass({ pass, passFiles, passCommits }).errors)
+  errors.push(...validatePass({ pass, passFiles }).errors)
   errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, fableState }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
@@ -1151,6 +1127,42 @@ export function reviewRecordWellFormed(record = {}) {
   return record.carried === undefined || record.carriedVerified === true
 }
 
+/** Current file artefacts synthesized from the pending history. */
+function pendingEndStateFiles(pendingCommits, endStateFiles) {
+  if (endStateFiles === null || endStateFiles === undefined) return pendingCommits ?? []
+  const material = new Set((endStateFiles ?? []).map(String))
+  const byFile = new Map()
+  for (const commit of pendingCommits ?? []) {
+    for (const file of [...new Set((commit?.files ?? []).map(String))]) {
+      if (!byFile.has(file)) byFile.set(file, [])
+      byFile.get(file).push(commit)
+    }
+  }
+  const artifacts = []
+  for (const [file, changes] of byFile) {
+    if (!material.has(file)) continue
+    const latest = changes.at(-1)
+    const authors = Array.isArray(latest?.authorModels) && latest.authorModels.length
+      ? uniqStrings(latest.authorModels)
+      : [latest?.authorModel].filter(Boolean)
+    artifacts.push({
+      ...latest,
+      files: [file],
+      authorModel: authors[0] ?? '',
+      authorModels: authors,
+      sourceCommits: changes.map((commit) => commit.sha),
+    })
+  }
+  return artifacts
+}
+
+const modelVendor = (model) => {
+  const value = String(model ?? '').toLowerCase()
+  if (/\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)) return 'openai'
+  if (/\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)) return 'anthropic'
+  return 'unknown'
+}
+
 /**
  * The gate itself.
  *
@@ -1173,6 +1185,7 @@ export function evaluateMechanismReview({
   head = '',
   pendingCommits = [],
   records = [],
+  endStateFiles = null,
   fence = null,
   sessionId = '',
 } = {}) {
@@ -1189,7 +1202,7 @@ export function evaluateMechanismReview({
   }
   const findings = []
 
-  for (const pendingCommit of pendingCommits ?? []) {
+  for (const pendingCommit of pendingEndStateFiles(pendingCommits, endStateFiles)) {
     let commit = pendingCommit
     const covering = [...new Set(commit?.coveringRecordShas ?? [])].flatMap((s) => bySha.get(String(s)) ?? [])
     // A record is only a review if it says who reviewed, how it ended AND what
@@ -1243,13 +1256,24 @@ export function evaluateMechanismReview({
       (r) => !r?.specExamination && !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit),
     )
 
-    // AUTHORSHIP-SCOPED PASSES ADVANCE PER CONTRIBUTION. Unlike the legacy
-    // size-only split below, these rows name the commits whose changes were in
-    // the material. Each file can therefore clear as soon as its own
-    // contribution was read; missing siblings stay owed by name instead of
-    // pulling the cleared file back into every later whole-range demand.
-    const scopedShape = (r) => Array.isArray(r?.pass?.commits) && Array.isArray(r?.pass?.files)
-    const scoped = sound.filter((r) => scopedShape(r) && r.pass.commits.map(String).includes(String(commit.sha)))
+    // END-STATE FILE PASSES CLEAR WHAT THEY READ. The record's own sha is the
+    // stored end state, and the wrapper selected this artefact at its latest
+    // change, so a record covering it remains valid across later commits to
+    // other files. Historical pass.commits rows describe superseded
+    // contribution slices and deliberately clear nothing here.
+    const fileClaim = (r) => r?.pass?.endState !== undefined
+    const fileScopedShape = (r) =>
+      fileClaim(r) &&
+      String(r.pass.endState) === String(r.sha) &&
+      Array.isArray(r?.pass?.files) &&
+      !Array.isArray(r?.pass?.commits)
+    const commitVendors = new Set((commit.authorModels ?? [commit.authorModel]).filter(Boolean).map(modelVendor))
+    const scoped = sound.filter(
+      (r) => {
+        const reviewerVendor = modelVendor(r.model)
+        return fileScopedShape(r) && reviewerVendor !== 'unknown' && !commitVendors.has('unknown') && !commitVendors.has(reviewerVendor)
+      },
+    )
     const remainingFiles = []
     let scopedRefusal = null
     for (const file of commit.files ?? []) {
@@ -1270,8 +1294,9 @@ export function evaluateMechanismReview({
     }
     if (!remainingFiles.length) continue
     commit = { ...commit, files: remainingFiles }
-    const legacyCovering = covering.filter((r) => !scopedShape(r))
-    const legacySound = sound.filter((r) => !scopedShape(r))
+    const legacyContributionShape = (r) => Array.isArray(r?.pass?.commits)
+    const legacyCovering = covering.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
+    const legacySound = sound.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
 
     // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
     // is cut through the file set and reviewed one pass at a time, so a single
@@ -1557,7 +1582,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     )
   }
   if (unreviewable.length) {
-    lines.push('', 'UNREVIEWABLE contributions (none may be treated as an ordinary missing review):')
+    lines.push('', 'UNREVIEWABLE end-state files (none may be treated as an ordinary missing review):')
     for (const group of unreviewable) {
       lines.push(
         `  · ${(group.files ?? []).join(', ') || '<files unknown>'}: ` +
@@ -1566,14 +1591,14 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     }
     lines.push(
       '',
-      'No record by the configured reviewer chain can clear those contributions. Inspect the',
+      'No record by the configured reviewer chain can clear those files. Inspect the',
       'authorship split with: node scripts/mechanism-review-guard.mjs --status',
     )
   } else if (groups.length > 1) {
-    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these contribution groups:')
+    lines.push('', 'This range MIXES AUTHORSHIP. Review it as these end-state file groups:')
     for (const group of groups) {
       lines.push(
-        `  · ${group.vendor || 'unknown'}-authored ${group.kind === 'commit' ? `commit ${(group.commits ?? [''])[0].slice(0, 7)}` : 'files'} ` +
+        `  · ${group.vendor || 'unknown'}-authored end-state files ` +
           `→ ${group.reviewerVendor || 'unknown'} reviewer ${group.reviewer || '<none>'}: ` +
           `${(group.files ?? []).join(', ') || '<files unknown>'}`,
       )
@@ -1581,11 +1606,11 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     lines.push(
       '',
       'Ask the planner for the runnable pass commands; each recorded pass clears only its',
-      'listed author contribution, so the two vendors accumulate coverage without self-review:',
+      'listed files at their reviewed end state, so the two vendors accumulate coverage without self-review:',
       '',
       `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
       '',
-      'Inspect the remaining contribution debt with: node scripts/mechanism-review-guard.mjs --status',
+      'Inspect the remaining file debt with: node scripts/mechanism-review-guard.mjs --status',
     )
   } else {
     lines.push(

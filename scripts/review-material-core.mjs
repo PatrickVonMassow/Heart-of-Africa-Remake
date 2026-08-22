@@ -945,11 +945,9 @@ export function passByIndex(plan, index) {
 /**
  * Coverage of a complete pass plan, or of one selected pass within it.
  *
- * This is FILE-CONTRIBUTION coverage, deliberately: pass records clear named
- * files and, for authorship splits, named commit contributions. A mixed-vendor
- * file therefore has one assignment per contribution group and is reported as
- * split; a character-weighted percentage would claim a precision the ledger
- * cannot reproduce.
+ * This is END-STATE FILE coverage, deliberately: every net-changed path is one
+ * assignment regardless of how many commits touched it. A character-weighted
+ * percentage would claim a precision the ledger cannot reproduce.
  */
 export function reviewCoverage(plan = null, pass = null) {
   const passes = Array.isArray(plan?.passes) ? plan.passes : []
@@ -993,7 +991,7 @@ export function formatReviewCoverage(plan, pass = null) {
   const block = pass ? `; block ${pass.index}/${pass.total}` : `; ${blockCount} block(s)`
   const names = (paths) => (paths.length ? paths.map(quotePassFile).join(', ') : 'none')
   return [
-    `Coverage: ${label} — ${coverage.percent}% of file contributions (${coverage.covered}/${coverage.total})${block}.`,
+    `Coverage: ${label} — ${coverage.percent}% of changed files (${coverage.covered}/${coverage.total})${block}.`,
     `  files read whole: ${names(coverage.whole)}`,
     `  oversized files read as complete diff only: ${names(coverage.diffOnly)}`,
     `  opaque bodies declared, with their complete diff read: ${names(coverage.opaque)}`,
@@ -1013,7 +1011,7 @@ export function formatCoveragePlan(plan) {
   const split = coverage.splitFiles.length
     ? `; split across blocks: ${coverage.splitFiles.map(quotePassFile).join(', ')}`
     : ''
-  return `  Coverage plan: ${status} (${coverage.covered}/${coverage.total} file contributions); ${dropped}${split}.`
+  return `  Coverage plan: ${status} (${coverage.covered}/${coverage.total} changed files); ${dropped}${split}.`
 }
 
 /**
@@ -1285,9 +1283,9 @@ export function formatShortfall(shortfall, { sha = '', plan = null } = {}) {
  * The `--pass k/n` value, parsed.
  *
  * `1/1` is meaningful for a BOUNDED review: it says the one round covered only
- * the commit/file contributions named beside it. The recorder requires commit
- * scope on that shape, so it can never masquerade as an ordinary whole-range
- * record. Larger totals remain the size/authorship split used by passComposition.
+ * the end-state files named beside it. The recorder stores its reviewed sha, so
+ * it can never masquerade as an ordinary whole-range record. Larger totals are
+ * the size/authorship split used by passComposition for legacy rows.
  */
 export function parsePassSpec(value) {
   const raw = String(value ?? '').trim()
