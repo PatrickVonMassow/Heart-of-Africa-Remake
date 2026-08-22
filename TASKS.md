@@ -11030,3 +11030,30 @@ to land than a mechanism that needs a review.
   Criticality: medium — the ratchet is the mechanism the user asked for twice, and its stated
   property is stronger than what it enforces.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 833. The timestamp guard's own test loses a minute race under load. MEASURED 22.08.2026:
+  `scripts/timestamp-guard.test.mjs > end-to-end guard process > (b) blocks a reply with NO
+  timestamp` went red twice inside the `main` pre-push gate while a second unit suite ran on the
+  same host, and passed on the next quiet run. It is not a product defect and not flakiness of
+  unknown origin: the case spawns the REAL guard process, which stamps the minute it runs in, and
+  then asserts `expect(verdict?.reason).toContain('**' + berlinStamp() + '**')` — computing a SECOND
+  stamp after the subprocess returned. When the minute rolls between the two, the strings differ
+  and the case fails at completely correct behaviour. The observed red showed exactly that: the
+  received text carried `11:47` where the expectation had the preceding minute.
+  WHY ONLY THIS CASE: the neighbouring case (a) takes its stamp BEFORE calling the guard, so a
+  rollover there leaves the guard reading a one-minute-old stamp, which it tolerates by design.
+  The exposure is proportional to how long the spawn takes, so it grows exactly when the host is
+  busy — which is when the gate runs.
+  FINAL STATE: the case accepts the guard's stamp against the minute the guard could legitimately
+  have been in — the stamp taken before the call OR after it — instead of a single stamp read after
+  the subprocess returned. The fix does not widen what the guard itself accepts; only the test's
+  expectation stops being narrower than the truth.
+  VERIFIABLE: a Vitest case that pins the boundary — a verdict whose reason carries the minute
+  BEFORE the assertion's stamp is accepted, one carrying an unrelated minute is still refused — so
+  the widening cannot decay into "any timestamp passes".
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point from
+  its own gate run, and the user ruled on 20.08.2026 that such a point does not overtake the
+  release.
+  Criticality: low — it costs a blocked push and a re-run, never a wrong verdict about the product,
+  but a red that clears itself on retry is exactly the kind that teaches a session to retry.
+  Bundle: Session- & Repo-Hygiene.

@@ -135,7 +135,15 @@ export const LIMITS = {
   // against the guide's measured 425 / 3773, and the ceilings move by exactly
   // that to the 431 / 3832 fit, with zero slack. Nothing was removed to fit it,
   // and no existing entry grew.
-  maxWords: 3849,
+  // LOWERED on 22.08.2026, and a lowering needs no justification of the kind a
+  // raise does — only the measurement. Point 813's lesson (a wait dies with
+  // whoever holds it, so the run stands until the next wake-up) was folded into
+  // the existing "Der autonome Lauf bleibt stehen" entry rather than given a new
+  // one, since that entry already owns the stalled-run class; the project-specific
+  // tail of the guard-rot entry paid for it. The guide now measures 430 / 3842,
+  // so the word ceiling drops by 7 to the exact fit. The line ceiling already sat
+  // at its measured value and is unchanged.
+  maxWords: 3842,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
