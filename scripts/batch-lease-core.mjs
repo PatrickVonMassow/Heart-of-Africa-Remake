@@ -52,6 +52,7 @@
 // safe direction is the conservative one: the old string regexes saw through a
 // wrapper by accident, and losing that would let a dispossessed session push
 // shared history through any shell (four-eyes review, 30.07.2026).
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   expandSegments,
   isMutatingSegment,
@@ -743,11 +744,35 @@ function writesOutputFile(segment) {
   )
 }
 
-export function mainWritingAction({ toolName, command } = {}) {
+/**
+ * Does a canonical target land in the checkout? PURE.
+ *
+ * The wrapper resolves both paths through the filesystem before calling this
+ * predicate. Keeping containment here means `..`, symlinks and platform path
+ * separators all receive one decision, while the unit layer can exercise the
+ * security boundary without touching the live checkout.
+ *
+ * Missing path evidence answers true (the conservative direction): a malformed
+ * write payload must not turn into an exemption from the main-write fence.
+ */
+export function resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot } = {}) {
+  if (typeof resolvedFilePath !== 'string' || !resolvedFilePath.trim()) return true
+  if (typeof checkoutRoot !== 'string' || !checkoutRoot.trim()) return true
+  const root = resolve(checkoutRoot)
+  const target = resolve(resolvedFilePath)
+  const rel = relative(root, target)
+  return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
+}
+
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot } = {}) {
   const tool = String(toolName ?? '')
-  if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Agent'].includes(tool)) {
+  if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
+    if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
+      return { writes: false, what: '' }
+    }
     return { writes: true, what: `${tool} in the main checkout` }
   }
+  if (tool === 'Agent') return { writes: true, what: `${tool} in the main checkout` }
   if (tool !== 'Bash' && tool !== 'PowerShell') return { writes: false, what: '' }
   let tooDeep = false
   const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
@@ -780,12 +805,15 @@ export function mainWriteFenceDecision({
   ownsBatchLock = false,
   toolName,
   command,
+  filePath,
+  resolvedFilePath,
+  checkoutRoot,
 } = {}) {
   try {
     if (paused === true || worktree === true || branch !== 'main') {
       return { block: false, registerWriter: false, reason: '' }
     }
-    const action = mainWritingAction({ toolName, command })
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot })
     if (!action.writes) return { block: false, registerWriter: false, reason: '' }
     if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
     return {

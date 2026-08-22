@@ -23,9 +23,9 @@
 // session id cannot, and the deny it used to eat was one it could never act on.
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, realpathSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import {
   REPO_ROOT,
   STATE_PATH,
@@ -57,6 +57,24 @@ import { publishCapability } from './board-currency-core.mjs'
 import { evaluate, isWorktreeCheckout } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * Resolve a write destination even when its leaf (or several parent directories)
+ * does not exist yet. `realpathSync` on the nearest existing ancestor follows
+ * every symlink already on the route; the untouched suffix is then appended to
+ * that canonical ancestor. The pure fence judges only the resulting path.
+ */
+function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
+  if (typeof filePath !== 'string' || !filePath.trim()) return ''
+  const absolute = resolve(cwd, filePath)
+  let existing = absolute
+  while (!existsSync(existing)) {
+    const parent = dirname(existing)
+    if (parent === existing) return ''
+    existing = parent
+  }
+  return resolve(realpathSync(existing), relative(existing, absolute))
+}
 
 /**
  * The transport this session may publish through (point 400, delta B/D). The
@@ -259,12 +277,16 @@ try {
     }).trim()
     const sid = payload.session_id || ''
     const lock = readOwnerLock()
+    const filePath = input0.file_path ?? input0.notebook_path
     const mainWrite = mainWriteFenceDecision({
       branch,
       worktree: isWorktreeCheckout(REPO_ROOT),
       ownsBatchLock: ownsLock(sid, { lock }).mine,
       toolName: payload.tool_name,
       command: input0.command,
+      filePath,
+      resolvedFilePath: resolvedWriteTarget(filePath, payload.cwd || REPO_ROOT),
+      checkoutRoot: realpathSync(REPO_ROOT),
     })
     if (mainWrite.block) {
       process.stdout.write(

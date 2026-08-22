@@ -12,7 +12,7 @@
 // promise that an unreadable state never costs the caller a tool call.
 import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -346,6 +346,26 @@ describe('board-first-guard (spawned)', () => {
       expect(reason).not.toContain('FENCED OUT')
     } finally {
       rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('a lockless main session may write outside the checkout but not enter it through a symlink', () => {
+    const now = Date.now()
+    writeJson(statePath(), { turnStartedAt: now - 1000 })
+    writeJson(focusPath(), { point: 821, note: 'fresh', setAt: now, confirmedAt: now })
+    rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
+    const scratch = mkdtempSync(resolve(tmpdir(), 'hoa-main-write-scratch-'))
+    const link = resolve(scratch, 'repo-link')
+    symlinkSync(repo, link, 'dir')
+    try {
+      expect(callGuard('Write', { file_path: resolve(scratch, 'note.mjs') }).stdout.trim()).toBe('')
+      expect(callGuard('Write', { file_path: resolve(scratch, 'memory', 'MEMORY.md') }).stdout.trim()).toBe('')
+      expect(denial(callGuard('Write', { file_path: resolve(repo, '..', repo.split(/[\\/]/).at(-1), 'inside.md') }))).toContain(
+        'MAIN WRITE REFUSED',
+      )
+      expect(denial(callGuard('Write', { file_path: resolve(link, 'through-link.md') }))).toContain('MAIN WRITE REFUSED')
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
     }
   })
 
