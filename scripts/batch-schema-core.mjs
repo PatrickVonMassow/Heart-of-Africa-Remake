@@ -130,6 +130,10 @@ export const ATTEMPT_IDENTITY_FIELDS = Object.freeze([
   'baseSha',
   'logPath',
   'heartbeatPath',
+  // The launcher lease M8 names, and the one field a duplicate-writer check turns
+  // on (M39): the attempt lease the daemon granted this process. Without it, an
+  // adopted attempt cannot be told from a second writer claiming the same branch.
+  'lease',
 ])
 
 export function attemptIdentity(fields = {}) {
@@ -219,10 +223,12 @@ const STATES_REQUIRING_REASON = Object.freeze(['failed', 'stalled', 'cancelled']
  *  answer. */
 export function attemptStateRecord({ state, reason, ...rest } = {}) {
   if (!ATTEMPT_STATES.includes(state)) return { ok: false, reason: `unknown state: ${state}` }
-  const unanswered = ATTEMPT_STATE_FIELDS.filter((f) => !(f in rest))
+  // `undefined` is an absent answer whether or not the key is present, so it counts
+  // as unanswered too; only an explicit `null` says "asked and empty".
+  const unanswered = ATTEMPT_STATE_FIELDS.filter((f) => !(f in rest) || rest[f] === undefined)
   if (unanswered.length) return { ok: false, reason: `unanswered: ${unanswered.join(', ')}` }
-  if (rest.actor === null || rest.fence === null || rest.at === null) {
-    return { ok: false, reason: 'actor, fence and at are never null' }
+  if (!rest.actor || !Number.isFinite(rest.at)) {
+    return { ok: false, reason: 'actor and at are never null or empty' }
   }
   if (!Number.isInteger(rest.fence) || rest.fence < 1) return { ok: false, reason: 'fence must be a positive integer' }
   if (STATES_REQUIRING_PUSHED_SHA.includes(state) && !rest.lastPushedSha) {
@@ -265,39 +271,55 @@ export const DAEMON_PAIR_READINGS = Object.freeze({
   unadopted: 'a handover, or a crash between the two writes — the lock owner probes the record and writes the copy',
   'cold-record': 'the daemon is gone — reconcile its workers (step 8), release the record, mint a new generation',
   'stale-copy': 'the daemon is gone and the copy still names it — as cold-record, and clear the copy',
-  'superseded-copy': 'the copy is older than the record — the record wins; rewrite the copy after probing',
+  'superseded-copy': 'the copy is older than the record and the record is live — the record wins; rewrite the copy',
   'orphaned-copy': 'a copy with no record — clear it; a daemon is never concluded from the copy alone',
-  'impossible-copy': 'a copy newer than the record — corruption, not a race: refuse every mutation and alert',
+  'impossible-copy': 'a copy the write orders cannot produce — corruption, not a race: refuse every mutation and alert',
 })
 
 /** Decides the pair from the pair alone. `probe` answers whether the RECORD's pid
  *  is live (pid and pid start time), and is consulted for no other purpose; a null
- *  probe means "not probed", which is only ever enough where the record is absent. */
+ *  probe means "not probed", which is only ever enough where the record is absent.
+ *
+ *  THE ORDER OF THE QUESTIONS IS THE MECHANISM. "Is the copy possible at all" comes
+ *  first, because a copy that the write orders cannot produce says nothing about
+ *  liveness and must not be resolved by it. Only then does the record's own probe
+ *  decide, because the record is the authority on existence: a DEAD record is cold
+ *  whatever the copy says, and the copy's staleness is part of that resolution
+ *  rather than a competing reading. */
 export function classifyDaemonPair({ record = null, copy = null, probe = null } = {}) {
   const reading = (name, extra = {}) => ({ reading: name, resolution: DAEMON_PAIR_READINGS[name], ...extra })
+  const impossible = (why) => reading('impossible-copy', { reason: why })
 
   if (copy && !record) return reading('orphaned-copy')
   if (!record) return reading('no-daemon')
-
   if (!Number.isFinite(record.generation)) {
-    return reading('impossible-copy', { reason: 'the record carries no generation, so nothing can be compared to it' })
-  }
-  if (copy && Number.isFinite(copy.generation) && copy.generation > record.generation) {
-    return reading('impossible-copy', {
-      reason: `copy generation ${copy.generation} is newer than the record's ${record.generation}; the write orders cannot produce this`,
-    })
+    return impossible('the record carries no generation, so nothing can be compared to it')
   }
 
-  const live = probe ? sameProcess(record, probe) && probe.live !== false : false
-  const matches = Boolean(copy) && sameProcess(record, copy) && copy.generation === record.generation
-
-  if (!copy) return live ? reading('unadopted') : reading('cold-record')
-  if (!matches) {
-    // The copy names a different, older daemon. It is stale bookkeeping either way;
-    // whether the RECORD's process still lives decides what happens to the record.
-    return live ? reading('superseded-copy') : reading('cold-record')
+  // The copy is only ever written FROM the record, so anything it says that the
+  // record does not is a claim no write order could have made.
+  if (copy) {
+    if (!Number.isFinite(copy.generation)) return impossible('the copy carries no generation and cannot be placed')
+    if (copy.generation > record.generation) {
+      return impossible(
+        `copy generation ${copy.generation} is newer than the record's ${record.generation}; the write orders cannot produce this`,
+      )
+    }
+    if (copy.generation === record.generation && !sameProcess(record, copy)) {
+      return impossible('the copy names this generation with another process, so it was not written from this record')
+    }
   }
-  return live ? reading('healthy') : reading('stale-copy')
+
+  const live = Boolean(probe) && probe.live !== false && sameProcess(record, probe)
+  if (!live) {
+    if (!copy) return reading('cold-record')
+    // A dead record is cold whichever copy stands beside it. `stale-copy` is the
+    // named case where the copy still points at exactly this daemon, because that
+    // is the copy a successor would otherwise trust.
+    return copy.generation === record.generation ? reading('stale-copy') : reading('cold-record')
+  }
+  if (!copy) return reading('unadopted')
+  return copy.generation === record.generation ? reading('healthy') : reading('superseded-copy')
 }
 
 /** The invariant in one predicate, so a caller can assert it without re-deriving
@@ -343,11 +365,26 @@ export function advancedCredential(current, { fence = current?.fence } = {}) {
  *  empty string for the very first advance, which leases the ref's ABSENCE. */
 export function publicationPush({ current = null, next = null, expectedOid, refs = [] } = {}) {
   if (!next) return { ok: false, reason: 'no credential to publish' }
-  if (current && sameCredential(current, next)) {
-    return { ok: false, reason: 'a publication whose credential update is a no-op has no fence and is refused' }
-  }
-  if (current && next.generation !== current.generation) {
-    return { ok: false, reason: 'a publication may not change the generation; recovery mints one, publication never does' }
+  if (!credential(next).ok) return { ok: false, reason: `the credential to publish is malformed: ${credential(next).reason}` }
+  if (current) {
+    if (!credential(current).ok) return { ok: false, reason: 'the current credential is malformed' }
+    if (next.generation !== current.generation) {
+      return {
+        ok: false,
+        reason: 'a publication may not change the generation; recovery mints one, publication never does',
+      }
+    }
+    // Equal is the no-op git may leave out of the transaction; BELOW is a rollback,
+    // which is the same hole one step further open — a replayed older credential
+    // would re-admit a predecessor. Only a strict advance is a publication.
+    if (!strictlyAhead(next, current)) {
+      return {
+        ok: false,
+        reason: sameCredential(current, next)
+          ? 'a publication whose credential update is a no-op has no fence and is refused'
+          : 'a publication may only advance the credential, never move it backwards',
+      }
+    }
   }
   if (expectedOid === undefined || expectedOid === null) {
     return { ok: false, reason: 'a publication without a lease on the credential ref is refused' }
@@ -355,8 +392,18 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
   if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
   return {
     ok: true,
+    // The VALUE the caller must write into the credential ref, returned beside the
+    // command so the two cannot come apart: a push built here that carried some
+    // other blob would be a lease on one credential and a publication of another.
+    credential: next,
     args: ['push', '--atomic', `--force-with-lease=${CREDENTIAL_REF}:${expectedOid}`, 'origin', ...refs, CREDENTIAL_REF],
   }
+}
+
+/** (fence, seq) ordered lexicographically within one generation. */
+export function strictlyAhead(candidate, reference) {
+  if (candidate.fence !== reference.fence) return candidate.fence > reference.fence
+  return candidate.seq > reference.seq
 }
 
 /** A push under a previous generation is refused at the reader as well as at the
@@ -364,6 +411,11 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
  *  credential from any earlier one matches nothing. */
 export function credentialAccepted(presented, published) {
   if (!presented || !published) return { ok: false, reason: 'both credentials are required' }
+  // A malformed credential is REFUSED rather than compared: comparing `undefined`
+  // with `<` answers false, so a credential missing its fence or seq would have
+  // passed every test below by carrying no number at all.
+  if (!credential(presented).ok) return { ok: false, reason: `malformed credential: ${credential(presented).reason}` }
+  if (!credential(published).ok) return { ok: false, reason: 'the published credential is malformed' }
   if (presented.generation !== published.generation) {
     return { ok: false, reason: 'foreign generation: this credential belongs to a fence store that no longer exists' }
   }
@@ -408,12 +460,18 @@ export function validateMutation({ presented = {}, lock = null, probe = null, no
   if (lock.fence !== presented.fence) {
     return { ok: false, reason: `stale fence: presented ${presented.fence}, the lock carries ${lock.fence}` }
   }
-  if (!sameProcess(lock, probe ? { pid: probe.pid, pidStartedAt: probe.startedAt } : null)) {
-    return { ok: false, reason: 'the lock owner does not probe live' }
+  // Liveness is the probe's own answer AND the identity match. A probe that says
+  // `live: false`, or none at all, is not evidence of a live owner — reading only
+  // pid and start time from it would accept a process it just reported dead.
+  if (!probe || probe.live === false) return { ok: false, reason: 'the lock owner was not probed live' }
+  if (!sameProcess(lock, { pid: probe.pid, pidStartedAt: probe.startedAt })) {
+    return { ok: false, reason: 'the probed process is not the one the lock names' }
   }
-  if (Number.isFinite(lock.leaseUntil) && now > lock.leaseUntil) {
-    return { ok: false, reason: "the lock owner's lease has expired" }
-  }
+  // A lock with no usable lease is refused rather than treated as unexpiring: an
+  // absent or unparseable leaseUntil is the one value a stale lock is likeliest to
+  // carry, and accepting it would make expiry optional.
+  if (!Number.isFinite(lock.leaseUntil)) return { ok: false, reason: 'the lock carries no usable lease' }
+  if (now > lock.leaseUntil) return { ok: false, reason: "the lock owner's lease has expired" }
   return { ok: true, fence: lock.fence }
 }
 

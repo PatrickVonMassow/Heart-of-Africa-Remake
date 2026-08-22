@@ -566,13 +566,16 @@ create the legacy path never touches cannot see that caller. Confining the start
 window does not fix it either: `--prepare` proves quiescence at an INSTANT, and proving is not
 reserving; the same lock-owning session could begin a legacy operation immediately afterwards.
 
-**So the daemon is not a second record at all: its existence is a FIELD OF THE BATCH LOCK.**
-`start` writes a `daemon` field — pid, pid start time, generation — into `.claude/batch-lock.json`
-through the same atomic test-and-set that already governs the lock, and `stop` clears it the same
-way. The consequences follow without any new primitive:
+**So the daemon's existence is ALSO A FIELD OF THE BATCH LOCK — a copy of its record, not a
+second record.** `start` writes a `daemon` field — pid, pid start time, generation — into
+`.claude/batch-lock.json` through the same atomic test-and-set that already governs the lock, and
+`stop` clears it the same way. The consequences follow without any new primitive:
 
-- **"Is there a daemon?" and "may I work?" are answered by ONE record,** read in one act, so the
-  two can never disagree and no caller can observe a state the other half contradicts.
+- **"Is there a daemon?" and "may I work?" are ONE READ for the current lock owner,** so that
+  owner cannot act on a pair of answers taken at two different instants. That is an ATOMICITY
+  property and nothing more: the durable record is the daemon's own identity file (below), the
+  lock's field is a copy of it, and the two CAN be apart — the write orders and the invariant that
+  make every such state decidable are settled in "THE PAIR IS TWO FILES" further down.
 - **Only the lock owner can start or stop one,** because only the lock owner can write the lock.
 - **A legacy operation and a daemon start of the SAME session cannot overlap,** because a session
   is one thread of control: it is either inside a legacy operation or writing the lock, never both.
@@ -731,16 +734,25 @@ corruption, and it fails closed.
 **The observations, and what each one resolves to.** Reconciliation is idempotent: running it
 twice changes nothing, because every resolution is a write toward the record's own truth.
 
+**The order of the questions is part of the mechanism.** Whether the copy is POSSIBLE at all is
+asked first, because a copy no write order could have produced says nothing about liveness and
+must not be resolved by it. Only then does the record's own probe decide, because the record is
+the authority on existence: a dead record is COLD whatever the copy says, and the copy's staleness
+is part of that resolution rather than a reading competing with it. An unprobed record is read
+exactly like a dead one — this table never treats "not asked" as "alive".
+
 | Record | Copy | Probe | Reading | Resolution |
 |---|---|---|---|---|
 | absent | absent | — | no daemon | today's path, legal and normal |
 | present | matching | live | healthy | nothing to do |
 | present | absent | live | unadopted — a handover, or a crash between the two writes | the lock owner probes the record and writes the copy |
-| present | absent | dead | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
-| present | matching | dead | stale copy | as cold record, and clear the copy |
-| present | mismatched, older | either | superseded copy | the record wins; rewrite the copy from it after probing |
+| present | absent | dead or unprobed | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
+| present | matching | dead or unprobed | stale copy | as cold record, and clear the copy |
+| present | older generation | live | superseded copy | the record wins; rewrite the copy from it |
+| present | older generation | dead or unprobed | cold record | the record is what must be reconciled, and the copy goes with it |
 | absent | present | — | orphaned copy | clear the copy; a daemon is never concluded from the copy alone |
-| any | mismatched, NEWER | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
+| present | newer generation, or no generation, or this generation under another process identity | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
+| no generation | any | — | impossible by construction | a record nothing can be compared to fails closed like the row above |
 
 Its acceptance cases are step 1's own: every row of this table decided from the pair alone, and
 the forbidden row refused rather than resolved.

@@ -104,7 +104,14 @@ describe('identity — pid and pid start time, never a bare pid', () => {
     baseSha: 'abc1234',
     logPath: '/logs/a1.log',
     heartbeatPath: '/logs/a1.beat',
+    lease: 'lease-a1-605',
   }
+
+  it('names every field union M8 requires, the launcher lease included', () => {
+    for (const field of ['batchId', 'pointId', 'attemptId', 'pid', 'pidStartedAt', 'branch', 'worktree', 'baseSha', 'logPath', 'heartbeatPath', 'lease']) {
+      expect(ATTEMPT_IDENTITY_FIELDS, field).toContain(field)
+    }
+  })
 
   it('accepts a complete identity and refuses every incomplete one', () => {
     expect(attemptIdentity(full).ok).toBe(true)
@@ -164,12 +171,22 @@ describe('attempt states and transitions (union M16)', () => {
     expect(attemptTransition('sleeping', 'running').ok).toBe(false)
   })
 
-  it('records leave no field unanswered', () => {
+  it('records leave no field unanswered — and undefined is not an answer either', () => {
     const base = { actor: 'session-1', fence: 604, at: NOW, lastCommit: null, lastPushedSha: null }
     expect(attemptStateRecord({ state: 'running', ...base }).ok).toBe(true)
     const { lastPushedSha: _gone, ...withoutKey } = base
     expect(attemptStateRecord({ state: 'running', ...withoutKey }).reason).toMatch(/unanswered/)
+    // The key is present and its value is undefined: absent by another spelling.
+    expect(attemptStateRecord({ state: 'running', ...base, lastCommit: undefined }).reason).toMatch(/unanswered/)
+    expect(attemptStateRecord({ state: 'running', ...base, actor: undefined }).reason).toMatch(/unanswered/)
     expect(attemptStateRecord({ state: 'running', ...base, fence: 0 }).ok).toBe(false)
+  })
+
+  it('refuses an empty actor and a timestamp that is not a number', () => {
+    const base = { actor: 'session-1', fence: 604, at: NOW, lastCommit: null, lastPushedSha: null }
+    expect(attemptStateRecord({ state: 'running', ...base, actor: '' }).ok).toBe(false)
+    expect(attemptStateRecord({ state: 'running', ...base, at: 'just now' }).ok).toBe(false)
+    expect(attemptStateRecord({ state: 'running', ...base, at: null }).ok).toBe(false)
   })
 
   it('a state that claims reviewable or landed work must name its pushed SHA', () => {
@@ -193,48 +210,64 @@ describe('the daemon pair — record and the lock copy of it', () => {
   const alive = { pid: 900, pidStartedAt: NOW - 600_000, live: true }
   const dead = { pid: 900, pidStartedAt: NOW - 600_000, live: false }
 
-  const cases = {
-    'no-daemon': { record: null, copy: null, probe: null },
-    healthy: { record, copy, probe: alive },
-    unadopted: { record, copy: null, probe: alive },
-    'cold-record': { record, copy: null, probe: dead },
-    'stale-copy': { record, copy, probe: dead },
-    'superseded-copy': { record, copy: { ...copy, generation: 6, pid: 880 }, probe: alive },
-    'orphaned-copy': { record: null, copy, probe: null },
-    'impossible-copy': { record, copy: { ...copy, generation: 8 }, probe: alive },
-  }
+  // ENUMERATED OVER THE INPUTS, not over the output labels: every combination of
+  // record, copy and probe this classifier can be handed, each with the reading it
+  // must produce. A label-keyed table would have passed while whole input states
+  // went undecided, which is exactly what the review found.
+  const older = { ...copy, generation: 6, pid: 880, pidStartedAt: NOW - 900_000 }
+  const inputs = [
+    ['record absent, copy absent', { record: null, copy: null, probe: null }, 'no-daemon'],
+    ['record absent, copy absent, probe offered', { record: null, copy: null, probe: alive }, 'no-daemon'],
+    ['copy with no record', { record: null, copy, probe: null }, 'orphaned-copy'],
+    ['matching copy, live record', { record, copy, probe: alive }, 'healthy'],
+    ['matching copy, dead record', { record, copy, probe: dead }, 'stale-copy'],
+    ['matching copy, unprobed record', { record, copy, probe: null }, 'stale-copy'],
+    ['no copy, live record', { record, copy: null, probe: alive }, 'unadopted'],
+    ['no copy, dead record', { record, copy: null, probe: dead }, 'cold-record'],
+    ['no copy, unprobed record', { record, copy: null, probe: null }, 'cold-record'],
+    ['older copy, live record', { record, copy: older, probe: alive }, 'superseded-copy'],
+    ['older copy, dead record', { record, copy: older, probe: dead }, 'cold-record'],
+    ['probe of another process', { record, copy, probe: { pid: 901, pidStartedAt: NOW, live: true } }, 'stale-copy'],
+    ['copy newer than the record', { record, copy: { ...copy, generation: 8 }, probe: alive }, 'impossible-copy'],
+    ['copy with no generation', { record, copy: { ...copy, generation: undefined }, probe: alive }, 'impossible-copy'],
+    [
+      'same generation, another process',
+      { record, copy: { ...copy, pid: 880, pidStartedAt: NOW - 900_000 }, probe: alive },
+      'impossible-copy',
+    ],
+    ['record with no generation', { record: { ...record, generation: undefined }, copy, probe: alive }, 'impossible-copy'],
+  ]
 
-  it('decides every reading it declares — and declares every reading it decides', () => {
-    expect(Object.keys(cases).sort()).toEqual(Object.keys(DAEMON_PAIR_READINGS).sort())
-    for (const [reading, input] of Object.entries(cases)) {
-      expect(classifyDaemonPair(input).reading, reading).toBe(reading)
-      expect(classifyDaemonPair(input).resolution, reading).toBe(DAEMON_PAIR_READINGS[reading])
+  it('decides every input state, and produces every reading it declares', () => {
+    const produced = new Set()
+    for (const [label, input, expected] of inputs) {
+      const out = classifyDaemonPair(input)
+      expect(out.reading, label).toBe(expected)
+      expect(out.resolution, label).toBe(DAEMON_PAIR_READINGS[expected])
+      produced.add(out.reading)
+    }
+    expect([...produced].sort()).toEqual(Object.keys(DAEMON_PAIR_READINGS).sort())
+  })
+
+  it('an impossible reading always says what made it impossible', () => {
+    for (const [label, input, expected] of inputs) {
+      if (expected !== 'impossible-copy') continue
+      expect(classifyDaemonPair(input).reason, label).toBeTruthy()
     }
   })
 
-  it('a copy newer than the record is corruption, not a race', () => {
+  it('the invariant predicate refuses exactly what the write orders cannot produce', () => {
     expect(daemonPairInvariantHolds({ record, copy: { ...copy, generation: 8 } })).toBe(false)
+    expect(daemonPairInvariantHolds({ record, copy: { ...copy, pid: 880, pidStartedAt: NOW } })).toBe(false)
     expect(daemonPairInvariantHolds({ record, copy })).toBe(true)
+    expect(daemonPairInvariantHolds({ record, copy: older })).toBe(true)
     expect(daemonPairInvariantHolds({ record, copy: null })).toBe(true)
     expect(daemonPairInvariantHolds({ record: null, copy })).toBe(true)
   })
 
-  it('a record without a generation can be compared to nothing and fails closed', () => {
-    expect(classifyDaemonPair({ record: { ...record, generation: undefined }, copy, probe: alive }).reading).toBe(
-      'impossible-copy',
-    )
-  })
-
-  it('liveness is never read from the copy', () => {
-    // The copy is present and matching; only the record's own probe decides.
+  it('liveness is never read from the copy — only the record probes', () => {
     expect(classifyDaemonPair({ record, copy, probe: dead }).reading).toBe('stale-copy')
-    expect(classifyDaemonPair({ record, copy, probe: null }).reading).toBe('stale-copy')
-  })
-
-  it('a dead record with an older copy is cold rather than superseded — the record is what must be reconciled', () => {
-    expect(classifyDaemonPair({ record, copy: { ...copy, generation: 6, pid: 880 }, probe: dead }).reading).toBe(
-      'cold-record',
-    )
+    expect(classifyDaemonPair({ record, copy, probe: { ...alive, live: false } }).reading).toBe('stale-copy')
   })
 })
 
@@ -253,6 +286,31 @@ describe('the coordinator credential', () => {
     const push = publicationPush({ current, next: current, expectedOid: 'oid1', refs: ['main'] })
     expect(push.ok).toBe(false)
     expect(push.reason).toMatch(/no-op/)
+  })
+
+  it('refuses a credential that moves BACKWARDS, which a no-op check alone would let through', () => {
+    const back = credential({ generation: gen, fence: 604, seq: 2 }).credential
+    expect(publicationPush({ current, next: back, expectedOid: 'oid1', refs: ['main'] }).reason).toMatch(/backwards/)
+    const olderFence = credential({ generation: gen, fence: 603, seq: 99 }).credential
+    expect(publicationPush({ current, next: olderFence, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(false)
+    // A new fence with a restarted seq IS an advance.
+    const newFence = credential({ generation: gen, fence: 605, seq: 0 }).credential
+    expect(publicationPush({ current, next: newFence, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(true)
+  })
+
+  it('refuses a malformed credential on either side rather than comparing undefined', () => {
+    expect(publicationPush({ current, next: { generation: gen, fence: 605 }, expectedOid: 'o', refs: ['main'] }).ok).toBe(
+      false,
+    )
+    expect(
+      publicationPush({ current: { generation: gen }, next: advancedCredential(current).credential, expectedOid: 'o', refs: ['main'] })
+        .ok,
+    ).toBe(false)
+  })
+
+  it('returns the value that must be written into the ref, so lease and payload cannot come apart', () => {
+    const next = advancedCredential(current).credential
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main'] }).credential).toEqual(next)
   })
 
   it('builds one atomic push carrying the work and the credential under a lease', () => {
@@ -295,6 +353,14 @@ describe('the coordinator credential', () => {
     expect(credentialAccepted({ generation: gen, fence: 605, seq: 0 }, current).ok).toBe(true)
   })
 
+  it('refuses a credential that carries no numbers at all instead of comparing undefined', () => {
+    expect(credentialAccepted({ generation: gen }, current).ok).toBe(false)
+    expect(credentialAccepted({ generation: gen, fence: 604 }, current).ok).toBe(false)
+    expect(credentialAccepted({ generation: gen, fence: '604', seq: 3 }, current).ok).toBe(false)
+    expect(credentialAccepted(current, { generation: gen }).ok).toBe(false)
+    expect(credentialAccepted(null, current).ok).toBe(false)
+  })
+
   it('minting is fail-closed on the fence store AND on the journal', () => {
     const store = { generation: gen, fence: 604 }
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: 604 })).toEqual({ ok: true, next: 605 })
@@ -307,7 +373,7 @@ describe('the coordinator credential', () => {
 
 describe('mutation validation — the fence IS the coordinator epoch', () => {
   const lock = { sessionId: 's1', fence: 604, pid: 500, pidStartedAt: NOW - 10_000, leaseUntil: NOW + 60_000 }
-  const probe = { pid: 500, startedAt: NOW - 10_000 }
+  const probe = { pid: 500, startedAt: NOW - 10_000, live: true }
   const presented = { sessionId: 's1', fence: 604 }
 
   it('accepts only when session, fence and liveness all hold at that instant', () => {
@@ -315,8 +381,19 @@ describe('mutation validation — the fence IS the coordinator epoch', () => {
     expect(validateMutation({ presented, lock: null, probe, now: NOW }).reason).toMatch(/no batch lock/)
     expect(validateMutation({ presented: { ...presented, sessionId: 's2' }, lock, probe, now: NOW }).ok).toBe(false)
     expect(validateMutation({ presented: { ...presented, fence: 603 }, lock, probe, now: NOW }).reason).toMatch(/stale fence/)
-    expect(validateMutation({ presented, lock, probe: { pid: 500, startedAt: NOW - 900_000 }, now: NOW }).ok).toBe(false)
-    expect(validateMutation({ presented, lock, probe, now: NOW + 120_000 }).reason).toMatch(/lease/)
+    expect(validateMutation({ presented, lock, probe: { ...probe, startedAt: NOW - 900_000 }, now: NOW }).ok).toBe(false)
+    expect(validateMutation({ presented, lock, probe, now: NOW + 120_000 }).reason).toMatch(/lease has expired/)
+  })
+
+  it('does not accept a probe that reported the owner DEAD, or no probe at all', () => {
+    expect(validateMutation({ presented, lock, probe: { ...probe, live: false }, now: NOW }).ok).toBe(false)
+    expect(validateMutation({ presented, lock, probe: null, now: NOW }).reason).toMatch(/not probed live/)
+  })
+
+  it('refuses a lock whose lease is missing or unreadable rather than treating it as unexpiring', () => {
+    const { leaseUntil: _gone, ...noLease } = lock
+    expect(validateMutation({ presented, lock: noLease, probe, now: NOW }).reason).toMatch(/no usable lease/)
+    expect(validateMutation({ presented, lock: { ...lock, leaseUntil: 'soon' }, probe, now: NOW }).ok).toBe(false)
   })
 
   it('compensates when the lock moved under the write', () => {
