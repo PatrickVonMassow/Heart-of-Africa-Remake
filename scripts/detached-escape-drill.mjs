@@ -39,6 +39,9 @@ export const BEAT_MS = 200
 /** The longest silence a working lane may show, in beat periods. */
 export const MAX_GAP_BEATS = 3
 
+/** Below this many beats before the kill there is no baseline to calibrate on. */
+export const MIN_BASELINE_BEATS = 5
+
 /**
  * Linux process states, split into living and dead.
  *
@@ -72,6 +75,7 @@ export function readOutcome({
   unknownLiveness = false,
   beatsBefore = 0,
   beatTimes = [],
+  startedObserving = null,
   killedAt = 0,
   observedUntil = 0,
   lastLine = '',
@@ -85,7 +89,14 @@ export function readOutcome({
   // worker's OWN jitter before the kill sets the bar: twice its worst pre-kill
   // pause, never below the three-period floor.
   const gapsIn = (marks) => marks.slice(1).map((t, i) => t - marks[i])
-  const jitter = Math.max(0, ...gapsIn(before))
+  // THE PRE-KILL WINDOW'S EDGES COUNT TOO. Measuring only the gaps BETWEEN beats
+  // missed a host that produced its first beat late or fell silent just before
+  // the kill — the two shapes of starvation most likely to matter.
+  // `t > 0` here dropped an observation start stamped at 0 and silently removed
+  // the leading edge — the same shape of bug the marks list had. Absent means
+  // null, never zero.
+  const preMarks = [startedObserving, ...before, killedAt].filter((t) => t !== null && Number.isFinite(t))
+  const jitter = preMarks.length > 1 ? Math.max(0, ...gapsIn(preMarks)) : 0
   const limit = Math.max(BEAT_MS * MAX_GAP_BEATS, jitter * 2)
   // The first gap is measured from the KILL, so a worker that goes quiet at the
   // moment its parent dies and only resumes later cannot hide in the average.
@@ -97,26 +108,37 @@ export function readOutcome({
   const gained = after.length
   const progressed = gained > 0 && maxGap <= limit
   // A HOST TOO LOADED TO MEASURE IS NOT A RESULT. If the worker could not hold
-  // its beat even BEFORE the kill, this run says nothing about what the kill did.
-  const unmeasurable = before.length > 1 && jitter > BEAT_MS * MAX_GAP_BEATS
+  // its beat even BEFORE the kill, this run says nothing about what the kill did
+  // — and a settling window that produced almost no beats at all is the same
+  // condition, not a clean baseline. `before.length > 1` alone let exactly that
+  // case through and green afterwards.
+  const enoughBaseline = before.length >= MIN_BASELINE_BEATS
+  const unmeasurable = !enoughBaseline || jitter > BEAT_MS * MAX_GAP_BEATS
+  // A DEATH IS A DEFINITE RESULT WHATEVER THE HOST WAS DOING. Only a POSITIVE
+  // verdict needs a baseline, so an unmeasurable window blocks "escaped" and
+  // never overrides "died" — the reading of a corpse does not depend on jitter.
+  const dead = !alive && !unknownLiveness
   const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness
   const why = escaped
     ? 'still running and still working after the kill'
-    : unmeasurable
-      ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
+    : dead
+      ? /EPIPE/i.test(lastLine)
+        ? 'died writing to a pipe whose reader went with the parent'
+        : 'died with the parent, cause not recorded in its own log'
       : unknownLiveness
         ? 'liveness could not be established, and an unreadable probe is not a survivor'
-        : !alive && /EPIPE/i.test(lastLine)
-          ? 'died writing to a pipe whose reader went with the parent'
-          : !alive
-            ? 'died with the parent, cause not recorded in its own log'
-            : gained === 0
-              ? 'still running but never beat again — a survivor that stopped is not a lane'
-              : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
+        : unmeasurable
+          ? enoughBaseline
+            ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
+            : `only ${before.length} beat(s) before the kill, too few for a baseline — this run measures nothing`
+          : gained === 0
+            ? 'still running but never beat again — a survivor that stopped is not a lane'
+            : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
   return {
     shape,
     escaped,
     progressed,
+    dead,
     unmeasurable,
     alive: Boolean(alive),
     beatsBefore,
@@ -196,7 +218,7 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
  * Where that file does not exist the signal probe is all there is, and the
  * limitation travels with the answer rather than being silently assumed away.
  */
-export function probeAlive(pid, { startedAt = 0, readProc = defaultReadProc, signal = defaultSignal } = {}) {
+export function probeAlive(pid, { startedAt = 0, requireIdentity = false, readProc = defaultReadProc, signal = defaultSignal } = {}) {
   if (!Number.isFinite(pid)) return { alive: false, how: 'no pid' }
   const stat = readProc(pid)
   if (stat != null) {
@@ -206,7 +228,16 @@ export function probeAlive(pid, { startedAt = 0, readProc = defaultReadProc, sig
     // the start time in clock ticks; captured after the spawn and compared here,
     // it tells the worker apart from its successor at the same number.
     const now = startTicksOf(stat)
-    if (startedAt && now && now !== startedAt) {
+    if (requireIdentity && !startedAt) {
+      // A FAILED CAPTURE IS NOT A PASS. `startedAt && now && …` silently turned
+      // recycling detection OFF whenever the spawn-time read had failed, which
+      // is exactly when a recycled pid is most likely to slip through.
+      return { alive: false, unknown: true, how: 'UNKNOWN — no spawn-time identity was captured for this pid' }
+    }
+    if (startedAt && !now) {
+      return { alive: false, unknown: true, how: `UNKNOWN — /proc gave no start time for pid ${pid}` }
+    }
+    if (startedAt && now !== startedAt) {
       return { alive: false, how: `pid ${pid} was recycled — start ${now} is not the ${startedAt} we spawned` }
     }
     // The state letter is the field after the ")" that closes the comm field —
@@ -223,11 +254,19 @@ export function probeAlive(pid, { startedAt = 0, readProc = defaultReadProc, sig
   // would have greened a dead lane. A drill that cannot see the truth reports
   // that it cannot, and `signal` is kept only to distinguish "gone" from
   // "unreadable" in the explanation.
-  // A pid the signal probe cannot find at all is GONE, not unknown: there is no
-  // corpse for /proc to have hidden. Only a pid that still answers the signal
-  // while /proc stays unreadable is genuinely undecidable here.
-  if (!signal(pid)) return { alive: false, how: 'no such process' }
-  return { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable and a signal probe cannot tell a corpse apart' }
+  // ONLY ESRCH ESTABLISHES "GONE". A pid that exists but refuses the signal, or
+  // an error we cannot classify, leaves the question open — and open is not an
+  // escape. Only a pid nothing answers for is reported dead outright.
+  const state = signal(pid)
+  if (state === 'gone') return { alive: false, how: 'no such process' }
+  return {
+    alive: false,
+    unknown: true,
+    how:
+      state === 'exists'
+        ? 'UNKNOWN — /proc unreadable and a signal probe cannot tell a corpse apart'
+        : 'UNKNOWN — /proc unreadable and the signal probe failed for an unclassified reason',
+  }
 }
 
 /** Field 22 of /proc/<pid>/stat — start time in clock ticks since boot. The
@@ -247,14 +286,26 @@ const defaultReadProc = (pid) => {
     return null
   }
 }
-const defaultSignal = (pid) => {
+/**
+ * Tri-state, because `catch { return false }` reads EPERM as "gone".
+ *
+ * Only `ESRCH` establishes that no such process exists. `EPERM` means the
+ * opposite — there IS one, we merely may not signal it — and any other error is
+ * undecided. A drill that folds all three into false would report a live
+ * foreign process as gone.
+ */
+export function signalState(pid) {
   try {
     process.kill(pid, 0)
-    return true
-  } catch {
-    return false
+    return 'exists'
+  } catch (err) {
+    if (err?.code === 'ESRCH') return 'gone'
+    if (err?.code === 'EPERM') return 'exists'
+    return 'unknown'
   }
 }
+
+const defaultSignal = signalState
 
 /** Run ONE shape end to end and return its evidence. */
 async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) {
@@ -276,13 +327,20 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
     stdio: ['ignore', startFd, startFd],
   })
   parent.unref()
+  // THE IDENTITY IS TAKEN AT SPAWN, not after the settling sleep: between the two
+  // the worker could already have exited and its number been reused, and the
+  // probe would then compare against the wrong process.
+  let startedAt = 0
+  for (let tries = 0; tries < 50 && !startedAt; tries += 1) {
+    const seen = Number(readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0])
+    if (Number.isFinite(seen) && seen > 0) startedAt = startTicksOf(defaultReadProc(seen) ?? '')
+    if (!startedAt) await sleep(20)
+  }
+  const startedObserving = Date.now()
   await sleep(settleMs)
   const lines = (path) => readFileSync(path, 'utf8').split('\n').filter(Boolean)
   const beatsBefore = lines(beat).length
   const pid = Number(readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0])
-  // The worker's start time, taken while it is provably still the process we
-  // spawned, so a recycled pid cannot pass the liveness probe after the kill.
-  const startedAt = startTicksOf(defaultReadProc(pid) ?? '')
   let killedAt = 0
   try {
     process.kill(-parent.pid, 'SIGKILL')
@@ -295,13 +353,14 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   const after = lines(beat)
   const observedUntil = Date.now()
   const beatTimes = after.filter((l) => l.startsWith('beat ')).map((l) => Number(l.slice('beat '.length)))
-  const live = probeAlive(pid, { startedAt })
+  const live = probeAlive(pid, { startedAt, requireIdentity: true })
   const outcome = readOutcome({
     shape,
     alive: live.alive,
     unknownLiveness: Boolean(live.unknown),
     beatsBefore,
     beatTimes,
+    startedObserving,
     killedAt,
     observedUntil,
     lastLine: after.at(-1) ?? '',

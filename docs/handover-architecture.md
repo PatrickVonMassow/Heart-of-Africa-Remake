@@ -383,15 +383,18 @@ compensation, and the design owes all three parts:
   answer said and which would have quarantined all legitimate predecessor history, transferred
   workers included, at every ordinary handover.
 
-  **What makes that test decidable is that the daemon writes the transition itself.** The lock file
-  is written by other processes, so a new fence can become authoritative there before anyone has
-  recorded it — and then an old-fence mutation could be appended before the transition and read as
-  legitimate. So the daemon does not treat the lock file as the transition. The FIRST time it
-  validates a fence it has not seen, it appends the transition record before the mutation it is
-  validating, in its own serial write order. The journal's order is therefore total and
-  self-contained, and "the fence in force at position i" is simply the last transition at or
-  before i. The lock file remains what the daemon READS; the journal is what makes the reading a
-  fact a later reader can re-derive.
+  **The transition is written by the ACQUIRER, not by the daemon.** Letting the daemon append it
+  when it first validated a request under a fence it had not seen left the record hostage to
+  traffic: A could validate fence 7, the lock could advance to 8, A could append its fence-7
+  mutation, and a crash before any fence-8 request arrived meant transition 8 was recorded only
+  after recovery — behind A's entry, which the positional rule would then accept. So acquisition
+  itself writes it: **B appends the fence transition as the first act of acquiring, before it may
+  request anything,** and a daemon that reads a lock fence for which the journal holds no
+  transition refuses to mutate and says so, rather than inventing the ordering it needs. The
+  journal's order is then total and self-contained, "the fence in force at position i" is the last
+  transition at or before i, and no gap in it depends on whether a request happened to arrive. The
+  lock file remains what the daemon READS; the journal is what makes the reading a fact a later
+  reader can re-derive.
 
 **EVERY PUBLISHED MUTATION IS UNCOMPENSABLE, and there are two of them.** A pushed merge can
 already have been fetched, read or built on, and "reverting" it is a new commit, not a reversal.
@@ -415,12 +418,32 @@ git push --atomic --force-with-lease=refs/hoa/coordinator:<the oid I acquired un
     origin <branch or main> refs/hoa/coordinator
 ```
 
-The lease is a compare-and-swap on the credential ref. A coordinator that was dispossessed pushes
-a lease that no longer matches, the lease fails, and `--atomic` means the branch or `main` update
-does not happen either. Nothing lands under a credential that has been superseded, whether or not
-the work itself would have fast-forwarded, and whether or not the rightful owner has pushed yet.
-Worker checkpoint pushes use the identical form, so M40's "check the lease before pushing" becomes
-a check that IS the push rather than one that precedes it.
+The lease is a compare-and-swap on the credential ref. A coordinator whose successor has ALREADY
+advanced that ref pushes a lease that no longer matches; the lease fails and `--atomic` means the
+branch or `main` update does not happen either. Worker checkpoint pushes use the identical form,
+so M40's "check the lease before pushing" becomes a check that IS the push rather than one that
+precedes it.
+
+**WHAT THE CAS ALONE STILL DOES NOT COVER, and the clock rule that does.** Between B's local
+acquisition and B's advance of the credential ref there is an interval in which the ref is still
+A's, so A's lease matches and git accepts A's push. No remote CAS can close that on its own,
+because during it nobody has told the remote anything. The interval is closed by the LEASE, and
+this is a clock rule, stated with its assumption rather than hidden:
+
+- **B advances the credential ref as the first act of acquisition,** before any work of its own,
+  and may publish nothing until that push has landed.
+- **A stops publishing δ before its own lease expires.** A re-reads its `leaseUntil` immediately
+  before every publishing act and refuses when less than δ remains.
+- **B may not take the lock before A's lease has expired,** which `scripts/batch-singleton.mjs`
+  already requires — takeover needs proven death or an expired lease, never impatience.
+- Therefore A's last possible push is δ before expiry and B's first possible acquisition is at
+  expiry, so the window has A on one side of the lease boundary and B on the other.
+
+**Its assumption is bounded clock drift between the two sessions,** which on one machine with one
+system clock is the ordinary case; δ is the margin that absorbs it and is a calibratable value in
+the schema, not a constant buried in code. Where death is PROVEN rather than merely assumed from
+an expired lease — the pid is gone and its start time cannot return — the wait does not apply,
+because a dead A publishes nothing.
 
 The landing's safety therefore comes from serialization plus a fenced remote update, and the local
 fence is what stops a dispossessed coordinator from acquiring the landing lock in the first place.
@@ -492,9 +515,20 @@ way. The consequences follow without any new primitive:
 - **"Is there a daemon?" and "may I work?" are answered by ONE record,** read in one act, so the
   two can never disagree and no caller can observe a state the other half contradicts.
 - **Only the lock owner can start or stop one,** because only the lock owner can write the lock.
-- **A legacy operation and a daemon start cannot overlap,** because both belong to the lock owner
-  and a session is one thread of control: it is either inside a legacy operation or writing the
-  lock, never both. The overlap the earlier answers left open needed two actors; there is only one.
+- **A legacy operation and a daemon start of the SAME session cannot overlap,** because a session
+  is one thread of control: it is either inside a legacy operation or writing the lock, never both.
+
+**That is not the whole answer, and the earlier draft stopped there.** Two actors do still exist
+when A begins a legacy operation while owning the lock, A's lease then expires or its death is
+observed, and B becomes owner and writes the `daemon` field while A is still inside that
+operation. The single-thread argument covers the current owner and says nothing about a former
+one. So the same lease rule that fences publication fences the regime: **a legacy operation
+re-reads the lock immediately before its own irreversible act and aborts if the lock is no longer
+its own or less than δ of its lease remains.** An operation that discovers it has been dispossessed
+does not finish "because it was nearly done"; it stops and leaves its work where a successor can
+see it. Combined with B's inability to take over before expiry, an operation begun under a valid
+lease either completes δ before that lease ends or aborts — and B's daemon field cannot appear
+during a legacy act that is still entitled to run.
 
 A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
 handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with

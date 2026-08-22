@@ -11,7 +11,9 @@ import {
   DEAD_STATES,
   LIVE_STATES,
   MAX_GAP_BEATS,
+  MIN_BASELINE_BEATS,
   probeAlive,
+  signalState,
   readOutcome,
   SHAPES,
   startTicksOf,
@@ -27,7 +29,16 @@ const beatsEvery = (ms, from = BEAT_MS, until = WINDOW) => {
   for (let t = from; t <= until; t += ms) out.push(t)
   return out
 }
-const healthy = { killedAt: KILL, observedUntil: WINDOW, beatTimes: beatsEvery(BEAT_MS), beatsBefore: 9 }
+// The observation begins BEFORE the kill: a baseline of beats is what the
+// tolerance is calibrated on, so every fixture that expects a verdict carries one.
+const BASELINE = beatsEvery(BEAT_MS, -1400, -BEAT_MS)
+const healthy = {
+  startedObserving: -1600,
+  killedAt: KILL,
+  observedUntil: WINDOW,
+  beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS)],
+  beatsBefore: BASELINE.length,
+}
 
 describe('readOutcome', () => {
   it('calls it an escape when the process is alive and never went silent', () => {
@@ -37,7 +48,7 @@ describe('readOutcome', () => {
   })
 
   it('refuses a single post-kill beat as work', () => {
-    const oneBeat = readOutcome({ shape: 'files', alive: true, ...healthy, beatTimes: [BEAT_MS] })
+    const oneBeat = readOutcome({ shape: 'files', alive: true, ...healthy, beatTimes: [...BASELINE, BEAT_MS] })
     expect(oneBeat.escaped).toBe(false)
     expect(oneBeat.why).toMatch(/silent for 2800 ms/)
   })
@@ -83,7 +94,7 @@ describe('readOutcome', () => {
       shape: 'files',
       alive: true,
       ...healthy,
-      beatTimes: beatsEvery(BEAT_MS).filter((t) => t !== 1000),
+      beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS).filter((t) => t !== 1000)],
     })
     expect(jitter.escaped).toBe(true)
   })
@@ -101,12 +112,15 @@ describe('readOutcome', () => {
     const jittery = readOutcome({
       shape: 'files',
       alive: true,
-      killedAt: 1000,
-      observedUntil: 4000,
-      beatTimes: [200, 700, 1200, 1900, 2400, 2900, 3400, 3900],
-      beatsBefore: 2,
+      startedObserving: 0,
+      killedAt: 2500,
+      observedUntil: 5500,
+      // Five baseline beats whose worst pause is 500 ms, then a post-kill run
+      // that pauses 900 ms — inside twice the baseline, outside the 600 ms floor.
+      beatTimes: [500, 1000, 1500, 2000, 2500, 3400, 3900, 4400, 4900, 5400],
+      beatsBefore: 5,
     })
-    expect(jittery.limit).toBe(1000) // twice the worst 500 ms pause before the kill
+    expect(jittery.limit).toBe(1000)
     expect(jittery.escaped).toBe(true)
   })
 
@@ -114,14 +128,49 @@ describe('readOutcome', () => {
     const starved = readOutcome({
       shape: 'files',
       alive: true,
+      startedObserving: 0,
       killedAt: 3000,
       observedUntil: 6000,
-      beatTimes: [200, 2800, 3200, 3600, 4000, 4400, 4800, 5200, 5600, 6000],
-      beatsBefore: 2,
+      // Six baseline beats, but one 1800 ms hole among them: the host was
+      // already starving before the kill, so nothing after it can be attributed.
+      beatTimes: [200, 400, 600, 800, 1000, 2800, 3200, 3600, 4000, 4400, 4800, 5200, 5600, 6000],
+      beatsBefore: 6,
     })
     expect(starved.unmeasurable).toBe(true)
     expect(starved.escaped).toBe(false)
     expect(starved.why).toMatch(/measures nothing/)
+  })
+
+  it('counts the EDGES of the baseline window, not only the gaps between beats', () => {
+    // A worker whose first beat came late, or that fell silent just before the
+    // kill, was invisible to a between-beats measurement — and those are the two
+    // shapes of starvation that matter most here.
+    const lateFirstBeat = readOutcome({
+      shape: 'files',
+      alive: true,
+      startedObserving: 0,
+      killedAt: 3000,
+      observedUntil: 6000,
+      beatTimes: [2000, 2200, 2400, 2600, 2800, 3200, 3400, 3600, 3800, 4000, 4200],
+      beatsBefore: 5,
+    })
+    expect(lateFirstBeat.jitter).toBe(2000)
+    expect(lateFirstBeat.unmeasurable).toBe(true)
+  })
+
+  it('calls a settling window with almost no beats unmeasurable, not a clean baseline', () => {
+    const thin = readOutcome({
+      shape: 'files',
+      alive: true,
+      startedObserving: -400,
+      killedAt: KILL,
+      beatTimes: [-200, ...beatsEvery(BEAT_MS)],
+      observedUntil: WINDOW,
+      beatsBefore: 1,
+    })
+    expect(thin.unmeasurable).toBe(true)
+    expect(thin.why).toMatch(/too few for a baseline/)
+    expect(MIN_BASELINE_BEATS).toBeGreaterThan(1)
   })
 
   it('names the pipe when the child left its cause in its own log', () => {
@@ -129,7 +178,7 @@ describe('readOutcome', () => {
       shape: 'pipes',
       alive: false,
       ...healthy,
-      beatTimes: [BEAT_MS],
+      beatTimes: [...BASELINE, BEAT_MS],
       lastLine: 'raised: EPIPE',
     })
     expect(died.escaped).toBe(false)
@@ -137,7 +186,7 @@ describe('readOutcome', () => {
   })
 
   it('does not invent a cause it was not given', () => {
-    const died = readOutcome({ shape: 'pipes', alive: false, ...healthy, beatTimes: [], lastLine: 'beat 17' })
+    const died = readOutcome({ shape: 'pipes', alive: false, ...healthy, beatTimes: BASELINE, lastLine: 'beat 17' })
     expect(died.why).toMatch(/cause not recorded/)
   })
 })
@@ -149,7 +198,7 @@ describe('probeAlive', () => {
     // `kill(pid, 0)` answers true for an exited process still in the table, and
     // Z is not the only such state: X and x are the exit states too.
     for (const state of DEAD_STATES) {
-      const dead = probeAlive(4242, { readProc: () => stat(state), signal: () => true })
+      const dead = probeAlive(4242, { readProc: () => stat(state), signal: () => 'exists' })
       expect(dead.alive, `state ${state}`).toBe(false)
       expect(dead.how).toMatch(new RegExp(`state ${state}`))
     }
@@ -157,43 +206,72 @@ describe('probeAlive', () => {
 
   it('reads a running, sleeping or stopped process as alive', () => {
     for (const state of LIVE_STATES) {
-      expect(probeAlive(4242, { readProc: () => stat(state), signal: () => false }).alive, `state ${state}`).toBe(true)
+      expect(probeAlive(4242, { readProc: () => stat(state), signal: () => 'gone' }).alive, `state ${state}`).toBe(true)
     }
   })
 
   it('FAILS CLOSED on a state letter it does not know', () => {
-    const unknown = probeAlive(4242, { readProc: () => stat('Q'), signal: () => true })
+    const unknown = probeAlive(4242, { readProc: () => stat('Q'), signal: () => 'exists' })
     expect(unknown.alive).toBe(false)
     expect(unknown.how).toMatch(/unrecognised/)
   })
 
   it('parses the state from the RIGHT, so a process name containing ")" cannot shift it', () => {
     const tricky = `4242 (nod)e) Z 1 4242 …`
-    expect(probeAlive(4242, { readProc: () => tricky, signal: () => true }).alive).toBe(false)
+    expect(probeAlive(4242, { readProc: () => tricky, signal: () => 'exists' }).alive).toBe(false)
   })
 
   it('FAILS CLOSED when /proc cannot be read but the pid still answers', () => {
     // MEASURED DEFECT of the third version: the fallback returned alive, and
     // `verdict` consumes only that boolean — so a transient read failure greened
     // a corpse. Undecidable is now its own answer and is never an escape.
-    const undecidable = probeAlive(4242, { readProc: () => null, signal: () => true })
+    const undecidable = probeAlive(4242, { readProc: () => null, signal: () => 'exists' })
     expect(undecidable.alive).toBe(false)
     expect(undecidable.unknown).toBe(true)
     expect(undecidable.how).toMatch(/UNKNOWN/)
   })
 
   it('calls a pid nothing answers for GONE, not undecidable', () => {
-    const gone = probeAlive(4242, { readProc: () => null, signal: () => false })
+    const gone = probeAlive(4242, { readProc: () => null, signal: () => 'gone' })
     expect(gone.alive).toBe(false)
     expect(gone.unknown).toBeUndefined()
     expect(gone.how).toMatch(/no such process/)
+  })
+
+  it('keeps a pid it may not signal UNDECIDED rather than gone', () => {
+    // EPERM says the process EXISTS and is not ours to signal. Folding it into
+    // "gone" would report a live foreign process as dead.
+    const forbidden = probeAlive(4242, { readProc: () => null, signal: () => 'exists' })
+    expect(forbidden.unknown).toBe(true)
+    const unclassified = probeAlive(4242, { readProc: () => null, signal: () => 'unknown' })
+    expect(unclassified.unknown).toBe(true)
+    expect(unclassified.how).toMatch(/unclassified/)
+  })
+
+  it('classifies the real signal probe: this process exists, a free number is gone', () => {
+    expect(signalState(process.pid)).toBe('exists')
+    expect(signalState(2 ** 30)).toBe('gone')
+  })
+
+  it('refuses to answer when NO spawn-time identity was captured', () => {
+    // `startedAt && now && …` silently switched recycling detection off whenever
+    // the spawn-time read had failed — which is when it is needed most.
+    const nothingCaptured = probeAlive(4242, {
+      requireIdentity: true,
+      startedAt: 0,
+      readProc: () => `4242 (node) S 1 …`,
+      signal: () => 'exists',
+    })
+    expect(nothingCaptured.alive).toBe(false)
+    expect(nothingCaptured.unknown).toBe(true)
+    expect(nothingCaptured.how).toMatch(/no spawn-time identity/)
   })
 
   it('refuses a RECYCLED pid, because a number is not an identity', () => {
     const spawned = `4242 (node) S 1 4242 4242 0 -1 0 0 0 0 0 1 2 3 4 20 0 1 0 900000 …`
     const other = `4242 (node) S 1 4242 4242 0 -1 0 0 0 0 0 1 2 3 4 20 0 1 0 999999 …`
     expect(startTicksOf(spawned)).toBe(900000)
-    const recycled = probeAlive(4242, { startedAt: startTicksOf(spawned), readProc: () => other, signal: () => true })
+    const recycled = probeAlive(4242, { startedAt: startTicksOf(spawned), readProc: () => other, signal: () => 'exists' })
     expect(recycled.alive).toBe(false)
     expect(recycled.how).toMatch(/recycled/)
     // …and the same process at the same start time is still itself.
@@ -201,7 +279,7 @@ describe('probeAlive', () => {
   })
 
   it('is total on a missing pid', () => {
-    expect(probeAlive(NaN, { readProc: () => null, signal: () => true }).alive).toBe(false)
+    expect(probeAlive(NaN, { readProc: () => null, signal: () => 'exists' }).alive).toBe(false)
   })
 })
 
@@ -213,7 +291,8 @@ describe('verdict', () => {
       beatsBefore: 9,
       killedAt: KILL,
       observedUntil: WINDOW,
-      beatTimes: escaped ? beatsEvery(BEAT_MS) : [],
+      startedObserving: -1600,
+      beatTimes: escaped ? [...BASELINE, ...beatsEvery(BEAT_MS)] : BASELINE,
       lastLine: 'raised: EPIPE',
     })
 
