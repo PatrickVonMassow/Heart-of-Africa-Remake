@@ -320,4 +320,18 @@ describe('the open-point headline (point 440)', () => {
     expect(hook).toContain('servingPolicyLine(fableState)')
     expect(hook).not.toContain("'Fable 5, then Opus 4.8")
   })
+
+  it('orients every owning successor through the child-output measurement', () => {
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('gatherSuccessorAgentOrientation(sessionId, { now })')
+    expect(hook).toContain('${agentLine}${ownerContext}')
+    expect(hook).toContain('PREDECESSOR CHILD STATE UNKNOWN')
+  })
+
+  it('serves the same transfer-and-measure rule from the owner runbook', () => {
+    const runbook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'batch-owner-runbook.md'), 'utf8')
+    expect(runbook).toMatch(/transfers pushed author\s+checkpoints/)
+    expect(runbook).toContain('batch-in-flight.mjs --agent-check')
+    expect(runbook).toContain('unreadable output is unknown, not death')
+  })
 })

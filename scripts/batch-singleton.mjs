@@ -602,9 +602,10 @@ export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclud
  *   'block-take-boundary' — owner, a point closed IN THIS SESSION and no marker:
  *                        the boundary is DUE and must be TAKEN, not offered
  *                        (point 388) — block, naming the one command
- *   'allow-release'    — owner with an honoured CLAIM at a CLEAN moment (point
- *                        395): the user took the batch back into the window they
- *                        are sitting at. Release the lock and end here
+ *   'allow-release'    — owner with an honoured CLAIM at a SAFE boundary (points
+ *                        395/716): the user took the batch back into the window
+ *                        they are sitting at. Transfer pushed declared work,
+ *                        release the lock and end here
  *   'allow-in-flight'  — owner WAITING on work it has declared and that is
  *                        provably still running (point 388, fifth live finding):
  *                        the turn may end, the lock stays held, nothing is handed
@@ -647,8 +648,9 @@ export function progressGuardDecision({
   // where both apply the session is finished either way, and handing the batch to
   // the window the user is sitting at beats handing it to the launcher. The
   // 'wait' verdict deliberately falls through to the ordinary decisions — a
-  // release is only ever offered at a moment `releaseDecision` has judged CLEAN,
-  // so a merge, a building agent or a running verification is never cut in half.
+  // release is only ever offered at a boundary `releaseDecision` has judged
+  // safe, so a merge or uncheckpointed work is never cut in half. Transferable
+  // agent work crosses it through the declaration's adoption record.
   if (claim === 'release') return 'allow-release'
   // The point boundary (point 373). A valid boundary is only ever honoured with
   // an armed launcher — an unarmed one would turn "end the session" into "end the

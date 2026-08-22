@@ -7,8 +7,8 @@
 //                                    [--worktree PATH]… [--log PATH]…
 //   node scripts/batch-in-flight.mjs --status   what the Stop hook would decide
 //   node scripts/batch-in-flight.mjs --clear    the wait is over
-//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH] [--branch REF]
-//                                    [--log PATH]
+//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH]… [--branch REF]…
+//                                    [--log PATH]…
 //                                    may this delegated agent be REPLACED? Exit 0
 //                                    yes, exit 1 no. Run it IMMEDIATELY before
 //                                    the respawn (point 434 (5)).
@@ -49,6 +49,7 @@ import {
   assessTransfer,
   checkEvidence,
   combineWorktreeStamps,
+  worktreeStamp,
   describeInFlight,
   markTransferred,
   porcelainPaths,
@@ -59,6 +60,9 @@ import {
   statusVerdict,
   transferBlockMessage,
   closingFreezeActive,
+  declaredAgentProbe,
+  standDownBoundaryDecision,
+  successorAgentOrientation,
   declaredAgentCount,
   openPointSpecs,
   waitEtaRefusal,
@@ -650,15 +654,63 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
  * being run AGAIN in the seconds before the spawn: on 30.07.2026 the branch tip
  * moved one minute before the replacement was started.
  */
-export function checkAgentOutput({ worktree = null, branch = null, log = null, now = Date.now(), graceMs } = {}) {
+export function checkAgentOutput(
+  {
+    worktree = null,
+    branch = null,
+    log = null,
+    now = Date.now(),
+    graceMs,
+    worktreeProbe = worktreeActiveAt,
+    branchProbe = refTipAt,
+    logProbe = mtimeOf,
+  } = {},
+) {
+  const many = (value) => (Array.isArray(value) ? value : value ? [value] : [])
+  const newestNumber = (values) => {
+    const nums = values.filter((value) => typeof value === 'number' && Number.isFinite(value))
+    return nums.length ? Math.max(...nums) : null
+  }
+  const worktreeStamps = many(worktree).map((path) => worktreeStamp(worktreeProbe(path))).filter(Boolean)
+  const newestWorktree = worktreeStamps.reduce((newest, stamp) => (!newest || stamp.at > newest.at ? stamp : newest), null)
   const output = agentOutputVerdict({
-    worktreeAt: worktree ? worktreeActiveAt(worktree) : null,
-    branchTipAt: branch ? refTipAt(branch) : null,
-    logAt: log ? mtimeOf(log) : null,
+    worktreeAt: newestWorktree,
+    branchTipAt: newestNumber(many(branch).map((ref) => branchProbe(ref))),
+    logAt: newestNumber(many(log).map((path) => logProbe(path))),
     now,
     ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
   })
   return { output, ...respawnDecision({ output }) }
+}
+
+const commandValue = (value) => JSON.stringify(String(value))
+
+/** The exact combined `--agent-check` command for one declaration. */
+export function declaredAgentCheckCommand(declaration) {
+  const probe = declaredAgentProbe(declaration)
+  const args = [
+    ...probe.worktrees.flatMap((value) => ['--worktree', commandValue(value)]),
+    ...probe.branches.flatMap((value) => ['--branch', commandValue(value)]),
+    ...probe.logs.flatMap((value) => ['--log', commandValue(value)]),
+  ]
+  return args.length ? `node scripts/batch-in-flight.mjs --agent-check ${args.join(' ')}` : ''
+}
+
+/** Ask every declared child output through the same verdict as `--agent-check`. */
+export function checkDeclaredAgentOutput(declaration, opts = {}) {
+  const probe = declaredAgentProbe(declaration)
+  const command = declaredAgentCheckCommand(declaration)
+  if (!probe.agent) return { checked: false, command, output: null, respawn: false, reason: 'no-declared-agent', detail: '' }
+  return {
+    checked: true,
+    command,
+    ...checkAgentOutput({
+      worktree: probe.worktrees,
+      branch: probe.branches,
+      log: probe.logs,
+      ...opts,
+    }),
+  }
 }
 
 // --- The transferable adoption record (point 675, defeat 2) ---------------------
@@ -1006,6 +1058,80 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
 }
 
 /**
+ * TURN A NON-OWNER STOP INTO THE OLD OWNER'S BOUNDARY (point 716).
+ *
+ * The pure decision distinguishes a plain stand-down from a live/unknown child.
+ * This wrapper asks the existing agent-output verdict and the existing transfer
+ * gatherer, then commits only the declaration that still names `sid`. A failed
+ * or uncheckpointed transfer is returned as a block: ending the parent there is
+ * the work-loss path this boundary closes.
+ */
+export function gatherStandDownBoundary(
+  sid,
+  { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {},
+) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return {
+      action: 'block',
+      reason: 'declaration-unreadable',
+      declaration: null,
+      agentCheck: { reason: 'output-unmeasurable', detail: 'the in-flight declaration could not be read' },
+      command: 'node scripts/batch-in-flight.mjs --status',
+      message: 'the in-flight declaration exists but could not be read',
+    }
+  }
+  const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
+  const transfer = gatherHandoverTransfer(sid, { cwd, lockPath, now })
+  const decision = standDownBoundaryDecision({
+    sid,
+    declaration,
+    agentCheck,
+    transfer: { available: typeof transfer.commit === 'function', blocked: transfer.blocked === true },
+  })
+  if (decision.action !== 'transfer') {
+    return { ...decision, declaration, agentCheck, command: agentCheck.command, message: transfer.message ?? '' }
+  }
+  try {
+    const summary = transfer.commit()
+    return {
+      action: 'transferred',
+      reason: decision.reason,
+      declaration: readDeclaration(path),
+      agentCheck,
+      command: agentCheck.command,
+      summary,
+      message: '',
+    }
+  } catch (error) {
+    return {
+      action: 'block',
+      reason: 'transfer-write-failed',
+      declaration,
+      agentCheck,
+      command: agentCheck.command,
+      message: String(error?.message ?? error),
+    }
+  }
+}
+
+/** Child-aware orientation for a session that now owns the batch. */
+export function gatherSuccessorAgentOrientation(sid, { lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return (
+      'PREDECESSOR CHILD STATE UNKNOWN: the in-flight declaration exists but could not be read. The lock does not ' +
+      'answer for children, so do not call an agent dead. Inspect `node scripts/batch-in-flight.mjs --status`, then ' +
+      'probe each named worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.'
+    )
+  }
+  const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
+  return successorAgentOrientation({ declaration, sid, agentCheck, command: agentCheck.command })
+}
+
+/**
  * MAY THIS SESSION ADOPT THIS TRANSFERRED RECORD (Sol final round, finding 2)?
  * PURE over its inputs. Null = yes; otherwise { reason, alert }.
  *
@@ -1077,14 +1203,17 @@ export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now()
  * under the adopting session's own identity, so every existing probe
  * (`gatherInFlight`, the launcher) keeps working on it unchanged.
  */
-export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+export function adoptTransferred(
+  sid,
+  { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now(), probeSet = probes } = {},
+) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
   const self = selfAdoptionRefusal({ declaration, marker: readBoundaryMarker(lockPath), sid, now })
   if (self) return { adopted: false, reason: self.reason, alerts: [self.alert] }
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
-  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probeSet }))
   const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {
     const cp = c?.ref ? checkpointOf(c.ref, { cwd }) : null
     return {
@@ -1174,7 +1303,7 @@ if (isMain) {
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
     '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
-    '--agent-check [--worktree PATH] [--branch REF] [--log PATH] | --handover-check | --adopt'
+    '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
 
   if (argv[0] === '--handover-check') {
     // May the boundary hand the declared work to a successor (point 675)?
@@ -1219,21 +1348,19 @@ if (isMain) {
     )
     process.exit(0)
   } else if (argv[0] === '--agent-check') {
-    const opt = (name) => {
-      const i = argv.indexOf(name)
-      return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null
-    }
-    const worktree = opt('--worktree')
-    const branch = opt('--branch')
-    const log = opt('--log')
-    if (!worktree && !branch && !log) {
+    const opts = (name) =>
+      argv.flatMap((value, i) => (value === name && i + 1 < argv.length ? [argv[i + 1]] : []))
+    const worktrees = opts('--worktree')
+    const branches = opts('--branch')
+    const logs = opts('--log')
+    if (!worktrees.length && !branches.length && !logs.length) {
       fail(
         'nothing to check. Name what the agent PRODUCES — its worktree (--worktree PATH) and/or its branch ' +
           `(--branch REF); --log PATH may ride along but never decides.\n${usage}`,
       )
     }
-    const r = checkAgentOutput({ worktree, branch, log })
-    console.log(JSON.stringify({ worktree, branch, log, graceMs: RESPAWN_GRACE_MS, ...r }, null, 2))
+    const r = checkAgentOutput({ worktree: worktrees, branch: branches, log: logs })
+    console.log(JSON.stringify({ worktrees, branches, logs, graceMs: RESPAWN_GRACE_MS, ...r }, null, 2))
     if (r.respawn) {
       console.log(
         `\nA REPLACEMENT IS PERMITTED: ${r.detail} (judged on ${r.judgedOn}). Re-run this exact command in the ` +
