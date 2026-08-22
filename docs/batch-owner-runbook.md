@@ -43,11 +43,15 @@ An expired, non-advancing owner stops owning. The ownership fence refuses that
 session's merge/push, work-order tick, board publication, and dashboard-state
 write. To take the batch back into a visible window, run
 `node scripts/batch-claim.mjs --session <id>`; the owner finishes a safe unit,
-with no merge, author, or verification mid-flight, releases, and that same claim
-takes ownership. Claims expire, dead claimants are ignored, and one session
-wins. Never ask the user to close a headless owner: verify its pid, use the
-claim, and use pause → stop → release only for the forced path. Withdraw an
-unused claim before leaving the window unattended.
+with no merge or uncheckpointed work mid-flight, transfers pushed author
+checkpoints and recorded runs, releases, and that same claim takes ownership.
+The claimant adopts the transferred declaration before starting anything else.
+Claims expire, dead claimants are ignored, and one session wins. Never infer a
+dead child from the owner lock: run `batch-in-flight.mjs --agent-check` over its
+declared worktree and branch; unreadable output is unknown, not death. Never ask
+the user to close a headless owner: verify its pid, use the claim, and use pause
+→ stop → release only for the forced path. Withdraw an unused claim before
+leaving the window unattended.
 
 `scripts/chat-watcher.mjs` may wake a bounded responder for inbox work only when
 there is no live owner and no honored claim; the launcher supervises it. A user

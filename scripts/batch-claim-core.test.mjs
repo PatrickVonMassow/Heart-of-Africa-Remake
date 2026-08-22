@@ -550,6 +550,32 @@ describe('releaseDecision — the owner releases only at a CLEAN moment', () => 
     })
   })
 
+  it('releases across a pushed checkpoint because the agent transfers to the claimant', () => {
+    expect(releaseDecision({ assessment: honoured, inFlightLive: true, inFlightTransferable: true })).toEqual({
+      verdict: 'release',
+      reason: 'work-transferable',
+    })
+    // A merge is still local mutable state, not adoptable work.
+    expect(
+      releaseDecision({
+        assessment: honoured,
+        inFlightLive: true,
+        inFlightTransferable: true,
+        gitOperation: 'merge',
+      }),
+    ).toEqual({ verdict: 'wait', reason: 'git-merge' })
+  })
+
+  it('writes the transfer before releasing and gives a non-owner Stop its boundary', () => {
+    const source = readFileSync(resolve(REPO_ROOT, 'scripts', 'batch-progress-guard.mjs'), 'utf8')
+    const transferAt = source.indexOf('transferred = handoverTransfer.commit()')
+    const releaseAt = source.indexOf('handBackToClaimant(sid, claimInfo.claim)')
+    expect(transferAt).toBeGreaterThan(0)
+    expect(transferAt).toBeLessThan(releaseAt)
+    expect(source).toContain('gatherStandDownBoundary(sid)')
+    expect(source).toContain('STAND-DOWN BOUNDARY COMPLETE')
+  })
+
   it('does NOT release mid-merge, mid-rebase or on an unresolved conflict', () => {
     for (const op of ['merge', 'rebase', 'cherry-pick', 'unresolved-conflict']) {
       expect(releaseDecision({ assessment: honoured, gitOperation: op })).toEqual({

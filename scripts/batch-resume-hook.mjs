@@ -36,6 +36,7 @@ import {
   transitionOwnerSession,
 } from './batch-singleton.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
+import { gatherSuccessorAgentOrientation } from './batch-in-flight.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
 import {
@@ -366,18 +367,35 @@ try {
       const ownerContext = ownsBatch(ownership)
         ? ownerRunbookContext(ownership, readOwnerRunbook())
         : ''
+      // A successor's lock says whether the PARENT process was inactive; it says
+      // nothing about that parent's delegated children. Ask the declaration
+      // through the exact `--agent-check` verdict before the orientation uses any
+      // death-shaped conclusion. Active output is named, unreadable output stays
+      // honestly UNKNOWN, and a transferred record hands over with --adopt.
+      let agentOrientation = ''
+      if (ownsBatch(ownership)) {
+        try {
+          agentOrientation = gatherSuccessorAgentOrientation(sessionId, { now })
+        } catch {
+          agentOrientation =
+            'PREDECESSOR CHILD STATE UNKNOWN: the in-flight declaration could not be read. Do not call an agent ' +
+            'dead from the lock alone; inspect `node scripts/batch-in-flight.mjs --status`, then probe each named ' +
+            'worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.'
+        }
+      }
+      const agentLine = agentOrientation ? ` ${agentOrientation}` : ''
       if (ownership === 'acquired-spawn') {
         const measured = auth?.startReason || 'the launcher recorded no start evidence'
         console.log(
           `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher. ` +
             `Launcher start evidence: ${measured}. ${RESUME_BODY} ` +
-            `Do NOT idle-stop (the batch-progress-guard enforces this).${ownerContext}`,
+            `Do NOT idle-stop (the batch-progress-guard enforces this).${agentLine}${ownerContext}`,
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {
         console.log(
           `${header} ${gitStanding()}${repoLine} Standing user instruction: continue the batch autonomously, ` +
             `point by point, then the Closing steps — without waiting for the user to say ` +
-            `"continue". ${RESUME_BODY}${ownerContext}`,
+            `"continue". ${RESUME_BODY}${agentLine}${ownerContext}`,
         )
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
