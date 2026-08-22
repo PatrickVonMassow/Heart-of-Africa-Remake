@@ -23,9 +23,9 @@
 // session id cannot, and the deny it used to eat was one it could never act on.
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { dirname, relative, resolve } from 'node:path'
 import {
   REPO_ROOT,
   STATE_PATH,
@@ -57,6 +57,57 @@ import { publishCapability } from './board-currency-core.mjs'
 import { evaluate, isWorktreeCheckout } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * Resolve a write destination even when its leaf (or several parent directories)
+ * does not exist yet. Entry existence matters here: `existsSync` follows a
+ * symlink and therefore mistakes a link to a not-yet-created target for a
+ * missing entry. Stop the upward walk on `lstatSync`, expand that link against
+ * its canonical containing directory, and repeat so dangling links and link
+ * chains cannot disguise a checkout destination.
+ *
+ * An unreadable link, a link loop, or a path with no readable ancestor returns
+ * the empty evidence sentinel. The pure fence deliberately treats that as
+ * inside the checkout, which is the conservative direction for a write guard.
+ */
+function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
+  if (typeof filePath !== 'string' || !filePath.trim()) return ''
+  let candidate = resolve(cwd, filePath)
+  const expandedLinks = new Set()
+
+  while (true) {
+    let existing = candidate
+    let entry
+    while (true) {
+      try {
+        entry = lstatSync(existing)
+        break
+      } catch (error) {
+        if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') return ''
+        const parent = dirname(existing)
+        if (parent === existing) return ''
+        existing = parent
+      }
+    }
+
+    if (!entry.isSymbolicLink()) {
+      try {
+        return resolve(realpathSync(existing), relative(existing, candidate))
+      } catch {
+        return ''
+      }
+    }
+
+    if (expandedLinks.has(existing)) return ''
+    expandedLinks.add(existing)
+    try {
+      const linkTarget = resolve(realpathSync(dirname(existing)), readlinkSync(existing))
+      candidate = resolve(linkTarget, relative(existing, candidate))
+    } catch {
+      return ''
+    }
+  }
+}
 
 /**
  * The transport this session may publish through (point 400, delta B/D). The
@@ -259,12 +310,16 @@ try {
     }).trim()
     const sid = payload.session_id || ''
     const lock = readOwnerLock()
+    const filePath = input0.file_path ?? input0.notebook_path
     const mainWrite = mainWriteFenceDecision({
       branch,
       worktree: isWorktreeCheckout(REPO_ROOT),
       ownsBatchLock: ownsLock(sid, { lock }).mine,
       toolName: payload.tool_name,
       command: input0.command,
+      filePath,
+      resolvedFilePath: resolvedWriteTarget(filePath, payload.cwd || REPO_ROOT),
+      checkoutRoot: realpathSync(REPO_ROOT),
     })
     if (mainWrite.block) {
       process.stdout.write(

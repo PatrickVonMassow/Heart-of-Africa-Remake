@@ -436,9 +436,7 @@ describe('the hook itself, run as the entry script', () => {
     expect(out).toBe('')
   })
 
-  it('does not judge the stale text the extractor returns while the final reply is unflushed', async () => {
-    // The transcript ENDS with a tool result, so the newest assistant text is the
-    // previous reply — the refused one whose correction is being written now.
+  it('does not judge stale text from before the last tool result while the final reply is unflushed', async () => {
     const { transcript, transcriptText, claimFile } = await fixture(
       [
         assistantRow('Mach bitte `/clear`.', '2026-08-20T09:00:00.000Z'),
@@ -446,7 +444,7 @@ describe('the hook itself, run as the entry script', () => {
       ],
       { claimantSid: SID, at: Date.parse('2026-08-20T08:00:00.000Z') },
     )
-    expect(extractLastAssistantText(transcriptText)).toBe('Mach bitte `/clear`.')
+    expect(extractLastAssistantText(transcriptText)).toBe(null)
     const { out } = await run({
       payload: { session_id: SID, transcript_path: transcript },
       claimFile,

@@ -169,10 +169,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
   echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; oder der Schutz wirkt — nur fragt ihn ein zweiter Weg nie.
-  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der
-  Test heißt ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die das
+  Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der Test heißt
+  ‚**gibt es einen Weg vorbei?**'; ‚wartet' etwas: **worauf**? **Vergleiche Ausgeführtes mit dem Repository.**"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -209,9 +209,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Start, was **lokal fertig, aber nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz: Sie feuert, wird geglaubt, deckt nur einen Teil.
+  Satz und deckt nur einen Teil — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander** und zieh **den Code auf den Satz**."
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz** und
+  setz seine Reichweite selbst — bis zur nächsten Regel, nicht bis zur nächsten Leerzeile."
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -301,16 +302,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Die Reihenfolge, aus der gearbeitet
-  wird, steht woanders — und die Nachfolge-Sitzung kennt deinen Chat nicht.
-  → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
-  fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
-  schneller fertig macht, kommt mit nach vorn."
+- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.** Die
+  nächste Sitzung kennt deinen Chat nicht, der alte Bestand bleibt liegen.
+  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander,
+  schlägt eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit
+  dem **Altbestand** geschieht: nachräumen oder liegen lassen."
 
-- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du gern einen
+- **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
-  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob der Weg trägt. Fehlt
-  wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob er trägt. Fehlt eine
+  Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu.
@@ -373,10 +374,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, den sie gerade gebaut hat.** Er feuert zuerst gegen ihre
-  eigene Arbeit, und die Schleife sieht von innen wie Fortschritt aus.
-  → *Prompt:* „Fasst du dieselbe Mechanik in Folge wieder an, **zähl mit** und sag es beim
-  dritten Mal: **wäre dieser Commit auch ohne den neuen Wächter nötig?**"
+- **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
+  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt.
+  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
+  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
   Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
@@ -426,4 +427,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: c8540f6218e62323a51575912444e5d584f057aacf7cbba110e5514013f3940a -->
+<!-- GUIDE-FINGERPRINT: b24f10099c4cbf7d4e020511608326708b2511911d275180e59bd4bc25baea4c -->

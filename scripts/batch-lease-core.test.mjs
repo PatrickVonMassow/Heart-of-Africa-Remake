@@ -35,6 +35,7 @@ import {
   dispossessionNotice,
   mainWritingAction,
   mainWriteFenceDecision,
+  resolvedTargetInCheckout,
 } from './batch-lease-core.mjs'
 import { LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 
@@ -464,6 +465,40 @@ describe('the main-write ownership fence', () => {
       reason: '',
     })
     expect(mainWritingAction({ toolName: 'Edit' }).writes).toBe(true)
+  })
+
+  it('judges file writes by their resolved target, not by the main session', () => {
+    const checkoutRoot = '/workspace/hoa'
+    const write = (filePath, resolvedFilePath) =>
+      decide({
+        ownsBatchLock: false,
+        toolName: 'Write',
+        command: undefined,
+        filePath,
+        resolvedFilePath,
+        checkoutRoot,
+      })
+
+    expect(write('/workspace/hoa/src/world.ts', '/workspace/hoa/src/world.ts').block).toBe(true)
+    expect(write('/tmp/claude-1000/session/scratchpad/note.mjs', '/tmp/claude-1000/session/scratchpad/note.mjs')).toEqual({
+      block: false,
+      registerWriter: false,
+      reason: '',
+    })
+    expect(write('/home/user/.claude/projects/hoa/memory/MEMORY.md', '/home/user/.claude/projects/hoa/memory/MEMORY.md').block).toBe(false)
+
+    // Both raw spellings look external. Their canonical destination is inside
+    // the checkout, whether reached through `..` or an outside symlink.
+    expect(write('/workspace/hoa/../hoa/TASKS.md', '/workspace/hoa/TASKS.md').block).toBe(true)
+    expect(write('/tmp/repo-link/TASKS.md', '/workspace/hoa/TASKS.md').block).toBe(true)
+  })
+
+  it('keeps containment total and conservative when path evidence is absent', () => {
+    expect(resolvedTargetInCheckout()).toBe(true)
+    expect(resolvedTargetInCheckout({ resolvedFilePath: '/tmp/note', checkoutRoot: '' })).toBe(true)
+    expect(resolvedTargetInCheckout({ resolvedFilePath: '/workspace/hoa', checkoutRoot: '/workspace/hoa' })).toBe(true)
+    expect(resolvedTargetInCheckout({ resolvedFilePath: '/workspace/hoax/note', checkoutRoot: '/workspace/hoa' })).toBe(false)
+    expect(decide({ ownsBatchLock: false, toolName: 'Write', command: undefined, filePath: '' }).block).toBe(true)
   })
 
   it('allows build and test gates that only write ignored outputs', () => {

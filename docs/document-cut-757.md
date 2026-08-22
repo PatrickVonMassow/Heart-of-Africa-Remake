@@ -88,7 +88,7 @@ ceiling is only confirmed against the counter that enforces it.
 
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
-| `CLAUDE.md` | 333 lines / 2,095 words / 17,328 B | 334 / 2,095 | 1 line, 0 words |
+| `CLAUDE.md` | 192 lines / 1,319 words / 9,630 B | 193 / 1,319 | 1 line, 0 words |
 | `MEMORY.md` | 47 lines / 709 words / 5,598 B | 47 / 710 | 0 lines, 1 word |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
@@ -102,7 +102,7 @@ is designed to gain one index line per new memory, and at zero word headroom the
 next one blocks the guard, so the budget needs a decision rather than a quiet
 widening. That is filed as its own work-order point.
 
-TWO OF THESE ROWS HAVE SINCE MOVED, and the table follows the LIVING file rather
+THREE OF THESE ROWS HAVE SINCE MOVED, and the table follows the LIVING file rather
 than freezing the merge-day reading, because the unit case measures what the
 files hold today. `MEMORY.md` stood at 710 words on merge day; on 20.08.2026 a
 later session executed the ruled cut of the time-tracking entry and wrote others,
@@ -113,6 +113,11 @@ merged into one entry and two more were tightened. The row above is the reading
 after that cut, not the merge-day one, and it shows what the pressure looks like
 from close up: one word of headroom, for a file designed to gain a line per
 memory.
+On 22.08.2026 `CLAUDE.md` moved for the first time since the merge: the
+four-eyes cut of point 768 rewrote the file, and the cross-vendor review of that
+cut put one rule back that had left the file without an enforcer ("Keep branches
+short"). The row above is the reading of that day — 192 lines / 1,319 words —
+and its ceiling followed the restored rule by exactly the four words it costs.
 The global stub is GONE: the user released it in the same ruling and it was
 deleted on 20.08.2026 (backup `local/global-CLAUDE-before-deletion-20-08-2026.md`),
 so its row is history and `doc-budget-guard` simply skips a budget whose file no

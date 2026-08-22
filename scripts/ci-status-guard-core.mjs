@@ -25,6 +25,54 @@ function runUrl(r) {
 }
 
 /**
+ * The runs for ONE workflow at ONE sha, reduced to the single run that carries
+ * the verdict — with SUPERSEDED CANCELLATIONS DROPPED FIRST.
+ *
+ * WHY (21.08.2026, measured on this batch): the same commit is run under more
+ * than one ref. Creating `feat/<point>` at main's tip pushes main's sha a second
+ * time, GitHub starts a second "CI" run for it, and the author's first commit
+ * then cancels that run through `concurrency: cancel-in-progress`. That
+ * cancellation is NEWER than main's own concluded run, so "newest id wins" let
+ * it bury a green main — the guard reported origin/main RED against a sha whose
+ * own CI run had succeeded, and demanded a fixing push that no code could
+ * supply. It reproduces at EVERY point, because branching off main is the
+ * routine first act of one.
+ *
+ * A cancellation carries NO information about the code: the run was stopped, it
+ * did not judge. So it counts only when it is the ONLY verdict that workflow
+ * reached on that commit — a genuinely cancelled lone run still demands
+ * attention. The moment another run of the same workflow on the same sha
+ * CONCLUDED, that conclusion is the evidence and the cancellation is noise.
+ *
+ * Note this never turns a red green: `failure`, `timed_out` and
+ * `startup_failure` are untouched, and dropping a cancellation only ever
+ * uncovers the verdict standing behind it — which may itself be red.
+ */
+function verdictRuns(runs, headSha) {
+  const mine = runs.filter((r) => runSha(r) === headSha)
+  const concluded = new Set()
+  for (const r of mine) {
+    if (String(r?.status ?? '') !== 'completed') continue
+    if (String(r?.conclusion ?? '') === 'cancelled') continue
+    concluded.add(runName(r))
+  }
+  return mine.filter(
+    (r) => !(String(r?.conclusion ?? '') === 'cancelled' && concluded.has(runName(r))),
+  )
+}
+
+/** Newest run per workflow name, from an already sha-filtered list. */
+function newestPerWorkflowFrom(runs) {
+  const newest = new Map()
+  for (const r of runs) {
+    const key = runName(r)
+    const prev = newest.get(key)
+    if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newest.set(key, r)
+  }
+  return newest
+}
+
+/**
  * Classify the CI state for `headSha` from a list of workflow runs.
  * Per workflow only the NEWEST run counts (a green re-run supersedes its red
  * predecessor). Across workflows: any red → 'failed'; else any unfinished →
@@ -34,15 +82,10 @@ function runUrl(r) {
 export function classifyRuns(runs, headSha) {
   try {
     if (!Array.isArray(runs) || !headSha) return { state: 'none' }
-    const mine = runs.filter((r) => runSha(r) === headSha)
+    const mine = verdictRuns(runs, headSha)
     if (mine.length === 0) return { state: 'none' }
 
-    const newestPerWorkflow = new Map()
-    for (const r of mine) {
-      const key = runName(r)
-      const prev = newestPerWorkflow.get(key)
-      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
-    }
+    const newestPerWorkflow = newestPerWorkflowFrom(mine)
 
     let pending = null
     let success = null
@@ -86,12 +129,7 @@ export function classifyRuns(runs, headSha) {
 export function failedRuns(runs, headSha) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = new Map()
-    for (const r of runs.filter((x) => runSha(x) === headSha)) {
-      const key = runName(r)
-      const prev = newestPerWorkflow.get(key)
-      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
-    }
+    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(runs, headSha))
     return [...newestPerWorkflow.values()]
       .filter((r) => String(r?.status ?? '') === 'completed' && FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map((r) => ({
@@ -119,12 +157,7 @@ export function failedRuns(runs, headSha) {
 export function recoveredWorkflows(runs, headSha) {
   try {
     if (!Array.isArray(runs) || !headSha) return []
-    const newestPerWorkflow = new Map()
-    for (const r of runs.filter((x) => runSha(x) === headSha)) {
-      const key = runName(r)
-      const prev = newestPerWorkflow.get(key)
-      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
-    }
+    const newestPerWorkflow = newestPerWorkflowFrom(verdictRuns(runs, headSha))
     return [...newestPerWorkflow.entries()]
       .filter(([, r]) => String(r?.status ?? '') === 'completed' && !FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
       .map(([name]) => name)

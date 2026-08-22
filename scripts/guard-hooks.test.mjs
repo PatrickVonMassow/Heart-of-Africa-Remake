@@ -23,6 +23,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { AUTO_END, AUTO_START } from './retro-core.mjs'
+import { DOC_BUDGETS } from './doc-budget-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SESSION = 'hook-test-session'
@@ -316,7 +317,26 @@ describe('doc-budget-guard', () => {
   })
 
   it('ALLOWS documents within budget', () => {
-    write('CLAUDE.md', '# CLAUDE\n\n## 1. Goal\nText.\n')
+    // WITHIN BUDGET NOW MEANS BETWEEN THE CEILING AND ITS SLACK (point 768): a nearly
+    // empty file is no longer "within budget", it is a ceiling nobody lowered. So every
+    // budgeted file in the fixture is built FROM the shipped budget rather than typed,
+    // and it follows the ceilings down at the next cut instead of going stale.
+    const budgetFor = (path) => DOC_BUDGETS.find((b) => b.path === path)
+    /** `words` words over at most `maxLines` lines — the guard's own tokenizer counts both. */
+    const filler = (words, maxLines) => {
+      const rows = Math.max(1, Math.min(maxLines, Math.ceil(words / 12)))
+      const per = Math.floor(words / rows)
+      return Array.from({ length: rows }, (_, i) =>
+        Array.from({ length: i === rows - 1 ? words - per * (rows - 1) : per }, (_, k) => `w${i}x${k}`).join(' '),
+      ).join('\n')
+    }
+    const claude = budgetFor('CLAUDE.md')
+    write('CLAUDE.md', `${filler(claude.maxWords - 1, claude.maxLines - 1)}\n`)
+    const design = budgetFor('design.md')
+    write('design.md', `${filler(design.maxWords - 1, design.maxLines - 1)}\n`)
+    // Only the PREAMBLE is budgeted here, so the filler stops at the checklist marker.
+    const tasks = budgetFor('TASKS.md')
+    write('TASKS.md', `${filler(tasks.maxWords - 1, tasks.maxLines - 1)}\n## Checklist\n\n- [ ] 1. A point.\n`)
     expectHookAgrees('doc-budget-guard.mjs', 'doc-budget-guard', { blocks: false })
   })
 })

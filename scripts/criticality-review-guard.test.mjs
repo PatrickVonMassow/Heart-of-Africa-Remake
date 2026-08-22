@@ -15,7 +15,15 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { baselineFor, bootstrapBase, readWorkOrder, showAt } from './criticality-review-guard.mjs'
+import {
+  attachPointFileSets,
+  attachUnavailableClearances,
+  baselineFor,
+  bootstrapBase,
+  pointFilesCommand,
+  readWorkOrder,
+  showAt,
+} from './criticality-review-guard.mjs'
 
 describe('baselineFor', () => {
   it('prefers the branch’s own confirmed baseline, then main’s, then nothing', () => {
@@ -87,6 +95,81 @@ describe('showAt', () => {
         throw e
       }),
     ).toThrow(/not a git repository/)
+  })
+})
+
+describe('point file-set measurement', () => {
+  it('uses the point lane only, excluding merges that import unrelated main work', () => {
+    expect(pointFilesCommand('base', 'review')).toEqual([
+      'log',
+      '--first-parent',
+      '--no-merges',
+      '--format=format:',
+      '--name-only',
+      '-z',
+      'base..review',
+    ])
+  })
+
+  it('replaces forged ledger coverage and leaves a failed measurement unknown', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 769,
+      sha: 'a'.repeat(40),
+      at: 1_787_000_000_000,
+      reachable: true,
+    }
+    const measured = {
+      point: 769,
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      descendsFrom: [commission.sha],
+      pointFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const failed = {
+      ...measured,
+      sha: 'c'.repeat(40),
+      descendsFrom: [commission.sha, measured.sha],
+    }
+    const rows = attachPointFileSets([commission, measured, failed], (_base, sha) => {
+      if (sha === failed.sha) throw new Error('undiffable')
+      return ['scripts/real.mjs', ' edge-space.mjs', 'scripts/real.mjs']
+    })
+    expect(rows[1].pointFiles).toEqual(['scripts/real.mjs', ' edge-space.mjs'])
+    expect(rows[2].pointFiles).toBeUndefined()
+  })
+
+  it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 769,
+      sha: 'a'.repeat(40),
+      at: 1_787_000_000_000,
+      reachable: true,
+    }
+    const receipt = {
+      kind: 'criticality-review-unavailable',
+      point: 769,
+      sha: 'b'.repeat(40),
+      files: ['scripts/both.mjs'],
+      descendsFrom: [commission.sha],
+      unavailableVerified: true,
+      unavailableFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const wrong = { ...receipt, sha: 'c'.repeat(40), files: ['scripts/reviewable.mjs'] }
+    const rows = attachUnavailableClearances([commission, receipt, wrong], () => ({
+      pointFiles: ['scripts/reviewable.mjs', 'scripts/both.mjs'],
+      unavailableFiles: ['scripts/both.mjs'],
+    }))
+    expect(rows[1]).toMatchObject({
+      unavailableVerified: true,
+      unavailableFiles: ['scripts/both.mjs'],
+      pointFiles: ['scripts/reviewable.mjs', 'scripts/both.mjs'],
+    })
+    expect(rows[2].unavailableVerified).toBeUndefined()
+    expect(rows[2].unavailableFiles).toBeUndefined()
   })
 })
 

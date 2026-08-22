@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   CONTRACT_MEMORY,
+  ATTENDED_CEILING_NOTICE_CHAR_BUDGET,
   CONTEXT_LEVEL_CHAR_BUDGET,
   ENFORCED_CLAIMS,
   PROMPT_CHAR_BUDGET,
@@ -22,6 +23,7 @@ import {
   STAND_DOWN_TEXT,
   UNENFORCEABLE_DUTIES,
   boardReminderText,
+  attendedCeilingNoticeText,
   contextLevelSuffix,
   groupThousands,
   hookInjectionText,
@@ -81,7 +83,7 @@ describe('the injected board reminder (point 436)', () => {
 
   it('is what the hook actually injects — no second copy of the prose', () => {
     const hook = readFileSync(join(SCRIPTS, 'dashboard-reminder-hook.mjs'), 'utf8')
-    expect(hook).toContain('process.stdout.write(hookInjectionText({ mtimeNote, contextTokens }))')
+    expect(hook).toContain('process.stdout.write(hookInjectionText({ mtimeNote, contextTokens, ceilingNotice }))')
     expect(hook).not.toContain('[dashboard-reminder] PFLICHT')
   })
 })
@@ -199,8 +201,21 @@ describe('the context level in the answer header', () => {
 
   it('has the live hook read through the shared context parser and output the pure branch text', () => {
     const hook = readFileSync(join(SCRIPTS, 'dashboard-reminder-hook.mjs'), 'utf8')
-    expect(hook).toContain("import { parseContextTokens } from './context-watermark-core.mjs'")
-    expect(hook).toContain('process.stdout.write(hookInjectionText({ standDown: true, contextTokens }))')
-    expect(hook).toContain('process.stdout.write(hookInjectionText({ mtimeNote, contextTokens }))')
+    expect(hook).toContain("CONTEXT_CEILING_TOKENS, parseContextTokens } from './context-watermark-core.mjs'")
+    expect(hook).toContain('process.stdout.write(hookInjectionText({ standDown: true, contextTokens, ceilingNotice }))')
+    expect(hook).toContain('process.stdout.write(hookInjectionText({ mtimeNote, contextTokens, ceilingNotice }))')
+  })
+
+  it('asks the attended user for /clear in observe and armed mode without blocking the answer', () => {
+    for (const mode of ['observe', 'armed']) {
+      const text = attendedCeilingNoticeText({ tokens: 265_517, ceiling: 150_000, mode })
+      expect(text).toContain('265.517 Tokens')
+      expect(text).toContain('150.000')
+      expect(text).toContain('`/clear`')
+      expect(text).toMatch(/Antworten werden nie verweigert/)
+      expect(text.length).toBeLessThanOrEqual(ATTENDED_CEILING_NOTICE_CHAR_BUDGET)
+      expect(hookInjectionText({ contextTokens: 265_517, ceilingNotice: text }).length)
+        .toBeLessThanOrEqual(PROMPT_CHAR_BUDGET + ATTENDED_CEILING_NOTICE_CHAR_BUDGET)
+    }
   })
 })
