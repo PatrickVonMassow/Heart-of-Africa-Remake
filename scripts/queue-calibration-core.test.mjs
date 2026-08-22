@@ -30,6 +30,7 @@ import {
   applyCorrections,
   clauseDemandsPicture,
   denialIsOpen,
+  PICTURE_PROOF_DENIALS,
   estimateProvenance,
   isComparedSnapshot,
   heldOutForPicture,
@@ -47,6 +48,7 @@ import {
   UNTAGGED,
   updateEstimateLedger,
 } from './queue-calibration-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 /** A landing, spelled the way the reading consumes it. */
 const landing = (over = {}) => ({
@@ -1476,26 +1478,11 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     expect(denialIsOpen('The change does not require a browser frame')).toBe(false)
   })
 
-  it('does not close a denial on a requirement word that qualifies its NOUN', () => {
-    // "No screenshot showing THE required state" is still an open negative list:
-    // behind a determiner the word describes the noun, not what the sentence
-    // demands. Read as closure it took the licence off the item that finishes
-    // the list, and "or picture proof is needed" became a demand.
-    expect(denialIsOpen('No screenshot showing the required state')).toBe(true)
-    expect(denialIsOpen('No screenshot that is in the required state')).toBe(true)
-    for (const [n, line] of [
-      [156, 'No screenshot showing the required state, browser frame, or picture proof is needed.'],
-      [157, 'No screenshot that is in the required state, browser frame, or picture proof is needed.'],
-    ]) {
-      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(false)
-    }
-  })
-
-  it('DOES close one whose predicate carries a complement', () => {
-    // The mirror case: "No screenshot necessary FOR THIS CHANGE" has said what
-    // it denies, complement and all, so the clause behind it is a new sentence.
-    // A rule that wanted the predicate at the end of the fragment left these
-    // open and swallowed the demand that followed.
+  it('closes one whose predicate carries a complement, in either language', () => {
+    // "No screenshot necessary FOR THIS CHANGE" has said what it denies,
+    // complement and all, so the clause behind it is a new sentence. A rule that
+    // wanted the predicate at the END of the fragment left these open and
+    // swallowed the demand that followed.
     expect(denialIsOpen('No screenshot necessary for this change')).toBe(false)
     expect(denialIsOpen('Kein Screenshot nötig für diese Änderung')).toBe(false)
     for (const [n, line] of [
@@ -1504,6 +1491,50 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     ]) {
       expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
     }
+  })
+
+  it('knows the German requirement VERBS, not only the adjectives', () => {
+    expect(denialIsOpen('Kein Screenshot wird benötigt')).toBe(false)
+    expect(denialIsOpen('Kein Screenshot braucht es')).toBe(false)
+    expect(denialIsOpen('Kein Screenshot erfordert das')).toBe(false)
+    expect(
+      pictureBearingPoints(block(160, 'Kein Screenshot wird benötigt. Ein Browser Frame oder picture proof nötig.')).has(160),
+    ).toBe(true)
+  })
+
+  it('errs towards holding a point OUT where the shape is genuinely ambiguous', () => {
+    // A requirement word inside the denied noun's own modifier — "No screenshot
+    // showing THE REQUIRED state, browser frame, or picture proof is needed" —
+    // cannot be told from the denial's predicate without parsing the sentence,
+    // and every rule that tried was beaten by the next one. The blunt rule
+    // reads it as closed, which makes the list tail a demand and holds the
+    // point out. That is the SAFE error: it narrows what the correction speaks
+    // for, where the opposite prices a rendered proof from a population that
+    // contains none.
+    expect(denialIsOpen('No screenshot showing the required state')).toBe(false)
+    expect(
+      pictureBearingPoints(
+        block(161, 'No screenshot showing the required state, browser frame, or picture proof is needed.'),
+      ).has(161),
+    ).toBe(true)
+  })
+
+  it('and the work order never takes that branch', () => {
+    // THE MEASUREMENT THE BLUNT RULE RESTS ON. Of every denial with anything
+    // behind it on the same line, none also carries a requirement word — so the
+    // ambiguity above is argued over sentences the corpus does not contain. If
+    // this ever fires, one has been written: read the line and decide whether it
+    // is held out correctly before touching the rule.
+    const ambiguous = []
+    for (const line of String(readTasksAll()).split('\n')) {
+      const fragments = splitClauses(line)
+      for (const [i, fragment] of fragments.entries()) {
+        if (i === fragments.length - 1) continue
+        if (!PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) continue
+        if (!denialIsOpen(fragment) && fragments.slice(i + 1).some((f) => f.trim())) ambiguous.push(line.trim())
+      }
+    }
+    expect(ambiguous, 'a denial carrying a requirement word now has a clause behind it').toEqual([])
   })
 
   it('reads a positive coordinated demand behind a closed denial as a demand', () => {

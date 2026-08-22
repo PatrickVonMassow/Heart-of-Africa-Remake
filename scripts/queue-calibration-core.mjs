@@ -896,24 +896,33 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * tail of the negative list turned a demand into a denial.
  */
 /**
- * THE ONE PLACE AN ATTRIBUTIVE ADJECTIVE CAN STAND, in both languages, is
- * between a determiner and its noun. That is the whole rule below, and it
- * replaced three rounds of regexes that each traded one misreading for another.
+ * HAS THIS DENIAL ALREADY STATED ITS OWN PREDICATE? Only an OPEN one lends it to
+ * the item that finishes a coordinated list.
  *
- * "No screenshot showing THE required state" describes what the screenshot would
- * show — the sentence has not said what it demands yet, and the list is still
- * running. "No screenshot NECESSARY for this change" and "Kein Screenshot NÖTIG
- * für diese Änderung" state it, complement and all, and the clause behind them
- * is a new sentence.
+ * THE RULE IS DELIBERATELY BLUNT, and this is the reasoning, because three
+ * rounds of cleverer ones each traded one misreading for another — an
+ * end-of-clause predicate left "No screenshot necessary for this change" open, a
+ * copula closed "No screenshot that is in the required state", a determiner test
+ * closed "showing required states" and "the states required by the ticket".
+ * Every rule of that shape is beaten by the next sentence.
+ *
+ * MEASURED against the work order this reads (22.08.2026): of every denial with
+ * anything behind it on the same line — ONE, in the whole file — NONE also
+ * carries a requirement word. The distinction those rounds argued over does not
+ * occur in the corpus at all.
+ *
+ * So the requirement word is taken as the predicate wherever it appears, and the
+ * error that leaves is the SAFE one. A denial wrongly read as closed makes the
+ * item behind it a demand of its own, which holds the point OUT of the
+ * correction — and holding a point out only narrows what the measurement speaks
+ * for, while wrongly admitting a render card prices a rendered proof from a
+ * population that contains none, which is exactly the confounder §14 forbids.
  */
-const DETERMINER =
-  '(the|a|an|this|that|these|those|its|their|our|your|his|her|no|any|some|' +
-  'der|die|das|den|dem|des|ein|eine|einen|einem|einer|eines|' +
-  'diese|dieser|diesem|diesen|dieses|jede|jeder|jedem|jeden|ihr|ihre|ihren|sein|seine|seinen)'
+const REQUIREMENT =
+  '(required|needed|necessary|require|requires|need|needs|' +
+  'nötig|noetig|erforderlich|benötigt|benoetigt|benötigen|benoetigen|braucht|brauchen|erfordert|erfordern)'
 
-const REQUIREMENT = '(required|needed|necessary|require|requires|need|needs|nötig|noetig|erforderlich)'
-
-const DENIAL_CARRIES_PREDICATE = new RegExp(`(?<!\\b${DETERMINER}\\s)\\b${REQUIREMENT}\\b`, 'i')
+const DENIAL_CARRIES_PREDICATE = new RegExp(`\\b${REQUIREMENT}\\b`, 'i')
 
 export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
 
