@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 21:40 · Quellen-Fingerprint: `e69e10176cf2…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 22:10 · Quellen-Fingerprint: `5300f45faab5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1354,7 +1354,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| When a measured doc budget blocks an addition, shorten or MERGE existing entries — raising the limit is the last resort, decided by me with a written reason, NEVER asked of the user | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1418,8 +1418,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: e69e10176cf20ea9ecd8f516894ff9c4d06a186f5392fa6c02e8eb3a0e5f319c -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T19:40:00.637Z -->
+<!-- RETRO-FINGERPRINT: 5300f45faab5a1c03230748d31e7c2802628156f0fe015f72e4dbfa5e7f48287 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T20:10:31.289Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2816,3 +2816,30 @@ Zeuge darf seine Sicherheit nicht von dem Mechanismus borgen, den er prüft. Pr�
 mein Test die Datei so, wie sie im Betrieb geladen wird?* Und: *Wenn das, was diesen Test
 absichert, kaputtginge — wäre der Test dann noch harmlos?* Verwandt mit §3.157 (das Etikett als
 einziger Beweis) und §3.156 (ein Mechanismus, der weiter greift als seine Regel).
+
+### 3.160 Die Entscheidung war getroffen, aufgeschrieben — und wurde trotzdem wieder gefragt
+
+Am 10.08.2026 hat der Nutzer allgemein zurückgezogen, dass ich ihn bei Anhebungen einer
+gemessenen Obergrenze frage: Ich entscheide selbst, als letztes Mittel, mit schriftlicher
+Begründung im Commit. Die Regel steht seitdem korrekt im Gedächtnis, mit seinen eigenen
+Worten. Am 22.08.2026 stand trotzdem wieder eine Karte auf der Tafel, die ihn genau danach
+fragte — und seine Antwort benannte die Ursache schärfer, als der Vorfall es getan hätte:
+„Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend."
+
+Die Klasse ist nicht „Regel vergessen". Die Regel war da, richtig formuliert und auffindbar.
+Sie hat nur keinen Ort, an dem sie WIRKT: Ein Gedächtniseintrag wird gelesen, wenn eine
+Sitzung ihn zufällig erinnert, und nichts verweigert die Frage in dem Moment, in dem sie
+gestellt wird. Damit steht sie schwächer da als jede unserer Bau-Regeln, die alle einen
+Wächter an genau der Stelle haben, an der man gegen sie verstößt. Das gilt für jede
+getroffene Entscheidung des Nutzers, nicht nur für diese: Der Zähler in Anhang A stand bei
+drei Anläufen, und der dritte kostete ihn dieselbe Minute wie der erste.
+
+Bemerkenswert ist auch, dass die Karte inhaltlich sauber argumentiert war — sie nannte die
+Regel, nannte den Rückzug vom 10.08. und fragte trotzdem. Eine gute Begründung ersetzt keine
+Verweigerung; sie macht die überflüssige Frage nur höflicher.
+
+**Lehre:** Eine Entscheidung des Nutzers gehört nicht ins Gedächtnis, sondern an das Tor, an
+dem man sie sonst erneut stellt — mit seinen Worten, sodass die Abweisung ihn zitiert statt
+mich. Prüffrage bei jeder Karte in „Von dir zu klären": *Hat er das schon einmal entschieden
+— und wenn ja, warum steht die Frage überhaupt noch offen?* Verwandt mit §3.112 (der
+verdrahtete, aber wirkungslose Mechanismus).

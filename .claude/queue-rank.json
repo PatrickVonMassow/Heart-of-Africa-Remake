@@ -521,6 +521,18 @@
       "why": "Ein Melder-Blindfleck hinter dem behobenen Defekt: der Launcher-Fehler, für den der Prüfer gebaut wurde, ist gefangen und grün, also darf der Rest warten.",
       "origin": "machine",
       "place": "last"
+    },
+    "843": {
+      "at": "2026-08-22T20:07:51.458Z",
+      "why": "Append-and-defer: der Besitzer hat den Mechanismus verlangt, aber keine Vorziehung; die Regel selbst gilt ab sofort auch ohne ihn",
+      "origin": "machine",
+      "place": "last"
+    },
+    "844": {
+      "at": "2026-08-22T20:09:27.269Z",
+      "why": "User request 22.08.2026, 21:19: he asked for the ticket himself and placed it directly behind point 598",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -570,7 +582,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T19:14:46.146Z",
+    "at": "2026-08-22T20:09:27.280Z",
     "points": [
       174,
       184,
@@ -817,7 +829,9 @@
       838,
       839,
       841,
-      842
+      842,
+      843,
+      844
     ]
   }
 }
