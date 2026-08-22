@@ -759,8 +759,10 @@ export const PICTURE_PROOF_MARKERS = [
   // "picture check" and "picture proof" name a DEMAND. "picture verification",
   // by contrast, is how the process talks about itself, and taking it marked
   // every process point that mentions the lane as a render point.
-  /\bpicture[- ](check|proof)\b/i,
-  /\brendered proof\b/i,
+  // PLURALS COUNT: "attach picture proofs" demands exactly what "attach a
+  // picture proof" demands, and the singular-only marker let it through.
+  /\bpicture[- ](checks?|proofs?)\b/i,
+  /\brendered proofs?\b/i,
   /\bam Bild\b/i,
 ]
 
@@ -778,7 +780,7 @@ export const PICTURE_VISUAL_COMPANION = /\b(pictures?|screenshots?|frames?|frami
  * it exists so "no screenshot is required here" does not mark a process point as
  * a render point, and it is not a general-purpose negation parser.
  */
-const PROOF_NOUN = '(screenshots?|browser frames?|picture[- ]\\w+|rendered proof)'
+const PROOF_NOUN = '(screenshots?|browser frames?|picture[- ]\\w+|rendered proofs?)'
 
 export const PICTURE_PROOF_DENIALS = [
   // "no screenshot", "without a browser frame", "kein Screenshot"
@@ -794,6 +796,28 @@ export const PICTURE_PROOF_DENIALS = [
   // screenshot." The fragment names no proof at all, so nothing marked it as a
   // denial and the bare noun behind the colon read as a demand.
   /^\s*(not|no longer|nicht|kein|keine)\s+(required|needed|necessary|nötig|noetig|erforderlich)\s*$/i,
+]
+
+/**
+ * A clause that HANDLES a proof artefact instead of asking for one.
+ *
+ * The markers name a DEMAND, not any mention — but every mention matched, so
+ * "Delete the obsolete screenshot fixture" was held out as render work. Narrow
+ * and symmetrical to the denials above: a housekeeping verb reaching a proof
+ * noun, or a proof noun naming a stored artefact. Nothing here touches
+ * "screenshot test" or "picture check", which is how a point ASKS for a proof.
+ */
+const UPKEEP_VERB =
+  '(delete|deletes|deleted|remove|removes|removed|drop|drops|dropped|rename|renames|renamed|' +
+  'move|moves|moved|prune|prunes|pruned|purge|purges|purged|' +
+  'lösche|loesche|löschen|loeschen|entferne|entfernen|umbenennen|verschieben)'
+
+const PROOF_ARTEFACT =
+  '(fixtures?|helpers?|files?|directory|directories|folders?|paths?|Datei|Dateien|Ordner|Verzeichnis)'
+
+export const PICTURE_PROOF_UPKEEP = [
+  new RegExp(`\\b${UPKEEP_VERB}\\b[^.;:]{0,40}?${PROOF_NOUN}`, 'i'),
+  new RegExp(`${PROOF_NOUN}\\s+${PROOF_ARTEFACT}\\b`, 'i'),
 ]
 
 /**
@@ -822,23 +846,31 @@ const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das)\b|[^a-zA-Z\u00c0-\
  * "No screenshot, browser frame, or picture proof IS REQUIRED" — the last item
  * finishes the sentence the denial began. That licence belongs to the shared
  * predicate alone; "and a browser frame MUST BE SUPPLIED" says something new.
+ *
+ * The conjunctions are glue here too, because the item that finishes the list
+ * carries the one that joins it — leading after an Oxford comma, and INTERNAL
+ * without one.
  */
 const LIST_TAIL_GLUE =
-  /^(?:\s|\b(?:a|an|the|ein|eine|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+  /^(?:\s|\b(?:a|an|the|ein|eine|or|and|nor|oder|und|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
-/** "…, or picture proof is required" — a fragment openly hanging off the last. */
-const LIST_CONJUNCTION = /^\s*(or|and|nor|oder|und)\b/i
+/**
+ * The conjunction that shows a fragment finishes a coordinated list. It may
+ * LEAD the fragment ("…, or picture proof is required") or sit INSIDE it, which
+ * is what an English list without an Oxford comma looks like: "No screenshot,
+ * browser frame or picture proof is required" cuts into two, and the second half
+ * carries both the last item and the predicate the whole list shares.
+ */
+const LIST_CONJUNCTION = /\b(or|and|nor|oder|und)\b/i
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
   const text = String(fragment ?? '')
-  const conjunction = LIST_CONJUNCTION.exec(text)
-  const rest = conjunction ? text.slice(conjunction[0].length) : text
   // Nothing but the proof noun and the words that carry it: no statement of its
   // own. A fragment that says something ("provide …", "must be supplied") is a
   // statement and ends whatever the fragment before it decided — a leading "and"
   // does not turn it back into a list item.
-  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), rest)
-  return (conjunction ? LIST_TAIL_GLUE : LIST_GLUE).test(bare)
+  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text)
+  return (LIST_CONJUNCTION.test(text) ? LIST_TAIL_GLUE : LIST_GLUE).test(bare)
 }
 
 /** Does ONE clause demand a rendered proof? */
@@ -847,8 +879,17 @@ export function clauseDemandsPicture(clause) {
   // A denial suppresses its OWN clause only. "No screenshot is required; provide
   // a browser frame" is a demand, and reading the whole line at once lost it.
   if (PICTURE_PROOF_DENIALS.some((re) => re.test(text))) return false
-  if (PICTURE_PROOF_MARKERS.some((re) => re.test(text))) return true
-  return PICTURE_BACKEND_MARKER.test(text) && PICTURE_VISUAL_COMPANION.test(text)
+  // A mention is not a demand: the clause that deletes or renames a proof
+  // artefact asks for no picture, and holding its point out would shrink the
+  // correction over work that never owed one. Upkeep only REMOVES what it
+  // explains — "rename the screenshot helper and check the rendered river on
+  // both backends" still demands the picture its second half asks for.
+  const asked = PICTURE_PROOF_UPKEEP.reduce(
+    (acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '),
+    text,
+  )
+  if (PICTURE_PROOF_MARKERS.some((re) => re.test(asked))) return true
+  return PICTURE_BACKEND_MARKER.test(asked) && PICTURE_VISUAL_COMPANION.test(asked)
 }
 
 /**

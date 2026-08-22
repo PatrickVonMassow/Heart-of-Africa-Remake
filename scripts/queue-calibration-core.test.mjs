@@ -1226,3 +1226,64 @@ describe('the two cross-cases the seams hid', () => {
     expect(pictureBearingPoints(block(102, 'No screenshot, browser frame, or picture proof is required.')).has(102)).toBe(false)
   })
 })
+
+describe('a mention of a proof is not a demand for one', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('takes the PLURAL demand the singular marker let through', () => {
+    // "attach picture proofs" asks for exactly what "attach a picture proof"
+    // asks for, and the marker's \b after the singular refused it.
+    expect(clauseDemandsPicture('attach picture proofs')).toBe(true)
+    expect(clauseDemandsPicture('rendered proofs on both backends')).toBe(true)
+    expect(clauseDemandsPicture('picture checks on both backends')).toBe(true)
+    expect(pictureBearingPoints(block(110, 'VERIFIABLE: picture proofs for each village.')).has(110)).toBe(true)
+  })
+
+  it('denies a coordinated list that has NO Oxford comma', () => {
+    // The last item carries both the conjunction and the predicate the whole
+    // list shares, and the comma-less form cut it into a fragment that read as
+    // a demand of its own.
+    expect(pictureBearingPoints(block(111, 'No screenshot, browser frame or picture proof is required.')).has(111)).toBe(
+      false,
+    )
+    expect(
+      pictureBearingPoints(block(112, 'Kein Screenshot, browser frame oder picture proof is required.')).has(112),
+    ).toBe(false)
+  })
+
+  it('still lets a real statement after a denial end the denial', () => {
+    // The licence belongs to the shared predicate — not to a fragment that says
+    // something new, however it is joined on.
+    expect(pictureBearingPoints(block(113, 'No screenshot is required, and a browser frame must be supplied.')).has(113)).toBe(
+      true,
+    )
+    expect(pictureBearingPoints(block(114, 'No screenshot is required, provide a browser frame.')).has(114)).toBe(true)
+  })
+
+  it('leaves housekeeping on a proof artefact out of the render set', () => {
+    expect(clauseDemandsPicture('Delete the obsolete screenshot fixture')).toBe(false)
+    expect(pictureBearingPoints(block(115, 'Delete the obsolete screenshot fixture; verify with unit tests.')).has(115)).toBe(
+      false,
+    )
+    expect(pictureBearingPoints(block(116, 'Remove the screenshot directory.')).has(116)).toBe(false)
+  })
+
+  it('removes only what the housekeeping explains, not the demand beside it', () => {
+    // The upkeep clause and the demand share ONE clause here — no punctuation
+    // separates them — so a rule that suppressed the whole clause would lose
+    // the picture the second half asks for.
+    expect(
+      pictureBearingPoints(block(117, 'Rename the screenshot helper and check the rendered river on both backends.')).has(
+        117,
+      ),
+    ).toBe(true)
+    expect(pictureBearingPoints(block(118, 'Delete the screenshot and attach a browser frame.')).has(118)).toBe(true)
+  })
+
+  it('does not mistake asking for a proof for filing one away', () => {
+    // "screenshot test" is how a point ASKS; the artefact nouns are narrow on
+    // purpose so they cannot swallow it.
+    expect(pictureBearingPoints(block(119, 'Add a screenshot test for the river.')).has(119)).toBe(true)
+    expect(pictureBearingPoints(block(120, 'VERIFIABLE: a browser frame.')).has(120)).toBe(true)
+  })
+})
