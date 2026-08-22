@@ -97,6 +97,7 @@ let gitlinkSha = ''
 let bulkSolSha = ''
 let edgeSha = ''
 let manyTouchesSha = ''
+let historicalReviewSha = ''
 let revertedSha = ''
 /** A name git prints QUOTED, because it is not plain ASCII. */
 const ODD_NAME = 'ümlaut.txt'
@@ -397,12 +398,14 @@ beforeAll(() => {
   // artefact is one small file and therefore one review round.
   git('checkout', '-q', '-b', 'many-touches', 'main')
   for (let index = 1; index <= 8; index++) {
-    manyTouchesSha = commit(
+    const touchSha = commit(
       'shared.txt',
       `current end state after touch ${index}\n`,
       `Touch the shared file ${index}`,
       'Opus 5',
     )
+    if (index === 1) historicalReviewSha = touchSha
+    manyTouchesSha = touchSha
   }
 
   // A path changed and then restored has no net artefact to review.
@@ -416,6 +419,23 @@ beforeAll(() => {
   git('rm', '-rqf', '--ignore-unmatch', '.')
   orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', 'Opus 5')
   git('checkout', '-q', '-f', 'feat')
+
+  // A genuine contribution-era scoped pass: it read shared.txt after touch 1,
+  // then seven later commits changed that file. The new plan must say why this
+  // once-usable reading no longer reduces the current file debt.
+  mkdirSync(join(repo, '.claude'), { recursive: true })
+  writeFileSync(
+    join(repo, '.claude', 'mechanism-reviews.jsonl'),
+    `${JSON.stringify({
+      sha: historicalReviewSha,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read the complete shared file after its first change',
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['shared.txt'], commits: [historicalReviewSha] },
+      at: 1_787_000_000_000,
+    })}\n`,
+  )
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -449,7 +469,11 @@ describe('a review that runs', () => {
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toContain('It fits in one round.')
     expect(r.stderr).toContain('DROPPED INTERMEDIATE STATES: shared.txt — 7 states were superseded')
-    expect(r.stderr.match(/pass 1\/1/g)).toHaveLength(1)
+    expect(r.stderr).toContain(
+      'INVALIDATED HISTORICAL COVERAGE: 1 scoped pass record contains a reading that no longer clears 1 end-state file',
+    )
+    expect(r.stderr).toContain(`${historicalReviewSha.slice(0, 7)} pass 1/1: shared.txt`)
+    expect(r.stderr.match(/^  pass 1\/1 →/gm)).toHaveLength(1)
     expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('current end state after touch 8')
   })
 

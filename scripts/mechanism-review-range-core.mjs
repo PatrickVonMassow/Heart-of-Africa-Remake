@@ -348,19 +348,37 @@ export function outstandingFiles({
 } = {}) {
   const state = endStateArtefacts({ commits, endStateFiles })
   const latest = new Map()
+  const invalidatedCoverage = []
   for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
     if (!files.length) continue
+    const historicalCommits = Array.isArray(record?.pass?.commits)
+      ? new Set(record.pass.commits.map(String))
+      : null
+    const invalidatedFiles = []
     for (const artefact of state.artefacts) {
+      if (!files.includes(artefact.file)) continue
       const latestChange = artefact.changes.at(-1)
-      if (!recordUsable(record, latestChange.commit)) continue
-      if (!files.includes(artefact.file) || !contained(record, artefact.endStateSha)) continue
       const reviewerVendor = vendorOf(record.model)
-      if (
-        reviewerVendor === 'unknown' ||
-        artefact.vendors.includes('unknown') ||
-        artefact.vendors.includes(reviewerVendor)
-      ) continue
+      const coversEndState =
+        recordUsable(record, latestChange.commit) &&
+        contained(record, artefact.endStateSha) &&
+        reviewerVendor !== 'unknown' &&
+        !artefact.vendors.includes('unknown') &&
+        !artefact.vendors.includes(reviewerVendor)
+      if (!coversEndState) {
+        // Count only coverage the replaced contribution model really accepted.
+        // A malformed row, an unrelated file name or a self-review did not grow
+        // the debt when the cut changed, so calling it "invalidated" would give
+        // the format migration blame for debt that already existed.
+        const coveredHistorically = historicalCommits && artefact.changes.some((change) =>
+          historicalCommits.has(String(change.sha)) &&
+          contained(record, change.sha) &&
+          recordUsable(record, change.commit) &&
+          !change.authors.some((author) => sameModel(record.model, author)))
+        if (coveredHistorically) invalidatedFiles.push(artefact.file)
+        continue
+      }
       const key = artefact.file
       // A CLOCK IS A NUMBER OR IT IS NOTHING. `Number(record.at ?? 0)` read a
       // numeric STRING as a time and an absent stamp as the epoch, so a row
@@ -373,6 +391,14 @@ export function outstandingFiles({
       // reading carries a line of its own that could go missing.
       latest.get(key).push({ record, at, artefact })
     }
+    if (invalidatedFiles.length) {
+      invalidatedCoverage.push({
+        sha: String(record?.sha ?? ''),
+        index: record?.pass?.index,
+        total: record?.pass?.total,
+        files: uniq(invalidatedFiles),
+      })
+    }
   }
   const covered = new Set()
   const refusals = []
@@ -381,13 +407,41 @@ export function outstandingFiles({
     if (String(read.record.verdict) === 'do-not-merge') refusals.push({ artefact: read.artefact, record: read.record })
     else covered.add(key)
   }
+  const outstanding = state.artefacts.filter((artefact) => !covered.has(artefact.file))
+  const owedFiles = new Set(outstanding.map((artefact) => artefact.file))
+  const invalidatedOutstandingCoverage = invalidatedCoverage
+    .map((record) => ({ ...record, files: record.files.filter((file) => owedFiles.has(file)) }))
+    .filter((record) => record.files.length)
   return {
-    outstanding: state.artefacts.filter((artefact) => !covered.has(artefact.file)),
+    outstanding,
     covered: state.artefacts.filter((artefact) => covered.has(artefact.file)),
     refusals,
     dropped: state.dropped,
     superseded: state.superseded,
+    invalidatedCoverage: invalidatedOutstandingCoverage,
   }
+}
+
+/** The explicit consequence of historical scoped readings that predate a
+ *  file's current end state. The caller owns path quoting for its output lane. */
+export function formatInvalidatedCoverage(items = [], { quoteFile = String } = {}) {
+  const records = (items ?? []).filter((item) => Array.isArray(item?.files) && item.files.length)
+  if (!records.length) return ''
+  const files = uniq(records.flatMap((item) => item.files))
+  const plural = (count, one, many = `${one}s`) => count === 1 ? one : many
+  const lines = [
+    `  INVALIDATED HISTORICAL COVERAGE: ${records.length} scoped pass ${plural(records.length, 'record')} ` +
+      `${plural(records.length, 'contains a reading that', 'contain readings that')} no longer ` +
+      `${plural(files.length, 'clears', 'clear')} ${files.length} end-state ${plural(files.length, 'file')}; ` +
+      'those files are owed again:',
+  ]
+  for (const record of records) {
+    const pass = Number.isInteger(record.index) && Number.isInteger(record.total)
+      ? ` pass ${record.index}/${record.total}`
+      : ''
+    lines.push(`    ${String(record.sha).slice(0, 7) || '<unknown>'}${pass}: ${record.files.map(quoteFile).join(', ')}`)
+  }
+  return lines.join('\n')
 }
 
 /** Rebuild commit input from an outstanding end-state file list. */

@@ -43,6 +43,7 @@ import {
 } from './mechanism-review-core.mjs'
 import {
   commitsForFiles,
+  formatInvalidatedCoverage,
   mechanismLogCommand,
   outstandingFiles,
   parseRangeLog as parseWholeRangeLog,
@@ -595,6 +596,9 @@ if (isMainModule(import.meta.url)) {
             `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
             `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
         )
+      }
+      if ((gathered.debt?.invalidatedCoverage ?? []).length) {
+        console.log(formatInvalidatedCoverage(gathered.debt.invalidatedCoverage, { quoteFile: quotePassFile }))
       }
       if (outcome.action === 'report-gap') console.log(`\n${gap.report}`)
       else console.log(

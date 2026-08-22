@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   commitsForFiles,
   endStateArtefacts,
+  formatInvalidatedCoverage,
   newestReading,
   eligibleReviewer,
   outstandingFiles,
@@ -239,12 +240,14 @@ describe('per-file end-state review baseline', () => {
       ...row({ head: change.sha, files: ['shared'], contained: [change.sha] }),
       pass: { index: 1, total: 1, files: ['shared'], commits: [change.sha] },
     }
-    expect(outstandingFiles({
+    const debt = outstandingFiles({
       commits: [change],
       endStateFiles: ['shared'],
       recordUsable: usable,
       records: [legacy],
-    }).covered.map((artefact) => artefact.file)).toEqual(['shared'])
+    })
+    expect(debt.covered.map((artefact) => artefact.file)).toEqual(['shared'])
+    expect(debt.invalidatedCoverage).toEqual([])
   })
 
   it('does not let historical scoped coverage clear a file changed after that review', () => {
@@ -254,12 +257,70 @@ describe('per-file end-state review baseline', () => {
       ...row({ head: reviewed.sha, files: ['shared'], contained: [reviewed.sha] }),
       pass: { index: 1, total: 1, files: ['shared'], commits: [reviewed.sha] },
     }
-    expect(outstandingFiles({
+    const debt = outstandingFiles({
       commits: [reviewed, latest],
       endStateFiles: ['shared'],
       recordUsable: usable,
       records: [legacy],
-    }).outstanding.map((artefact) => artefact.file)).toEqual(['shared'])
+    })
+    expect(debt.outstanding.map((artefact) => artefact.file)).toEqual(['shared'])
+    expect(debt.invalidatedCoverage).toEqual([{
+      sha: reviewed.sha,
+      index: 1,
+      total: 1,
+      files: ['shared'],
+    }])
+  })
+
+  it('counts and names only the historical readings invalidated by later file states', () => {
+    const first = commit('a', 'Claude Opus 5', ['advanced', 'still-current'])
+    const latest = commit('b', 'Claude Opus 5', ['advanced'])
+    const historical = {
+      ...row({ head: first.sha, files: ['advanced', 'still-current'], contained: [first.sha] }),
+      pass: {
+        index: 2,
+        total: 3,
+        files: ['advanced', 'still-current'],
+        commits: [first.sha],
+      },
+    }
+    const oldSelfReview = { ...historical, model: 'Claude Opus 5' }
+    const debt = outstandingFiles({
+      commits: [first, latest],
+      endStateFiles: ['advanced', 'still-current'],
+      recordUsable: usable,
+      // The second row never cleared anything under the old model either, so
+      // the migration must not count it as coverage the new cut invalidated.
+      records: [oldSelfReview, historical],
+    })
+    expect(debt.covered.map((artefact) => artefact.file)).toEqual(['still-current'])
+    expect(formatInvalidatedCoverage(debt.invalidatedCoverage, { quoteFile: (file) => `'${file}'` })).toBe(
+      `  INVALIDATED HISTORICAL COVERAGE: 1 scoped pass record contains a reading that no longer clears 1 end-state file; those files are owed again:\n` +
+      `    ${first.sha.slice(0, 7)} pass 2/3: 'advanced'`,
+    )
+  })
+
+  it('does not report invalidated history after a current reading clears the file', () => {
+    const first = commit('a', 'Claude Opus 5', ['advanced'])
+    const latest = commit('b', 'Claude Opus 5', ['advanced'])
+    const historical = {
+      ...row({ head: first.sha, files: ['advanced'], contained: [first.sha] }),
+      pass: { index: 1, total: 1, files: ['advanced'], commits: [first.sha] },
+    }
+    const current = row({
+      head: latest.sha,
+      files: ['advanced'],
+      contained: [first.sha, latest.sha],
+      at: 200,
+    })
+    const debt = outstandingFiles({
+      commits: [first, latest],
+      endStateFiles: ['advanced'],
+      recordUsable: usable,
+      records: [historical, current],
+    })
+    expect(debt.outstanding).toEqual([])
+    expect(debt.invalidatedCoverage).toEqual([])
   })
 
   it('keeps a newer refusal visible and lets a later clearance settle it', () => {

@@ -51,6 +51,8 @@ import { isMainModule } from './is-main.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
+import { readRecords, verifyCarried } from './mechanism-review.mjs'
+import { mergeProblem, reviewRecordWellFormed } from './mechanism-review-core.mjs'
 import {
   addedFilesAreCoveredByPatch,
   buildReviewPrompt,
@@ -96,7 +98,9 @@ import {
   unquoteGitPath,
 } from './review-material-core.mjs'
 import {
+  formatInvalidatedCoverage,
   mechanismLogCommand,
+  outstandingFiles,
   parseRangeLog,
   planAuthorshipGroups,
   UNREVIEWABLE_NARROWING_REMEDY,
@@ -336,16 +340,44 @@ export function gatherAuthorshipCommits(sha, base) {
   })
 }
 
+/** Historical scoped rows on this exact range, with ancestry re-measured from
+ *  Git. Only these measured facts may explain why an old reading is reusable or
+ *  why a later file state invalidated it. */
+export function gatherHistoricalCoverageRecords(sha, base, allRecords = readRecords()) {
+  const branchShas = new Set(git(['rev-list', sha, '--not', base]).split(/\r?\n/).filter(Boolean))
+  const records = (allRecords ?? []).filter(
+    (record) => branchShas.has(String(record?.sha ?? '')) && Array.isArray(record?.pass?.files),
+  )
+  for (const record of records) {
+    record.containedShas = new Set(
+      git(['rev-list', record.sha, '--not', base]).split(/\r?\n/).filter(Boolean),
+    )
+  }
+  return verifyCarried(records, allRecords)
+}
+
 /**
  * Size every authorship group with the standing material planner, then flatten
  * the result into one recordable pass sequence at the requested head.
  */
-export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipCommits(sha, base) } = {}) {
+export function buildAuthorshipPassPlan({
+  sha,
+  base,
+  commits = gatherAuthorshipCommits(sha, base),
+  records = [],
+  recordUsable = () => true,
+} = {}) {
   // The net range is authority for materiality. Commit history supplies only
   // authorship: a reverted path is absent, while a path touched eight times is
   // still one current artefact.
   const fullRange = gatherRange(sha, base)
   const authorship = planAuthorshipGroups({ commits, endStateFiles: fullRange.paths })
+  const coverage = outstandingFiles({
+    commits,
+    endStateFiles: fullRange.paths,
+    records,
+    recordUsable,
+  })
   const passes = []
   const uncoverable = []
   let rawSize = 0
@@ -391,6 +423,7 @@ export function buildAuthorshipPassPlan({ sha, base, commits = gatherAuthorshipC
     unreviewable: authorship.unreviewable,
     dropped: authorship.dropped,
     superseded: authorship.superseded,
+    invalidatedCoverage: coverage.invalidatedCoverage,
   }
 }
 
@@ -424,6 +457,8 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
       `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
     )
   }
+  const invalidated = formatInvalidatedCoverage(plan.invalidatedCoverage, { quoteFile: quotePassFile })
+  if (invalidated) lines.push(invalidated)
   for (const item of plan.dropped ?? []) {
     lines.push(`  DROPPED AS NON-MATERIAL: ${quotePassFile(item.file)} — ${item.reason}.`)
   }
@@ -891,7 +926,13 @@ if (isMainModule(import.meta.url)) {
     }
 
     const base = mergeBase(sinceFlag || 'main', full, { explicit: Boolean(sinceFlag) })
-    const plan = buildAuthorshipPassPlan({ sha: full, base })
+    const records = gatherHistoricalCoverageRecords(full, base)
+    const plan = buildAuthorshipPassPlan({
+      sha: full,
+      base,
+      records,
+      recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
+    })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
     if (plan.unreviewable.length) {
       console.error(
