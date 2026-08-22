@@ -250,7 +250,7 @@ describe('distributions', () => {
     expect(classesOf(landing({ criticality: null, delegated: false, picture: true }))).toEqual({
       criticality: UNTAGGED,
       lane: 'lane-unestablished',
-      picture: 'picture-verified',
+      picture: PICTURE_VERIFIED,
     })
     expect(classesOf(landing({ picture: false })).picture).toBe('picture-unestablished')
   })
