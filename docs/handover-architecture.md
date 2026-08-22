@@ -411,13 +411,23 @@ compensation, and the design owes all three parts:
     will move, the exact object id it expects to find there and the exact object id it will leave.
     The commits exist locally before the push, so the after-oid is known in advance. The entry
     exists before the push can, so no landed push lacks a record.
-  - **Recovery asks the remote about those objects.** For each unverified publishing intent,
-    reconciliation fetches and asks whether the after-oid is contained in the ref's history
-    (`git merge-base --is-ancestor`). Contained means LANDED — and it stays true through any
-    number of later publications, which is exactly what a `seq` comparison could not do. Absent
-    from the remote means ABANDONED. Nothing is inferred from the credential's current value,
-    because a `seq` is reused by a later attempt after a failed one and cannot tell landed from
-    superseded from abandoned.
+  - **Recovery asks the remote about those objects, on the WORK ref.** For each unverified
+    publishing intent, reconciliation fetches and asks whether the after-oid is contained in the
+    history of the ref the intent named — `main` or a feature branch — with
+    `git merge-base --is-ancestor <after-oid> <that ref>`. That is a question about COMMIT
+    ancestry on an ordinary branch; the credential ref is not involved, carries a blob rather
+    than a history, and is never asked. Contained means LANDED, and it stays true through any
+    number of later publications, which is what a `seq` comparison could not do. Absent from the
+    remote means ABANDONED.
+  - **The other two recorded facts are the fallback, not decoration.** Where the after-oid is
+    absent but the work may still have landed in rewritten form, the publication id — carried as
+    a trailer in the commit itself — is searched in the named ref's history, and the
+    expected-before oid says which base the attempt was built on, which distinguishes "never
+    landed" from "landed and was later rewritten". This repository does not rewrite published
+    history, so the fallback is a safety net rather than the normal path; recovery that needs it
+    reports that it did.
+  - **Nothing is inferred from the credential's current value,** because a `seq` is reused by a
+    later attempt after a failed one and cannot tell landed from superseded from abandoned.
   - **Only entries with no publishing intent are quarantined locally,** and those are the ones the
     local-and-reversible argument actually covers.
 
@@ -588,6 +598,15 @@ actually holds is narrow:
 - **A daemon may be started only as the FIRST act of a session that has just acquired the lock,**
   before that session has begun any operation of its own. Then no legacy operation of the starting
   session can be in flight, because it has not started one.
+- **AND ONLY WHEN NO OTHER SESSION THAT EVER HELD THE LOCK IS STILL ALIVE.** This is the half the
+  first act alone does not cover, and without it starting a daemon beside a former owner's live
+  operation is not a residual risk but an uncovered safety violation — two writers of the same
+  local state, one of them uninstrumented. It is provable rather than assumed: a legacy operation
+  runs INSIDE a session process, so it cannot outlive one, and this repository already tracks
+  every session that has held the lock and probes their pids — `scripts/batch-singleton.mjs`
+  answers "live parallel sessions" today and refuses the batch when it finds any. Daemon start
+  requires that answer to be NONE, by pid and pid start time, and refuses otherwise with the
+  session it found named.
 - **A former owner's legacy operation is out of scope,** written down rather than covered: its
   published acts are refused by the credential ref once the successor has advanced it, and its
   local acts have whatever recoverability today's code gives them — which this design neither
@@ -602,9 +621,11 @@ Written here because a mechanism that hides its limits is worse than one that ha
 because each of these is a candidate for its own work-order entry rather than a line someone
 discovers while building:
 
-1. **Cross-regime interference with an operation that predates the daemon.** Named above. No
-   mechanism here constrains it; the restriction on when a daemon may start only excludes the
-   starting session's own operations.
+1. **An operation that predates the daemon is not instrumented by it.** The start precondition
+   above — first act of a fresh lock, and no other live session that ever held it — is what keeps
+   the two from coexisting, and it is a checkable condition rather than an assumption. What
+   remains residual is narrower: this design does not measure or improve the recoverability of
+   work begun on the old path, it only refuses to run beside it.
 2. **One push of publishing authority after local dispossession.** The credential ref decides who
    publishes, so between a successor's local acquisition and its advance of that ref, the
    predecessor is still the named publisher. This is deliberate — it keeps exactly one publisher
@@ -613,8 +634,12 @@ discovers while building:
 3. **The unprovable journal tail after a daemon crash.** Resolved against the remote where an
    entry names a publishing intent, quarantined where it does not. An entry that is neither is not
    possible by construction, but the construction is a rule the implementation must keep.
-4. **The drill's check-to-signal interval.** Node exposes no pidfd, so the drill detects a
-   recycled pid after the fact instead of preventing one. It reports rather than promises.
+4. **The drill's check-to-signal interval, and the part of it that is invisible.** Node exposes no
+   pidfd, so a recycled pid is detected after the fact rather than prevented — and one branch
+   cannot be detected at all: if the worker exits, its number is reused, the stranger is signalled
+   and the stranger then vanishes, the probe answers exactly what a clean reap answers. The
+   detection is best-effort and the drill says so; it never reports cleanup it cannot establish,
+   but it also cannot rule this case out.
 
 A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
 handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with

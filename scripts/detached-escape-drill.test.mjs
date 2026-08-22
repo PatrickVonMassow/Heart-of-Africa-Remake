@@ -378,6 +378,31 @@ describe('reap', () => {
     expect(said).toMatch(/recycled between the check and the signal/)
   })
 
+  it('reports a signal that FAILED, instead of calling it cleanup', () => {
+    // `catch { return undefined }` treated EPERM and every unclassified error as
+    // a worker that had gone away by itself, so one this drill left running read
+    // as reaped. Only ESRCH is that case.
+    const raise = (code) => () => {
+      const err = new Error(code)
+      err.code = code
+      throw err
+    }
+    expect(reap(4242, 900000, { probe: identity('/proc state S', true), kill: raise('EPERM') })).toMatch(/NOT signalled/)
+    expect(reap(4242, 900000, { probe: identity('/proc state S', true), kill: raise('EINVAL') })).toMatch(/NOT signalled/)
+    expect(reap(4242, 900000, { probe: identity('/proc state S', true), kill: raise('ESRCH') })).toBeUndefined()
+  })
+
+  it('cannot see the branch where the stranger vanishes, and does not pretend to', () => {
+    // Original exits, number reused, stranger signalled, stranger gone before the
+    // reread: the probe answers "no such process", which is exactly what a clean
+    // reap answers. Residual 4 records that this detection is best-effort.
+    const answers = [
+      { alive: true, how: '/proc state S' },
+      { alive: false, how: 'no such process' },
+    ]
+    expect(reap(4242, 900000, { probe: () => answers.shift(), kill: () => {} })).toBeUndefined()
+  })
+
   it('stays quiet when the same process is still settling after the signal', () => {
     // Signal delivery is asynchronous: a process still running an instant later
     // is ordinary, and calling that a recycled pid was a false alarm on every

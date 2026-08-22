@@ -426,9 +426,10 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
  *
  * NOT PREVENTABLE — the interval between reading /proc and sending the signal.
  * The worker can exit and its number be reused inside it, and Node exposes no
- * pidfd to close that. So it is DETECTED instead: the identity is read again
- * after the signal, and a change is reported rather than passed over in silence.
- * A drill that cannot promise something says what it did.
+ * pidfd to close that. It is detected where it CAN be: the identity is read
+ * again after the signal and a change is reported. Where the stranger vanishes
+ * before that read, the answer is indistinguishable from a clean reap, so the
+ * detection is best-effort and is recorded as such rather than promised.
  */
 export function reap(pid, startedAt, { probe = probeAlive, kill = process.kill.bind(process) } = {}) {
   if (!(pid > 1)) return `no worker pid was captured, so nothing was signalled`
@@ -439,8 +440,12 @@ export function reap(pid, startedAt, { probe = probeAlive, kill = process.kill.b
   if (!before.alive) return `pid ${pid} not reaped: ${before.how}`
   try {
     kill(pid, 'SIGKILL')
-  } catch {
-    return undefined // it went away between the check and the signal: nothing to reap
+  } catch (err) {
+    // NOT EVERY FAILURE IS A CLEAN EXIT. Swallowing all of them reported EPERM
+    // and unclassified errors as successful cleanup, so a worker this drill left
+    // running looked reaped. Only ESRCH means it went away by itself.
+    if (err?.code === 'ESRCH') return undefined
+    return `pid ${pid} was NOT signalled: ${err?.code ?? err}`
   }
   // ONLY AN IDENTITY CHANGE IS REPORTED. A process still running an instant after
   // SIGKILL is ordinary — signal delivery is asynchronous — and reporting that as
@@ -449,6 +454,11 @@ export function reap(pid, startedAt, { probe = probeAlive, kill = process.kill.b
   if (/recycled/.test(after.how ?? '')) {
     return `pid ${pid} was recycled between the check and the signal: ${after.how}`
   }
+  // AND THE BRANCH THIS CANNOT SEE: if the original exited, its number was
+  // reused, the stranger was signalled and the stranger then vanished, the probe
+  // answers "no such process" — indistinguishable from having reaped our own.
+  // The detection is therefore best-effort, which residual 4 says out loud
+  // instead of promising what it cannot deliver.
   return undefined
 }
 
