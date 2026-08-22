@@ -895,15 +895,25 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * behind it is a new sentence with a predicate of its own, and reading it as the
  * tail of the negative list turned a demand into a denial.
  */
-// The requirement word has to BE the predicate, not merely appear in the clause:
-// "No screenshot showing the REQUIRED state, browser frame, or picture proof is
-// needed" is an open negative list, and reading the bare word as closure turned
-// its last item into a demand. Three shapes say it — a copula reaching the word
-// in either language, an English "does not require", and the predicative
-// adjective that ends a clause, which is how German states it ("Kein Screenshot
-// nötig") and how the bare forms read ("Not required", "Nicht erforderlich").
-const DENIAL_CARRIES_PREDICATE =
-  /\b(is|are|was|were|be|been|ist|sind|war|waren|wird|werden)\b[^,;:]{0,30}\b(required|needed|necessary|nötig|noetig|erforderlich)\b|\bnot\s+(\w+\s+){0,2}(require|requires|need|needs|required|needed|necessary)\b|\b(required|needed|necessary|nötig|noetig|erforderlich)\s*$/i
+/**
+ * THE ONE PLACE AN ATTRIBUTIVE ADJECTIVE CAN STAND, in both languages, is
+ * between a determiner and its noun. That is the whole rule below, and it
+ * replaced three rounds of regexes that each traded one misreading for another.
+ *
+ * "No screenshot showing THE required state" describes what the screenshot would
+ * show — the sentence has not said what it demands yet, and the list is still
+ * running. "No screenshot NECESSARY for this change" and "Kein Screenshot NÖTIG
+ * für diese Änderung" state it, complement and all, and the clause behind them
+ * is a new sentence.
+ */
+const DETERMINER =
+  '(the|a|an|this|that|these|those|its|their|our|your|his|her|no|any|some|' +
+  'der|die|das|den|dem|des|ein|eine|einen|einem|einer|eines|' +
+  'diese|dieser|diesem|diesen|dieses|jede|jeder|jedem|jeden|ihr|ihre|ihren|sein|seine|seinen)'
+
+const REQUIREMENT = '(required|needed|necessary|require|requires|need|needs|nötig|noetig|erforderlich)'
+
+const DENIAL_CARRIES_PREDICATE = new RegExp(`(?<!\\b${DETERMINER}\\s)\\b${REQUIREMENT}\\b`, 'i')
 
 export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
 

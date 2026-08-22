@@ -1477,16 +1477,33 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
   })
 
   it('does not close a denial on a requirement word that qualifies its NOUN', () => {
-    // "No screenshot showing the REQUIRED state" is still an open negative list:
-    // the word describes what the screenshot would show, not what the sentence
+    // "No screenshot showing THE required state" is still an open negative list:
+    // behind a determiner the word describes the noun, not what the sentence
     // demands. Read as closure it took the licence off the item that finishes
     // the list, and "or picture proof is needed" became a demand.
     expect(denialIsOpen('No screenshot showing the required state')).toBe(true)
-    expect(
-      pictureBearingPoints(
-        block(156, 'No screenshot showing the required state, browser frame, or picture proof is needed.'),
-      ).has(156),
-    ).toBe(false)
+    expect(denialIsOpen('No screenshot that is in the required state')).toBe(true)
+    for (const [n, line] of [
+      [156, 'No screenshot showing the required state, browser frame, or picture proof is needed.'],
+      [157, 'No screenshot that is in the required state, browser frame, or picture proof is needed.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(false)
+    }
+  })
+
+  it('DOES close one whose predicate carries a complement', () => {
+    // The mirror case: "No screenshot necessary FOR THIS CHANGE" has said what
+    // it denies, complement and all, so the clause behind it is a new sentence.
+    // A rule that wanted the predicate at the end of the fragment left these
+    // open and swallowed the demand that followed.
+    expect(denialIsOpen('No screenshot necessary for this change')).toBe(false)
+    expect(denialIsOpen('Kein Screenshot nötig für diese Änderung')).toBe(false)
+    for (const [n, line] of [
+      [158, 'No screenshot necessary for this change; a browser frame and picture proof are required.'],
+      [159, 'Kein Screenshot nötig für diese Änderung. Ein browser frame ist nötig.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
+    }
   })
 
   it('reads a positive coordinated demand behind a closed denial as a demand', () => {
