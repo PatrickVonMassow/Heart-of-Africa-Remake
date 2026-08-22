@@ -24,6 +24,7 @@ import { parseSegments } from './command-classify-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { interceptToolOutput, interceptionEnvelope } from './tool-output-intercept-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 
@@ -105,12 +106,15 @@ if (isMainModule(import.meta.url)) {
     }
 
     const subject = subjectFrom(payload)
-    if (!subject) process.exit(0)
+    const interception = interceptToolOutput(payload, { parseSegments })
+    if (!subject && !interception) process.exit(0)
 
     const gathered = gatherPathScope({ sessionId: payload.session_id || '' })
     if (!gathered.applicable) process.exit(0)
 
-    const verdict = evaluate({ ...subject, ctx: gathered.inputs.ctx, parseSegments })
+    const verdict = subject
+      ? evaluate({ ...subject, ctx: gathered.inputs.ctx, parseSegments })
+      : { block: false }
     if (verdict.block) {
       process.stdout.write(
         JSON.stringify({
@@ -121,6 +125,9 @@ if (isMainModule(import.meta.url)) {
           },
         }),
       )
+    } else {
+      const envelope = interceptionEnvelope(interception)
+      if (envelope) process.stdout.write(JSON.stringify(envelope))
     }
     process.exit(0)
   } catch (e) {
