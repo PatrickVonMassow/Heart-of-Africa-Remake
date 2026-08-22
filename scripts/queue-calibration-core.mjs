@@ -865,18 +865,6 @@ const LIST_GLUE =
 
 
 
-/**
- * A DENIAL THAT ALREADY SAID "IS REQUIRED" HAS FINISHED ITS SENTENCE.
- *
- * The shared predicate can only be lent onward by a denial that is still open:
- * "No screenshot, browser frame or picture proof IS REQUIRED" names the
- * predicate once, at the end. Where the denial carries its own — "No screenshot
- * IS REQUIRED, a browser frame and picture proof ARE REQUIRED" — the clause
- * behind it is a new sentence with a predicate of its own, and reading it as the
- * tail of the negative list turned a demand into a denial.
- */
-
-
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
   // Nothing but the proof noun and the words that carry it: no statement of its
   // own. A fragment that says something ("provide …", "must be supplied") is a
