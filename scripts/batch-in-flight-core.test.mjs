@@ -26,7 +26,6 @@ import {
   RESPAWN_GRACE_MS,
   WORK_FRESH_MS,
   agentOutputVerdict,
-  deadOwnerVerdict,
   declaredAgentProbe,
   assessInFlight,
   assessOwnerWork,
@@ -953,22 +952,6 @@ describe('the stand-down boundary — declared children cross ownership', () => 
     })
   })
 
-  it('refuses a dead-owner verdict while a child worktree or branch tip is moving', () => {
-    for (const childOutput of [
-      agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW }),
-      agentOutputVerdict({ branchTipAt: NOW - 60_000, now: NOW }),
-    ]) {
-      expect(deadOwnerVerdict({ ownerInactive: true, childOutput })).toEqual({ dead: false, reason: 'child-working' })
-    }
-    expect(deadOwnerVerdict({ ownerInactive: true, childOutput: agentOutputVerdict({ now: NOW }) })).toEqual({
-      dead: false,
-      reason: 'child-unknown',
-    })
-    expect(
-      deadOwnerVerdict({ ownerInactive: true, childOutput: agentOutputVerdict({ branchTipAt: NOW - 90 * 60_000, now: NOW }) }),
-    ).toEqual({ dead: true, reason: 'owner-inactive-child-quiet' })
-  })
-
   it('orients the successor from the measurement and names the exact probe', () => {
     const transferred = { ...agent, transfer: { v: 1, by: SID, at: NOW, checkpoints: [] } }
     const text = successorAgentOrientation({
@@ -1008,6 +991,7 @@ describe('the stand-down boundary — declared children cross ownership', () => 
       })
       expect(orientation).toContain('MEASURED WORKING')
       expect(orientation).toContain('--adopt')
+      expect(orientation).not.toContain('provably dead')
 
       const adopted = adoptTransferred('session-successor', {
         lockPath,

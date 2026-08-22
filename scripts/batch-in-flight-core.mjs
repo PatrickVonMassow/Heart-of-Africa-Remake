@@ -972,22 +972,6 @@ export function standDownBoundaryDecision({ sid = '', declaration = null, agentC
   return plain('agent-measured-quiet')
 }
 
-/**
- * MAY THE SUCCESSOR CALL THE PREDECESSOR DEAD? PURE.
- *
- * The owner's process and its children are separate measurements. The lock can
- * establish the former; only the same output verdict as `--agent-check` can
- * establish the latter. Active or unreadable child output therefore refuses a
- * dead-owner description. Only measured-quiet output permits one.
- */
-export function deadOwnerVerdict({ ownerInactive = false, childOutput = null } = {}) {
-  if (ownerInactive !== true) return { dead: false, reason: 'owner-not-measured-inactive' }
-  const child = respawnDecision({ output: childOutput })
-  if (child.reason === 'agent-alive') return { dead: false, reason: 'child-working' }
-  if (child.reason === 'output-unmeasurable') return { dead: false, reason: 'child-unknown' }
-  return { dead: true, reason: 'owner-inactive-child-quiet' }
-}
-
 /** The successor-facing words for the child measurement. PURE. */
 export function successorAgentOrientation({ declaration = null, sid = '', agentCheck = null, command = '' } = {}) {
   if (!declaration || declaration.sessionId === sid || !declaredAgentProbe(declaration).agent) return ''
