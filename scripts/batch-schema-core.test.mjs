@@ -1,0 +1,486 @@
+// THE SCHEMAS AND INVARIANTS OF THE DURABLE LANE (point 834, step 1). Every rule
+// scripts/batch-schema-core.mjs states, swept without a filesystem.
+//
+// Two of these cases are ENUMERATING rather than exemplary, and they are the ones
+// that keep working after this point lands: the daemon-pair table must have a case
+// for every reading it declares, and every registered daemon command must have an
+// idempotency case. A row or a command added later without one fails here instead
+// of passing silently.
+import { describe, it, expect } from 'vitest'
+import { PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
+import {
+  ATTEMPT_IDENTITY_FIELDS,
+  ATTEMPT_STATES,
+  ATTEMPT_TRANSITIONS,
+  CREDENTIAL_REF,
+  DAEMON_COMMANDS,
+  DAEMON_PAIR_READINGS,
+  MIGRATIONS,
+  PROCESS_START_TOLERANCE_MS,
+  PUBLISHED_ACTS,
+  SCHEMA_VERSION,
+  TERMINAL_ATTEMPT_STATES,
+  advancedCredential,
+  applyOnce,
+  attemptIdentity,
+  attemptStateRecord,
+  attemptTransition,
+  canonicalJson,
+  checkSchemaVersion,
+  classifyDaemonPair,
+  credential,
+  credentialAccepted,
+  daemonPairInvariantHolds,
+  fenceInForceAt,
+  frameEntry,
+  idempotencyKey,
+  markUnverifiedTail,
+  mayMintFence,
+  migrateRecord,
+  parseFramedLine,
+  publicationPush,
+  registerDaemonCommand,
+  revalidateAfterWrite,
+  sameProcess,
+  validateMutation,
+} from './batch-schema-core.mjs'
+
+const NOW = 1_800_000_000_000
+
+describe('the schema version rule', () => {
+  it('accepts the current version', () => {
+    expect(checkSchemaVersion(SCHEMA_VERSION).verdict).toBe('accept')
+  })
+
+  it('REFUSES one version ahead rather than guessing at a shape it does not know', () => {
+    const verdict = checkSchemaVersion(SCHEMA_VERSION + 1)
+    expect(verdict.verdict).toBe('refuse')
+    expect(verdict.reason).toMatch(/ahead/)
+  })
+
+  it('refuses an unversioned record', () => {
+    expect(checkSchemaVersion(undefined).verdict).toBe('refuse')
+    expect(checkSchemaVersion('1').verdict).toBe('refuse')
+    expect(checkSchemaVersion(0).verdict).toBe('refuse')
+  })
+
+  it('migrates one version behind and re-reads equal', () => {
+    const migrations = { 1: (r) => ({ ...r, v: 2, addedByMigration: true }) }
+    const old = { v: 1, kind: 'attempt', attemptId: 'a1' }
+    const migrated = migrateRecord(old, { current: 2, migrations })
+    expect(migrated.ok).toBe(true)
+    expect(migrated.migrated).toBe(true)
+    expect(migrated.record).toEqual({ v: 2, kind: 'attempt', attemptId: 'a1', addedByMigration: true })
+    // Re-reading the migrated record is a no-op: it is now current.
+    const again = migrateRecord(migrated.record, { current: 2, migrations })
+    expect(again.migrated).toBe(false)
+    expect(again.record).toEqual(migrated.record)
+  })
+
+  it('refuses an older record when no migration is registered — which is today, on purpose', () => {
+    expect(Object.keys(MIGRATIONS)).toHaveLength(0)
+    const verdict = migrateRecord({ v: 1 }, { current: 2 })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.reason).toMatch(/unmigratable/)
+  })
+
+  it('refuses a migration that does not leave the record at the current version', () => {
+    const migrations = { 1: (r) => ({ ...r }) }
+    const out = migrateRecord({ v: 1 }, { current: 2, migrations })
+    expect(out.ok).toBe(false)
+    expect(out.reason).toMatch(/instead of 2/)
+  })
+})
+
+describe('identity — pid and pid start time, never a bare pid', () => {
+  const full = {
+    batchId: 'b1',
+    pointId: 834,
+    attemptId: 'a1',
+    pid: 4711,
+    pidStartedAt: NOW - 60_000,
+    branch: 'feat/834-x',
+    worktree: '/w/834',
+    baseSha: 'abc1234',
+    logPath: '/logs/a1.log',
+    heartbeatPath: '/logs/a1.beat',
+  }
+
+  it('accepts a complete identity and refuses every incomplete one', () => {
+    expect(attemptIdentity(full).ok).toBe(true)
+    for (const field of ATTEMPT_IDENTITY_FIELDS) {
+      const { [field]: _dropped, ...missing } = full
+      const verdict = attemptIdentity(missing)
+      expect(verdict.ok, `${field} must be required`).toBe(false)
+      expect(verdict.missing).toEqual([field])
+    }
+  })
+
+  it('refuses an empty string as an answer', () => {
+    expect(attemptIdentity({ ...full, branch: '' }).ok).toBe(false)
+  })
+
+  it('a recycled pid is not the same process', () => {
+    const a = { pid: 4711, pidStartedAt: NOW }
+    expect(sameProcess(a, { pid: 4711, pidStartedAt: NOW + 1500 })).toBe(true)
+    expect(sameProcess(a, { pid: 4711, pidStartedAt: NOW + 90_000 })).toBe(false)
+    expect(sameProcess(a, { pid: 4712, pidStartedAt: NOW })).toBe(false)
+    expect(sameProcess(a, null)).toBe(false)
+  })
+
+  it('carries the same tolerance the lock already uses, so the copy cannot drift', () => {
+    expect(PROCESS_START_TOLERANCE_MS).toBe(PID_START_TOLERANCE_MS)
+  })
+})
+
+describe('attempt states and transitions (union M16)', () => {
+  it('every state has a transition row, and only the terminal ones are empty', () => {
+    for (const state of ATTEMPT_STATES) {
+      expect(ATTEMPT_TRANSITIONS[state], state).toBeDefined()
+      const empty = ATTEMPT_TRANSITIONS[state].length === 0
+      expect(empty, state).toBe(TERMINAL_ATTEMPT_STATES.includes(state))
+    }
+  })
+
+  it('every named target is itself a state', () => {
+    for (const [from, targets] of Object.entries(ATTEMPT_TRANSITIONS)) {
+      for (const to of targets) expect(ATTEMPT_STATES, `${from} -> ${to}`).toContain(to)
+    }
+  })
+
+  it('a terminal attempt does not resume; a retry is a new attempt id', () => {
+    expect(attemptTransition('landed', 'running').ok).toBe(false)
+    expect(attemptTransition('failed', 'queued').reason).toMatch(/terminal/)
+    expect(attemptTransition('cancelled', 'running').ok).toBe(false)
+  })
+
+  it('a stale base returns a landing to queued rather than retrying it silently', () => {
+    expect(attemptTransition('landing', 'queued').ok).toBe(true)
+    expect(attemptTransition('landing', 'running').ok).toBe(false)
+  })
+
+  it('refuses states it does not know', () => {
+    expect(attemptTransition('running', 'paused').ok).toBe(false)
+    expect(attemptTransition('sleeping', 'running').ok).toBe(false)
+  })
+
+  it('records leave no field unanswered', () => {
+    const base = { actor: 'session-1', fence: 604, at: NOW, lastCommit: null, lastPushedSha: null }
+    expect(attemptStateRecord({ state: 'running', ...base }).ok).toBe(true)
+    const { lastPushedSha: _gone, ...withoutKey } = base
+    expect(attemptStateRecord({ state: 'running', ...withoutKey }).reason).toMatch(/unanswered/)
+    expect(attemptStateRecord({ state: 'running', ...base, fence: 0 }).ok).toBe(false)
+  })
+
+  it('a state that claims reviewable or landed work must name its pushed SHA', () => {
+    const base = { actor: 'session-1', fence: 604, at: NOW, lastCommit: 'c0ffee', lastPushedSha: null }
+    expect(attemptStateRecord({ state: 'ready-for-review', ...base }).ok).toBe(false)
+    expect(attemptStateRecord({ state: 'landed', ...base }).ok).toBe(false)
+    expect(attemptStateRecord({ state: 'ready-for-review', ...base, lastPushedSha: 'deadbee' }).ok).toBe(true)
+  })
+
+  it('a named failure state carries its reason (union M38)', () => {
+    const base = { actor: 'daemon', fence: 604, at: NOW, lastCommit: null, lastPushedSha: null }
+    expect(attemptStateRecord({ state: 'stalled', ...base }).ok).toBe(false)
+    expect(attemptStateRecord({ state: 'cancelled', ...base }).ok).toBe(false)
+    expect(attemptStateRecord({ state: 'failed', ...base, reason: 'heartbeat timeout' }).ok).toBe(true)
+  })
+})
+
+describe('the daemon pair — record and the lock copy of it', () => {
+  const record = { v: 1, pid: 900, pidStartedAt: NOW - 600_000, generation: 7, fence: 604, launchNonce: 'n1', startedAt: NOW - 600_000 }
+  const copy = { pid: 900, pidStartedAt: NOW - 600_000, generation: 7 }
+  const alive = { pid: 900, pidStartedAt: NOW - 600_000, live: true }
+  const dead = { pid: 900, pidStartedAt: NOW - 600_000, live: false }
+
+  const cases = {
+    'no-daemon': { record: null, copy: null, probe: null },
+    healthy: { record, copy, probe: alive },
+    unadopted: { record, copy: null, probe: alive },
+    'cold-record': { record, copy: null, probe: dead },
+    'stale-copy': { record, copy, probe: dead },
+    'superseded-copy': { record, copy: { ...copy, generation: 6, pid: 880 }, probe: alive },
+    'orphaned-copy': { record: null, copy, probe: null },
+    'impossible-copy': { record, copy: { ...copy, generation: 8 }, probe: alive },
+  }
+
+  it('decides every reading it declares — and declares every reading it decides', () => {
+    expect(Object.keys(cases).sort()).toEqual(Object.keys(DAEMON_PAIR_READINGS).sort())
+    for (const [reading, input] of Object.entries(cases)) {
+      expect(classifyDaemonPair(input).reading, reading).toBe(reading)
+      expect(classifyDaemonPair(input).resolution, reading).toBe(DAEMON_PAIR_READINGS[reading])
+    }
+  })
+
+  it('a copy newer than the record is corruption, not a race', () => {
+    expect(daemonPairInvariantHolds({ record, copy: { ...copy, generation: 8 } })).toBe(false)
+    expect(daemonPairInvariantHolds({ record, copy })).toBe(true)
+    expect(daemonPairInvariantHolds({ record, copy: null })).toBe(true)
+    expect(daemonPairInvariantHolds({ record: null, copy })).toBe(true)
+  })
+
+  it('a record without a generation can be compared to nothing and fails closed', () => {
+    expect(classifyDaemonPair({ record: { ...record, generation: undefined }, copy, probe: alive }).reading).toBe(
+      'impossible-copy',
+    )
+  })
+
+  it('liveness is never read from the copy', () => {
+    // The copy is present and matching; only the record's own probe decides.
+    expect(classifyDaemonPair({ record, copy, probe: dead }).reading).toBe('stale-copy')
+    expect(classifyDaemonPair({ record, copy, probe: null }).reading).toBe('stale-copy')
+  })
+
+  it('a dead record with an older copy is cold rather than superseded — the record is what must be reconciled', () => {
+    expect(classifyDaemonPair({ record, copy: { ...copy, generation: 6, pid: 880 }, probe: dead }).reading).toBe(
+      'cold-record',
+    )
+  })
+})
+
+describe('the coordinator credential', () => {
+  const gen = 'g-4f2a91bc'
+  const current = credential({ generation: gen, fence: 604, seq: 3 }).credential
+
+  it('is a triple, and refuses to be built from anything less', () => {
+    expect(credential({ generation: 'short', fence: 1, seq: 0 }).ok).toBe(false)
+    expect(credential({ generation: gen, fence: 0, seq: 0 }).ok).toBe(false)
+    expect(credential({ generation: gen, fence: 1, seq: -1 }).ok).toBe(false)
+    expect(credential({ generation: gen, fence: 1, seq: 0 }).ok).toBe(true)
+  })
+
+  it('refuses a publication whose credential update would be a no-op', () => {
+    const push = publicationPush({ current, next: current, expectedOid: 'oid1', refs: ['main'] })
+    expect(push.ok).toBe(false)
+    expect(push.reason).toMatch(/no-op/)
+  })
+
+  it('builds one atomic push carrying the work and the credential under a lease', () => {
+    const next = advancedCredential(current).credential
+    const push = publicationPush({ current, next, expectedOid: 'oid1', refs: ['main'] })
+    expect(push.ok).toBe(true)
+    expect(push.args).toEqual([
+      'push',
+      '--atomic',
+      `--force-with-lease=${CREDENTIAL_REF}:oid1`,
+      'origin',
+      'main',
+      CREDENTIAL_REF,
+    ])
+  })
+
+  it('the very first advance leases the ref ABSENCE', () => {
+    const first = credential({ generation: gen, fence: 604, seq: 0 }).credential
+    const push = publicationPush({ current: null, next: first, expectedOid: '', refs: ['main'] })
+    expect(push.ok).toBe(true)
+    expect(push.args).toContain(`--force-with-lease=${CREDENTIAL_REF}:`)
+  })
+
+  it('refuses a publication with no lease at all, and one that carries no work', () => {
+    const next = advancedCredential(current).credential
+    expect(publicationPush({ current, next, refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [] }).ok).toBe(false)
+  })
+
+  it('a publication never changes the generation; recovery mints one', () => {
+    const foreign = credential({ generation: 'g-otherrrr', fence: 604, seq: 4 }).credential
+    expect(publicationPush({ current, next: foreign, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(false)
+  })
+
+  it('refuses a credential from a previous generation, a stale fence and a stale seq', () => {
+    expect(credentialAccepted({ generation: 'g-oldstore', fence: 999, seq: 9 }, current).reason).toMatch(/foreign/)
+    expect(credentialAccepted({ generation: gen, fence: 603, seq: 99 }, current).reason).toMatch(/stale fence/)
+    expect(credentialAccepted({ generation: gen, fence: 604, seq: 2 }, current).reason).toMatch(/stale seq/)
+    expect(credentialAccepted({ generation: gen, fence: 604, seq: 3 }, current).ok).toBe(true)
+    expect(credentialAccepted({ generation: gen, fence: 605, seq: 0 }, current).ok).toBe(true)
+  })
+
+  it('minting is fail-closed on the fence store AND on the journal', () => {
+    const store = { generation: gen, fence: 604 }
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: 604 })).toEqual({ ok: true, next: 605 })
+    expect(mayMintFence({ fenceStore: null, journalOk: true }).reason).toMatch(/missing/)
+    expect(mayMintFence({ fenceStore: { fence: 604 }, journalOk: true }).reason).toMatch(/lost its generation/)
+    expect(mayMintFence({ fenceStore: store, journalOk: false }).reason).toMatch(/journal/)
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: 700 }).reason).toMatch(/high water/)
+  })
+})
+
+describe('mutation validation — the fence IS the coordinator epoch', () => {
+  const lock = { sessionId: 's1', fence: 604, pid: 500, pidStartedAt: NOW - 10_000, leaseUntil: NOW + 60_000 }
+  const probe = { pid: 500, startedAt: NOW - 10_000 }
+  const presented = { sessionId: 's1', fence: 604 }
+
+  it('accepts only when session, fence and liveness all hold at that instant', () => {
+    expect(validateMutation({ presented, lock, probe, now: NOW }).ok).toBe(true)
+    expect(validateMutation({ presented, lock: null, probe, now: NOW }).reason).toMatch(/no batch lock/)
+    expect(validateMutation({ presented: { ...presented, sessionId: 's2' }, lock, probe, now: NOW }).ok).toBe(false)
+    expect(validateMutation({ presented: { ...presented, fence: 603 }, lock, probe, now: NOW }).reason).toMatch(/stale fence/)
+    expect(validateMutation({ presented, lock, probe: { pid: 500, startedAt: NOW - 900_000 }, now: NOW }).ok).toBe(false)
+    expect(validateMutation({ presented, lock, probe, now: NOW + 120_000 }).reason).toMatch(/lease/)
+  })
+
+  it('compensates when the lock moved under the write', () => {
+    expect(revalidateAfterWrite({ validated: presented, lock }).verdict).toBe('stands')
+    expect(revalidateAfterWrite({ validated: presented, lock: { ...lock, fence: 605 } }).verdict).toBe('compensate')
+    expect(revalidateAfterWrite({ validated: presented, lock: null }).verdict).toBe('compensate')
+  })
+})
+
+describe('the daemon command table', () => {
+  // One payload per registered command. The enumerating case below fails when a
+  // command is added without one, so a new mutation cannot arrive unkeyed.
+  const payloads = {
+    'queue-job': { batchId: 'b1', pointId: 834, requestId: 'r1' },
+    'start-attempt': { batchId: 'b1', pointId: 834, attemptId: 'a1' },
+    'grant-lease': { batchId: 'b1', attemptId: 'a1', requestId: 'r2' },
+    'request-checkpoint': { batchId: 'b1', requestId: 'r3' },
+    'adopt-attempt': { batchId: 'b1', attemptId: 'a1', fence: 605 },
+    'cancel-attempt': { batchId: 'b1', attemptId: 'a1', requestId: 'r4' },
+    'record-state': { batchId: 'b1', attemptId: 'a1', state: 'running', at: NOW },
+  }
+
+  it('every registered command has an idempotency case, and applying it twice changes the state once', () => {
+    expect(Object.keys(payloads).sort()).toEqual(Object.keys(DAEMON_COMMANDS).sort())
+    for (const [name, payload] of Object.entries(payloads)) {
+      const keyed = idempotencyKey(name, payload)
+      expect(keyed.ok, name).toBe(true)
+      const applied = new Set()
+      let changes = 0
+      for (const _pass of [1, 2]) {
+        const out = applyOnce(applied, keyed.key, () => {
+          changes += 1
+        })
+        expect(out.ok, name).toBe(true)
+        if (out.applied) applied.add(keyed.key)
+      }
+      expect(changes, name).toBe(1)
+    }
+  })
+
+  it('every registered command declares a compensation', () => {
+    for (const [name, spec] of Object.entries(DAEMON_COMMANDS)) {
+      expect(spec.compensation, name).toBeTruthy()
+      expect(spec.keyFields.length, name).toBeGreaterThan(0)
+    }
+  })
+
+  it('the same request keys the same twice and a different one keys differently', () => {
+    const a = idempotencyKey('queue-job', payloads['queue-job']).key
+    const b = idempotencyKey('queue-job', { ...payloads['queue-job'] }).key
+    const c = idempotencyKey('queue-job', { ...payloads['queue-job'], requestId: 'r9' }).key
+    expect(a).toBe(b)
+    expect(a).not.toBe(c)
+  })
+
+  it('refuses to key a payload that cannot answer the key fields', () => {
+    expect(idempotencyKey('queue-job', { batchId: 'b1' }).reason).toMatch(/missing/)
+    expect(idempotencyKey('no-such-command', {}).ok).toBe(false)
+  })
+
+  it('registration refuses a command without a compensation or without a key', () => {
+    expect(registerDaemonCommand(DAEMON_COMMANDS, 'prune-logs', { keyFields: ['batchId'] }).reason).toMatch(
+      /no compensation/,
+    )
+    expect(registerDaemonCommand(DAEMON_COMMANDS, 'prune-logs', { compensation: 'restore-logs' }).reason).toMatch(
+      /no idempotency key/,
+    )
+    const ok = registerDaemonCommand(DAEMON_COMMANDS, 'prune-logs', {
+      compensation: 'restore-logs',
+      keyFields: ['batchId', 'requestId'],
+    })
+    expect(ok.ok).toBe(true)
+    expect(ok.table['prune-logs'].compensation).toBe('restore-logs')
+    expect(DAEMON_COMMANDS['prune-logs']).toBeUndefined()
+  })
+
+  it('refuses to register a published act as a compensable mutation', () => {
+    for (const act of PUBLISHED_ACTS) {
+      const out = registerDaemonCommand(DAEMON_COMMANDS, act, { compensation: 'x', keyFields: ['batchId'] })
+      expect(out.ok, act).toBe(false)
+      expect(out.reason).toMatch(/published act/)
+    }
+  })
+
+  it('refuses to re-register a name that is already taken', () => {
+    expect(registerDaemonCommand(DAEMON_COMMANDS, 'queue-job', { compensation: 'x', keyFields: ['batchId'] }).ok).toBe(
+      false,
+    )
+  })
+
+  it('a mutation without a key cannot be applied at all', () => {
+    expect(applyOnce(new Set(), '', () => {}).ok).toBe(false)
+  })
+})
+
+describe('journal framing', () => {
+  const entry = { seq: 12, fence: 604, kind: 'record-state', payload: { state: 'running', attemptId: 'a1' } }
+
+  it('frames and parses back to the same entry', () => {
+    const framed = frameEntry(entry)
+    expect(framed.ok).toBe(true)
+    expect(framed.line.endsWith('\n')).toBe(true)
+    const parsed = parseFramedLine(framed.line)
+    expect(parsed.ok).toBe(true)
+    expect(parsed.entry).toEqual({ ...entry, v: SCHEMA_VERSION })
+  })
+
+  it('refuses an entry without seq, fence or kind', () => {
+    expect(frameEntry({ ...entry, seq: undefined }).ok).toBe(false)
+    expect(frameEntry({ ...entry, fence: undefined }).ok).toBe(false)
+    expect(frameEntry({ ...entry, kind: undefined }).ok).toBe(false)
+    expect(frameEntry(null).ok).toBe(false)
+  })
+
+  it('reads a half-written tail as TRUNCATED, not as data', () => {
+    const line = frameEntry(entry).line
+    const half = line.slice(0, Math.floor(line.length / 2))
+    expect(parseFramedLine(half).reason).toMatch(/truncated/)
+  })
+
+  it('catches a tampered record in the middle by its checksum', () => {
+    const parsedLine = JSON.parse(frameEntry(entry).line)
+    parsedLine.payload.state = 'landed'
+    expect(parseFramedLine(JSON.stringify(parsedLine)).reason).toMatch(/checksum/)
+    const { c: _dropped, ...noChecksum } = parsedLine
+    expect(parseFramedLine(JSON.stringify(noChecksum)).reason).toMatch(/no checksum/)
+    expect(parseFramedLine('   ').ok).toBe(false)
+  })
+
+  it('hashes by meaning rather than by key order', () => {
+    const a = frameEntry({ seq: 1, fence: 604, kind: 'k', payload: { b: 2, a: 1 } }).line
+    const b = frameEntry({ kind: 'k', payload: { a: 1, b: 2 }, fence: 604, seq: 1 }).line
+    expect(a).toBe(b)
+    expect(canonicalJson({ b: undefined, a: 1 })).toBe('{"a":1}')
+  })
+})
+
+describe('the journal tail that cannot prove its own order', () => {
+  const transitions = [
+    { seq: 1, fence: 604 },
+    { seq: 10, fence: 605 },
+  ]
+  const entries = [
+    { seq: 2, fence: 604, kind: 'record-state' },
+    { seq: 9, fence: 604, kind: 'record-state' },
+    { seq: 11, fence: 605, kind: 'record-state' },
+    { seq: 12, fence: 604, kind: 'record-state' },
+  ]
+
+  it('reads the fence in force at a position rather than the reader own fence', () => {
+    expect(fenceInForceAt(transitions, 2)).toBe(604)
+    expect(fenceInForceAt(transitions, 10)).toBe(605)
+    expect(fenceInForceAt(transitions, 0)).toBe(null)
+  })
+
+  it('keeps confirmed predecessor history and quarantines only the entry whose fence was not in force', () => {
+    const marked = markUnverifiedTail({ entries, transitions, lastConfirmedSeq: 12, currentFence: 605 })
+    expect(marked.filter((e) => e.unverified)).toHaveLength(0)
+    expect(marked.filter((e) => e.quarantine).map((e) => e.seq)).toEqual([12])
+  })
+
+  it('marks everything after the last confirmed position when the current credential has no transition', () => {
+    const marked = markUnverifiedTail({ entries, transitions, lastConfirmedSeq: 9, currentFence: 606 })
+    expect(marked.filter((e) => e.unverified).map((e) => e.seq)).toEqual([11, 12])
+    expect(marked.find((e) => e.seq === 2).unverified).toBeUndefined()
+  })
+})
