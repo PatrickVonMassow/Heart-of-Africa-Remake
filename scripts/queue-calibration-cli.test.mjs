@@ -2,39 +2,74 @@
 //
 // The arithmetic is in `queue-calibration-core.mjs` and tested there. What this
 // file covers is what only the assembled command can be wrong about: the report
-// says one thing while the store says another, or the store keeps a number
-// nobody can re-derive. Both were review findings on 22.08.2026.
+// saying one thing while the store says another, a store keeping a number nobody
+// can re-derive, and an apply that moves cards it does not account for. All three
+// were review findings on 22.08.2026.
 //
-// EVERY RUN HERE IS READ-ONLY TOWARDS THE CHECKOUT. `--state-dir` points the
-// command at a throwaway directory, so the queue data, the calibration store and
-// any write land there; the repository is only ever read, through git.
+// EVERY ASSERTION HERE IS DERIVED, NEVER RESTATED. A claim the command prints is
+// checked against the rows it kept, and a card it says it wrote is checked
+// against the queue data on disk — an earlier version of this suite read both
+// halves out of the same stdout, so an implementation that reported one card and
+// moved five would have passed it.
+//
+// AND THE CHECKOUT IS PROVEN UNTOUCHED. `--state-dir` points the command at a
+// throwaway directory; these tests assert that the repository's own state files
+// are byte-identical afterwards rather than trusting that routing to hold.
 import { describe, it, expect, beforeAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { REPO_ROOT } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
+import { openPointsOf } from './board-queue-core.mjs'
 import { isComparedSnapshot, pictureBearingPoints } from './queue-calibration-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'queue-calibration.mjs')
+const SEEDED_ESTIMATE = '~3 h'
+
+/** Existence and content of the state files this command would write by default. */
+const checkoutState = () =>
+  ['board-queue.json', 'queue-calibration.json'].map((name) => {
+    const path = resolve(REPO_ROOT, '.claude', name)
+    return existsSync(path) ? createHash('sha256').update(readFileSync(path)).digest('hex') : 'absent'
+  })
 
 /**
- * A queue data file holding open points that CAN be corrected, with an estimate
+ * A queue data file holding open points that CAN be corrected, with one estimate
  * each. Points owing a rendered proof are left out on purpose: they are held out
  * of every correction, so seeding them would leave the apply case asserting
  * nothing at all.
  */
 function seedQueueData(dir, count = 12) {
   const held = pictureBearingPoints(readTasksAll())
-  const open = [...String(readTasksOpen() ?? '').matchAll(/^- \[ \] (\d+)\./gm)]
-    .map((m) => Number(m[1]))
-    .filter((p) => !held.has(p))
+  const open = openPointsOf(readTasksOpen()).filter((p) => !held.has(p))
   const points = {}
   for (const point of open.slice(0, count)) {
-    points[String(point)] = { title: `Point ${point}`, body: [], estimate: '~3 h' }
+    points[String(point)] = { title: `Point ${point}`, body: [], estimate: SEEDED_ESTIMATE }
   }
   writeFileSync(join(dir, 'board-queue.json'), `${JSON.stringify({ points }, null, 2)}\n`)
   return Object.keys(points).map(Number)
+}
+
+const estimatesOf = (path) => {
+  const points = JSON.parse(readFileSync(path, 'utf8')).points ?? {}
+  return new Map(Object.entries(points).map(([k, v]) => [Number(k), v.estimate ?? null]))
+}
+
+const run = (dir, ...args) => {
+  const before = checkoutState()
+  const result = spawnSync(process.execPath, [SCRIPT, '--state-dir', dir, '--limit', '30', ...args], {
+    encoding: 'utf8',
+    windowsHide: true,
+    cwd: process.cwd(),
+    input: '',
+  })
+  // THE CHECKOUT IS NOT THE COMMAND'S WORKSPACE. Asserted per run, because a
+  // routing regression would otherwise rewrite the real queue silently.
+  expect(checkoutState(), 'the repository state files must be untouched').toEqual(before)
+  return result
 }
 
 describe('the report and the store are one reading', () => {
@@ -45,41 +80,57 @@ describe('the report and the store are one reading', () => {
   beforeAll(() => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-'))
     seeded = seedQueueData(dir)
-    const run = spawnSync(process.execPath, [SCRIPT, '--state-dir', dir, '--limit', '30'], {
-      encoding: 'utf8',
-      windowsHide: true,
-      cwd: process.cwd(),
-      input: '',
-    })
-    expect(run.status, run.stderr).toBe(0)
-    out = run.stdout
+    const result = run(dir)
+    expect(result.status, result.stderr).toBe(0)
+    out = result.stdout
     store = JSON.parse(readFileSync(join(dir, 'queue-calibration.json'), 'utf8'))
   }, 120_000)
 
-  it('seeds enough cards for the run to have something to say', () => {
+  it('has a fixture with something to measure and something to correct', () => {
+    // Guards every assertion below against degenerating as the work order moves.
     expect(seeded.length).toBeGreaterThan(0)
+    expect(store.rows.length).toBeGreaterThan(0)
   })
 
-  it('prints what actually holds a landing out, not only how it was verified', () => {
+  it('prints for each landing what actually holds it out, not how it was verified', () => {
     // The picture column is the RETAINED VERIFICATION class; `owed` is the fact
-    // the exclusion is made on, and it used to be invisible per landing.
+    // the exclusion is made on. Both are compared against the stored rows, so
+    // printing one constant for every landing cannot pass.
     expect(out).toMatch(/point\s+crit\s+lane\s+picture\s+owed\s+merge/)
-    const rows = out.split('\n').filter((l) => /^ {2}\d+\s+\S+\s+\S+\s+picture-\S+\s+(yes|no)\s/.test(l))
-    expect(rows.length).toBe(store.window.landings)
+    const printed = new Map(
+      [...out.matchAll(/^ {2}(\d+)\s+\S+\s+\S+\s+(picture-\S+)\s+(yes|no)\s/gm)].map((m) => [
+        Number(m[1]),
+        { pictureClass: m[2], owed: m[3] === 'yes' },
+      ]),
+    )
+    expect(printed.size).toBe(store.rows.length)
+    for (const r of store.rows) {
+      expect(printed.get(r.point), `point ${r.point} must appear in the table`).toEqual({
+        pictureClass: r.pictureClass,
+        owed: r.owesPicture,
+      })
+    }
   })
 
   it('claims exactly the comparisons its own rows can show', () => {
-    // The printed claim and the rows behind it, checked against each other —
-    // counting stored-but-uncomparable snapshots as comparisons is what let the
+    // Counting stored-but-uncomparable snapshots as comparisons is what let the
     // report promise ratios that ACTUAL ÷ ESTIMATE did not have.
-    expect(store.provenance.estimates.snapshot).toBe(store.rows.filter((r) => isComparedSnapshot(r)).length)
-    expect(out).toContain(`${store.provenance.estimates.snapshot} snapshot(s) compared`)
-    expect(out).toContain(`${store.provenance.estimates.snapshotUncomparable} snapshot(s) carrying no ratio`)
+    const comparable = store.rows.filter((r) => isComparedSnapshot(r)).length
+    const stored = store.rows.filter((r) => r.estimateSource === 'snapshot').length
+    expect(store.provenance.estimates.snapshot).toBe(comparable)
+    expect(store.provenance.estimates.snapshotUncomparable).toBe(stored - comparable)
+    expect(out).toContain(`${comparable} snapshot(s) compared`)
+    expect(out).toContain(`${stored - comparable} snapshot(s) carrying no ratio`)
   })
 
-  it('names every card the holdout reached, not just how many', () => {
-    expect(store.heldOut.every((p) => store.pictureBearing.includes(p))).toBe(true)
-    if (store.heldOut.length) expect(out).toContain(`held out: ${store.heldOut.join(', ')}`)
+  it('holds out exactly the open cards that owe a proof, and names them', () => {
+    // Derived from the work order, not from the store: `heldOut: []` fails here.
+    const expected = openPointsOf(readTasksOpen())
+      .filter((p) => store.pictureBearing.includes(p))
+      .sort((a, b) => a - b)
+    expect(expected.length).toBeGreaterThan(0)
+    expect(store.heldOut).toEqual(expected)
+    expect(out).toContain(`held out: ${expected.join(', ')}`)
   })
 
   it('keeps the rows the aggregates were taken from', () => {
@@ -101,43 +152,68 @@ describe('the report and the store are one reading', () => {
   })
 
   it('keeps the denominator and the factor beside the numbers they produced', () => {
-    expect(typeof store.promiseMedians).toBe('object')
-    for (const [name, applied] of Object.entries(store.applied)) {
-      expect(applied.factor).toBeGreaterThan(0)
-      expect(typeof applied.basis).toBe('string')
-      // A factor the store records is a factor the report printed.
-      expect(out).toMatch(new RegExp(`^\\s+${name}\\s+\\S+\\s+\\(${applied.basis.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'm'))
+    const classes = Object.keys(store.applied)
+    // An empty `applied` would make every check below vacuous.
+    expect(classes.length).toBeGreaterThan(0)
+    for (const name of classes) {
+      const { factor, basis } = store.applied[name]
+      expect(factor).toBeGreaterThan(0)
+      expect(typeof basis).toBe('string')
+      // Every factor the store records is one the report printed…
+      expect(out).toMatch(new RegExp(`^\\s+${name}\\s+\\S+\\s+\\(${basis.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'm'))
+      // …and the promise it was measured against is kept with it.
+      expect(typeof store.promiseMedians[name]).toBe('number')
     }
   })
 })
 
-describe('an apply leaves the ledger standing for every card it moved', () => {
-  it('writes a baseline and an applied entry per written card', () => {
+describe('an apply accounts for every card it moves', () => {
+  it('moves exactly the cards it reports, and remembers what each promised', () => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-apply-'))
-    seedQueueData(dir)
-    const run = spawnSync(process.execPath, [SCRIPT, '--state-dir', dir, '--limit', '30', '--apply'], {
-      encoding: 'utf8',
-      windowsHide: true,
-      cwd: process.cwd(),
-      input: '',
-    })
-    expect(run.status, run.stderr).toBe(0)
+    const seeded = seedQueueData(dir)
+    const dataFile = join(dir, 'board-queue.json')
+    const before = estimatesOf(dataFile)
+    const result = run(dir, '--apply')
+    expect(result.status, result.stderr).toBe(0)
+    const after = estimatesOf(dataFile)
+
+    // WHAT ACTUALLY CHANGED, read off the queue data — never off the report.
+    const moved = [...after.entries()].filter(([p, v]) => before.get(p) !== v).map(([p]) => p).sort((a, b) => a - b)
+    expect(moved.length, 'the seeded cards must actually move').toBeGreaterThan(0)
+    expect(after.size, 'no card may be added or dropped').toBe(before.size)
+
+    // …and what the command SAID it changed. A run that moved five cards while
+    // reporting one fails here, which the old stdout-only reading could not see.
+    const reported = [...result.stdout.matchAll(/^ {2}(\d+) \S.* → \S/gm)].map((m) => Number(m[1])).sort((a, b) => a - b)
+    const count = /APPLIED: (\d+) estimate\(s\) written/.exec(result.stdout)
+    expect(reported).toEqual(moved)
+    expect(Number(count?.[1])).toBe(moved.length)
+
+    // EVERY MOVED CARD IS ON THE LEDGER, with the promise it came from — not
+    // merely with something truthy. Each queue write commits on its own, so a
+    // ledger written only at the end would leave a corrected card whose promise
+    // nothing remembers, and the next run would measure its own correction.
     const store = JSON.parse(readFileSync(join(dir, 'queue-calibration.json'), 'utf8'))
-    const written = [...run.stdout.matchAll(/^ {2}(\d+) \S.* → \S/gm)].map((m) => Number(m[1]))
-    const applied = [...run.stdout.matchAll(/APPLIED: (\d+) estimate\(s\) written/g)]
-    expect(applied.length).toBe(1)
-    // Without this the loop below could pass by asserting nothing.
-    expect(written.length, 'the seeded cards must actually move').toBeGreaterThan(0)
-    // EVERY CARD THAT MOVED IS ON THE LEDGER. The queue write commits on its
-    // own, so a ledger written only at the very end would leave a corrected card
-    // whose promise nothing remembers — and the next run would measure its own
-    // correction as if it were the batch getting slower.
-    const cards = JSON.parse(readFileSync(join(dir, 'board-queue.json'), 'utf8')).points
-    for (const point of written.filter((p) => cards[String(p)])) {
+    for (const point of moved) {
       const entry = store.estimates[String(point)]
       expect(entry, `point ${point} must be on the ledger`).toBeTruthy()
-      expect(entry.baseline).toBeTruthy()
-      expect(entry.applied?.estimate).toBe(cards[String(point)].estimate)
+      expect(entry.baseline, `point ${point} must remember what it promised`).toBe(SEEDED_ESTIMATE)
+      expect(entry.applied?.estimate).toBe(after.get(point))
+      expect(entry.intent, 'a completed write leaves no announcement standing').toBeUndefined()
     }
+    expect(moved.every((p) => seeded.includes(p))).toBe(true)
   }, 120_000)
+
+  it('does not correct its own correction when it runs again', () => {
+    // The whole purpose of the ledger, end to end: the second run divides by the
+    // same promise the first one did instead of compounding its own writing.
+    const dir = mkdtempSync(join(tmpdir(), 'queue-cal-twice-'))
+    seedQueueData(dir)
+    const dataFile = join(dir, 'board-queue.json')
+    expect(run(dir, '--apply').status).toBe(0)
+    const afterFirst = estimatesOf(dataFile)
+    expect(run(dir, '--apply').status).toBe(0)
+    const afterSecond = estimatesOf(dataFile)
+    expect([...afterSecond.entries()]).toEqual([...afterFirst.entries()])
+  }, 180_000)
 })

@@ -796,6 +796,11 @@ export const PICTURE_PROOF_DENIALS = [
   // screenshot." The fragment names no proof at all, so nothing marked it as a
   // denial and the bare noun behind the colon read as a demand.
   /^\s*(not|no longer|nicht|kein|keine)\s+(required|needed|necessary|nötig|noetig|erforderlich)\s*$/i,
+  // A NEGATIVE CONTINUATION: "No screenshot is required, NOR is a browser frame
+  // required." The denial in front of it has finished its own sentence, so it can
+  // lend nothing — but "nor" carries the negation itself, and reading the clause
+  // as a fresh demand turned a doubled denial into a render point.
+  new RegExp(`^\\s*(nor|noch)\\b[^.;:]{0,60}${PROOF_NOUN}`, 'i'),
 ]
 
 /**
@@ -825,7 +830,17 @@ const UPKEEP_GAP =
   '(?:\\s+(?:the|a|an|its|this|that|old|obsolete|stale|unused|leftover|remaining|' +
   'der|die|das|den|dem|ein|eine|einen|alte|alten|alter|altes|veraltete|veralteten|unbenutzte|unbenutzten))*'
 
-export const PICTURE_PROOF_UPKEEP = [new RegExp(`\\b${UPKEEP_VERB}\\b${UPKEEP_GAP}\\s+${PROOF_NOUN}`, 'i')]
+/**
+ * ONE VERB MAY GOVERN SEVERAL OBJECTS: "remove the screenshots and browser
+ * frames" deletes both. Only glue may join them — a second verb ends the reach,
+ * which is what keeps "remove the screenshots and attach a browser frame" a
+ * demand.
+ */
+const UPKEEP_MORE = `(?:\\s*,?\\s*(?:and|or|und|oder)?${UPKEEP_GAP}\\s+${PROOF_NOUN})*`
+
+export const PICTURE_PROOF_UPKEEP = [
+  new RegExp(`\\b${UPKEEP_VERB}\\b${UPKEEP_GAP}\\s+${PROOF_NOUN}${UPKEEP_MORE}`, 'i'),
+]
 
 /**
  * ONE LINE, CUT INTO THE CLAUSES A DENIAL CAN REACH.
@@ -842,11 +857,15 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  *
  * "No screenshot, browser frame, or picture proof is required" cuts into three,
  * and the last two are bare nouns that a marker test happily accepts. They are
- * not new statements; they belong to the denial in front of them. A fragment
+ * not new statements; they belong to the clause in front of them. A fragment
  * that carries a word of its own ("provide a browser frame") does state
- * something, and the denial before it does not reach that far.
+ * something, and the clause before it does not reach that far.
+ *
+ * The conjunction that JOINS an item is glue like the article that carries it;
+ * what is not glue here is the shared PREDICATE, and lending that out is the
+ * separate licence `LIST_TAIL_GLUE` grants.
  */
-const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das|or|and|nor|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 /**
  * The tail of a coordinated list may carry the predicate the whole list shares:
@@ -920,25 +939,32 @@ export function clauseDemandsPicture(clause) {
  * denial governing the bare list items that trail it.
  */
 export function lineDemandsPicture(line) {
-  let denied = false
-  // Whether that denial may still lend its predicate to what trails it.
+  // Whether the clause in front SUPPRESSES the proof nouns that trail it — a
+  // denial denies them, and housekeeping is deleting them. The list is cut at
+  // commas, so a verb's coordinated objects arrive as separate fragments and
+  // must inherit the same way a denied list does.
+  let suppressed = false
+  // …and whether a denial may still lend its predicate to what trails it.
   let open = false
   for (const fragment of splitClauses(line)) {
     if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
-      denied = true
+      suppressed = true
       open = denialIsOpen(fragment)
       continue
     }
-    // A bare list item INHERITS the decision in front of it: denied after a
-    // denial, and a demand of its own where nothing denied it.
+    // A bare list item INHERITS the decision in front of it: suppressed after a
+    // denial or a housekeeping clause, and a demand of its own where nothing did.
     if (isListContinuation(fragment, PICTURE_PROOF_MARKERS, { allowPredicate: open })) {
-      if (denied) continue
+      if (suppressed) continue
       if (clauseDemandsPicture(fragment)) return true
       continue
     }
-    denied = false
+    const demands = clauseDemandsPicture(fragment)
+    // A clause naming a proof noun that is NOT a demand, because a housekeeping
+    // verb governs it, governs the bare objects behind it too.
+    suppressed = !demands && PICTURE_PROOF_UPKEEP.some((re) => re.test(fragment))
     open = false
-    if (clauseDemandsPicture(fragment)) return true
+    if (demands) return true
   }
   return false
 }
@@ -1262,16 +1288,16 @@ export function applyCorrections({
   }
   for (const p of Array.isArray(plan) ? plan : []) {
     save(ledgerWithIntent(estimates, p, { now }))
-    let outcome
-    try {
-      outcome = writeCard(p)
-    } catch (e) {
-      // The card did not move, so the announcement is withdrawn before the
-      // failure leaves this loop — and everything written before it stands.
-      save(ledgerWithoutIntent(estimates, p.point))
-      throw e
-    }
+    // A THROW LEAVES THE ANNOUNCEMENT STANDING, deliberately and without a
+    // handler: a failure does not prove the card stayed as it was — the writer
+    // can commit its atomic write and then be killed before it exits, and
+    // withdrawing here would delete the only recognition of the value now on the
+    // card. Left standing, the ledger recognises BOTH values, so the baseline
+    // survives either way, and everything written before this stands too.
+    const outcome = writeCard(p)
     if (outcome?.refused) {
+      // A REFUSAL IS DIFFERENT: the writer compared under its lock and wrote
+      // nothing, so the announcement is known to be false and is withdrawn.
       save(ledgerWithoutIntent(estimates, p.point))
       refused.push({ ...p, detail: outcome.detail ?? '' })
       continue

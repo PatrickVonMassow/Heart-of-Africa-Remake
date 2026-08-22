@@ -1426,12 +1426,24 @@ describe('the ledger stays ahead of the queue, card by card', () => {
     // ledger written once at the end, card 10 would be lost entirely here.
     const { thrown, last, log } = run([entry(10), entry(12), entry(14)], { fails: new Set([12]) })
     expect(thrown?.message).toBe('boom 12')
-    expect(log).toEqual(['persist', 'write:10', 'persist', 'persist', 'write:12', 'persist'])
+    expect(log).toEqual(['persist', 'write:10', 'persist', 'persist', 'write:12'])
     expect(last['10'].applied.estimate).toBe('~5 h')
     expect(last['10'].baseline).toBe('~10 h')
-    // The card that never moved carries no announcement any more.
-    expect(last['12'].intent).toBeUndefined()
     expect(last['14']).toBeUndefined()
+  })
+
+  it('KEEPS the announcement when the write fails, because failure proves nothing', () => {
+    // The writer can commit its atomic write and then be killed before it exits.
+    // Withdrawing here would delete the only record of the value now on the card,
+    // and the next run would take that correction for a fresh promise.
+    const { last } = run([entry(12)], { fails: new Set([12]) })
+    expect(last['12']).toEqual({ baseline: '~12 h', intent: { estimate: '~6 h', at: 7 } })
+    // Whichever of the two the card holds, the baseline survives.
+    for (const current of ['~12 h', '~6 h']) {
+      expect(updateEstimateLedger(last, { cards: { 12: { estimate: current } }, open: [12], now: 9 })['12'].baseline).toBe(
+        '~12 h',
+      )
+    }
   })
 
   it('withdraws the announcement when the write is refused', () => {
@@ -1496,5 +1508,39 @@ describe('housekeeping reaches only what its verb governs', () => {
       false,
     )
     expect(pictureBearingPoints(block(137, 'Remove the screenshot directory.')).has(137)).toBe(false)
+  })
+})
+
+describe('a denial can be continued as well as finished', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('reads "nor" as carrying the negation itself', () => {
+    // The denial in front has finished its own sentence and can lend nothing —
+    // but "nor" does not need it, and reading the clause as a fresh demand
+    // turned a doubled denial into a render point.
+    expect(pictureBearingPoints(block(140, 'No screenshot is required, nor is a browser frame required.')).has(140)).toBe(
+      false,
+    )
+    expect(pictureBearingPoints(block(141, 'Kein Screenshot ist nötig, noch ein browser frame.')).has(141)).toBe(false)
+  })
+
+  it('leaves a real demand standing behind a denial that merely ended', () => {
+    expect(pictureBearingPoints(block(142, 'No screenshot is required. Attach a browser frame.')).has(142)).toBe(true)
+  })
+})
+
+describe('one housekeeping verb may govern several objects', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('reaches the coordinated objects it deletes', () => {
+    expect(pictureBearingPoints(block(143, 'Remove the screenshots and browser frames.')).has(143)).toBe(false)
+    expect(pictureBearingPoints(block(144, 'Delete the screenshot, the browser frame and the picture proof.')).has(144)).toBe(
+      false,
+    )
+  })
+
+  it('stops at the second verb, which is where the demand begins', () => {
+    expect(pictureBearingPoints(block(145, 'Remove the screenshots and attach a browser frame.')).has(145)).toBe(true)
+    expect(pictureBearingPoints(block(146, 'Remove the old helper and attach a screenshot.')).has(146)).toBe(true)
   })
 })
