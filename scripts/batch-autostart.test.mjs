@@ -22,52 +22,26 @@ describe('batch-autostart is import-proof', () => {
   })
 
   // AND ITS NAMED IMPORTS MUST RESOLVE UNDER REAL NODE, WHICH THE ASSERTION
-  // ABOVE CANNOT SEE (22.08.2026). Vitest loads a module through Vite's SSR
-  // transform, where a named import of something the target does not export
-  // silently becomes `undefined`. Real node refuses it at LINK time, before the
-  // first line runs. So the launcher imported `pidCorroboration` from
-  // `batch-ownership-core.mjs`, which exports it from `batch-singleton.mjs`
-  // instead; the whole unit gate stayed green while `node
-  // scripts/batch-autostart.mjs` — the 900-second OS recovery tick, and the only
-  // thing that restarts a dead batch — died with `does not provide an export
-  // named 'pidCorroboration'`.
+  // ABOVE CANNOT SEE (22.08.2026). Vitest's transform turns a named import of
+  // something the target does not export into `undefined`; real node refuses it
+  // at LINK time. The launcher imported `pidCorroboration` from the wrong module
+  // and the whole unit gate stayed green while `node scripts/batch-autostart.mjs`
+  // — the 900-second OS recovery tick — died before its first line.
   //
-  // THE WITNESS NEVER IMPORTS THE LAUNCHER (cross-vendor review, GPT-5.6 Sol,
-  // 22.08.2026). The first version of this probe did, and leaned on the very
-  // CLI guard it was standing beside to stop the side effects — so a regression
-  // in that guard would have let a test spawn a real batch session, which is the
-  // accident of point 373 all over again. Instead the child re-declares the
-  // launcher's own import statements and links THOSE: exactly the failure being
-  // pinned, with the launcher's body never evaluated. The child also gets a hard
-  // timeout, because a synchronous `spawnSync` cannot be interrupted by vitest's.
-  it('has every named import of the launcher really exported by its target', () => {
-    const probe = [
-      "import { readFileSync } from 'node:fs'",
-      "import { pathToFileURL } from 'node:url'",
-      "const src = readFileSync('scripts/batch-autostart.mjs', 'utf8')",
-      // Prose about an import is not an import; only code is judged.
-      "const code = src.split('\\n').filter((l) => !l.trimStart().startsWith('//')).join('\\n')",
-      "const base = pathToFileURL(process.cwd() + '/scripts/')",
-      "const missing = []",
-      "const re = /import\\s*\\{([^}]*)\\}\\s*from\\s*'(\\.[^']*)'/g",
-      "let m",
-      "while ((m = re.exec(code))) {",
-      "  const mod = await import(new URL(m[2], base).href)",
-      "  for (const raw of m[1].split(',')) {",
-      "    const name = raw.trim().split(/\\s+as\\s+/)[0].trim()",
-      "    if (name && !(name in mod)) missing.push(m[2] + ' -> ' + name)",
-      "  }",
-      "}",
-      "console.log(missing.length ? 'MISSING ' + missing.join(', ') : 'ALL-NAMED-IMPORTS-RESOLVE')",
-    ].join('\n')
-    const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 60_000,
-    })
+  // THE WITNESS NEVER LOADS THE LAUNCHER. `scripts/module-link-check.mjs` reads
+  // the launcher's import statements and links only their targets, so no CLI
+  // guard has to hold for this test to be free of side effects, and the scanner
+  // carries its own tests for every import form plus a fixture that really is
+  // broken. The child gets a hard timeout, which vitest cannot supply to a
+  // synchronous `spawnSync`.
+  it('has every named import really exported by its target, checked by a real node process', () => {
+    const run = spawnSync(
+      process.execPath,
+      ['scripts/module-link-check.mjs', 'scripts/batch-autostart.mjs'],
+      { cwd: process.cwd(), encoding: 'utf8', windowsHide: true, timeout: 60_000 },
+    )
+    expect(run.stdout.trim(), run.stderr).toBe('ALL-NAMED-IMPORTS-RESOLVE')
     expect(run.status, run.stderr).toBe(0)
-    expect(run.stdout.trim(), run.stdout).toBe('ALL-NAMED-IMPORTS-RESOLVE')
   }, 90_000)
 })
 
