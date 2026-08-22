@@ -240,6 +240,127 @@ Neither blind list fully specified schema upgrades, durable-write semantics, com
 - Enforce configurable CPU, memory and disk headroom in addition to the three-process cap.
 - Record sampling method, batch mix, eligible intervals and exclusions so context and throughput comparisons cannot be selected after the fact.
 
+### The three mechanisms the synthesis owed
+
+The union describes a durable lane but leaves three of its load-bearing parts as instructions
+rather than mechanisms. They are written out here, before any of them is built, because each one
+is where the lane either survives or quietly does not.
+
+#### 1. How the daemon escapes the session that starts it
+
+This is the defect that killed the run of 21.08.2026, so it is stated against the code that
+failed. `scripts/author-sol.mjs` spawns `codex` with `detached` on every platform but win32, and
+that alone is not an escape. Three bindings survive it: the child's stdout and stderr are PIPES
+whose read ends belong to the spawning process, the spawning process never calls `child.unref()`,
+so its event loop holds the child open, and the whole `runCodex` call is awaited INSIDE a tool
+call of the session. When the session dies, the reader of both pipes dies with it and the run dies
+on its next write.
+
+The repository already contains a process that escapes correctly, and the daemon copies it rather
+than inventing a second answer: `scripts/batch-autostart.mjs` starts its supervisor with
+`spawn(…, { cwd: REPO, detached: true, stdio: ['ignore', out, out] })` followed by `.unref()`,
+where `out` is a file descriptor from `openSync(path, 'a')`. That is the whole mechanism, and each
+of its three parts carries its own weight:
+
+- **`detached: true`** makes the new process a group leader, so a signal sent to the session's
+  process group — which is how a dying session takes its children — does not reach it.
+- **File descriptors instead of pipes** remove the parent from the data path entirely. Nothing the
+  daemon writes needs a live reader, so the parent's death cannot break a write. The log file is
+  the record a later session reads.
+- **`.unref()`** removes the child from the parent's event loop, so the spawning tool call can
+  return while the daemon keeps running.
+
+Two rules follow from it and are part of the mechanism, not commentary:
+
+- **The spawning call NEVER awaits the daemon.** It returns as soon as the daemon has written its
+  own identity record — pid, pid start time, schema version, coordinator epoch — into the state
+  store, and the caller waits for THAT FILE with a bounded timeout. A readiness proof that travels
+  over a pipe would reintroduce the binding this mechanism removes.
+- **Workers are children of the daemon, never of a session.** A session that wants authoring asks
+  the daemon to start it; the daemon spawns it by the same pattern. This is what makes the lane
+  transferable at all: after the session dies, the worker's parent is still alive and still owns
+  it, so a successor adopts a supervised process rather than an orphan.
+
+The identity record stores pid AND pid start time because a bare pid is not an identity: this
+repository already learned that in `scripts/batch-singleton.mjs`, where `PID_START_TOLERANCE_MS`
+exists precisely so a recycled pid cannot read as a live owner. `node scripts/batch-daemon.mjs
+stop` signals the recorded pid after checking that start time, never a process group inherited
+from a parent that may no longer exist.
+
+What proves it is not a unit test: it is the drill named below — kill the spawning session
+mid-authoring and require that daemon and worker are still running and that a FRESH session finds
+and adopts them.
+
+#### 2. Migrating today's batch lock to the coordinator lease
+
+Ownership today is `.claude/batch-lock.json` — session id, pid, pid start time, a heartbeat and a
+`leaseUntil` — acquired by the atomic test-and-set in `scripts/batch-singleton.mjs`, with every
+guard standing down for a non-owner. The union adds a renewable coordinator lease with an epoch.
+Two owner records covering the same batch is exactly the shape that produces a split brain, so the
+relation between them is fixed here rather than discovered later.
+
+**Precedence.** The batch lock remains the SOLE authority on whether a session may work at all.
+The lease is the sole authority on whether a session may MUTATE daemon-owned state. A session
+needs both to mutate, and the lease never grants anything the lock denies. The lease is therefore
+a strict narrowing of an authority that already exists — there is no combination in which the two
+records disagree and the lease wins.
+
+**Atomic cutover.** The lease is DERIVED, not claimed. The daemon mints a lease only for the
+session whose id equals the lock's `sessionId` and whose pid and pid start time match the lock's,
+and it re-reads the lock at every renewal. Acquiring the lock is therefore the only act that
+acquires the right to a lease, and losing the lock invalidates the lease at its next validation.
+Because there is no second acquire, there is no window in which two records were claimed
+separately and disagree about who the owner is.
+
+**The epoch.** The daemon keeps a monotone counter in its state store and increments it on every
+mint. Every daemon mutation, every checkpoint acknowledgment and every push carries the epoch it
+was authorized under, and the daemon refuses anything below its current value. That is what fences
+a replaced coordinator: an orphan that keeps running discovers it is fenced at its first mutation
+rather than at its first conflict.
+
+**Split-brain prevention.** Two sessions cannot hold the lock — that is the existing test-and-set
+— and a lease exists only against the current lock holder, so at most one live epoch exists at any
+moment. The case the lock alone never covered is a session that KEEPS working after losing the
+lock; the epoch closes it, because its next mutation presents a stale number.
+
+**Rollback.** The whole layer sits behind the activation flag. With the flag off the daemon mints
+no lease, no path consults one, and the batch lock decides exactly as it does today. Rolling back
+is turning the flag off, and it needs no state migration, because the lease is derived state that
+the next mint recomputes — it is never the source of truth about who owns the batch. A lock with
+no daemon is the normal case today. A daemon with no lock is an error, and the daemon answers it
+by refusing every mutation and raising an alert, never by choosing an owner itself.
+
+#### 3. Ordered ownership for the prose-only omissions
+
+The "Additional omissions" section states six requirements without an owner, a step or a test, and
+a requirement in that state is not scheduled work. Each one is placed here, in the ordered work
+above, with the file that owns it and the case that accepts it. Test paths follow this
+repository's convention — Vitest beside its subject as `scripts/<name>.test.mjs` — and not the
+`scripts/__tests__/` and `tests/` conventions the union assumed, neither of which exists here.
+
+| Requirement | Step | Owning file | Acceptance test |
+|---|---|---|---|
+| Schema versioning, unknown-future rejection, migration of the previous version | 1 | `scripts/batch-schema-core.mjs` | `scripts/batch-schema-core.test.mjs`: a current record, one version ahead (refused), one version behind (migrated) |
+| Idempotency keys on every daemon mutation and every boundary/checkpoint retry | 1 and 2 | `scripts/batch-schema-core.mjs`, `scripts/batch-state-core.mjs` | `scripts/batch-state-core.test.mjs`: the same key applied twice changes state once |
+| Daemon authorization: control and state paths restricted to the repository owner; no command derived from mutable worker output | 3 | `scripts/batch-daemon.mjs` | `scripts/batch-daemon-core.test.mjs`: a control request from a foreign uid refused, and a worker-supplied string never reaching an exec path |
+| Retention of landed and cancelled attempts: audit records preserved, logs and worktrees eventually pruned | 3 | `scripts/batch-daemon-core.mjs` | `scripts/batch-daemon-core.test.mjs`: an aged landed attempt keeps its record and loses its log and worktree; a cancelled one under the horizon keeps both |
+| CPU, memory and disk headroom enforced beside the three-process cap | 5 | `scripts/batch-dispatch-core.mjs` | `scripts/batch-dispatch-core.test.mjs`: dispatch refused under each threshold with the reason named, and the refusal reported rather than silent |
+| Sampling method, batch mix, eligible intervals and exclusions recorded so a comparison cannot be selected afterwards | 11 | `scripts/batch-metrics-core.mjs` | `scripts/batch-metrics-core.test.mjs`: a report carries its own sampling record, and one assembled without it is refused |
+
+State permissions belong to the daemon row above rather than to a row of their own: the store is
+created by the daemon and its mode is part of the same authorization decision.
+
+#### The drill that reproduces the real regression
+
+Named here because the three mechanisms above are only claims until it passes, and because a
+launcher-client exit, a daemon restart and a normal handover are all easier than what actually
+happened. The drill kills the SPAWNING SESSION mid-authoring — the process that ran the tool call,
+by signal to its process group, without warning — and then requires three things: the daemon is
+still running under its recorded pid and start time, the worker is still running and still
+checkpointing, and a FRESH session discovers both from durable state and adopts them without any
+inherited transcript. It runs under `node scripts/batch-daemon.mjs drill --scenario parent-death`
+and is a precondition of the step-8 slice, not a later trial.
+
 ## The raw blind halves
 
 They are versioned, not reproduced here. A section of this document once claimed to be "List B,
