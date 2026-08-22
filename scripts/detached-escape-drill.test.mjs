@@ -374,7 +374,7 @@ describe('reap', () => {
       { alive: true, how: '/proc state S' },
       { alive: false, how: 'pid 4242 was recycled — start 999999 is not the 900000 we spawned' },
     ]
-    const said = reap(4242, 900000, { probe: () => answers.shift(), kill: () => {} })
+    const said = reap(4242, 900000, { probe: () => answers.shift(), kill: () => {}, settle: () => {} })
     expect(said).toMatch(/recycled between the check and the signal/)
   })
 
@@ -400,15 +400,40 @@ describe('reap', () => {
       { alive: true, how: '/proc state S' },
       { alive: false, how: 'no such process' },
     ]
-    expect(reap(4242, 900000, { probe: () => answers.shift(), kill: () => {} })).toBeUndefined()
+    expect(reap(4242, 900000, { probe: () => answers.shift(), kill: () => {}, settle: () => {} })).toBeUndefined()
   })
 
-  it('stays quiet when the same process is still settling after the signal', () => {
-    // Signal delivery is asynchronous: a process still running an instant later
-    // is ordinary, and calling that a recycled pid was a false alarm on every
-    // healthy run.
-    const said = reap(4242, 900000, { probe: identity('/proc state R', true), kill: () => {} })
-    expect(said).toBeUndefined()
+  it('gives an asynchronously delivered signal time, then reports what is still true', () => {
+    // Signal delivery is asynchronous, so ONE read proves nothing about a process
+    // still in the table — but silence for it covered a live survivor, which is
+    // the opposite of what this function promises. It re-reads a bounded number
+    // of times and reports whatever remains.
+    const settling = [
+      { alive: true, how: '/proc state R' },
+      { alive: true, how: '/proc state R' },
+      { alive: false, how: 'no such process' },
+    ]
+    expect(reap(4242, 900000, { probe: () => settling.shift(), kill: () => {}, settle: () => {} })).toBeUndefined()
+
+    const stubborn = reap(4242, 900000, {
+      probe: identity('/proc state R', true),
+      kill: () => {},
+      settle: () => {},
+    })
+    expect(stubborn).toMatch(/still running/)
+  })
+
+  it('reports a post-signal probe it could not read, instead of calling it done', () => {
+    const reads = [
+      { alive: true, how: '/proc state S' },
+      { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable' },
+      { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable' },
+      { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable' },
+      { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable' },
+      { alive: false, unknown: true, how: 'UNKNOWN — /proc unreadable' },
+    ]
+    const unreadable = reap(4242, 900000, { probe: () => reads.shift(), kill: () => {}, settle: () => {} })
+    expect(unreadable).toMatch(/state could not be read/)
   })
 })
 

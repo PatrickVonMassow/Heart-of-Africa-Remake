@@ -411,21 +411,25 @@ compensation, and the design owes all three parts:
     will move, the exact object id it expects to find there and the exact object id it will leave.
     The commits exist locally before the push, so the after-oid is known in advance. The entry
     exists before the push can, so no landed push lacks a record.
-  - **Recovery asks the remote about those objects, on the WORK ref.** For each unverified
-    publishing intent, reconciliation fetches and asks whether the after-oid is contained in the
-    history of the ref the intent named — `main` or a feature branch — with
-    `git merge-base --is-ancestor <after-oid> <that ref>`. That is a question about COMMIT
-    ancestry on an ordinary branch; the credential ref is not involved, carries a blob rather
-    than a history, and is never asked. Contained means LANDED, and it stays true through any
-    number of later publications, which is what a `seq` comparison could not do. Absent from the
-    remote means ABANDONED.
-  - **The other two recorded facts are the fallback, not decoration.** Where the after-oid is
-    absent but the work may still have landed in rewritten form, the publication id — carried as
-    a trailer in the commit itself — is searched in the named ref's history, and the
-    expected-before oid says which base the attempt was built on, which distinguishes "never
-    landed" from "landed and was later rewritten". This repository does not rewrite published
-    history, so the fallback is a safety net rather than the normal path; recovery that needs it
-    reports that it did.
+  - **Recovery asks the remote about those objects, on the WORK ref, in ONE ordered procedure.**
+    The earlier wording gave a rule and then a fallback that contradicted it, so an implementation
+    reading only the first sentence would have called rewritten work abandoned. There is one
+    procedure, and it runs to the end before it concludes anything. For each unverified publishing
+    intent, reconciliation fetches the ref the intent named — `main` or a feature branch, never
+    the credential ref, which carries a blob and has no history — and then:
+
+    1. `git merge-base --is-ancestor <after-oid> <that ref>` succeeds → **LANDED.** This stays
+       true through any number of later publications, which is what a `seq` comparison could not
+       do.
+    2. Otherwise the publication id is searched as a commit trailer in that ref's history →
+       found means **LANDED-REWRITTEN**, recorded as such, so nobody later reads it as a clean
+       landing.
+    3. Otherwise, if the ref is still at the recorded expected-before oid, or its history contains
+       that oid and nothing derived from this attempt → **ABANDONED.**
+    4. Otherwise → **UNKNOWN, and quarantined.** The ref moved in a way this attempt's own record
+       cannot explain — a rewrite that lost the trailer looks exactly like an unrelated successor,
+       and the expected-before oid alone cannot tell them apart. Guessing here is what the whole
+       mechanism exists to avoid.
   - **Nothing is inferred from the credential's current value,** because a `seq` is reused by a
     later attempt after a failed one and cannot tell landed from superseded from abandoned.
   - **Only entries with no publishing intent are quarantined locally,** and those are the ones the
@@ -595,18 +599,36 @@ local state, and nothing in this design prevents that. It is a known residual, r
 design's obligation is to avoid CREATING the situation where it can, and the one restriction that
 actually holds is narrow:
 
-- **A daemon may be started only as the FIRST act of a session that has just acquired the lock,**
-  before that session has begun any operation of its own. Then no legacy operation of the starting
-  session can be in flight, because it has not started one.
-- **AND ONLY WHEN NO OTHER SESSION THAT EVER HELD THE LOCK IS STILL ALIVE.** This is the half the
-  first act alone does not cover, and without it starting a daemon beside a former owner's live
-  operation is not a residual risk but an uncovered safety violation — two writers of the same
-  local state, one of them uninstrumented. It is provable rather than assumed: a legacy operation
-  runs INSIDE a session process, so it cannot outlive one, and this repository already tracks
-  every session that has held the lock and probes their pids — `scripts/batch-singleton.mjs`
-  answers "live parallel sessions" today and refuses the batch when it finds any. Daemon start
-  requires that answer to be NONE, by pid and pid start time, and refuses otherwise with the
-  session it found named.
+- **A daemon may be started only before the starting session has begun any operation of its own.**
+
+  **ONE ORDER, because two rules each claimed the "first act".** Acquisition owes the credential
+  ref its advance before anything may be published, and a daemon start owes the lock its
+  immediacy — read separately, bootstrap could satisfy neither. They are ordered, and this is the
+  only sequence: **acquire the lock → start the daemon, if one is to be started → advance
+  `refs/hoa/coordinator` → and only now may anything be published.** "First act" for the daemon
+  means before any operation; "first act" for the credential means before any publication. The
+  daemon start is not a publication, so it precedes the advance without violating it.
+- **AND ONLY WHEN NOTHING OF THE OLD PATH IS STILL RUNNING — probed, not assumed.** Without this,
+  starting a daemon beside a former owner's live operation is an uncovered safety violation rather
+  than a residual: two writers of the same local state, one of them uninstrumented.
+
+  **A previous draft said a legacy operation "runs inside a session process, so it cannot outlive
+  one", and mechanism 1 of this very document refutes that.** `scripts/author-sol.mjs` spawns a
+  DETACHED child; whether it survives its parent depends on its stdio, which is the entire subject
+  above. Probing former session pids therefore proves nothing about their detached children. So
+  the precondition probes the work, not only the workers:
+
+  - no other live session that ever held the lock (`scripts/batch-singleton.mjs`, by pid and pid
+    start time — what it already answers as "live parallel sessions");
+  - no in-flight declaration that still checks out (`scripts/batch-in-flight.mjs --agent-check`,
+    which probes branch, worktree, pid and log rather than trusting the record);
+  - no live process holding any worktree of this repository.
+
+  **And the limit of that, stated rather than assumed away: it is exactly as strong as the
+  declaration coverage.** An old-path child nobody declared cannot be found by any of these
+  checks. That gap is not a side note — it IS the defect this whole point exists to remove, and
+  until the point lands the honest reading is that the first daemon must be started when the batch
+  is provably idle, not merely between two operations.
 - **A former owner's legacy operation is out of scope,** written down rather than covered: its
   published acts are refused by the credential ref once the successor has advanced it, and its
   local acts have whatever recoverability today's code gives them — which this design neither

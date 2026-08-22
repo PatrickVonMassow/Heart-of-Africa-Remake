@@ -243,6 +243,10 @@ await new Promise(() => {})
 `
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
+
+/** A short SYNCHRONOUS pause, so the reap check can be a plain function while
+ *  still giving an asynchronously delivered signal time to take effect. */
+const sleepBriefly = () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
 /**
  * IS THAT PID A LIVE PROCESS, and not a corpse still in the table?
  *
@@ -431,7 +435,11 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
  * before that read, the answer is indistinguishable from a clean reap, so the
  * detection is best-effort and is recorded as such rather than promised.
  */
-export function reap(pid, startedAt, { probe = probeAlive, kill = process.kill.bind(process) } = {}) {
+export function reap(
+  pid,
+  startedAt,
+  { probe = probeAlive, kill = process.kill.bind(process), attempts = 5, settle = sleepBriefly } = {},
+) {
   if (!(pid > 1)) return `no worker pid was captured, so nothing was signalled`
   const before = probe(pid, { startedAt, requireIdentity: true })
   // A worker that is simply GONE is the expected end of one of the two shapes,
@@ -450,15 +458,24 @@ export function reap(pid, startedAt, { probe = probeAlive, kill = process.kill.b
   // ONLY AN IDENTITY CHANGE IS REPORTED. A process still running an instant after
   // SIGKILL is ordinary — signal delivery is asynchronous — and reporting that as
   // a recycled pid was a false alarm on every healthy run.
-  const after = probe(pid, { startedAt, requireIdentity: true })
+  // SIGNAL DELIVERY IS ASYNCHRONOUS, so one read proves nothing about a process
+  // that is still there. It is re-read a bounded number of times, and whatever
+  // is still true at the end is REPORTED — silence used to cover both a live
+  // survivor and an unreadable probe, which is the opposite of what residual 4
+  // claims for this function.
+  let after = probe(pid, { startedAt, requireIdentity: true })
+  for (let tries = 1; tries < attempts && (after.alive || after.unknown); tries += 1) {
+    settle()
+    after = probe(pid, { startedAt, requireIdentity: true })
+  }
   if (/recycled/.test(after.how ?? '')) {
     return `pid ${pid} was recycled between the check and the signal: ${after.how}`
   }
-  // AND THE BRANCH THIS CANNOT SEE: if the original exited, its number was
-  // reused, the stranger was signalled and the stranger then vanished, the probe
-  // answers "no such process" — indistinguishable from having reaped our own.
-  // The detection is therefore best-effort, which residual 4 says out loud
-  // instead of promising what it cannot deliver.
+  if (after.alive) return `pid ${pid} was signalled but is still running: ${after.how}`
+  if (after.unknown) return `pid ${pid} was signalled but its state could not be read: ${after.how}`
+  // AND THE BRANCH NOTHING HERE CAN SEE: if the original exited, its number was
+  // reused, the stranger was signalled and the stranger then vanished, this
+  // answers exactly what a clean reap answers. Residual 4 records that.
   return undefined
 }
 
