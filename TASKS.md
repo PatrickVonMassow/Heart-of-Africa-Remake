@@ -10336,6 +10336,14 @@ to land than a mechanism that needs a review.
   prevent. The gate's own retry does not help: it runs under the same load. The standing user rule
   (judge a rotating failure only after a quiet-host rerun) is never consulted BEFORE the expensive
   run starts.
+  REPRODUCED 22.08.2026, 12:04, with the same signature and the same cause: a `main` push of one
+  bookkeeping commit was refused after two red `unit` runs while GPT-5.6 Sol answered the review of
+  point 597 in its own worktree. Vitest itself reported 374 files / 12,795 tests with NOTHING
+  failing; the gate named it correctly ("its summary named NO failing test, yet the runner exited
+  non-zero ... a run that could not finish proved nothing") and its retry ran under the very load
+  that caused the first red. Two hours earlier the same push had gone green on a quiet host with
+  the same 374 files. So the defect is confirmed as contention, not flakiness of unknown origin,
+  and the cost is measured twice now: bookkeeping left committed and unpushed both times.
   FINAL STATE: the gate measures load before it starts and names it in its verdict. A run whose
   summary names NO failing test while the measured load sits above a calibrated threshold is
   treated as NOT JUDGED and waits for a quiet moment, rather than blocking as a red — the
