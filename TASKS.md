@@ -11179,4 +11179,4 @@ to land than a mechanism that needs a review.
   refusing a `MEMORY.md` that exceeds its ceiling.
   Criticality: low — no product behaviour and no lost work; it costs a false red on unrelated
   points, which is a verification-trust problem rather than a defect.
-  Bundle: Chat & Tafel.
+  Bundle: Session- & Repo-Hygiene.
