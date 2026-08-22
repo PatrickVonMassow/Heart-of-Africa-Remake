@@ -146,12 +146,12 @@ if (isMainModule(import.meta.url)) {
     const authorship = {
       A: checkAuthorshipFile({
         claimedModel: a.model,
-        artifactAt: authorAtA || a.authoredAt,
+        artefactAt: authorAtA || a.authoredAt,
         transcriptPath: authorTranscriptA || a.transcript,
       }),
       B: checkAuthorshipFile({
         claimedModel: b.model,
-        artifactAt: authorAtB || b.authoredAt,
+        artefactAt: authorAtB || b.authoredAt,
         transcriptPath: authorTranscriptB || b.transcript,
       }),
     }

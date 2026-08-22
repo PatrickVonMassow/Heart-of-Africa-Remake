@@ -28,9 +28,9 @@ export function readTranscript(path) {
 }
 
 /** Check one claim and retain which transcript path was attempted. */
-export function checkAuthorshipFile({ claimedModel = '', artifactAt = '', transcriptPath = '' } = {}) {
+export function checkAuthorshipFile({ claimedModel = '', artefactAt = '', transcriptPath = '' } = {}) {
   const transcript = readTranscript(transcriptPath)
-  const result = checkAuthorship({ claimedModel, artifactAt, transcriptText: transcript.text })
+  const result = checkAuthorship({ claimedModel, artefactAt, transcriptText: transcript.text })
   return {
     ...result,
     transcript: transcript.path || null,

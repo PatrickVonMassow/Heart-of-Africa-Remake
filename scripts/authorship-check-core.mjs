@@ -15,7 +15,7 @@ const MODEL_IN_HEADING =
   /\b(GPT[\s-]*\d+(?:\.\d+)?[\s-]*Sol|Sol(?:[\s-]*\d+(?:\.\d+)?)?|Claude[\s-]+(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?|(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?)\b/i
 
 /** The claimed model in a machine-readable half or a markdown heading. */
-export function claimedModelFromArtifact(text) {
+export function claimedModelFromArtefact(text) {
   const raw = String(text ?? '')
   try {
     const parsed = JSON.parse(raw)
@@ -31,7 +31,7 @@ export function claimedModelFromArtifact(text) {
 }
 
 /** One timestamp in the transcript/CLI domain, or null when it is unusable. */
-export function parseArtifactTime(value) {
+export function parseArtefactTime(value) {
   if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : null
   const raw = String(value ?? '').trim()
   if (!raw) return null
@@ -66,7 +66,7 @@ export function readTranscriptMessages(text) {
       malformedLines++
       continue
     }
-    const at = parseArtifactTime(entry?.timestamp)
+    const at = parseArtefactTime(entry?.timestamp)
     if (at !== null) eventTimes.push(at)
     if (entry?.type === 'turn_context' && typeof entry?.payload?.model === 'string') {
       codexTurnModel = entry.payload.model.trim()
@@ -94,8 +94,8 @@ export function readTranscriptMessages(text) {
 }
 
 /** The last model-bearing assistant message at or before an artefact timestamp. */
-export function messageAtArtifact(reading, at) {
-  const stamp = parseArtifactTime(at)
+export function messageAtArtefact(reading, at) {
+  const stamp = parseArtefactTime(at)
   if (stamp === null || reading?.firstAt == null || reading?.lastAt == null) return null
   // Outside the transcript is not evidence. In particular, a recovered file's
   // current mtime must not inherit the model from a session that ended days ago.
@@ -117,15 +117,15 @@ export function messageAtArtifact(reading, at) {
  *   unverified    no transcript reading covers the artefact timestamp
  *   unclaimed     the artefact names no model at all
  */
-export function checkAuthorship({ claimedModel = '', artifactAt, transcriptText = null } = {}) {
+export function checkAuthorship({ claimedModel = '', artefactAt, transcriptText = null } = {}) {
   const claimed = String(claimedModel ?? '').trim()
-  const at = parseArtifactTime(artifactAt)
+  const at = parseArtefactTime(artefactAt)
   if (!claimed) {
     return {
       status: 'unclaimed',
       claimedModel: '',
       actualModel: '',
-      artifactAt: at,
+      artefactAt: at,
       messageAt: null,
       messageId: '',
       sidechain: false,
@@ -137,7 +137,7 @@ export function checkAuthorship({ claimedModel = '', artifactAt, transcriptText 
       status: 'unverified',
       claimedModel: claimed,
       actualModel: '',
-      artifactAt: null,
+      artefactAt: null,
       messageAt: null,
       messageId: '',
       sidechain: false,
@@ -149,7 +149,7 @@ export function checkAuthorship({ claimedModel = '', artifactAt, transcriptText 
       status: 'unverified',
       claimedModel: claimed,
       actualModel: '',
-      artifactAt: at,
+      artefactAt: at,
       messageAt: null,
       messageId: '',
       sidechain: false,
@@ -157,13 +157,13 @@ export function checkAuthorship({ claimedModel = '', artifactAt, transcriptText 
     }
   }
   const reading = readTranscriptMessages(transcriptText)
-  const message = messageAtArtifact(reading, at)
+  const message = messageAtArtefact(reading, at)
   if (!message) {
     return {
       status: 'unverified',
       claimedModel: claimed,
       actualModel: '',
-      artifactAt: at,
+      artefactAt: at,
       messageAt: null,
       messageId: '',
       sidechain: false,
@@ -177,7 +177,7 @@ export function checkAuthorship({ claimedModel = '', artifactAt, transcriptText 
     status: agrees ? 'agreement' : 'disagreement',
     claimedModel: claimed,
     actualModel: message.model,
-    artifactAt: at,
+    artefactAt: at,
     messageAt: message.at,
     messageId: message.messageId,
     sidechain: message.sidechain,

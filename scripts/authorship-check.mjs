@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Check an artefact's claimed author against per-message session metadata.
 //
-//   node scripts/authorship-check.mjs --artifact <file> --at <ISO timestamp> \
+//   node scripts/authorship-check.mjs --artefact <file> --at <ISO timestamp> \
 //       --transcript <session.jsonl> [--claimed <model>] [--json]
 //
 // `--claimed` is for line-list/derived artefacts with no heading; otherwise the
@@ -11,13 +11,13 @@
 import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import {
-  claimedModelFromArtifact,
+  claimedModelFromArtefact,
   formatAuthorship,
 } from './authorship-check-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 
 export const FLAG_SPEC = Object.freeze({
-  '--artifact': true,
+  '--artefact': true,
   '--at': true,
   '--transcript': true,
   '--claimed': true,
@@ -54,13 +54,13 @@ export function parseArgs(argv = []) {
     values[key] = value
     i++
   }
-  if (!values.artifact) errors.push('--artifact names the file whose author is claimed')
+  if (!values.artefact) errors.push('--artefact names the file whose author is claimed')
   if (!values.at) errors.push('--at names when the artefact was produced (ISO timestamp or epoch ms)')
   return { ok: errors.length === 0, values, errors }
 }
 
 export const usage = () =>
-  'usage: node scripts/authorship-check.mjs --artifact <file> --at <ISO timestamp> \\\n' +
+  'usage: node scripts/authorship-check.mjs --artefact <file> --at <ISO timestamp> \\\n' +
   '           [--transcript <session.jsonl>] [--claimed <model>] [--json]\n' +
   '\nThe comparison uses message.model at the artefact timestamp, per message and including\n' +
   'delegated sidechains. A missing transcript is printed as UNVERIFIED, never agreement.'
@@ -72,19 +72,19 @@ if (isMainModule(import.meta.url)) {
     console.error(`\n${usage()}`)
     process.exit(2)
   }
-  const { artifact, at, transcript = '', claimed = '', json = false } = parsed.values
-  let artifactText
+  const { artefact, at, transcript = '', claimed = '', json = false } = parsed.values
+  let artefactText
   try {
-    artifactText = readFileSync(artifact, 'utf8')
+    artefactText = readFileSync(artefact, 'utf8')
   } catch (error) {
-    console.error(`authorship-check: cannot read ${artifact}: ${(error && error.message) || error}`)
+    console.error(`authorship-check: cannot read ${artefact}: ${(error && error.message) || error}`)
     process.exit(2)
   }
   const result = checkAuthorshipFile({
-    claimedModel: claimed || claimedModelFromArtifact(artifactText),
-    artifactAt: at,
+    claimedModel: claimed || claimedModelFromArtefact(artefactText),
+    artefactAt: at,
     transcriptPath: transcript,
   })
-  console.log(json ? JSON.stringify({ artifact, transcript: transcript || null, ...result }, null, 2) : formatAuthorship(result, artifact))
+  console.log(json ? JSON.stringify({ artefact, transcript: transcript || null, ...result }, null, 2) : formatAuthorship(result, artefact))
   process.exit(result.status === 'agreement' ? 0 : result.status === 'disagreement' ? 1 : 2)
 }

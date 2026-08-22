@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   authorshipRefusesPermission,
   checkAuthorship,
-  claimedModelFromArtifact,
+  claimedModelFromArtefact,
   formatAuthorship,
   readTranscriptMessages,
 } from './authorship-check-core.mjs'
@@ -19,12 +19,12 @@ const transcript = (...lines) => lines.join('\n')
 
 describe('transcript-backed authorship', () => {
   it('reads a JSON model or the first markdown heading without inventing an unnamed author', () => {
-    expect(claimedModelFromArtifact('{"model":"GPT-5.6 Sol","entries":[]}')).toBe('GPT-5.6 Sol')
-    expect(claimedModelFromArtifact('# Proposal A — Fable 5, written blind\n\nBody')).toBe('Fable 5')
+    expect(claimedModelFromArtefact('{"model":"GPT-5.6 Sol","entries":[]}')).toBe('GPT-5.6 Sol')
+    expect(claimedModelFromArtefact('# Proposal A — Fable 5, written blind\n\nBody')).toBe('Fable 5')
     expect(
-      claimedModelFromArtifact('# Proposal A — written blind\n\n    # Proposal A — Fable 5, original heading'),
+      claimedModelFromArtefact('# Proposal A — written blind\n\n    # Proposal A — Fable 5, original heading'),
     ).toBe('Fable 5')
-    expect(claimedModelFromArtifact('# Proposal A — written blind\n\nBody')).toBe('')
+    expect(claimedModelFromArtefact('# Proposal A — written blind\n\nBody')).toBe('')
   })
 
   it('catches the 676 half-A mislabel across a session model switch', () => {
@@ -36,7 +36,7 @@ describe('transcript-backed authorship', () => {
     )
     const result = checkAuthorship({
       claimedModel: 'Fable 5',
-      artifactAt: '2026-08-13T15:34:26.009Z',
+      artefactAt: '2026-08-13T15:34:26.009Z',
       transcriptText: text,
     })
     expect(result).toMatchObject({
@@ -64,7 +64,7 @@ describe('transcript-backed authorship', () => {
     )
     const result = checkAuthorship({
       claimedModel: 'GPT-5.6 Sol',
-      artifactAt: '2026-08-13T15:36:56.233Z',
+      artefactAt: '2026-08-13T15:36:56.233Z',
       transcriptText: text,
     })
     expect(result.status).toBe('agreement')
@@ -85,7 +85,7 @@ describe('transcript-backed authorship', () => {
     )
     const result = checkAuthorship({
       claimedModel: 'Fable 5',
-      artifactAt: '2026-08-13T10:00:03.000Z',
+      artefactAt: '2026-08-13T10:00:03.000Z',
       transcriptText: text,
     })
     expect(result).toMatchObject({ status: 'agreement', sidechain: true, messageId: 'delegated-write' })
@@ -93,7 +93,7 @@ describe('transcript-backed authorship', () => {
   })
 
   it('records missing and out-of-range transcripts as unverified', () => {
-    expect(checkAuthorship({ claimedModel: 'Fable 5', artifactAt: 100, transcriptText: null })).toMatchObject({
+    expect(checkAuthorship({ claimedModel: 'Fable 5', artefactAt: 100, transcriptText: null })).toMatchObject({
       status: 'unverified',
       reason: expect.stringMatching(/transcript is missing/),
     })
@@ -104,7 +104,7 @@ describe('transcript-backed authorship', () => {
     expect(
       checkAuthorship({
         claimedModel: 'Fable 5',
-        artifactAt: '2026-08-14T10:00:00.000Z',
+        artefactAt: '2026-08-14T10:00:00.000Z',
         transcriptText: text,
       }).status,
     ).toBe('unverified')
@@ -112,8 +112,8 @@ describe('transcript-backed authorship', () => {
 
   it('reports a heading with no model as unclaimed even when the transcript is readable', () => {
     const result = checkAuthorship({
-      claimedModel: claimedModelFromArtifact('# Proposal A — written blind'),
-      artifactAt: '2026-08-13T10:00:00.000Z',
+      claimedModel: claimedModelFromArtefact('# Proposal A — written blind'),
+      artefactAt: '2026-08-13T10:00:00.000Z',
       transcriptText: entry({ at: '2026-08-13T10:00:00.000Z', model: 'claude-opus-5' }),
     })
     expect(result).toMatchObject({ status: 'unclaimed', actualModel: '' })

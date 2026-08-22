@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('authorship-check command', () => {
   it('refuses malformed command lines instead of dropping flags', () => {
-    const parsed = parseArgs(['--artifact', 'half.md', '--wat', 'x'])
+    const parsed = parseArgs(['--artefact', 'half.md', '--wat', 'x'])
     expect(parsed.ok).toBe(false)
     expect(parsed.errors).toEqual(expect.arrayContaining([expect.stringMatching(/unknown argument/), expect.stringMatching(/--at/)]))
   })
@@ -43,7 +43,7 @@ describe('authorship-check command', () => {
         JSON.stringify({ timestamp: '2026-08-13T15:34:27.000Z', type: 'user', message: { role: 'user' } }),
       ].join('\n'),
     })
-    const result = run('--artifact', artifactPath, '--at', at, '--transcript', transcriptPath)
+    const result = run('--artefact', artifactPath, '--at', at, '--transcript', transcriptPath)
     expect(result.status).toBe(1)
     expect(result.output).toContain('DISAGREEMENT')
     expect(result.output).toContain('claude-opus-5')
@@ -51,7 +51,7 @@ describe('authorship-check command', () => {
 
   it('prints unverified and exits two when the transcript is gone', () => {
     const { artifactPath } = fixture()
-    const result = run('--artifact', artifactPath, '--at', '2026-08-13T15:34:26.009Z')
+    const result = run('--artefact', artifactPath, '--at', '2026-08-13T15:34:26.009Z')
     expect(result.status).toBe(2)
     expect(result.output).toContain('UNVERIFIED')
   })

@@ -321,7 +321,7 @@ export function buildRecord({
   // wherever the transcript still exists. Expired evidence stays explicit.
   const reviewerAuthorship = checkAuthorshipFile({
     claimedModel: model,
-    artifactAt: modelAt,
+    artefactAt: modelAt,
     transcriptPath: modelTranscript,
   })
   const merge = resolveMergePolicy({
@@ -383,8 +383,8 @@ export function buildRecord({
         status: reviewerAuthorship.status,
         claimedModel: reviewerAuthorship.claimedModel,
         ...(reviewerAuthorship.actualModel ? { actualModel: reviewerAuthorship.actualModel } : {}),
-        ...(reviewerAuthorship.artifactAt != null
-          ? { artifactAt: reviewerAuthorship.artifactAt, artifactAtIso: new Date(reviewerAuthorship.artifactAt).toISOString() }
+        ...(reviewerAuthorship.artefactAt != null
+          ? { artefactAt: reviewerAuthorship.artefactAt, artefactAtIso: new Date(reviewerAuthorship.artefactAt).toISOString() }
           : {}),
         ...(reviewerAuthorship.messageAt != null
           ? { messageAt: reviewerAuthorship.messageAt, messageAtIso: new Date(reviewerAuthorship.messageAt).toISOString() }
