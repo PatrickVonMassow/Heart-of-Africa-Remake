@@ -36,40 +36,56 @@ export const SHAPES = ['pipes', 'files']
 /** The heartbeat period the fixture worker writes at. */
 export const BEAT_MS = 200
 
+/** The longest silence a working lane may show, in beat periods. */
+export const MAX_GAP_BEATS = 3
+
+/**
+ * Linux process states, split into living and dead.
+ *
+ * `Z` is not the only dead one: `X` and `x` are the exit states, and a table
+ * entry in any of them is a corpse. Everything not named here is UNKNOWN and
+ * reads as dead, because a liveness probe that guesses in the optimistic
+ * direction is what produces a green run over a dead lane.
+ */
+export const LIVE_STATES = new Set(['R', 'S', 'D', 'T', 't', 'I', 'W', 'K', 'P'])
+export const DEAD_STATES = new Set(['Z', 'X', 'x'])
+
 /**
  * What a run's evidence MEANS — the pure half, so the reading is testable
  * without spawning anything.
  *
- * ESCAPED IS A RATE, NOT A SINGLE BEAT. The first version called any increase
- * "still working", and the cross-vendor reading broke it in one line: a worker
- * that emits one beat after the kill and then hangs for the rest of the window
- * passed. A surviving lane has to keep working, so the run must show at least
- * half the beats the observation window could hold AND a last beat that is
- * recent at the end of it.
+ * IT READS THE BEAT TIMESTAMPS, NOT A COUNT. Two earlier versions were broken
+ * by a cross-vendor reading on exactly this: the first called any single
+ * increase "still working", and the second let a worker produce its quota and
+ * then hang for the last second of the window. A count cannot see a gap. So the
+ * measure is the largest SILENCE between consecutive beats, and the silence
+ * between the last beat and the end of the window — a lane that stops working
+ * anywhere inside the window fails, wherever it stops.
  *
  * `alive` is a LIVENESS verdict, not a `kill(pid, 0)` result: that call answers
- * true for a zombie, which is a dead worker with an entry still in the table.
- * The caller resolves that; see `probeAlive`.
+ * true for a corpse still in the process table. The caller resolves it; see
+ * `probeAlive`.
  */
 export function readOutcome({
   shape,
   alive,
-  beatsBefore,
-  beatsAfter,
-  lastBeatAt = 0,
+  beatsBefore = 0,
+  beatTimes = [],
+  killedAt = 0,
   observedUntil = 0,
-  observeMs = 0,
   lastLine = '',
 } = {}) {
-  const gained = Number(beatsAfter) - Number(beatsBefore)
-  const expected = observeMs ? Math.floor(observeMs / BEAT_MS) : 0
-  // Half of what the window could hold: enough slack for a loaded host, far
-  // above the single beat a hung process can still emit.
-  const kept = expected ? gained >= Math.floor(expected / 2) : gained > 0
-  // …and it must still have been beating at the END of the window, so a worker
-  // that ran fast and then stopped cannot pass on volume alone.
-  const fresh = lastBeatAt && observedUntil ? observedUntil - lastBeatAt <= BEAT_MS * 5 : gained > 0
-  const progressed = Boolean(kept && fresh)
+  const after = beatTimes.filter((t) => Number(t) > killedAt).map(Number).sort((a, b) => a - b)
+  const limit = BEAT_MS * MAX_GAP_BEATS
+  // The first gap is measured from the KILL, so a worker that goes quiet at the
+  // moment its parent dies and only resumes later cannot hide in the average.
+  // Every mark, including a kill stamped at 0: filtering on truthiness dropped
+  // it and silently disabled the first-gap rule — caught by the late-start case.
+  const marks = [killedAt, ...after, observedUntil].filter((t) => Number.isFinite(t))
+  let maxGap = 0
+  for (let i = 1; i < marks.length; i += 1) maxGap = Math.max(maxGap, marks[i] - marks[i - 1])
+  const gained = after.length
+  const progressed = gained > 0 && maxGap <= limit
   const escaped = Boolean(alive) && progressed
   const why = escaped
     ? 'still running and still working after the kill'
@@ -77,10 +93,20 @@ export function readOutcome({
       ? 'died writing to a pipe whose reader went with the parent'
       : !alive
         ? 'died with the parent, cause not recorded in its own log'
-        : !kept
-          ? 'still running but barely working — a lane that emits one beat and hangs is not a lane'
-          : 'still running but stopped beating before the window closed'
-  return { shape, escaped, progressed, alive: Boolean(alive), beatsBefore, beatsAfter, gained, why }
+        : gained === 0
+          ? 'still running but never beat again — a survivor that stopped is not a lane'
+          : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
+  return {
+    shape,
+    escaped,
+    progressed,
+    alive: Boolean(alive),
+    beatsBefore,
+    beatsAfter: beatsBefore + gained,
+    gained,
+    maxGap,
+    why,
+  }
 }
 
 /** The verdict over both shapes: the drill proves its point only if they DIFFER. */
@@ -157,8 +183,11 @@ export function probeAlive(pid, { readProc = defaultReadProc, signal = defaultSi
     // The state letter is the field after the ")" that closes the comm field —
     // parsed from the right, because a process name may itself contain ")".
     const state = stat.slice(stat.lastIndexOf(')') + 1).trim().charAt(0)
-    if (state === 'Z') return { alive: false, how: 'zombie in /proc' }
-    return { alive: state !== '', how: `/proc state ${state}` }
+    if (DEAD_STATES.has(state)) return { alive: false, how: `dead in /proc (state ${state})` }
+    if (LIVE_STATES.has(state)) return { alive: true, how: `/proc state ${state}` }
+    // FAIL CLOSED on a letter this list does not know. A probe that guesses
+    // "alive" for an unrecognised state is the one that greens a dead lane.
+    return { alive: false, how: `unrecognised /proc state ${state || '(none)'} — read as dead` }
   }
   return { alive: signal(pid), how: 'signal probe only — a zombie reads as alive here' }
 }
@@ -203,24 +232,25 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   const lines = (path) => readFileSync(path, 'utf8').split('\n').filter(Boolean)
   const beatsBefore = lines(beat).length
   const pid = Number(readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0])
+  let killedAt = 0
   try {
     process.kill(-parent.pid, 'SIGKILL')
   } catch {
     /* already gone */
+  } finally {
+    killedAt = Date.now()
   }
   await sleep(observeMs)
   const after = lines(beat)
   const observedUntil = Date.now()
-  const beats = after.filter((l) => l.startsWith('beat '))
-  const lastBeatAt = Number(beats.at(-1)?.slice('beat '.length)) || 0
+  const beatTimes = after.filter((l) => l.startsWith('beat ')).map((l) => Number(l.slice('beat '.length)))
   const outcome = readOutcome({
     shape,
     alive: probeAlive(pid).alive,
     beatsBefore,
-    beatsAfter: after.length,
-    lastBeatAt,
+    beatTimes,
+    killedAt,
     observedUntil,
-    observeMs,
     lastLine: after.at(-1) ?? '',
   })
   if (Number.isFinite(pid)) {

@@ -376,10 +376,30 @@ compensation, and the design owes all three parts:
   branch preserved, a queued job is withdrawn, a lease grant is revoked. Every mutation the daemon
   accepts must therefore DECLARE its compensation, and a mutation without one cannot be
   registered — that is a case in step 1's command table, not a convention.
-- **Refuse it downstream.** Every journal entry carries the fence it was written under, and the
-  successor's reconciliation (step 8) quarantines any entry below the fence current when it
-  adopts. So even a compensation that itself fails leaves evidence a successor refuses to act on,
-  rather than state it silently trusts.
+- **Refuse it downstream.** Every journal entry carries the fence it was written under, AND the
+  journal records every fence transition, so an entry is legitimate exactly when its fence is the
+  one in force at its own position in the journal. Reconciliation (step 8) quarantines the entries
+  that fail THAT test, not everything below the successor's own fence — the first draft said the
+  latter and would have quarantined all legitimate predecessor history, transferred workers
+  included, at every ordinary handover.
+
+**ONE MUTATION CLASS HAS NO HONEST COMPENSATION, and it is named rather than covered.** A landed
+merge is pushed; it can already have been fetched, read or built on, and "reverting" it is a new
+commit, not a reversal. So landing does not rest on compensation at all, and it is the one place
+where the mechanism is exclusion instead:
+
+- Landing is serial under the batch-wide landing lock (step 9), which the daemon grants under the
+  fence and which is held across the whole merge and push.
+- The fence is re-validated immediately BEFORE the irreversible act, with the lock still held, so
+  the window that remains is one push rather than a whole landing.
+- What closes even that window is not ours: the remote ref update is git's own atomic
+  compare-and-swap. A push from a dispossessed coordinator fails as a non-fast-forward the moment
+  the rightful owner has pushed, and step 9's revalidation against the current base is what makes
+  that failure the normal, recoverable outcome rather than a surprise.
+
+The landing's safety therefore comes from serialization plus the remote's own atomicity, and the
+fence is what stops a dispossessed coordinator from ACQUIRING the landing lock in the first place.
+Claiming compensation for it would have been a lie.
 
 The honest claim is therefore narrower than the first draft's: the fence makes a dispossessed
 coordinator's work DETECTABLE AND REVERSIBLE within one mutation, not impossible.
@@ -390,14 +410,22 @@ number and reopen everything above. It does not advance it. `--commit` seals the
 RECORDS the fence it ran under; the next acquisition takes the next number, as every acquisition
 already does. Step 7 is corrected to that wording in the same commit that builds it.
 
-**FENCE LOSS IS FAIL-CLOSED.** `.claude/batch-fence.json` is monotonic and never deleted, but
-"never" is an intention, not a guarantee — a wiped `.claude`, a restored backup or a re-seeded
-file can hand out a number that a durable record already carries, and then a stale
-`(sessionId, fence)` pair becomes valid again. So the daemon does not trust the file alone: at
-start, and at every mint, it compares it against the highest fence any record in its own journal
-carries. If the file is missing or lower, the daemon MINTS NOTHING, refuses every mutation and
-raises an alert until the fence is re-seeded strictly above that high-water mark. Refusing is the
-correct behaviour here: a batch that cannot prove who owns it must stop, not guess.
+**FENCE LOSS IS FAIL-CLOSED, AND SO IS JOURNAL LOSS.** `.claude/batch-fence.json` is monotonic
+and never deleted, but "never" is an intention, not a guarantee — a wiped `.claude`, a restored
+backup or a re-seeded file can hand out a number that a durable record already carries, and then a
+stale `(sessionId, fence)` pair becomes valid again. So the daemon does not trust the file alone:
+at start, and at every mint, it compares it against the highest fence any record in its own
+journal carries, and mints nothing while the file is missing or lower.
+
+That check is only as good as the journal, which is the second half of the rule and the half the
+first draft left out: **a missing or checksum-failing journal itself prohibits minting.** An old
+fence file beside a lost journal would otherwise find no higher value and cheerfully hand out a
+reused number — the comparison would pass precisely because the evidence was gone. In that state
+the daemon refuses every mutation and raises an alert, and recovery is an OPERATOR act, never an
+automatic one: the fence is re-seeded strictly above the highest number found in any surviving
+record — journal, sealed snapshot, `.claude/boundary.log`, and the fences carried in pushed
+commits, which live in a repository that is replicated off this host. A batch that cannot prove
+who owns it must stop, not guess.
 
 **Split-brain prevention.** Two sessions cannot hold the lock; that is the existing test-and-set,
 and it is the only exclusion primitive in the design. The case the lock alone never covered is a
@@ -416,8 +444,15 @@ be STARTED.** The regime is then a fact about the world rather than a setting �
   pid-start-time test used everywhere else here.
 - **No daemon means today's path,** exactly as it runs now.
 
-There is consequently no combination in which both regimes are live, because "both regimes" would
-require two daemons and the identity record forbids that. Rollback is then a single operation with
+That forbids two daemons. It does NOT by itself forbid a legacy caller that read "no daemon",
+began an old-path operation, and was still inside it when a daemon started — and an exclusive
+create the legacy path never touches cannot see that caller. So the daemon's lifecycle is confined
+to the one window in which no legacy operation can be in flight: **a daemon may be started and
+stopped only by the session holding the batch lock, in the boundary window, after `--prepare` has
+proved that nothing is in flight.** That is not an extra mechanism; it is the state the two-phase
+boundary already establishes and already checks. A start attempted at any other moment is refused
+and says why. A daemon then persists across the sessions that follow, which is the whole point of
+it, and the regime changes only where the batch has already proved itself quiet. Rollback is then a single operation with
 nothing to interleave: `node scripts/batch-daemon.mjs stop --drain` refuses new mutations,
 completes the at most one mutation in flight (they are serialized, so the wait is bounded by a
 single operation), cancels its workers through the cancellation path that preserves their branches
