@@ -485,6 +485,12 @@ export function classSummaries(landings, axis) {
       ratio: summarise(rated.map((m) => m.elapsedHours / m.estimateHours)),
       correctableRatio: summarise(correctableRated.map((m) => m.elapsedHours / m.estimateHours)),
       comparable: !unknowable && rated.length >= MIN_CLASS_SAMPLES,
+      // The eligibility the DECISION runs on. A global factor is applied to
+      // cards and measured on the correctable population, so the question of
+      // whether the classes agree enough to adopt one has to be asked of that
+      // same population — or adoption could succeed on evidence the factor is
+      // never drawn from, and once did, yielding an adopted factor of null.
+      correctableComparable: !unknowable && correctableRated.length >= MIN_CLASS_SAMPLES,
       // A class can be measured WITHOUT any landing-time snapshot: the elapsed
       // span is read off git, while the ratio needs a promise recorded while the
       // point was still open. Two separate kinds of evidence — and the second one
@@ -505,9 +511,20 @@ export function classSummaries(landings, axis) {
  */
 export function axisSpread(summaries) {
   const rows = Array.isArray(summaries) ? summaries : []
-  const factors = rows.filter((s) => s.comparable).map((s) => s.ratio.median).filter((f) => asNumber(f) && f > 0)
-  const unknowable = rows.filter((s) => !s.comparable && s.unknowable).map((s) => s.name)
-  const pending = rows.filter((s) => !s.comparable && !s.unknowable && (s.points ?? 0) > 0).map((s) => s.name)
+  // The picture-verified class is OUTSIDE the correctable population by
+  // construction — a render landing is exactly what the correction is never
+  // measured on — so no number of further landings can make it comparable. It is
+  // missing information for this decision, not a class that is merely thin;
+  // calling it "pending" would refuse every global factor for ever and read as
+  // if more evidence were on its way.
+  const outsideCorrection = (s) => s.name === PICTURE_VERIFIED
+  const eligible = (s) => (s.correctableComparable === undefined ? s.comparable : s.correctableComparable)
+  const median = (s) => (s.correctableComparable === undefined ? s.ratio?.median : s.correctableRatio?.median)
+  const factors = rows.filter(eligible).map(median).filter((f) => asNumber(f) && f > 0)
+  const unknowable = rows.filter((s) => !eligible(s) && (s.unknowable || outsideCorrection(s))).map((s) => s.name)
+  const pending = rows
+    .filter((s) => !eligible(s) && !s.unknowable && !outsideCorrection(s) && (s.points ?? 0) > 0)
+    .map((s) => s.name)
   const base = { classes: factors.length, unknowable, pending }
   if (factors.length < 2) return { ...base, spread: null }
   return { ...base, spread: Math.max(...factors) / Math.min(...factors) }
@@ -541,9 +558,19 @@ export function globalFactorDecision(byAxis, { tolerance = GLOBAL_FACTOR_TOLERAN
   const mute = spreads.filter(
     (s) => asNumber(s.spread) === null && !undecidable.includes(s) && !pending.includes(s),
   )
-  const residual = undecidable.map(
-    (u) => `${u.axis} excluded — ${u.unknowable.join(', ')} groups landings whose ${u.axis} is not established`,
-  )
+  // Two different silences, and the reader is owed the difference: a class that
+  // GROUPS unestablished information, and a class the correction is never
+  // measured on at all. Naming both under one wording said something false
+  // about one of them.
+  const residual = undecidable.map((u) => {
+    const grouping = u.unknowable.filter((n) => n !== PICTURE_VERIFIED)
+    const parts = []
+    if (grouping.length) parts.push(`${grouping.join(', ')} groups landings whose ${u.axis} is not established`)
+    if (u.unknowable.includes(PICTURE_VERIFIED)) {
+      parts.push(`${PICTURE_VERIFIED} is outside the population a correction is measured on`)
+    }
+    return `${u.axis} excluded — ${parts.join('; ')}`
+  })
   if (offenders.length || pending.length || mute.length || !compared.length) {
     const said = [
       ...offenders.map((o) => `${o.axis} classes differ by ${o.spread.toFixed(2)}×`),
@@ -673,6 +700,11 @@ export function promiseMedians({ cards = {}, open = [], criticality = new Map(),
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0)) {
     if (skip.has(point)) continue
     const from = cards?.[point]?.estimate ?? null
+    // A card that promises nothing NOW promises nothing. The ledger remembers
+    // what a card said before a correction touched it — it is not a store the
+    // card can be restored from, and reading it here resurrected estimates that
+    // had been removed and let them weigh on the denominator.
+    if (from === null || from === undefined) continue
     const baseline = ledgerEntry(ledger, point)?.baseline ?? from
     if (String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)) continue
     const hours = parseEstimateHours(baseline)
@@ -761,6 +793,22 @@ export const PICTURE_PROOF_DENIALS = [
  */
 export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|--/)
 
+/**
+ * A fragment that states nothing of its own — the tail of a coordinated list.
+ *
+ * "No screenshot, browser frame, or picture proof is required" cuts into three,
+ * and the last two are bare nouns that a marker test happily accepts. They are
+ * not new statements; they belong to the denial in front of them. A fragment
+ * that carries a word of its own ("provide a browser frame") does state
+ * something, and the denial before it does not reach that far.
+ */
+const LIST_GLUE = /^(?:\s|\b(?:or|and|nor|a|an|the|is|are|was|were|be|been|required|needed|necessary|oder|und|kein|keine|ein|eine|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+
+export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
+  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), String(fragment ?? ''))
+  return LIST_GLUE.test(bare)
+}
+
 /** Does ONE clause demand a rendered proof? */
 export function clauseDemandsPicture(clause) {
   const text = String(clause ?? '')
@@ -769,6 +817,30 @@ export function clauseDemandsPicture(clause) {
   if (PICTURE_PROOF_DENIALS.some((re) => re.test(text))) return false
   if (PICTURE_PROOF_MARKERS.some((re) => re.test(text))) return true
   return PICTURE_BACKEND_MARKER.test(text) && PICTURE_VISUAL_COMPANION.test(text)
+}
+
+/**
+ * Does one LINE demand a rendered proof? Clause by clause, left to right, with a
+ * denial governing the bare list items that trail it.
+ */
+export function lineDemandsPicture(line) {
+  let denied = false
+  for (const fragment of splitClauses(line)) {
+    if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
+      denied = true
+      continue
+    }
+    // A bare list item INHERITS the decision in front of it: denied after a
+    // denial, and a demand of its own where nothing denied it.
+    if (isListContinuation(fragment)) {
+      if (denied) continue
+      if (clauseDemandsPicture(fragment)) return true
+      continue
+    }
+    denied = false
+    if (clauseDemandsPicture(fragment)) return true
+  }
+  return false
 }
 
 export function pictureBearingPoints(text) {
@@ -780,7 +852,7 @@ export function pictureBearingPoints(text) {
     else if (/^- \[/.test(line)) point = null
     if (point === null || out.has(point)) continue
     // The head line carries the point's title, and a title can name the proof.
-    if (splitClauses(line).some(clauseDemandsPicture)) out.add(point)
+    if (lineDemandsPicture(line)) out.add(point)
   }
   return out
 }
@@ -892,7 +964,9 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b)) {
     const from = cards?.[point]?.estimate ?? null
     const entry = ledgerEntry(ledger, point)
-    const baseline = entry?.baseline ?? from
+    // Same rule as the denominator's: with no estimate on the card there is
+    // nothing to correct, and a remembered baseline is not a replacement for one.
+    const baseline = from === null || from === undefined ? null : (entry?.baseline ?? from)
     // BEFORE EVERY OTHER BRANCH: owing a rendered proof is a property of the
     // POINT, not of what its card happens to hold right now. Testing the live
     // estimate let a render card with an empty card but a surviving ledger

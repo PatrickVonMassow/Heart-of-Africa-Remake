@@ -288,7 +288,12 @@ describe('is one global factor honest?', () => {
   it('adopts one factor when measured classes agree and missing-information axes are named residuals', () => {
     const rows = [
       ...classOf(6, 0.3, { criticality: 'medium', picture: false, delegated: true }),
-      ...classOf(6, 0.32, { criticality: 'high', picture: true, delegated: true }),
+      ...classOf(6, 0.32, { criticality: 'high', picture: false, delegated: true }),
+      // The picture axis needs a second class, and a render landing may not sit
+      // in a criticality class the decision then compares — it would empty that
+      // class's correctable population. So it rides ALONGSIDE six non-render
+      // landings of the same criticality, which stays comparable.
+      ...classOf(6, 0.32, { criticality: 'high', picture: true, delegated: true }).map((r, i) => ({ ...r, point: 900 + i })),
       ...mainSessionLandings(4, { criticality: 'medium' }),
     ].map((r, i) => ({ ...r, point: 200 + i }))
     const decision = globalFactorDecision(axesFrom(rows))
@@ -296,7 +301,8 @@ describe('is one global factor honest?', () => {
     expect(decision.reason).toMatch(/adopted — criticality compared/)
     expect(decision.undecidable).toEqual([
       'lane excluded — lane-unestablished groups landings whose lane is not established',
-      'picture excluded — picture-unestablished groups landings whose picture is not established',
+      'picture excluded — picture-unestablished groups landings whose picture is not established; ' +
+        'picture-verified is outside the population a correction is measured on',
     ])
   })
 
@@ -306,7 +312,7 @@ describe('is one global factor honest?', () => {
     // it. Silence that can still be broken is not a residual.
     const rows = [
       ...classOf(6, 0.3, { criticality: 'medium', picture: false, delegated: true }),
-      ...classOf(6, 0.32, { criticality: 'high', picture: true, delegated: true }),
+      ...classOf(6, 0.32, { criticality: 'high', picture: false, delegated: true }),
       ...classOf(2, 0.31, { criticality: 'low', picture: false, delegated: false }),
     ].map((r, i) => ({ ...r, point: 200 + i }))
     const decision = globalFactorDecision(axesFrom(rows))
@@ -319,7 +325,7 @@ describe('is one global factor honest?', () => {
       ...classOf(6, 0.25, { criticality: 'medium', picture: false, delegated: true }),
       ...classOf(6, 0.25, { criticality: 'high', picture: false, delegated: true }),
       // The low criticality class takes four times as long as its estimate promised.
-      ...classOf(6, 1.2, { criticality: 'low', picture: true, delegated: true }),
+      ...classOf(6, 1.2, { criticality: 'low', picture: false, delegated: true }),
     ].map((r, i) => ({ ...r, point: 300 + i }))
     const decision = globalFactorDecision(axesFrom(rows))
     expect(decision.adopted).toBe(false)
@@ -444,8 +450,8 @@ describe('the rewrite plan', () => {
 
   it('plans an unseen class unchanged even under an adopted global factor', () => {
     const flat = [
-      ...classOf(6, 0.5, { criticality: 'high', picture: true }),
-      ...classOf(6, 0.52, { criticality: 'low', picture: true }),
+      ...classOf(6, 0.5, { criticality: 'high', picture: false }),
+      ...classOf(6, 0.52, { criticality: 'low', picture: false }),
       ...mainSessionLandings(3, { criticality: 'high' }),
     ]
     const uniform = calibrationReading(flat)
@@ -1107,5 +1113,80 @@ describe('a default is published only from the population it is measured on', ()
     expect(medium.comparable).toBe(true)
     expect(medium.elapsedComparable).toBe(false)
     expect(inheritanceDefaults(reading)).toEqual({})
+  })
+})
+
+
+describe('adoption is decided on the population the adopted factor is measured on', () => {
+  it('never adopts on ratios the factor is not drawn from', () => {
+    // Five rated RENDER landings would make the class comparable on the whole
+    // class while the correctable population holds nothing at all. Adopting on
+    // that produced an adopted decision with a null factor.
+    const rows = [
+      ...Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 700 + i, elapsedHours: 3, estimateHours: 2, criticality: 'medium', owesPicture: true }),
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 800 + i, elapsedHours: 3, estimateHours: 2, criticality: 'high', owesPicture: true }),
+      ),
+    ]
+    const reading = calibrationReading(rows)
+    expect(reading.decision.adopted).toBe(false)
+    expect(reading.decision.factor).toBeNull()
+  })
+
+  it('an adopted decision always carries a factor', () => {
+    const rows = [
+      ...classOf(6, 0.3, { criticality: 'medium', picture: false, delegated: true }),
+      ...classOf(6, 0.32, { criticality: 'high', picture: false, delegated: true }),
+      ...mainSessionLandings(4, { criticality: 'medium' }),
+    ].map((r, i) => ({ ...r, point: 200 + i }))
+    const reading = calibrationReading(rows)
+    expect(reading.decision.adopted).toBe(true)
+    expect(reading.decision.factor).toBeGreaterThan(0)
+  })
+})
+
+describe('a card that promises nothing now promises nothing', () => {
+  const reading = calibrationReading(
+    Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+    ),
+  )
+
+  it('does not resurrect a removed estimate out of the ledger', () => {
+    const plan = rewritePlan(reading, {
+      cards: {},
+      open: [10],
+      criticality: new Map([[10, 'medium']]),
+      ledger: { 10: { baseline: '~8 h' } },
+    })
+    expect(plan[0]).toMatchObject({ point: 10, from: null, to: null, changed: false })
+    expect(plan[0].reason).toMatch(/no stored estimate/)
+  })
+
+  it('keeps that ghost out of the denominator as well', () => {
+    const cards = { 11: { estimate: '~2 h' } }
+    const ledger = { 10: { baseline: '~40 h' } }
+    expect(
+      promiseMedians({ cards, open: [10, 11], criticality: new Map([[10, 'medium'], [11, 'medium']]), ledger }).get('medium'),
+    ).toBe(2)
+  })
+})
+
+describe('a coordinated list of denied nouns stays denied', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('does not read the tail of a negative list as a demand', () => {
+    const tasks = block(96, 'No screenshot, browser frame, or picture proof is required.')
+    expect(pictureBearingPoints(tasks).has(96)).toBe(false)
+  })
+
+  it('still reads a bare demand where nothing denied it', () => {
+    expect(pictureBearingPoints(block(97, 'VERIFIABLE: a browser frame.')).has(97)).toBe(true)
+  })
+
+  it('lets a real statement after a denial end the denial', () => {
+    expect(pictureBearingPoints(block(98, 'No screenshot is required, provide a browser frame.')).has(98)).toBe(true)
   })
 })
