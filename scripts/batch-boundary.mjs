@@ -32,7 +32,7 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 import { markHandover, readOwnerLock } from './batch-singleton.mjs'
 import { gatherClaim } from './batch-claim.mjs'
-import { reservationDecision } from './batch-claim-core.mjs'
+import { resolveBoundaryDestination } from './batch-claim-core.mjs'
 import {
   BOUNDARY_CAUSES,
   BOUNDARY_DESTINATIONS,
@@ -495,8 +495,9 @@ export function boundaryHandover({
   // that is honoured AND for a released one still reserving the freed lock
   // (point 461), so the card must name the claiming window in both states or it
   // announces a fresh session the launcher will not start.
+  const destination = resolveBoundaryDestination({ assessment: claim })
   const where = boundaryDestination({
-    claimHonoured: reservationDecision({ assessment: claim }).acquire === false,
+    claimHonoured: destination.action === 'reserve',
     claimantSid: claim.claimantSid,
   })
   // The CARD owns no point chip, but its prose names the first open point or the

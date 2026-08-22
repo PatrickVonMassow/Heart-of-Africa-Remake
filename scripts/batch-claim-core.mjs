@@ -277,9 +277,6 @@ export function assessClaim({
   probePid = null,
   tolerance = PID_START_TOLERANCE_MS,
 } = {}) {
-  // Kept in the public input shape for callers which also report whether an
-  // owner stands; it no longer suspends the renewable reservation clock.
-  void ownerHolding
   const out = (honour, reason, extra = {}) => ({
     honour,
     reserve: false,
@@ -352,10 +349,12 @@ export function assessClaim({
   const live = claimantLiveness({ claim, probePid, tolerance })
   if (!live.alive) return out(false, live.reason, { ...base, ageMs })
 
-  // A breathing window is not activity. Pending claims expire too unless their
-  // holder refreshes the record; otherwise an idle editor can reserve the batch
-  // for as long as its host process happens to live.
-  if (renewalAgeMs > maxAgeMs) {
+  // While a LIVE SESSION owner still holds the lock, a human takeover claim has
+  // somebody to wait for and its claimant's identity is the honest bound. The
+  // take-up clock starts mattering when there is nobody left to wait for. Machine
+  // errands keep their own clock because their pid names the issuer, not a window
+  // waiting to take the batch.
+  if (renewalAgeMs > maxAgeMs && (ownerHolding !== true || claimIsBounded(claim))) {
     return out(false, 'expired', { ...base, ageMs })
   }
   return out(true, 'honour', { ...base, ageMs })
@@ -423,6 +422,50 @@ export function reservationDecision({ assessment } = {}) {
 }
 
 /**
+ * WHERE DOES OWNERSHIP GO WHEN THE CURRENT OWNER MAY NO LONGER CONTINUE? PURE.
+ *
+ * This is the single destination decision used by a regular boundary, a handed-
+ * over lock, a free lock and an expired lease. `renewalUntil` is present only
+ * when the launcher's independently observed evidence extended an expired lease.
+ * An honoured claim wins that tie: the user explicitly asked to take over, so the
+ * old owner is released to that window instead of being renewed past it.
+ *
+ * Returns { action, spawn, reason, claimantSid, renewalUntil } where action is:
+ *   wait    — the current owner still owns the batch;
+ *   reserve — release/leave the lock free for the claiming window;
+ *   renew   — persist the evidence-backed lease extension;
+ *   spawn   — start a fresh successor.
+ */
+export function resolveBoundaryDestination({
+  assessment = null,
+  ownerAlive = false,
+  leaseExpired = false,
+  renewalUntil = null,
+} = {}) {
+  const reservation = reservationDecision({ assessment })
+  const reserved = reservation.acquire === false
+  const renewal = typeof renewalUntil === 'number' && Number.isFinite(renewalUntil)
+
+  if (leaseExpired === true) {
+    if (reserved) {
+      return { action: 'reserve', spawn: false, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+    }
+    if (renewal) {
+      return { action: 'renew', spawn: false, reason: 'evidence-advancing', claimantSid: null, renewalUntil }
+    }
+    return { action: 'spawn', spawn: true, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+  }
+
+  if (ownerAlive === true) {
+    return { action: 'wait', spawn: false, reason: reserved ? reservation.reason : 'owner-alive', claimantSid: reservation.claimantSid, renewalUntil: null }
+  }
+  if (reserved) {
+    return { action: 'reserve', spawn: false, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+  }
+  return { action: 'spawn', spawn: true, reason: reservation.reason, claimantSid: reservation.claimantSid, renewalUntil: null }
+}
+
+/**
  * MAY THE LAUNCHER TAKE A FREE LOCK FOR ITSELF RIGHT NOW? PURE — the probe is
  * injected, the claim is passed in, nothing here reads a file.
  *
@@ -467,9 +510,10 @@ export function takeoverDecision({
   tolerance = PID_START_TOLERANCE_MS,
 } = {}) {
   const assessment = claim ? assessClaim({ claim, now, maxAgeMs, probePid, tolerance }) : null
-  const { acquire, reason, claimantSid } = reservationDecision({ assessment })
+  const destination = resolveBoundaryDestination({ assessment })
+  const { reason, claimantSid } = destination
   const ageMs = Number.isFinite(assessment?.ageMs) ? assessment.ageMs : null
-  if (acquire) return { spawn: true, reason, claimantSid, ageMs, message: null }
+  if (destination.spawn) return { spawn: true, reason, claimantSid, ageMs, message: null }
 
   // FLOOR, never round: an age rounded UP reads at the log as though the window
   // had already run out while the lock was in fact still being held, and the line
