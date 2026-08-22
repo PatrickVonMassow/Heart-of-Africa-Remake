@@ -510,6 +510,11 @@ export const SUCCESSOR_TRIGGERS = Object.freeze({
 })
 
 const SUCCESSOR_TRIGGER_SET = new Set(Object.values(SUCCESSOR_TRIGGERS))
+const CI_WAIT_VETO_TRIGGERS = new Set([
+  SUCCESSOR_TRIGGERS.CHILD_EXIT,
+  SUCCESSOR_TRIGGERS.CRASH,
+  SUCCESSOR_TRIGGERS.WATCHDOG,
+])
 
 /**
  * THE ONE SUCCESSOR-START DECISION. PURE.
@@ -523,6 +528,7 @@ const SUCCESSOR_TRIGGER_SET = new Set(Object.values(SUCCESSOR_TRIGGERS))
 export function successorStartDecision({
   trigger = { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
   spawnToken = '',
+  ciWait = null,
   paused = false,
   openPoints = 1,
   formatAlarm = false,
@@ -540,9 +546,39 @@ export function successorStartDecision({
   const sourceSpawnToken = typeof trigger?.predecessorToken === 'string' && trigger.predecessorToken
     ? trigger.predecessorToken
     : null
+  const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
+  const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
+  const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
+    ? new Date(ciWaitDeadline).toISOString()
+    : 'its recorded interaction deadline'
+  const ciWaitVetoActive =
+    CI_WAIT_VETO_TRIGGERS.has(kind) &&
+    ciWait?.visible === true &&
+    ciWait.pending === true &&
+    ciWait.deadlineReached !== true
   const evidence = {
-    trigger: { kind: kind || null, generation: sourceGeneration, predecessorToken: sourceSpawnToken },
+    trigger: {
+      kind: kind || null,
+      generation: sourceGeneration,
+      predecessorToken: sourceSpawnToken,
+      wakeToken,
+      result: trigger?.result ?? null,
+    },
     policy: { paused: paused === true, openPoints, formatAlarm: formatAlarm === true, claimReserved: claimReserved === true },
+    ciWait: ciWait?.visible === true
+      ? {
+          pending: ciWait.pending === true,
+          terminal: ciWait.terminal === true,
+          observerAlive: ciWait.observerAlive === true,
+          repair: ciWait.repair === true,
+          deadline: ciWaitDeadline,
+          deadlineReached: ciWait.deadlineReached === true,
+          vetoActive: ciWaitVetoActive,
+          identity: ciWait.identity ?? null,
+          wakeToken: ciWait.wakeToken ?? null,
+          result: ciWait.result ?? null,
+        }
+      : null,
     observed: {
       lockKind: typeof lock?.kind === 'string' ? lock.kind : null,
       lockSession: typeof lock?.sessionId === 'string' ? lock.sessionId : null,
@@ -564,6 +600,21 @@ export function successorStartDecision({
   if (openPoints === 0) return refuse('batch-complete', 'the work order has no open successor')
   if (claimReserved === true) return refuse('claim-reserved', 'an honoured user claim reserves the next ownership')
 
+  // An unfinished run temporarily owns the empty interval after its worker
+  // exits. Replacement-style child-exit, crash, and watchdog requests would
+  // only wake into the same Stop, so they wait for the observer. A deliberate
+  // boundary does useful work on the next point while CI continues in parallel
+  // and must not make every clean handover pay this exceptional-path latency.
+  // The interaction deadline also bounds the veto so an unreachable run cannot
+  // idle the batch forever; observation itself continues on either path.
+  if (ciWaitVetoActive) {
+    return refuse(
+      'ci-wait-pending',
+      `CI run ${ciWait.identity ?? 'unknown'} is still under durable observation and remains a successor veto until ${ciWaitDeadlineLabel}` +
+        (ciWait.repair === true ? '; its observer must be repaired before a successor starts' : ''),
+    )
+  }
+
   if (kind === SUCCESSOR_TRIGGERS.BOUNDARY) {
     if (sourceGeneration === null) return refuse('missing-generation', 'the boundary notification names no handover generation')
     if (!lock || lock.handedOver !== true) return refuse('boundary-not-standing', 'the notified boundary is not standing on the owner lock')
@@ -575,8 +626,14 @@ export function successorStartDecision({
     }
   }
 
-  if (kind === SUCCESSOR_TRIGGERS.CI_TERMINAL && trigger?.terminal !== true) {
-    return refuse('ci-not-terminal', 'the CI notification does not carry a terminal result')
+  if (kind === SUCCESSOR_TRIGGERS.CI_TERMINAL) {
+    if (trigger?.terminal !== true || ciWait?.terminal !== true) {
+      return refuse('ci-not-terminal', 'the CI notification does not carry a persisted terminal result')
+    }
+    if (!wakeToken) return refuse('missing-ci-wake', 'the terminal CI notification carries no wake token')
+    if (wakeToken !== ciWait.wakeToken) {
+      return refuse('stale-ci-wake', 'the terminal CI notification belongs to a superseded wait')
+    }
   }
 
   if (sourceSpawnToken && evidence.observed.lockSpawnToken && evidence.observed.lockSpawnToken !== sourceSpawnToken) {
@@ -613,6 +670,7 @@ export function successorStartDecision({
       spawnToken,
       sourceGeneration,
       sourceSpawnToken,
+      wakeToken,
       trigger: kind,
       requestedAt: now,
     },
@@ -673,10 +731,31 @@ export function supervisedExitTrigger(records = [], { childStartedAt = 0 } = {})
     return {
       kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
       terminal: true,
+      wakeToken: terminal.evidence.wakeToken ?? null,
+      result: terminal.evidence.terminal,
       evidence: { seq: terminal.seq ?? null, result: terminal.evidence.terminal },
     }
   }
   return { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null }
+}
+
+/** A red terminal wake is a repair handoff, not permission to select unrelated
+ * work. Green simply confirms why the sleeping batch was resumed. */
+export function ciTerminalPrompt(ciWait) {
+  if (ciWait?.terminal !== true) return ''
+  const result = ciWait.result ?? {}
+  const identity = ciWait.identity ?? 'the observed workflow run'
+  if (result.verdict === 'red' || result.state === 'failed') {
+    return (
+      `\n\nCI-TERMINAL-HANDOFF: ${identity} concluded RED. This successor is the repair path: ` +
+      'run `node scripts/ci-status-guard.mjs` first, inspect the named failure, repair it, run the required gates, ' +
+      'and push the fixing commit before selecting another work-order point.'
+    )
+  }
+  if (result.verdict === 'green' || result.state === 'success') {
+    return `\n\nCI-TERMINAL-HANDOFF: ${identity} concluded GREEN; continue the batch immediately.`
+  }
+  return ''
 }
 
 /** The persisted record for a start the decision licensed. PURE. */

@@ -2,9 +2,14 @@
 // red blocks and notifies once per sha, pending/success/none allow, malformed
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
+import { assessCiWait } from './batch-in-flight-core.mjs'
+import { successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
+  acknowledgeCiWaitState,
   blockReason,
   cachedAnswer,
+  ciWaitBackoffMs,
+  ciWaitIdentity,
   ciRedAlertMessage,
   classifyRuns,
   failedRuns,
@@ -16,8 +21,11 @@ import {
   recoveredWorkflows,
   refTargets,
   refVerdict,
+  reconcileCiWait,
+  renewCiWait,
   shouldBlock,
   shouldNotify,
+  observeCiWait,
   sweepTargets,
   FAMINE_TTL_MS,
   PUSH_WINDOW_MS,
@@ -450,6 +458,113 @@ describe('cachedAnswer', () => {
   it('fails open on junk', () => {
     expect(cachedAnswer(undefined, NOW)).toBe(null)
     expect(cachedAnswer({ state: 'seen', checkedAt: NOW }, NOW)).toBe(null)
+  })
+})
+
+describe('renewable durable CI wait', () => {
+  const observation = (at, state = 'pending') => ({
+    target: { ref: 'origin/feat/x', sha: BRANCH },
+    classification: { state, workflowName: 'CI', runId: 32462093487 },
+    firstSeenAt: at,
+    observedAt: at,
+  })
+
+  it('carries the complete identity and renews without replacing its wake token or deadline', () => {
+    const firstObservation = { ...observation(t(120)), observedAt: t(90) }
+    const secondObservation = { ...observation(t(120)), observedAt: t(30) }
+    const first = renewCiWait(null, firstObservation, { now: t(90), makeWakeToken: () => 'wake-1' })
+    const second = renewCiWait(first, secondObservation, { now: t(30), makeWakeToken: () => 'wake-2' })
+    expect(ciWaitIdentity(observation(t(120)))).toBe(`origin/feat/x:${BRANCH}:CI:32462093487`)
+    expect(second).toMatchObject({
+      state: 'pending',
+      ref: 'origin/feat/x',
+      sha: BRANCH,
+      workflow: 'CI',
+      runId: 32462093487,
+      firstObservationAt: t(90),
+      lastObservationAt: t(30),
+      deadline: t(120) + WAIT_BUDGET_MS,
+      wakeToken: 'wake-1',
+      observations: 2,
+      terminal: null,
+    })
+  })
+
+  it('keeps observing past the interaction deadline and preserves a terminal result for recovery', () => {
+    const wait = renewCiWait(null, observation(NOW - WAIT_BUDGET_MS), { now: NOW, makeWakeToken: () => 'wake-1' })
+    const stillPending = observeCiWait(wait, { state: 'pending' }, { now: NOW + 1 })
+    const finished = observeCiWait(stillPending, { state: 'success', conclusion: 'success', url: 'https://x' }, { now: NOW + 2 })
+    expect(stillPending).toMatchObject({ state: 'pending', deadline: NOW, lastObservationAt: NOW + 1 })
+    expect(finished).toMatchObject({
+      state: 'success',
+      wakeToken: 'wake-1',
+      observer: null,
+      terminal: { state: 'success', verdict: 'green', observedAt: NOW + 2, conclusion: 'success', url: 'https://x' },
+    })
+  })
+
+  it('backs off exponentially but never reaches the 900-second scheduler interval', () => {
+    expect(ciWaitBackoffMs({ observations: 1 })).toBe(15_000)
+    expect(ciWaitBackoffMs({ observations: 2 })).toBe(30_000)
+    expect(ciWaitBackoffMs({ observations: 20 })).toBe(90_000)
+  })
+
+  it('fails closed as data: malformed input cannot invent a wait or erase a valid one', () => {
+    expect(renewCiWait(null, {}, { makeWakeToken: () => 'wake' })).toBeNull()
+    const wait = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake' })
+    expect(observeCiWait(wait, { state: 'mystery' }, { now: NOW + 1 })).toEqual(wait)
+  })
+
+  it('never lets a stale pending observation resurrect an already-terminal wait', () => {
+    const pending = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake' })
+    const terminal = observeCiWait(pending, { state: 'success' }, { now: NOW + 1 })
+    const reconciled = reconcileCiWait(terminal, [observation(NOW)], { now: NOW + 2, makeWakeToken: () => 'new-wake' })
+    expect(reconciled).toEqual(terminal)
+  })
+
+  it('archives terminal evidence only for the matching successor wake token', () => {
+    const pending = renewCiWait(null, observation(NOW), { now: NOW, makeWakeToken: () => 'wake' })
+    const terminal = observeCiWait(pending, { state: 'failed', conclusion: 'failure' }, { now: NOW + 1 })
+    const original = { shas: {}, ciWait: terminal }
+    expect(acknowledgeCiWaitState(original, 'stale', { now: NOW + 2 })).toEqual({ state: original, acknowledged: false })
+    expect(acknowledgeCiWaitState(original, 'wake', { now: NOW + 2 })).toMatchObject({
+      acknowledged: true,
+      state: { ciWait: null, lastCiWait: { wakeToken: 'wake', recoveredAt: NOW + 2, terminal: { verdict: 'red' } } },
+    })
+  })
+
+  it('FAKE CLOCK: two Stop attempts and worker exit keep the wait visible, then terminal wakes before 900 seconds', () => {
+    let clock = NOW
+    const stop = () => observation(clock)
+    const first = renewCiWait(null, stop(), { now: clock, makeWakeToken: () => 'wake-incident' })
+
+    clock += 60_000 // the second Stop attempt from the measured interaction
+    const second = renewCiWait(first, stop(), { now: clock, makeWakeToken: () => 'must-not-replace' })
+    expect(second).toMatchObject({ state: 'pending', wakeToken: 'wake-incident', observations: 2 })
+
+    clock += 1 // worker exits; neither its pid nor its turn owns the observation
+    const afterExit = assessCiWait({ wait: second, now: clock, probePid: () => null })
+    expect(afterExit).toMatchObject({ visible: true, pending: true, repair: true })
+
+    const workerExitedAt = clock
+    clock += ciWaitBackoffMs(second)
+    const terminalWait = observeCiWait(second, { state: 'success', conclusion: 'success' }, { now: clock })
+    const terminal = assessCiWait({ wait: terminalWait, now: clock, probePid: () => null })
+    const wake = successorStartDecision({
+      trigger: {
+        kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+        terminal: true,
+        wakeToken: terminal.wakeToken,
+        result: terminal.result,
+      },
+      spawnToken: 'successor-token',
+      ciWait: terminal,
+      openPoints: 1,
+      assessment: { alive: false, reason: 'worker-exited' },
+      now: clock,
+    })
+    expect(wake).toMatchObject({ start: true, code: 'start', reservation: { wakeToken: 'wake-incident' } })
+    expect(clock - workerExitedAt).toBeLessThan(900_000)
   })
 })
 
