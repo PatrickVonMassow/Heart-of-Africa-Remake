@@ -169,13 +169,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
   echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; der Schutz wirkt — nur fragt ihn ein zweiter Weg nie; oder die Umgebung
-  führt ihre **eigene Kopie** der Datei aus, die du korrekt geändert hast.
-  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der
-  Test heißt ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**? Was die Umgebung
-  ausführt, **vergleiche** mit dem Stand im Repository und **benenne** die Abweichung, statt sie
-  still zu überschreiben."
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die das
+  Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der Test heißt
+  ‚**gibt es einen Weg vorbei?**'; ‚wartet' etwas: **worauf**? **Vergleiche Ausgeführtes mit dem Repository.**"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
