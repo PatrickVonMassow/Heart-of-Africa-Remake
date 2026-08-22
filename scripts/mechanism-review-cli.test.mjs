@@ -328,8 +328,13 @@ describe('the mode round-trips into the ledger', () => {
         writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
         return path
       }
+      // The halves name their authors, so the merger is checked against THEM: Fable
+      // wrote A and Sol wrote B, which leaves Claude as the one model that wrote
+      // neither. This fixture used to say A was Opus 5's and let Sol merge its own
+      // half B — the recorder could not see that, because it read the commit
+      // trailers instead of the halves.
       const listA = w('A.json', {
-        model: 'Opus 5',
+        model: 'Fable 5',
         entries: [
           { id: 'A1', file: 'x.ts', defect: 'the first defect' },
           { id: 'A2', file: 'y.ts', defect: 'the second defect' },
@@ -344,11 +349,24 @@ describe('the mode round-trips into the ledger', () => {
       })
       const built = build({
         mode: 'blind-parallel',
+        mergedBy: 'Claude Opus 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+      })
+      expect(built.record.mergedBy).toBe('Claude Opus 5')
+
+      // AND THE HOLE THAT FIXTURE STOOD IN: an author of a half is refused as the
+      // merger now that the halves say who wrote them.
+      const selfMerged = build({
+        mode: 'blind-parallel',
         mergedBy: 'GPT-5.6 Sol',
         unionPath: union,
         listAPath: listA,
         listBPath: listB,
       })
+      expect(selfMerged.ok).toBe(false)
+      expect((selfMerged.errors ?? []).join('\n')).toMatch(/authored one of the two lists \(GPT-5\.6 Sol\)/)
       expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
       expect(built.record.accounting).toMatch(/^2 A \+ 1 B entries → 2 union entries .*every input entry accounted for$/)
       expect(built.record.accountingSource).toBe('computed')

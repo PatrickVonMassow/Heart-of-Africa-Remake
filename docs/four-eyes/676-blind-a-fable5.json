@@ -1,72 +1,75 @@
-[
- {
-  "id": "A1",
-  "file": "CLAUDE.md",
-  "defect": "The conflict is an ARTEFACT of process parentage, not a real trade-off: the successor already has the information it needs (the in-flight declaration names branch, worktree, pid, log), it lacks only a live process."
- },
- {
-  "id": "A2",
-  "file": "CLAUDE.md",
-  "defect": "The coupling is provably breakable — the detached Sol authoring lane survived a landing, a board rebuild and a failed boundary in the supervising session, measured 13.08.2026."
- },
- {
-  "id": "A3a",
-  "file": "CLAUDE.md",
-  "defect": "Delegated AUTHORING runs as a detached process (the author-sol.mjs shape), never as an in-process Agent-tool subagent."
- },
- {
-  "id": "A3b",
-  "file": "CLAUDE.md",
-  "defect": "The in-flight declaration becomes the ADOPTION RECORD; what is missing today is that nothing tells the successor the run is now its own."
- },
- {
-  "id": "A3c",
-  "file": "CLAUDE.md",
-  "defect": "The handover condition changes from 'no agent in flight' to 'the point I was LANDING is landed'."
- },
- {
-  "id": "A4",
-  "file": "CLAUDE.md",
-  "defect": "The successor must gain a capability it lacks: resume supervision of a process it did not spawn — notice completion without a harness notification, and hand findings back for a second leg."
- },
- {
-  "id": "A5a",
-  "file": "CLAUDE.md",
-  "defect": "Failure mode: an adopted run dies unnoticed. The in-flight probe already expires when the work stops moving; expiry must ALERT rather than merely unblock."
- },
- {
-  "id": "A5b",
-  "file": "CLAUDE.md",
-  "defect": "Failure mode: two sessions adopt the same run. The batch lock and its fence already serialise ownership."
- },
- {
-  "id": "A5c",
-  "file": "CLAUDE.md",
-  "defect": "Failure mode: a detached run outlives its point with nobody landing it. The board now-card and the ETA rule make an unattended run visible to the reader."
- },
- {
-  "id": "A6a",
-  "file": "CLAUDE.md",
-  "defect": "Rejected: raising the pool cap. The binding constraint is LANDING throughput (30-90 min per point today), not authoring slots; more authors only queue at the same door."
- },
- {
-  "id": "A6b",
-  "file": "CLAUDE.md",
-  "defect": "Rejected: refilling slots to keep the session busy — that is the branch of the dilemma that grows context for no throughput."
- },
- {
-  "id": "A6c",
-  "file": "CLAUDE.md",
-  "defect": "Rejected: moving picture judgment or landing out of the main session; they are the serial duties that define it."
- },
- {
-  "id": "A7",
-  "file": "CLAUDE.md",
-  "defect": "The larger driver the problem statement understates: main-session context grows mostly from HARVESTING and BOOKKEEPING (diffs, gates, guard remedies, board), not from spawning — so also split the ROLES into a short-lived dispatcher and a lander, so neither carries the other's history."
- },
- {
-  "id": "A8",
-  "file": "CLAUDE.md",
-  "defect": "Measured by scripts/measure-context-cost.mjs over a full day, in both scopes: median main-session context at handover and the share of spend above 150k context (the 87-94 % figure that motivated the boundary), against points landed per day."
- }
-]
+{
+ "model": "Fable 5",
+ "entries": [
+  {
+   "id": "A1",
+   "file": "CLAUDE.md",
+   "defect": "The conflict is an ARTEFACT of process parentage, not a real trade-off: the successor already has the information it needs (the in-flight declaration names branch, worktree, pid, log), it lacks only a live process."
+  },
+  {
+   "id": "A2",
+   "file": "CLAUDE.md",
+   "defect": "The coupling is provably breakable — the detached Sol authoring lane survived a landing, a board rebuild and a failed boundary in the supervising session, measured 13.08.2026."
+  },
+  {
+   "id": "A3a",
+   "file": "CLAUDE.md",
+   "defect": "Delegated AUTHORING runs as a detached process (the author-sol.mjs shape), never as an in-process Agent-tool subagent."
+  },
+  {
+   "id": "A3b",
+   "file": "CLAUDE.md",
+   "defect": "The in-flight declaration becomes the ADOPTION RECORD; what is missing today is that nothing tells the successor the run is now its own."
+  },
+  {
+   "id": "A3c",
+   "file": "CLAUDE.md",
+   "defect": "The handover condition changes from 'no agent in flight' to 'the point I was LANDING is landed'."
+  },
+  {
+   "id": "A4",
+   "file": "CLAUDE.md",
+   "defect": "The successor must gain a capability it lacks: resume supervision of a process it did not spawn — notice completion without a harness notification, and hand findings back for a second leg."
+  },
+  {
+   "id": "A5a",
+   "file": "CLAUDE.md",
+   "defect": "Failure mode: an adopted run dies unnoticed. The in-flight probe already expires when the work stops moving; expiry must ALERT rather than merely unblock."
+  },
+  {
+   "id": "A5b",
+   "file": "CLAUDE.md",
+   "defect": "Failure mode: two sessions adopt the same run. The batch lock and its fence already serialise ownership."
+  },
+  {
+   "id": "A5c",
+   "file": "CLAUDE.md",
+   "defect": "Failure mode: a detached run outlives its point with nobody landing it. The board now-card and the ETA rule make an unattended run visible to the reader."
+  },
+  {
+   "id": "A6a",
+   "file": "CLAUDE.md",
+   "defect": "Rejected: raising the pool cap. The binding constraint is LANDING throughput (30-90 min per point today), not authoring slots; more authors only queue at the same door."
+  },
+  {
+   "id": "A6b",
+   "file": "CLAUDE.md",
+   "defect": "Rejected: refilling slots to keep the session busy — that is the branch of the dilemma that grows context for no throughput."
+  },
+  {
+   "id": "A6c",
+   "file": "CLAUDE.md",
+   "defect": "Rejected: moving picture judgment or landing out of the main session; they are the serial duties that define it."
+  },
+  {
+   "id": "A7",
+   "file": "CLAUDE.md",
+   "defect": "The larger driver the problem statement understates: main-session context grows mostly from HARVESTING and BOOKKEEPING (diffs, gates, guard remedies, board), not from spawning — so also split the ROLES into a short-lived dispatcher and a lander, so neither carries the other's history."
+  },
+  {
+   "id": "A8",
+   "file": "CLAUDE.md",
+   "defect": "Measured by scripts/measure-context-cost.mjs over a full day, in both scopes: median main-session context at handover and the share of spend above 150k context (the 87-94 % figure that motivated the boundary), against points landed per day."
+  }
+ ]
+}

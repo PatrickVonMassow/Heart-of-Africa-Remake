@@ -185,7 +185,11 @@ export function countUnionFiles({ unionPath, listAPath, listBPath }) {
   if (!inputs.ok) return { ok: false, errors: inputs.errors }
   const result = accountUnion({ a, b, union })
   if (!result.ok) return { ok: false, errors: [formatAccounting(result)] }
-  return { ok: true, summary: summaryLine(result), errors: [] }
+  // THE HALVES NAME THEIR OWN AUTHORS, and that beats the commit-trailer proxy the
+  // merger check falls back to — see buildRecord below for why the proxy is wrong
+  // whenever the merging model is also the one that commits the union.
+  const halfAuthors = [a.model, b.model].map((m) => String(m ?? '').trim()).filter(Boolean)
+  return { ok: true, summary: summaryLine(result), halfAuthors, errors: [] }
 }
 
 /**
@@ -297,6 +301,8 @@ export function buildRecord({
   const missing = paths.filter(([, v]) => !String(v ?? '').trim()).map(([flag]) => flag)
   let source = 'stated'
   let receipt = accounting
+  /** The two blind halves' own authors, when the files were handed over. */
+  let halfAuthors = []
   if (missing.length < paths.length) {
     if (missing.length) {
       return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
@@ -305,13 +311,26 @@ export function buildRecord({
     if (!counted.ok) return { ok: false, errors: counted.errors }
     receipt = counted.summary
     source = 'computed'
+    if (counted.halfAuthors?.length === 2) halfAuthors = counted.halfAuthors
   }
   const commit = resolve(sha)
+  // WHO WROTE THE TWO HALVES, and only failing that, who touched the commit. The
+  // trailer proxy reads the union commit's models as the list authors, which holds
+  // only while the merging model is a DELEGATE whose output somebody else commits.
+  // Where the merger commits its own union — a merge performed by the session
+  // itself — the proxy names the merger as an author of the material and refuses
+  // the one model the rule actually allows. Measured on the 13.08.2026 stage: the
+  // halves are Fable's and Sol's, Claude wrote neither and merged, and no record
+  // of that fact could be written. Supplying --union/--list-a/--list-b replaces the
+  // proxy with the halves themselves, which are versioned files a reviewer can read.
+  const mergeAuthors = halfAuthors.length === 2
+    ? halfAuthors
+    : [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])]
   const merge = resolveMergePolicy({
     mode,
     mergedBy,
     mergeFallback,
-    authors: [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])],
+    authors: mergeAuthors,
     fableState,
   })
   const check = validateRecord({
@@ -323,6 +342,8 @@ export function buildRecord({
     // EVERY model named in the trailers, not only the first: two co-authors mean
     // two list authors, and the merger has to be neither (four-eyes, point 634).
     authors: commit.authors,
+    // Read off the halves when they were handed over; see mergeAuthors above.
+    halfAuthors,
     mode,
     framing,
     authorFraming,

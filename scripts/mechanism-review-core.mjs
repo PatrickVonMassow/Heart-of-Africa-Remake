@@ -496,15 +496,23 @@ export function validateMergedBy({
   model,
   authoredBy,
   authors,
+  halfAuthors,
   fableState,
 } = {}) {
   const m = String(mode ?? '').trim()
   const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  // THE HALVES THEMSELVES WHERE THEY WERE READ, the trailer proxy only failing that.
+  // The proxy treats the union commit's models as the list authors, which is right
+  // while the merger is a delegate somebody else commits for, and wrong the moment
+  // the merging model commits its own union: it then names the merger as an author
+  // of the material and refuses the one model the rule allows.
+  const halves = (Array.isArray(halfAuthors) ? halfAuthors : []).map((a) => String(a ?? '').trim()).filter(Boolean)
+  const listAuthors = halves.length === 2 ? halves : [model, ...wrote]
   const policy = resolveMergePolicy({
     mode: m,
     mergedBy,
     mergeFallback,
-    authors: [model, ...wrote],
+    authors: listAuthors,
     fableState,
   })
   const who = policy.mergedBy
@@ -522,7 +530,7 @@ export function validateMergedBy({
     return { ok: errors.length === 0, errors }
   }
   if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
-  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason }).errors]
+  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: listAuthors, fallback: reason }).errors]
   if (!receipt) {
     errors.push(
       '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
@@ -1005,6 +1013,7 @@ export function validateRecord({
   mergeFallback,
   accounting,
   authors,
+  halfAuthors,
   pass,
   passFiles,
   fableState,
@@ -1035,7 +1044,10 @@ export function validateRecord({
     errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
   }
   errors.push(...validatePass({ pass, passFiles }).errors)
-  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, fableState }).errors)
+  errors.push(
+    ...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, halfAuthors, fableState })
+      .errors,
+  )
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
