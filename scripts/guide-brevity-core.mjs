@@ -156,7 +156,7 @@ export const LIMITS = {
   // entries were tightened anyway, so the guide measures 428 / 3826 and BOTH
   // ceilings follow it down to the exact fit. A ceiling still RISES only by the
   // measured size of genuinely new tips, as the rule above allows and the +1 line
-  // / +21 words of 30.07.2026 did; what never happens is a ceiling left standing
+  // / +21 words of 22.08.2026 did; what never happens is a ceiling left standing
   // above a guide that has shrunk.
   maxWords: 3826,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
