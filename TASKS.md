@@ -200,6 +200,35 @@ put it is the mistake this line exists to stop.
   parent-session-death drill; and the stage proven DARK — with the flag off, today's authoring path
   is the path that runs now. Mechanism review per step, not once at the end; each step green on the
   unit layer before the next.
+  THE DESIGN STAGE IS CLOSED, AND WHAT IT LEFT IS LISTED HERE rather than rediscovered while
+  building (twelve cross-vendor rounds over the three mechanisms, GPT-5.6 Sol at effort high,
+  22./23.08.2026, every round recorded in `.claude/mechanism-reviews.jsonl`; the final round was
+  asked to separate what is still false from what is an admitted uncovered case, and it did).
+  Several claims were WITHDRAWN rather than patched — a clock rule that could not be enforced
+  against scheduling delay, an exclusion that did not exist, and a reversibility the design never
+  established — and the text says so where it once claimed otherwise. FIVE ITEMS ARE OWED:
+  (i) BEFORE STEP 1: the daemon's existence is recorded twice — its own durable identity file and
+      a copy in the batch lock — and mechanism 2 claims the two can never disagree. They can: a
+      crash between the two writes, or a daemon exit, leaves them apart. Step 1 defines the
+      crash-safe transition and reconciliation invariant for that pair BEFORE the schemas encode
+      the states, or the schemas encode a lie.
+  (ii) AGAINST STEP 4: one sentence still reads "B advances the ref as the first act of
+      acquisition", which the later mandatory order contradicts — acquire, start the daemon if one
+      is to be started, advance the credential, then publish. The explanation after it re-reads
+      "first act" as "before any publication"; the earlier sentence is simply false and goes.
+  (iii) AGAINST STEP 8: the recovery procedure's third outcome consumes a case its fourth says
+      must be quarantined. A rewrite that lost its publication trailer and an unrelated successor
+      leave the same graph evidence, so ABANDONED must not be concluded from "the history contains
+      the expected-before oid and nothing derived from this attempt"; that case is UNKNOWN.
+  (iv) AGAINST STEP 7: the omissions table's idempotency case still requires a repeated `--commit`
+      to advance the fence once, while step 7 and mechanism 2 say `--commit` never advances it.
+      The case asserts the fence is UNCHANGED.
+  (v) THE ADMITTED RESIDUALS, which are not blockers and are recorded as limits in
+      `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the
+      very defect this point removes, so it is worst before the point lands); work begun on the old
+      path gains nothing from this design; one push of publishing authority survives local
+      dispossession, deliberately, so that exactly one publisher exists at all times; and the
+      drill's check-to-signal interval has one branch it cannot observe.
   QUEUE RANK: at the front, directly behind point 716 — but BLOCKED BEFORE CODE by (b) since
   22.08.2026, 18:20, so the queue passes it and the next unblocked point is worked until the
   Fable switch is flipped. Reason for the rank: the user ordered it forward on 22.08.2026 after a
