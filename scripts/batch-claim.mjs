@@ -162,9 +162,8 @@ export function gatherClaim(
         : ourClaudeProcess(sid, { lockPath })
   }
   const lock = ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock
-  // Owner context is still reported and used by the surrounding handshake, but
-  // no longer suspends reservation age. Lock existence alone must still not call
-  // a launcher's pending-spawn placeholder a live session owner.
+  // Owner context suspends a human claim's pending clock. Lock existence alone
+  // must still not call a launcher's pending-spawn placeholder a live owner.
   const ownerHolding = ownerIsHolding({
     lock,
     claimantSid: claim.sessionId,

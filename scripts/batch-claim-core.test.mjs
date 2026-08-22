@@ -32,6 +32,7 @@ import {
   describeClaim,
   ownerIsHolding,
   releaseDecision,
+  resolveBoundaryDestination,
   reservationDecision,
   takeoverDecision,
   waitForClaimEnd,
@@ -240,9 +241,9 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     expect(asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS })).honour).toBe(true)
   })
 
-  it('a LIVE process does not preserve an unrenewed claimed reservation', () => {
+  it('a LIVE owner preserves the claim until there is nobody left to wait for', () => {
     const longTurn = claimOf({ at: NOW - 3 * 60 * 60 * 1000 })
-    expect(asOwner(longTurn, { ownerHolding: true })).toMatchObject({ honour: false, reason: 'expired' })
+    expect(asOwner(longTurn, { ownerHolding: true })).toMatchObject({ honour: true, reason: 'honour' })
     expect(asOwner({ ...longTurn, activityAt: NOW - 1_000 }, { ownerHolding: true })).toMatchObject({
       honour: true,
       reason: 'honour',
@@ -708,7 +709,7 @@ describe('reservationDecision — a free lock still belongs to the window that c
       // decision and adds the pick-up window's own log line (point 446).
       ['batch-autostart.mjs', 'takeoverDecision('],
       ['chat-watcher.mjs', 'reservationDecision('],
-      ['batch-boundary.mjs', 'reservationDecision('],
+      ['batch-boundary.mjs', 'resolveBoundaryDestination('],
       ['batch-resume-hook.mjs', 'reservationDecision('],
       // The door whose 17:11 re-acquire IS the incident: it was already wired
       // correctly, and nothing pinned it against drift (four-eyes finding 2).
@@ -897,6 +898,53 @@ describe('takeoverDecision — the launcher does not grab a lock that was freed 
       expect(takeoverDecision({ claim, now: NOW, probePid: aliveClaimant }).spawn).toBe(
         reservationDecision({ assessment }).acquire,
       )
+    }
+  })
+})
+
+describe('resolveBoundaryDestination — every ownership exit uses one decision', () => {
+  const honoured = { honour: true, reserve: false, reason: 'honour', claimantSid: CLAIMANT }
+
+  it('reserves an expired lease or handover for an honoured claim', () => {
+    expect(resolveBoundaryDestination({ assessment: honoured, leaseExpired: true, renewalUntil: NOW + 60_000 })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+      claimantSid: CLAIMANT,
+    })
+    expect(resolveBoundaryDestination({ assessment: honoured, ownerAlive: false })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+    })
+  })
+
+  it('matches --status for an old claim while a live owner still holds', () => {
+    const old = claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 })
+    const ownerHolding = ownerIsHolding({
+      lock: { sessionId: OWNER, kind: 'session' },
+      claimantSid: CLAIMANT,
+      alive: true,
+    })
+    const assessment = assessClaim({ claim: old, ownerHolding, now: NOW, probePid: aliveClaimant })
+    expect(assessment).toMatchObject({ honour: true, reason: 'honour' })
+    expect(resolveBoundaryDestination({ assessment, ownerAlive: false })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+      claimantSid: CLAIMANT,
+    })
+  })
+
+  it('renews advancing evidence only when no claim is waiting', () => {
+    expect(resolveBoundaryDestination({ leaseExpired: true, renewalUntil: NOW + 60_000 })).toMatchObject({
+      action: 'renew',
+      spawn: false,
+      renewalUntil: NOW + 60_000,
+    })
+  })
+
+  it('spawns for an expired lease or handover with no honoured claim', () => {
+    for (const assessment of [null, { honour: false, reserve: false, reason: 'expired', claimantSid: CLAIMANT }]) {
+      expect(resolveBoundaryDestination({ assessment, leaseExpired: true }).action).toBe('spawn')
+      expect(resolveBoundaryDestination({ assessment, ownerAlive: false }).action).toBe('spawn')
     }
   })
 })

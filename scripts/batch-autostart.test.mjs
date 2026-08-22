@@ -12,6 +12,7 @@
 // witness — and it is safe precisely because the throw comes before the first side
 // effect, which is the property being pinned.
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -19,6 +20,29 @@ describe('batch-autostart is import-proof', () => {
   it('throws instead of spawning when it is imported rather than run', async () => {
     await expect(import('./batch-autostart.mjs')).rejects.toThrow(/CLI, not a module/)
   })
+
+  // AND IT MUST LINK UNDER REAL NODE, WHICH THE ASSERTION ABOVE CANNOT SEE
+  // (22.08.2026). Vitest loads a module through Vite's SSR transform, where a
+  // named import of something the target does not export silently becomes
+  // `undefined`. Real node refuses it at LINK time, before the first line runs.
+  // So the launcher imported `pidCorroboration` from `batch-ownership-core.mjs`,
+  // which exports it from `batch-singleton.mjs` instead; the whole unit gate
+  // stayed green while `node scripts/batch-autostart.mjs` — the 900-second OS
+  // recovery tick, and the only thing that restarts a dead batch — died with
+  // `does not provide an export named 'pidCorroboration'`. Only a real node
+  // process is a witness for that, and the import-proof guard is what makes the
+  // witness safe: the module links, then refuses to run before any side effect.
+  it('links in a real node process, reaching the CLI guard rather than a missing export', () => {
+    const probe = "import('./scripts/batch-autostart.mjs').then(() => console.log('LINKED-AND-RAN'), (e) => console.log(e.constructor.name + ': ' + e.message.split('\\n')[0]))"
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.stdout).not.toMatch(/does not provide an export named/)
+    expect(run.stdout).toMatch(/CLI, not a module/)
+  }, 30_000)
 })
 
 // ---------------------------------------------------------------------------
@@ -130,6 +154,13 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(reader).toMatch(/catch\s*\{\s*return null\s*\}/)
   })
 
+  it('routes claim, handover and lease expiry through the shared destination', () => {
+    expect(code).toMatch(/ownerHolding:\s*ownerIsHolding\(\{[\s\S]{0,220}?lock,[\s\S]{0,220}?claimantSid:/)
+    expect(code).toMatch(/resolveBoundaryDestination\(\{[\s\S]{0,220}?assessment:\s*claimantAssessment,[\s\S]{0,220}?leaseExpired:/)
+    expect(code).toMatch(/destination\.action === 'reserve'[\s\S]{0,500}?handBackToClaimant\(/)
+    expect(code).toMatch(/destination\.action === 'renew'[\s\S]{0,300}?updateOwnLock\(/)
+  })
+
   // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes
   // review, finding C). Order is the whole behaviour here, and order is only
   // visible in the source — the file cannot be imported. The sweep sat BELOW the
@@ -151,7 +182,7 @@ describe('the launcher uses the pure spawn builders', () => {
       [/batchParked/, 'the user-paused guard'],
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
-      [/takeover\.spawn/, 'the user claim that reserves the batch'],
+      [/destination\.action === 'reserve'/, 'the user claim that reserves the batch'],
     ]) {
       expect(sweep, `the sweep must run before ${what}`).toBeLessThan(lineOf(re, what))
     }
@@ -160,7 +191,7 @@ describe('the launcher uses the pure spawn builders', () => {
   it('…and every one of those exits persists the state the sweep just changed', () => {
     // A pruned ledger that is never written back is a sweep that half happened.
     const first = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
-    const claimEnd = codeLines.findIndex((l) => /takeover\.spawn/.test(l))
+    const claimEnd = codeLines.findIndex((l) => /destination\.action === 'reserve'/.test(l))
     const early = codeLines.slice(first, claimEnd + 12)
     expect(early.some((l) => /\bbail\(/.test(l)), 'the early guards must exit through bail()').toBe(true)
     for (const l of early) {
@@ -266,7 +297,7 @@ describe('the launcher runs the board watchdog', () => {
     for (const [re, what] of [
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
-      [/takeover\.spawn/, 'the user claim that reserves the batch'],
+      [/destination\.action === 'reserve'/, 'the user claim that reserves the batch'],
     ]) {
       expect(watch, `the watchdog must run before ${what}`).toBeLessThan(lineOf(re, what))
     }
