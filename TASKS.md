@@ -11068,3 +11068,89 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs a blocked push and a re-run, never a wrong verdict about the product,
   but a red that clears itself on retry is exactly the kind that teaches a session to retry.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 836. `author-sol` reports every run as a PROBLEM as soon as the test line says "skipped"
+  (MEASURED 22.08.2026 on both authoring legs of point 835). GPT-5.6 Sol reported
+  `test:unit PASS (12,842 passed, 5 skipped); build PASS; lint PASS` — three green gates, and all
+  three verified green independently by the calling session. `scripts/author-sol.mjs` nevertheless
+  ended the run with exit 3 and the line "the run's own GATES line is not a report of three green
+  gates: it reports a gate as anything but green". Our suite carries five deliberately skipped
+  tests permanently, so this fires on EVERY run: the checker reads any word beside passed/green as
+  a red report.
+  WHY IT MATTERS: the harness reports the background task as `failed`, and the calling session has
+  to open the log every single time to establish that nothing is broken. The damage is not the
+  wasted read — it is that a genuinely red gate now looks exactly like the normal case, which is
+  the state the check exists to prevent.
+  FINAL STATE: the GATES-line check treats a run's neutral count words — at least `skipped` and
+  `todo` — as neutral rather than as a red report, and keeps refusing a line that reports a gate as
+  failed, red, not run or unknown. A run whose three gates are green exits 0 and is reported as a
+  success by the harness.
+  VERIFIABLE: Vitest over the pure checker — the two GATES lines measured on 22.08.2026 (both
+  carrying "5 skipped") pass; a line reporting `test:unit FAILED`, one reporting a gate as `not
+  run`, and one naming only two of the three gates each still fail; and the word `skipped` inside a
+  gate NAME does not smuggle a red line through.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point from
+  its own run, and the user ruled on 20.08.2026 that such a point does not overtake the release.
+  Criticality: medium — it costs a log read per delegated run today, but it trains the session to
+  read "failed" as noise, and that is how a real red gets waved through.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 837. The four-eyes gate on `main` has been standing open on a suspended demand, and the debt
+  behind it is now 28 commits (MEASURED 22.08.2026 with `guard-preflight --for merge` and by running
+  `mechanism-review-guard` against a real Stop payload). The gate does not block, because the range
+  `265712e4..main` measures 11,487,013 characters against a 200,000-character round budget and
+  `TASKS.md` and `docs/tasks-archive.md` cannot be carried even as a diff — so the guard takes its
+  gap clause, names the gap and lets the turn end. That is the designed behaviour, and it is the
+  problem: the demand is SUSPENDED, never satisfied, and it silently grows.
+  WHAT STANDS UNANSWERED: 22 do-not-merge records whose re-review would have to sit on a commit
+  that descends from the fix (the `clear-claim-guard` series from 5ce597c, the `doc-budget-core`
+  series from 7db99ea, and the `guard-health` widening 65022b1/6a5e92d, which its own record says
+  was answered by the revert aeedceb but never got the follow-up ledger line); seven commits with
+  no review recorded at all, four of them from the landing of point 597 itself (71b1be3, 4b9f2c3,
+  8b07b48, 5092e14) — the very mechanism point 835 then had to repair; and three contributions the
+  guard calls UNREVIEWABLE because their authorship vendor is unknown
+  (`criticality-review-guard-core`, `docs/analysis_de/vibe-coding-anleitung.md`, and
+  `.claude/mechanism-reviews.jsonl` with `.gitignore`).
+  FINAL STATE: the range is coverable again, by the same means point 722 used for the last one —
+  the reading is scheduled in passes against a frozen range, the do-not-merge records are either
+  answered on a descending commit or their revert is recorded in the ledger, and the unknown-vendor
+  contributions are either given their vendor or cut out with an explicit `--since` so a reviewer
+  can prove independence. Any part that is genuinely not worth reading is re-baselined WITH the
+  written justification the baseline file already demands, naming every file it leaves unread.
+  VERIFIABLE: `node scripts/mechanism-review-guard.mjs --status` reports a coverable plan rather
+  than a gap, and running the guard against a real Stop payload no longer prints REVIEW GAP; every
+  commit listed above is either cleared, answered or named in a recorded re-baseline justification.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point from
+  its own preflight, and the user ruled on 20.08.2026 that such a point does not overtake the
+  release.
+  Criticality: high — this is the gate that is supposed to keep a second pair of eyes on every
+  mechanism, and a gate that has been open long enough teaches the sessions passing through it that
+  it was never load-bearing.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 838. Point 834's estimate is 1.8x the whole programme it is the front stage of, and the 676
+  board card still describes steps that were cut out of it (user question 22.08.2026, 13:19; the
+  measurement is a previous session's, recorded in the findings carrier and drained here).
+  MEASURED from `.claude/board-queue.json`: 834 carries ~16 h, the highest value on the whole
+  board; 676 — the complete 13-step programme of the same architecture — carries ~9 h, 809 and 757
+  carry ~6 h, 716 carries ~2 h. A front stage cannot cost 1.8x the whole. MEASURED from
+  `.claude/queue-calibration.json` over 106 landed points that had both an estimate and a measured
+  span: the median of actual/estimated is 0.37 (p25 0.23, p75 1.00), evenly spread across high 0.38
+  / medium 0.38 / low 0.34 — our estimates run about 2.7x over a branch-to-landing span that still
+  contains idle time. Separately, the 676 card text still describes the complete programme although
+  TASKS.md has already cut steps 1-4, 8 and 9 out of it into 834: card and spec disagree.
+  FINAL STATE: 834 and 676 carry estimates that are consistent with each other and with the
+  calibration — the recorded recommendation is 834 at ~6 h, the height of 809 and 757, and 676
+  pulled down to its remainder (steps 5-7 and 10-13) at ~4 h, with the reservation that step 13 is
+  a multi-day measuring run and is stated as such rather than averaged away. The 676 board card
+  describes the steps its spec actually still holds. Whether the recommended numbers are adopted or
+  others are, the two cards and the two specs say the same thing afterwards.
+  VERIFIABLE: `node scripts/board.mjs` shows both cards with their new estimates, the 676 card text
+  names only steps 5-7 and 10-13, and no card on the board carries an estimate larger than a card
+  that contains it.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: it is queue bookkeeping, not
+  delivery, and the user ruled on 20.08.2026 that a point the machine files does not overtake the
+  release.
+  Criticality: low — it costs no product behaviour, but the board is what the user plans against,
+  and a front stage priced above its own whole makes that plan wrong.
+  Bundle: unbundled (batch autonomy).
