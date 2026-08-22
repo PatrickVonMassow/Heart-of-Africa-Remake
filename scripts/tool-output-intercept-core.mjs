@@ -1,6 +1,9 @@
 // Pure PreToolUse input rewriting for the large producers named by the output
-// budget. The registered wrapper is scripts/path-scope-guard.mjs: every Bash,
-// PowerShell, Read and Grep call already passes through that hook.
+// budget. This is deliberately a NAMED-PRODUCER bound, not a blanket ceiling
+// over every Bash/PowerShell call: the spill runner re-executes shell commands,
+// so commands whose output is consumed by their caller stay untouched. The
+// registered scripts/path-scope-guard.mjs hook sees every call in these tool
+// families and rewrites only the producers classified below.
 
 export const READ_LINE_BUDGET = 200
 export const GREP_RESULT_BUDGET = 100
@@ -15,6 +18,17 @@ export function shellProducer(command, { expandSegments, headAndArgs } = {}) {
     const lower = (split.args ?? []).map((word) => String(word.text ?? '').toLowerCase())
     if (head === 'grep' || head === 'egrep' || head === 'fgrep') return 'grep'
     if (head === 'git' && lower.includes('diff')) return 'git diff'
+    if (head === 'git' && lower.includes('show')) return 'git show'
+    if (head === 'git' && lower.includes('log') && lower.some((word) => word === '-p' || word === '--patch')) {
+      return 'git log --patch'
+    }
+    if (head === 'cat' || head === 'head' || head === 'tail') return `${head} file read`
+    if (
+      head === 'sed' &&
+      lower.some((word) => word === '--quiet' || word === '--silent' || /^-[^-]*n/.test(word))
+    ) {
+      return 'sed selective file read'
+    }
     if (head === 'npm' && lower.some((word) => word === 'ls' || word === 'list')) return 'npm ls'
     if (head === 'gh') {
       const positionals = lower.filter((word) => !word.startsWith('-'))

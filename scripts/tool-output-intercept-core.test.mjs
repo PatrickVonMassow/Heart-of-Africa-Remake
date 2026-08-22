@@ -20,7 +20,14 @@ function decodedCommand(interception) {
 describe('PreToolUse output interception', () => {
   it.each([
     ['git diff', 'git diff HEAD~1', 'git diff'],
+    ['git show', 'git --no-pager show HEAD', 'git show'],
+    ['git log -p', 'git log -p --all', 'git log --patch'],
+    ['git log --patch', 'git --no-pager log --patch -2', 'git log --patch'],
     ['grep', 'grep -R "needle" src', 'grep'],
+    ['cat', 'cat a.log b.log', 'cat file read'],
+    ['head', 'head -n 100000 a.log', 'head file read'],
+    ['tail', 'tail -n 100000 a.log', 'tail file read'],
+    ['sed -n', "sed -n '1,99999p' a.log", 'sed selective file read'],
     ['npm ls', 'npm ls --all', 'npm ls'],
     ['gh run view', 'gh run view 12345 --log', 'gh run view'],
   ])('budgets a direct %s without the caller routing it through a project script', (label, command, producer) => {
@@ -59,11 +66,19 @@ describe('PreToolUse output interception', () => {
     expect(call('Bash', { command: 'echo "grep needle"' })).toBeNull()
   })
 
+  it('leaves unlisted and output-consumed shell commands outside the named-producer bound', () => {
+    expect(call('Bash', { command: 'git log --oneline -5' })).toBeNull()
+    expect(call('Bash', { command: 'node scripts/custom-reporter.mjs' })).toBeNull()
+    expect(call('Bash', { command: 'npm run test:unit' })).toBeNull()
+  })
+
   it.each([
     ['env CI=1 git diff', 'git diff'],
     ['sudo npm ls --all', 'npm ls'],
     ['bash -c "gh run view 123 --log"', 'gh run view'],
     ['echo $(grep -R needle src)', 'grep'],
+    ['bash -c "git log -p -1"', 'git log --patch'],
+    ['echo $(cat a.log)', 'cat file read'],
   ])('cannot bypass interception through a shell carrier: %s', (command, producer) => {
     expect(call('Bash', { command })?.producer).toBe(producer)
   })
