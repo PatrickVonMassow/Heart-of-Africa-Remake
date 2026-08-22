@@ -347,14 +347,37 @@ describe('the mode round-trips into the ledger', () => {
           { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
         ],
       })
+      // The halves decide the merger only where they are TRACKED artefacts, so the
+      // temp fixtures say so explicitly; the untracked case is asserted below.
+      const tracked = { isTracked: () => true }
       const built = build({
         mode: 'blind-parallel',
         mergedBy: 'Claude Opus 5',
         unionPath: union,
         listAPath: listA,
         listBPath: listB,
+        ...tracked,
       })
       expect(built.record.mergedBy).toBe('Claude Opus 5')
+      // The record CARRIES the halves, because the gate re-judges it later and
+      // would otherwise fall back to the trailer proxy and call this a self-merge.
+      expect(built.record.halfAuthors).toEqual(['Fable 5', 'GPT-5.6 Sol'])
+      expect(built.record.halfSources).toEqual([listA, listB])
+
+      // UNTRACKED HALVES ARE CALLER-WRITTEN and decide nothing: the trailer proxy
+      // stands, and with it the older refusal. Without this the change would be
+      // WEAKER than the proxy it replaced — anyone could write two files naming
+      // authors that leave themselves untainted.
+      const untracked = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Claude Opus 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        isTracked: () => false,
+      })
+      expect(untracked.ok).toBe(false)
+      expect(untracked.record?.halfAuthors).toBeUndefined()
 
       // AND THE HOLE THAT FIXTURE STOOD IN: an author of a half is refused as the
       // merger now that the halves say who wrote them.
@@ -364,6 +387,7 @@ describe('the mode round-trips into the ledger', () => {
         unionPath: union,
         listAPath: listA,
         listBPath: listB,
+        ...tracked,
       })
       expect(selfMerged.ok).toBe(false)
       expect((selfMerged.errors ?? []).join('\n')).toMatch(/authored one of the two lists \(GPT-5\.6 Sol\)/)

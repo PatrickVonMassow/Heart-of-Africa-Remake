@@ -1116,10 +1116,18 @@ export function mergeProblem(record = {}, commit = {}) {
   // The FALLBACK is judged, not merely present: any word in that field used to
   // buy an author the merge, while the recorder demanded it name the model that
   // was missing. One function answers for both halves.
+  // THE HALVES THE RECORD ITSELF NAMES, where it names them from tracked files,
+  // and only failing that the commit-trailer proxy. Re-judging a recorded merge
+  // by the proxy alone condemns every merge whose merging model committed its own
+  // union — which is precisely the case the recorder was taught to accept, so the
+  // gate has to read the same fact or the two disagree by construction.
+  const halves = (Array.isArray(record.halfAuthors) ? record.halfAuthors : [])
+    .map((a) => String(a ?? '').trim())
+    .filter(Boolean)
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,
-    authors: [...authors, record.model].filter(Boolean),
+    authors: halves.length === 2 ? halves : [...authors, record.model].filter(Boolean),
     fallback: record.mergeFallback,
   })
   return check.ok ? '' : 'self-merge'

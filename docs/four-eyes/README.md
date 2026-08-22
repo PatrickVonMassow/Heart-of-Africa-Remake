@@ -10,6 +10,14 @@ the machine-readable `.json` (the exact `blind-merge.mjs` input: `id`, `file`, `
 and the model's output verbatim as `.md`. Neither `local/` nor a session scratchpad is a
 record — both are untracked and one of them is wiped by a reboot.
 
+**The halves must be TRACKED here for the tooling to trust them.** `blind-merge.mjs`
+and `mechanism-review.mjs` decide the merger question — who wrote neither half — from
+the `model` field of these files, but only when git tracks them; an arbitrary path is
+written by whoever runs the command, and a caller who may write the halves could name
+authors that leave itself untainted. Tracking does not make a half unforgeable. It
+makes a forgery a commit somebody can read, which is the same footing as every other
+claim in the ledger.
+
 ## Counting a union against its halves
 
     node scripts/blind-merge.mjs --a docs/four-eyes/<stage>-blind-a-<model>.json \

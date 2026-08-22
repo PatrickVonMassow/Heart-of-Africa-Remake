@@ -100,6 +100,24 @@ export const RECORDS_PATH = recordsPathFor()
 // arguments directly — there is no shell to inject into.
 const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
+/**
+ * Is this path a TRACKED repository artefact? The merger question may only be
+ * decided by halves that are — an arbitrary path is caller-written, and a
+ * caller who may write the halves may name authors that leave itself untainted
+ * (four-eyes finding on this change: as first written, this was WEAKER than the
+ * commit-trailer proxy it replaced, not stricter). Tracked does not make a half
+ * unforgeable; it makes a forgery a commit somebody can read.
+ */
+const isTrackedInGit = (path) => {
+  if (!String(path ?? '').trim()) return false
+  const probe = spawnSync('git', ['ls-files', '--error-unmatch', '--', path], {
+    windowsHide: true,
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  })
+  return probe.status === 0
+}
+
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */
 export function readRecords(path = RECORDS_PATH) {
@@ -218,6 +236,7 @@ export function buildRecord({
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
+  isTracked = isTrackedInGit,
   fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
@@ -301,8 +320,10 @@ export function buildRecord({
   const missing = paths.filter(([, v]) => !String(v ?? '').trim()).map(([flag]) => flag)
   let source = 'stated'
   let receipt = accounting
-  /** The two blind halves' own authors, when the files were handed over. */
+  /** The two blind halves' own authors, when the files were handed over TRACKED. */
   let halfAuthors = []
+  /** …and the paths they were read from, so the record says what it trusted. */
+  let halfSources = []
   if (missing.length < paths.length) {
     if (missing.length) {
       return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
@@ -311,7 +332,13 @@ export function buildRecord({
     if (!counted.ok) return { ok: false, errors: counted.errors }
     receipt = counted.summary
     source = 'computed'
-    if (counted.halfAuthors?.length === 2) halfAuthors = counted.halfAuthors
+    // ONLY FROM TRACKED HALVES, see isTrackedInGit: an untracked path is caller-
+    // written, and the whole point of reading the halves is that a reviewer can
+    // read the same file. Where they are not tracked the trailer proxy stands.
+    if (counted.halfAuthors?.length === 2 && [listAPath, listBPath].every((path) => isTracked(path))) {
+      halfAuthors = counted.halfAuthors
+      halfSources = [listAPath, listBPath]
+    }
   }
   const commit = resolve(sha)
   // WHO WROTE THE TWO HALVES, and only failing that, who touched the commit. The
@@ -391,6 +418,13 @@ export function buildRecord({
       // written before this flag carry none, and read as unrecorded.
       ...(merge.mergedBy ? { mergedBy: merge.mergedBy } : {}),
       ...(merge.mergeFallback ? { mergeFallback: merge.mergeFallback } : {}),
+      // WHO WROTE THE TWO HALVES, where tracked files said so. Stored because the
+      // GATE re-judges this record later and would otherwise fall back to the
+      // commit-trailer proxy, which reads the merging model as an author whenever
+      // the merger committed its own union — so a merge accepted here would be
+      // condemned as a self-merge on the next read (four-eyes finding on this
+      // change). The sources travel with it so the claim stays checkable.
+      ...(halfAuthors.length === 2 ? { halfAuthors, halfSources } : {}),
       // The count itself, so the ledger holds the receipt and not only the claim
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.

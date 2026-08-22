@@ -20,6 +20,7 @@ import {
   MERGE_ACCOUNTING_SINCE,
   MODE_REQUIRED_SINCE,
   mechanismPathsIn,
+  mergeProblem,
   modelFromTrailers,
   modelsFromTrailers,
   MODES,
@@ -2018,5 +2019,39 @@ describe('the ledger path of a checkout', () => {
     // Trimming would rename a legitimate POSIX directory into a different one.
     expect(ledgerPathFrom('/repo/odd name ')).toBe(resolve('/repo/odd name ', LEDGER_RELATIVE_PATH))
     expect(ledgerPathFrom('   ')).toBe(resolve('   ', LEDGER_RELATIVE_PATH))
+  })
+})
+
+describe('a recorded merge is re-judged by the halves it names', () => {
+  const base = {
+    mode: BLIND_PARALLEL,
+    at: MERGE_ACCOUNTING_SINCE + 1,
+    model: 'GPT-5.6 Sol',
+    accounting: '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for',
+  }
+  // The union commit is Claude's, because Claude performed the merge and committed
+  // it. The trailer proxy therefore reads Claude as an author of the material.
+  const commit = { authorModels: ['Claude Opus 5 (1M context)'] }
+
+  it('accepts the merger the halves leave untainted, whoever committed the union', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+    expect(mergeProblem(record, commit)).toBe('')
+  })
+
+  it('would have condemned that same merge on the commit trailers alone', () => {
+    // Without the halves the gate falls back to the proxy and calls the accepted
+    // merge a self-merge — the recorder and the gate disagreeing by construction.
+    const record = { ...base, mergedBy: 'Claude Opus 5' }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
+  })
+
+  it('still refuses a merger the halves name as an author', () => {
+    const record = { ...base, mergedBy: 'GPT-5.6 Sol', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
+  })
+
+  it('ignores a half list that does not name both authors', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5'] }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 })
