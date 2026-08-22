@@ -11113,3 +11113,38 @@ to land than a mechanism that needs a review.
   gate that blocks on something no turn can settle teaches the sessions passing through it that the
   gate is noise.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 841. The parallel-session detector counts a stood-down chat session as a second batch worker
+  (measured 22.08.2026, 18:23). `.claude/parallel-alert.json` named session `60142e49` as the
+  parallel driver — the interactive chat session that the batch-singleton hook had in the same
+  period explicitly told to STAND DOWN: not a batch worker, answering the user only. The detector
+  never asks whether a session WORKS ON THE BATCH. `classifyParallel`
+  (`scripts/batch-singleton.mjs:577-590`) flags every top-level sid that is not the lock owner and
+  carries tool activity fresher than `PARALLEL_FRESH_MS`; a session answering its user in the same
+  repository matches that description exactly.
+  THE COST IS PAID EVERY TIME THE USER CHATS DURING A RUN: five escalating unanswered ntfy alerts,
+  a self-pause at 18:23 lifted only at 18:37 after a hand diagnosis, and the card "Batch pausiert:
+  Alarm blieb unbeantwortet" back on the board — while exactly one batch session was running. It
+  reproduces: as long as the user chats here while a worker runs, the alarm fires again.
+  NOT ALREADY COVERED: point 515 (placeholder owner, pid equality) does not reach this class. The
+  chat session has a real, distinct session id and genuine tool activity; nothing about it is a
+  placeholder. The classifier already HAS the right shape for the answer — its `exclude` list names
+  the sessions that are second BY DESIGN rather than by accident, today exactly one (the window that
+  claimed the batch through the sanctioned channel). A session the singleton itself classified as a
+  non-worker belongs in that same class.
+  FINAL STATE: a session that the singleton has itself pronounced STAND DOWN over never counts as a
+  parallel batch session. The pronouncement is the evidence — the same decision that told the
+  session not to drive the batch also keeps it out of the detector, so the two can never disagree.
+  Where that record is absent, the detector answers as it does today rather than guessing, and a
+  session is measured by whether it performs batch actions, never by tool freshness alone.
+  VERIFIABLE: Vitest in the pure core over both cases — a stood-down chat session with fresh tool
+  activity produces NO parallel finding, and a genuine second owner-less driver still does; plus the
+  22.08.2026 reading (`ownerSid` the worker, `60142e49` stood down) as a recorded fixture that
+  reproduces the false alarm before the change and no alert after it.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point
+  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. Stated
+  against that rank: the alarm pauses the whole batch for 10-20 minutes each time it fires, so the
+  cost of leaving it is paid by every run the user watches.
+  Criticality: medium — it destroys no work, but it stops the batch out of a phantom and trains the
+  sessions passing through it to read a real parallel-session alert as noise.
+  Bundle: unbundled (batch autonomy).
