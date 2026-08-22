@@ -327,4 +327,11 @@ describe('the open-point headline (point 440)', () => {
     expect(hook).toContain('${agentLine}${ownerContext}')
     expect(hook).toContain('PREDECESSOR CHILD STATE UNKNOWN')
   })
+
+  it('serves the same transfer-and-measure rule from the owner runbook', () => {
+    const runbook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'docs', 'batch-owner-runbook.md'), 'utf8')
+    expect(runbook).toMatch(/transfers pushed author\s+checkpoints/)
+    expect(runbook).toContain('batch-in-flight.mjs --agent-check')
+    expect(runbook).toContain('unreadable output is unknown, not death')
+  })
 })
