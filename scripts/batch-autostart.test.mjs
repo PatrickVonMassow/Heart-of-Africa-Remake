@@ -21,28 +21,54 @@ describe('batch-autostart is import-proof', () => {
     await expect(import('./batch-autostart.mjs')).rejects.toThrow(/CLI, not a module/)
   })
 
-  // AND IT MUST LINK UNDER REAL NODE, WHICH THE ASSERTION ABOVE CANNOT SEE
-  // (22.08.2026). Vitest loads a module through Vite's SSR transform, where a
-  // named import of something the target does not export silently becomes
-  // `undefined`. Real node refuses it at LINK time, before the first line runs.
-  // So the launcher imported `pidCorroboration` from `batch-ownership-core.mjs`,
-  // which exports it from `batch-singleton.mjs` instead; the whole unit gate
-  // stayed green while `node scripts/batch-autostart.mjs` — the 900-second OS
-  // recovery tick, and the only thing that restarts a dead batch — died with
-  // `does not provide an export named 'pidCorroboration'`. Only a real node
-  // process is a witness for that, and the import-proof guard is what makes the
-  // witness safe: the module links, then refuses to run before any side effect.
-  it('links in a real node process, reaching the CLI guard rather than a missing export', () => {
-    const probe = "import('./scripts/batch-autostart.mjs').then(() => console.log('LINKED-AND-RAN'), (e) => console.log(e.constructor.name + ': ' + e.message.split('\\n')[0]))"
+  // AND ITS NAMED IMPORTS MUST RESOLVE UNDER REAL NODE, WHICH THE ASSERTION
+  // ABOVE CANNOT SEE (22.08.2026). Vitest loads a module through Vite's SSR
+  // transform, where a named import of something the target does not export
+  // silently becomes `undefined`. Real node refuses it at LINK time, before the
+  // first line runs. So the launcher imported `pidCorroboration` from
+  // `batch-ownership-core.mjs`, which exports it from `batch-singleton.mjs`
+  // instead; the whole unit gate stayed green while `node
+  // scripts/batch-autostart.mjs` — the 900-second OS recovery tick, and the only
+  // thing that restarts a dead batch — died with `does not provide an export
+  // named 'pidCorroboration'`.
+  //
+  // THE WITNESS NEVER IMPORTS THE LAUNCHER (cross-vendor review, GPT-5.6 Sol,
+  // 22.08.2026). The first version of this probe did, and leaned on the very
+  // CLI guard it was standing beside to stop the side effects — so a regression
+  // in that guard would have let a test spawn a real batch session, which is the
+  // accident of point 373 all over again. Instead the child re-declares the
+  // launcher's own import statements and links THOSE: exactly the failure being
+  // pinned, with the launcher's body never evaluated. The child also gets a hard
+  // timeout, because a synchronous `spawnSync` cannot be interrupted by vitest's.
+  it('has every named import of the launcher really exported by its target', () => {
+    const probe = [
+      "import { readFileSync } from 'node:fs'",
+      "import { pathToFileURL } from 'node:url'",
+      "const src = readFileSync('scripts/batch-autostart.mjs', 'utf8')",
+      // Prose about an import is not an import; only code is judged.
+      "const code = src.split('\\n').filter((l) => !l.trimStart().startsWith('//')).join('\\n')",
+      "const base = pathToFileURL(process.cwd() + '/scripts/')",
+      "const missing = []",
+      "const re = /import\\s*\\{([^}]*)\\}\\s*from\\s*'(\\.[^']*)'/g",
+      "let m",
+      "while ((m = re.exec(code))) {",
+      "  const mod = await import(new URL(m[2], base).href)",
+      "  for (const raw of m[1].split(',')) {",
+      "    const name = raw.trim().split(/\\s+as\\s+/)[0].trim()",
+      "    if (name && !(name in mod)) missing.push(m[2] + ' -> ' + name)",
+      "  }",
+      "}",
+      "console.log(missing.length ? 'MISSING ' + missing.join(', ') : 'ALL-NAMED-IMPORTS-RESOLVE')",
+    ].join('\n')
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
       cwd: process.cwd(),
       encoding: 'utf8',
       windowsHide: true,
+      timeout: 60_000,
     })
     expect(run.status, run.stderr).toBe(0)
-    expect(run.stdout).not.toMatch(/does not provide an export named/)
-    expect(run.stdout).toMatch(/CLI, not a module/)
-  }, 30_000)
+    expect(run.stdout.trim(), run.stdout).toBe('ALL-NAMED-IMPORTS-RESOLVE')
+  }, 90_000)
 })
 
 // ---------------------------------------------------------------------------
