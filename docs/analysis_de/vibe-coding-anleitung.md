@@ -187,16 +187,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
-  Aufgabe, und bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
-  festhalten, was mich braucht, weitergehen. Jedes Warten bricht auch beim **Fehler** ab."
-
-- **Das Warten stirbt mit dem Wartenden.** Der Lauf wartet auf ein Ergebnis — und der, der
-  wartet, geht unter. Danach wartet niemand mehr, und alles steht bis zum nächsten Weckruf,
-  obwohl das Ergebnis längst da ist.
-  → *Prompt:* „Ein Wartezustand gehört in eine **Datei**, nicht in einen laufenden Prozess: Wer
-  nach einem Ausfall übernimmt, muss ihm ansehen können, **worauf** gewartet wird und **wie
-  weit** es ist, und dort weiterwarten statt neu anzufangen. Der Notfall-Weckruf ist die
-  Rückfallebene, nie der normale Weg."
+  Aufgabe, und bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
+  Jedes Warten bricht beim **Fehler** ab und steht in einer **Datei**, nicht in einem Prozess."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
@@ -220,7 +212,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Satz und deckt nur einen Teil — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
   **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz** und
-  setz seine Reichweite selbst — bis zur nächsten Regel, nicht bis zur nächsten Leerzeile."
+  setz seine Reichweite selbst."
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
