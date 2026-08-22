@@ -95,6 +95,24 @@ const shallowCheckout = () => {
 }
 const HISTORY_IS_SHALLOW = shallowCheckout()
 
+// AND THE BRANCH LANE HAS NO `main` AT ALL. The shallow probe above answers a
+// different question than the one a `feat/**` CI run asks: that checkout is the
+// BRANCH, fetched two commits deep, so the revision `main` the command reads does
+// not exist in it and `git log --first-parent main` dies with `bad revision`
+// before any span is measured. The three cases above then skip for shallowness
+// while the suite's own `beforeAll` still fails for the missing ref — red for the
+// checkout again, one lane further along. Point 829 removes the dependency; until
+// then the whole suite says why it cannot run where its base ref is absent.
+const baseRefPresent = () => {
+  const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'main^{commit}'], {
+    encoding: 'utf8',
+    cwd: REPO_ROOT,
+    windowsHide: true,
+  })
+  return probe.status === 0
+}
+const BASE_REF_MISSING = !baseRefPresent()
+
 const run = (dir, ...args) => {
   const before = checkoutState()
   const result = spawnSync(process.execPath, [SCRIPT, '--state-dir', dir, '--limit', '30', ...args], {
@@ -109,7 +127,7 @@ const run = (dir, ...args) => {
   return result
 }
 
-describe('the report and the store are one reading', () => {
+describe.skipIf(BASE_REF_MISSING)('the report and the store are one reading', () => {
   let out = ''
   let store = null
   let seeded = []
@@ -224,7 +242,7 @@ describe('the report and the store are one reading', () => {
   })
 })
 
-describe('an apply accounts for every card it moves', () => {
+describe.skipIf(BASE_REF_MISSING)('an apply accounts for every card it moves', () => {
   it.skipIf(HISTORY_IS_SHALLOW)('moves exactly the cards it reports, and remembers what each promised', () => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-apply-'))
     const { correctable, held } = seedQueueData(dir)

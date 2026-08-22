@@ -98,8 +98,9 @@ jobs:
           #   · fetch-depth: 600 with blobs is a 1.4 GiB clone — the fixture's
           #     `--limit 30` reaches back over ~227 first-parent commits.
           # The dependency belongs to the suite, not to the checkout: point 829
-          # gives it its own fixture history, and until then those cases skip here
-          # and say why.
+          # gives it its own fixture history, and until then it skips here and says
+          # why — for shallowness on `main`, and for the missing `main` revision
+          # itself on a branch run, where this checkout is the branch.
           fetch-depth: 2
       - uses: actions/setup-node@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
