@@ -11068,3 +11068,35 @@ to land than a mechanism that needs a review.
   built for is caught today; what is at stake is that a LATER launcher defect of the same class
   slips past it unnoticed, which is exactly how the first one survived.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 843. A ruling the owner already gave is asked again, because the only place it lives is a
+  memory (measured 22.08.2026, 22:05, from the owner's own board message: "Ich hatte bereits vor
+  längerer Zeit festgelegt, dass du selbstständig - als letztes Mittel - die Obergrenze anlegen
+  sollst. Das vergisst du immer wieder. Etabliere mit einem Mechanismus, dass du mich das nicht
+  mehr fragst. Die bisherige Form, in der das hinterlegt ist, ist offensichtlich unzureichend.").
+  The card he was answering — "Anhebung der Anleitungs-Obergrenze: selbst entscheiden oder
+  zurücknehmen?" — asked him to confirm a decision he had already delegated on 10.08.2026
+  ("Frage mich in Zukunft allgemein nicht mehr bzgl. Anhebungen"). The ruling IS recorded, in the
+  auto-memory `doc-budget-shorten-dont-raise`, and the card was written anyway: a memory is read
+  when a session happens to recall it, and nothing REFUSES the question at the moment it is
+  asked. This is not the doc-ceiling rule's problem — that rule is written correctly. It is that
+  a settled ruling has no enforcing home, so every settled ruling in this repository can be
+  re-asked the same way.
+  FINAL STATE: settled owner rulings live in ONE tracked register, each carrying the ruling, the
+  date, the owner's verbatim words, and the terms that identify a question about it. `node
+  scripts/board.mjs vdzk-add` REFUSES a card whose title or question matches a registered ruling
+  and prints the ruling plus the action it already authorises, so the card cannot be written at
+  all; `decision-card-guard` judges the composed reply against the same register, so asking in
+  prose is refused by the same words. The doc-ceiling ruling is the register's first entry, and
+  the memory stops being the record and points at the register instead.
+  MATCHING MUST NOT GO BLIND EITHER WAY: a rewording of the same question is still refused, and a
+  question the register does not cover passes untouched — a register that swallows genuine
+  decisions costs more than the repetition it prevents. Where a match is uncertain, the refusal
+  names the ruling and lets the session state, in one line, why this question is NOT that one.
+  VERIFIABLE: Vitest over the pure matcher — the refused card verbatim, three rewordings of it,
+  and an unrelated decision card that must pass; a case proving the refusal prints the ruling's
+  own words; a repository check that every register entry carries date, verbatim wording and
+  terms; and the guard registered in `.claude/settings.json` under the authoritative inventory.
+  Criticality: medium — no work is lost, but the owner is asked to re-decide what he decided, and
+  he has now reported the same class twice.
+  Bundle: Chat & Tafel.
