@@ -69,7 +69,7 @@
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
 export const LIMITS = {
-  maxLines: 430,
+  maxLines: 428,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -147,8 +147,15 @@ export const LIMITS = {
   // repository - real history, real main branch - rather than the code went into
   // the existing "Der Test hing an seiner Umgebung" entry, which already owns the
   // environment-dependency class; two verbose entries were tightened to pay for it,
-  // so the guide measures 430 / 3841 and the word ceiling drops by one more.
-  maxWords: 3841,
+  // so the guide measured 430 / 3841 and the word ceiling dropped by one more.
+  // LOWERED ONCE MORE the same evening: the detector that estimates a property the
+  // system has already DECIDED (retrospective 3.158) was read against the guide and
+  // deliberately NOT added - every entry was already one or two sentences at the
+  // ceiling, so buying room would have meant deleting a beginner lesson to make
+  // space for a refinement, and the retrospective is where that belongs. Four
+  // entries were tightened anyway, so the guide measures 428 / 3826 and BOTH
+  // ceilings follow it down. The ratchet only ever moves this way.
+  maxWords: 3826,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -313,6 +313,7 @@ describe('attachCoverage', () => {
     const rec = (index) => ({
       sha: recSha,
       model: 'GPT-5.6 Sol',
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'fixture transcript absent' },
       authoredBy: 'Claude Opus 5 <noreply@anthropic.com>',
       verdict: 'merge',
       evidence: 'checked the guard change against its spec end to end',

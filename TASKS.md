@@ -180,43 +180,6 @@ put it is the mistake this line exists to stop.
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
 
-- [ ] 840. A model label passes as proof of authorship, and authorship decides who may merge
-  (measured 22.08.2026 while recovering the blind halves of the 13.08.2026 handover stage for point
-  834). Half A of that stage carries the heading `# Proposal A — Fable 5, written 13.08.2026 before
-  seeing any other proposal`, and the origin session repeated `written blind by Fable 5` when it
-  handed the two lists to the merge. Both are FALSE. The transcript's per-message `model` field
-  shows `claude-opus-5` generated the tool call that wrote the file; the session ran two models that
-  day and switched exactly once, at 12:49:10Z; the blind stage is first mentioned at 15:33:16Z, two
-  hours and forty-four minutes after Fable's last message; and the transcript holds no sidechain
-  entries, so nothing was delegated either.
-  THE COST WAS PAID TWICE. The mislabel stood for five days and was restated in
-  `docs/handover-architecture.md`. Then this session BELIEVED it, rewrote that document's correct
-  attribution on its strength, concluded that Claude was free to merge a stage Claude had written
-  half of, performed that merge and recorded it — and only the cross-vendor review, which refused to
-  accept a label as evidence, forced the reading that overturned it. Four commits of the branch are
-  that correction and its withdrawal.
-  WHY IT MATTERS BEYOND ONE STAGE: authorship decides a PERMISSION here — who may fold a
-  blind-parallel union, who may review a range — and `scripts/blind-merge.mjs`,
-  `scripts/mechanism-review.mjs` and `scripts/fable-switch-core.mjs` all take the answer from a
-  `model` field the reviewed party writes. A self-asserted label is exactly as trustworthy as
-  whoever benefits from it, and today nothing anywhere compares one against the metadata of the
-  messages that produced the text.
-  FINAL STATE: a claimed author can be checked, and is. A command reads `message.model` from the
-  session transcript at the timestamp of the artefact — per message, never per session, because one
-  session switching models makes the session-level answer worthless — and reports agreement,
-  disagreement or an unreadable transcript. Where a half's claimed author disagrees with the
-  metadata, the four-eyes tooling refuses rather than proceeds. Where the transcript is gone, that
-  is SAID, and the claim is recorded as unverified rather than silently trusted.
-  VERIFIABLE: the command answers correctly for the 676 halves — half A disagrees with its heading
-  and half B agrees with its own — and its cases cover a session with a model switch, a delegated
-  sidechain, a missing transcript and a half whose heading names no model at all.
-  QUEUE RANK: directly behind point 834, whose precondition it guards. Reason: 834's re-merge cannot
-  be trusted until a claimed author can be checked, and this session already spent a full cycle
-  proving that by getting it wrong.
-  Criticality: high — it decides a permission in the rule the project relies on to catch what a
-  single model misses, and it has already produced one invalid recorded merge.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
@@ -11126,12 +11089,15 @@ to land than a mechanism that needs a review.
   a self-pause at 18:23 lifted only at 18:37 after a hand diagnosis, and the card "Batch pausiert:
   Alarm blieb unbeantwortet" back on the board — while exactly one batch session was running. It
   reproduces: as long as the user chats here while a worker runs, the alarm fires again.
-  NOT ALREADY COVERED: point 515 (placeholder owner, pid equality) does not reach this class. The
-  chat session has a real, distinct session id and genuine tool activity; nothing about it is a
-  placeholder. The classifier already HAS the right shape for the answer — its `exclude` list names
-  the sessions that are second BY DESIGN rather than by accident, today exactly one (the window that
-  claimed the batch through the sanctioned channel). A session the singleton itself classified as a
-  non-worker belongs in that same class.
+  NOT ALREADY COVERED, AND NAMED AGAINST BOTH NEIGHBOURS: point 515 (placeholder owner, pid
+  equality) does not reach this class — the chat session has a real, distinct session id and genuine
+  tool activity; nothing about it is a placeholder. Point 823 edits the SAME function for the
+  neighbouring class and still does not cover it: 823 drops a session whose PROCESS IS GONE or whose
+  boundary is committed, and this session's process is alive, has no boundary and keeps making real
+  tool calls. Under 823's own final state it stays flagged. The classifier already HAS the right
+  shape for the answer — its `exclude` list names the sessions that are second BY DESIGN rather than
+  by accident, today exactly one (the window that claimed the batch through the sanctioned channel).
+  A session the singleton itself classified as a non-worker belongs in that same class.
   FINAL STATE: a session that the singleton has itself pronounced STAND DOWN over never counts as a
   parallel batch session. The pronouncement is the evidence — the same decision that told the
   session not to drive the batch also keeps it out of the detector, so the two can never disagree.
