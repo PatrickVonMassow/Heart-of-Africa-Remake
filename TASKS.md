@@ -10092,6 +10092,11 @@ to land than a mechanism that needs a review.
   that ordering rule on 20.08.2026 and withdrew 224 with it, so the memory and its index line
   are already deleted and nothing is owed for it here; and
   `release-order-communication-first` is LIVE because 633 and 174 are both still open.
+  ALREADY EXECUTED BY POINT 768 (landed 22.08.2026): both CLAUDE.md sentences are gone. The
+  four-eyes cut of the build order removed the WebGPU escape hatch (U6) and the
+  graphics-detail closing reminder (U45 part 1) in the same edit, as point 768's own text said
+  it would, so a repository search finds neither in `CLAUDE.md` today. This point must not cut
+  them a second time; what is left of it is U55, the four memories, and nothing else.
   FINAL STATE: the two CLAUDE.md sentences are gone, each in a commit that names the user's
   ruling and its date, so a later reader does not restore them as an accidental deletion. The
   four memories are handled INDIVIDUALLY under the caveat: the spent one is deleted with its
@@ -10913,9 +10918,15 @@ to land than a mechanism that needs a review.
   are chosen by the test — so the assertions are true or false because of the command, never
   because of the checkout. Where a case genuinely needs the real repository, it says so and states
   what it would take as sufficient history instead of assuming it.
-  VERIFIABLE: the suite passes in a `--depth 2` clone of main and in the full checkout, with the
-  same assertions and no skips; and a deliberately broken correction (one that applies to nothing)
-  still fails it in both.
+  A SECOND SKIP WAS NEEDED ON 22.08.2026, and it belongs to the same gap: the shallow probe answers
+  the question a `main` run asks, but a `feat/**` run checks out the BRANCH two commits deep, so the
+  revision `main` the command reads is absent entirely and the suite's own setup died with
+  `bad revision 'main'` before any span was measured. The suite now also skips where its base ref is
+  missing, which widens exactly the gap this point closes — on a branch run it currently guards
+  nothing at all.
+  VERIFIABLE: the suite passes in a `--depth 2` clone of main, in a `--depth 2` clone of a branch
+  with no `main` ref, and in the full checkout, with the same assertions and no skips; and a
+  deliberately broken correction (one that applies to nothing) still fails it in all three.
   QUEUE RANK: behind point 174, at the end of the order. Reason: the machine filed this point
   itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. The
   red it describes is already closed by the deepened checkout, so nothing waits on it.
@@ -10923,3 +10934,36 @@ to land than a mechanism that needs a review.
   passes by skipping; the fixture and the "still fails when the correction is broken" case are what
   the point pins.
   Bundle: Testinfrastruktur.
+
+- [ ] 830. The model-policy fingerprint swallows the rest of §6, so seven unrelated rules cannot be
+  edited without staling twelve files (filed by the machine 22.08.2026 out of point 768's
+  blind-parallel record, `docs/blind-768/README.md`, "The one union entry deliberately not
+  applied"). MEASURED on the landed file: `scripts/rule-echo-core.mjs` gives `rule:model-policy`
+  the source `startsWith: '- **Model policy'` and no `until`, so its passage runs to the next BLANK
+  line — and CLAUDE.md §6 has no blank line between its bullets, so the passage reaches from line 74
+  to line 101, seven bullets past the rule it is named for: four eyes, language files, journal
+  markup, small command output, settled judgment, and the comment rule. Twelve stamped files echo
+  that fingerprint.
+  WHAT IT ALREADY COST: point 768's counted merge produced union entry U36 — drop "Act on settled
+  judgment. Confirm before outward-facing or hard-to-reverse steps unless durably authorized." from
+  §6 — and the entry could NOT be decided on its own merits, because applying it would have marked
+  twelve stamped files stale over a rule that had not changed. So a fingerprint wider than its rule
+  is now deciding what may be cut from the most expensive document in the project.
+  FINAL STATE: `rule:model-policy` ends at the next bullet (`until` is already supported by the
+  registry and needs no new mechanism), so an edit to a neighbouring §6 bullet no longer stales the
+  twelve echoing files; every other registry entry whose source ends at a blank line is checked the
+  same way in the same commit, because the defect is the shape, not the one entry. Then U36 is
+  decided on its own merits and the decision recorded: the ground the merge gave it was "baseline
+  agent behaviour", the weakest of the three admissible grounds, for a rule about irreversible
+  outward-facing acts — so dropping it needs a better ground than the one on file, and keeping it is
+  a legitimate outcome.
+  VERIFIABLE: a Vitest case shows the `rule:model-policy` fingerprint UNCHANGED when a neighbouring
+  §6 bullet is edited and CHANGED when the model-policy bullet itself is; `node scripts/rule-echo.mjs`
+  reports the twelve stamped files fresh across that neighbouring edit; a case pins that no registry
+  entry's passage reaches past the rule it names; and the U36 decision is recorded with its ground —
+  if it is applied, the sentence is gone from CLAUDE.md and the doc budget stays green.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point
+  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release.
+  Criticality: low — no product defect. It matters because the cost is invisible: the file simply
+  stops being editable in the places the fingerprint covers, and the last cut already bent to it.
+  Bundle: Session- & Repo-Hygiene.

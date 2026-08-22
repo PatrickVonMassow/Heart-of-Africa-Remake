@@ -367,12 +367,6 @@
       "why": "An escalation that never fires costs nothing while it waits; it belongs with the other rule-corpus findings of the same night.",
       "place": "last"
     },
-    "768": {
-      "at": "2026-08-21T16:05:59.141Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for TOKENS: CLAUDE.md loads on every turn and section 7.1 alone is about 1.9k of it. Its branch stands.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "785": {
       "at": "2026-08-20T15:51:25.029Z",
       "why": "Last is right: it improves what the header REPORTS, while 764 first has to make the suffix mandatory at all — until that lands there is nothing requiring a truer value, and both edit the same header path, so they must not run in parallel anyway.",
@@ -496,6 +490,12 @@
       "why": "Behind point 174 at the end: the machine filed it itself (user ruling 20.08.2026), and the red it describes is already closed by the declared precondition, so nothing waits on it.",
       "origin": "machine",
       "place": "last"
+    },
+    "830": {
+      "at": "2026-08-22T07:24:25.223Z",
+      "why": "The machine filed this point itself out of point 768's blind-parallel record; the user's ruling of 20.08.2026 keeps such a point behind the release, and nothing waits on it — the fingerprint is wider than its rule, it costs no product behaviour, and the one decision it blocks (U36) is recorded as open.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -542,13 +542,12 @@
       759,
       760,
       762,
-      764,
-      768
+      764
     ],
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T06:31:21.109Z",
+    "at": "2026-08-22T07:24:25.229Z",
     "points": [
       174,
       184,
@@ -762,7 +761,6 @@
       765,
       766,
       767,
-      768,
       774,
       777,
       778,
@@ -791,7 +789,8 @@
       825,
       826,
       827,
-      829
+      829,
+      830
     ]
   }
 }
