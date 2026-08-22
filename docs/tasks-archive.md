@@ -21853,3 +21853,28 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   user has now asked twice for the growth to be stopped by a mechanism rather than by intent.
   A guard change is a mechanism, so it needs the other model's recorded review before it lands.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 813. A session that dies inside the CI wait leaves the batch idle, because the wait lives
+  only in that turn (measured 21.08.2026; lever 2c of point 809's merged spec, cut as its own point
+  because it is a mechanism of its own, and it carries the request point 808 filed alone from the
+  same incident).
+  WHAT WAS MEASURED. Owner session 6a0621ed wrote its last transcript line at 08:15:29Z inside a
+  ci-status-guard wait — run 32462093487 was still running and the hook text told it to sleep about
+  90 s and then end the turn again. It ended the turn and never came back; nothing re-invoked it,
+  and the observation of that run died with the turn.
+  FINAL STATE: a pending CI check is a renewable in-flight wait carrying ref, SHA, workflow
+  identity, run id, first and last observation, deadline and wake token, and it survives worker exit
+  and supervisor restart. It is observed by event or bounded backoff rather than by instructing a
+  headless session to sleep and end its turn again — the measured session did exactly that and
+  exited while the run was still going. Reaching the interaction budget may release the process but
+  may not abandon the observation, erase the state or defer recovery to a later tick. A terminal
+  result wakes the successor on green and a repair path on red.
+  VERIFIABLE: a fake-clock test reproduces two Stop attempts followed by worker exit and proves the
+  wait stays visible and its terminal result triggers recovery without a 900-second gap.
+  DEPENDENCY: point 809 lands first; the successor wake this point needs on a terminal result is
+  the decision point 811 builds, so 811 stands before it.
+  FILES: scripts/ci-status-guard-core.mjs, scripts/batch-in-flight-core.mjs,
+  scripts/batch-autostart-core.mjs.
+  Criticality: high — it is the cause that started the measured incident, and it fails exactly when
+  the batch is otherwise healthy and merely waiting for green.
+  Bundle: Session- & Repo-Hygiene.
