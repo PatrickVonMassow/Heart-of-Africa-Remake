@@ -21878,3 +21878,84 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the cause that started the measured incident, and it fails exactly when
   the batch is otherwise healthy and merely waiting for green.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 597. Large tool output never enters the context whole (point 572's measure 7). The
+  bound `scripts/verify/run-logged.mjs` already applies to verify runs extends to the other
+  big producers: `git diff` (`--stat` first), `grep` (`-c` or a head bound), file reads
+  (`offset`/`limit` instead of a whole file), `npm ls`, `gh run view`.
+  IT IS ENFORCED, NOT PRACTISED (user 19.08.2026, on GPT-5.6 Sol's audit of the
+  context-ceiling programme). A rule that is followed cannot bound an input-dependent output:
+  the same 40,000-token jump the ceiling must survive comes back the moment one call is made
+  the way it always was. So every tool output passes a BUDGET with spill-to-log, and what
+  stands in the context is what fits, never what the producer chose to print.
+  THE INTERCEPTION POINT IS NAMED, or this stays a rule wearing a mechanism's clothes
+  (GPT-5.6 Sol, review 19.08.2026: naming `run-logged.mjs` leaves a direct `git diff`, `grep`,
+  file read, `npm ls` or `gh run view` entirely unbudgeted, and those are exactly the calls
+  the point lists). The budget therefore sits in the PreToolUse chain, where every tool call
+  passes whether or not it went through a project script, and the point names that hook and
+  its file. A producer that bypasses it is a defect the tests must catch, not a caller's
+  discipline.
+  THE ON-DEMAND PATH IS NAMED, not reinvented: `node scripts/verify/run-logged.mjs --show
+  <log>` already hands back the run when the digest is not enough, but it is narrowed to
+  SELECTIVE, line-bounded or paginated queries — a full `--show` reloads the very 40,000
+  tokens the budget just prevented and would make the overview call a net loss. What must
+  NOT be adopted is the tempting inverse either: a runner that returns only the names of
+  failing suites by default.
+  THE ERROR CHANNEL IS BOUNDED TOO, AND THESE FOUR CONDITIONS ARE HOW. An unbounded channel
+  defeats any ceiling, but a truncated cause forces a re-run, and one browser-suite re-run
+  costs a multiple of what the cut saved — the house rule "a red closes by a CAUSE, never by
+  a later green" exists because that already hurt. Each condition is binding:
+  1. ERRORS HAVE THEIR OWN, GENEROUS BUDGET, separate from the ordinary output budget and a
+     multiple of it. It exists to catch the outlier, not to discipline the normal case.
+     MEASURED 19.08.2026 over the 124 log files under `local/`: median 3,197 characters,
+     p95 36,118, max 158,017 — the typical output is tiny and the top 5 % is the whole
+     problem, so a generous budget almost never binds. The number itself is set from the same
+     measurement taken over ERROR outputs specifically, not over all logs.
+  2. REPETITION IS CUT, CONTENT IS NOT. A large error output is almost never one long cause;
+     it is one cause repeated — identical stacks across twenty cases, a diff per assertion, a
+     retry printing everything three times. Collapsing by SIGNATURE removes most of the volume
+     and loses no distinguishable cause. This cut runs FIRST, and often it is the only one
+     needed.
+  3. THE FIRST DISTINCT CAUSE IS NEVER CUT SHORT OF ITS OWN HARD MAXIMUM. It enters the
+     context whole up to a cap that is generous by the p95 measurement above and far larger
+     than any real assertion-plus-stack, and beyond that cap it spills to log with condition 4's
+     notice. "Never cut" without a maximum is the one hole through which a single output can
+     still exceed the ceiling (GPT-5.6 Sol, review 19.08.2026), and the maximum is what makes
+     the channel bounded while still fitting every cause anyone has actually needed to read.
+     Further occurrences of the same signature collapse to a count; further DISTINCT causes get
+     a bounded excerpt with a pointer to the full text.
+  4. CUT FROM THE MIDDLE, NEVER THE HEAD OR THE TAIL, and never silently. The assertion and
+     the stack top are at the head, the summary at the tail — a naive head bound loses the
+     summary and a tail bound loses the assertion. Every cut states in the context how much
+     was omitted and how to fetch it.
+  So the rule is: error output is never cut SILENTLY, never cut BEFORE its first distinct
+  cause, and never cut at HEAD or TAIL — and every failing test keeps its name.
+  THE POINT SPLITS AT ITS DEPENDENCY, and the ceiling-relevant half is what stands at the front
+  of the queue (GPT-5.6 Sol, review 19.08.2026). The OUTPUT BUDGET and the error channel above
+  depend on nothing and are what points 743 and 745 consume, so they are built first. The
+  standing-load paragraph below is CONDITIONAL on point 599's cache reading, and 599 stands far
+  back in the work order — that half waits for it and does not hold up the budget.
+  MEASURED TARGET: a 10k output entering a point's context at response 20 is re-read by
+  its remaining ~218 responses at 218k weighted, ten responses' worth; the trade pays up
+  to a follow-up-query rate of ~85 %.
+  THE STANDING LOAD IS THE SAME ARITHMETIC ON A LARGER SCALE: 1k of permanently carried
+  text costs 3.27 M per window, so CLAUDE.md alone (~11.4k tokens) is ~4.2 % of it, and
+  per-turn injected text that CHANGES additionally breaks the cache prefix. So: a hook that
+  succeeded says nothing, and the per-turn injections are audited. CONDITIONAL on point
+  599's cache reading, and it cuts TEXT only — never a duty that is enforced rather than
+  remembered.
+  VERIFIABLE (the error channel): a Vitest case per condition — a twenty-fold repeated stack
+  collapsing to one cause plus a count; a first distinct cause surviving whole against a budget
+  far below its size; a first distinct cause LARGER than its own hard maximum, spilling to log
+  with its notice; a second distinct cause surviving as a bounded excerpt WITH its pointer;
+  a middle cut that keeps both the head assertion and the tail summary; and a case asserting no
+  cut is ever written without its omission notice.
+  VERIFIABLE (the interception): a case per named producer — a direct `git diff`, `grep`, file
+  read, `npm ls` and `gh run view` — proving each is budgeted without having been routed
+  through a project script, and one asserting that NO admitted output, error output included,
+  can exceed the per-call maximum. That is the case which proves a bound rather than a habit.
+  Criticality: medium — the real risk is cutting an error message, which the four conditions
+  bound rather than exclude, and the budget now denies output instead of advising against it.
+  NOT ON ITS BRANCH 17.08.2026: `feat/595-598-verification-ladder-brief` is named for this point
+  but contains NOTHING of it — measured by reading the whole net diff. It must be built, here or
+  on its own branch; the shared branch lands 595 and 598 alone.
