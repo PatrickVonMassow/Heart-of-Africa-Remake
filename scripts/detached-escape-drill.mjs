@@ -285,7 +285,12 @@ export function probeAlive(pid, { startedAt = 0, requireIdentity = false, readPr
     if (LIVE_STATES.has(state)) return { alive: true, how: `/proc state ${state}` }
     // FAIL CLOSED on a letter this list does not know. A probe that guesses
     // "alive" for an unrecognised state is the one that greens a dead lane.
-    return { alive: false, how: `unrecognised /proc state ${state || '(none)'} — read as dead` }
+    // UNKNOWN, and marked as such: reporting only `alive: false` let `reap` fall
+    // through to silence for a state it HAD observed and could not classify,
+    // which contradicts its own contract. The unreadable case and the
+    // unrecognised case are both uncertainty; only the vanished stranger is
+    // invisible.
+    return { alive: false, unknown: true, how: `unrecognised /proc state ${state || '(none)'} — read as dead` }
   }
   // FAIL CLOSED WHERE /proc CANNOT BE READ. The signal probe answers true for a
   // corpse, and `verdict` consumes only the boolean — so a transient read failure

@@ -249,10 +249,17 @@ describe('probeAlive', () => {
     }
   })
 
-  it('FAILS CLOSED on a state letter it does not know', () => {
+  it('FAILS CLOSED on a state letter it does not know, and marks it UNCERTAIN', () => {
     const unknown = probeAlive(4242, { readProc: () => stat('Q'), signal: () => 'exists' })
     expect(unknown.alive).toBe(false)
     expect(unknown.how).toMatch(/unrecognised/)
+    // Without the flag, `reap` fell through to silence for a state it had
+    // OBSERVED and could not classify — which its contract forbids.
+    expect(unknown.unknown).toBe(true)
+    const reads = [{ alive: true, how: '/proc state S' }, ...Array(6).fill(null).map(() => probeAlive(4242, { readProc: () => stat('Q'), signal: () => 'exists' }))]
+    expect(reap(4242, 900000, { probe: () => reads.shift(), kill: () => {}, settle: () => {} })).toMatch(
+      /state could not be read/,
+    )
   })
 
   it('parses the state from the RIGHT, so a process name containing ")" cannot shift it', () => {
