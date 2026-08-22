@@ -1,4 +1,11 @@
-# Proposal A — Fable 5, written 13.08.2026 before seeing any other proposal
+# Proposal A — written 13.08.2026 before seeing any other proposal
+
+<!-- THE HEADING BELOW IS THE ORIGINAL AND IT IS WRONG about its own author. It was
+     written by Claude Opus 5, not Fable 5; see 676-provenance.md for the transcript
+     metadata that settles it. The line is kept verbatim because it is the evidence
+     of the mislabel, not a caption to be quietly corrected. -->
+
+    # Proposal A — Fable 5, written 13.08.2026 before seeing any other proposal
 
 ## A1. The two goals are not in conflict; the coupling is an artefact
 The handover does not wait on agents because the successor lacks INFORMATION — the in-flight

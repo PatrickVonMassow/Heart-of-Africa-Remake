@@ -1,5 +1,4 @@
 {
- "mergedBy": "Claude Opus 5",
  "entries": [
   {
    "id": "M1",
@@ -437,5 +436,6 @@
    ],
    "defect": "Retain drain-before-boundary as the explicit safe fallback whenever any active lane is not transferable."
   }
- ]
+ ],
+ "mergedByNote": "NONE. Fable 5 wrote neither half and is switched off, so this stage has no valid merger: Sol folded it first and Claude re-folded it on 22.08.2026, and each wrote one of the halves. See docs/handover-architecture.md."
 }

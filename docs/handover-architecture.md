@@ -3,34 +3,47 @@
 PROVENANCE. This is the result of the blind-parallel four-eyes stage of 13.08.2026 (CLAUDE.md
 §6) on the question: how can the batch keep three authoring lanes busy AND hand the session over
 on context, when today a handover kills every worker the session spawned. Two lists were written
-blind — **list A by Fable 5, list B by GPT-5.6 Sol** — and merged into the counted union below,
-every entry accounted for as `only A`, `only B` or `merged with <id>`. Both raw halves are
+blind — **list A by Claude (Opus 5), list B by GPT-5.6 Sol** — and merged into the counted union
+below, every entry accounted for as `only A`, `only B` or `merged with <id>`. Both raw halves are
 versioned in `docs/four-eyes/` and the union is `docs/four-eyes/676-union.json`, so the count is
 reproducible: `node scripts/blind-merge.mjs --a … --b … --union …`.
 
-THE DEVIATION IS SETTLED (22.08.2026). The original merge was performed by Sol, the author of
-list B, which CLAUDE.md §6 forbids: the merge is where a finding vanishes unnoticed. That
-deviation is now repaired, and two errors in how it was described are repaired with it.
+THE DEVIATION IS NOT SETTLED, and saying so is the point of this paragraph. CLAUDE.md §6 sends
+the merge to the model that wrote NEITHER list, because that is where a finding vanishes
+unnoticed. The original merge was performed by Sol, the author of list B. The model that wrote
+neither half is Fable 5, and Fable is switched off, so no third model is available: every merge
+of this stage so far is the WEAKER TWO-MODEL FALLBACK, and none of them is the valid four-eyes
+result the stage owes. Enabling Fable for this one merge is a decision for the project owner.
 
-First, this section named the wrong author for list A. It said Claude (Opus 5) and offered Fable
-5 as the untainted third model, so the remedy it prescribed for itself was impossible — Fable
-wrote list A. The origin session's own commands say so verbatim (`# Proposal A — Fable 5, written
-13.08.2026 before seeing any other proposal`). The model that wrote NEITHER half is therefore
-Claude (Opus 5), and the re-merge did not wait on the Fable switch.
+WHAT WAS DONE ON 22.08.2026, and what it is worth. The raw halves had never been versioned —
+list A lived only in a session scratchpad under `/tmp`, list B only in the untracked `local/` —
+so the stage could not be re-merged, re-counted or re-reviewed at all. They are recovered and
+versioned now, and `docs/four-eyes/README.md` makes filing both halves a rule.
 
-Second, the raw halves had never been versioned — list A lived only in a session scratchpad under
-`/tmp`, list B only in the untracked `local/`. Recovering them is what made the re-merge possible
-at all; `docs/four-eyes/README.md` now makes filing both halves a rule.
-
-THE RE-MERGE, by Claude (Opus 5), 22.08.2026, against the recovered raw halves. The accounting
+A RE-MERGE was then run by Claude and audited by Sol. Because Claude wrote list A, that is a
+same-vendor merge and is recorded as the fallback, not as a third-model result. Its accounting
 holds exactly: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), every
-input entry claimed once, no dangling reference and no duplicate. Fifty-seven rows are faithful.
-FOUR ROWS LOST A CLAUSE and are restored below, marked `RESTORED BY THE RE-MERGE` — three of them
-list-A clauses dropped by list B's own author, which is the failure the third-model rule exists
-to catch. One of the three is demonstrably consequential: A5b had already pointed at the existing
-batch lock and its fence as the thing a coordinator lease must be reconciled with, M8 dropped it,
-no union row mentioned a lock or a migration afterwards, and Sol's audit of 22.08.2026 had to
-raise the missing migration rule again from scratch.
+input entry claimed once, no dangling reference and no duplicate — a count Sol reproduced
+independently. FOUR ROWS had lost a clause and are restored below, marked `RESTORED BY THE
+RE-MERGE`; three of them are list-A clauses dropped by list B's author. One is demonstrably
+consequential: A5b had already pointed at the existing batch lock and its fence as the thing a
+coordinator lease must be reconciled with, M8 dropped it, no union row mentioned a lock or a
+migration afterwards, and Sol's audit of 22.08.2026 had to raise the missing migration rule again
+from scratch.
+
+THE RESTORATIONS ARE NOT A CLEAN BILL. Sol's review of that re-merge found a further loss the
+re-merge had missed — M27 keeps B15's state vocabulary but drops the actor, coordinator epoch,
+timestamps and last local and pushed commit that B15 requires of every point state — which shows
+the sweep was not exhaustive. Structural checks cannot find these: the id accounting balances and
+the two union representations agree while a row is substantively incomplete. Treat the union as a
+specification with known gaps until a third model has folded it.
+
+A CORRECTION, WITHDRAWN THE SAME DAY, is recorded here because the document carried it briefly
+and someone may have read it. Half A's own heading claims Fable 5 wrote it. On that label this
+paragraph was rewritten to say list A was Fable's, which would have made Claude an eligible
+merger. The label is false: the transcript metadata shows `claude-opus-5` generated half A, and
+Fable had stopped serving nearly three hours earlier. The original attribution above is the
+correct one. `docs/four-eyes/676-provenance.md` carries the reading.
 
 The rejected alternatives are kept deliberately: they are the cheap-looking answers this stage
 ruled out, and an implementer who does not see them re-proposes them.
@@ -212,6 +225,6 @@ because the raw halves now have a home that cannot drift from them:
 
 | Half | Model | Entries | File |
 |---|---|---|---|
-| A | Fable 5 | 14 | `docs/four-eyes/676-blind-a-fable5.json` / `.md` |
+| A | Claude Opus 5 | 14 | `docs/four-eyes/676-blind-a-opus5.json` / `.md` |
 | B | GPT-5.6 Sol | 56 | `docs/four-eyes/676-blind-b-sol.json` / `.md` |
-| Union | merged by Claude (Opus 5) | 61 | `docs/four-eyes/676-union.json` |
+| Union | folded by Claude (Opus 5) — the two-model fallback, not a third model | 61 | `docs/four-eyes/676-union.json` |

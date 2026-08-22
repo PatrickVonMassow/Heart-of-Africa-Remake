@@ -16,7 +16,7 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
 
 const read = (rel) => readFileSync(join(REPO_ROOT, rel), 'utf8')
-const HALF_A = 'docs/four-eyes/676-blind-a-fable5'
+const HALF_A = 'docs/four-eyes/676-blind-a-opus5'
 const HALF_B = 'docs/four-eyes/676-blind-b-sol'
 const UNION = 'docs/four-eyes/676-union.json'
 const DOC = 'docs/handover-architecture.md'
@@ -38,7 +38,11 @@ describe('the 676 stage is auditable from its raw halves', () => {
   })
 
   it('names the author of each half in the file the tooling actually reads', () => {
-    expect(JSON.parse(read(`${HALF_A}.json`)).model).toBe('Fable 5')
+    // Half A's own heading claims Fable 5 and is wrong; the transcript metadata
+    // says Claude Opus 5 (676-provenance.md). The file the tooling reads carries
+    // the true author, and the verbatim half keeps the mislabel as evidence.
+    expect(JSON.parse(read(`${HALF_A}.json`)).model).toBe('Claude Opus 5')
+    expect(read(`${HALF_A}.md`)).toMatch(/Proposal A — Fable 5/)
     expect(JSON.parse(read(`${HALF_B}.json`)).model).toBe('GPT-5.6 Sol')
   })
 
@@ -47,8 +51,13 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // bound them before this case, so the JSON could balance while the table said
     // something else.
     const stored = JSON.parse(read(UNION))
-    expect(stored.mergedBy).toBe('Claude Opus 5')
     expect(stored.entries).toEqual(unionFromDocument(read(DOC)))
+    // THIS UNION HAS NO VALID MERGER and must not claim one. Half A is Claude's and
+    // half B is Sol's, so the model that wrote neither is Fable — switched off. Both
+    // folds on record were made by an author of the material.
+    expect(stored.mergedBy).toBeUndefined()
+    expect(stored.mergedByNote).toMatch(/no valid merger/i)
+    expect(read(DOC)).toMatch(/WEAKER TWO-MODEL FALLBACK/)
   })
 
   it('keeps half B\'s verbatim text and its parsed form the same list', () => {

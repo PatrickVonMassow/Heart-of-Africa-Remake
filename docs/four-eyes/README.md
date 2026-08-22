@@ -30,21 +30,19 @@ The union is `docs/handover-architecture.md`; work-order points 676 and 834 buil
 
 | Half | Model | Entries | File |
 |---|---|---|---|
-| A | Fable 5 | 14 | `676-blind-a-fable5.json` / `.md` |
+| A | Claude Opus 5 | 14 | `676-blind-a-opus5.json` / `.md` |
 | B | GPT-5.6 Sol | 56 | `676-blind-b-sol.json` / `.md` |
 
 RECOVERED on 22.08.2026 from the origin session's scratchpad and `local/`, both of them
 untracked; the halves had never been versioned, which is why the rule above now exists.
-The primary evidence for the recovery and for the authorship claim below — quoted from the
-origin transcript, with its limits stated — is `676-provenance.md`.
 
-**The provenance of `docs/handover-architecture.md` names the wrong author for half A.**
-It says list A is "by Claude (Opus 5)" and offers Fable 5 as the untainted third model.
-The origin session's own commands say otherwise, verbatim: it wrote
-`# Proposal A — Fable 5, written 13.08.2026 before seeing any other proposal`, and handed
-the merge to Sol as `LIST A (14 entries, written blind by Fable 5)`. Half A is Fable 5's.
+**Half A's own heading says Fable 5 wrote it, and that is false** — the transcript
+metadata says Claude Opus 5, and Fable had stopped serving nearly three hours before the
+stage began. `676-provenance.md` carries the reading. A correction filed earlier on
+22.08.2026 believed the label, renamed the half to Fable's and concluded that Claude was
+free to merge; that correction is withdrawn.
 
-That mistake inverts the remedy the document prescribes for itself. Fable 5 wrote half A
-and cannot merge; Sol wrote half B and did merge, which is the recorded deviation. The
-model that wrote **neither** half is Claude (Opus 5) — so the re-merge is valid work for
-Claude, and does not wait on the Fable switch.
+The consequence is the one the architecture document already stated for itself: half A is
+Claude's, half B is Sol's, and the model that wrote **neither** is Fable 5 — switched off.
+No third model is available, so any re-merge is the weaker two-model fallback of
+CLAUDE.md §6 and is recorded as such, with its framing decorrelated.
