@@ -61,9 +61,12 @@ describe('readOutcome', () => {
       shape: 'files',
       alive: true,
       ...healthy,
-      beatTimes: beatsEvery(BEAT_MS, BEAT_MS, 2001),
+      beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS, BEAT_MS, 2001)],
     })
     expect(quotaThenHang.escaped).toBe(false)
+    // …and for the RIGHT reason: the baseline is intact, so this is a hang and
+    // not an unmeasurable host.
+    expect(quotaThenHang.unmeasurable).toBe(false)
     expect(quotaThenHang.maxGap).toBeGreaterThan(BEAT_MS * MAX_GAP_BEATS)
   })
 
@@ -72,9 +75,10 @@ describe('readOutcome', () => {
       shape: 'files',
       alive: true,
       ...healthy,
-      beatTimes: [...beatsEvery(BEAT_MS, BEAT_MS, 600), ...beatsEvery(BEAT_MS, 2200, WINDOW)],
+      beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS, BEAT_MS, 600), ...beatsEvery(BEAT_MS, 2200, WINDOW)],
     })
     expect(gapInside.escaped).toBe(false)
+    expect(gapInside.unmeasurable).toBe(false)
     expect(gapInside.maxGap).toBe(1600)
   })
 
@@ -83,9 +87,10 @@ describe('readOutcome', () => {
       shape: 'files',
       alive: true,
       ...healthy,
-      beatTimes: beatsEvery(BEAT_MS, 1400, WINDOW),
+      beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS, 1400, WINDOW)],
     })
     expect(lateStart.escaped).toBe(false)
+    expect(lateStart.unmeasurable).toBe(false)
     expect(lateStart.maxGap).toBe(1400)
   })
 
@@ -156,6 +161,38 @@ describe('readOutcome', () => {
     })
     expect(lateFirstBeat.jitter).toBe(2000)
     expect(lateFirstBeat.unmeasurable).toBe(true)
+
+    // …and the TRAILING edge: beats that stop well before the kill.
+    const silentBeforeKill = readOutcome({
+      shape: 'files',
+      alive: true,
+      startedObserving: 0,
+      killedAt: 3000,
+      observedUntil: 6000,
+      beatTimes: [200, 400, 600, 800, 1000, 3200, 3400, 3600, 3800, 4000, 4200],
+      beatsBefore: 5,
+    })
+    expect(silentBeforeKill.jitter).toBe(2000)
+    expect(silentBeforeKill.unmeasurable).toBe(true)
+  })
+
+  it('lets a definite death stand even when the baseline was unmeasurable', () => {
+    // A corpse is a corpse whatever the host was doing; only a POSITIVE verdict
+    // needs a baseline. Without this the reading of the pipes shape would have
+    // depended on machine load.
+    const deadOnBadHost = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      startedObserving: 0,
+      killedAt: 3000,
+      observedUntil: 6000,
+      beatTimes: [2900],
+      beatsBefore: 1,
+      lastLine: 'raised: EPIPE',
+    })
+    expect(deadOnBadHost.unmeasurable).toBe(true)
+    expect(deadOnBadHost.dead).toBe(true)
+    expect(deadOnBadHost.why).toMatch(/pipe whose reader went with the parent/)
   })
 
   it('calls a settling window with almost no beats unmeasurable, not a clean baseline', () => {
@@ -251,6 +288,21 @@ describe('probeAlive', () => {
   it('classifies the real signal probe: this process exists, a free number is gone', () => {
     expect(signalState(process.pid)).toBe('exists')
     expect(signalState(2 ** 30)).toBe('gone')
+  })
+
+  it('classifies EPERM as EXISTS, which a bare catch would have called gone', () => {
+    // The branch itself, not a hand-written answer: a process we may not signal
+    // is a process that IS there, and folding it into "gone" reports a live
+    // foreign worker as dead.
+    const raise = (code) => () => {
+      const err = new Error(code)
+      err.code = code
+      throw err
+    }
+    expect(signalState(1, raise('EPERM'))).toBe('exists')
+    expect(signalState(1, raise('ESRCH'))).toBe('gone')
+    expect(signalState(1, raise('EINVAL'))).toBe('unknown')
+    expect(signalState(1, () => undefined)).toBe('exists')
   })
 
   it('refuses to answer when NO spawn-time identity was captured', () => {

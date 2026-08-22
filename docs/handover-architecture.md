@@ -383,18 +383,27 @@ compensation, and the design owes all three parts:
   answer said and which would have quarantined all legitimate predecessor history, transferred
   workers included, at every ordinary handover.
 
-  **The transition is written by the ACQUIRER, not by the daemon.** Letting the daemon append it
-  when it first validated a request under a fence it had not seen left the record hostage to
-  traffic: A could validate fence 7, the lock could advance to 8, A could append its fence-7
-  mutation, and a crash before any fence-8 request arrived meant transition 8 was recorded only
-  after recovery — behind A's entry, which the positional rule would then accept. So acquisition
-  itself writes it: **B appends the fence transition as the first act of acquiring, before it may
-  request anything,** and a daemon that reads a lock fence for which the journal holds no
-  transition refuses to mutate and says so, rather than inventing the ordering it needs. The
-  journal's order is then total and self-contained, "the fence in force at position i" is the last
-  transition at or before i, and no gap in it depends on whether a request happened to arrive. The
-  lock file remains what the daemon READS; the journal is what makes the reading a fact a later
-  reader can re-derive.
+  **THE JOURNAL HAS EXACTLY ONE WRITER, AND ITS TAIL IS ALLOWED TO SAY "I DO NOT KNOW".** Two
+  earlier answers each gave the transition to a different author — first the daemon, then the
+  acquirer — and both failed for the same reason: two independent writers cannot establish an
+  order between their own appends. Letting the daemon write it left the record hostage to traffic
+  (validate 7, lock moves to 8, append the 7, crash before any 8 arrives, and transition 8 lands
+  behind the entry it should have condemned); letting the acquirer write it merely moved the same
+  race to the acquirer's append.
+
+  So the daemon is the only writer, transitions included, and where it cannot prove the order it
+  says so instead of inventing one. On restart the daemon reads the lock. If the current credential
+  has no transition in the journal, every entry after its own last CONFIRMED position — the last
+  entry it had both written and re-validated before the crash — is marked `unverified`, because it
+  cannot prove whether those entries were written before or after the credential moved.
+  Reconciliation quarantines exactly those, and nothing else: confirmed history stays history,
+  including transferred workers.
+
+  **What makes that tolerable rather than a hole is that the unverifiable set is local-only.** A
+  published act is decided at the remote by the credential lease, not by journal order, so an
+  entry whose position cannot be proven is by construction a local mutation — journalled, marked,
+  and reversible. "The fence in force at position i" therefore remains the last transition at or
+  before i for the confirmed prefix, and the tail is not read as a fact at all.
 
 **EVERY PUBLISHED MUTATION IS UNCOMPENSABLE, and there are two of them.** A pushed merge can
 already have been fetched, read or built on, and "reverting" it is a new commit, not a reversal.
@@ -424,26 +433,28 @@ branch or `main` update does not happen either. Worker checkpoint pushes use the
 so M40's "check the lease before pushing" becomes a check that IS the push rather than one that
 precedes it.
 
-**WHAT THE CAS ALONE STILL DOES NOT COVER, and the clock rule that does.** Between B's local
-acquisition and B's advance of the credential ref there is an interval in which the ref is still
-A's, so A's lease matches and git accepts A's push. No remote CAS can close that on its own,
-because during it nobody has told the remote anything. The interval is closed by the LEASE, and
-this is a clock rule, stated with its assumption rather than hidden:
+**THE INTERVAL BEFORE THE SUCCESSOR'S ADVANCE IS NOT A WINDOW OF TWO PUBLISHERS.** Between B's
+local acquisition and B's advance of the credential ref, the ref still carries A's credential, so
+A's push is accepted. An earlier answer tried to close that with a clock — A stops δ before its
+lease expires — and that was wrong twice over: re-reading a clock and then acting is the same
+check-then-act race one level down, and no margin can be enforced against scheduling delay or push
+latency. **The clock rule is withdrawn.** What actually holds is a rule about who may publish:
 
-- **B advances the credential ref as the first act of acquisition,** before any work of its own,
-  and may publish nothing until that push has landed.
-- **A stops publishing δ before its own lease expires.** A re-reads its `leaseUntil` immediately
-  before every publishing act and refuses when less than δ remains.
-- **B may not take the lock before A's lease has expired,** which `scripts/batch-singleton.mjs`
-  already requires — takeover needs proven death or an expired lease, never impatience.
-- Therefore A's last possible push is δ before expiry and B's first possible acquisition is at
-  expiry, so the window has A on one side of the lease boundary and B on the other.
+- **The ref decides, and only the ref.** Whoever's credential `refs/hoa/coordinator` carries is
+  the one publisher. Not "the lock holder", not "whoever's lease is fresh" — the ref.
+- **B advances the ref as the first act of acquisition and publishes nothing before that push has
+  landed.** Until then B is not a publisher, by its own rule.
+- **A remains a publisher until the ref moves,** and that is CORRECT rather than a leak: during
+  that interval A is the only party the ref names and B has published nothing, so there is exactly
+  one publisher throughout. The instant B's advance lands, A's next lease fails.
+- **Nothing is timed, so nothing depends on a clock.** A push that was in flight when A died is
+  either accepted before B's advance — A was still the named publisher — or rejected by the lease
+  afterwards. There is no third outcome, and no assumption about drift, scheduling or latency
+  survives in this argument at all.
 
-**Its assumption is bounded clock drift between the two sessions,** which on one machine with one
-system clock is the ordinary case; δ is the margin that absorbs it and is a calibratable value in
-the schema, not a constant buried in code. Where death is PROVEN rather than merely assumed from
-an expired lease — the pid is gone and its start time cannot return — the wait does not apply,
-because a dead A publishes nothing.
+What this costs is honest and small: for the length of one push, a dispossessed-in-the-lock-file
+coordinator can still publish. What it buys is that the property is decided by an atomic operation
+on the far side rather than by two clocks agreeing.
 
 The landing's safety therefore comes from serialization plus a fenced remote update, and the local
 fence is what stops a dispossessed coordinator from acquiring the landing lock in the first place.
@@ -522,13 +533,20 @@ way. The consequences follow without any new primitive:
 when A begins a legacy operation while owning the lock, A's lease then expires or its death is
 observed, and B becomes owner and writes the `daemon` field while A is still inside that
 operation. The single-thread argument covers the current owner and says nothing about a former
-one. So the same lease rule that fences publication fences the regime: **a legacy operation
-re-reads the lock immediately before its own irreversible act and aborts if the lock is no longer
-its own or less than δ of its lease remains.** An operation that discovers it has been dispossessed
-does not finish "because it was nearly done"; it stops and leaves its work where a successor can
-see it. Combined with B's inability to take over before expiry, an operation begun under a valid
-lease either completes δ before that lease ends or aborts — and B's daemon field cannot appear
-during a legacy act that is still entitled to run.
+one, and re-reading the lock "immediately before" the irreversible act only moves the race — it
+does not remove it.
+
+**So the question is answered by asking what a legacy operation can actually do irreversibly, and
+there are only two kinds.** It can PUBLISH, and publication is decided at the remote by the
+credential lease above, which needs no clock and no local re-read: a dispossessed operation's push
+fails the moment the successor's advance has landed, and before that it is still the one named
+publisher. Or it can mutate LOCAL state, which is not published, is journalled with the credential
+it ran under, and is therefore detectable and compensable exactly like a daemon mutation.
+
+The `daemon` field is itself a local mutation of that kind. So B writing it while A is still
+inside a legacy operation is not a correctness failure: A's local work is attributable and
+reversible, and A's published work is fenced by the ref. What the earlier draft claimed — an
+exclusion — does not exist and is not needed.
 
 A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
 handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with

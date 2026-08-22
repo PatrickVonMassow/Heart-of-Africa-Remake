@@ -204,7 +204,18 @@ const child = spawn(process.execPath, [worker, beat], {
 // same time. stdio is now the single difference between the two runs.
 child.unref()
 if (shape !== 'files') { child.stdout.on('data', () => {}); child.stderr.on('data', () => {}) }
-console.log(String(child.pid))
+// THE IDENTITY IS RECORDED HERE, by the process that just created the child, in
+// the same tick. Reading it from the drill after the fact left a window in which
+// the worker could exit and its number be reused before the read — and the drill
+// would then have adopted the replacement as the spawned identity.
+import { readFileSync as rf } from 'node:fs'
+let ticks = 0
+try {
+  const stat = rf('/proc/' + child.pid + '/stat', 'utf8')
+  const rest = stat.slice(stat.lastIndexOf(')') + 1).trim().split(/\\s+/)
+  ticks = Number(rest[19]) || 0
+} catch (e) { console.error('identity read failed: ' + (e && e.code ? e.code : e)) }
+console.log(String(child.pid) + ' ' + String(ticks))
 await new Promise(() => {})
 `
 
@@ -294,9 +305,9 @@ const defaultReadProc = (pid) => {
  * undecided. A drill that folds all three into false would report a live
  * foreign process as gone.
  */
-export function signalState(pid) {
+export function signalState(pid, kill = (p) => process.kill(p, 0)) {
   try {
-    process.kill(pid, 0)
+    kill(pid)
     return 'exists'
   } catch (err) {
     if (err?.code === 'ESRCH') return 'gone'
@@ -327,20 +338,23 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
     stdio: ['ignore', startFd, startFd],
   })
   parent.unref()
-  // THE IDENTITY IS TAKEN AT SPAWN, not after the settling sleep: between the two
-  // the worker could already have exited and its number been reused, and the
-  // probe would then compare against the wrong process.
+  // The parent writes "<pid> <startTicks>" as one line, taken in the tick it
+  // spawned the child, so the identity cannot belong to a replacement.
+  let pid = 0
   let startedAt = 0
-  for (let tries = 0; tries < 50 && !startedAt; tries += 1) {
-    const seen = Number(readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0])
-    if (Number.isFinite(seen) && seen > 0) startedAt = startTicksOf(defaultReadProc(seen) ?? '')
-    if (!startedAt) await sleep(20)
+  for (let tries = 0; tries < 100 && !pid; tries += 1) {
+    const line = readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0] ?? ''
+    const [seenPid, seenTicks] = line.split(/\s+/).map(Number)
+    if (Number.isFinite(seenPid) && seenPid > 0) {
+      pid = seenPid
+      startedAt = Number.isFinite(seenTicks) ? seenTicks : 0
+    }
+    if (!pid) await sleep(20)
   }
   const startedObserving = Date.now()
   await sleep(settleMs)
   const lines = (path) => readFileSync(path, 'utf8').split('\n').filter(Boolean)
   const beatsBefore = lines(beat).length
-  const pid = Number(readFileSync(join(dir, `start-${shape}.log`), 'utf8').trim().split('\n')[0])
   let killedAt = 0
   try {
     process.kill(-parent.pid, 'SIGKILL')
@@ -391,7 +405,11 @@ export async function runDrill(opts = {}) {
 if (isMainModule(import.meta.url)) {
   const result = await runDrill()
   for (const o of result.outcomes) {
-    console.log(`${o.shape}: ${o.escaped ? 'ESCAPED' : 'DIED'} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
+    // FOUR OUTCOMES, NOT TWO. Labelling every non-escape "DIED" reported an
+    // undecidable probe and an unmeasurable host as deaths — the two readings
+    // this drill added precisely so that they would not be mistaken for one.
+    const label = o.escaped ? 'ESCAPED' : o.dead ? 'DIED' : o.unmeasurable ? 'INCONCLUSIVE' : 'UNKNOWN'
+    console.log(`${o.shape}: ${label} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
   }
   console.log(result.ok ? `VERDICT: ${result.note}` : `VERDICT: ${result.note}`)
   process.exit(result.ok ? 0 : 1)
