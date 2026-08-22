@@ -47,6 +47,13 @@ export const CALIBRATION_PATH = '.claude/queue-calibration.json'
 /** How many landed comparables a class needs before its factor is trusted. */
 export const MIN_CLASS_SAMPLES = 5
 
+/**
+ * The basis name for a correction taken from MEASURED ELAPSED TIME rather than
+ * from estimate-versus-actual ratios. Named apart because the two rest on
+ * different evidence, and a reader must be able to tell which one moved a card.
+ */
+export const ELAPSED_BIAS_BASIS = 'measured-elapsed'
+
 /** Beyond this spread between an axis's class factors, one global factor lies. */
 export const GLOBAL_FACTOR_TOLERANCE = 1.5
 
@@ -441,13 +448,19 @@ export function classSummaries(landings, axis) {
   for (const [name, members] of groups) {
     const rated = members.filter((m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours))
     const unknowable = UNKNOWABLE_CLASSES.has(name)
+    const elapsed = summarise(members.map((m) => m.elapsedHours))
     out.push({
       axis,
       name,
       points: members.length,
-      elapsed: summarise(members.map((m) => m.elapsedHours)),
+      elapsed,
       ratio: summarise(rated.map((m) => m.elapsedHours / m.estimateHours)),
       comparable: !unknowable && rated.length >= MIN_CLASS_SAMPLES,
+      // A class can be measured WITHOUT any landing-time snapshot: the elapsed
+      // span is read off git, while the ratio needs a promise recorded while the
+      // point was still open. Two separate kinds of evidence — and the second one
+      // exists only for landings after this command's first run.
+      elapsedComparable: !unknowable && elapsed.n >= MIN_CLASS_SAMPLES,
       unknowable,
     })
   }
@@ -566,23 +579,100 @@ export function calibrationReading(landings, { cadenceHours = [], window = null,
  * cannot be read off a queued card, so they inform the DECISION above and never
  * a card's own number.
  */
-export function factorForCard(reading, criticality) {
+export function factorForCard(reading, criticality, { promiseMedian = null } = {}) {
   const label = criticality ?? UNTAGGED
   const ownClass = (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
-  if (!ownClass?.comparable || ownClass.ratio?.n < MIN_CLASS_SAMPLES) {
+  const ratioComparable = Boolean(ownClass?.comparable) && (ownClass?.ratio?.n ?? 0) >= MIN_CLASS_SAMPLES
+  if (ratioComparable) {
+    if (reading?.decision?.adopted && asNumber(reading.decision.factor)) {
+      return { factor: reading.decision.factor, basis: 'global', label, reason: null }
+    }
+    const factor = asNumber(reading?.factors?.[label])
+    if (factor && factor > 0) return { factor, basis: `criticality:${label}`, label, reason: null }
+  }
+  // THE SECOND BASIS, and the one that answers the question this point was filed
+  // for. A ratio needs a promise recorded at the landing, and those snapshots
+  // begin only with this command's first run — so on the day it ships, every
+  // class is "pending" and the queue keeps a promise no measurement supports.
+  // The bias is measurable without a single snapshot: the class's MEASURED
+  // median elapsed against the median of what its open cards currently promise.
+  // Applied as a FACTOR, so each card keeps its position relative to its
+  // neighbours; only the class's centre moves onto the measurement.
+  const promise = asNumber(promiseMedian)
+  const measured = asNumber(ownClass?.elapsed?.median)
+  if (ownClass?.elapsedComparable && promise > 0 && measured > 0) {
+    return { factor: measured / promise, basis: `${ELAPSED_BIAS_BASIS}:${label}`, label, reason: null }
+  }
+  if (!ratioComparable) {
     return {
       factor: null,
       basis: null,
       label,
-      reason: `class "${label}" has no landed comparable (fewer than ${MIN_CLASS_SAMPLES} measured landings)`,
+      reason: ownClass?.elapsedComparable
+        ? `class "${label}" is measured but its open cards promise nothing comparable`
+        : `class "${label}" has no landed comparable (fewer than ${MIN_CLASS_SAMPLES} measured landings)`,
     }
   }
-  if (reading?.decision?.adopted && asNumber(reading.decision.factor)) {
-    return { factor: reading.decision.factor, basis: 'global', label, reason: null }
-  }
-  const factor = asNumber(reading?.factors?.[label])
-  if (factor && factor > 0) return { factor, basis: `criticality:${label}`, label, reason: null }
   return { factor: null, basis: null, label, reason: `class "${label}" has no usable factor` }
+}
+
+/**
+ * THE MEDIAN PROMISE PER CRITICALITY CLASS, over the cards still open.
+ *
+ * The denominator of the bias above. It reads each card's BASELINE — what it
+ * promised before any correction — so a second run divides by the same number
+ * the first one did instead of compounding its own writing. An inherited class
+ * median is not a promise anybody made and is left out.
+ */
+export function promiseMedians({ cards = {}, open = [], criticality = new Map(), ledger = {} } = {}) {
+  const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
+  const groups = new Map()
+  for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0)) {
+    const from = cards?.[point]?.estimate ?? null
+    const baseline = ledgerEntry(ledger, point)?.baseline ?? from
+    if (String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)) continue
+    const hours = parseEstimateHours(baseline)
+    if (!hours) continue
+    const label = crit.get(point) ?? UNTAGGED
+    if (!groups.has(label)) groups.set(label, [])
+    groups.get(label).push(hours)
+  }
+  const out = new Map()
+  for (const [label, xs] of groups) {
+    const median = summarise(xs).median
+    if (median) out.set(label, median)
+  }
+  return out
+}
+
+/**
+ * WHICH OPEN POINTS ASK FOR A PICTURE PROOF — the confounder, made operative.
+ *
+ * Point 730's own measurement carries a binding limit: its window holds no
+ * render point with a picture check, so its factor "must NOT be carried over to
+ * render points". A queued card's picture axis cannot be READ off the board —
+ * whether a picture check happened is a property of how the work turned out —
+ * but the point's own spec says whether one is OWED, and that is the half that
+ * exists before the work starts.
+ *
+ * The markers are deliberately narrow: a demand for a rendered PROOF, not any
+ * mention of pictures. A process point that discusses the picture lane is not a
+ * render point, and excluding it would quietly shrink the correction.
+ */
+export const PICTURE_PROOF_MARKERS = [/\bboth backends\b/i, /\bbrowser frame\b/i, /\bscreenshots?\b/i]
+
+export function pictureBearingPoints(text) {
+  const out = new Set()
+  let point = null
+  for (const line of String(text ?? '').split('\n')) {
+    const head = /^- \[[x ]\] (\d+)\./.exec(line)
+    if (head) point = Number(head[1])
+    else if (/^- \[/.test(line)) point = null
+    if (point === null || out.has(point)) continue
+    // The head line carries the point's title, and a title can name the proof.
+    if (PICTURE_PROOF_MARKERS.some((re) => re.test(line))) out.add(point)
+  }
+  return out
 }
 
 /**
@@ -656,8 +746,10 @@ export function estimateForLanding(ledger, point, currentEstimate) {
  * IDEMPOTENT BY CONSTRUCTION: the factor is applied to the card's BASELINE, so a
  * second run of the same reading computes the same target and changes nothing.
  */
-export function rewritePlan(reading, { cards = {}, open = [], criticality = new Map(), ledger = {} } = {}) {
+export function rewritePlan(reading, { cards = {}, open = [], criticality = new Map(), ledger = {}, pictureBearing = new Set() } = {}) {
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
+  const picture = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
+  const promises = promiseMedians({ cards, open, criticality: crit, ledger })
   const plan = []
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b)) {
     const from = cards?.[point]?.estimate ?? null
@@ -675,7 +767,22 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
       continue
     }
     const hours = parseEstimateHours(baseline)
-    const { factor, basis, label, reason: factorReason } = factorForCard(reading, crit.get(point))
+    const label0 = crit.get(point) ?? UNTAGGED
+    const { factor, basis, label, reason: factorReason } = factorForCard(reading, crit.get(point), {
+      promiseMedian: promises.get(label0) ?? null,
+    })
+    if (hours && picture.has(point)) {
+      plan.push({
+        point,
+        from,
+        baseline,
+        to: from,
+        changed: false,
+        reason:
+          'the point asks for a picture proof and the measured window holds no render landing — the confounder forbids carrying this factor here, so the estimate is kept',
+      })
+      continue
+    }
     if (!hours) {
       plan.push({ point, from, baseline, to: from, changed: false, reason: 'no stored estimate to correct — the card keeps its "no estimate yet" marker' })
       continue
@@ -760,7 +867,10 @@ export function ledgerAfterApply(ledger, plan, { now = Math.floor(Date.now() / 1
 export function inheritanceDefaults(reading) {
   const out = {}
   for (const c of reading?.byAxis?.criticality ?? []) {
-    if (!c.comparable) continue
+    // Measured elapsed time is the default's whole content, so a class settles
+    // this the moment it HAS measured landings — a ratio snapshot adds nothing
+    // to a median the git history already answers.
+    if (!c.comparable && !c.elapsedComparable) continue
     const hours = roundHours(c.elapsed.median)
     if (hours) out[c.name] = hours
   }

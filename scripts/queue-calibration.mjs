@@ -32,8 +32,11 @@ import {
   calibrationReading,
   elapsedHoursToTick,
   estimateForLanding,
+  ELAPSED_BIAS_BASIS,
   inheritanceDefaults,
   inheritedEstimateForClass,
+  pictureBearingPoints,
+  promiseMedians,
   laneForAttribution,
   ledgerAfterApply,
   MIN_CLASS_SAMPLES,
@@ -142,7 +145,8 @@ function readStore() {
 
 try {
   const cards = readCards()
-  const criticality = parseCriticality(readTasksAll())
+  const tasksAll = readTasksAll()
+  const criticality = parseCriticality(tasksAll)
   const open = openPointsOf(readTasksOpen())
   const previousStore = readStore()
   // Every OPEN card's promise is snapshotted BEFORE anything is computed, so the
@@ -259,7 +263,18 @@ try {
   console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
   for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}`)
 
-  const plan = rewritePlan(reading, { cards, open, criticality, ledger })
+  const promises = promiseMedians({ cards, open, criticality, ledger })
+  for (const c of reading.byAxis.criticality) {
+    const promise = promises.get(c.name)
+    if (!c.comparable && c.elapsedComparable && promise) {
+      console.log(
+        `  ${c.name.padEnd(13)} ${fmt(c.elapsed.median / promise, '×')}  (${ELAPSED_BIAS_BASIS}: median ${fmt(c.elapsed.median, ' h')} measured against the ${fmt(promise, ' h')} its open cards promise, n=${c.elapsed.n})`,
+      )
+    }
+  }
+
+  const pictureBearing = pictureBearingPoints(tasksAll)
+  const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing })
   const changed = plan.filter((p) => p.changed)
   const kept = plan.filter((p) => !p.changed)
   console.log('')

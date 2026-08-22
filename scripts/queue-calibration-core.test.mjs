@@ -10,6 +10,7 @@ import {
   estimateTail,
   elapsedHoursToTick,
   ESTIMATE_FLOOR_HOURS,
+  ELAPSED_BIAS_BASIS,
   factorForCard,
   formatEstimate,
   globalFactorDecision,
@@ -26,7 +27,9 @@ import {
   parseEstimateHours,
   parseFirstParentChain,
   parseTickEvents,
+  pictureBearingPoints,
   pictureVerifiedPoints,
+  promiseMedians,
   rewritePlan,
   roundHours,
   SPAN_NO_BRANCH,
@@ -569,5 +572,130 @@ describe('what a newly filed card inherits', () => {
     // No tag, and the untagged class was not measured here — the board's own
     // "no estimate yet" marker stays, which is exactly the intended fallback.
     expect(inheritedEstimate(6, { defaults, criticality: new Map() })).toBeNull()
+  })
+})
+
+
+describe('correcting a queue no landing ever promised against', () => {
+  // THE DAY THE COMMAND SHIPS. Every landing behind it has a measurable span in
+  // git and NOT ONE has a recorded promise: the snapshot ledger starts with the
+  // command's own first run. A build that needs ratios here corrects nothing at
+  // all, and the queue keeps the guess the point was filed to remove.
+  const unpromised = (n, hours, over = {}) =>
+    Array.from({ length: n }, (_, i) => landing({ point: 600 + i, elapsedHours: hours, estimateHours: null, ...over }))
+
+  const rows = [
+    ...unpromised(6, 1, { criticality: 'medium' }),
+    ...unpromised(6, 2, { criticality: 'high' }).map((r, i) => ({ ...r, point: 700 + i })),
+  ]
+  const reading = calibrationReading(rows)
+
+  it('measures a class off git even when no landing carries a promise', () => {
+    const medium = reading.byAxis.criticality.find((c) => c.name === 'medium')
+    expect(medium).toMatchObject({ comparable: false, elapsedComparable: true })
+    expect(medium.ratio.n).toBe(0)
+    expect(medium.elapsed.median).toBe(1)
+  })
+
+  it('takes the median promise of the OPEN cards as the denominator', () => {
+    const medians = promiseMedians({
+      cards: { 10: { estimate: '~2 h' }, 11: { estimate: '~4 h' }, 12: { estimate: '~9 h' } },
+      open: [10, 11, 12],
+      criticality: new Map([[10, 'medium'], [11, 'medium'], [12, 'high']]),
+    })
+    expect(medians.get('medium')).toBe(3)
+    expect(medians.get('high')).toBe(9)
+  })
+
+  it('leaves out a card that promises nothing and one that inherited its number', () => {
+    const medians = promiseMedians({
+      cards: { 10: { estimate: '~2 h' }, 11: {}, 12: { estimate: `~8 h ${INHERITED_ESTIMATE_NOTE}` } },
+      open: [10, 11, 12],
+      criticality: new Map([[10, 'medium'], [11, 'medium'], [12, 'medium']]),
+    })
+    expect(medians.get('medium')).toBe(2)
+  })
+
+  it('corrects by measured elapsed over the promise, and names that basis', () => {
+    const { factor, basis } = factorForCard(reading, 'medium', { promiseMedian: 4 })
+    expect(factor).toBe(0.25)
+    expect(basis).toBe(`${ELAPSED_BIAS_BASIS}:medium`)
+  })
+
+  it('prefers a measured RATIO wherever one exists — the second basis is the fallback', () => {
+    const rated = calibrationReading(classOf(6, 0.5, { criticality: 'medium' }))
+    const { basis } = factorForCard(rated, 'medium', { promiseMedian: 4 })
+    expect(basis).toBe('criticality:medium')
+  })
+
+  it('still refuses a class git cannot measure either', () => {
+    const { factor, reason } = factorForCard(reading, 'maximum', { promiseMedian: 4 })
+    expect(factor).toBeNull()
+    expect(reason).toMatch(/no landed comparable/)
+  })
+
+  it('says so when the class is measured but its open cards promise nothing', () => {
+    const { factor, reason } = factorForCard(reading, 'medium', { promiseMedian: null })
+    expect(factor).toBeNull()
+    expect(reason).toMatch(/promise nothing comparable/)
+  })
+
+  it('MOVES the cards — the whole reason the point exists', () => {
+    const plan = rewritePlan(reading, {
+      cards: { 10: { estimate: '~3 h' }, 11: { estimate: '~6 h' } },
+      open: [10, 11],
+      criticality: new Map([[10, 'medium'], [11, 'medium']]),
+    })
+    // Median promise 4.5 h against a measured median of 1 h.
+    expect(plan[0]).toMatchObject({ point: 10, changed: true, basis: `${ELAPSED_BIAS_BASIS}:medium` })
+    expect(plan[1].changed).toBe(true)
+    // Each card keeps its position relative to its neighbour: one factor, not one value.
+    expect(parseEstimateHours(plan[1].to)).toBeGreaterThan(parseEstimateHours(plan[0].to))
+  })
+
+  it('a new card inherits the class median without any promise ever recorded', () => {
+    expect(inheritanceDefaults(reading)).toMatchObject({ medium: 1, high: 2 })
+  })
+})
+
+describe('the confounder that forbids carrying the factor to render points', () => {
+  const tasks = [
+    '- [ ] 10. A render point.',
+    '  VERIFIABLE: a browser frame from that seed, on both backends.',
+    '  Criticality: medium.',
+    '',
+    '- [ ] 11. A process point that DISCUSSES the picture lane.',
+    '  The picture lane was broken and unnoticed; picture verification is part of a landing.',
+    '  Criticality: medium.',
+    '',
+    '- [ ] 12. A point whose title already names its screenshot proof.',
+    '  Criticality: medium.',
+    '',
+  ].join('\n')
+
+  it('finds the point that owes a rendered proof', () => {
+    expect(pictureBearingPoints(tasks).has(10)).toBe(true)
+  })
+
+  it('does NOT take a point that merely talks about pictures', () => {
+    expect(pictureBearingPoints(tasks).has(11)).toBe(false)
+  })
+
+  it('reads the head line too, where a title can name the proof', () => {
+    expect(pictureBearingPoints(tasks).has(12)).toBe(true)
+  })
+
+  it('KEEPS such a card and names the confounder instead of moving it', () => {
+    const reading = calibrationReading(classOf(6, 0.25, { criticality: 'medium' }))
+    const plan = rewritePlan(reading, {
+      cards: { 10: { estimate: '~4 h' }, 20: { estimate: '~4 h' } },
+      open: [10, 20],
+      criticality: new Map([[10, 'medium'], [20, 'medium']]),
+      pictureBearing: new Set([10]),
+    })
+    expect(plan[0]).toMatchObject({ point: 10, to: '~4 h', changed: false })
+    expect(plan[0].reason).toMatch(/picture proof/)
+    // The point beside it, owing no picture, still moves.
+    expect(plan[1]).toMatchObject({ point: 20, changed: true })
   })
 })
