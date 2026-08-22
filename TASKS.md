@@ -10967,3 +10967,40 @@ to land than a mechanism that needs a review.
   Criticality: low — no product defect. It matters because the cost is invisible: the file simply
   stops being editable in the places the fingerprint covers, and the last cut already bent to it.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 831. The launcher's singleton is the RECORD, so a live daemon the record does not name is
+  invisible and `--start` puts a second one beside it (measured 22.08.2026, 09:37 local, while
+  taking the boundary of point 768). WHAT WAS MEASURED, in this order: `node
+  scripts/batch-boundary.mjs --prepare 768` refused with "the launcher is unknown — nothing would
+  restart the batch"; `--status` agreed and printed NOT armed; and `ps` showed
+  `/usr/local/bin/node /workspace/hoa/scripts/batch-launcher.mjs --daemon` alive as pid 223003
+  since 01:48 with its cwd on this checkout. `.claude/batch-launcher.json` existed and had been
+  written at 08:52, so the record was fresh — it simply named a pid the probe could not confirm.
+  `--start` then reported "Launcher started (pid 2493391)" and TWO daemons ticked the same
+  checkout until the older one was killed by hand.
+  WHY IT IS NOT COSMETIC: each daemon ticks `scripts/batch-autostart.mjs` every fifteen minutes and
+  each tick may spawn a batch session. Two daemons are two independent spawn decisions against one
+  lock — the double-spawn the singleton exists to prevent, arrived through the singleton's own
+  arming path. The class is the one points 795 and 823 already describe from the other side: a
+  liveness question answered from a FILE while the process it is about is a `/proc` read away.
+  WHERE IT SITS: `scripts/batch-launcher.mjs` decides `--start` on `launcherState({ recordPath })`
+  and refuses only when that record reads `ready` or `running` with a foreign pid; nothing looks
+  for a running `--daemon` process that the record does not name. `scripts/batch-singleton.mjs`
+  already owns `probePid`, so the missing half is a search, not a new mechanism.
+  FINAL STATE: `--start` and `--status` answer from the PROCESSES as well as from the record. A
+  live `batch-launcher.mjs --daemon` on this checkout that the record does not name is reported by
+  `--status` as an orphan with its pid and start time, and `--start` refuses to add a second one —
+  it either adopts the orphan into the record or names the exact command that ends it, and says
+  which. A stale record with no live daemon behind it still starts normally, because that is the
+  case the arming path exists for.
+  VERIFIABLE: a Vitest case over the pure decision with a live foreign daemon and a record that
+  does not name it refuses the start and names the orphan; a case with a stale record and no live
+  daemon starts; a case with the record naming the live daemon reports `already running` as today;
+  and the process search is asserted to match only this checkout's daemon, so a second project's
+  launcher on the same host is not mistaken for this one.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point
+  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. The
+  measured occurrence is closed by hand, so nothing waits on it.
+  Criticality: medium — no product defect, but its failure mode is two writers on one repository,
+  and it is reached through the very command the boundary tells a session to run.
+  Bundle: Session- & Repo-Hygiene.
