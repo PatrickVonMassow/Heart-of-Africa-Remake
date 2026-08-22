@@ -899,35 +899,29 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * HAS THIS DENIAL ALREADY STATED ITS OWN PREDICATE? Only an OPEN one lends it to
  * the item that finishes a coordinated list.
  *
- * THE RULE IS DELIBERATELY BLUNT, and this is the reasoning, because three
- * rounds of cleverer ones each traded one misreading for another — an
- * end-of-clause predicate left "No screenshot necessary for this change" open, a
- * copula closed "No screenshot that is in the required state", a determiner test
- * closed "showing required states" and "the states required by the ticket".
- * Every rule of that shape is beaten by the next sentence.
+ * IT IS DECIDED BY POSITION, NOT BY VOCABULARY. An open denial is one that stops
+ * at the noun it denies — "No screenshot", "Kein Screenshot" — because the
+ * sentence has not said what it demands yet: the enumeration runs on into the
+ * next fragment and the predicate arrives at the end of it. A denial that
+ * carries anything past that noun has said something more, whatever the words,
+ * and the clause behind it is a new sentence.
  *
- * MEASURED against the work order this reads (22.08.2026): of every denial with
- * anything behind it on the same line — ONE, in the whole file — NONE also
- * carries a requirement word. The distinction those rounds argued over does not
- * occur in the corpus at all.
+ * FOUR ROUNDS WENT INTO WORD LISTS FIRST, and each was beaten by the next
+ * sentence — an end-of-clause predicate, then a copula, then a determiner test,
+ * then "benötigt", "gebraucht", "muss … erstellt werden". A list of words is
+ * never finished; a position is.
  *
- * So the requirement word is taken as the predicate wherever it appears, and the
- * error that leaves is the SAFE one. A denial wrongly read as closed makes the
- * item behind it a demand of its own, which holds the point OUT of the
- * correction — and holding a point out only narrows what the measurement speaks
- * for, while wrongly admitting a render card prices a rendered proof from a
- * population that contains none, which is exactly the confounder §14 forbids.
+ * MEASURED against the work order (22.08.2026): exactly one denial in the whole
+ * file has anything behind it on the same line, and the classification of all
+ * 196 picture-bearing points is the same under this rule as under the four it
+ * replaced. Where it cannot tell, it reads the denial as CLOSED, which makes the
+ * item behind it a demand and holds the point OUT — the safe error, because
+ * holding a point out only narrows what the correction speaks for, while
+ * admitting a render card prices a rendered proof from a population containing
+ * none.
  */
-const REQUIREMENT =
-  '(required|needed|necessary|require|requires|need|needs|' +
-  'nötig|noetig|erforderlich|benötigt|benoetigt|benötigen|benoetigen|' +
-  // The passive is how German usually says it — "wird gebraucht", "wurde
-  // benötigt" — and the active forms alone left those denials open.
-  'braucht|brauchte|brauchten|brauchen|gebraucht|erfordert|erforderte|erfordern)'
-
-const DENIAL_CARRIES_PREDICATE = new RegExp(`\\b${REQUIREMENT}\\b`, 'i')
-
-export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
+export const denialIsOpen = (fragment) =>
+  PICTURE_PROOF_MARKERS.some((re) => new RegExp(`(?:${re.source})\\s*$`, 'i').test(String(fragment ?? '')))
 
 /**
  * A NEGATIVE CONTINUATION — "No screenshot is required, NOR is a browser frame

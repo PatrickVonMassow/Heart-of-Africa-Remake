@@ -1475,7 +1475,17 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     expect(denialIsOpen('No screenshot is required')).toBe(false)
     expect(denialIsOpen('Kein Screenshot nötig')).toBe(false)
     expect(denialIsOpen('Nicht erforderlich')).toBe(false)
-    expect(denialIsOpen('The change does not require a browser frame')).toBe(false)
+    // …and one that ends ON the denied noun is open however complete it reads,
+    // because a coordinated item may still follow: "The change does not require
+    // a browser frame, or a screenshot" denies both. The licence still needs a
+    // conjunction, so an ordinary sentence behind it is unaffected.
+    expect(denialIsOpen('The change does not require a browser frame')).toBe(true)
+    expect(pictureBearingPoints(block(164, 'The change does not require a browser frame, or a screenshot.')).has(164)).toBe(
+      false,
+    )
+    expect(pictureBearingPoints(block(165, 'The change does not require a browser frame. Provide a screenshot.')).has(165)).toBe(
+      true,
+    )
   })
 
   it('closes one whose predicate carries a complement, in either language', () => {
@@ -1493,22 +1503,31 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     }
   })
 
-  it('knows the German requirement VERBS, not only the adjectives', () => {
-    // Including the PASSIVE, which is how German usually says it. Missing
-    // "gebraucht" left that denial open and suppressed the demand behind it —
-    // and that is the unsafe direction, a render point admitted for correction.
-    for (const denial of [
-      'Kein Screenshot wird benötigt',
+  it('needs no vocabulary at all, in either language', () => {
+    // A WORD LIST IS NEVER FINISHED. Four rounds of them were each beaten by the
+    // next sentence — "benötigt", "gebraucht", "muss … erstellt werden". The
+    // rule asks about POSITION instead: a denial that stops at the noun it
+    // denies has not said what it demands yet; one that carries anything past
+    // that noun has, whatever the words are.
+    for (const open of ['No screenshot', 'Kein Screenshot', 'no browser frame', 'kein picture proof']) {
+      expect(denialIsOpen(open), open).toBe(true)
+    }
+    for (const closed of [
+      'No screenshot is required',
+      'No screenshot necessary for this change',
       'Kein Screenshot wird gebraucht',
-      'Kein Screenshot wurde gebraucht',
-      'Kein Screenshot braucht es',
-      'Kein Screenshot erfordert das',
+      'Kein Screenshot wird benötigt',
+      'Kein Screenshot muss erstellt werden',
+      'Kein Screenshot nötig für diese Änderung',
+      'Nicht erforderlich',
+      'Not required',
     ]) {
-      expect(denialIsOpen(denial), denial).toBe(false)
+      expect(denialIsOpen(closed), closed).toBe(false)
     }
     for (const [n, line] of [
       [160, 'Kein Screenshot wird benötigt. Ein Browser Frame oder picture proof nötig.'],
       [162, 'Kein Screenshot wird gebraucht. Ein Browser Frame oder picture proof ist nötig.'],
+      [163, 'Kein Screenshot muss erstellt werden. Ein Browser Frame oder picture proof ist nötig.'],
     ]) {
       expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
     }
@@ -1531,13 +1550,18 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     ).toBe(true)
   })
 
-  it('and the work order never takes that branch', () => {
-    // THE MEASUREMENT THE BLUNT RULE RESTS ON. Of every denial with anything
-    // behind it on the same line, none also carries a requirement word — so the
-    // ambiguity above is argued over sentences the corpus does not contain. If
-    // this ever fires, one has been written: read the line and decide whether it
-    // is held out correctly before touching the rule.
-    const ambiguous = []
+  // The one denial in the work order with a clause behind it, as it stood when
+  // the position rule was decided (22.08.2026). It reads correctly either way:
+  // the fragment carries words past its noun, so the rule calls it closed, and
+  // the clause behind it names no proof at all — nothing hangs on the answer.
+  const KNOWN_TRAILING_DENIALS = ['(b) NO PICTURE SHOWS THE FEATURE. The frame shutter secures WHICH place is']
+
+  it('sees the whole of what the work order actually asks it to decide', () => {
+    // THE MEASUREMENT THE RULE RESTS ON. A denial reaching a clause behind it is
+    // the only shape where open-versus-closed changes an answer, and the corpus
+    // holds exactly one line of it. The EXACT SET is pinned, not the count: a
+    // count would let the known line be replaced by an unexamined one without a
+    // word from the suite, and this check exists to force that look.
     const trailing = []
     for (const line of String(readTasksAll()).split('\n')) {
       const fragments = splitClauses(line)
@@ -1546,16 +1570,9 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
         if (!PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) continue
         if (!fragments.slice(i + 1).some((f) => f.trim())) continue
         trailing.push(line.trim())
-        if (!denialIsOpen(fragment)) ambiguous.push(line.trim())
       }
     }
-    expect(ambiguous, 'a denial carrying a requirement word now has a clause behind it').toEqual([])
-    // THE WIDER SHAPE TOO, because the check above can only see the requirement
-    // words the vocabulary already knows — a denial phrased with one it does not
-    // would look open and slip past it. This counts every denial with a clause
-    // behind it, whatever it is phrased with, and one line is what the corpus
-    // held when the rule was decided.
-    expect(trailing.length, `denials with a clause behind them:\n${trailing.join('\n')}`).toBeLessThanOrEqual(1)
+    expect(trailing).toEqual(KNOWN_TRAILING_DENIALS)
   })
 
   it('reads a positive coordinated demand behind a closed denial as a demand', () => {
