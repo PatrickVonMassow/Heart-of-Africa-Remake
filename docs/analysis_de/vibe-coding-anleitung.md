@@ -170,9 +170,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
-  die das Werkzeug liest; oder der Schutz wirkt — nur fragt ihn ein zweiter Weg nie.
+  die das Werkzeug liest; der Schutz wirkt — nur fragt ihn ein zweiter Weg nie; oder die Umgebung
+  führt ihre **eigene Kopie** der Datei aus, die du korrekt geändert hast.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der
-  Test heißt ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**?"
+  Test heißt ‚**gibt es einen Weg vorbei?**'; und ‚wartet' etwas: **worauf**? Was die Umgebung
+  ausführt, **vergleiche** mit dem Stand im Repository und **benenne** die Abweichung, statt sie
+  still zu überschreiben."
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -426,4 +429,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 414bd4601d0fc6522f716d68e21792435fd152318450bd9d2f1623af9eef0486 -->
+<!-- GUIDE-FINGERPRINT: a7d99152b7b47267a3f7a43cb2e6db6ec898d1749b4bbe3ea0e411e80f543a0f -->

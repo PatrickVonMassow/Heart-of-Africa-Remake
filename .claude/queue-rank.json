@@ -296,12 +296,6 @@
       "origin": "user",
       "place": "last"
     },
-    "748": {
-      "at": "2026-08-21T17:23:20.040Z",
-      "why": "Nutzeranweisung 21.08.2026 16:39Z im Board-Chat: direkt hinter 745, weil es dessen prospektives Budget erbt",
-      "origin": "user",
-      "place": "ahead"
-    },
     "749": {
       "at": "2026-08-21T16:06:01.041Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It removes a wrong board card: no speed, no tokens, no blocked work.",
@@ -382,12 +376,6 @@
     "768": {
       "at": "2026-08-21T16:05:59.141Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for TOKENS: CLAUDE.md loads on every turn and section 7.1 alone is about 1.9k of it. Its branch stands.",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "779": {
-      "at": "2026-08-21T16:05:59.064Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for TOKENS: 25,000 measured tokens for four timestamps, and the branch is already built, green and pushed, so it is a landing rather than a build.",
       "origin": "user",
       "place": "ahead"
     },
@@ -508,6 +496,12 @@
       "why": "Bleibt hinten und wird mit 825 zusammen angefasst: das Loch ist latent, keine heutige Landung bricht daran, und die Nutzerregel vom 20.08.2026 laesst nur einen HIGH-Punkt vor dem Release stehen.",
       "origin": "machine",
       "place": "last"
+    },
+    "827": {
+      "at": "2026-08-22T00:13:54.202Z",
+      "why": "Behind point 174: the machine filed it from a drained finding, and the user's ruling of 20.08.2026 keeps such a point out of the release's way; the live top-up covers the outage until it runs.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -549,7 +543,6 @@
       744,
       746,
       747,
-      748,
       749,
       750,
       752,
@@ -557,13 +550,12 @@
       760,
       762,
       764,
-      768,
-      779
+      768
     ],
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-21T19:59:06.096Z",
+    "at": "2026-08-22T00:13:54.209Z",
     "points": [
       174,
       184,
@@ -764,7 +756,6 @@
       744,
       746,
       747,
-      748,
       749,
       750,
       752,
@@ -783,7 +774,6 @@
       774,
       777,
       778,
-      779,
       785,
       786,
       791,
@@ -808,7 +798,8 @@
       823,
       824,
       825,
-      826
+      826,
+      827
     ]
   }
 }
