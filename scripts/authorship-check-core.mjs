@@ -14,7 +14,28 @@ import { sameModel } from './mechanism-review-core.mjs'
 const MODEL_IN_HEADING =
   /\b(GPT[\s-]*\d+(?:\.\d+)?[\s-]*Sol|Sol(?:[\s-]*\d+(?:\.\d+)?)?|Claude[\s-]+(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?|(?:Opus|Fable|Sonnet|Haiku)(?:[\s-]*\d+(?:\.\d+)?)?)\b/i
 
-/** The claimed model in a machine-readable half or a markdown heading. */
+/** Remove HTML comments while retaining any visible content around them. */
+function visibleMarkdownOnLine(line, commentState) {
+  let visible = ''
+  let cursor = 0
+  while (cursor < line.length) {
+    if (commentState.inside) {
+      const end = line.indexOf('-->', cursor)
+      if (end === -1) return visible
+      commentState.inside = false
+      cursor = end + 3
+      continue
+    }
+    const start = line.indexOf('<!--', cursor)
+    if (start === -1) return visible + line.slice(cursor)
+    visible += line.slice(cursor, start)
+    commentState.inside = true
+    cursor = start + 4
+  }
+  return visible
+}
+
+/** The claimed model in a machine-readable half or its first visible markdown H1. */
 export function claimedModelFromArtefact(text) {
   const raw = String(text ?? '')
   try {
@@ -23,9 +44,31 @@ export function claimedModelFromArtefact(text) {
   } catch {
     // A prose artefact is expected to be non-JSON.
   }
-  for (const heading of raw.split(/\r?\n/).filter((line) => /^\s*#(?:\s|$)/.test(line))) {
-    const claim = heading.match(MODEL_IN_HEADING)?.[1]
-    if (claim) return claim.trim()
+
+  const commentState = { inside: false }
+  let fence = null
+  for (const sourceLine of raw.split(/\r?\n/)) {
+    if (fence) {
+      const fenceMarker = sourceLine.match(/^ {0,3}(`{3,}|~{3,})/)?.[1]
+      if (
+        fenceMarker?.[0] === fence.character &&
+        fenceMarker.length >= fence.length &&
+        /^ {0,3}(`{3,}|~{3,})[\t ]*$/.test(sourceLine)
+      ) {
+        fence = null
+      }
+      continue
+    }
+
+    const line = visibleMarkdownOnLine(sourceLine, commentState)
+    const fenceMarker = line.match(/^ {0,3}(`{3,}|~{3,})/)?.[1]
+    if (fenceMarker) {
+      fence = { character: fenceMarker[0], length: fenceMarker.length }
+      continue
+    }
+
+    if (!/^#(?:[\t ]|$)/.test(line)) continue
+    return line.match(MODEL_IN_HEADING)?.[1]?.trim() ?? ''
   }
   return ''
 }

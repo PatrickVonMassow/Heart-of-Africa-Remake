@@ -18,13 +18,32 @@ const entry = ({ at, model = '', sidechain = false, role = 'assistant', id = 'me
 const transcript = (...lines) => lines.join('\n')
 
 describe('transcript-backed authorship', () => {
-  it('reads a JSON model or the first markdown heading without inventing an unnamed author', () => {
+  it('reads a JSON model or the artefact title without inventing an unnamed author', () => {
     expect(claimedModelFromArtefact('{"model":"GPT-5.6 Sol","entries":[]}')).toBe('GPT-5.6 Sol')
     expect(claimedModelFromArtefact('# Proposal A — Fable 5, written blind\n\nBody')).toBe('Fable 5')
-    expect(
-      claimedModelFromArtefact('# Proposal A — written blind\n\n    # Proposal A — Fable 5, original heading'),
-    ).toBe('Fable 5')
     expect(claimedModelFromArtefact('# Proposal A — written blind\n\nBody')).toBe('')
+  })
+
+  it('does not treat the corrected 676 half-A quoted heading as its own claim', () => {
+    const correctedHalfA = `# Proposal A — written 13.08.2026 before seeing any other proposal
+
+<!-- THE HEADING BELOW IS THE ORIGINAL AND IT IS WRONG about its own author. It was
+     written by Claude Opus 5, not Fable 5; see 676-provenance.md for the transcript
+     metadata that settles it. The line is kept verbatim because it is the evidence
+     of the mislabel, not a caption to be quietly corrected. -->
+
+    # Proposal A — Fable 5, written 13.08.2026 before seeing any other proposal`
+
+    expect(claimedModelFromArtefact(correctedHalfA)).toBe('')
+  })
+
+  it('ignores model headings quoted in fenced code and HTML comments', () => {
+    expect(
+      claimedModelFromArtefact('```md\n<!-- quoted markup -->\n# Proposal A — Fable 5\n```\n# Proposal A — Claude Opus 5'),
+    ).toBe('Claude Opus 5')
+    expect(claimedModelFromArtefact('<!--\n# Proposal A — Fable 5\n-->\n# Proposal A — Claude Opus 5')).toBe(
+      'Claude Opus 5',
+    )
   })
 
   it('catches the 676 half-A mislabel across a session model switch', () => {
