@@ -419,12 +419,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "813": {
-      "at": "2026-08-21T16:05:59.295Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front as URGENT: a session dying inside the CI wait leaves the batch idle until the next launcher tick. Its branch stands.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "815": {
       "at": "2026-08-21T12:12:01.487Z",
       "why": "Last is right: the classifier's cost only becomes a defect once the journal has accumulated for weeks, and the retention rule it needs is not urgent today — it belongs behind the release point with 810, the other medium finding from the same 809 review.",
@@ -559,7 +553,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T08:27:30.317Z",
+    "at": "2026-08-22T09:24:28.807Z",
     "points": [
       174,
       184,
@@ -789,7 +783,6 @@
       806,
       807,
       810,
-      813,
       814,
       815,
       817,
