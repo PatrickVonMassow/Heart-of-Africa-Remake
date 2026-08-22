@@ -27,7 +27,9 @@ import {
   parseEstimateHours,
   parseFirstParentChain,
   parseTickEvents,
+  applyCorrections,
   clauseDemandsPicture,
+  denialIsOpen,
   estimateProvenance,
   isComparedSnapshot,
   heldOutForPicture,
@@ -1366,5 +1368,133 @@ describe('a class the landing window never saw takes no factor at all', () => {
     expect(plan[0].changed).toBe(false)
     expect(plan[0].factor).toBeUndefined()
     expect(plan[0].reason).toMatch(/no landed comparable/)
+  })
+})
+
+describe('the ledger stays ahead of the queue, card by card', () => {
+  const entry = (point) => ({ point, baseline: `~${point} h`, to: `~${point / 2} h`, factor: 0.5, basis: 'x' })
+
+  /** A run that records the exact interleaving of persists and writes. */
+  const run = (plan, { fails = new Set(), refuses = new Set(), carried = [], ledger = {} } = {}) => {
+    const log = []
+    const persisted = []
+    const persist = (l) => {
+      log.push('persist')
+      persisted.push(JSON.parse(JSON.stringify(l)))
+    }
+    const writeCard = (p) => {
+      log.push(`write:${p.point}`)
+      if (fails.has(p.point)) throw new Error(`boom ${p.point}`)
+      return refuses.has(p.point) ? { refused: true, detail: 'compare-and-set' } : { refused: false }
+    }
+    let thrown = null
+    let result = null
+    try {
+      result = applyCorrections({ plan, carried, ledger, writeCard, persist, now: 7 })
+    } catch (e) {
+      thrown = e
+    }
+    return { log, persisted, thrown, result, last: persisted[persisted.length - 1] ?? null }
+  }
+
+  it('persists the baseline BEFORE the card is written, every time', () => {
+    // THE ORDER IS THE POINT. A ledger written only after the write — or only at
+    // the end of the run — leaves a window in which the queue has moved and the
+    // promise it moved from is nowhere on disk.
+    const { log } = run([entry(10), entry(12)])
+    // announce 10 · write 10 · record 10 · announce 12 · write 12 · record 12 ·
+    // and the cards that carried a factor without moving.
+    expect(log).toEqual([
+      'persist', 'write:10', 'persist',
+      'persist', 'write:12', 'persist',
+      'persist',
+    ])
+    // NO WRITE IS EVER THE FIRST THING THAT HAPPENS TO A CARD.
+    for (const [i, event] of log.entries()) {
+      if (event.startsWith('write:')) expect(log[i - 1]).toBe('persist')
+    }
+  })
+
+  it('names the announced write, so an interruption is still recognisable', () => {
+    const { persisted } = run([entry(10)])
+    // The state on disk while the child is running.
+    expect(persisted[0]['10']).toEqual({ baseline: '~10 h', intent: { estimate: '~5 h', at: 7 } })
+  })
+
+  it('keeps every card written before one that fails', () => {
+    // This is the case the previous test suite could not tell apart: with the
+    // ledger written once at the end, card 10 would be lost entirely here.
+    const { thrown, last, log } = run([entry(10), entry(12), entry(14)], { fails: new Set([12]) })
+    expect(thrown?.message).toBe('boom 12')
+    expect(log).toEqual(['persist', 'write:10', 'persist', 'persist', 'write:12', 'persist'])
+    expect(last['10'].applied.estimate).toBe('~5 h')
+    expect(last['10'].baseline).toBe('~10 h')
+    // The card that never moved carries no announcement any more.
+    expect(last['12'].intent).toBeUndefined()
+    expect(last['14']).toBeUndefined()
+  })
+
+  it('withdraws the announcement when the write is refused', () => {
+    const { result, last } = run([entry(10)], { refuses: new Set([10]) })
+    expect(result.written).toEqual([])
+    expect(result.refused[0].point).toBe(10)
+    expect(last['10'].intent).toBeUndefined()
+    expect(last['10'].applied).toBeUndefined()
+    expect(last['10'].baseline).toBe('~10 h')
+  })
+
+  it('recognises the announced value as its own writing on the next run', () => {
+    // The interrupted state: the card holds the corrected estimate, the ledger
+    // holds the announcement. Without this the next run would snapshot the
+    // correction as a fresh promise and measure its own writing.
+    const interrupted = { 10: { baseline: '~10 h', intent: { estimate: '~5 h', at: 7 } } }
+    const after = updateEstimateLedger(interrupted, { cards: { 10: { estimate: '~5 h' } }, open: [10], now: 9 })
+    expect(after['10'].baseline).toBe('~10 h')
+  })
+})
+
+describe('a denial that finished its own sentence lends nothing onward', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('separates an open denial from a closed one', () => {
+    expect(denialIsOpen('No screenshot')).toBe(true)
+    expect(denialIsOpen('No screenshot is required')).toBe(false)
+    expect(denialIsOpen('Nicht erforderlich')).toBe(false)
+    expect(denialIsOpen('The change does not require a browser frame')).toBe(false)
+  })
+
+  it('reads a positive coordinated demand behind a closed denial as a demand', () => {
+    // The shared-predicate licence belongs to a list the denial has not finished
+    // yet. Here it HAS finished, so what follows is a new sentence.
+    expect(
+      pictureBearingPoints(block(130, 'No screenshot is required, a browser frame and picture proof are required.')).has(130),
+    ).toBe(true)
+  })
+
+  it('still denies the tail of a list the denial has not finished', () => {
+    expect(pictureBearingPoints(block(131, 'No screenshot, browser frame or picture proof is required.')).has(131)).toBe(false)
+    expect(pictureBearingPoints(block(132, 'No screenshot, browser frame, or picture proof is required.')).has(132)).toBe(false)
+  })
+})
+
+describe('housekeeping reaches only what its verb governs', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('does not reach past an intervening statement to swallow a demand', () => {
+    // A free gap between the verb and a proof noun read straight through the
+    // demand standing between them.
+    expect(pictureBearingPoints(block(133, 'Remove the old helper and attach a screenshot.')).has(133)).toBe(true)
+    expect(pictureBearingPoints(block(134, 'Delete the fixture, then supply a browser frame.')).has(134)).toBe(true)
+  })
+
+  it('does not read a demand for proof FILES as filing one away', () => {
+    expect(pictureBearingPoints(block(135, 'Provide screenshot files for review.')).has(135)).toBe(true)
+  })
+
+  it('still leaves the housekeeping its verb does govern out', () => {
+    expect(pictureBearingPoints(block(136, 'Delete the obsolete screenshot fixture; verify with unit tests.')).has(136)).toBe(
+      false,
+    )
+    expect(pictureBearingPoints(block(137, 'Remove the screenshot directory.')).has(137)).toBe(false)
   })
 })

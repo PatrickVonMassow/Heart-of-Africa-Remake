@@ -26,6 +26,7 @@ import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { QUEUE_DATA_PATH, normaliseQueueData, openPointsOf, parseQueueDataFile } from './board-queue-core.mjs'
 import {
   applicableChanges,
+  applyCorrections,
   AXES,
   attributeMerges,
   CALIBRATION_PATH,
@@ -42,7 +43,6 @@ import {
   pictureBearingPoints,
   promiseMedians,
   laneForAttribution,
-  ledgerAfterApply,
   MIN_CLASS_SAMPLES,
   parseCalibrationArgs,
   parseCriticality,
@@ -404,32 +404,32 @@ try {
     // while holding the board-edit lock, then writes inside that transaction.
     const live = readCards()
     const { written: candidates, skipped } = applicableChanges(changed, live)
-    const written = []
-    const refused = []
-    for (const p of candidates) {
+    // ONE CHILD PER CARD, taking the board-edit lock and comparing under it. A
+    // refusal (exit 3) is an outcome, not a failure; anything else is a failure
+    // and is named as one — a persist that fails is NOT reported as this child's.
+    const writeCard = (p) => {
       try {
         execFileSync(process.execPath, [boardQueueScript, 'set', String(p.point), '--estimate', p.to, '--if-estimate', p.from], {
           encoding: 'utf8',
           windowsHide: true,
           env: { ...process.env, HOA_QUEUE_DATA_FILE: dataFile },
         })
-        written.push(p)
-        // THE LEDGER FOLLOWS THE CARD IMMEDIATELY, not the whole run. The write
-        // above is already committed; if the next child throws, this card's
-        // promise is on disk regardless.
-        estimates = ledgerAfterApply(estimates, [p])
-        persist(estimates)
+        return { refused: false }
       } catch (e) {
-        if (e.status === 3) {
-          refused.push({ ...p, detail: String(e.stderr ?? '').trim() })
-          continue
-        }
+        if (e.status === 3) return { refused: true, detail: String(e.stderr ?? '').trim() }
         throw new Error(`board-queue set failed for ${p.point}: ${String(e.stderr ?? e.message).trim()}`)
       }
     }
-    // The cards that carry a factor but did not move keep their baseline too.
-    estimates = ledgerAfterApply(estimates, plan.filter((p) => p.factor && !p.changed))
-    persist(estimates)
+    // The ORDER is the core's: ledger before the write, ledger after it.
+    const applied = applyCorrections({
+      plan: candidates,
+      carried: plan.filter((p) => p.factor && !p.changed),
+      ledger: estimates,
+      writeCard,
+      persist,
+    })
+    const { written, refused } = applied
+    estimates = applied.estimates
     console.log('')
     console.log(`APPLIED: ${written.length} estimate(s) written to ${QUEUE_DATA_PATH}. Render them: node scripts/board-queue.mjs`)
     for (const p of written) console.log(`  ${p.point} ${p.from} → ${p.to}`)

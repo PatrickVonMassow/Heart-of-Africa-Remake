@@ -812,13 +812,20 @@ const UPKEEP_VERB =
   'move|moves|moved|prune|prunes|pruned|purge|purges|purged|' +
   'lösche|loesche|löschen|loeschen|entferne|entfernen|umbenennen|verschieben)'
 
-const PROOF_ARTEFACT =
-  '(fixtures?|helpers?|files?|directory|directories|folders?|paths?|Datei|Dateien|Ordner|Verzeichnis)'
+/**
+ * ONLY WHAT THE VERB DIRECTLY GOVERNS may stand between it and the proof noun:
+ * a determiner and a few adjectives, nothing that could be a second statement.
+ * A free gap reached straight through the demand behind it — "remove the old
+ * helper AND ATTACH A SCREENSHOT" is a demand, and a 40-character window
+ * swallowed it. An artefact rule of the shape "<proof noun> file(s)" is gone for
+ * the same reason: "provide screenshot files for review" asks for exactly what
+ * it names.
+ */
+const UPKEEP_GAP =
+  '(?:\\s+(?:the|a|an|its|this|that|old|obsolete|stale|unused|leftover|remaining|' +
+  'der|die|das|den|dem|ein|eine|einen|alte|alten|alter|altes|veraltete|veralteten|unbenutzte|unbenutzten))*'
 
-export const PICTURE_PROOF_UPKEEP = [
-  new RegExp(`\\b${UPKEEP_VERB}\\b[^.;:]{0,40}?${PROOF_NOUN}`, 'i'),
-  new RegExp(`${PROOF_NOUN}\\s+${PROOF_ARTEFACT}\\b`, 'i'),
-]
+export const PICTURE_PROOF_UPKEEP = [new RegExp(`\\b${UPKEEP_VERB}\\b${UPKEEP_GAP}\\s+${PROOF_NOUN}`, 'i')]
 
 /**
  * ONE LINE, CUT INTO THE CLAUSES A DENIAL CAN REACH.
@@ -863,14 +870,30 @@ const LIST_TAIL_GLUE =
  */
 const LIST_CONJUNCTION = /\b(or|and|nor|oder|und)\b/i
 
-export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
+/**
+ * A DENIAL THAT ALREADY SAID "IS REQUIRED" HAS FINISHED ITS SENTENCE.
+ *
+ * The shared predicate can only be lent onward by a denial that is still open:
+ * "No screenshot, browser frame or picture proof IS REQUIRED" names the
+ * predicate once, at the end. Where the denial carries its own — "No screenshot
+ * IS REQUIRED, a browser frame and picture proof ARE REQUIRED" — the clause
+ * behind it is a new sentence with a predicate of its own, and reading it as the
+ * tail of the negative list turned a demand into a denial.
+ */
+const DENIAL_CARRIES_PREDICATE =
+  /\b(is|are|was|were|be|been)\b[^,;:]{0,30}\b(required|needed|necessary)\b|\bnot\s+(\w+\s+){0,2}(required|needed|necessary|require|requires|need|needs)\b|\bnicht\s+(nötig|noetig|erforderlich)\b|\b(nicht|kein|keine)\s+(nötig|noetig|erforderlich)\b/i
+
+export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
+
+export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS, { allowPredicate = true } = {}) => {
   const text = String(fragment ?? '')
   // Nothing but the proof noun and the words that carry it: no statement of its
   // own. A fragment that says something ("provide …", "must be supplied") is a
   // statement and ends whatever the fragment before it decided — a leading "and"
   // does not turn it back into a list item.
   const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text)
-  return (LIST_CONJUNCTION.test(text) ? LIST_TAIL_GLUE : LIST_GLUE).test(bare)
+  const glue = allowPredicate && LIST_CONJUNCTION.test(text) ? LIST_TAIL_GLUE : LIST_GLUE
+  return glue.test(bare)
 }
 
 /** Does ONE clause demand a rendered proof? */
@@ -898,19 +921,23 @@ export function clauseDemandsPicture(clause) {
  */
 export function lineDemandsPicture(line) {
   let denied = false
+  // Whether that denial may still lend its predicate to what trails it.
+  let open = false
   for (const fragment of splitClauses(line)) {
     if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
       denied = true
+      open = denialIsOpen(fragment)
       continue
     }
     // A bare list item INHERITS the decision in front of it: denied after a
     // denial, and a demand of its own where nothing denied it.
-    if (isListContinuation(fragment)) {
+    if (isListContinuation(fragment, PICTURE_PROOF_MARKERS, { allowPredicate: open })) {
       if (denied) continue
       if (clauseDemandsPicture(fragment)) return true
       continue
     }
     denied = false
+    open = false
     if (clauseDemandsPicture(fragment)) return true
   }
   return false
@@ -981,8 +1008,14 @@ export function updateEstimateLedger(ledger, { cards = {}, open = [], now = Math
     const current = cards?.[point]?.estimate ?? null
     if (!current || String(current).includes(INHERITED_ESTIMATE_NOTE)) continue
     const prev = ledgerEntry(out, point)
-    // Our own last write, or the untouched baseline: the baseline stands.
-    if (prev && (prev.applied?.estimate === current || prev.baseline === current)) continue
+    // Our own last write, the value we announced we were about to write, or the
+    // untouched baseline: in all three the baseline stands. Without the announced
+    // value, a run interrupted between the queue write and its ledger entry came
+    // back to a corrected card it did not recognise and snapshotted the
+    // correction as a fresh promise.
+    if (prev && (prev.applied?.estimate === current || prev.intent?.estimate === current || prev.baseline === current)) {
+      continue
+    }
     out[String(point)] = { baseline: current, baselineAt: Math.floor(now) }
   }
   return out
@@ -1127,11 +1160,6 @@ export function applicableChanges(plan, liveCards = {}) {
 }
 
 /**
- * The ledger after a rewrite was APPLIED — each corrected card remembers the
- * baseline it came from and the factor that was used, which is what makes the
- * next run recognise its own writing instead of correcting it a second time.
- */
-/**
  * WHAT A SNAPSHOT ACTUALLY CONTRIBUTED — compared, or merely stored.
  *
  * A landing counts as COMPARED only where a ratio could be computed from it: a
@@ -1154,6 +1182,12 @@ export function estimateProvenance(rows = []) {
   }
 }
 
+/**
+ * The ledger after a rewrite was APPLIED — each corrected card remembers the
+ * baseline it came from and the factor that was used, which is what makes the
+ * next run recognise its own writing instead of correcting it a second time.
+ * The INTENT is cleared here: the write it stood in for has happened.
+ */
 export function ledgerAfterApply(ledger, plan, { now = Math.floor(Date.now() / 1000) } = {}) {
   const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
   for (const p of Array.isArray(plan) ? plan : []) {
@@ -1163,8 +1197,91 @@ export function ledgerAfterApply(ledger, plan, { now = Math.floor(Date.now() / 1
       baseline: p.baseline,
       applied: { estimate: p.to, factor: p.factor, basis: p.basis ?? null, at: Math.floor(now) },
     }
+    delete out[String(p.point)].intent
   }
   return out
+}
+
+/**
+ * THE LEDGER BEFORE A CARD IS WRITTEN — baseline recorded, write announced.
+ *
+ * The card is written by a separate process that commits on its own, so there is
+ * always an instant where the queue has moved and this ledger has not. Recording
+ * the INTENT first closes it: whichever of the two values the card holds when a
+ * run is interrupted, the ledger already names the promise it came from, and
+ * `updateEstimateLedger` recognises the announced value as this tool's own
+ * writing instead of snapshotting a corrected estimate as a fresh baseline.
+ */
+export function ledgerWithIntent(ledger, p, { now = Math.floor(Date.now() / 1000) } = {}) {
+  const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
+  if (!p || !p.baseline || !p.to) return out
+  out[String(p.point)] = {
+    ...(ledgerEntry(out, p.point) ?? {}),
+    baseline: p.baseline,
+    intent: { estimate: p.to, at: Math.floor(now) },
+  }
+  return out
+}
+
+/** …and the ledger after that write was REFUSED: the announcement is withdrawn. */
+export function ledgerWithoutIntent(ledger, point) {
+  const out = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
+  const entry = ledgerEntry(out, point)
+  if (!entry?.intent) return out
+  const rest = { ...entry }
+  delete rest.intent
+  out[String(point)] = rest
+  return out
+}
+
+/**
+ * WRITE THE CORRECTIONS, KEEPING THE LEDGER AHEAD OF THE QUEUE.
+ *
+ * The order is the whole content of this function, which is why it is here and
+ * not in the command: for every card the ledger is persisted BEFORE the write
+ * and again AFTER it, so no interruption can leave a corrected card whose
+ * promise nothing remembers. `writeCard` returns 'written' or 'refused' and
+ * throws only on a real failure; a throw stops the run with everything written
+ * so far already on the ledger.
+ */
+export function applyCorrections({
+  plan = [],
+  carried = [],
+  ledger = {},
+  writeCard,
+  persist,
+  now = Math.floor(Date.now() / 1000),
+} = {}) {
+  let estimates = { ...(ledger && typeof ledger === 'object' ? ledger : {}) }
+  const written = []
+  const refused = []
+  const save = (next) => {
+    estimates = next
+    persist(estimates)
+    return estimates
+  }
+  for (const p of Array.isArray(plan) ? plan : []) {
+    save(ledgerWithIntent(estimates, p, { now }))
+    let outcome
+    try {
+      outcome = writeCard(p)
+    } catch (e) {
+      // The card did not move, so the announcement is withdrawn before the
+      // failure leaves this loop — and everything written before it stands.
+      save(ledgerWithoutIntent(estimates, p.point))
+      throw e
+    }
+    if (outcome?.refused) {
+      save(ledgerWithoutIntent(estimates, p.point))
+      refused.push({ ...p, detail: outcome.detail ?? '' })
+      continue
+    }
+    save(ledgerAfterApply(estimates, [p], { now }))
+    written.push(p)
+  }
+  // The cards that carry a factor but did not move keep their baseline too.
+  save(ledgerAfterApply(estimates, carried, { now }))
+  return { written, refused, estimates }
 }
 
 /**
