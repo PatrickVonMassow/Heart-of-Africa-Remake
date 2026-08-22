@@ -44,6 +44,7 @@ import {
   ownerStateKey,
   verdictRepeat,
   isOwnSpawn,
+  pidCorroboration,
   readSessionProcesses,
   retireBatchWriter,
   revokeWriterFence,
@@ -105,7 +106,7 @@ import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
-import { ownerActivityDecision, pidCorroboration } from './batch-ownership-core.mjs'
+import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely

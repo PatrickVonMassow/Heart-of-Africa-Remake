@@ -12,6 +12,7 @@
 // witness — and it is safe precisely because the throw comes before the first side
 // effect, which is the property being pinned.
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -19,6 +20,29 @@ describe('batch-autostart is import-proof', () => {
   it('throws instead of spawning when it is imported rather than run', async () => {
     await expect(import('./batch-autostart.mjs')).rejects.toThrow(/CLI, not a module/)
   })
+
+  // AND IT MUST LINK UNDER REAL NODE, WHICH THE ASSERTION ABOVE CANNOT SEE
+  // (22.08.2026). Vitest loads a module through Vite's SSR transform, where a
+  // named import of something the target does not export silently becomes
+  // `undefined`. Real node refuses it at LINK time, before the first line runs.
+  // So the launcher imported `pidCorroboration` from `batch-ownership-core.mjs`,
+  // which exports it from `batch-singleton.mjs` instead; the whole unit gate
+  // stayed green while `node scripts/batch-autostart.mjs` — the 900-second OS
+  // recovery tick, and the only thing that restarts a dead batch — died with
+  // `does not provide an export named 'pidCorroboration'`. Only a real node
+  // process is a witness for that, and the import-proof guard is what makes the
+  // witness safe: the module links, then refuses to run before any side effect.
+  it('links in a real node process, reaching the CLI guard rather than a missing export', () => {
+    const probe = "import('./scripts/batch-autostart.mjs').then(() => console.log('LINKED-AND-RAN'), (e) => console.log(e.constructor.name + ': ' + e.message.split('\\n')[0]))"
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', probe], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.stdout).not.toMatch(/does not provide an export named/)
+    expect(run.stdout).toMatch(/CLI, not a module/)
+  }, 30_000)
 })
 
 // ---------------------------------------------------------------------------
