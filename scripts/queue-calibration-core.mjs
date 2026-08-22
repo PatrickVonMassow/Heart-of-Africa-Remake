@@ -874,7 +874,7 @@ const LIST_GLUE =
  * without one.
  */
 const LIST_TAIL_GLUE =
-  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|oder|und|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und|is|are|was|were|be|been|required|needed|necessary|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 /**
  * The conjunction that shows a fragment finishes a coordinated list. It may
@@ -883,7 +883,7 @@ const LIST_TAIL_GLUE =
  * browser frame or picture proof is required" cuts into two, and the second half
  * carries both the last item and the predicate the whole list shares.
  */
-const LIST_CONJUNCTION = /\b(or|and|nor|oder|und)\b/i
+const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
 
 /**
  * A DENIAL THAT ALREADY SAID "IS REQUIRED" HAS FINISHED ITS SENTENCE.
@@ -910,6 +910,16 @@ export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(
  * a negation wherever it appeared admitted a render card for correction.
  */
 export const NEGATIVE_CONTINUATION = /^\s*(nor|noch)\b/i
+
+/**
+ * …and it must SAY NOTHING OF ITS OWN either. "Noch" also means "another", so
+ * "Noch ein Browser Frame wird gebraucht" is a demand standing behind a denial,
+ * not a continuation of it. Only a fragment that adds nothing beyond the
+ * predicate the denial already used may carry the negation on.
+ */
+export const continuesDenial = (fragment) =>
+  NEGATIVE_CONTINUATION.test(String(fragment ?? '')) &&
+  isListContinuation(fragment, PICTURE_PROOF_MARKERS, { allowPredicate: true })
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS, { allowPredicate = true } = {}) => {
   const text = String(fragment ?? '')
@@ -946,33 +956,38 @@ export function clauseDemandsPicture(clause) {
  * denial governing the bare list items that trail it.
  */
 export function lineDemandsPicture(line) {
-  // Whether the clause in front SUPPRESSES the proof nouns that trail it — a
-  // denial denies them, and housekeeping is deleting them. The list is cut at
-  // commas, so a verb's coordinated objects arrive as separate fragments and
-  // must inherit the same way a denied list does.
-  let suppressed = false
-  // …and whether a denial may still lend its predicate to what trails it.
+  // The two clauses that SUPPRESS the proof nouns trailing them are kept apart,
+  // because only one of them can carry a negation onward: a DENIAL denies its
+  // list, while HOUSEKEEPING merely deletes its objects. Conflating them made
+  // "Lösche den alten Screenshot. Noch einen Browser Frame anhängen." lose its
+  // second sentence. The list is cut at commas, so a verb's coordinated objects
+  // arrive as separate fragments and inherit the same way a denied list does.
+  let denied = false
+  let upkept = false
+  // …and whether the denial may still lend its predicate to what trails it.
   let open = false
   for (const fragment of splitClauses(line)) {
     // "…, nor is a browser frame required": the negation carries on by itself,
-    // but only where there is one to carry.
-    if (suppressed && NEGATIVE_CONTINUATION.test(fragment)) continue
+    // but only behind a real denial and only where it adds nothing of its own.
+    if (denied && continuesDenial(fragment)) continue
     if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
-      suppressed = true
+      denied = true
+      upkept = false
       open = denialIsOpen(fragment)
       continue
     }
     // A bare list item INHERITS the decision in front of it: suppressed after a
     // denial or a housekeeping clause, and a demand of its own where nothing did.
     if (isListContinuation(fragment, PICTURE_PROOF_MARKERS, { allowPredicate: open })) {
-      if (suppressed) continue
+      if (denied || upkept) continue
       if (clauseDemandsPicture(fragment)) return true
       continue
     }
     const demands = clauseDemandsPicture(fragment)
     // A clause naming a proof noun that is NOT a demand, because a housekeeping
     // verb governs it, governs the bare objects behind it too.
-    suppressed = !demands && PICTURE_PROOF_UPKEEP.some((re) => re.test(fragment))
+    upkept = !demands && PICTURE_PROOF_UPKEEP.some((re) => re.test(fragment))
+    denied = false
     open = false
     if (demands) return true
   }

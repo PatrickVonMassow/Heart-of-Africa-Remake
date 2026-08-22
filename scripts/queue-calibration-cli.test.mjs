@@ -27,7 +27,14 @@ import { openPointsOf } from './board-queue-core.mjs'
 import { isComparedSnapshot, parseCriticality, pictureBearingPoints, promiseMedians } from './queue-calibration-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'queue-calibration.mjs')
-const SEEDED_ESTIMATE = '~3 h'
+// Three different promises, so a class median is a real median and not the one
+// value every card happens to carry.
+const CORRECTABLE_ESTIMATES = ['~2 h', '~3 h', '~5 h']
+// …and a promise far above them for the cards that owe a rendered proof. They
+// are seeded ON PURPOSE: if the correction ever stopped excluding them, the
+// medians below would move, and the denominator check would see it. With only
+// correctable cards in the fixture, dropping the exclusion changed nothing.
+const RENDER_ESTIMATE = '~20 h'
 
 /** Existence and content of the state files this command would write by default. */
 const checkoutState = () =>
@@ -37,20 +44,24 @@ const checkoutState = () =>
   })
 
 /**
- * A queue data file holding open points that CAN be corrected, with one estimate
- * each. Points owing a rendered proof are left out on purpose: they are held out
- * of every correction, so seeding them would leave the apply case asserting
- * nothing at all.
+ * A queue data file with both kinds of open card: ones that CAN be corrected,
+ * carrying three different promises, and ones owing a rendered proof, carrying a
+ * much larger one. The second kind never moves — that is the holdout — but it
+ * has to be present, or the fixture cannot tell a correction that excludes it
+ * from one that does not.
  */
 function seedQueueData(dir, count = 12) {
-  const held = pictureBearingPoints(readTasksAll())
-  const open = openPointsOf(readTasksOpen()).filter((p) => !held.has(p))
+  const owed = pictureBearingPoints(readTasksAll())
+  const open = openPointsOf(readTasksOpen())
+  const correctable = open.filter((p) => !owed.has(p)).slice(0, count)
+  const held = open.filter((p) => owed.has(p)).slice(0, count)
   const points = {}
-  for (const point of open.slice(0, count)) {
-    points[String(point)] = { title: `Point ${point}`, body: [], estimate: SEEDED_ESTIMATE }
-  }
+  correctable.forEach((point, i) => {
+    points[String(point)] = { title: `Point ${point}`, body: [], estimate: CORRECTABLE_ESTIMATES[i % CORRECTABLE_ESTIMATES.length] }
+  })
+  for (const point of held) points[String(point)] = { title: `Point ${point}`, body: [], estimate: RENDER_ESTIMATE }
   writeFileSync(join(dir, 'board-queue.json'), `${JSON.stringify({ points }, null, 2)}\n`)
-  return Object.keys(points).map(Number)
+  return { correctable, held }
 }
 
 const estimatesOf = (path) => {
@@ -81,7 +92,7 @@ describe('the report and the store are one reading', () => {
   beforeAll(() => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-'))
     stateDir = dir
-    seeded = seedQueueData(dir)
+    seeded = seedQueueData(dir).correctable
     const result = run(dir)
     expect(result.status, result.stderr).toBe(0)
     out = result.stdout
@@ -172,23 +183,25 @@ describe('the report and the store are one reading', () => {
     // satisfied the old check; this one has to be the median promise of the open
     // cards of that class, with the render cards excluded exactly as the
     // correction excludes them.
+    const cards = JSON.parse(readFileSync(join(stateDir, 'board-queue.json'), 'utf8')).points
+    const open = openPointsOf(readTasksOpen())
+    const criticality = parseCriticality(readTasksAll())
     const owed = pictureBearingPoints(readTasksAll())
-    const expected = promiseMedians({
-      cards: JSON.parse(readFileSync(join(stateDir, 'board-queue.json'), 'utf8')).points,
-      open: openPointsOf(readTasksOpen()),
-      criticality: parseCriticality(readTasksAll()),
-      ledger: {},
-      exclude: owed,
-    })
+    const expected = promiseMedians({ cards, open, criticality, ledger: {}, exclude: owed })
     expect(store.promiseMedians).toEqual(Object.fromEntries(expected))
     for (const name of classes) expect(store.promiseMedians[name]).toBeGreaterThan(0)
+    // AND THE FIXTURE CAN TELL THE DIFFERENCE: with the render cards left in,
+    // the medians are other numbers. Without this the assertion above would hold
+    // for a command that had dropped the exclusion altogether.
+    const withRenderCards = promiseMedians({ cards, open, criticality, ledger: {}, exclude: new Set() })
+    expect(Object.fromEntries(withRenderCards)).not.toEqual(store.promiseMedians)
   })
 })
 
 describe('an apply accounts for every card it moves', () => {
   it('moves exactly the cards it reports, and remembers what each promised', () => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-apply-'))
-    const seeded = seedQueueData(dir)
+    const { correctable, held } = seedQueueData(dir)
     const dataFile = join(dir, 'board-queue.json')
     const before = estimatesOf(dataFile)
     const result = run(dir, '--apply')
@@ -215,11 +228,14 @@ describe('an apply accounts for every card it moves', () => {
     for (const point of moved) {
       const entry = store.estimates[String(point)]
       expect(entry, `point ${point} must be on the ledger`).toBeTruthy()
-      expect(entry.baseline, `point ${point} must remember what it promised`).toBe(SEEDED_ESTIMATE)
+      expect(entry.baseline, `point ${point} must remember what it promised`).toBe(before.get(point))
       expect(entry.applied?.estimate).toBe(after.get(point))
       expect(entry.intent, 'a completed write leaves no announcement standing').toBeUndefined()
     }
-    expect(moved.every((p) => seeded.includes(p))).toBe(true)
+    expect(moved.every((p) => correctable.includes(p))).toBe(true)
+    // NOT ONE RENDER CARD MOVED, and the fixture had some to move.
+    expect(held.length).toBeGreaterThan(0)
+    for (const point of held) expect(after.get(point)).toBe(RENDER_ESTIMATE)
   }, 120_000)
 
   it('still divides by the promise that was actually made, on the second run', () => {
@@ -234,17 +250,24 @@ describe('an apply accounts for every card it moves', () => {
     seedQueueData(dir)
     const dataFile = join(dir, 'board-queue.json')
     const storeFile = join(dir, 'queue-calibration.json')
+    const promised = estimatesOf(dataFile)
     expect(run(dir, '--apply').status).toBe(0)
     const afterFirst = estimatesOf(dataFile)
-    const moved = [...afterFirst.entries()].filter(([, v]) => v !== SEEDED_ESTIMATE).map(([p]) => p)
+    const first = JSON.parse(readFileSync(storeFile, 'utf8'))
+    const moved = [...afterFirst.entries()].filter(([p, v]) => promised.get(p) !== v).map(([p]) => p)
     expect(moved.length).toBeGreaterThan(0)
 
     expect(run(dir, '--apply').status).toBe(0)
     const afterSecond = estimatesOf(dataFile)
-    const store = JSON.parse(readFileSync(storeFile, 'utf8'))
+    const second = JSON.parse(readFileSync(storeFile, 'utf8'))
     expect([...afterSecond.entries()]).toEqual([...afterFirst.entries()])
     for (const point of moved) {
-      expect(store.estimates[String(point)].baseline, `point ${point} keeps its original promise`).toBe(SEEDED_ESTIMATE)
+      expect(second.estimates[String(point)].baseline, `point ${point} keeps its original promise`).toBe(promised.get(point))
     }
+    // THE DENOMINATOR DID NOT MOVE, although every corrected card did. Keeping
+    // the baseline while dividing by the corrected estimates would show smaller
+    // medians here — and would leave the queue just as stable, which is why the
+    // queue alone cannot tell the two apart.
+    expect(second.promiseMedians).toEqual(first.promiseMedians)
   }, 180_000)
 })

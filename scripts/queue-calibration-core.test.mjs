@@ -1532,6 +1532,24 @@ describe('a denial can be continued as well as finished', () => {
     expect(pictureBearingPoints(block(148, 'Noch ein browser frame wird gebraucht.')).has(148)).toBe(true)
   })
 
+  it('does not let HOUSEKEEPING carry a negation it never made', () => {
+    // Deleting a screenshot denies nothing about the next sentence. One flag for
+    // both lost the demand behind a tidy-up.
+    expect(
+      pictureBearingPoints(block(151, 'Lösche den alten Screenshot. Noch einen Browser Frame anhängen.')).has(151),
+    ).toBe(true)
+  })
+
+  it('lets a positive predicate end the negation even behind a denial', () => {
+    // "noch" also means "another": the clause states something of its own, so
+    // the denial in front of it does not reach it.
+    expect(pictureBearingPoints(block(152, 'Kein Screenshot nötig. Noch ein Browser Frame wird gebraucht.')).has(152)).toBe(
+      true,
+    )
+    // …while the bare continuation stays denied.
+    expect(pictureBearingPoints(block(153, 'Kein Screenshot ist nötig, noch ein browser frame.')).has(153)).toBe(false)
+  })
+
   it('leaves a real demand standing behind a denial that merely ended', () => {
     expect(pictureBearingPoints(block(142, 'No screenshot is required. Attach a browser frame.')).has(142)).toBe(true)
   })
