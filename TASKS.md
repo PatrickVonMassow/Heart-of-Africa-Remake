@@ -101,15 +101,26 @@ put it is the mistake this line exists to stop.
   FINAL STATE:
   1. The hook resolves its own script path from a source that cannot be empty — the hook file's own
      location — and never from an environment variable it does not set itself.
-  2. The intercept FAILS OPEN. If the budget script cannot be found or cannot run, the untouched
-     command passes through with a named warning: an unbudgeted output is a cost, a dead tool call
-     is a defect.
+  2. The intercept FAILS OPEN, BUT ONLY WHERE THE BUDGET NEVER STARTED. If the budget script
+     cannot be found or cannot be launched, the untouched command passes through with a named
+     warning: an unbudgeted output is a cost, a dead tool call is a defect. A GENUINE OVER-BUDGET
+     RESULT NEVER FAILS OPEN — that is the case point 597 exists for — and a budget that dies AFTER
+     consuming output fails LOUD and attributed rather than passing a truncated stream off as
+     whole, because the command cannot simply be run again (Sol A12/A13, 22.08.2026). A fail-open
+     that repeats is a degradation, not a transient: it is counted and surfaced, never silently
+     normal.
+  2b. THE WARNING HAS A CHANNEL. It goes to stderr or another out-of-band path, never to stdout,
+     where it would corrupt the very pipelines this hook sits in; and it must remain visible where
+     stderr is swallowed, or the failure is unattributed again (Sol A14).
   3. A failure of the budget is ATTRIBUTED. Whatever the caller sees must name the hook, so a dead
      command can never again read as the command's own failure.
   VERIFIABLE: Vitest over the pure command builder — an unset, empty and relative
-  `CLAUDE_PROJECT_DIR` each still yield a runnable absolute path; and over the fail-open path — a
-  missing or non-executable budget script leaves the command's own output and exit code intact
-  while emitting the named warning.
+  `CLAUDE_PROJECT_DIR` each still yield a runnable absolute path, and a path containing spaces
+  survives the shell; plus SUBPROCESS cases, since the script is invoked as `node <script>` and
+  "non-executable" is not the real failure mode (Sol A15): a missing script, an unreadable one and
+  one that dies of a syntax error each leave the command's own output and exit code intact while
+  emitting the named warning on its own channel, and a budget killed after consuming output
+  produces a loud, attributed failure instead of a truncated pass.
   QUEUE RANK: at the very front, before point 716. Reason: it is live on `main` right now and
   breaks every session that starts without the variable, including the one that found it.
   Criticality: high — a guard that silently destroys the tool calls it was built to bound costs
@@ -167,10 +178,15 @@ put it is the mistake this line exists to stop.
   run has no checkpoint to resume from. Point 676 has owned the cure since 13.08.2026 at
   criticality high, blocked by nothing — its only cited prerequisite, 675, is closed — and has
   waited at queue position 198 while the failure it describes kept happening.
-  THIS POINT IS THE FRONT STAGE OF 676, NOT A SECOND 676. The remainder of 676 keeps its number,
-  its spec and its rank: bounded dispatch, checkpoint barrier, two-phase boundary, successor
-  reconciliation beyond the slice claimed here, crash-recoverable landing, board projection,
-  metrics, staged failure trials and the measured baseline trial.
+  THIS POINT IS THE FRONT STAGE OF 676, NOT A SECOND 676. The remainder of 676 keeps its number and its rank:
+  bounded dispatch, checkpoint barrier, two-phase boundary, successor reconciliation beyond the
+  slice claimed here, crash-recoverable landing, board projection, metrics, staged failure trials
+  and the measured baseline trial. ITS SPEC IS AMENDED IN THE SAME COMMIT that files this point, so
+  the steps carried here are struck from it and its text says it begins AFTER this point — an
+  unamended 676 duplicates steps 1-4 and 8 and lets its remainder be worked first (Sol A9).
+  A17 IS RESOLVED BEFORE 716 LANDS, not after: 716 and 676 must not codify contradictory answers
+  about transferring a live Agent-tool child, so whichever of the two lands first carries the
+  agreed answer and the other cites it (Sol A10).
   THE CUT IS AT STEP 4, NOT STEP 3, and this is the correction Sol's audit forced. Steps 1-3 of the
   document's "Ordered work" — schemas and invariants, the durable state store, the daemon plus the
   Sol adapter — deliver DURABLE EXECUTION, not TRANSFERABLE SUPERVISION: a worker merely is not
@@ -179,12 +195,17 @@ put it is the mistake this line exists to stop.
   without step 4 is worse than today: without epoch fencing, attempt leases, fail-closed worktree
   locks and push-time lease validation, two coordinators can drive one batch, two attempts can
   share one worktree, and a replaced orphan can keep checkpointing and pushing (Sol A6). This point
-  therefore carries steps 1-4 and names step 8 — fenced discovery, adoption, reconciliation — with
-  step 9 for safe landing, as the point at which survivability may be CLAIMED (Sol A3).
+  therefore CARRIES steps 1-4 AND step 8 — fenced discovery, adoption, reconciliation — and step 9
+  where landing is needed, because that is the smallest set at which survivability may be CLAIMED
+  (Sol A3). A second cross-vendor pass on this very text refused the earlier wording: merely NAMING
+  8 and 9 delivers nothing, and the parent-death drill below cannot pass without them, since
+  fresh-session discovery and adoption live in step 8 (Sol, 22.08.2026, A1/A5/A11).
   IT IS BUILT DARK. Steps 1-4 land behind an activation flag with today's path untouched (Sol A20),
   because evidence-preserving cancellation and lease release arrive only later and there is no
   rollback path before them. Nothing in the board, the brief or the handover advertises a surviving
-  lane until the step-8 slice is green.
+  lane until the step-8 slice is green — and that is an INTERLOCK, not a habit: the flag REFUSES to
+  enable while steps 8 and 9 are not green, and a test pins that refusal (Sol A8; controlling what
+  is advertised does not control what is switched on).
   BEFORE ANY CODE, TWO THINGS IN ORDER:
   (a) THE RAW BLIND LISTS ARE RECOVERED. Point 676's own first step — re-run the A/B merge with a
       model that authored neither list — cannot be validly performed from the present record (Sol
@@ -211,6 +232,14 @@ put it is the mistake this line exists to stop.
   4. ORDERED OWNERSHIP AND TESTS for the prose-only requirements of the document's "Additional
      omissions" section (Sol A21): daemon authorization, state permissions, retention, resource
      headroom, experimental sampling.
+  THE FOUR FOLDED ITEMS ARE DELIVERED, NOT DEMANDED. A second cross-vendor pass found each of them
+  still standing as an instruction: item 1 repeats that the daemon's escape must be stated without
+  stating it, item 3 asks for a migration rule without giving precedence, atomic cutover,
+  split-brain prevention or rollback, and item 4 assigns no ordered step, owner or acceptance test
+  (Sol A3/A6/A7). The FIRST sub-step of this point therefore WRITES those three mechanisms down and
+  puts each through its own mechanism review before any of them is built. Likewise the revisability
+  of schemas, store and adapter is owned: a named later step reopens them, and what it reopens is
+  re-tested and re-reviewed rather than inherited (Sol A4 on A12-A14).
   VERIFIABLE: the unit cases the union names per step; each folded item with its own test; the
   parent-session-death drill; and the stage proven DARK — with the flag off, today's authoring path
   is the path that runs now. Mechanism review per step, not once at the end; each step green on the
@@ -420,6 +449,51 @@ put it is the mistake this line exists to stop.
   Claude lane showing a supervising session whose turn ends are not held by its agent.
   Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
   ends, which is how the batch stalls.
+
+- [ ] 829. The calibration suite measures the repository it is running in, so it goes red for the
+  checkout rather than for the code (measured 22.08.2026, 07:30, on main 46585af). Three cases in
+  `scripts/queue-calibration-cli.test.mjs` — the store's denominators, the cards an apply moves,
+  and the second run's division — assert that the correction actually applied to something. They
+  do not build that something: they run `scripts/queue-calibration.mjs` against the LIVE checkout,
+  whose landings come out of `git log --first-parent main` and whose per-landing span comes out of
+  `git log <merge>^1..<merge>^2`. On a developer machine that history is there and all three pass.
+  In CI the checkout was two commits deep, every merge parent was missing, every span read as
+  unknown, no class produced a factor, `applied` came back empty and no card moved — three
+  assertions of `expected 0 to be greater than 0`. Reproduced exactly in a `--depth 2` clone of
+  main: the command exits 0, prints `585 landed point(s)`, and every row's merge column is `none`.
+  main was red from 04:19 on 22.08.2026 until the checkout was deepened.
+  ALREADY DONE, AND NOT THE FIX: the three cases now declare their precondition — they skip where
+  `git rev-parse --is-shallow-repository` says the checkout cannot supply merge parents, and say
+  why — so main is green again and every developer checkout still runs them in full. That is a
+  stated gap, not a repair: the cases no longer run in the one place that guards the branch.
+  DEEPENING CI WAS MEASURED AND REJECTED, both directions, so nobody spends the afternoon again:
+  (a) `fetch-depth: 0` with `filter: blob:none` checks out in six seconds — the pack is 7.4 GiB of
+  which commits and trees are only ~8 MiB — but the command reads a file OUT OF HISTORY per
+  landing, every read becomes a lazy fetch, and the unit step ran past the fifteen-minute job
+  timeout instead of its usual five; (b) `--depth 600` with blobs is a 1.4 GiB clone, and the
+  fixture's own `--limit 30` reaches back over ~227 first-parent commits, so nothing much cheaper
+  would cover it either.
+  FINAL STATE: the three cases stand on a FIXTURE the test builds — a throwaway git repository with
+  a synthesized first-parent chain of merges and tick commits, whose landings, spans and classes
+  are chosen by the test — so the assertions are true or false because of the command, never
+  because of the checkout. Where a case genuinely needs the real repository, it says so and states
+  what it would take as sufficient history instead of assuming it.
+  A SECOND SKIP WAS NEEDED ON 22.08.2026, and it belongs to the same gap: the shallow probe answers
+  the question a `main` run asks, but a `feat/**` run checks out the BRANCH two commits deep, so the
+  revision `main` the command reads is absent entirely and the suite's own setup died with
+  `bad revision 'main'` before any span was measured. The suite now also skips where its base ref is
+  missing, which widens exactly the gap this point closes — on a branch run it currently guards
+  nothing at all.
+  VERIFIABLE: the suite passes in a `--depth 2` clone of main, in a `--depth 2` clone of a branch
+  with no `main` ref, and in the full checkout, with the same assertions and no skips; and a
+  deliberately broken correction (one that applies to nothing) still fails it in all three.
+  QUEUE RANK: behind point 174, at the end of the order. Reason: the machine filed this point
+  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. The
+  red it describes is already closed by the deepened checkout, so nothing waits on it.
+  Criticality: medium — it is test infrastructure, and its dangerous direction is a suite that
+  passes by skipping; the fixture and the "still fails when the correction is broken" case are what
+  the point pins.
+  Bundle: Testinfrastruktur.
 
 - [ ] 737. The review's pass plan cuts per COMMIT and file, so a diff that fits in one round is
   split into thirteen (measured 19.08.2026 while commissioning point 730's fourth round). The net
@@ -10904,51 +10978,6 @@ to land than a mechanism that needs a review.
   a firewall that seals the container; the additive top-up and the never-flush rule are what the
   test pins.
   Bundle: Session- & Repo-Hygiene.
-- [ ] 829. The calibration suite measures the repository it is running in, so it goes red for the
-  checkout rather than for the code (measured 22.08.2026, 07:30, on main 46585af). Three cases in
-  `scripts/queue-calibration-cli.test.mjs` — the store's denominators, the cards an apply moves,
-  and the second run's division — assert that the correction actually applied to something. They
-  do not build that something: they run `scripts/queue-calibration.mjs` against the LIVE checkout,
-  whose landings come out of `git log --first-parent main` and whose per-landing span comes out of
-  `git log <merge>^1..<merge>^2`. On a developer machine that history is there and all three pass.
-  In CI the checkout was two commits deep, every merge parent was missing, every span read as
-  unknown, no class produced a factor, `applied` came back empty and no card moved — three
-  assertions of `expected 0 to be greater than 0`. Reproduced exactly in a `--depth 2` clone of
-  main: the command exits 0, prints `585 landed point(s)`, and every row's merge column is `none`.
-  main was red from 04:19 on 22.08.2026 until the checkout was deepened.
-  ALREADY DONE, AND NOT THE FIX: the three cases now declare their precondition — they skip where
-  `git rev-parse --is-shallow-repository` says the checkout cannot supply merge parents, and say
-  why — so main is green again and every developer checkout still runs them in full. That is a
-  stated gap, not a repair: the cases no longer run in the one place that guards the branch.
-  DEEPENING CI WAS MEASURED AND REJECTED, both directions, so nobody spends the afternoon again:
-  (a) `fetch-depth: 0` with `filter: blob:none` checks out in six seconds — the pack is 7.4 GiB of
-  which commits and trees are only ~8 MiB — but the command reads a file OUT OF HISTORY per
-  landing, every read becomes a lazy fetch, and the unit step ran past the fifteen-minute job
-  timeout instead of its usual five; (b) `--depth 600` with blobs is a 1.4 GiB clone, and the
-  fixture's own `--limit 30` reaches back over ~227 first-parent commits, so nothing much cheaper
-  would cover it either.
-  FINAL STATE: the three cases stand on a FIXTURE the test builds — a throwaway git repository with
-  a synthesized first-parent chain of merges and tick commits, whose landings, spans and classes
-  are chosen by the test — so the assertions are true or false because of the command, never
-  because of the checkout. Where a case genuinely needs the real repository, it says so and states
-  what it would take as sufficient history instead of assuming it.
-  A SECOND SKIP WAS NEEDED ON 22.08.2026, and it belongs to the same gap: the shallow probe answers
-  the question a `main` run asks, but a `feat/**` run checks out the BRANCH two commits deep, so the
-  revision `main` the command reads is absent entirely and the suite's own setup died with
-  `bad revision 'main'` before any span was measured. The suite now also skips where its base ref is
-  missing, which widens exactly the gap this point closes — on a branch run it currently guards
-  nothing at all.
-  VERIFIABLE: the suite passes in a `--depth 2` clone of main, in a `--depth 2` clone of a branch
-  with no `main` ref, and in the full checkout, with the same assertions and no skips; and a
-  deliberately broken correction (one that applies to nothing) still fails it in all three.
-  QUEUE RANK: behind point 174, at the end of the order. Reason: the machine filed this point
-  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. The
-  red it describes is already closed by the deepened checkout, so nothing waits on it.
-  Criticality: medium — it is test infrastructure, and its dangerous direction is a suite that
-  passes by skipping; the fixture and the "still fails when the correction is broken" case are what
-  the point pins.
-  Bundle: Testinfrastruktur.
-
 - [ ] 830. The model-policy fingerprint swallows the rest of §6, so seven unrelated rules cannot be
   edited without staling twelve files (filed by the machine 22.08.2026 out of point 768's
   blind-parallel record, `docs/blind-768/README.md`, "The one union entry deliberately not

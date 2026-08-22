@@ -383,6 +383,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
+- **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.** Fenster enden, und
+  mit ihnen jede Nachricht, die nur im Fenster stand — auch die sorgfältig formulierte.
+  → *Prompt:* „Halte jeden Auftrag, der eine Sitzung überdauern soll, in einer Datei fest, die dein
+  Werkzeug beim nächsten Start von sich aus liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
+
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
   baut aber weder Zustand noch Befehl dafür. Der ehrliche Ausnahmefall muss die Form des
   Normalfalls nachahmen, und nur eine irreführende Formulierung besteht dessen Prüfung.
@@ -427,4 +432,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 5be53fd57d3a346b8819d46291d3a40bb05db59324385d00375392aaa58da879 -->
+<!-- GUIDE-FINGERPRINT: 6011ae5790cc370e0fe7d9aa1b5ef4b1b82dc80a91f104549897f1995ced8506 -->
