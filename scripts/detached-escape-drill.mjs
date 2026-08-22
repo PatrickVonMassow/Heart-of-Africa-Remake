@@ -419,9 +419,18 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
 /**
  * KILL ONLY WHAT THIS DRILL SPAWNED, AND SAY SO WHEN IT CANNOT.
  *
- * Returns a sentence when nothing was signalled, and undefined when the worker
- * was reaped. Two hazards, treated differently because only one of them can be
- * prevented:
+ * WHAT THE RETURN VALUE MEANS, exactly, because the first contract was false.
+ * A SENTENCE is anything this function could observe and wants on the record:
+ * it refused to signal, the signal failed, the process is still running, its
+ * state could not be read, or its identity changed under the signal. UNDEFINED
+ * means only "nothing left to report" — the worker was gone, or it disappeared
+ * after being signalled. It is NOT a proof that the process this drill spawned
+ * is the one that died: the vanished-stranger case below is indistinguishable
+ * from a clean reap and also returns undefined. That is residual 4 in
+ * docs/handover-architecture.md, and it is why the architecture no longer says
+ * this function reports every cleanup it cannot establish.
+ *
+ * Two hazards, treated differently because only one of them can be prevented:
  *
  * PREVENTABLE — a pid of 0 or 1, or a number whose identity does not match the
  * one captured at spawn. `Number.isFinite(0)` is true and `process.kill(0, …)`

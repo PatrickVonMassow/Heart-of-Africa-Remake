@@ -203,7 +203,7 @@ The attached material does not disclose the existing progress-board source path,
 
 7. Add two-phase boundary handling.
 
-   `node scripts/batch-boundary.mjs --prepare --batch <id>` performs health, landing-lock, bookkeeping, board, queue and checkpoint validation. `node scripts/batch-boundary.mjs --commit --batch <id>` seals the snapshot, advances the epoch, writes the marker, obtains the daemon receipt and fences the caller. Verify that commit is idempotent, failed prepare creates no marker, post-commit mutation fails, and unhealthy dependencies refuse handover using `npx vitest run scripts/__tests__/batch-boundary.test.mjs`.
+   `node scripts/batch-boundary.mjs --prepare --batch <id>` performs health, landing-lock, bookkeeping, board, queue and checkpoint validation. `node scripts/batch-boundary.mjs --commit --batch <id>` seals the snapshot, RECORDS the fence it ran under, writes the marker, obtains the daemon receipt and fences the caller. It does NOT advance the fence — acquisition is that number's only writer (mechanism 2); an earlier draft of this step said otherwise and would have made the boundary a second, unsynchronised writer of it. Verify that commit is idempotent, failed prepare creates no marker, post-commit mutation fails, and unhealthy dependencies refuse handover using `npx vitest run scripts/__tests__/batch-boundary.test.mjs`.
 
 8. Add successor startup and reconciliation.
 
@@ -432,8 +432,11 @@ compensation, and the design owes all three parts:
        mechanism exists to avoid.
   - **Nothing is inferred from the credential's current value,** because a `seq` is reused by a
     later attempt after a failed one and cannot tell landed from superseded from abandoned.
-  - **Only entries with no publishing intent are quarantined locally,** and those are the ones the
-    local-and-reversible argument actually covers.
+  - **Two things are quarantined, and the earlier wording named only one.** An entry with NO
+    publishing intent is quarantined locally — that is the case the local-and-reversible argument
+    covers. An entry WITH a publishing intent that the procedure above ends at UNKNOWN is
+    quarantined too, and it is not covered by that argument at all: it may have published. It is
+    marked as such, so nobody later reads a quarantined entry as uniformly local.
 
   "The fence in force at position i" therefore remains the last transition at or before i for the
   confirmed prefix, and the tail is resolved by evidence rather than read as a fact.
@@ -605,7 +608,10 @@ actually holds is narrow:
   ref its advance before anything may be published, and a daemon start owes the lock its
   immediacy — read separately, bootstrap could satisfy neither. They are ordered, and this is the
   only sequence: **acquire the lock → start the daemon, if one is to be started → advance
-  `refs/hoa/coordinator` → and only now may anything be published.** "First act" for the daemon
+  `refs/hoa/coordinator` → and only now may anything be published.** The very first advance has no
+  previous value to lease, so it leases the ref's ABSENCE — `--force-with-lease=refs/hoa/coordinator:`
+  with an empty expected oid, which git accepts only while the ref does not exist. Two sessions
+  racing to create it therefore cannot both win, and the loser re-reads and acquires normally. "First act" for the daemon
   means before any operation; "first act" for the credential means before any publication. The
   daemon start is not a publication, so it precedes the advance without violating it.
 - **AND ONLY WHEN NOTHING OF THE OLD PATH IS STILL RUNNING — probed, not assumed.** Without this,
@@ -643,11 +649,12 @@ Written here because a mechanism that hides its limits is worse than one that ha
 because each of these is a candidate for its own work-order entry rather than a line someone
 discovers while building:
 
-1. **An operation that predates the daemon is not instrumented by it.** The start precondition
-   above — first act of a fresh lock, and no other live session that ever held it — is what keeps
-   the two from coexisting, and it is a checkable condition rather than an assumption. What
-   remains residual is narrower: this design does not measure or improve the recoverability of
-   work begun on the old path, it only refuses to run beside it.
+1. **An undeclared old-path child can evade every start check.** The precondition probes live
+   sessions, in-flight declarations and worktree processes, and none of those can see a detached
+   child nobody declared — which is precisely the condition this point exists to remove, so it is
+   at its worst before the point lands and gone after it. Until then the honest reading is that
+   the first daemon is started when the batch is provably idle. This design also does not measure
+   or improve the recoverability of work begun on the old path.
 2. **One push of publishing authority after local dispossession.** The credential ref decides who
    publishes, so between a successor's local acquisition and its advance of that ref, the
    predecessor is still the named publisher. This is deliberate — it keeps exactly one publisher
@@ -660,11 +667,19 @@ discovers while building:
    pidfd, so a recycled pid is detected after the fact rather than prevented — and one branch
    cannot be detected at all: if the worker exits, its number is reused, the stranger is signalled
    and the stranger then vanishes, the probe answers exactly what a clean reap answers. The
-   detection is best-effort and the drill says so; it never reports cleanup it cannot establish,
-   but it also cannot rule this case out.
+   detection is best-effort: the drill reports every uncertainty it can OBSERVE — a refusal to
+   signal, a failed signal, a survivor, an unreadable state, a changed identity — and this one it
+   cannot observe at all. Its silence therefore means "nothing left to report", never "the process
+   I spawned is the one that died".
 
-A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
-handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with
+**A daemon persists across the sessions that follow, and the lock is NOT what carries it across.**
+`acquire` deletes the lock file — that is why the fence lives in `.claude/batch-fence.json` rather
+than in the lock — so a `daemon` field of the lock cannot survive a handover, and an earlier draft
+that said it did was wrong. The durable record is the daemon's own identity file in the state
+store, which no lock operation touches. The lock's field is a COPY of it, written by acquisition
+after reading it, and that copy is what makes "is there a daemon" and "may I work" one atomic read
+FOR THE CURRENT OWNER. Persistence comes from the durable record; atomicity comes from the copy;
+neither claim rests on the other. Rollback is then a single operation with
 nothing to interleave: `node scripts/batch-daemon.mjs stop --drain` refuses new mutations,
 completes the at most one mutation in flight (they are serialized, so the wait is bounded by a
 single operation), cancels its workers through the cancellation path that preserves their branches
