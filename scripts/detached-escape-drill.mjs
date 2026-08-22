@@ -119,22 +119,29 @@ export function readOutcome({
   // never overrides "died" — the reading of a corpse does not depend on jitter.
   const dead = !alive && !unknownLiveness
   const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness
-  const why = escaped
-    ? 'still running and still working after the kill'
-    : dead
-      ? /EPIPE/i.test(lastLine)
-        ? 'died writing to a pipe whose reader went with the parent'
-        : 'died with the parent, cause not recorded in its own log'
-      : unknownLiveness
-        ? 'liveness could not be established, and an unreadable probe is not a survivor'
-        : unmeasurable
-          ? enoughBaseline
-            ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
-            : `only ${before.length} beat(s) before the kill, too few for a baseline — this run measures nothing`
-          : gained === 0
-            ? 'still running but never beat again — a survivor that stopped is not a lane'
-            : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
+  // ONE PRECEDENCE, NOT TWO. The reason used to encode the same order as the
+  // command's labelling, independently, so the two could drift apart — and had
+  // already produced a run whose label and reason disagreed. The label is chosen
+  // first, here, and the reason is chosen BY it.
+  const label = labelFor({ escaped, dead, unknownLiveness, unmeasurable })
+  const why =
+    label === 'ESCAPED'
+      ? 'still running and still working after the kill'
+      : label === 'DIED'
+        ? /EPIPE/i.test(lastLine)
+          ? 'died writing to a pipe whose reader went with the parent'
+          : 'died with the parent, cause not recorded in its own log'
+        : label === 'UNKNOWN'
+          ? 'liveness could not be established, and an unreadable probe is not a survivor'
+          : label === 'INCONCLUSIVE'
+            ? enoughBaseline
+              ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
+              : `only ${before.length} beat(s) before the kill, too few for a baseline — this run measures nothing`
+            : gained === 0
+              ? 'still running but never beat again — a survivor that stopped is not a lane'
+              : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
   return {
+    label,
     shape,
     escaped,
     progressed,
@@ -401,17 +408,48 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // drill. And even a real pid may have been recycled by now, in which case the
   // signal would hit a stranger. So the identity is re-checked at the moment of
   // the kill, and anything it cannot vouch for is left alone and reported.
-  const reapable = pid > 1 && probeAlive(pid, { startedAt, requireIdentity: true })
-  if (reapable && (reapable.alive || reapable.unknown === undefined)) {
-    try {
-      if (reapable.alive) process.kill(pid, 'SIGKILL')
-    } catch {
-      /* already gone */
-    }
-  } else if (pid > 1) {
-    outcome.leftAlone = `pid ${pid} not reaped: ${reapable ? reapable.how : 'no identity'}`
-  }
+  outcome.leftAlone = reap(pid, startedAt)
   return outcome
+}
+
+/**
+ * KILL ONLY WHAT THIS DRILL SPAWNED, AND SAY SO WHEN IT CANNOT.
+ *
+ * Returns a sentence when nothing was signalled, and undefined when the worker
+ * was reaped. Two hazards, treated differently because only one of them can be
+ * prevented:
+ *
+ * PREVENTABLE — a pid of 0 or 1, or a number whose identity does not match the
+ * one captured at spawn. `Number.isFinite(0)` is true and `process.kill(0, …)`
+ * signals the CALLER'S OWN PROCESS GROUP, which here is the batch session; a
+ * mismatched identity is a stranger. Neither is ever signalled.
+ *
+ * NOT PREVENTABLE — the interval between reading /proc and sending the signal.
+ * The worker can exit and its number be reused inside it, and Node exposes no
+ * pidfd to close that. So it is DETECTED instead: the identity is read again
+ * after the signal, and a change is reported rather than passed over in silence.
+ * A drill that cannot promise something says what it did.
+ */
+export function reap(pid, startedAt, { probe = probeAlive, kill = process.kill.bind(process) } = {}) {
+  if (!(pid > 1)) return `no worker pid was captured, so nothing was signalled`
+  const before = probe(pid, { startedAt, requireIdentity: true })
+  // A worker that is simply GONE is the expected end of one of the two shapes,
+  // not a refusal to clean up — there is nothing left to signal.
+  if (/no such process/.test(before.how ?? '')) return undefined
+  if (!before.alive) return `pid ${pid} not reaped: ${before.how}`
+  try {
+    kill(pid, 'SIGKILL')
+  } catch {
+    return undefined // it went away between the check and the signal: nothing to reap
+  }
+  // ONLY AN IDENTITY CHANGE IS REPORTED. A process still running an instant after
+  // SIGKILL is ordinary — signal delivery is asynchronous — and reporting that as
+  // a recycled pid was a false alarm on every healthy run.
+  const after = probe(pid, { startedAt, requireIdentity: true })
+  if (/recycled/.test(after.how ?? '')) {
+    return `pid ${pid} was recycled between the check and the signal: ${after.how}`
+  }
+  return undefined
 }
 
 export async function runDrill(opts = {}) {

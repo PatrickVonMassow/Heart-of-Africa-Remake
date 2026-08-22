@@ -406,13 +406,18 @@ compensation, and the design owes all three parts:
   written in a way that makes the question ANSWERABLE, and reconciliation answers it against the
   remote rather than assuming:
 
-  - **Intent precedes the act.** Before any publishing act the daemon appends an intent entry
-    naming the credential `seq` that push will use and the refs it will move. The entry exists
-    before the push can, so no landed push lacks a record.
-  - **Recovery reads the remote.** For every unverified entry that names a publishing intent,
-    reconciliation fetches and asks whether that `seq` is the one the credential ref carries and
-    whether the named refs moved. Landed is recorded as landed; not landed is recorded as
-    abandoned; the intent is never quarantined on a guess.
+  - **Intent precedes the act, and names an OBJECT rather than a counter.** Before any publishing
+    act the daemon appends an intent entry carrying a unique publication id, and for every ref it
+    will move, the exact object id it expects to find there and the exact object id it will leave.
+    The commits exist locally before the push, so the after-oid is known in advance. The entry
+    exists before the push can, so no landed push lacks a record.
+  - **Recovery asks the remote about those objects.** For each unverified publishing intent,
+    reconciliation fetches and asks whether the after-oid is contained in the ref's history
+    (`git merge-base --is-ancestor`). Contained means LANDED — and it stays true through any
+    number of later publications, which is exactly what a `seq` comparison could not do. Absent
+    from the remote means ABANDONED. Nothing is inferred from the credential's current value,
+    because a `seq` is reused by a later attempt after a failed one and cannot tell landed from
+    superseded from abandoned.
   - **Only entries with no publishing intent are quarantined locally,** and those are the ones the
     local-and-reversible argument actually covers.
 
@@ -573,20 +578,43 @@ before the daemon existed cannot journal through it, and letting legacy code app
 break the one-writer rule the section above depends on. Nor does local imply reversible —
 terminating a process is local and final.
 
-**So the honest statement is a scope limit.** For an operation that began on the old path, this
-design changes nothing: it has exactly today's guarantees, no better and no worse, and the new
-mechanisms neither protect nor endanger it. What the design must therefore avoid is CREATING that
-situation, and the one restriction that actually holds is narrow:
+**So the honest statement is a scope limit, and it is a limit rather than a reassurance.** An
+operation that began on the old path is not covered by any mechanism here, and this text does NOT
+claim it is left unharmed: a daemon started while such an operation is running can touch the same
+local state, and nothing in this design prevents that. It is a known residual, recorded as one. The
+design's obligation is to avoid CREATING the situation where it can, and the one restriction that
+actually holds is narrow:
 
 - **A daemon may be started only as the FIRST act of a session that has just acquired the lock,**
   before that session has begun any operation of its own. Then no legacy operation of the starting
   session can be in flight, because it has not started one.
-- **A former owner's legacy operation is out of scope,** and that is written down rather than
-  covered: it runs under today's rules, its published acts are refused by the credential ref once
-  the successor has advanced it, and its local acts are exactly as recoverable as they are today.
+- **A former owner's legacy operation is out of scope,** written down rather than covered: its
+  published acts are refused by the credential ref once the successor has advanced it, and its
+  local acts have whatever recoverability today's code gives them — which this design neither
+  measures nor improves.
 
 The exclusion the earlier drafts claimed does not exist. Naming the residue is what keeps the rest
 of this section true.
+
+#### The residuals this design does not remove
+
+Written here because a mechanism that hides its limits is worse than one that has none, and
+because each of these is a candidate for its own work-order entry rather than a line someone
+discovers while building:
+
+1. **Cross-regime interference with an operation that predates the daemon.** Named above. No
+   mechanism here constrains it; the restriction on when a daemon may start only excludes the
+   starting session's own operations.
+2. **One push of publishing authority after local dispossession.** The credential ref decides who
+   publishes, so between a successor's local acquisition and its advance of that ref, the
+   predecessor is still the named publisher. This is deliberate — it keeps exactly one publisher
+   at all times — but it means a lock file and the remote can disagree about ownership for the
+   length of one push.
+3. **The unprovable journal tail after a daemon crash.** Resolved against the remote where an
+   entry names a publishing intent, quarantined where it does not. An entry that is neither is not
+   possible by construction, but the construction is a rule the implementation must keep.
+4. **The drill's check-to-signal interval.** Node exposes no pidfd, so the drill detects a
+   recycled pid after the fact instead of preventing one. It reports rather than promises.
 
 A daemon then persists across the sessions that follow — the lock's `daemon` field survives the
 handover the same way the fence does — which is the whole point of it. Rollback is then a single operation with

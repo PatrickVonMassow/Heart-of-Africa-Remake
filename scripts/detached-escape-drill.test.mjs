@@ -14,6 +14,7 @@ import {
   MAX_GAP_BEATS,
   MIN_BASELINE_BEATS,
   probeAlive,
+  reap,
   signalState,
   readOutcome,
   SHAPES,
@@ -333,6 +334,56 @@ describe('probeAlive', () => {
 
   it('is total on a missing pid', () => {
     expect(probeAlive(NaN, { readProc: () => null, signal: () => 'exists' }).alive).toBe(false)
+  })
+})
+
+describe('reap', () => {
+  const identity = (how, alive) => () => ({ alive, how })
+
+  it('NEVER signals pid 0 or 1 — that would hit the caller\'s own process group', () => {
+    // `Number.isFinite(0)` was true and `process.kill(0, 'SIGKILL')` signals the
+    // caller's group: the batch session running this drill.
+    let signalled = 0
+    for (const pid of [0, 1, NaN, -5]) {
+      const said = reap(pid, 12345, { probe: identity('/proc state R', true), kill: () => (signalled += 1) })
+      expect(said).toMatch(/nothing was signalled/)
+    }
+    expect(signalled).toBe(0)
+  })
+
+  it('refuses a pid whose identity does not match, and says so', () => {
+    let signalled = 0
+    const said = reap(4242, 900000, {
+      probe: identity('pid 4242 was recycled — start 999999 is not the 900000 we spawned', false),
+      kill: () => (signalled += 1),
+    })
+    expect(signalled).toBe(0)
+    expect(said).toMatch(/not reaped/)
+    expect(said).toMatch(/recycled/)
+  })
+
+  it('says nothing about a worker that is simply gone — that is one shape\'s normal end', () => {
+    expect(reap(4242, 900000, { probe: identity('no such process', false), kill: () => {} })).toBeUndefined()
+  })
+
+  it('DETECTS the check-to-signal window it cannot prevent', () => {
+    // Node exposes no pidfd, so the interval between reading /proc and sending
+    // the signal cannot be closed. It is read again afterwards, and a changed
+    // identity is reported rather than passed over.
+    const answers = [
+      { alive: true, how: '/proc state S' },
+      { alive: false, how: 'pid 4242 was recycled — start 999999 is not the 900000 we spawned' },
+    ]
+    const said = reap(4242, 900000, { probe: () => answers.shift(), kill: () => {} })
+    expect(said).toMatch(/recycled between the check and the signal/)
+  })
+
+  it('stays quiet when the same process is still settling after the signal', () => {
+    // Signal delivery is asynchronous: a process still running an instant later
+    // is ordinary, and calling that a recycled pid was a false alarm on every
+    // healthy run.
+    const said = reap(4242, 900000, { probe: identity('/proc state R', true), kill: () => {} })
+    expect(said).toBeUndefined()
   })
 })
 
