@@ -72,9 +72,10 @@ function preflight(scriptPath) {
   return ''
 }
 
-function childExitCode(code, signal) {
+function childExitCode(code) {
   if (Number.isInteger(code)) return code
-  return signal ? 1 : 1
+  // Keep a signalled child as the plain failure status the hook harness expects, not shell-style 128+n.
+  return 1
 }
 
 function runOriginal(command) {
