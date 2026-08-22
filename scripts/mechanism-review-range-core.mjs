@@ -180,7 +180,7 @@ export function contributionsIn(commits = []) {
 }
 
 /** One reviewable artefact per file in the range's end state. */
-export function endStateArtifacts({ commits = [], endStateFiles = null } = {}) {
+export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
   const contributions = contributionsIn(commits)
   const byFile = new Map()
   for (const contribution of contributions) {
@@ -194,7 +194,7 @@ export function endStateArtifacts({ commits = [], endStateFiles = null } = {}) {
   const material = endStateFiles === null
     ? new Set(byFile.keys())
     : new Set(uniq(endStateFiles))
-  const artifacts = []
+  const artefacts = []
   const dropped = []
   const superseded = []
   for (const [file, changes] of byFile) {
@@ -209,7 +209,7 @@ export function endStateArtifacts({ commits = [], endStateFiles = null } = {}) {
     const latest = changes.at(-1)
     const authors = latest.authors
     const vendors = uniq(authors.map(vendorOf))
-    artifacts.push({
+    artefacts.push({
       file,
       authors,
       vendors: vendors.length ? vendors : ['unknown'],
@@ -226,7 +226,7 @@ export function endStateArtifacts({ commits = [], endStateFiles = null } = {}) {
       })
     }
   }
-  return { contributions, artifacts, dropped, superseded }
+  return { contributions, artefacts, dropped, superseded }
 }
 
 /**
@@ -241,31 +241,31 @@ export function planAuthorshipGroups({
   endStateFiles = null,
   candidates = REVIEWER_CANDIDATES,
 } = {}) {
-  const state = endStateArtifacts({ commits, endStateFiles })
+  const state = endStateArtefacts({ commits, endStateFiles })
   const byVendors = new Map()
-  for (const artifact of state.artifacts) {
-    const key = artifact.vendors.join('+')
+  for (const artefact of state.artefacts) {
+    const key = artefact.vendors.join('+')
     if (!byVendors.has(key)) byVendors.set(key, [])
-    byVendors.get(key).push(artifact)
+    byVendors.get(key).push(artefact)
   }
 
   const groups = []
-  for (const [vendor, artifacts] of byVendors) {
-    const authors = uniq(artifacts.flatMap((artifact) => artifact.authors))
+  for (const [vendor, artefacts] of byVendors) {
+    const authors = uniq(artefacts.flatMap((artefact) => artefact.authors))
     groups.push({
       kind: 'files',
       vendor,
       authors,
-      files: artifacts.map((artifact) => artifact.file),
-      commits: uniq(artifacts.flatMap((artifact) => artifact.commits)),
-      endStateShas: Object.fromEntries(artifacts.map((artifact) => [artifact.file, artifact.endStateSha])),
+      files: artefacts.map((artefact) => artefact.file),
+      commits: uniq(artefacts.flatMap((artefact) => artefact.commits)),
+      endStateShas: Object.fromEntries(artefacts.map((artefact) => [artefact.file, artefact.endStateSha])),
       ...reviewerFields(authors, candidates),
     })
   }
 
   return {
     ...state,
-    mixedFiles: state.artifacts.filter((artifact) => artifact.vendors.length > 1).map((artifact) => artifact.file),
+    mixedFiles: state.artefacts.filter((artefact) => artefact.vendors.length > 1).map((artefact) => artefact.file),
     groups,
     unreviewable: groups.filter((group) => !group.reviewer),
   }
@@ -344,7 +344,7 @@ export function outstandingFiles({
   records = [],
   recordUsable = () => true,
 } = {}) {
-  const state = endStateArtifacts({ commits, endStateFiles })
+  const state = endStateArtefacts({ commits, endStateFiles })
   const latest = new Map()
   for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
@@ -352,17 +352,17 @@ export function outstandingFiles({
     // rows described intermediate contributions and deliberately clear nothing
     // under the replacement model.
     if (!files.length || String(record?.pass?.endState ?? '') !== String(record?.sha ?? '')) continue
-    for (const artifact of state.artifacts) {
-      const latestChange = artifact.changes.at(-1)
+    for (const artefact of state.artefacts) {
+      const latestChange = artefact.changes.at(-1)
       if (!recordUsable(record, latestChange.commit)) continue
-      if (!files.includes(artifact.file) || !contained(record, artifact.endStateSha)) continue
+      if (!files.includes(artefact.file) || !contained(record, artefact.endStateSha)) continue
       const reviewerVendor = vendorOf(record.model)
       if (
         reviewerVendor === 'unknown' ||
-        artifact.vendors.includes('unknown') ||
-        artifact.vendors.includes(reviewerVendor)
+        artefact.vendors.includes('unknown') ||
+        artefact.vendors.includes(reviewerVendor)
       ) continue
-      const key = artifact.file
+      const key = artefact.file
       // A CLOCK IS A NUMBER OR IT IS NOTHING. `Number(record.at ?? 0)` read a
       // numeric STRING as a time and an absent stamp as the epoch, so a row
       // whose clock nobody wrote still outranked one that had it; and `NaN`
@@ -372,19 +372,19 @@ export function outstandingFiles({
       if (!latest.has(key)) latest.set(key, [])
       // Pushed in ledger order: the position in this list IS the line, so no
       // reading carries a line of its own that could go missing.
-      latest.get(key).push({ record, at, artifact })
+      latest.get(key).push({ record, at, artefact })
     }
   }
   const covered = new Set()
   const refusals = []
   for (const [key, readings] of latest) {
     const read = newestReading(readings)
-    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ artifact: read.artifact, record: read.record })
+    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ artefact: read.artefact, record: read.record })
     else covered.add(key)
   }
   return {
-    outstanding: state.artifacts.filter((artifact) => !covered.has(artifact.file)),
-    covered: state.artifacts.filter((artifact) => covered.has(artifact.file)),
+    outstanding: state.artefacts.filter((artefact) => !covered.has(artefact.file)),
+    covered: state.artefacts.filter((artefact) => covered.has(artefact.file)),
     refusals,
     dropped: state.dropped,
     superseded: state.superseded,
@@ -392,15 +392,15 @@ export function outstandingFiles({
 }
 
 /** Rebuild commit input from an outstanding end-state file list. */
-export function commitsForFiles(artifacts = []) {
+export function commitsForFiles(artefacts = []) {
   const bySha = new Map()
-  for (const artifact of artifacts ?? []) {
-    for (const contribution of artifact.changes ?? []) {
+  for (const artefact of artefacts ?? []) {
+    for (const contribution of artefact.changes ?? []) {
       if (!bySha.has(contribution.sha)) {
         bySha.set(contribution.sha, { ...contribution.commit, sha: contribution.sha, files: [] })
       }
       const commit = bySha.get(contribution.sha)
-      if (!commit.files.includes(artifact.file)) commit.files.push(artifact.file)
+      if (!commit.files.includes(artefact.file)) commit.files.push(artefact.file)
     }
   }
   return [...bySha.values()]

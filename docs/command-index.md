@@ -191,7 +191,7 @@
 | `mechanism-review-guard-gap-core.mjs` | THE REVIEW-GAP RULING (point 714): what the mechanism gate does while a range's review material CANNOT BE ASSEMBLED at all. | — |
 | `mechanism-review-guard-gap.mjs` | THE REVIEW-GAP MEASUREMENT (point 714) — the impure half of the ruling whose wording lives in mechanism-review-guard-gap-core.mjs. | — |
 | `mechanism-review-guard.mjs` | Stop hook (point 377): the four-eyes rule for a MECHANISM gets its own mechanism. | — |
-| `mechanism-review-range-core.mjs` | Pure planning core for authorship-cut mechanism reviews. | — |
+| `mechanism-review-range-core.mjs` | Pure planning core for end-state mechanism reviews. | — |
 | `mechanism-review.mjs` | The record half of the four-eyes gate on mechanisms (point 377). | usage: node scripts/mechanism-review.mjs --record <sha> --model <name> |
 | `model-guard-core.mjs` | Pure decision core of the serving-model tripwire (point 309). | — |
 | `model-guard.mjs` | Stop hook (point 309): catch a silently DEGRADED serving model at its FIRST commit. | — |

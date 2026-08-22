@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   commitsForFiles,
-  endStateArtifacts,
+  endStateArtefacts,
   newestReading,
   eligibleReviewer,
   outstandingFiles,
@@ -69,11 +69,11 @@ describe('authorship-cut mechanism review planning', () => {
 
   it('drops a path reverted to its base state and names why', () => {
     const file = 'scripts/reverted-guard.mjs'
-    const state = endStateArtifacts({
+    const state = endStateArtefacts({
       commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'Claude Opus 5', [file])],
       endStateFiles: [],
     })
-    expect(state.artifacts).toEqual([])
+    expect(state.artefacts).toEqual([])
     expect(state.dropped).toEqual([
       { file, reason: 'end state identical to the base', commits: [sha('a'), sha('b')] },
     ])
@@ -196,8 +196,8 @@ describe('per-file end-state review baseline', () => {
       recordUsable: usable,
       records: [row({ head: first.sha, files: ['covered'], contained: [first.sha] })],
     })
-    expect(result.covered.map((artifact) => artifact.file)).toEqual(['covered'])
-    expect(result.outstanding.map((artifact) => artifact.file)).toEqual(['other'])
+    expect(result.covered.map((artefact) => artefact.file)).toEqual(['covered'])
+    expect(result.outstanding.map((artefact) => artefact.file)).toEqual(['other'])
   })
 
   it('owes only a covered file changed by a later commit', () => {
@@ -210,7 +210,7 @@ describe('per-file end-state review baseline', () => {
       records: [row({ head: first.sha, files: ['covered'], contained: [first.sha] })],
     })
     expect(result.covered).toEqual([])
-    expect(result.outstanding.map((artifact) => artifact.file)).toEqual(['covered'])
+    expect(result.outstanding.map((artefact) => artefact.file)).toEqual(['covered'])
   })
 
   it('does not accept a same-vendor reviewer for the file\'s final author', () => {
@@ -230,7 +230,7 @@ describe('per-file end-state review baseline', () => {
       })],
     })
     expect(result.covered).toEqual([])
-    expect(result.outstanding.map((artifact) => artifact.file)).toEqual(['shared'])
+    expect(result.outstanding.map((artefact) => artefact.file)).toEqual(['shared'])
   })
 
   it('does not keep the historical contribution-scoped clearing beside the new model', () => {
@@ -244,7 +244,7 @@ describe('per-file end-state review baseline', () => {
       endStateFiles: ['shared'],
       recordUsable: usable,
       records: [legacy],
-    }).outstanding.map((artifact) => artifact.file)).toEqual(['shared'])
+    }).outstanding.map((artefact) => artefact.file)).toEqual(['shared'])
   })
 
   it('keeps a newer refusal visible and lets a later clearance settle it', () => {
@@ -274,7 +274,7 @@ describe('per-file end-state review baseline', () => {
       commit('b', 'Claude Opus 5', ['shared']),
     ]
     const debt = outstandingFiles({ commits, endStateFiles: ['shared', 'done'], records: [], recordUsable: usable })
-    const rebuilt = commitsForFiles(debt.outstanding.filter((artifact) => artifact.file === 'shared'))
+    const rebuilt = commitsForFiles(debt.outstanding.filter((artefact) => artefact.file === 'shared'))
     expect(rebuilt.map((change) => [change.sha, change.files])).toEqual([
       [sha('a'), ['shared']],
       [sha('b'), ['shared']],

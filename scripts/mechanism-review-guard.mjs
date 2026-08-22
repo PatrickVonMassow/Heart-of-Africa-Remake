@@ -394,7 +394,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   })
   const authorshipPlan = planAuthorshipGroups({
     commits: commitsForFiles(debt.outstanding),
-    endStateFiles: debt.outstanding.map((artifact) => artifact.file),
+    endStateFiles: debt.outstanding.map((artefact) => artefact.file),
   })
 
   return {

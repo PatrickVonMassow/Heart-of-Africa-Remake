@@ -1138,14 +1138,14 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
       byFile.get(file).push(commit)
     }
   }
-  const artifacts = []
+  const artefacts = []
   for (const [file, changes] of byFile) {
     if (!material.has(file)) continue
     const latest = changes.at(-1)
     const authors = Array.isArray(latest?.authorModels) && latest.authorModels.length
       ? uniqStrings(latest.authorModels)
       : [latest?.authorModel].filter(Boolean)
-    artifacts.push({
+    artefacts.push({
       ...latest,
       files: [file],
       authorModel: authors[0] ?? '',
@@ -1153,7 +1153,7 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
       sourceCommits: changes.map((commit) => commit.sha),
     })
   }
-  return artifacts
+  return artefacts
 }
 
 const modelVendor = (model) => {
