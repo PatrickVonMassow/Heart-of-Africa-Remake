@@ -33,6 +33,7 @@ import {
   CHAT_PROMPT_MAX_CHARS,
   CHAT_PROMPT_MAX_MESSAGES,
   chatPromptSuffix,
+  ciTerminalPrompt,
   nextChatHandedAt,
   pendingSinceHandover,
   STANDING_ALERT_INTERVAL_MS,
@@ -268,11 +269,121 @@ describe('the immediate successor decision — one door for every transport', ()
   it.each([
     ['clean child exit', { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' }],
     ['crash', { kind: SUCCESSOR_TRIGGERS.CRASH, predecessorToken: 'spawn-1' }],
-    ['terminal CI result', { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: true }],
   ])('%s starts immediately from the same decision', (_label, trigger) => {
     let clock = NOW
     expect(start({ trigger, lock: null, now: clock })).toMatchObject({ start: true, code: 'start' })
     expect(clock).toBe(NOW)
+  })
+
+  it.each(['green', 'red'])('a matching terminal CI %s wakes immediately', (verdict) => {
+    const state = verdict === 'green' ? 'success' : 'failed'
+    const ciWait = {
+      visible: true,
+      pending: false,
+      terminal: true,
+      wakeToken: 'wake-1',
+      identity: 'origin/feat/x:abc:CI:42',
+      result: { state, verdict },
+    }
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: true, wakeToken: 'wake-1', result: ciWait.result },
+      ciWait,
+    })).toMatchObject({
+      start: true,
+      code: 'start',
+      reservation: { wakeToken: 'wake-1', trigger: 'ci-terminal' },
+    })
+  })
+
+  it.each([
+    ['child exit', SUCCESSOR_TRIGGERS.CHILD_EXIT],
+    ['crash', SUCCESSOR_TRIGGERS.CRASH],
+    ['watchdog', SUCCESSOR_TRIGGERS.WATCHDOG],
+  ])('keeps %s recovery behind a pending durable wait', (_label, kind) => {
+    const ciWait = {
+      visible: true,
+      pending: true,
+      terminal: false,
+      observerAlive: false,
+      repair: true,
+      deadline: NOW + 60_000,
+      deadlineReached: false,
+      identity: 'origin/feat/x:abc:CI:42',
+      wakeToken: 'wake-1',
+    }
+    expect(start({ trigger: { kind }, ciWait })).toMatchObject({
+      start: false,
+      code: 'ci-wait-pending',
+      reason: `CI run origin/feat/x:abc:CI:42 is still under durable observation and remains a successor veto until ${new Date(NOW + 60_000).toISOString()}; its observer must be repaired before a successor starts`,
+      evidence: { ciWait: { repair: true, deadline: NOW + 60_000, deadlineReached: false, vetoActive: true } },
+    })
+  })
+
+  it('lets a deliberate boundary overlap a pending CI observation', () => {
+    const ciWait = {
+      visible: true,
+      pending: true,
+      terminal: false,
+      observerAlive: true,
+      repair: false,
+      deadline: NOW + 60_000,
+      deadlineReached: false,
+      identity: 'origin/feat/x:abc:CI:42',
+      wakeToken: 'wake-1',
+    }
+    expect(start({
+      trigger: { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      lock: { sessionId: 'old', kind: 'session', fence: 17, handedOver: true },
+      assessment: { alive: false, reason: 'handed-over' },
+      ciWait,
+    })).toMatchObject({
+      start: true,
+      code: 'start',
+      reservation: { trigger: 'boundary', sourceGeneration: 17 },
+      evidence: {
+        ciWait: {
+          pending: true,
+          observerAlive: true,
+          deadlineReached: false,
+          vetoActive: false,
+        },
+      },
+    })
+  })
+
+  it.each([
+    ['child exit', { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT }, null],
+    ['watchdog', { kind: SUCCESSOR_TRIGGERS.WATCHDOG }, null],
+    [
+      'boundary',
+      { kind: SUCCESSOR_TRIGGERS.BOUNDARY, generation: 17 },
+      { sessionId: 'old', kind: 'session', fence: 17, handedOver: true },
+    ],
+  ])('lets %s recover after the CI wait deadline while observation remains visible', (_label, trigger, lock) => {
+    const ciWait = {
+      visible: true,
+      pending: true,
+      terminal: false,
+      observerAlive: true,
+      repair: false,
+      deadline: NOW - 24 * 60 * 60 * 1000,
+      deadlineReached: true,
+      identity: 'refs/heads/main:abc:CI:99',
+      wakeToken: 'wake-1',
+    }
+    expect(start({ trigger, lock, assessment: { alive: false, reason: 'inactive' }, ciWait })).toMatchObject({
+      start: true,
+      code: 'start',
+      evidence: {
+        ciWait: {
+          pending: true,
+          observerAlive: true,
+          deadline: NOW - 24 * 60 * 60 * 1000,
+          deadlineReached: true,
+          vetoActive: false,
+        },
+      },
+    })
   })
 
   it('returns precise evidence for every policy refusal', () => {
@@ -297,9 +408,17 @@ describe('the immediate successor decision — one door for every transport', ()
       trigger: { kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, predecessorToken: 'spawn-1' },
       lock: { sessionId: 'new', spawnToken: 'spawn-2' },
     })).toMatchObject({ start: false, code: 'stale-spawn' })
+    const terminal = {
+      visible: true, pending: false, terminal: true, wakeToken: 'wake-1', identity: 'wait-1', result: { verdict: 'green' },
+    }
+    expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: false }, ciWait: terminal }))
+      .toMatchObject({ start: false, code: 'ci-not-terminal' })
+    expect(start({ trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: true }, ciWait: terminal }))
+      .toMatchObject({ start: false, code: 'missing-ci-wake' })
     expect(start({
-      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, predecessorToken: 'spawn-1', terminal: false },
-    })).toMatchObject({ start: false, code: 'ci-not-terminal' })
+      trigger: { kind: SUCCESSOR_TRIGGERS.CI_TERMINAL, terminal: true, wakeToken: 'old-wake' },
+      ciWait: terminal,
+    })).toMatchObject({ start: false, code: 'stale-ci-wake' })
   })
 
   it('a concurrent watchdog and duplicate notification reserve exactly one writer', () => {
@@ -391,10 +510,12 @@ describe('supervisor restart decision', () => {
 describe('supervised exit trigger', () => {
   it('carries a terminal CI result into the immediate decision', () => {
     expect(supervisedExitTrigger([
-      { seq: 3, atMs: 1500, event: 'ci-wait-finish', evidence: { terminal: { state: 'success', verdict: 'green' } } },
+      { seq: 3, atMs: 1500, event: 'ci-wait-finish', evidence: { wakeToken: 'wake-1', terminal: { state: 'success', verdict: 'green' } } },
     ], { childStartedAt: 1000 })).toEqual({
       kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
       terminal: true,
+      wakeToken: 'wake-1',
+      result: { state: 'success', verdict: 'green' },
       evidence: { seq: 3, result: { state: 'success', verdict: 'green' } },
     })
   })
@@ -405,6 +526,22 @@ describe('supervised exit trigger', () => {
       { seq: 3, atMs: 1500, event: 'foreground-activity', evidence: {} },
     ], { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
     expect(supervisedExitTrigger(null, { childStartedAt: 1000 })).toEqual({ kind: SUCCESSOR_TRIGGERS.CHILD_EXIT, evidence: null })
+  })
+})
+
+describe('terminal CI successor prompt', () => {
+  it('routes red to repair and green to ordinary continuation', () => {
+    expect(ciTerminalPrompt({
+      terminal: true,
+      identity: 'origin/feat/x:abc:CI:42',
+      result: { state: 'failed', verdict: 'red' },
+    })).toMatch(/successor is the repair path[\s\S]*ci-status-guard[\s\S]*fixing commit/)
+    expect(ciTerminalPrompt({
+      terminal: true,
+      identity: 'origin/feat/x:abc:CI:42',
+      result: { state: 'success', verdict: 'green' },
+    })).toMatch(/concluded GREEN; continue the batch immediately/)
+    expect(ciTerminalPrompt(null)).toBe('')
   })
 })
 

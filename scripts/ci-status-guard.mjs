@@ -26,12 +26,18 @@
 // (Layer B), which fires on the gate verdict even with no session running — and
 // on a `feat/**` branch it fires where this guard cannot, since that run
 // concludes green by design (point 513) and only its verdict knows better.
-import { readFileSync, existsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
+import { readFileSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { request } from 'node:https'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
+  acknowledgeCiWaitState,
+  blockReason,
+  ciWaitBackoffMs,
+  ciWaitIdentity,
+  classifyRuns,
   failedRuns,
   ciRedAlertMessage,
   notifiedFromState,
@@ -40,6 +46,9 @@ import {
   pruneShaCache,
   pushedRefsFromReflog,
   refTargets,
+  reconcileCiWait,
+  renewCiWait,
+  observeCiWait,
   sweepTargets,
 } from './ci-status-guard-core.mjs'
 import {
@@ -55,13 +64,17 @@ import {
   blockingDeployments,
   candidateDeployments,
 } from './pages-deploy-unblock-core.mjs'
-import { heldByOtherLiveOwner, readOwnerLock } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, probePid, readOwnerLock } from './batch-singleton.mjs'
+import { assessCiWait } from './batch-in-flight-core.mjs'
 import { isMainModule } from './is-main.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 const STATE = repoPath('.claude/ci-status-guard-state.json')
+const STATE_LOCK = repoPath('.claude/ci-status-guard-state.lock')
+const SELF = repoPath('scripts/ci-status-guard.mjs')
+const AUTOSTART = repoPath('scripts/batch-autostart.mjs')
 const NTFY_TOPIC_FILE = repoPath('.claude/ntfy-topic')
 // The PAT lives OUTSIDE version control; candidates in preference order. Read
 // at call time, never logged. Missing token → unauthenticated (public repo,
@@ -70,6 +83,98 @@ const TOKEN_PATHS = [
   repoPath('.secrets/github-token'),
   'C:\\Users\\Patri\\.claude\\projects\\c--Users-Patri-Documents-Developing-hoa\\.secrets\\github-token',
 ]
+
+const waitSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+/** Serialise cache and durable-wait changes made by Stop hooks and the detached
+ * observer. The observer performs network I/O outside this lock; only one small
+ * read/modify/atomic-write sits inside it. */
+function mutateState(mutator, { now = Date.now(), waitMs = 2000 } = {}) {
+  const deadline = now + waitMs
+  while (true) {
+    try {
+      mkdirSync(STATE_LOCK)
+      break
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error
+      try {
+        if (now - statSync(STATE_LOCK).mtimeMs > 30_000) rmSync(STATE_LOCK, { recursive: true, force: true })
+      } catch { /* retry */ }
+      if (Date.now() >= deadline) throw new Error('timed out acquiring CI state lock')
+      waitSync(5)
+    }
+  }
+  try {
+    const current = readJson(STATE) ?? {}
+    const next = mutator(current)
+    writeJsonAtomic(STATE, next && typeof next === 'object' ? next : current)
+    return next
+  } finally {
+    rmSync(STATE_LOCK, { recursive: true, force: true })
+  }
+}
+
+function startWaitObserver(wait) {
+  const assessment = assessCiWait({ wait, probePid })
+  if (!assessment.pending || !assessment.repair) return false
+  try {
+    const child = spawn(process.execPath, [SELF, '--observe', wait.wakeToken], {
+      cwd: REPO_ROOT,
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    return true
+  } catch {
+    return false
+  }
+}
+
+function requestSuccessor(wait) {
+  try {
+    const child = spawn(process.execPath, [
+      AUTOSTART,
+      '--immediate',
+      '--cause', 'ci-terminal',
+      '--wake-token', wait.wakeToken,
+      '--ci-result', wait.terminal?.verdict ?? wait.state,
+    ], {
+      cwd: REPO_ROOT,
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore',
+    })
+    child.unref()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Keep the event-driven wake alive through a still-running predecessor. The
+ * first request is immediate; later attempts use the same bounded backoff as CI
+ * observation. A pause suppresses requests without erasing terminal truth. */
+async function wakeSuccessorUntilRecovered(wait) {
+  while (true) {
+    const current = readJson(STATE)?.ciWait
+    if (!current?.terminal || current.wakeToken !== wait.wakeToken) return
+    if (!existsSync(PAUSE)) requestSuccessor(current)
+    await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(current)))
+  }
+}
+
+/** Consume terminal wake state only after a successor was actually spawned.
+ * Failed/refused launches leave it intact for watchdog recovery. */
+export function acknowledgeCiWait(wakeToken, { now = Date.now() } = {}) {
+  let acknowledged = false
+  mutateState((current) => {
+    const result = acknowledgeCiWaitState(current, wakeToken, { now })
+    acknowledged = result.acknowledged
+    return result.state
+  })
+  return acknowledged
+}
 
 function git(args) {
   return execFileSync('git', args, {
@@ -475,7 +580,10 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     headSha: head,
     headPushed: isPushed(head),
   })
-  if (targets.length === 0) return { applicable: true, inputs: { decision: null, failedOpen: [] } }
+  if (targets.length === 0) {
+    if (!readOnly) startWaitObserver(state.ciWait)
+    return { applicable: true, inputs: { decision: null, failedOpen: [] } }
+  }
 
   const swept = await sweepTargets({
     targets,
@@ -491,13 +599,32 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
           notifyCiRed(ciRedAlertMessage({ target, classification, standDown })),
   })
 
+  let durableWait = state.ciWait ?? null
   if (!readOnly) {
+    const persisted = mutateState((current) => {
+      const observations = swept.observations ?? []
+      const prior = current.ciWait ?? null
+      const nextWait = reconcileCiWait(prior, observations, { now, makeWakeToken: randomUUID })
+      const staleAgainstTerminal = prior?.terminal && observations.some((item) =>
+        ciWaitIdentity(item) === prior.identity && item?.classification?.state === 'pending')
+      return {
+        ...current,
+        famine: swept.famine,
+        shas: staleAgainstTerminal ? current.shas : swept.cache,
+        notifiedRefs: swept.notified,
+        notifiedAt: now,
+        ciWait: nextWait,
+      }
+    })
+    durableWait = persisted?.ciWait ?? null
+
     const owner = readOwnerLock()
     for (const observation of swept.observations ?? []) {
-      const state = observation.classification?.state
-      const event = state === 'pending'
+      const observedState = observation.classification?.state
+      const event = observedState === 'pending'
         ? (observation.previousState === 'pending' ? ACTIVITY_EVENTS.CI_WAIT_OBSERVATION : ACTIVITY_EVENTS.CI_WAIT_START)
         : ACTIVITY_EVENTS.CI_WAIT_FINISH
+      const ownsWait = ciWaitIdentity(observation) === durableWait?.identity
       emitActivity({
         event,
         at: observation.observedAt,
@@ -507,29 +634,23 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
           ? owner.pidStartedAt ?? null
           : Date.now() - Math.round(process.uptime() * 1000),
         generation: owner?.sessionId === sessionId ? owner.fence ?? null : null,
-        cause: `github-actions-${state}`,
+        cause: `github-actions-${observedState}`,
         evidence: {
           id: `ci:${observation.target?.ref ?? 'unknown'}:${observation.target?.sha ?? 'unknown'}`,
           ref: observation.target?.ref ?? null,
           sha: observation.target?.sha ?? null,
           workflow: observation.classification?.workflowName ?? null,
           runId: observation.classification?.runId ?? null,
-          firstObservationAt: observation.firstSeenAt,
+          firstObservationAt: ownsWait ? durableWait.firstObservationAt : observation.observedAt,
           lastObservationAt: observation.observedAt,
-          leaseUntil: state === 'pending' ? observation.observedAt + 2 * 60_000 : null,
-          terminal: state === 'pending' ? null : { state, verdict: observation.verdict },
+          deadline: ownsWait ? durableWait.deadline : null,
+          wakeToken: ownsWait ? durableWait.wakeToken : null,
+          leaseUntil: observedState === 'pending' ? observation.observedAt + 2 * 60_000 : null,
+          terminal: observedState === 'pending' ? null : { state: observedState, verdict: observation.verdict },
         },
       })
     }
-  }
-
-  if (!readOnly && (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified))) {
-    writeJsonAtomic(STATE, {
-      famine: swept.famine,
-      shas: swept.cache,
-      notifiedRefs: swept.notified,
-      notifiedAt: now,
-    })
+    startWaitObserver(durableWait)
   }
 
   // A fail-open SAYS why (point 387): a silently swallowed API error is
@@ -551,6 +672,164 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   return { applicable: true, inputs: { decision: swept.decision, failedOpen: swept.failedOpen } }
 }
 
+/** Claim and run the renewable observer. Its ownership is stored on the wait,
+ * not in process memory, so a duplicate spawn loses harmlessly and a launcher
+ * restart can replace a dead observer without replacing the wake token. */
+async function observeDurableWait(wakeToken) {
+  if (typeof wakeToken !== 'string' || !wakeToken) return
+  const startedAt = probePid(process.pid)?.startedAt ?? Date.now() - Math.round(process.uptime() * 1000)
+  let claimed = false
+  mutateState((current) => {
+    const wait = current.ciWait
+    const assessment = assessCiWait({ wait, probePid })
+    if (!assessment.pending || wait.wakeToken !== wakeToken) return current
+    if (assessment.observerAlive && wait.observer?.pid !== process.pid) return current
+    claimed = true
+    return { ...current, ciWait: { ...wait, observer: { pid: process.pid, startedAt } } }
+  })
+  if (!claimed) return
+
+  let repo
+  try { repo = githubRepo() } catch { return }
+  if (!repo) return
+
+  while (true) {
+    const snapshot = readJson(STATE) ?? {}
+    const wait = snapshot.ciWait
+    if (wait?.state !== 'pending' || wait?.wakeToken !== wakeToken || wait?.observer?.pid !== process.pid) return
+
+    const runs = await fetchRuns(repo, wait.sha)
+    if (!runs) {
+      await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+      continue
+    }
+    let classification = classifyRuns(runs, wait.sha)
+    const observedAt = Date.now()
+    if (classification.state === 'pending') {
+      const observation = {
+        target: { ref: wait.ref, sha: wait.sha },
+        classification,
+        firstSeenAt: wait.firstObservationAt,
+        observedAt,
+      }
+      let renewed = null
+      mutateState((current) => {
+        if (current.ciWait?.wakeToken !== wakeToken || current.ciWait?.state !== 'pending') return current
+        const sameRun = ciWaitIdentity(observation) === current.ciWait.identity
+        renewed = renewCiWait(sameRun ? current.ciWait : null, observation, {
+          now: observedAt,
+          // A re-run changes run id but not the observer's obligation.
+          makeWakeToken: () => wakeToken,
+        }) ?? current.ciWait
+        if (!sameRun) {
+          renewed = {
+            ...renewed,
+            firstObservationAt: current.ciWait.firstObservationAt,
+            deadline: current.ciWait.deadline,
+          }
+        }
+        renewed = { ...renewed, observer: { pid: process.pid, startedAt } }
+        return { ...current, ciWait: renewed }
+      })
+      if (!renewed) return
+      emitActivity({
+        event: ACTIVITY_EVENTS.CI_WAIT_OBSERVATION,
+        at: observedAt,
+        pid: process.pid,
+        pidStartedAt: startedAt,
+        cause: 'github-actions-pending-observer',
+        evidence: {
+          id: `ci:${renewed.ref}:${renewed.sha}`,
+          ref: renewed.ref,
+          sha: renewed.sha,
+          workflow: renewed.workflow,
+          runId: renewed.runId,
+          firstObservationAt: renewed.firstObservationAt,
+          lastObservationAt: renewed.lastObservationAt,
+          deadline: renewed.deadline,
+          wakeToken,
+          leaseUntil: observedAt + ciWaitBackoffMs(renewed) + 5_000,
+          terminal: null,
+        },
+      })
+      await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(renewed)))
+      continue
+    }
+    if (classification.state !== 'success' && classification.state !== 'failed') {
+      await new Promise((resolve) => setTimeout(resolve, ciWaitBackoffMs(wait)))
+      continue
+    }
+
+    let standDown = false
+    let famine = snapshot.famine ?? {}
+    if (classification.state === 'failed') {
+      try {
+        const judged = await judgeRed(repo, {
+          sha: wait.sha,
+          runs,
+          classification,
+          famine,
+          now: observedAt,
+        })
+        classification = judged.classification ?? classification
+        standDown = judged.standDown === true
+        famine = { ...famine, ...(judged.stillFamished ?? {}) }
+      } catch { /* an undecidable red remains a repository repair path */ }
+      await notifyCiRed(ciRedAlertMessage({ target: { ref: wait.ref, sha: wait.sha }, classification, standDown }))
+    }
+
+    let finished = null
+    mutateState((current) => {
+      if (current.ciWait?.wakeToken !== wakeToken || current.ciWait?.state !== 'pending') return current
+      finished = observeCiWait(current.ciWait, classification, { now: observedAt })
+      const reason = classification.state === 'failed' && !standDown
+        ? blockReason(classification, wait.sha, wait.ref)
+        : null
+      return {
+        ...current,
+        famine,
+        shas: {
+          ...(current.shas ?? {}),
+          [wait.sha]: {
+            state: classification.state,
+            firstSeenAt: wait.firstObservationAt,
+            checkedAt: observedAt,
+            ...(reason ? { reason } : {}),
+          },
+        },
+        notifiedRefs: classification.state === 'failed'
+          ? { ...(current.notifiedRefs ?? {}), [wait.ref]: wait.sha }
+          : current.notifiedRefs,
+        notifiedAt: observedAt,
+        ciWait: finished,
+      }
+    })
+    if (!finished) return
+    emitActivity({
+      event: ACTIVITY_EVENTS.CI_WAIT_FINISH,
+      at: observedAt,
+      pid: process.pid,
+      pidStartedAt: startedAt,
+      cause: `github-actions-${classification.state}-observer`,
+      evidence: {
+        id: `ci:${finished.ref}:${finished.sha}`,
+        ref: finished.ref,
+        sha: finished.sha,
+        workflow: finished.workflow,
+        runId: finished.runId,
+        firstObservationAt: finished.firstObservationAt,
+        lastObservationAt: finished.lastObservationAt,
+        deadline: finished.deadline,
+        wakeToken,
+        leaseUntil: null,
+        terminal: finished.terminal,
+      },
+    })
+    await wakeSuccessorUntilRecovered(finished)
+    return
+  }
+}
+
 async function main() {
   let sessionId = ''
   try {
@@ -563,7 +842,11 @@ async function main() {
   if (decision) process.stdout.write(JSON.stringify({ decision: 'block', reason: decision }))
 }
 
-if (isMainModule(import.meta.url)) {
+if (isMainModule(import.meta.url) && process.argv[2] === '--observe') {
+  observeDurableWait(process.argv[3]).catch((e) => {
+    console.error(`ci-status observer error: ${e && e.message}`)
+  })
+} else if (isMainModule(import.meta.url)) {
   // No process.exit after awaits (libuv teardown race on Windows) — print the
   // decision and let the loop drain; any error allows the stop (fail-open).
   main().catch((e) => {

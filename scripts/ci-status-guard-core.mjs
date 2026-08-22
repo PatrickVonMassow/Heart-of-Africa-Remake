@@ -203,8 +203,167 @@ export const WAIT_BUDGET_MS = 30 * 60 * 1000
 /** Minimum spacing between two API calls for the same non-terminal sha, so a
  *  blocked or waiting session re-asks about once a minute, not once a turn. */
 export const RECHECK_MS = 60 * 1000
+/** The durable observer starts quickly, then backs off to a bounded interval.
+ *  The 900-second launcher tick is recovery only; it is never this clock. */
+export const CI_WAIT_BACKOFF_MIN_MS = 15 * 1000
+export const CI_WAIT_BACKOFF_MAX_MS = 90 * 1000
+/** Schema version for the renewable wait stored beside the sha cache. */
+export const CI_WAIT_VERSION = 1
 /** How long an outage-waiver clock may sit unrefreshed before it is forgotten. */
 export const FAMINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Stable identity of one workflow run. A re-run receives a new run id and is
+ * therefore a new wait even when ref, sha and workflow name are unchanged. */
+export function ciWaitIdentity({ target, classification } = {}) {
+  const ref = typeof target?.ref === 'string' ? target.ref : ''
+  const sha = typeof target?.sha === 'string' ? target.sha : ''
+  const workflow = typeof classification?.workflowName === 'string' ? classification.workflowName : ''
+  const run = classification?.runId
+  if (!ref || !sha || !workflow || (typeof run !== 'number' && typeof run !== 'string')) return null
+  return `${ref}:${sha}:${workflow}:${String(run)}`
+}
+
+/**
+ * Create or renew the durable observation of an unfinished workflow run.
+ *
+ * The wake token and first-observation deadline never move on a repeat Stop:
+ * replacing either would orphan the already-running observer. Last observation
+ * and observation count do move, making the wait renewable and visible without
+ * pretending that the interaction budget also renewed. Token creation stays
+ * injected so this module remains deterministic under a fake clock.
+ */
+export function renewCiWait(previous, observation, {
+  now = Date.now(),
+  makeWakeToken = () => '',
+  waitBudgetMs = WAIT_BUDGET_MS,
+} = {}) {
+  try {
+    const identity = ciWaitIdentity(observation)
+    if (!identity || observation?.classification?.state !== 'pending' || !Number.isFinite(Number(now))) return null
+    const same = previous?.v === CI_WAIT_VERSION && previous?.identity === identity && previous?.state === 'pending' && previous?.terminal == null
+    const firstObservationAt = same && Number.isFinite(previous.firstObservationAt)
+      ? previous.firstObservationAt
+      : Number.isFinite(observation?.observedAt)
+        ? observation.observedAt
+        : Number(now)
+    const budgetStartedAt = Number.isFinite(observation?.firstSeenAt) ? observation.firstSeenAt : firstObservationAt
+    const wakeToken = same && typeof previous.wakeToken === 'string' && previous.wakeToken
+      ? previous.wakeToken
+      : String(makeWakeToken() ?? '')
+    if (!wakeToken) return null
+    return {
+      v: CI_WAIT_VERSION,
+      identity,
+      state: 'pending',
+      ref: observation.target.ref,
+      sha: observation.target.sha,
+      workflow: observation.classification.workflowName,
+      runId: observation.classification.runId,
+      firstObservationAt,
+      lastObservationAt: Number(now),
+      deadline: same && Number.isFinite(previous.deadline)
+        ? previous.deadline
+        : budgetStartedAt + waitBudgetMs,
+      wakeToken,
+      observations: same && Number.isSafeInteger(previous.observations) ? previous.observations + 1 : 1,
+      observer: same && previous.observer && typeof previous.observer === 'object'
+        ? { ...previous.observer }
+        : null,
+      terminal: null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Persist one observer result. Pending renews the observation without changing
+ * identity/deadline/token; terminal keeps the full wait visible for the guarded
+ * successor request. Unknown/API-failure results leave the durable truth alone. */
+export function observeCiWait(wait, classification, { now = Date.now() } = {}) {
+  try {
+    if (wait?.v !== CI_WAIT_VERSION || wait?.state !== 'pending' || !wait?.wakeToken) return wait ?? null
+    const state = String(classification?.state ?? '')
+    if (state === 'pending') {
+      return {
+        ...wait,
+        lastObservationAt: Number(now),
+        observations: Number.isSafeInteger(wait.observations) ? wait.observations + 1 : 1,
+      }
+    }
+    if (state !== 'success' && state !== 'failed') return wait
+    const verdict = state === 'success' ? 'green' : 'red'
+    return {
+      ...wait,
+      state,
+      lastObservationAt: Number(now),
+      observations: Number.isSafeInteger(wait.observations) ? wait.observations + 1 : 1,
+      observer: null,
+      terminal: {
+        state,
+        verdict,
+        observedAt: Number(now),
+        conclusion: classification?.conclusion ?? null,
+        url: classification?.url ?? null,
+      },
+    }
+  } catch {
+    return wait ?? null
+  }
+}
+
+/** Reconcile one completed sweep with the durable wait under the state lock.
+ * Terminal written by a concurrent observer outranks a stale pending response;
+ * a genuinely new run identity can still begin the next wait. */
+export function reconcileCiWait(previous, observations = [], options = {}) {
+  try {
+    const list = Array.isArray(observations) ? observations : []
+    const matching = previous?.identity
+      ? list.find((item) => ciWaitIdentity(item) === previous.identity)
+      : null
+    if (matching?.classification?.state === 'pending') {
+      return previous?.state === 'pending'
+        ? renewCiWait(previous, matching, options) ?? previous
+        : previous ?? null
+    }
+    if (matching) return observeCiWait(previous, matching.classification, options)
+    if (previous?.state === 'pending') return previous
+    const pending = list.find((item) => item?.classification?.state === 'pending')
+    return pending ? renewCiWait(null, pending, options) : previous ?? null
+  } catch {
+    return previous ?? null
+  }
+}
+
+/** Archive the terminal wait only for the successor carrying its wake token. */
+export function acknowledgeCiWaitState(state, wakeToken, { now = Date.now() } = {}) {
+  try {
+    const current = state && typeof state === 'object' ? state : {}
+    const wait = current.ciWait
+    if (!wait?.terminal || typeof wakeToken !== 'string' || wait.wakeToken !== wakeToken) {
+      return { state: current, acknowledged: false }
+    }
+    return {
+      acknowledged: true,
+      state: {
+        ...current,
+        lastCiWait: { ...wait, recoveredAt: now },
+        ciWait: null,
+      },
+    }
+  } catch {
+    return { state: state && typeof state === 'object' ? state : {}, acknowledged: false }
+  }
+}
+
+/** Exponential bounded backoff for the detached observer. The deadline is not
+ * consulted: it releases the interaction, never the observation. */
+export function ciWaitBackoffMs(wait, {
+  minMs = CI_WAIT_BACKOFF_MIN_MS,
+  maxMs = CI_WAIT_BACKOFF_MAX_MS,
+} = {}) {
+  const count = Number.isSafeInteger(wait?.observations) && wait.observations > 0 ? wait.observations : 1
+  return Math.min(Math.max(1, Number(maxMs) || CI_WAIT_BACKOFF_MAX_MS), Math.max(1, Number(minMs) || CI_WAIT_BACKOFF_MIN_MS) * (2 ** Math.min(count - 1, 6)))
+}
 
 /** `%gD` under `--date=unix`: `refs/remotes/origin/x@{1786125241}`. */
 const REFLOG_LINE = /^(.+)@\{(\d+)\}\t([0-9a-f]{7,40})\t(.*)$/

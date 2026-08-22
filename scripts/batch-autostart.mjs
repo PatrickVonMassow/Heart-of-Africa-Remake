@@ -54,12 +54,13 @@ import {
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { takeoverDecision } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
-import { assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
+import { assessCiWait, assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import {
   RESUME_PROMPT,
   buildSpawnArgs,
   buildSpawnOptions,
   chatPromptSuffix,
+  ciTerminalPrompt,
   resolveClaudeCli,
   cliSearchSummary,
   repoTrustKeys,
@@ -100,6 +101,7 @@ import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
+import { acknowledgeCiWait } from './ci-status-guard.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -184,12 +186,16 @@ const triggerKind = Object.values(SUCCESSOR_TRIGGERS).includes(requestedKind)
   : SUCCESSOR_TRIGGERS.WATCHDOG
 const requestedGeneration = Number(argValue('--generation'))
 const predecessorToken = argValue('--predecessor-token') || null
+const wakeToken = argValue('--wake-token') || null
+const ciResult = argValue('--ci-result') || null
 const spawnToken = randomUUID()
 const trigger = {
   kind: triggerKind,
   ...(Number.isSafeInteger(requestedGeneration) && requestedGeneration >= 0 ? { generation: requestedGeneration } : {}),
   ...(predecessorToken ? { predecessorToken } : {}),
-  ...(triggerKind === SUCCESSOR_TRIGGERS.CI_TERMINAL ? { terminal: true } : {}),
+  ...(triggerKind === SUCCESSOR_TRIGGERS.CI_TERMINAL
+    ? { terminal: true, ...(wakeToken ? { wakeToken } : {}), ...(ciResult ? { result: { verdict: ciResult } } : {}) }
+    : {}),
 }
 
 /** Start the short-lived watcher which owns no batch state and can only request
@@ -241,9 +247,12 @@ if (argv[0] === '--supervise') {
   try {
     let out = 'ignore'
     try { out = openSync(C('autostart-run.log'), 'a') } catch { /* request still runs */ }
+    const requestArgs = [SELF, '--immediate', '--cause', exitTrigger.kind, '--predecessor-token', token]
+    if (exitTrigger.wakeToken) requestArgs.push('--wake-token', exitTrigger.wakeToken)
+    if (exitTrigger.result?.verdict) requestArgs.push('--ci-result', exitTrigger.result.verdict)
     const request = spawn(
       process.execPath,
-      [SELF, '--immediate', '--cause', exitTrigger.kind, '--predecessor-token', token],
+      requestArgs,
       { cwd: REPO, detached: true, windowsHide: true, stdio: ['ignore', out, out] },
     )
     request.unref()
@@ -806,7 +815,14 @@ try {
 let open
 try { open = openPointCount() } catch { log('skip: cannot read TASKS.md'); bail() }
 if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); await notify('TASKS.md format', 'The batch parser found checkboxes but no points — halting resurrection to be safe.', 'high'); bail() }
-if (open === 0) { log('skip: batch complete (0 open points)'); bail() }
+if (open === 0) {
+  const completedWait = assessCiWait({ wait: readJson(C('ci-status-guard-state.json'))?.ciWait, now, probePid })
+  if (completedWait.terminal) {
+    try { acknowledgeCiWait(completedWait.wakeToken) } catch { /* no successor is needed */ }
+  }
+  log('skip: batch complete (0 open points)')
+  bail()
+}
 
 // --- THE USER TOOK THE BATCH BACK (point 395) ---------------------------------
 // A live claim RESERVES the batch for the window the user is sitting at.
@@ -1032,9 +1048,26 @@ const previousBatchWriters = state.writerObservations && typeof state.writerObse
   ? state.writerObservations
   : {}
 const fenceState = readFence()
+const ciWait = readJson(C('ci-status-guard-state.json'))?.ciWait ?? null
+const ciWaitAssessment = assessCiWait({ wait: ciWait, now, probePid })
+if (!batchParked && ciWaitAssessment.repair) {
+  try {
+    const observer = spawn(process.execPath, [R('./ci-status-guard.mjs'), '--observe', ciWait.wakeToken], {
+      cwd: REPO,
+      detached: true,
+      windowsHide: true,
+      stdio: 'ignore',
+    })
+    observer.unref()
+    log(`restarted missing CI observer for ${ciWait.identity} (pid ${observer.pid})`)
+  } catch (error) {
+    log(`CI observer repair failed for ${ciWait.identity} (${error?.message ?? error})`)
+  }
+}
 let startDecision = successorStartDecision({
   trigger,
   spawnToken,
+  ciWait: ciWaitAssessment,
   paused: batchParked,
   openPoints: open,
   formatAlarm: open === -1,
@@ -1144,6 +1177,7 @@ if (verdict === 'skip-alive') {
       const after = successorStartDecision({
         trigger,
         spawnToken,
+        ciWait: assessCiWait({ wait: readJson(C('ci-status-guard-state.json'))?.ciWait, now, probePid }),
         paused: batchParked,
         openPoints: open,
         formatAlarm: open === -1,
@@ -1569,7 +1603,7 @@ try {
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
   const fableState = currentFableState()
   if (!fableState.ok) throw new Error(fableState.problem)
-  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + suffix, fableState }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix, fableState }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
   // ASYNCHRONOUSLY, so without this handler the one failure class the resolver
   // can still produce would take the tick down as an unhandled event instead of
@@ -1618,6 +1652,13 @@ writeJsonAtomic(
     supervisorStartedAt: supervisor?.startedAt,
   }),
 )
+if (ciWaitAssessment.terminal) {
+  try {
+    acknowledgeCiWait(ciWaitAssessment.wakeToken)
+  } catch (error) {
+    log(`spawned successor but could not acknowledge CI wake ${ciWaitAssessment.wakeToken} (${error?.message ?? error})`)
+  }
+}
 writeJsonAtomic(C('autostart-state.json'), {
   ...state,
   lastHead: curHead,
