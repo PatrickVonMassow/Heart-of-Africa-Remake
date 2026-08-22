@@ -33,19 +33,43 @@ import { isMainModule } from './is-main.mjs'
 /** The two shapes this drill compares, by the only field that differs. */
 export const SHAPES = ['pipes', 'files']
 
+/** The heartbeat period the fixture worker writes at. */
+export const BEAT_MS = 200
+
 /**
  * What a run's evidence MEANS — the pure half, so the reading is testable
  * without spawning anything.
  *
- * `beatsBefore`/`beatsAfter` are heartbeat counts around the kill; `alive` is a
- * post-kill liveness probe of the child pid.
+ * ESCAPED IS A RATE, NOT A SINGLE BEAT. The first version called any increase
+ * "still working", and the cross-vendor reading broke it in one line: a worker
+ * that emits one beat after the kill and then hangs for the rest of the window
+ * passed. A surviving lane has to keep working, so the run must show at least
+ * half the beats the observation window could hold AND a last beat that is
+ * recent at the end of it.
  *
- * ESCAPED requires BOTH: a live process that has stopped working is not a
- * surviving lane, and beats that stopped where the kill fell are the failure
- * this drill exists to catch.
+ * `alive` is a LIVENESS verdict, not a `kill(pid, 0)` result: that call answers
+ * true for a zombie, which is a dead worker with an entry still in the table.
+ * The caller resolves that; see `probeAlive`.
  */
-export function readOutcome({ shape, alive, beatsBefore, beatsAfter, lastLine = '' } = {}) {
-  const progressed = Number(beatsAfter) > Number(beatsBefore)
+export function readOutcome({
+  shape,
+  alive,
+  beatsBefore,
+  beatsAfter,
+  lastBeatAt = 0,
+  observedUntil = 0,
+  observeMs = 0,
+  lastLine = '',
+} = {}) {
+  const gained = Number(beatsAfter) - Number(beatsBefore)
+  const expected = observeMs ? Math.floor(observeMs / BEAT_MS) : 0
+  // Half of what the window could hold: enough slack for a loaded host, far
+  // above the single beat a hung process can still emit.
+  const kept = expected ? gained >= Math.floor(expected / 2) : gained > 0
+  // …and it must still have been beating at the END of the window, so a worker
+  // that ran fast and then stopped cannot pass on volume alone.
+  const fresh = lastBeatAt && observedUntil ? observedUntil - lastBeatAt <= BEAT_MS * 5 : gained > 0
+  const progressed = Boolean(kept && fresh)
   const escaped = Boolean(alive) && progressed
   const why = escaped
     ? 'still running and still working after the kill'
@@ -53,8 +77,10 @@ export function readOutcome({ shape, alive, beatsBefore, beatsAfter, lastLine = 
       ? 'died writing to a pipe whose reader went with the parent'
       : !alive
         ? 'died with the parent, cause not recorded in its own log'
-        : 'still running but no longer working — a survivor that stopped is not a lane'
-  return { shape, escaped, progressed, alive: Boolean(alive), beatsBefore, beatsAfter, why }
+        : !kept
+          ? 'still running but barely working — a lane that emits one beat and hangs is not a lane'
+          : 'still running but stopped beating before the window closed'
+  return { shape, escaped, progressed, alive: Boolean(alive), beatsBefore, beatsAfter, gained, why }
 }
 
 /** The verdict over both shapes: the drill proves its point only if they DIFFER. */
@@ -77,10 +103,18 @@ export function verdict(outcomes) {
   }
 }
 
+// THE WORKER DOES NOT DECIDE ITS OWN FATE. An earlier version installed an
+// uncaughtException handler that exited on EPIPE, so the drill measured a policy
+// it had written itself. The handler now only RECORDS the cause and rethrows, so
+// what ends the process is the runtime's own default — which is what a real
+// authoring tool is subject to, and which we do not control.
 const WORKER = `
 import { openSync, writeSync } from 'node:fs'
 const fd = openSync(process.argv[2], 'a')
-process.on('uncaughtException', (e) => { writeSync(fd, 'died: ' + (e.code ?? e.message) + '\\n'); process.exit(9) })
+process.on('uncaughtException', (e) => {
+  writeSync(fd, 'raised: ' + (e.code ?? e.message) + '\\n')
+  throw e
+})
 setInterval(() => {
   process.stdout.write('work ' + Date.now() + '\\n')
   writeSync(fd, 'beat ' + Date.now() + '\\n')
@@ -97,14 +131,46 @@ const child = spawn(process.execPath, [worker, beat], {
   windowsHide: true,
   stdio: shape === 'files' ? ['ignore', out, out] : ['ignore', 'pipe', 'pipe'],
 })
-if (shape === 'files') child.unref()
-else { child.stdout.on('data', () => {}); child.stderr.on('data', () => {}) }
+// UNREF IN BOTH SHAPES. It was files-only once, and the cross-vendor reading was
+// right that this made the comparison prove nothing: two variables moved at the
+// same time. stdio is now the single difference between the two runs.
+child.unref()
+if (shape !== 'files') { child.stdout.on('data', () => {}); child.stderr.on('data', () => {}) }
 console.log(String(child.pid))
 await new Promise(() => {})
 `
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
-const alive = (pid) => {
+/**
+ * IS THAT PID A LIVE PROCESS, and not a corpse still in the table?
+ *
+ * `kill(pid, 0)` answers true for a ZOMBIE — an exited child whose parent has
+ * not reaped it — which is exactly the state a killed worker can be left in.
+ * On Linux the truth is one field of /proc/<pid>/stat, and the drill reads it.
+ * Where that file does not exist the signal probe is all there is, and the
+ * limitation travels with the answer rather than being silently assumed away.
+ */
+export function probeAlive(pid, { readProc = defaultReadProc, signal = defaultSignal } = {}) {
+  if (!Number.isFinite(pid)) return { alive: false, how: 'no pid' }
+  const stat = readProc(pid)
+  if (stat != null) {
+    // The state letter is the field after the ")" that closes the comm field —
+    // parsed from the right, because a process name may itself contain ")".
+    const state = stat.slice(stat.lastIndexOf(')') + 1).trim().charAt(0)
+    if (state === 'Z') return { alive: false, how: 'zombie in /proc' }
+    return { alive: state !== '', how: `/proc state ${state}` }
+  }
+  return { alive: signal(pid), how: 'signal probe only — a zombie reads as alive here' }
+}
+
+const defaultReadProc = (pid) => {
+  try {
+    return readFileSync(`/proc/${pid}/stat`, 'utf8')
+  } catch {
+    return null
+  }
+}
+const defaultSignal = (pid) => {
   try {
     process.kill(pid, 0)
     return true
@@ -144,11 +210,17 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   }
   await sleep(observeMs)
   const after = lines(beat)
+  const observedUntil = Date.now()
+  const beats = after.filter((l) => l.startsWith('beat '))
+  const lastBeatAt = Number(beats.at(-1)?.slice('beat '.length)) || 0
   const outcome = readOutcome({
     shape,
-    alive: Number.isFinite(pid) && alive(pid),
+    alive: probeAlive(pid).alive,
     beatsBefore,
     beatsAfter: after.length,
+    lastBeatAt,
+    observedUntil,
+    observeMs,
     lastLine: after.at(-1) ?? '',
   })
   if (Number.isFinite(pid)) {

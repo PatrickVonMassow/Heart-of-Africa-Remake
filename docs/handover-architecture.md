@@ -262,16 +262,24 @@ const child = spawn('codex', args, {
 })
 ```
 
-**What actually kills it is the PIPE, and nothing else in that call.** Run
+**The binding that decides it is the stdio shape.** Run
 `node scripts/detached-escape-drill.mjs` and it measures both shapes against the same kill: a
-parent that is its own group leader, a child spawned `detached` either way, the parent's whole
-process group then SIGKILLed as a dying session takes its children, and an observer outside that
-group. Measured 22.08.2026 on the project's Linux container — with
-`stdio: ['ignore', 'pipe', 'pipe']` the child died two beats after the kill, its own log ending
-`died: EPIPE`; with `stdio: ['ignore', fd, fd]` and `.unref()` it was still beating three seconds
-later, reparented to pid 1. Both were `detached`; only the second survived. The drill refuses to
-conclude anything when the two shapes behave alike, which is what it did when an earlier harness
-sent the kill to the wrong process group.
+parent that is its own group leader, a child spawned `detached` and `.unref()`ed EITHER WAY so
+that stdio is the only variable, the parent's whole process group then SIGKILLed as a dying
+session takes its children, and an observer outside that group. Measured 22.08.2026 on the
+project's Linux container — with `stdio: ['ignore', 'pipe', 'pipe']` the child died two beats
+after the kill, its own log ending `raised: EPIPE`; with `stdio: ['ignore', fd, fd]` it was still
+beating at rate three seconds later, reparented to pid 1.
+
+**What that drill does and does not establish.** It is a Node worker that writes to stdout and
+does not handle the error, not `codex` — so it shows that for a child of that shape the pipe
+decides, and it does NOT prove by itself that the historical run died of exactly this. The worker
+deliberately does not choose its own fate: its handler records the cause and rethrows, so what
+ends the process is the runtime's default rather than a policy the drill wrote for itself. Whether
+`codex` would survive a broken stdout is not ours to decide, and that is the argument for removing
+the pipe rather than for handling the error. The drill also refuses to conclude anything when the
+two shapes behave alike, which is what it did when an earlier harness sent the kill to the wrong
+process group.
 
 That correction matters, because the two bindings the first draft blamed are not lifetime
 bindings at all:
@@ -353,30 +361,73 @@ The daemon serializes mutations against itself, so this read-and-decide is one o
 mutation. It records the fence it validated in the journal entry, so a later reader can see which
 regime authorized which write.
 
-**Why that closes the interleaving.** The moment B acquires the lock, the file says B and the
-fence has advanced. A's mutation under the old fence is refused by the very next read — whether or
-not B has ever contacted the daemon, whether or not A knows it lost the lock, and with no window
-in which a cached number lags the file. A mutation that lands in the instant before B's acquire
-landed under a lock A genuinely held, which is the correct outcome and not a race.
+**That does NOT make the window zero, and the mechanism says so.** Serializing the daemon's own
+mutations does not serialize the lock file, which `release` and `acquire` write from other
+processes. A release can land between the daemon's validation and its write, so a mutation can
+still commit microseconds after its author stopped holding the lock. No arrangement of two
+independently written files removes that window; what removes its EFFECT is detection and
+compensation, and the design owes all three parts:
+
+- **Re-validate after the write.** The daemon reads the lock again immediately after the journal
+  write and compares fence and session against what it validated. Unchanged is the ordinary case
+  and the mutation stands.
+- **Compensate when it changed.** A mutation whose lock moved under it is reversed by its own
+  compensation and the reversal is journalled beside it: a started worker is stopped and its
+  branch preserved, a queued job is withdrawn, a lease grant is revoked. Every mutation the daemon
+  accepts must therefore DECLARE its compensation, and a mutation without one cannot be
+  registered — that is a case in step 1's command table, not a convention.
+- **Refuse it downstream.** Every journal entry carries the fence it was written under, and the
+  successor's reconciliation (step 8) quarantines any entry below the fence current when it
+  adopts. So even a compensation that itself fails leaves evidence a successor refuses to act on,
+  rather than state it silently trusts.
+
+The honest claim is therefore narrower than the first draft's: the fence makes a dispossessed
+coordinator's work DETECTABLE AND REVERSIBLE within one mutation, not impossible.
+
+**ONE WRITER OF THE FENCE, AND IT IS ACQUISITION.** The union's step 7 has `--commit` "advance the
+coordinator epoch", which would make the boundary a second, unsynchronised writer of the same
+number and reopen everything above. It does not advance it. `--commit` seals the snapshot and
+RECORDS the fence it ran under; the next acquisition takes the next number, as every acquisition
+already does. Step 7 is corrected to that wording in the same commit that builds it.
+
+**FENCE LOSS IS FAIL-CLOSED.** `.claude/batch-fence.json` is monotonic and never deleted, but
+"never" is an intention, not a guarantee — a wiped `.claude`, a restored backup or a re-seeded
+file can hand out a number that a durable record already carries, and then a stale
+`(sessionId, fence)` pair becomes valid again. So the daemon does not trust the file alone: at
+start, and at every mint, it compares it against the highest fence any record in its own journal
+carries. If the file is missing or lower, the daemon MINTS NOTHING, refuses every mutation and
+raises an alert until the fence is re-seeded strictly above that high-water mark. Refusing is the
+correct behaviour here: a batch that cannot prove who owns it must stop, not guess.
 
 **Split-brain prevention.** Two sessions cannot hold the lock; that is the existing test-and-set,
 and it is the only exclusion primitive in the design. The case the lock alone never covered is a
 session that KEEPS WORKING after losing it, and the fence closes exactly that: its next mutation
 presents a number the file no longer carries.
 
-**Rollback, as an operation rather than a flag read.** A flag consulted per call would let a single
-mutation cross authorization regimes, so it is not consulted per call. The activation flag is read
-ONCE, at daemon start, and sealed into the daemon's identity record; a running daemon never
-changes regime, and every mutation it accepts is authorized under the regime it started in.
-Turning the flag off therefore does nothing to a running daemon. The rollback is
-`node scripts/batch-daemon.mjs stop --drain`, which in order: refuses new mutations, completes the
-at most one mutation in flight (they are serialized, so the wait is bounded by a single
-operation), cancels its workers through the cancellation path that preserves their branches and
-last pushed SHAs, seals the snapshot, and exits. Only then is the flag's new value the whole
-truth. State left behind is INERT rather than migrated: the old path never reads the daemon's
-store, so its epoch-bearing records are retained as audit. Turning the flag back on starts a fresh
-daemon that reads the sealed snapshot through step 1's version rule and quarantines it rather than
-guessing if the schema is not one it knows.
+**Rollback: the REGIME IS THE DAEMON'S EXISTENCE, not a flag anybody reads.** A flag consulted per
+call lets one mutation cross regimes. Sealing the flag into a daemon's identity fixes that for one
+daemon but not for two, and the cross-vendor reading was right that flag-then-drain and
+drain-then-flag both leave a window in which an old-regime daemon and a new-regime caller overlap.
+So the flag does not define the regime at all. It defines one thing only: **whether a daemon may
+be STARTED.** The regime is then a fact about the world rather than a setting —
+
+- **A live daemon means the new path.** There is at most one, because `start` claims the daemon
+  identity record by exclusive create and refuses while a live one exists, by the same pid and
+  pid-start-time test used everywhere else here.
+- **No daemon means today's path,** exactly as it runs now.
+
+There is consequently no combination in which both regimes are live, because "both regimes" would
+require two daemons and the identity record forbids that. Rollback is then a single operation with
+nothing to interleave: `node scripts/batch-daemon.mjs stop --drain` refuses new mutations,
+completes the at most one mutation in flight (they are serialized, so the wait is bounded by a
+single operation), cancels its workers through the cancellation path that preserves their branches
+and last pushed SHAs, seals the snapshot, releases the identity record and exits. The flag is set
+off BEFORE the drain, where its only effect is to stop a new daemon starting behind the one that
+is leaving; it never switches a caller's path, because no caller reads it. State left behind is
+INERT rather than migrated: the old path never reads the daemon's store, so its fence-bearing
+records are retained as audit. Turning the flag back on starts a fresh daemon that reads the
+sealed snapshot through step 1's version rule and quarantines it rather than guessing if the
+schema is not one it knows.
 
 **The two degenerate combinations.** A lock with no daemon is the normal case today and stays
 legal. A daemon with no live lock is an error, and the daemon answers it by refusing every
