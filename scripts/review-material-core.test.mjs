@@ -466,7 +466,7 @@ describe('opaque file bodies are absent by design', () => {
 describe('the pass report keeps the range warning and ledger pointer', () => {
   const pass = { index: 2, total: 3, files: ['b.mjs'] }
   const assertRulings = (text) => {
-    expect(text).toContain('NOT cleared until every pass 1..3 is recorded')
+    expect(text).toMatch(/clears the listed files at [ab]{7}/)
     expect(text).toContain('node scripts/mechanism-review.mjs --list')
   }
 
@@ -832,7 +832,7 @@ describe('the passes a range too large is cut into', () => {
     expect([...covered].sort()).toEqual([...paths].sort())
     expect(covered).toHaveLength(new Set(covered).size)
     for (const pass of plan.passes) expect(pass.total).toBe(plan.passes.length)
-    expect(formatCoveragePlan(plan)).toContain('100% planned coverage (4/4 file contributions); nothing dropped')
+    expect(formatCoveragePlan(plan)).toContain('100% planned coverage (4/4 changed files); nothing dropped')
   })
 
   it('sends a file bigger than a whole round as its DIFF, and says so', () => {
@@ -855,7 +855,7 @@ describe('the passes a range too large is cut into', () => {
     expect(plan.uncoverable.map((u) => u.path)).toEqual(['x.md'])
     expect(plan.passes.flatMap((p) => p.files)).not.toContain('x.md')
     expect(plan.fits).toBe(false)
-    expect(formatCoveragePlan(plan)).toContain('0% planned coverage (0/1 file contributions); x.md')
+    expect(formatCoveragePlan(plan)).toContain('0% planned coverage (0/1 changed files); x.md')
   })
 
   it('costs a deleted file from the patch alone, so it is not lost from the plan', () => {
@@ -951,7 +951,7 @@ describe('the passes a range too large is cut into', () => {
       budget: 20_000,
     })
     expect(plan.fits).toBe(true)
-    expect(formatReviewCoverage(plan)).toContain('Coverage: FULL REVIEW — 100% of file contributions (1/1); 1 block(s).')
+    expect(formatReviewCoverage(plan)).toContain('Coverage: FULL REVIEW — 100% of changed files (1/1); 1 block(s).')
     expect(formatReviewCoverage(plan)).toContain('files split across blocks: none')
     expect(formatReviewCoverage(plan)).toContain('dropped: none')
   })
@@ -971,7 +971,7 @@ describe('the passes a range too large is cut into', () => {
     expect(report).toContain('dropped: none')
   })
 
-  it('reports a mixed-authorship file as split contributions rather than duplicate coverage', () => {
+  it('still exposes an invalid duplicate assignment instead of hiding it', () => {
     const plan = {
       passes: [
         { index: 1, total: 2, files: ['shared.mjs'], patchOnly: [], absentByDesign: [] },
@@ -980,8 +980,8 @@ describe('the passes a range too large is cut into', () => {
       uncoverable: [],
       unreviewable: [],
     }
-    expect(formatCoveragePlan(plan)).toContain('100% planned coverage (2/2 file contributions)')
-    expect(formatReviewCoverage(plan, plan.passes[0])).toContain('50% of file contributions (1/2)')
+    expect(formatCoveragePlan(plan)).toContain('100% planned coverage (2/2 changed files)')
+    expect(formatReviewCoverage(plan, plan.passes[0])).toContain('50% of changed files (1/2)')
     expect(formatReviewCoverage(plan, plan.passes[0])).toContain('files split across blocks: shared.mjs')
   })
 })
@@ -1367,7 +1367,7 @@ describe('the pass flag', () => {
     expect(parsePassSpec(' 1 / 2 ')).toMatchObject({ ok: true, index: 1, total: 2 })
   })
 
-  it('accepts one pass so the recorder can bind it to a bounded contribution scope', () => {
+  it('accepts one pass so the recorder can bind it to a bounded end-state file scope', () => {
     expect(parsePassSpec('1/1')).toEqual({ ok: true, index: 1, total: 1, errors: [] })
   })
 

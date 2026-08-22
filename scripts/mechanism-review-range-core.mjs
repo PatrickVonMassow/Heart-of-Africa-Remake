@@ -1,9 +1,9 @@
-// Pure planning core for authorship-cut mechanism reviews.
+// Pure planning core for end-state mechanism reviews.
 //
-// A range is not one authorship unit.  A file changed only by one vendor can be
-// reviewed as part of that vendor's file group; a file changed by both vendors
-// cannot.  The latter is cut at commit boundaries, so no reviewer is ever asked
-// to judge its own contribution hidden inside somebody else's file group.
+// A convergent review judges the range's artefact at HEAD, not every historical
+// version that led there. Each net-changed path therefore appears once, routed
+// by the author of its final change. Intermediate versions are named as
+// superseded, and paths whose final state equals the base are dropped.
 import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
@@ -179,72 +179,93 @@ export function contributionsIn(commits = []) {
   return out
 }
 
-/**
- * Group outstanding contributions into reviewable authorship slices.
- *
- * `files` groups contain paths whose every contribution came from one vendor.
- * `commit` groups are the commit-level cuts for paths touched by >1 vendor.
- * Every group names the reviewer selected from the supplied candidate order;
- * an empty reviewer is an explicit unreviewable group, never an implicit one.
- */
-export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDIDATES } = {}) {
+/** One reviewable artefact per file in the range's end state. */
+export function endStateArtefacts({ commits = [], endStateFiles = null } = {}) {
   const contributions = contributionsIn(commits)
-  const authorsByCommit = new Map()
-  for (const contribution of contributions) {
-    if (!authorsByCommit.has(contribution.sha)) authorsByCommit.set(contribution.sha, contribution.authors)
-  }
   const byFile = new Map()
   for (const contribution of contributions) {
     if (!byFile.has(contribution.file)) byFile.set(contribution.file, [])
     byFile.get(contribution.file).push(contribution)
   }
 
-  const exclusive = new Map()
-  const mixedFiles = []
+  // null preserves the useful pure-function default: callers without a measured
+  // net diff plan every touched path. An explicit list is authoritative, and an
+  // explicit empty list means the whole range reverted to its base state.
+  const material = endStateFiles === null
+    ? new Set(byFile.keys())
+    : new Set(uniq(endStateFiles))
+  const artefacts = []
+  const dropped = []
+  const superseded = []
   for (const [file, changes] of byFile) {
-    const vendors = new Set(changes.flatMap((c) => c.authors.map(vendorOf)))
-    if (!vendors.size) vendors.add('unknown')
-    if (vendors.size === 1) {
-      const vendor = [...vendors][0]
-      if (!exclusive.has(vendor)) exclusive.set(vendor, [])
-      exclusive.get(vendor).push(...changes)
-    } else {
-      mixedFiles.push(file)
+    if (!material.has(file)) {
+      dropped.push({
+        file,
+        reason: 'end state identical to the base',
+        commits: changes.map((change) => change.sha),
+      })
+      continue
     }
+    const latest = changes.at(-1)
+    const authors = latest.authors
+    const vendors = uniq(authors.map(vendorOf))
+    artefacts.push({
+      file,
+      authors,
+      vendors: vendors.length ? vendors : ['unknown'],
+      commits: changes.map((change) => change.sha),
+      endStateSha: latest.sha,
+      changes,
+    })
+    if (changes.length > 1) {
+      superseded.push({
+        file,
+        reason: 'intermediate states superseded within the range',
+        commits: changes.slice(0, -1).map((change) => change.sha),
+        retainedAt: latest.sha,
+      })
+    }
+  }
+  return { contributions, artefacts, dropped, superseded }
+}
+
+/**
+ * Group end-state files into reviewable authorship slices.
+ *
+ * Files with the same author-vendor set may travel together. A path touched by
+ * both vendors stays ONE end-state file group; it is explicitly unreviewable
+ * when no third vendor is configured, never expanded back into commit slices.
+ */
+export function planAuthorshipGroups({
+  commits = [],
+  endStateFiles = null,
+  candidates = REVIEWER_CANDIDATES,
+} = {}) {
+  const state = endStateArtefacts({ commits, endStateFiles })
+  const byVendors = new Map()
+  for (const artefact of state.artefacts) {
+    const key = artefact.vendors.join('+')
+    if (!byVendors.has(key)) byVendors.set(key, [])
+    byVendors.get(key).push(artefact)
   }
 
   const groups = []
-  for (const [vendor, changes] of exclusive) {
-    const authors = uniq(changes.flatMap((c) => c.authors))
+  for (const [vendor, artefacts] of byVendors) {
+    const authors = uniq(artefacts.flatMap((artefact) => artefact.authors))
     groups.push({
       kind: 'files',
       vendor,
       authors,
-      files: uniq(changes.map((c) => c.file)),
-      commits: uniq(changes.map((c) => c.sha)),
-      ...reviewerFields(authors, candidates),
-    })
-  }
-
-  // One mixed-path slice per commit. Files touched together by that commit may
-  // stay together: they have the same authors and therefore the same reviewer.
-  for (const commit of commits ?? []) {
-    const files = uniq(commit?.files).filter((file) => mixedFiles.includes(file))
-    if (!files.length) continue
-    const authors = authorsByCommit.get(String(commit.sha)) ?? []
-    groups.push({
-      kind: 'commit',
-      vendor: uniq(authors.map(vendorOf)).join('+') || 'unknown',
-      authors,
-      files,
-      commits: [String(commit.sha)],
+      files: artefacts.map((artefact) => artefact.file),
+      commits: uniq(artefacts.flatMap((artefact) => artefact.commits)),
+      endStateShas: Object.fromEntries(artefacts.map((artefact) => [artefact.file, artefact.endStateSha])),
       ...reviewerFields(authors, candidates),
     })
   }
 
   return {
-    contributions,
-    mixedFiles,
+    ...state,
+    mixedFiles: state.artefacts.filter((artefact) => artefact.vendors.length > 1).map((artefact) => artefact.file),
     groups,
     unreviewable: groups.filter((group) => !group.reviewer),
   }
@@ -310,27 +331,55 @@ export function newestReading(readings = []) {
 const clockOf = (row) => (typeof row?.at === 'number' && Number.isFinite(row.at) ? row.at : null)
 
 /**
- * Remove only contribution pairs actually read by a valid authorship-scoped
- * pass.  The caller supplies `recordUsable`, because ledger-era validation is
- * owned by mechanism-review-core; this function owns coverage, not trust.
+ * Remove only end-state files actually read by a valid file-scoped pass.
+ *
+ * A record covers a file when it names that file and contains the file's latest
+ * change. That measured ancestry fact also rescues historical scoped rows: the
+ * reviewer necessarily read the file at or after its last change, regardless of
+ * which pass-record format wrote the row. A later commit touching another path
+ * leaves that fact true; a later change to this path moves the latest-change
+ * boundary beyond the record and makes only this file owed again.
  */
-export function outstandingContributions({ commits = [], records = [], recordUsable = () => true } = {}) {
-  const contributions = contributionsIn(commits)
-  // THE LATEST READING OF A CONTRIBUTION RULES IT, and only it. A pair read
-  // twice — cleared once, refused later — is still refused: the gate blocks on
-  // the newest verdict, so a plan that counted the older clearance would hide
-  // the very file the gate is blocking on and leave the block unresolvable.
+export function outstandingFiles({
+  commits = [],
+  endStateFiles = null,
+  records = [],
+  recordUsable = () => true,
+} = {}) {
+  const state = endStateArtefacts({ commits, endStateFiles })
   const latest = new Map()
+  const invalidatedCoverage = []
   for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
-    const commitsRead = Array.isArray(record?.pass?.commits) ? record.pass.commits.map(String) : []
-    if (!files.length || !commitsRead.length) continue
-    for (const contribution of contributions) {
-      if (!recordUsable(record, contribution.commit)) continue
-      if (!files.includes(contribution.file) || !commitsRead.includes(contribution.sha)) continue
-      if (!contained(record, contribution.sha)) continue
-      if (contribution.authors.some((author) => sameModel(record.model, author))) continue
-      const key = keyFor(contribution.sha, contribution.file)
+    if (!files.length) continue
+    const historicalCommits = Array.isArray(record?.pass?.commits)
+      ? new Set(record.pass.commits.map(String))
+      : null
+    const invalidatedFiles = []
+    for (const artefact of state.artefacts) {
+      if (!files.includes(artefact.file)) continue
+      const latestChange = artefact.changes.at(-1)
+      const reviewerVendor = vendorOf(record.model)
+      const coversEndState =
+        recordUsable(record, latestChange.commit) &&
+        contained(record, artefact.endStateSha) &&
+        reviewerVendor !== 'unknown' &&
+        !artefact.vendors.includes('unknown') &&
+        !artefact.vendors.includes(reviewerVendor)
+      if (!coversEndState) {
+        // Count only coverage the replaced contribution model really accepted.
+        // A malformed row, an unrelated file name or a self-review did not grow
+        // the debt when the cut changed, so calling it "invalidated" would give
+        // the format migration blame for debt that already existed.
+        const coveredHistorically = historicalCommits && artefact.changes.some((change) =>
+          historicalCommits.has(String(change.sha)) &&
+          contained(record, change.sha) &&
+          recordUsable(record, change.commit) &&
+          !change.authors.some((author) => sameModel(record.model, author)))
+        if (coveredHistorically) invalidatedFiles.push(artefact.file)
+        continue
+      }
+      const key = artefact.file
       // A CLOCK IS A NUMBER OR IT IS NOTHING. `Number(record.at ?? 0)` read a
       // numeric STRING as a time and an absent stamp as the epoch, so a row
       // whose clock nobody wrote still outranked one that had it; and `NaN`
@@ -340,32 +389,72 @@ export function outstandingContributions({ commits = [], records = [], recordUsa
       if (!latest.has(key)) latest.set(key, [])
       // Pushed in ledger order: the position in this list IS the line, so no
       // reading carries a line of its own that could go missing.
-      latest.get(key).push({ record, at, contribution })
+      latest.get(key).push({ record, at, artefact })
+    }
+    if (invalidatedFiles.length) {
+      invalidatedCoverage.push({
+        sha: String(record?.sha ?? ''),
+        index: record?.pass?.index,
+        total: record?.pass?.total,
+        files: uniq(invalidatedFiles),
+      })
     }
   }
   const covered = new Set()
   const refusals = []
   for (const [key, readings] of latest) {
     const read = newestReading(readings)
-    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ contribution: read.contribution, record: read.record })
+    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ artefact: read.artefact, record: read.record })
     else covered.add(key)
   }
+  const outstanding = state.artefacts.filter((artefact) => !covered.has(artefact.file))
+  const owedFiles = new Set(outstanding.map((artefact) => artefact.file))
+  const invalidatedOutstandingCoverage = invalidatedCoverage
+    .map((record) => ({ ...record, files: record.files.filter((file) => owedFiles.has(file)) }))
+    .filter((record) => record.files.length)
   return {
-    outstanding: contributions.filter((c) => !covered.has(keyFor(c.sha, c.file))),
-    covered: contributions.filter((c) => covered.has(keyFor(c.sha, c.file))),
+    outstanding,
+    covered: state.artefacts.filter((artefact) => covered.has(artefact.file)),
     refusals,
+    dropped: state.dropped,
+    superseded: state.superseded,
+    invalidatedCoverage: invalidatedOutstandingCoverage,
   }
 }
 
-/** Rebuild commit input from an outstanding contribution list. */
-export function commitsForContributions(contributions = []) {
+/** The explicit consequence of historical scoped readings that predate a
+ *  file's current end state. The caller owns path quoting for its output lane. */
+export function formatInvalidatedCoverage(items = [], { quoteFile = String } = {}) {
+  const records = (items ?? []).filter((item) => Array.isArray(item?.files) && item.files.length)
+  if (!records.length) return ''
+  const files = uniq(records.flatMap((item) => item.files))
+  const plural = (count, one, many = `${one}s`) => count === 1 ? one : many
+  const lines = [
+    `  INVALIDATED HISTORICAL COVERAGE: ${records.length} scoped pass ${plural(records.length, 'record')} ` +
+      `${plural(records.length, 'contains a reading that', 'contain readings that')} no longer ` +
+      `${plural(files.length, 'clears', 'clear')} ${files.length} end-state ${plural(files.length, 'file')}; ` +
+      'those files are owed again:',
+  ]
+  for (const record of records) {
+    const pass = Number.isInteger(record.index) && Number.isInteger(record.total)
+      ? ` pass ${record.index}/${record.total}`
+      : ''
+    lines.push(`    ${String(record.sha).slice(0, 7) || '<unknown>'}${pass}: ${record.files.map(quoteFile).join(', ')}`)
+  }
+  return lines.join('\n')
+}
+
+/** Rebuild commit input from an outstanding end-state file list. */
+export function commitsForFiles(artefacts = []) {
   const bySha = new Map()
-  for (const contribution of contributions ?? []) {
-    if (!bySha.has(contribution.sha)) {
-      bySha.set(contribution.sha, { ...contribution.commit, sha: contribution.sha, files: [] })
+  for (const artefact of artefacts ?? []) {
+    for (const contribution of artefact.changes ?? []) {
+      if (!bySha.has(contribution.sha)) {
+        bySha.set(contribution.sha, { ...contribution.commit, sha: contribution.sha, files: [] })
+      }
+      const commit = bySha.get(contribution.sha)
+      if (!commit.files.includes(artefact.file)) commit.files.push(artefact.file)
     }
-    const commit = bySha.get(contribution.sha)
-    if (!commit.files.includes(contribution.file)) commit.files.push(contribution.file)
   }
   return [...bySha.values()]
 }

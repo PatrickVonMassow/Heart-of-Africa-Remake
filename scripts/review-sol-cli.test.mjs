@@ -96,6 +96,9 @@ let oddSha = ''
 let gitlinkSha = ''
 let bulkSolSha = ''
 let edgeSha = ''
+let manyTouchesSha = ''
+let historicalReviewSha = ''
+let revertedSha = ''
 /** A name git prints QUOTED, because it is not plain ASCII. */
 const ODD_NAME = 'ümlaut.txt'
 /** A name git does NOT quote and a trim would corrupt (POSIX only — Windows
@@ -391,12 +394,48 @@ beforeAll(() => {
   git('commit', '--no-verify', '-q', '-m', 'Add two more files no round can hold\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>')
   bulkSolSha = git('rev-parse', 'HEAD')
 
+  // The measured shape behind point 737: history is long, but the end-state
+  // artefact is one small file and therefore one review round.
+  git('checkout', '-q', '-b', 'many-touches', 'main')
+  for (let index = 1; index <= 8; index++) {
+    const touchSha = commit(
+      'shared.txt',
+      `current end state after touch ${index}\n`,
+      `Touch the shared file ${index}`,
+      'Opus 5',
+    )
+    if (index === 1) historicalReviewSha = touchSha
+    manyTouchesSha = touchSha
+  }
+
+  // A path changed and then restored has no net artefact to review.
+  git('checkout', '-q', '-b', 'reverted', 'main')
+  commit('world.txt', 'temporary world\n', 'Temporarily revise the world', 'Opus 5')
+  revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world', 'Opus 5')
+
   // A history sharing no ancestor with the rest: the third form of "not a proper
   // ancestor", which merge-base answers with nothing at all.
   git('checkout', '-q', '--orphan', 'unrelated')
   git('rm', '-rqf', '--ignore-unmatch', '.')
   orphanSha = commit('orphan.txt', 'no common ancestor with anything\n', 'Start an unrelated history', 'Opus 5')
   git('checkout', '-q', '-f', 'feat')
+
+  // A genuine contribution-era scoped pass: it read shared.txt after touch 1,
+  // then seven later commits changed that file. The new plan must say why this
+  // once-usable reading no longer reduces the current file debt.
+  mkdirSync(join(repo, '.claude'), { recursive: true })
+  writeFileSync(
+    join(repo, '.claude', 'mechanism-reviews.jsonl'),
+    `${JSON.stringify({
+      sha: historicalReviewSha,
+      model: 'GPT-5.6 Sol',
+      verdict: 'merge',
+      evidence: 'read the complete shared file after its first change',
+      mode: 'review',
+      pass: { index: 1, total: 1, files: ['shared.txt'], commits: [historicalReviewSha] },
+      at: 1_787_000_000_000,
+    })}\n`,
+  )
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -424,6 +463,30 @@ describe('the fixture is hermetic', () => {
 })
 
 describe('a review that runs', () => {
+  it('reviews one current file once after eight commits touched it', () => {
+    provenId()
+    const r = run(['--sha', manyTouchesSha, '--brief', 'judge the current shared file'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('It fits in one round.')
+    expect(r.stderr).toContain('DROPPED INTERMEDIATE STATES: shared.txt — 7 states were superseded')
+    expect(r.stderr).toContain(
+      'INVALIDATED HISTORICAL COVERAGE: 1 scoped pass record contains a reading that no longer clears 1 end-state file',
+    )
+    expect(r.stderr).toContain(`${historicalReviewSha.slice(0, 7)} pass 1/1: shared.txt`)
+    expect(r.stderr.match(/^  pass 1\/1 →/gm)).toHaveLength(1)
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('current end state after touch 8')
+  })
+
+  it('drops a file restored to its base state and names the reason', () => {
+    writeFileSync(join(dir, 'calls.log'), '')
+    const r = run(['--sha', revertedSha, '--brief', 'judge the net range'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).toContain('DROPPED AS NON-MATERIAL: world.txt — end state identical to the base')
+    expect(r.stderr).toContain('no review record is needed')
+    expect(r.stdout).not.toContain('mechanism-review.mjs --record')
+    expect(calls()).toEqual([])
+  })
+
   it('prints the reviewer, its answer and a complete record command, and exits 0', () => {
     provenId()
     const r = run(['--sha', headSha, '--point', '624', '--brief', 'judge the fallback path'])
@@ -669,8 +732,8 @@ describe('the guards around the run', () => {
     const printed = recordCommandIn(r.stdout)
     expect(printed).toContain('--pass 1/1')
     expect(printed).toContain('--pass-files "added.txt"')
-    expect(printed).toContain(`--pass-commits "${headSha}"`)
-    expect(r.stdout).toContain('SCOPED record clears only the listed commit/file contributions')
+    expect(printed).not.toContain('--pass-commits')
+    expect(r.stdout).toContain(`clears the listed files at ${headSha.slice(0, 7)}`)
   })
 
   it('refuses an explicit --since that is not a proper ancestor, in each of its three forms', () => {
@@ -883,7 +946,7 @@ describe('a narrowed --since on the early routes', () => {
     const printed = recordCommandIn(r.stdout)
     expect(printed).toContain('--pass 1/1')
     expect(printed).toContain('--pass-files "added.txt"')
-    expect(printed).toContain(`--pass-commits "${headSha}"`)
+    expect(printed).not.toContain('--pass-commits')
     expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim()).toBe('')
     rmSync(shareFile, { force: true })
   })
@@ -895,7 +958,7 @@ describe('a narrowed --since on the early routes', () => {
     const printed = recordCommandIn(r.stdout)
     expect(printed).toContain('--pass 1/1')
     expect(printed).toContain('--pass-files "sol2.txt"')
-    expect(printed).toContain(`--pass-commits "${solHeadSha}"`)
+    expect(printed).not.toContain('--pass-commits')
     expect(calls()).toEqual([])
   })
 
@@ -933,7 +996,7 @@ describe('a range too large for one round', () => {
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'])
     expect(r.status, r.stderr).toBe(4)
     expect(r.stderr).toContain('material budget is 200000 characters')
-    expect(r.stderr).toContain('PASSES over the FILE SET')
+    expect(r.stderr).toContain('PASSES over the END-STATE FILE SET')
     expect(r.stderr).toContain('bulk-a.txt')
     expect(r.stderr).toContain('bulk-b.txt')
     expect(r.stderr).toContain('--pass 1')
@@ -951,8 +1014,8 @@ describe('a range too large for one round', () => {
     const printed = recordCommandIn(r.stdout)
     expect(printed).toMatch(/--pass 1\/2/)
     expect(printed).toMatch(/--pass-files "bulk-[ab]\.txt"/)
-    expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
-    expect(r.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of file contributions (1/2); block 1/2.')
+    expect(r.stdout).toContain('clears the listed files at')
+    expect(r.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2); block 1/2.')
     expect(r.stdout).toContain('assigned to other blocks, not dropped:')
     expect(r.stdout).toContain('dropped: none')
     // What actually went to the reviewer stayed inside the budget.
@@ -1062,7 +1125,7 @@ describe('a range too large for one round', () => {
     // The hand-off template carries the not-cleared warning and the ledger
     // pointer too (round-5 pass 6) — a fallback pass template without it read
     // like a cleared range.
-    expect(r.stdout).toContain('NOT cleared until every pass 1..2 is recorded')
+    expect(r.stdout).toContain('clears the listed files at')
     expect(r.stdout).toContain('mechanism-review.mjs --list')
     expect(calls()).toEqual([])
     rmSync(shareFile, { force: true })
@@ -1112,7 +1175,7 @@ describe('a range too large for one round', () => {
     expect(r.status, r.stderr).toBe(0)
     expect(r.stderr).toContain('It fits in one round.')
     expect(r.stderr).toContain('Coverage plan: 100% planned coverage')
-    expect(r.stdout).toContain('Coverage: FULL REVIEW — 100% of file contributions')
+    expect(r.stdout).toContain('Coverage: FULL REVIEW — 100% of changed files')
   })
 
   it('retires carry planning because recorded contribution coverage now persists directly', () => {
@@ -1124,14 +1187,14 @@ describe('a range too large for one round', () => {
     ])
     expect(r.status).toBe(2)
     expect(r.stderr).toContain('--carry-from is obsolete')
-    expect(r.stderr).toContain('commit/file contributions')
+    expect(r.stderr).toContain('end-state files')
     expect(calls()).toEqual([])
   })
 
-  it('states that answer commits still require the confirming clean pass', () => {
+  it('states the file-scoped convergence cost for answer commits', () => {
     const r = run([])
     expect(r.status).toBe(2)
-    expect(r.stderr).toContain('answer a recorded finding is itself a new contribution by design')
-    expect(r.stderr).toContain('confirming clean pass reviews it too')
+    expect(r.stderr).toContain('commits touching')
+    expect(r.stderr).toContain('confirming clean pass only for')
   })
 })

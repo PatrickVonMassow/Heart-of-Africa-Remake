@@ -50,7 +50,7 @@ describe('the flag surface', () => {
     const flags = [
       '--record', '--model', '--verdict', '--evidence', '--point', '--mode', '--framing',
       '--author-framing', '--spec-examination',
-      '--pass', '--pass-files', '--pass-commits', '--carried-from', '--list',
+      '--pass', '--pass-files', '--carried-from', '--list',
     ]
     for (const flag of flags) {
       expect(KNOWN_FLAGS.has(flag), `${flag} must be accepted`).toBe(true)
@@ -68,9 +68,9 @@ describe('the flag surface', () => {
     expect(text).toContain('criticality-review-guard.mjs --status')
   })
 
-  it('states the accepted clean-pass convergence cost', () => {
-    expect(usage()).toContain('answer a finding is still a NEW contribution by design')
-    expect(usage()).toContain('confirming clean pass')
+  it('states the per-file convergence boundary', () => {
+    expect(usage()).toContain('later commit to')
+    expect(usage()).toContain('commit touching only other')
   })
 })
 
@@ -238,101 +238,46 @@ describe('the mode round-trips into the ledger', () => {
     }
   })
 
-  it('round-trips an authorship pass contribution scope', () => {
-    const a = 'a'.repeat(40)
-    const b = 'b'.repeat(40)
+  it('round-trips an end-state file pass', () => {
+    const head = 'b'.repeat(40)
     const built = build({
       mode: 'review',
       pass: '1/2',
       passFiles: 'scripts/shared-guard.mjs',
-      passCommits: `${a},${b}`,
+      sha: head,
     })
     expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
     expect(built.record.pass).toEqual({
       index: 1,
       total: 2,
       files: ['scripts/shared-guard.mjs'],
-      commits: [a, b],
+      endState: head,
     })
     expect(built.record.partialReview).toBe(true)
   })
 
-  it('round-trips a bounded one-pass contribution scope', () => {
-    const boundary = 'b'.repeat(40)
+  it('round-trips a bounded one-pass file scope at the reviewed sha', () => {
+    const head = 'b'.repeat(40)
     const built = build({
       mode: 'review',
       pass: '1/1',
       passFiles: 'scripts/scoped-guard.mjs',
-      passCommits: boundary,
+      sha: head,
     })
     expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
     expect(built.record.pass).toEqual({
       index: 1,
       total: 1,
       files: ['scripts/scoped-guard.mjs'],
-      commits: [boundary],
+      endState: head,
     })
     expect(built.record.partialReview).toBe(true)
   })
 
-  it('refuses a one-pass marker without the contribution boundary that scopes it', () => {
-    const built = build({ mode: 'review', pass: '1/1', passFiles: 'scripts/scoped-guard.mjs' })
-    expect(built.ok).toBe(false)
-    expect(built.errors.join('\n')).toMatch(/needs --pass-commits/)
-  })
-
-  it('stores a contribution boundary WHOLE, so the gate can match it at all', () => {
-    const full = 'a'.repeat(40)
-    const built = build({
-      mode: 'review',
-      pass: '1/2',
-      passFiles: 'scripts/shared-guard.mjs',
-      // The flag accepts an abbreviation; the gate compares against full shas.
-      passCommits: full.slice(0, 8),
-      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
-    })
-    expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
-    expect(built.record.pass.commits).toEqual([full])
-  })
-
-  it('refuses a contribution boundary this repository cannot resolve', () => {
-    const built = build({
-      mode: 'review',
-      pass: '1/2',
-      passFiles: 'scripts/shared-guard.mjs',
-      passCommits: 'deadbeef',
-      resolve: (ref) => {
-        if (String(ref) === 'deadbeef') throw new Error('no such commit')
-        return stub({ sha: String(ref) })
-      },
-    })
-    expect(built.ok).toBe(false)
-    expect(built.errors.join('\n')).toContain('--pass-commits deadbeef')
-  })
-
-  it('refuses two boundaries that name the same commit once resolved', () => {
-    const full = 'a'.repeat(40)
-    const built = build({
-      mode: 'review',
-      pass: '1/2',
-      passFiles: 'scripts/shared-guard.mjs',
-      passCommits: `${full.slice(0, 8)},${full}`,
-      resolve: (ref) => ({ ...stub(), sha: String(ref).length === 40 ? String(ref) : full }),
-    })
-    expect(built.ok).toBe(false)
-    expect(built.errors.join('\n')).toContain('resolve to the same commit')
-  })
-
-  it('refuses to carry an authorship scope into a different plan', () => {
-    const built = build({
-      mode: '',
-      carriedFrom: 'a'.repeat(40),
-      pass: '1/2',
-      passFiles: 'scripts/shared-guard.mjs',
-      passCommits: 'b'.repeat(40),
-    })
-    expect(built.ok).toBe(false)
-    expect(built.errors.join('\n')).toContain('cannot be carried')
+  it('refuses the removed contribution-boundary flag at the command surface', () => {
+    const result = run('--record', 'b'.repeat(40), '--pass-commits', 'a'.repeat(40))
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('unknown flag --pass-commits')
   })
 
   it('carries the same-model fallback framing through with a blind-parallel mode', () => {
@@ -660,6 +605,10 @@ describe('the mode round-trips into the ledger', () => {
       pass: { index: 1, total: 2, files: [unchangedFile] },
       at: 1_787_000_000_000,
     }
+    const contributionSource = {
+      ...source,
+      pass: { ...source.pass, commits: [parent] },
+    }
     const carriedRow = (over = {}) => ({
       sha: head,
       model: source.model,
@@ -683,6 +632,8 @@ describe('the mode round-trips into the ledger', () => {
       carriedRow({ evidence: 'CARRIED from abcdef0 (blobs verified identical): something nobody wrote' }),
       // No source row in the ledger at all: must not stamp.
       carriedRow({ model: 'Fable 5' }),
+      // The superseded contribution model cannot be promoted through carry.
+      carriedRow(),
     ]
     verifyCarried(rows, [source])
     expect(rows[0].carriedVerified, `${unchangedFile} unchanged + source matches`).toBe(true)
@@ -695,6 +646,8 @@ describe('the mode round-trips into the ledger', () => {
     expect(rows[6].carriedVerified, 'invented verdict').toBe(false)
     expect(rows[7].carriedVerified, 'fabricated evidence').toBe(false)
     expect(rows[8].carriedVerified, 'no matching source').toBe(false)
+    verifyCarried([rows[9]], [contributionSource])
+    expect(rows[9].carriedVerified, 'historical contribution source').toBe(false)
   })
 
   it('refuses a non-hex --record sha by SHAPE, before git or any shell sees it (landing-round pass 4)', () => {
