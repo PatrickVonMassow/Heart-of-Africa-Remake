@@ -479,6 +479,132 @@ put it is the mistake this line exists to stop.
 
   Bundle: Chat & Tafel.
 
+- [ ] 515. The parallel-session detector counts a placeholder owner as a second
+  SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
+  alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
+  FALSE. `.claude/batch-lock.json` carried the placeholder `x` as its `sessionId`
+  (still visible as `sessionIdBefore`, restamped 12:07). The detector compares the
+  lock's owner id against the observed session ids; a placeholder matches no real
+  id, so EVERY live session read as an additional one. The log proves it twice
+  over: `08:06 owner=x plus 45289138-…`, `11:06 owner=x plus 52543006-…` — two
+  different "second" ids against the same placeholder owner, and on both occasions
+  exactly ONE claude process was running (pid 1470, the very pid the lock names).
+  The cost is not the alert but the escalation: a self-pause that only a human can
+  lift, on evidence that was never there.
+  FINAL STATE:
+  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
+     never as a foreign owner. The detector may then report "owner unknown"; it may
+     not report parallel sessions.
+  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
+     the ids say — the pid is the stronger evidence and settles it first.
+  3. Both cases are covered by Vitest in the pure decision core.
+  4. The escalation chain itself stays untouched: five unanswered alerts still
+     pause the batch. The point removes the false alert, never the response to a
+     real one.
+  5. A self-pause no longer writes a card into "Von dir zu klären" (user
+     05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
+     That section holds GENUINE user decisions only; diagnosing a pause and
+     lifting it is the session's own work. The pause is instead reported where the
+     session's own state is reported — the now-card — so the reader sees it
+     without being asked to act on it.
+  WHERE THE PLACEHOLDER COMES FROM, MEASURED 05.08.2026 21:08 — the point above
+  treats it as weather; it is written by our own code. `ownsLock(sessionId)`
+  (`scripts/batch-singleton.mjs`) RESTAMPS the lock's `sessionId` to whatever id
+  the CALLER passed as soon as process ancestry proves the lock belongs to this
+  process tree. Any caller reaching it with a throwaway id — `--session x` through
+  `resolveSessionId` — therefore renames a LIVE owner's lock to that id, which is
+  exactly the `sessionIdBefore: <real id>` / `sessionId: "x"` pair both incidents
+  left behind. `isProbeSessionId` is the only filter and does not recognise a bare
+  placeholder.
+  WHAT IT COST TODAY, and why item 2 above is not enough on its own: the renamed
+  owner could no longer prove itself either, because `ownsLock` with the REAL id
+  then answered `pid-reused` — point 504's drifting start-time compare, on the same
+  lock, in the same minute. The live session was fenced out of its OWN batch (no
+  merge, no push, no tick) with two delegated agents still building, and the claim
+  path could not resolve it: the owner that must honour a claim at its next clean
+  moment IS that fenced session, so the handover deadlocks. Ownership was restored
+  by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
+  does not offer.
+  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
+     an id of the shape a real session carries; a placeholder, a probe id or an
+     empty string leaves the recorded owner untouched and answers the ownership
+     question without writing. Renaming a lock is a side effect of asking a
+     question, so the question must be safe to ask.
+  7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
+     `pid` is this very process (argv and session match) but the id no longer does,
+     one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
+     as a torn state and names it in its verdict, rather than reporting "consistent"
+     as it did today. Hand-editing the lock is then never the only path.
+  8. A SESSION THE SINGLETON ITSELF STOOD DOWN IS NOT A PARALLEL BATCH SESSION
+     (measured 18.08.2026 from `.claude/autostart.log`). At 09:18Z and 12:18Z the
+     detector reported "PARALLEL SESSIONS DETECTED: owner=d559dcb0 plus 7fe2e051"
+     — 7fe2e051 being the user's ATTENDED chat window, which the singleton had put
+     on STAND DOWN and which ran read-only measurements all day: no merge, no
+     tick, no batch action of any kind. Here the COUNT was right and the JUDGEMENT
+     wrong: the detector cannot see that it silenced one of the two itself. Five
+     unanswered alerts then paused the batch at 14:18; the restart clock lifted it
+     at 14:48. So a session carrying the stand-down note and no mutating action
+     since counts as attended-observing — no alert, no escalation. The alarm for a
+     genuinely second WORKING session is untouched. This branch is separate from
+     items 1/2 above: those answer the placeholder owner, this one answers a real
+     second process.
+  9. A PAUSED BATCH STILL DELIVERS THE USER'S WORDS (measured 18.08.2026 15:0x,
+     and it is the same incident's second half). The instruction "714: authoring
+     lane Sol from now on" was sent at 14:30:45 and lay in the spool at 14:30:46 —
+     the inbound leg is a live subscription and was one second fast — yet it
+     reached the owner only around 14:49. Cause, at two places:
+     `scripts/lock-heartbeat-hook.mjs` calls `deliverPendingMessages({ ownsBatch,
+     paused })`, which returns '' while the batch is paused, and the launcher
+     additionally stopped the watcher at 14:33 ("chat watcher: stopped (paused)").
+     That is the wrong direction: a paused batch is exactly when an instruction
+     matters most — lift the pause, do X first, stop Y — and the pause card asks
+     the user to act in the same breath. FINAL STATE: the per-tool-call delivery
+     keeps running while the batch is paused (the suppression was token thrift for
+     an idle session, not correctness), and the watcher is NOT stopped by a pause —
+     or, if it must stop for resource reasons, the launcher poll replaces it for
+     the pause's duration and the pause card names the delay that then applies.
+  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
+  parallel-session alert in the pure core's tests, and the same setup replayed
+  against the real detector stays silent; a Vitest case pins that the pause path
+  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
+  the lock's recorded owner byte-identical while a real id still restamps; the
+  doctor reports the pid-mine/id-foreign lock as torn and repairs it; a stood-down
+  session with no mutating action since the note raises no parallel-session alert
+  while a second WORKING session still does; and the pure core answers "paused
+  plus a waiting message" with delivery rather than silence.
+
+- [ ] 749. The machine files its own status reports as user decisions, and the user keeps
+  having to clear them out (user 19.08.2026, 18:59, on the card "Batch pausiert: Alarm blieb
+  unbeantwortet": "Ich habe schon wieder so eine pathologische Karte unter 'Von dir zu klären'
+  … Das ist nicht meine Zuständigkeit. Da kann ich nichts machen. Löse das selbst."). The rule
+  is settled and enforced elsewhere: "Von dir zu klären" holds ONLY genuine user decisions.
+  Two scripts break it from the machine side — `scripts/alert-escalation.mjs:166` posts
+  "Batch pausiert: Alarm blieb unbeantwortet" and `scripts/child-retry.mjs:284` posts "Batch
+  pausiert: Umgebungsausfall", both through `board.mjs vdzk-add`. Neither asks the user to
+  DECIDE anything: the first reports that an ntfy alert went unanswered and the batch paused
+  itself, the second that the environment failed. Both close with an instruction the user
+  cannot carry out ("prüfen, was die Meldung ausgelöst hat"), and both resolve by themselves
+  when the restart clock expires — so the card outlives the condition it describes.
+  FINAL STATE:
+  - Neither script writes to the decision section. A paused batch and an environment outage
+    are STATE, and they are shown where the board already shows state; the ntfy alert stays
+    as it is, since that is the channel built for reaching the user.
+  - A decision card is admissible from an automated path only when it names a choice the user
+    alone can make, and it names the options. Where a script has no such choice to offer, the
+    board API refuses the card rather than accepting it — the same shape as the existing card
+    gates, so the rule is enforced instead of remembered.
+  - A card whose condition has resolved does not have to be removed by hand: a status the
+    board derives is re-derived, and the pause state disappears from the board when the pause
+    file does.
+  VERIFIABLE: Vitest over the refusal — an automated card without a named choice is rejected
+  and the message names the state section as the right place; a genuine decision card with
+  options is accepted; and a case over each of the two call sites asserting they no longer
+  reach `vdzk-add`. Plus a case that the board's rendered pause state disappears once
+  `.claude/batch-paused` is gone.
+  Criticality: medium — it touches the alert path, which must keep reaching the user; the
+  change removes a board card, never a notification.
+  Bundle: Chat & Tafel.
+
 - [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
   full proof — both backends where they can differ, LARGE where the change warrants it —
@@ -2203,38 +2329,6 @@ put it is the mistake this line exists to stop.
   the one the rollback covers.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 749. The machine files its own status reports as user decisions, and the user keeps
-  having to clear them out (user 19.08.2026, 18:59, on the card "Batch pausiert: Alarm blieb
-  unbeantwortet": "Ich habe schon wieder so eine pathologische Karte unter 'Von dir zu klären'
-  … Das ist nicht meine Zuständigkeit. Da kann ich nichts machen. Löse das selbst."). The rule
-  is settled and enforced elsewhere: "Von dir zu klären" holds ONLY genuine user decisions.
-  Two scripts break it from the machine side — `scripts/alert-escalation.mjs:166` posts
-  "Batch pausiert: Alarm blieb unbeantwortet" and `scripts/child-retry.mjs:284` posts "Batch
-  pausiert: Umgebungsausfall", both through `board.mjs vdzk-add`. Neither asks the user to
-  DECIDE anything: the first reports that an ntfy alert went unanswered and the batch paused
-  itself, the second that the environment failed. Both close with an instruction the user
-  cannot carry out ("prüfen, was die Meldung ausgelöst hat"), and both resolve by themselves
-  when the restart clock expires — so the card outlives the condition it describes.
-  FINAL STATE:
-  - Neither script writes to the decision section. A paused batch and an environment outage
-    are STATE, and they are shown where the board already shows state; the ntfy alert stays
-    as it is, since that is the channel built for reaching the user.
-  - A decision card is admissible from an automated path only when it names a choice the user
-    alone can make, and it names the options. Where a script has no such choice to offer, the
-    board API refuses the card rather than accepting it — the same shape as the existing card
-    gates, so the rule is enforced instead of remembered.
-  - A card whose condition has resolved does not have to be removed by hand: a status the
-    board derives is re-derived, and the pause state disappears from the board when the pause
-    file does.
-  VERIFIABLE: Vitest over the refusal — an automated card without a named choice is rejected
-  and the message names the state section as the right place; a genuine decision card with
-  options is accepted; and a case over each of the two call sites asserting they no longer
-  reach `vdzk-add`. Plus a case that the board's rendered pause state disappears once
-  `.claude/batch-paused` is gone.
-  Criticality: medium — it touches the alert path, which must keep reaching the user; the
-  change removes a board card, never a notification.
-  Bundle: Chat & Tafel.
-
 - [ ] 750. A session that dies without a boundary leaves no reading, so the overshoot series
   under-counts exactly where it matters most (GPT-5.6 Sol, review of the context-ceiling
   programme, 19.08.2026; point 742 names this residual and expressly does not claim it). The
@@ -2662,100 +2756,6 @@ put it is the mistake this line exists to stop.
   does the work at all. The four-eyes mechanism review applies.
 
   Bundle: unbundled (batch autonomy).
-
-- [ ] 515. The parallel-session detector counts a placeholder owner as a second
-  SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
-  alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
-  FALSE. `.claude/batch-lock.json` carried the placeholder `x` as its `sessionId`
-  (still visible as `sessionIdBefore`, restamped 12:07). The detector compares the
-  lock's owner id against the observed session ids; a placeholder matches no real
-  id, so EVERY live session read as an additional one. The log proves it twice
-  over: `08:06 owner=x plus 45289138-…`, `11:06 owner=x plus 52543006-…` — two
-  different "second" ids against the same placeholder owner, and on both occasions
-  exactly ONE claude process was running (pid 1470, the very pid the lock names).
-  The cost is not the alert but the escalation: a self-pause that only a human can
-  lift, on evidence that was never there.
-  FINAL STATE:
-  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
-     never as a foreign owner. The detector may then report "owner unknown"; it may
-     not report parallel sessions.
-  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
-     the ids say — the pid is the stronger evidence and settles it first.
-  3. Both cases are covered by Vitest in the pure decision core.
-  4. The escalation chain itself stays untouched: five unanswered alerts still
-     pause the batch. The point removes the false alert, never the response to a
-     real one.
-  5. A self-pause no longer writes a card into "Von dir zu klären" (user
-     05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
-     That section holds GENUINE user decisions only; diagnosing a pause and
-     lifting it is the session's own work. The pause is instead reported where the
-     session's own state is reported — the now-card — so the reader sees it
-     without being asked to act on it.
-  WHERE THE PLACEHOLDER COMES FROM, MEASURED 05.08.2026 21:08 — the point above
-  treats it as weather; it is written by our own code. `ownsLock(sessionId)`
-  (`scripts/batch-singleton.mjs`) RESTAMPS the lock's `sessionId` to whatever id
-  the CALLER passed as soon as process ancestry proves the lock belongs to this
-  process tree. Any caller reaching it with a throwaway id — `--session x` through
-  `resolveSessionId` — therefore renames a LIVE owner's lock to that id, which is
-  exactly the `sessionIdBefore: <real id>` / `sessionId: "x"` pair both incidents
-  left behind. `isProbeSessionId` is the only filter and does not recognise a bare
-  placeholder.
-  WHAT IT COST TODAY, and why item 2 above is not enough on its own: the renamed
-  owner could no longer prove itself either, because `ownsLock` with the REAL id
-  then answered `pid-reused` — point 504's drifting start-time compare, on the same
-  lock, in the same minute. The live session was fenced out of its OWN batch (no
-  merge, no push, no tick) with two delegated agents still building, and the claim
-  path could not resolve it: the owner that must honour a claim at its next clean
-  moment IS that fenced session, so the handover deadlocks. Ownership was restored
-  by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
-  does not offer.
-  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
-     an id of the shape a real session carries; a placeholder, a probe id or an
-     empty string leaves the recorded owner untouched and answers the ownership
-     question without writing. Renaming a lock is a side effect of asking a
-     question, so the question must be safe to ask.
-  7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
-     `pid` is this very process (argv and session match) but the id no longer does,
-     one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
-     as a torn state and names it in its verdict, rather than reporting "consistent"
-     as it did today. Hand-editing the lock is then never the only path.
-  8. A SESSION THE SINGLETON ITSELF STOOD DOWN IS NOT A PARALLEL BATCH SESSION
-     (measured 18.08.2026 from `.claude/autostart.log`). At 09:18Z and 12:18Z the
-     detector reported "PARALLEL SESSIONS DETECTED: owner=d559dcb0 plus 7fe2e051"
-     — 7fe2e051 being the user's ATTENDED chat window, which the singleton had put
-     on STAND DOWN and which ran read-only measurements all day: no merge, no
-     tick, no batch action of any kind. Here the COUNT was right and the JUDGEMENT
-     wrong: the detector cannot see that it silenced one of the two itself. Five
-     unanswered alerts then paused the batch at 14:18; the restart clock lifted it
-     at 14:48. So a session carrying the stand-down note and no mutating action
-     since counts as attended-observing — no alert, no escalation. The alarm for a
-     genuinely second WORKING session is untouched. This branch is separate from
-     items 1/2 above: those answer the placeholder owner, this one answers a real
-     second process.
-  9. A PAUSED BATCH STILL DELIVERS THE USER'S WORDS (measured 18.08.2026 15:0x,
-     and it is the same incident's second half). The instruction "714: authoring
-     lane Sol from now on" was sent at 14:30:45 and lay in the spool at 14:30:46 —
-     the inbound leg is a live subscription and was one second fast — yet it
-     reached the owner only around 14:49. Cause, at two places:
-     `scripts/lock-heartbeat-hook.mjs` calls `deliverPendingMessages({ ownsBatch,
-     paused })`, which returns '' while the batch is paused, and the launcher
-     additionally stopped the watcher at 14:33 ("chat watcher: stopped (paused)").
-     That is the wrong direction: a paused batch is exactly when an instruction
-     matters most — lift the pause, do X first, stop Y — and the pause card asks
-     the user to act in the same breath. FINAL STATE: the per-tool-call delivery
-     keeps running while the batch is paused (the suppression was token thrift for
-     an idle session, not correctness), and the watcher is NOT stopped by a pause —
-     or, if it must stop for resource reasons, the launcher poll replaces it for
-     the pause's duration and the pause card names the delay that then applies.
-  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
-  parallel-session alert in the pure core's tests, and the same setup replayed
-  against the real detector stays silent; a Vitest case pins that the pause path
-  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
-  the lock's recorded owner byte-identical while a real id still restamps; the
-  doctor reports the pid-mine/id-foreign lock as torn and repairs it; a stood-down
-  session with no mutating action since the note raises no parallel-session alert
-  while a second WORKING session still does; and the pure core answers "paused
-  plus a waiting message" with delivery rather than silence.
 
 - [ ] 660. One session, two identities: the fence locks out the session that is working
   (measured 12.08.2026, 18:02-18:20). The launcher spawned session 6cd11926 at 17:57 (fence
