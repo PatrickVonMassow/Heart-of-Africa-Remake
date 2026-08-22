@@ -8,6 +8,7 @@ import { dirname, join, relative } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { budgetToolOutput } from './tool-output-budget-core.mjs'
+import { pruneCaptureLogs } from './tool-output-log-retention.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
@@ -39,6 +40,7 @@ async function run() {
   const command = decodeCommand(process.argv.slice(2))
   const logPath = logPathFor()
   mkdirSync(dirname(logPath), { recursive: true })
+  pruneCaptureLogs(dirname(logPath))
   const log = createWriteStream(logPath, { flags: 'wx' })
   const invocation = shellInvocation(command)
   let captured = ''

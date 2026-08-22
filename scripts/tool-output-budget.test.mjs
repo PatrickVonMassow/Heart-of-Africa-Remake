@@ -1,10 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ERROR_OUTPUT_BUDGET, ORDINARY_OUTPUT_BUDGET } from './tool-output-budget-core.mjs'
+import { CAPTURE_LOG_MAX_AGE_MS, pruneCaptureLogs } from './tool-output-log-retention.mjs'
 
 const RUNNER = join(dirname(fileURLToPath(import.meta.url)), 'tool-output-budget.mjs')
 
@@ -69,5 +70,27 @@ describe('tool-output-budget runner', () => {
     expect(result.stdout).toContain('missing --encoded-command')
     expect(result.stdout).not.toContain('at run')
     expect(result.stdout.length).toBeLessThanOrEqual(ERROR_OUTPUT_BUDGET)
+  })
+})
+
+describe('tool output capture retention', () => {
+  it('removes only runner-owned logs older than the retention window', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-tool-retention-'))
+    const stale = '2026-01-01T00-00-00-000-101.log'
+    const recent = '2026-08-22T00-00-00-000-102.log'
+    const unrelated = 'keep-me.log'
+    try {
+      for (const name of [stale, recent, unrelated]) writeFileSync(join(dir, name), name)
+      const now = Date.now()
+      const old = new Date(now - CAPTURE_LOG_MAX_AGE_MS - 1_000)
+      utimesSync(join(dir, stale), old, old)
+
+      expect(pruneCaptureLogs(dir, { now })).toEqual([stale])
+      expect(existsSync(join(dir, stale))).toBe(false)
+      expect(existsSync(join(dir, recent))).toBe(true)
+      expect(existsSync(join(dir, unrelated))).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
