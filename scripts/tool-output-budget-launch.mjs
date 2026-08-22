@@ -94,10 +94,10 @@ function runOriginal(command) {
       process.stderr.write(`tool-output-budget WARNING: the unbudgeted command could not be launched: ${error.message}\n`)
       resolveExit(1)
     })
-    child.on('close', (code, signal) => {
+    child.on('close', (code) => {
       if (settled) return
       settled = true
-      resolveExit(childExitCode(code, signal))
+      resolveExit(childExitCode(code))
     })
     for (const signal of FORWARDED_SIGNALS) process.once(signal, () => child.kill(signal))
   })
@@ -145,13 +145,13 @@ async function run() {
   if (completed === null) {
     const reason = `budget worker died after capture began (exit ${outcome.code ?? outcome.signal ?? 'unknown'})`
     announce('after-start', reason, degradationLog)
-    process.exitCode = childExitCode(outcome.code, outcome.signal) || 1
+    process.exitCode = childExitCode(outcome.code) || 1
     return
   }
   if (outcome.signal || outcome.code !== completed) {
     const reason = `budget worker reported command exit ${completed} but ended with ${outcome.code ?? outcome.signal ?? 'unknown'}`
     announce('after-start', reason, degradationLog)
-    process.exitCode = childExitCode(outcome.code, outcome.signal) || 1
+    process.exitCode = childExitCode(outcome.code) || 1
     return
   }
   process.exitCode = completed
