@@ -23,7 +23,7 @@
 // session id cannot, and the deny it used to eat was one it could never act on.
 // A subagent running in the main tree still gets the deny, and its text still
 // tells it to repeat the call, which the once-per-turn stand-down lets through.
-import { readFileSync, existsSync, realpathSync } from 'node:fs'
+import { readFileSync, existsSync, lstatSync, readlinkSync, realpathSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, relative, resolve } from 'node:path'
 import {
@@ -60,20 +60,53 @@ const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
 /**
  * Resolve a write destination even when its leaf (or several parent directories)
- * does not exist yet. `realpathSync` on the nearest existing ancestor follows
- * every symlink already on the route; the untouched suffix is then appended to
- * that canonical ancestor. The pure fence judges only the resulting path.
+ * does not exist yet. Entry existence matters here: `existsSync` follows a
+ * symlink and therefore mistakes a link to a not-yet-created target for a
+ * missing entry. Stop the upward walk on `lstatSync`, expand that link against
+ * its canonical containing directory, and repeat so dangling links and link
+ * chains cannot disguise a checkout destination.
+ *
+ * An unreadable link, a link loop, or a path with no readable ancestor returns
+ * the empty evidence sentinel. The pure fence deliberately treats that as
+ * inside the checkout, which is the conservative direction for a write guard.
  */
 function resolvedWriteTarget(filePath, cwd = REPO_ROOT) {
   if (typeof filePath !== 'string' || !filePath.trim()) return ''
-  const absolute = resolve(cwd, filePath)
-  let existing = absolute
-  while (!existsSync(existing)) {
-    const parent = dirname(existing)
-    if (parent === existing) return ''
-    existing = parent
+  let candidate = resolve(cwd, filePath)
+  const expandedLinks = new Set()
+
+  while (true) {
+    let existing = candidate
+    let entry
+    while (true) {
+      try {
+        entry = lstatSync(existing)
+        break
+      } catch (error) {
+        if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') return ''
+        const parent = dirname(existing)
+        if (parent === existing) return ''
+        existing = parent
+      }
+    }
+
+    if (!entry.isSymbolicLink()) {
+      try {
+        return resolve(realpathSync(existing), relative(existing, candidate))
+      } catch {
+        return ''
+      }
+    }
+
+    if (expandedLinks.has(existing)) return ''
+    expandedLinks.add(existing)
+    try {
+      const linkTarget = resolve(realpathSync(dirname(existing)), readlinkSync(existing))
+      candidate = resolve(linkTarget, relative(existing, candidate))
+    } catch {
+      return ''
+    }
   }
-  return resolve(realpathSync(existing), relative(existing, absolute))
 }
 
 /**
