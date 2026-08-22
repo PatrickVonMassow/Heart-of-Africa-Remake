@@ -13,7 +13,7 @@ because that is where a finding vanishes unnoticed. This stage spent nine days w
 model: the original merge was performed by Sol, the author of list B, a re-merge on 22.08.2026
 by Claude Opus 5, the author of list A, and both are recorded as the weaker two-model fallback.
 On 22.08.2026 at 18:14 the owner reported that new weekly volume had been released and asked for
-the Fable suspension to be lifted; the switch was set ON at 18:26. The same evening Fable 5 —
+the Fable suspension to be lifted; the owner flipped the switch at 18:26. The same evening Fable 5 —
 which wrote neither half — folded the stage BLIND: from the two versioned halves alone, before
 reading either fallback union, then compared its result against the recorded fold and justified
 every difference from the halves. That third-model fold is the union below and supersedes both

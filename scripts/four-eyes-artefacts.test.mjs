@@ -52,12 +52,14 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // something else.
     const stored = JSON.parse(read(UNION))
     expect(stored.entries).toEqual(unionFromDocument(read(DOC)))
-    // THIS UNION HAS NO VALID MERGER and must not claim one. Half A is Claude's and
-    // half B is Sol's, so the model that wrote neither is Fable — switched off. Both
-    // folds on record were made by an author of the material.
-    expect(stored.mergedBy).toBeUndefined()
-    expect(stored.mergedByNote).toMatch(/no valid merger/i)
-    expect(read(DOC)).toMatch(/WEAKER TWO-MODEL FALLBACK/)
+    // THE UNION NAMES ITS VALID MERGER: half A is Claude's and half B is Sol's, so
+    // the model that wrote neither is Fable 5, which folded the stage on 22.08.2026
+    // once the owner had lifted its suspension. The two earlier folds by the halves'
+    // own authors remain recorded as the weaker two-model fallback this replaced.
+    expect(stored.mergedBy).toBe('Claude Fable 5')
+    expect(stored.mergedByNote).toMatch(/wrote neither half/i)
+    expect(stored.mergedByNote).toMatch(/replaces the two recorded fallback folds/i)
+    expect(read(DOC)).toMatch(/weaker two-model fallback/i)
   })
 
   it('keeps half B\'s verbatim text and its parsed form the same list', () => {
