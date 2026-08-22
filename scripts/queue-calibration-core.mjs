@@ -920,7 +920,10 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  */
 const REQUIREMENT =
   '(required|needed|necessary|require|requires|need|needs|' +
-  'nötig|noetig|erforderlich|benötigt|benoetigt|benötigen|benoetigen|braucht|brauchen|erfordert|erfordern)'
+  'nötig|noetig|erforderlich|benötigt|benoetigt|benötigen|benoetigen|' +
+  // The passive is how German usually says it — "wird gebraucht", "wurde
+  // benötigt" — and the active forms alone left those denials open.
+  'braucht|brauchte|brauchten|brauchen|gebraucht|erfordert|erforderte|erfordern)'
 
 const DENIAL_CARRIES_PREDICATE = new RegExp(`\\b${REQUIREMENT}\\b`, 'i')
 

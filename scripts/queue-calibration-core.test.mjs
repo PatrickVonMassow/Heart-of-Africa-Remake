@@ -1494,12 +1494,24 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
   })
 
   it('knows the German requirement VERBS, not only the adjectives', () => {
-    expect(denialIsOpen('Kein Screenshot wird benötigt')).toBe(false)
-    expect(denialIsOpen('Kein Screenshot braucht es')).toBe(false)
-    expect(denialIsOpen('Kein Screenshot erfordert das')).toBe(false)
-    expect(
-      pictureBearingPoints(block(160, 'Kein Screenshot wird benötigt. Ein Browser Frame oder picture proof nötig.')).has(160),
-    ).toBe(true)
+    // Including the PASSIVE, which is how German usually says it. Missing
+    // "gebraucht" left that denial open and suppressed the demand behind it —
+    // and that is the unsafe direction, a render point admitted for correction.
+    for (const denial of [
+      'Kein Screenshot wird benötigt',
+      'Kein Screenshot wird gebraucht',
+      'Kein Screenshot wurde gebraucht',
+      'Kein Screenshot braucht es',
+      'Kein Screenshot erfordert das',
+    ]) {
+      expect(denialIsOpen(denial), denial).toBe(false)
+    }
+    for (const [n, line] of [
+      [160, 'Kein Screenshot wird benötigt. Ein Browser Frame oder picture proof nötig.'],
+      [162, 'Kein Screenshot wird gebraucht. Ein Browser Frame oder picture proof ist nötig.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
+    }
   })
 
   it('errs towards holding a point OUT where the shape is genuinely ambiguous', () => {
@@ -1526,15 +1538,24 @@ describe('a denial that finished its own sentence lends nothing onward', () => {
     // this ever fires, one has been written: read the line and decide whether it
     // is held out correctly before touching the rule.
     const ambiguous = []
+    const trailing = []
     for (const line of String(readTasksAll()).split('\n')) {
       const fragments = splitClauses(line)
       for (const [i, fragment] of fragments.entries()) {
         if (i === fragments.length - 1) continue
         if (!PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) continue
-        if (!denialIsOpen(fragment) && fragments.slice(i + 1).some((f) => f.trim())) ambiguous.push(line.trim())
+        if (!fragments.slice(i + 1).some((f) => f.trim())) continue
+        trailing.push(line.trim())
+        if (!denialIsOpen(fragment)) ambiguous.push(line.trim())
       }
     }
     expect(ambiguous, 'a denial carrying a requirement word now has a clause behind it').toEqual([])
+    // THE WIDER SHAPE TOO, because the check above can only see the requirement
+    // words the vocabulary already knows — a denial phrased with one it does not
+    // would look open and slip past it. This counts every denial with a clause
+    // behind it, whatever it is phrased with, and one line is what the corpus
+    // held when the rule was decided.
+    expect(trailing.length, `denials with a clause behind them:\n${trailing.join('\n')}`).toBeLessThanOrEqual(1)
   })
 
   it('reads a positive coordinated demand behind a closed denial as a demand', () => {
