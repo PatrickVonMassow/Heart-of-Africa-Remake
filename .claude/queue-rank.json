@@ -533,6 +533,12 @@
       "why": "User request 22.08.2026, 21:19: he asked for the ticket himself and placed it directly behind point 598",
       "origin": "user",
       "place": "ahead"
+    },
+    "845": {
+      "at": "2026-08-22T20:51:29.892Z",
+      "why": "Machine-filed, low and cheap: it costs a false red on unrelated points, not lost work, so it waits behind the release like the other detector-hygiene findings of this evening.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -582,7 +588,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T20:09:27.280Z",
+    "at": "2026-08-22T20:51:29.898Z",
     "points": [
       174,
       184,
@@ -831,7 +837,8 @@
       841,
       842,
       843,
-      844
+      844,
+      845
     ]
   }
 }
