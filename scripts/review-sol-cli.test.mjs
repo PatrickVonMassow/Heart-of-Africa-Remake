@@ -56,6 +56,8 @@ const SCRIPT_FILES = [
   // is the only honest way to claim that command is complete.
   'mechanism-review.mjs',
   'mechanism-review-core.mjs',
+  'authorship-check-core.mjs',
+  'authorship-check-io.mjs',
   'mandatory-duty-core.mjs',
   'mechanism-review-range-core.mjs',
   // …which counts a blind-parallel union itself (point 634), so its accounting
