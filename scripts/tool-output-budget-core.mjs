@@ -136,6 +136,11 @@ export function distinctErrorCauses(text) {
 function boundedNames(names, logPath) {
   if (names.length === 0) return { text: 'failing tests: (no test-name marker found)', cuts: [] }
   const rendered = `failing tests (${names.length}): ${names.join(' | ')}`
+  // Names normally stay whole, but they cannot be the one unbounded field in a
+  // hard-maximum digest. If their aggregate exceeds 10 KiB, preserve names at
+  // both ends and spend the middle on an exact omission count plus the same
+  // selective spill-log pointer as every other cut. `result.names` and the
+  // captured log retain the complete list.
   const bounded = cutMiddle(rendered, 10 * 1024, { logPath })
   return { text: bounded.text, cuts: bounded.cut ? [bounded] : [] }
 }

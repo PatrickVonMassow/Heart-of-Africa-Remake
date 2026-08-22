@@ -24,6 +24,22 @@ describe('tool-output error channel', () => {
     for (let i = 1; i <= 20; i++) expect(result.text).toContain(`src/math.test.ts > case ${i}`)
   })
 
+  it('makes an oversized failing-name list visibly bounded while preserving both ends', () => {
+    const raw = Array.from(
+      { length: 1_000 },
+      (_, i) => ` FAIL  suite.test.ts > [case-${String(i).padStart(4, '0')}-END]\n${stack}`,
+    ).join('\n')
+    const result = budgetErrorOutput(raw, { logPath: LOG, command: 'npm run test:unit' })
+
+    expect(result.names).toHaveLength(1_000)
+    expect(result.text).toContain('[case-0000-END]')
+    expect(result.text).toContain('[case-0999-END]')
+    expect(result.text).not.toContain('[case-0500-END]')
+    expect(result.text).toMatch(/OMITTED \d+ CHARACTERS FROM THE MIDDLE/)
+    expect(result.text).toContain(`--show ${LOG} --tail 120`)
+    expect(result.text.length).toBeLessThanOrEqual(ERROR_OUTPUT_BUDGET)
+  })
+
   it('keeps the first distinct cause whole when it is far larger than the ordinary budget', () => {
     const cause = `ASSERTION AT THE HEAD\n${'diagnostic detail\n'.repeat(1_000)}SUMMARY AT THE TAIL`
     expect(cause.length).toBeGreaterThan(ORDINARY_OUTPUT_BUDGET)
