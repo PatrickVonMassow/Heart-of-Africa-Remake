@@ -128,17 +128,25 @@ put it is the mistake this line exists to stop.
       timestamps and commit identities B15 requires. That neutral fold runs through
       `scripts/mechanism-review.mjs --merged-by`; it may add, drop or re-word union entries, and
       what it settles is what gets built. Fable is the only currently identified qualifying
-      merger and is off, so this point is BLOCKED BEFORE CODE until the owner enables Fable or
-      supplies another qualifying third model. Only read-only repository and test mapping are
-      safe before that fold lands. Steps 1-3 remain revisable: a named later step reopens
-      schemas, store and adapter, and re-tests and re-reviews every reopened part.
-      WHAT UNBLOCKS IT IS ALREADY IN MOTION: on 22.08.2026 at 18:14 the owner reported new weekly
-      volume, asked for the Fable suspension to be lifted, and restated the rule he wants back —
-      Sol and Opus 5 blind, Fable folding — while asking expressly that it not be implemented
-      before he has seen the resulting model rules. The switch is therefore still off, and it is
-      flipped only on his instruction. A claim that he had ruled the opposite stood in the branch
-      documents for about twenty minutes on 22.08.2026 and is withdrawn; it was inferred from the
-      standing switch setting, and point 840 exists to make that class of claim checkable.
+      merger. It was off when this point was filed; `.claude/fable-switch.json` records it back
+      ON since 22.08.2026, 18:26 (`setBy: Test`, reason "User instruction 22.08.2026: Anthropic
+      released new weekly volume — Fable may be used again"), and CLAUDE.md §6 makes that record
+      the sole answer on whether Fable may blind-merge. THE FOLD IS THEREFORE THE FIRST ACTION
+      OF THIS POINT rather than a blocker of it — but it still precedes every line of code. Only
+      read-only repository and test mapping are safe before it lands. Steps 1-3 remain
+      revisable: a named later step reopens schemas, store and adapter, and re-tests and
+      re-reviews every reopened part.
+      WHAT THE RECORD DOES AND DOES NOT AUTHORIZE: on 22.08.2026 at 18:14 the owner reported new
+      weekly volume, asked for the Fable suspension to be lifted, and restated the rule he wants
+      back — Sol and Opus 5 blind, Fable folding — while asking expressly that it not be
+      implemented before he has seen the resulting model rules. The switch was flipped twelve
+      minutes later. That authorizes THE FOLD; it is not a ruling that the §6 model rules may be
+      rewritten, which still waits for him. A claim that he had ruled the opposite stood in the
+      branch documents for about twenty minutes on 22.08.2026 and is withdrawn; it was inferred
+      from the standing switch setting, and point 840 exists to make that class of claim
+      checkable. The branch documents of this point — `docs/four-eyes/README.md`, the union's
+      `mergedByNote` and `docs/handover-architecture.md` — were written before the flip and
+      still say the switch is off; the fold corrects them where it lands.
   THE READ-ONLY TEST MAPPING IS DONE, since it is one of the two things safe before the fold. The
   union's "Ordered work" names `scripts/__tests__/<name>.test.mjs` and `tests/<name>.spec.ts`;
   NEITHER convention exists in this repository. Vitest lives beside its subject as
