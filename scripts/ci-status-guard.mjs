@@ -6,15 +6,14 @@
 // (point 387, 30.07.2026). Asking about HEAD alone let 26 red runs on `main`
 // and thirteen red branch runs stand unseen for three weeks: the owning
 // session's HEAD was green while every push of a delegated agent's branch
-// failed, and a delegated agent pushes under the parent's session id. So this
-// sweeps every ref the repository pushed inside the window — named from the
-// local push reflog, never from an API sweep over branches — and a push does not
-// count as landed until the run for that exact sha has CONCLUDED green. An
-// unfinished run is a WAIT, not a pass; a ref that no longer exists is dropped;
-// the alert goes out once per (ref, sha). Answers that can never change are
-// cached per sha in .claude/ci-status-guard-state.json, so the common turn — the
-// one that pushed nothing new — costs no API call at all. The decision logic
-// lives in ci-status-guard-core.mjs (pure, Vitest-covered).
+// failed. So this observes every ref the repository pushed inside the window —
+// named from the local push reflog, never from an API sweep over branches. Main
+// and a branch offered back for landing gate on a concluded green run; a branch
+// whose author is still declared in flight is reported without owning the
+// supervisor's turn end. The exemption ends with that declaration. A ref that
+// no longer exists is dropped, and terminal answers are cached per sha so the
+// common turn costs no API call. The decision logic lives in
+// ci-status-guard-core.mjs (pure, Vitest-covered).
 //
 // Fail-OPEN above all: CI pending, no run yet, token missing, offline, non-200,
 // any internal error → allow, so the guard can never freeze a session. All
@@ -46,6 +45,7 @@ import {
   pruneShaCache,
   pushedRefsFromReflog,
   refTargets,
+  selectCiTargets,
   reconcileCiWait,
   renewCiWait,
   observeCiWait,
@@ -66,6 +66,7 @@ import {
 } from './pages-deploy-unblock-core.mjs'
 import { heldByOtherLiveOwner, probePid, readOwnerLock } from './batch-singleton.mjs'
 import { assessCiWait } from './batch-in-flight-core.mjs'
+import { gatherInFlight, worktreeBranch } from './batch-in-flight.mjs'
 import { isMainModule } from './is-main.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
@@ -570,16 +571,47 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   const existingRefs = remoteRefNames()
   const notified = pruneNotifiedRefs(notifiedFromState(state), existingRefs)
 
+  // The declaration is assessed through the same liveness probes as the wait
+  // guard. A stale file does not exempt a branch; a live worktree-only
+  // declaration still resolves to the branch it is authoring.
+  let liveAuthorBranches = []
+  try {
+    const inFlight = gatherInFlight(sessionId, { now })
+    if (inFlight.live) {
+      for (const item of inFlight.declaration?.evidence ?? []) {
+        if (item?.kind === 'branch' && item.ref) liveAuthorBranches.push(item.ref)
+        if (item?.kind === 'worktree' && item.path) {
+          const branch = worktreeBranch(item.path)
+          if (branch) liveAuthorBranches.push(branch)
+        }
+      }
+    }
+  } catch {
+    // Unknown liveness is not permission to skip a landing gate.
+    liveAuthorBranches = []
+  }
+
   // EVERY REF THIS REPOSITORY PUSHED, not just HEAD (point 387). The list comes
   // from the local push reflog: a delegated agent's branch push lands in the
   // shared reflog, so the owning session sees the work it is responsible for
   // without asking the API about a single branch it did not push.
-  const targets = refTargets({
-    pushed: pushedRefsFromReflog(pushReflog(), { now }),
-    existingRefs,
-    headSha: head,
-    headPushed: isPushed(head),
+  const targets = selectCiTargets({
+    targets: refTargets({
+      pushed: pushedRefsFromReflog(pushReflog(), { now }),
+      existingRefs,
+      headSha: head,
+      headPushed: isPushed(head),
+    }),
+    liveAuthorBranches,
   })
+  const reported = targets.filter((target) => target.disposition === 'report')
+  if (!readOnly && reported.length > 0) {
+    console.error(
+      `ci-status-guard reports without blocking while the author is declared in flight: ${reported
+        .map((target) => `${target.ref} ${String(target.sha).slice(0, 7)}`)
+        .join('; ')}`,
+    )
+  }
   if (targets.length === 0) {
     if (!readOnly) startWaitObserver(state.ciWait)
     return { applicable: true, inputs: { decision: null, failedOpen: [] } }
@@ -602,7 +634,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   let durableWait = state.ciWait ?? null
   if (!readOnly) {
     const persisted = mutateState((current) => {
-      const observations = swept.observations ?? []
+      const observations = (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')
       const prior = current.ciWait ?? null
       const nextWait = reconcileCiWait(prior, observations, { now, makeWakeToken: randomUUID })
       const staleAgainstTerminal = prior?.terminal && observations.some((item) =>
@@ -619,7 +651,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
     durableWait = persisted?.ciWait ?? null
 
     const owner = readOwnerLock()
-    for (const observation of swept.observations ?? []) {
+    for (const observation of (swept.observations ?? []).filter((item) => item?.target?.disposition !== 'report')) {
       const observedState = observation.classification?.state
       const event = observedState === 'pending'
         ? (observation.previousState === 'pending' ? ACTIVITY_EVENTS.CI_WAIT_OBSERVATION : ACTIVITY_EVENTS.CI_WAIT_START)

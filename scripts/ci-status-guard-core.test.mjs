@@ -20,6 +20,7 @@ import {
   pushedRefsFromReflog,
   recoveredWorkflows,
   refTargets,
+  selectCiTargets,
   refVerdict,
   reconcileCiWait,
   renewCiWait,
@@ -389,11 +390,49 @@ describe('refTargets', () => {
     expect(got).toHaveLength(1)
   })
 
+  it('keeps main as the owner of a shared sha even when the feature push is newer', () => {
+    const got = refTargets({
+      pushed: [
+        { ref: 'origin/feat/x', sha: HEAD, at: t(30) },
+        { ref: 'origin/main', sha: HEAD, at: t(60) },
+      ],
+      existingRefs: ['origin/main', 'origin/feat/x'],
+      headSha: HEAD,
+    })
+    expect(got).toEqual([{ ref: 'origin/main', sha: HEAD, at: t(60) }])
+  })
+
   it('keeps the old guarantee: a HEAD pushed from another clone is still judged', () => {
     const got = refTargets({ pushed: [], existingRefs: [], headSha: HEAD, headPushed: true })
     expect(got).toEqual([{ ref: 'HEAD', sha: HEAD, at: 0 }])
     // …and nothing is claimed when HEAD was never pushed at all.
     expect(refTargets({ pushed: [], existingRefs: [], headSha: HEAD, headPushed: false })).toEqual([])
+  })
+})
+
+describe('selectCiTargets', () => {
+  const main = { ref: 'origin/main', sha: HEAD, at: t(120) }
+  const candidate = { ref: 'origin/feat/669-rescue', sha: BRANCH, at: t(60) }
+
+  it('always gates main, even if a malformed declaration names it', () => {
+    expect(selectCiTargets({ targets: [main], liveAuthorBranches: ['main'] })[0].disposition).toBe('gate')
+  })
+
+  it('gates a landing candidate whose author is no longer declared', () => {
+    expect(selectCiTargets({ targets: [candidate], liveAuthorBranches: [] })[0].disposition).toBe('gate')
+  })
+
+  it('reports without gating while that exact branch has a live author', () => {
+    expect(
+      selectCiTargets({ targets: [candidate], liveAuthorBranches: ['refs/heads/feat/669-rescue'] })[0].disposition,
+    ).toBe('report')
+  })
+
+  it('gates the branch again the moment its author declaration is gone', () => {
+    const live = selectCiTargets({ targets: [candidate], liveAuthorBranches: ['origin/feat/669-rescue'] })
+    const gone = selectCiTargets({ targets: [candidate], liveAuthorBranches: [] })
+    expect(live[0].disposition).toBe('report')
+    expect(gone[0].disposition).toBe('gate')
   })
 })
 
@@ -638,6 +677,29 @@ describe('sweepTargets', () => {
     expect(got.decision).toContain(BRANCH.slice(0, 7))
     expect(got.alerts).toHaveLength(1)
     expect(got.alerts[0].target.ref).toBe('origin/feat/x')
+  })
+
+  it('reports a live author red without blocking, then reuses that verdict to gate after handoff', async () => {
+    const reportTarget = { ...branchTarget, disposition: 'report' }
+    const first = await sweep({ targets: [reportTarget], runsBySha: { [BRANCH]: redRun(BRANCH) } })
+    expect(first.decision).toBe(null)
+    expect(first.alerts).toEqual([])
+
+    const afterHandoff = await sweepTargets({
+      targets: [{ ...branchTarget, disposition: 'gate' }],
+      cache: first.cache,
+      notified: first.notified,
+      now: NOW,
+      fetchRuns: async () => {
+        throw new Error('the fresh terminal verdict should be reused')
+      },
+      judgeRed: async () => {
+        throw new Error('the fresh terminal verdict should be reused')
+      },
+      notify: async () => {},
+    })
+    expect(afterHandoff.decision).toContain('origin/feat/x')
+    expect(afterHandoff.decision).toContain('RED')
   })
 
   it('alerts ONCE per (ref, sha) — the next turn on the same pair stays silent', async () => {

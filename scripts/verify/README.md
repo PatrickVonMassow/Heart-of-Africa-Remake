@@ -733,6 +733,14 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
+The timed Sol authoring lane applies that distinction mechanically. Every
+author-written checkpoint and the pre-run commission receipt use the rescue
+pair, so its two-minute pushes start no disposable CI chain. Only after the
+author process exits cleanly, leaves a clean tree and reports `test:unit`, build
+and lint green does the wrapper add one unskipped completion commit. A killed or
+malformed run gets no completion commit; its pushed history therefore claims
+only recoverable work, never readiness to land.
+
 The convention is unchanged by point 513, only its reason has narrowed: a branch
 run mails nobody now, so what the marker still buys is that a half-finished state
 raises no alert, no red commit status and no entry to triage at all. Both halves
@@ -775,9 +783,11 @@ differences included, where merely noticing red closes only the cases someone
 happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
 `ci-status-guard-core.test.mjs`):
 
-- **Every ref this repository pushed** is judged, not just HEAD. A delegated
-  agent pushes under the parent's session id and into the shared reflog, so those
-  refs are the parent's responsibility. The ref is named in the block message.
+- **Every ref this repository pushed** is observed, not just HEAD. `main` always
+  gates, and a feature branch gates once its author hands it back as a landing
+  candidate. While that exact branch has a live in-flight declaration it is
+  reported without blocking the supervisor; removal of the declaration restores
+  the gate immediately, including from a fresh cached verdict.
 - **The list comes from the local push reflog** (`update by push` entries only —
   a fetch is somebody else's branch), never from an API sweep over branches.
   Four local git calls per turn end, ~30 ms measured, none of them growing with

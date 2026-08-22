@@ -177,8 +177,9 @@ export function shouldBlock(state) {
 // The guard used to ask about `git rev-parse HEAD` alone. Through the night of
 // 30.07. the owning session's HEAD was `main` and green while every push of a
 // delegated agent's branch failed CI: thirteen "Run failed" mails, and the one
-// session that could have fixed it never learned. A delegated agent pushes under
-// the parent's session id, so those refs ARE the parent's responsibility.
+// session that could have fixed it never learned. Those refs must stay visible,
+// but an actively authored branch is not the supervisor's turn-end gate. Main
+// and branches handed back as landing candidates are.
 //
 // So the unit of judgement is the PUSHED REF, and the demand is not "notice a
 // red" but "confirm the run for that exact sha CONCLUDED green" — which closes
@@ -410,11 +411,21 @@ export function pushedRefsFromReflog(text, { now = Date.now(), windowMs = PUSH_W
 export function refTargets({ pushed = [], existingRefs = [], headSha = '', headPushed = false } = {}) {
   try {
     const exists = new Set(existingRefs)
-    const seenShas = new Set()
+    const seenShas = new Map()
     const live = []
     for (const p of [...pushed].sort((a, b) => Number(b?.at ?? 0) - Number(a?.at ?? 0))) {
-      if (!p?.ref || !p?.sha || !exists.has(p.ref) || seenShas.has(p.sha)) continue
-      seenShas.add(p.sha)
+      if (!p?.ref || !p?.sha || !exists.has(p.ref)) continue
+      const previous = seenShas.get(p.sha)
+      if (previous !== undefined) {
+        // Main always gates. When creating a feature branch pushes main's tip
+        // under a second ref, SHA de-duplication must not discard that fact in
+        // favour of the newer feature-ref reflog entry.
+        if (p.ref === 'origin/main' && live[previous]?.ref !== 'origin/main') {
+          live[previous] = { ref: p.ref, sha: p.sha, at: Number(p.at) || 0 }
+        }
+        continue
+      }
+      seenShas.set(p.sha, live.length)
       live.push({ ref: p.ref, sha: p.sha, at: Number(p.at) || 0 })
     }
     // HEAD's own sha leads: it is what the session is standing on.
@@ -423,6 +434,30 @@ export function refTargets({ pushed = [], existingRefs = [], headSha = '', headP
     return live
   } catch {
     return []
+  }
+}
+
+const branchName = (ref) => String(ref ?? '').trim().replace(/^refs\/remotes\//, '').replace(/^refs\/heads\//, '').replace(/^origin\//, '')
+
+/**
+ * Decide which pushed refs own the supervisor's turn end.
+ *
+ * Main and every branch no longer covered by a live author declaration gate.
+ * A declared author branch remains visible but report-only until that exact
+ * declaration ends. HEAD is conservative because its branch identity was lost
+ * before this pure layer received it.
+ */
+export function selectCiTargets({ targets = [], liveAuthorBranches = [] } = {}) {
+  try {
+    const authored = new Set((Array.isArray(liveAuthorBranches) ? liveAuthorBranches : []).map(branchName).filter(Boolean))
+    return (Array.isArray(targets) ? targets : []).map((target) => {
+      const branch = branchName(target?.ref)
+      const reportOnly = branch !== 'main' && branch !== 'HEAD' && authored.has(branch)
+      return { ...target, disposition: reportOnly ? 'report' : 'gate' }
+    })
+  } catch {
+    // A selection bug may never exempt a ref from the gate.
+    return (Array.isArray(targets) ? targets : []).map((target) => ({ ...target, disposition: 'gate' }))
   }
 }
 
@@ -569,13 +604,14 @@ export async function sweepTargets({
   let dirty = false
 
   for (const target of targets) {
+    const gates = target?.disposition !== 'report'
     const entry = nextCache[target.sha]
     const cached = cachedAnswer(entry, now)
     // A sha whose run CONCLUDED green (or that no workflow covers) is never
     // asked about again — this is what keeps the repeat turn free.
     if (cached === 'success' || cached === 'nocheck') continue
     if (cached === 'failed') {
-      if (entry.reason) block ??= entry.reason
+      if (gates && entry.reason) block ??= entry.reason
       continue
     }
     if (cached === 'pending') {
@@ -584,7 +620,7 @@ export async function sweepTargets({
       // residual (b)). Past it the entry still mutes the API, it just no longer
       // holds the turn.
       if (refVerdict({ state: 'pending', at: Number(entry.firstSeenAt) || now, now }) === 'wait') {
-        waiting ??= entry.reason
+        if (gates) waiting ??= entry.reason
         observations.push({
           target,
           classification: { state: 'pending', runId: entry.runId ?? null, workflowName: entry.workflowName ?? null },
@@ -639,7 +675,7 @@ export async function sweepTargets({
     }
     if (verdict === 'wait') {
       const reason = waitReason(target, classification)
-      waiting ??= reason
+      if (gates) waiting ??= reason
       nextCache[target.sha] = {
         state: 'pending', firstSeenAt: at, checkedAt: now, reason,
         runId: classification.runId ?? null, workflowName: classification.workflowName ?? null,
@@ -682,7 +718,7 @@ export async function sweepTargets({
     const alertKey = standDown
       ? `${target.sha}:${chosen.runId}:${new Date(now).toISOString().slice(0, 13)}`
       : target.sha
-    if (shouldNotify(chosen.state, nextNotified[target.ref], alertKey)) {
+    if (gates && shouldNotify(chosen.state, nextNotified[target.ref], alertKey)) {
       await notify({ target, classification: chosen, standDown })
       nextNotified[target.ref] = alertKey
     }
@@ -691,7 +727,7 @@ export async function sweepTargets({
     // turn end over GitHub's own outage clears nothing and stops the batch.
     const reason = standDown ? null : blockReason(chosen, target.sha, target.ref)
     nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason }
-    if (reason) block ??= reason
+    if (gates && reason) block ??= reason
   }
 
   // A workflow still dying the famine way KEEPS its clock; one this sweep judged
