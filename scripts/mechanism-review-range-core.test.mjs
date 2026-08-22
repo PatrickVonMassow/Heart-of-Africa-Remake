@@ -233,7 +233,7 @@ describe('per-file end-state review baseline', () => {
     expect(result.outstanding.map((artefact) => artefact.file)).toEqual(['shared'])
   })
 
-  it('does not keep the historical contribution-scoped clearing beside the new model', () => {
+  it('rescues historical scoped coverage when the review contains the file\'s latest change', () => {
     const change = commit('a', 'Claude Opus 5', ['shared'])
     const legacy = {
       ...row({ head: change.sha, files: ['shared'], contained: [change.sha] }),
@@ -241,6 +241,21 @@ describe('per-file end-state review baseline', () => {
     }
     expect(outstandingFiles({
       commits: [change],
+      endStateFiles: ['shared'],
+      recordUsable: usable,
+      records: [legacy],
+    }).covered.map((artefact) => artefact.file)).toEqual(['shared'])
+  })
+
+  it('does not let historical scoped coverage clear a file changed after that review', () => {
+    const reviewed = commit('a', 'Claude Opus 5', ['shared'])
+    const latest = commit('b', 'Claude Opus 5', ['shared'])
+    const legacy = {
+      ...row({ head: reviewed.sha, files: ['shared'], contained: [reviewed.sha] }),
+      pass: { index: 1, total: 1, files: ['shared'], commits: [reviewed.sha] },
+    }
+    expect(outstandingFiles({
+      commits: [reviewed, latest],
       endStateFiles: ['shared'],
       recordUsable: usable,
       records: [legacy],

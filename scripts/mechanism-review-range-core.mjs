@@ -333,10 +333,12 @@ const clockOf = (row) => (typeof row?.at === 'number' && Number.isFinite(row.at)
 /**
  * Remove only end-state files actually read by a valid file-scoped pass.
  *
- * A record covers a file when it names that file, stores its own reviewed sha as
- * `pass.endState`, and contains the file's latest change. A later commit touching
- * another path leaves that fact true; a later change to this path moves the
- * latest-change boundary beyond the record and makes only this file owed again.
+ * A record covers a file when it names that file and contains the file's latest
+ * change. That measured ancestry fact also rescues historical scoped rows: the
+ * reviewer necessarily read the file at or after its last change, regardless of
+ * which pass-record format wrote the row. A later commit touching another path
+ * leaves that fact true; a later change to this path moves the latest-change
+ * boundary beyond the record and makes only this file owed again.
  */
 export function outstandingFiles({
   commits = [],
@@ -348,10 +350,7 @@ export function outstandingFiles({
   const latest = new Map()
   for (const record of records ?? []) {
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
-    // New records say which end state they read. Historical `pass.commits`
-    // rows described intermediate contributions and deliberately clear nothing
-    // under the replacement model.
-    if (!files.length || String(record?.pass?.endState ?? '') !== String(record?.sha ?? '')) continue
+    if (!files.length) continue
     for (const artefact of state.artefacts) {
       const latestChange = artefact.changes.at(-1)
       if (!recordUsable(record, latestChange.commit)) continue
