@@ -6,11 +6,18 @@
 // launcher's inbox tick for a DROP NOTICE — a receipt for one of those would tell
 // the watcher a message had been answered when nobody had answered it, and the
 // message would be marked consumed and lost (see `ackPlan`).
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { RECEIPT_PATH, postOutbox, readReplyReceipt, sendReply } from './chat-reply.mjs'
+import {
+  RECEIPT_PATH,
+  parseReplyText,
+  postOutbox,
+  readReplyReceipt,
+  sendReply,
+  sendReplyFromInput,
+} from './chat-reply.mjs'
 import { TEST_VECTOR, parseEnvelope, verifyMessage } from './chat-core.mjs'
 
 const secret = TEST_VECTOR.secret
@@ -35,6 +42,68 @@ const recorder = (ok = true, status = 200) => {
   }
   return { calls, fetchImpl }
 }
+
+describe('reply arguments — prose reaches the transport, flags do not', () => {
+  it('publishes a bare quoted message', async () => {
+    const transport = vi.fn(async () => ({ ok: true, status: 200, id: 'quoted' }))
+    await sendReplyFromInput({
+      args: ['Eine kurze Antwort.'],
+      stdinText: '',
+      secretReader: () => secret,
+      transport,
+    })
+    expect(transport).toHaveBeenCalledWith({ secret, text: 'Eine kurze Antwort.' })
+  })
+
+  it('--text-stdin publishes the piped input, not the flag', async () => {
+    const transport = vi.fn(async () => ({ ok: true, status: 200, id: 'piped' }))
+    await sendReplyFromInput({
+      args: ['--text-stdin'],
+      stdinText: 'Die vollst\u00e4ndige Antwort.\n',
+      secretReader: () => secret,
+      transport,
+    })
+    expect(transport).toHaveBeenCalledWith({ secret, text: 'Die vollst\u00e4ndige Antwort.' })
+  })
+
+  it('keeps the existing no-argument stdin form', () => {
+    expect(parseReplyText([], 'Antwort aus der Pipe.\n')).toBe('Antwort aus der Pipe.')
+  })
+
+  it('names an unknown flag and both supported input forms without publishing', async () => {
+    const transport = vi.fn()
+    expect(() => parseReplyText(['--text-stdinn'], 'Ungesendete Antwort.')).toThrow(
+      /--text-stdinn.*quoted argument.*pipe it on stdin.*--text-stdin/,
+    )
+    await expect(
+      sendReplyFromInput({
+        args: ['--text-stdinn'],
+        stdinText: 'Ungesendete Antwort.',
+        secretReader: () => secret,
+        transport,
+      }),
+    ).rejects.toThrow(/--text-stdinn.*quoted argument.*pipe it on stdin.*--text-stdin/)
+    expect(transport).not.toHaveBeenCalled()
+  })
+
+  it('refuses empty or whitespace-only stdin without publishing', async () => {
+    const transport = vi.fn()
+    for (const stdinText of ['', ' \r\n\t']) {
+      expect(() => parseReplyText(['--text-stdin'], stdinText)).toThrow(
+        /empty message.*quoted argument.*pipe it on stdin/,
+      )
+      await expect(
+        sendReplyFromInput({
+          args: ['--text-stdin'],
+          stdinText,
+          secretReader: () => secret,
+          transport,
+        }),
+      ).rejects.toThrow(/empty message.*quoted argument.*pipe it on stdin/)
+    }
+    expect(transport).not.toHaveBeenCalled()
+  })
+})
 
 describe('postOutbox — a signed envelope for the phone', () => {
   it('posts to the OUTBOX topic, signed for the outbox direction', async () => {
