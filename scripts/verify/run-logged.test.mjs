@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { commandNamesRun } from '../batch-in-flight.mjs'
 import { ORDINARY_OUTPUT_BUDGET } from '../tool-output-budget-core.mjs'
+import { MAX_SELECTED_LINES, parseRunLoggedArgs } from './run-logged-args.mjs'
 
 const WRAPPER = join(dirname(fileURLToPath(import.meta.url)), 'run-logged.mjs')
 
@@ -23,6 +24,26 @@ function runShow(args, logDir) {
     env: { ...process.env, VERIFY_LOG_DIR: logDir },
   })
 }
+
+describe('run-logged argument budgets', () => {
+  it('clamps both selective reads and verify digest lines before output is assembled', () => {
+    const parsed = parseRunLoggedArgs([
+      '--tail',
+      '999999',
+      '--max',
+      '999999',
+      '--keep',
+      '999999',
+      'world',
+    ])
+    expect(parsed.own).toMatchObject({
+      tail: MAX_SELECTED_LINES,
+      max: MAX_SELECTED_LINES,
+      keep: MAX_SELECTED_LINES,
+    })
+    expect(parsed.forward).toEqual(['world'])
+  })
+})
 
 describe('run-logged --show', () => {
   it('reads a bounded window and starts NOTHING', () => {
@@ -101,6 +122,7 @@ describe('run-logged default launch — the run-identity re-exec (point 700, Sol
         env: { ...process.env, VERIFY_LOG_DIR: relDir, HOA_ACTIVITY_JOURNAL_PATH: join(dir, 'activity.jsonl') },
       })
       expect(res.status, res.stderr).toBe(1) // the shim forwards the child's exit code
+      expect(res.stdout).toContain('── tool error digest ── run-logged verify digest')
       const recordName = readdirSync(dir).find((n) => n.endsWith('.run.json'))
       expect(recordName, `log dir held ${readdirSync(dir).join(', ')}`).toBeTruthy()
       const record = JSON.parse(readFileSync(join(dir, recordName), 'utf8'))
