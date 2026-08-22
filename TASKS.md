@@ -1904,7 +1904,14 @@ put it is the mistake this line exists to stop.
   hook is not blocked. Separately, every `COVERED -> <guard>` entry in `docs/document-cut-757.md`
   is re-checked against the guard's actual assertions, and each one that does not hold is either
   repaired the same way or its rule is restored to `MEMORY.md`; the document records the re-check
-  with its date so no later reader trusts the original claims.
+  with its date so no later reader trusts the original claims. THE SAME RE-CHECK COVERS THE 768
+  CUT (added 22.08.2026): its counted union `docs/blind-768/union.json` grounds ten entries on a
+  guard — U23, U24, U26, U29, U30, U35, U44, U45, U46 and U51 — and the cross-vendor review of
+  that cut reported unsupported guard coverage among them without the entry being recoverable
+  from the run's output. Each of the ten is checked against what its guard actually asserts,
+  including the fail-open paths (`commission-guard` allows without judgment when it cannot read
+  the census), and an entry that does not hold has its rule restored to `CLAUDE.md` the way the
+  review already restored two.
   VERIFIABLE: Vitest over the pure guard core — a reply with stamp and suffix passes; the same
   reply without the suffix is refused when a reading was delivered; `· Kontext: -- Tokens` passes;
   a turn with no hook line demands no suffix; and a malformed suffix is refused with a message
@@ -10941,7 +10948,7 @@ to land than a mechanism that needs a review.
   applied"). MEASURED on the landed file: `scripts/rule-echo-core.mjs` gives `rule:model-policy`
   the source `startsWith: '- **Model policy'` and no `until`, so its passage runs to the next BLANK
   line — and CLAUDE.md §6 has no blank line between its bullets, so the passage reaches from line 74
-  to line 101, seven bullets past the rule it is named for: four eyes, language files, journal
+  to line 101, six bullets past the rule it is named for: four eyes, language files, journal
   markup, small command output, settled judgment, and the comment rule. Twelve stamped files echo
   that fingerprint.
   WHAT IT ALREADY COST: point 768's counted merge produced union entry U36 — drop "Act on settled
@@ -11003,4 +11010,48 @@ to land than a mechanism that needs a review.
   measured occurrence is closed by hand, so nothing waits on it.
   Criticality: medium — no product defect, but its failure mode is two writers on one repository,
   and it is reached through the very command the boundary tells a session to run.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 832. The ratchet holds against today's ceiling, not against the one it replaced — and three
+  of the cut guard's readers are heuristics that give both wrong answers (cross-vendor review of
+  point 768, GPT-5.6 Sol, 22.08.2026, pass 3 of 4, verdict do-not-merge; the fail-open word ceiling
+  it also found was fixed in the same session and is not part of this point). FOUR FINDINGS, each
+  reproducible from the line named:
+  (1) HIGH — `scripts/doc-budget-core.mjs`, the ratchet branch `budget.maxWords - m.words > slack`:
+  the comparison has NO historical ceiling behind it. Growing a document from 100 to 150 words while
+  moving `maxWords` from 100 to 150 in the same commit stays green, and `formatDocBudgetVerdict()`
+  still offers the RAISE remedy. What is enforced is proximity to today's mutable ceiling, not the
+  property the module's own comment states — that each document can only ever ratchet DOWN.
+  (2) MEDIUM — `RATIONALE_MARKERS` gives both wrong answers on real lines: "Preserve the reason on
+  every record" is an instruction and matches `the reason`, while "Push after every commit; an
+  interrupted session loses unpushed work" carries a rationale and matches nothing. The word ratchet
+  catches neither while the document sits inside its slack.
+  (3) MEDIUM — `withoutCodeSpans()` is not CommonMark code-span handling: it splits on newlines, so
+  a span that crosses a line ending is reported as prose, and a backslash-escaped backtick is still
+  read as a delimiter, so a rationale between two escaped backticks is hidden. Neither case is
+  tested.
+  (4) MEDIUM — `scripts/design-sections.test.mjs`, `expand()` at `out.push(range[1], range[2])`:
+  a cross-prefix citation such as `§§17.1–19.2` is reduced to its two endpoints and the test blesses
+  that, so a section lying between them is never swept and a later-added section missing from
+  `BASELINE_SECTION_IDS` can disappear with the citation check still green.
+  WHAT THE FIRST ONE HAS TO DECIDE, because it is not a pure bug: this project RAISES a ceiling on
+  purpose, in writing, twice on 22.08.2026 alone (the guide by the measured fit of one new lesson,
+  `CLAUDE.md` by the four words of a rule the review put back). A monotone-down rule with no way up
+  would forbid the project's own practice. So the answer is not "never raise" but "a raise cannot be
+  silent": the enforced property has to be that the ceiling falls by default and rises only with a
+  justification the mechanism can see, and the module's comment has to state exactly what is
+  enforced rather than a stronger claim.
+  FINAL STATE: the ratchet compares against the ceiling's own previous value, not only against the
+  document; a raise without a recorded written justification is a finding; the two heuristic readers
+  either carry the cases above as passing tests or state in one line what they deliberately do not
+  see; and the section sweep expands a cross-prefix range over every section it contains.
+  VERIFIABLE: Vitest over the pure core — a commit that grows a document and its ceiling together is
+  refused while the same growth with a recorded justification passes; the four lines quoted above
+  produce the correct verdict in both directions; and a section added between the endpoints of a
+  cross-prefix citation is swept.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point from a
+  review of its own work, and the user ruled on 20.08.2026 that such a point does not overtake the
+  release.
+  Criticality: medium — the ratchet is the mechanism the user asked for twice, and its stated
+  property is stronger than what it enforces.
   Bundle: Session- & Repo-Hygiene.

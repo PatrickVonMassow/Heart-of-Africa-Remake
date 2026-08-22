@@ -83,8 +83,14 @@ export const DOC_BUDGETS = [
     // The line margin remains; the word ceiling is exact. Leaving the former ceiling
     // standing would hand the next writer the 780 words this cut bought — which is
     // what the slack below now refuses.
+    // RAISED again by the FOUR measured words of a second rule the cross-vendor
+    // review put back on 22.08.2026: "Keep branches short" left the file on the
+    // ground that small commits imply it, and they do not — the queue record holds a
+    // branch of forty commits that stood 658 behind `main`. The rule has no other
+    // authority and no guard, so it returns and the ceiling follows it by exactly
+    // its own size.
     maxLines: 193,
-    maxWords: 1315,
+    maxWords: 1319,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
@@ -481,7 +487,20 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         why: budget.why,
       })
     }
-    if (m.words > budget.maxWords) {
+    // THE CEILING ITSELF IS READ BEFORE IT IS COMPARED AGAINST. `undefined` or `NaN`
+    // makes every comparison below false — the document passes at any size and the
+    // ratchet passes with it, which is the one failure this module may not have
+    // (cross-vendor review). An unreadable ceiling is a finding, like an unreadable
+    // slack.
+    if (!(Number.isInteger(budget.maxWords) && budget.maxWords >= 0)) {
+      findings.push({
+        path: budget.path,
+        kind: 'word ceiling is not a whole number of words',
+        actual: budget.maxWords === undefined ? '(no maxWords)' : String(budget.maxWords),
+        budget: 'a non-negative integer, written per document',
+        why: 'a ceiling that cannot be read lets the document grow without limit',
+      })
+    } else if (m.words > budget.maxWords) {
       findings.push({
         path: budget.path,
         kind: 'words',
@@ -504,7 +523,7 @@ export function evaluateDocBudgets(docs, budgets = DOC_BUDGETS) {
         budget: 'a non-negative integer, written per document',
         why: 'a ratchet that cannot be read is a ceiling nobody ever lowers again',
       })
-    } else if (m.words <= budget.maxWords && budget.maxWords - m.words > slack) {
+    } else if (Number.isInteger(budget.maxWords) && m.words <= budget.maxWords && budget.maxWords - m.words > slack) {
       findings.push({
         path: budget.path,
         kind: 'headroom',

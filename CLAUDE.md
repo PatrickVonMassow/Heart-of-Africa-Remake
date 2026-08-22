@@ -60,8 +60,8 @@ strategy and suite map: `scripts/verify/README.md`.
   points verbatim to `docs/tasks-archive.md`. Consumers needing open and closed
   work use `scripts/tasks-source.mjs`.
 - Land through `node scripts/land-point.mjs <N> --model <m>`; its gate is
-  mandatory after every merge. Verify again after syncing substantial `main`
-  changes. Owner operation: `docs/batch-owner-runbook.md`.
+  mandatory after every merge. Keep branches short, and verify again after syncing
+  substantial `main` changes. Owner operation: `docs/batch-owner-runbook.md`.
 - A delegated author runs `node scripts/point-brief.mjs <N>`, may read named
   sections on demand, and escalates an ambiguous or insufficient brief instead
   of guessing. Regenerate a brief from an older revision.

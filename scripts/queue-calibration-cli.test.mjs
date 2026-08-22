@@ -103,15 +103,19 @@ const HISTORY_IS_SHALLOW = shallowCheckout()
 // while the suite's own `beforeAll` still fails for the missing ref — red for the
 // checkout again, one lane further along. Point 829 removes the dependency; until
 // then the whole suite says why it cannot run where its base ref is absent.
-const baseRefPresent = () => {
+// EXIT 1 AND NOTHING ELSE. `--verify --quiet` answers 1 for "this revision does not
+// resolve"; 128 is a broken or unreadable repository and a null status is a Git that
+// never ran. Treating those as a missing ref would skip the suite for the very
+// failures it should go red for, so they fall through to the run (cross-vendor review).
+const baseRefMissing = () => {
   const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'main^{commit}'], {
     encoding: 'utf8',
     cwd: REPO_ROOT,
     windowsHide: true,
   })
-  return probe.status === 0
+  return probe.status === 1
 }
-const BASE_REF_MISSING = !baseRefPresent()
+const BASE_REF_MISSING = baseRefMissing()
 
 const run = (dir, ...args) => {
   const before = checkoutState()

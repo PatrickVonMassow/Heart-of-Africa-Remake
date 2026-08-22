@@ -496,3 +496,23 @@ describe('the per-point ceiling of the work order', () => {
     expect(evaluateDocBudgets([{ path: 'TASKS.md', text }], budget).block).toBe(true)
   })
 })
+
+describe('the word ceiling is read before it is compared against', () => {
+  // A ceiling of undefined/NaN made every comparison false, so the document passed
+  // at any size and the ratchet passed with it (cross-vendor review, 22.08.2026).
+  const doc = (words) => ({ path: 'X.md', text: Array.from({ length: words }, () => 'wort').join(' ') })
+
+  it('reports an unreadable ceiling instead of passing the document at any size', () => {
+    const budgets = [{ path: 'X.md', maxLines: 10, maxWords: undefined, slackWords: 5 }]
+    const verdict = evaluateDocBudgets([doc(9999)], budgets)
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings.map((f) => f.kind)).toContain('word ceiling is not a whole number of words')
+  })
+
+  it('does the same for a ceiling that is not a number at all', () => {
+    const budgets = [{ path: 'X.md', maxLines: 10, maxWords: Number.NaN, slackWords: 5 }]
+    const verdict = evaluateDocBudgets([doc(9999)], budgets)
+    expect(verdict.block).toBe(true)
+    expect(verdict.findings.some((f) => f.kind === 'headroom')).toBe(false)
+  })
+})
