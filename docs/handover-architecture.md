@@ -179,7 +179,9 @@ The attached material does not disclose the existing progress-board source path,
 
 1. Define schemas and invariants before process changes.
 
-   Update `CLAUDE.md` and add schema modules used by `scripts/detached-agent.mjs`. Specify identities, states, valid transitions, lease epochs, checksum framing, schema version, retry request IDs and the rule that every mutating command is idempotent. Verify with `npx vitest run scripts/__tests__/batch-schema.test.mjs`.
+   Add `scripts/batch-schema-core.mjs`, the pure schema and invariant layer every later step reads. Specify identities, attempt states and their valid transitions, the coordinator credential and its lease epoch, the daemon record and its lock copy, checksum framing, the schema version rule, retry request ids and the rule that every mutating command declares its compensation and is idempotent. The daemon-pair table of mechanism 2 is decided here rather than assumed, and the credential's acceptance cases — a push under a previous generation refused, a fence store that lost its generation refusing to mint — belong to this step. Verify with `npx vitest run scripts/batch-schema-core.test.mjs` (the union's `scripts/__tests__/batch-schema.test.mjs` is translated to this repository's convention).
+
+   `CLAUDE.md`'s lifecycle rules are NOT written here, and that is the dark rule rather than an omission: the lane may not be advertised until the step-8 slice is green, and CLAUDE.md is where this project states what runs. They land with that slice, together with the activation flag's release.
 
 2. Build the durable state store.
 
@@ -694,6 +696,54 @@ schema is not one it knows.
 **The two degenerate combinations.** A lock with no daemon is the normal case today and stays
 legal. A daemon with no live lock is an error, and the daemon answers it by refusing every
 mutation and raising an alert — never by choosing an owner itself.
+
+**THE PAIR IS TWO FILES, SO WHAT MAKES IT SAFE IS A WRITE ORDER AND AN INVARIANT — not the claim
+that it cannot disagree.** The persistence paragraph above says the durable record is the
+daemon's identity file and that the lock carries a copy of it; an earlier draft added that the two can therefore never
+disagree, and that is false. A crash between the two writes leaves them apart, `acquire` deletes
+the lock file and takes the copy with it, and a daemon that exits releases the record while the
+copy still names it. The schemas of step 1 encode STATES, so this pair's transitions are settled
+here, BEFORE they are encoded — otherwise the schemas encode a lie.
+
+- **The record** is `<state-store>/daemon.json`: pid, pid start time, generation, schema version,
+  the fence being served, the launch nonce. Its only writer is the daemon itself, by
+  write–flush–rename, and `start` claims it by exclusive create.
+- **The copy** is the `daemon` field of `.claude/batch-lock.json`: pid, pid start time and
+  generation, nothing else. Its only writer is the lock's atomic test-and-set, so only the lock
+  owner can write it, and it is a CACHE — it exists so that "is there a daemon" and "may I work"
+  are one read for the current owner, and for nothing else.
+
+**Two write orders, and each is crash-safe in the same direction.** START writes the record
+durably first; the lock owner then reads it, matches the launch nonce, probes the identity and
+writes the copy. STOP clears the copy first; the daemon releases its record as its last act. A
+HANDOVER deletes the lock file, so the copy is gone by construction and the successor rewrites it
+from the record. Every one of these leaves, at worst, a record with no copy — the ordinary state
+at every handover, never an incident.
+
+**THE INVARIANT, in one sentence: the record is the sole authority on the daemon's existence, and
+the copy may only ever be ABSENT or OLDER, never NEWER.** Formally `copy.generation <=
+record.generation` at every observable instant, and a copy is trusted only when it matches the
+record exactly and the record's pid and pid start time probe live. Liveness is never read from
+the copy. Both write orders can produce absence and staleness and neither can produce novelty, so
+a copy naming a generation the record does not carry is not a race this design lost — it is
+corruption, and it fails closed.
+
+**The observations, and what each one resolves to.** Reconciliation is idempotent: running it
+twice changes nothing, because every resolution is a write toward the record's own truth.
+
+| Record | Copy | Probe | Reading | Resolution |
+|---|---|---|---|---|
+| absent | absent | — | no daemon | today's path, legal and normal |
+| present | matching | live | healthy | nothing to do |
+| present | absent | live | unadopted — a handover, or a crash between the two writes | the lock owner probes the record and writes the copy |
+| present | absent | dead | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
+| present | matching | dead | stale copy | as cold record, and clear the copy |
+| present | mismatched, older | either | superseded copy | the record wins; rewrite the copy from it after probing |
+| absent | present | — | orphaned copy | clear the copy; a daemon is never concluded from the copy alone |
+| any | mismatched, NEWER | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
+
+Its acceptance cases are step 1's own: every row of this table decided from the pair alone, and
+the forbidden row refused rather than resolved.
 
 #### 3. Ordered ownership for the prose-only omissions
 
