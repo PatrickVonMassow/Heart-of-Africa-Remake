@@ -35,6 +35,7 @@ import {
   ELAPSED_BIAS_BASIS,
   inheritanceDefaults,
   inheritedEstimateForClass,
+  PICTURE_VERIFIED,
   pictureBearingPoints,
   pictureConfounded,
   promiseMedians,
@@ -187,6 +188,10 @@ try {
   const cadenceHours = rows.slice(1).map((r, i) => (r.landedAt - rows[i].landedAt) / HOUR)
   const window = { from: rows[0].landedAt, to: rows[rows.length - 1].landedAt, landings: rows.length, since: options.since, limit }
   const reading = calibrationReading(rows, { cadenceHours, window })
+  // Whether this window can say anything about a render point decides BOTH the
+  // rewrite below and the confounder line printed with the limits, so it is read
+  // once, here, and never restated as a standing fact.
+  const confounded = pictureConfounded(reading)
 
   console.log(`WINDOW  ${iso(window.from)} → ${iso(window.to)} UTC · ${window.landings} landed point(s)` + (limit ? ` (--limit ${limit})` : ` (--since ${window.since})`))
   console.log('')
@@ -235,7 +240,18 @@ try {
   )
   console.log('CLASSIFICATION LIMIT — LANE: only a merge subject naming the point’s branch establishes delegated; every other row is lane-unestablished.')
   console.log('CLASSIFICATION LIMIT — PICTURE: render-verify-state.json is git-ignored, bounded to 40 runs and clearedHeads is pruned at branch end; only a retained branch entry establishes picture verification.')
-  console.log('CONFOUNDER: the small measured window is all process/infrastructure points and has no render point with a picture check; do not carry its factor to render points.')
+  if (confounded) {
+    console.log(
+      'CONFOUNDER: this window has no landing with an established picture check, so it says nothing about what one costs; ' +
+        'its factor is not carried to a point that owes a rendered proof.',
+    )
+  } else {
+    const render = reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED)
+    console.log(
+      `CONFOUNDER LAPSED: ${render.elapsed.n} landing(s) with an established picture check are now measurable ` +
+        `(median ${fmt(render.elapsed.median, ' h')}), so a point owing a rendered proof is corrected from THAT class.`,
+    )
+  }
   console.log('CONFOUNDER: point 713 still stands at 14 do-not-merge rounds, so the review loop is not universally healed.')
   console.log('')
   console.log(`ELAPSED PER POINT (h)   ${five(reading.overall.elapsed, ' h')}`)
@@ -247,13 +263,16 @@ try {
     console.log(`BY ${axis.toUpperCase()}`)
     for (const c of reading.byAxis[axis]) {
       console.log(
-        `  ${String(c.name).padEnd(15)} points ${String(c.points).padStart(3)}  measured ${String(c.ratio.n).padStart(3)}  ` +
+        `  ${String(c.name).padEnd(15)} points ${String(c.points).padStart(3)}  spans ${String(c.elapsed.n).padStart(3)}  ` +
+          `rated ${String(c.ratio.n).padStart(3)}  ` +
           `median elapsed ${fmt(c.elapsed.median, ' h').padStart(8)}  median ratio ${fmt(c.ratio.median, '×').padStart(8)}` +
           (c.unknowable
             ? '  (missing-information class — excluded from comparison)'
             : c.comparable
               ? ''
-              : `  (PENDING: fewer than ${MIN_CLASS_SAMPLES} measured — no comparable yet)`),
+              : c.elapsedComparable
+                ? `  (no ratio yet — fewer than ${MIN_CLASS_SAMPLES} rated; its correction comes from the measured spans)`
+                : `  (PENDING: fewer than ${MIN_CLASS_SAMPLES} measured spans — nothing to correct from yet)`),
       )
     }
   }
@@ -270,7 +289,6 @@ try {
   for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}`)
 
   const declaredPicture = pictureBearingPoints(tasksAll)
-  const confounded = pictureConfounded(reading)
   const pictureBearing = confounded ? declaredPicture : new Set()
   const promises = promiseMedians({ cards, open, criticality, ledger, exclude: pictureBearing })
   for (const c of reading.byAxis.criticality) {

@@ -27,6 +27,7 @@ import {
   parseEstimateHours,
   parseFirstParentChain,
   parseTickEvents,
+  PICTURE_VERIFIED,
   pictureBearingPoints,
   pictureConfounded,
   pictureVerifiedPoints,
@@ -848,5 +849,68 @@ describe('what a newly filed render card inherits', () => {
         pictureConfounded: true,
       }),
     ).toMatch(/Klassenmedian/)
+  })
+})
+
+
+describe('a render card is corrected from render work, never from a pooled median', () => {
+  // Six process landings at 1 h and six RENDER landings at 3 h. The pooled
+  // criticality median is 2 h and belongs to neither lane.
+  const rows = [
+    ...Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium', picture: false }),
+    ),
+    ...Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 700 + i, elapsedHours: 3, estimateHours: null, criticality: 'medium', picture: true }),
+    ),
+  ]
+  const reading = calibrationReading(rows)
+
+  it('has both a pooled median and a separate render median', () => {
+    expect(reading.byAxis.criticality.find((c) => c.name === 'medium').elapsed.median).toBe(2)
+    expect(reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED).elapsed.median).toBe(3)
+  })
+
+  it('aims the render card at the RENDER median, not the pooled one', () => {
+    const plan = rewritePlan(reading, {
+      cards: { 20: { estimate: '~6 h' } },
+      open: [20],
+      criticality: new Map([[20, 'medium']]),
+      pictureBearing: new Set([20]),
+    })
+    // Render median 3 h over the render cards' own promise of 6 h → 0.5×, so ~3 h.
+    // The pooled median of 2 h would have produced ~2 h instead.
+    expect(plan[0]).toMatchObject({ point: 20, to: '~3 h', changed: true })
+    expect(plan[0].basis).toBe(`${ELAPSED_BIAS_BASIS}:${PICTURE_VERIFIED}`)
+  })
+
+  it('leaves a non-render card on its criticality class', () => {
+    const plan = rewritePlan(reading, {
+      cards: { 10: { estimate: '~4 h' }, 20: { estimate: '~6 h' } },
+      open: [10, 20],
+      criticality: new Map([[10, 'medium'], [20, 'medium']]),
+      pictureBearing: new Set([20]),
+    })
+    expect(plan[0].basis).toBe(`${ELAPSED_BIAS_BASIS}:medium`)
+    // …and its denominator is its own promise, with the render card left out.
+    expect(plan[0]).toMatchObject({ point: 10, to: '~2 h' })
+  })
+})
+
+describe('a denial the old guard read the wrong way round', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('reads a postfix denial as a denial', () => {
+    const tasks = [
+      block(60, 'A screenshot is not required for this change.'),
+      block(61, 'The change does not require a browser frame.'),
+      block(62, 'Ein Screenshot ist hier nicht nötig.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)]).toEqual([])
+  })
+
+  it('does NOT read a demand as a denial just because it contains a negation', () => {
+    const tasks = block(63, 'VERIFIABLE: a browser frame on both backends; it may not be skipped.')
+    expect(pictureBearingPoints(tasks).has(63)).toBe(true)
   })
 })

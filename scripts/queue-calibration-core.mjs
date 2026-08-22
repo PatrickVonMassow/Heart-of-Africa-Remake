@@ -579,9 +579,13 @@ export function calibrationReading(landings, { cadenceHours = [], window = null,
  * cannot be read off a queued card, so they inform the DECISION above and never
  * a card's own number.
  */
-export function factorForCard(reading, criticality, { promiseMedian = null } = {}) {
+export function factorForCard(reading, criticality, { promiseMedian = null, measuredFrom = null } = {}) {
   const label = criticality ?? UNTAGGED
-  const ownClass = (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
+  // `measuredFrom` overrides WHICH measured class supplies the elapsed numerator.
+  // A card that owes a rendered proof belongs to the render class the moment that
+  // class can be measured; correcting it from the pooled criticality median would
+  // aim it at a centre mixed from work that never rendered anything.
+  const ownClass = measuredFrom ?? (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
   const ratioComparable = Boolean(ownClass?.comparable) && (ownClass?.ratio?.n ?? 0) >= MIN_CLASS_SAMPLES
   if (ratioComparable) {
     if (reading?.decision?.adopted && asNumber(reading.decision.factor)) {
@@ -601,7 +605,7 @@ export function factorForCard(reading, criticality, { promiseMedian = null } = {
   const promise = asNumber(promiseMedian)
   const measured = asNumber(ownClass?.elapsed?.median)
   if (ownClass?.elapsedComparable && promise > 0 && measured > 0) {
-    return { factor: measured / promise, basis: `${ELAPSED_BIAS_BASIS}:${label}`, label, reason: null }
+    return { factor: measured / promise, basis: `${ELAPSED_BIAS_BASIS}:${ownClass.name ?? label}`, label, reason: null }
   }
   if (!ratioComparable) {
     return {
@@ -684,8 +688,17 @@ export const PICTURE_PROOF_MARKERS = [
  * it exists so "no screenshot is required here" does not mark a process point as
  * a render point, and it is not a general-purpose negation parser.
  */
+const PROOF_NOUN = '(screenshots?|browser frames?|picture[- ]\\w+|rendered proof)'
+
 export const PICTURE_PROOF_DENIALS = [
-  /\b(no|without|kein|keine|ohne)\s+(\w+\s+){0,2}(screenshots?|browser frames?|picture[- ]\w+)/i,
+  // "no screenshot", "without a browser frame", "kein Screenshot"
+  new RegExp(`\\b(no|without|kein|keine|ohne)\\s+(\\w+\\s+){0,2}${PROOF_NOUN}`, 'i'),
+  // "a screenshot is not required", "the browser frame was not needed"
+  new RegExp(`${PROOF_NOUN}\\s+(\\w+\\s+){0,3}(is|are|was|were)?\\s*not\\s+(required|needed|necessary)`, 'i'),
+  // "does not require a screenshot", "will not need a browser frame"
+  new RegExp(`\\bnot\\s+(\\w+\\s+){0,2}(require|requires|need|needs)\\s+(\\w+\\s+){0,2}${PROOF_NOUN}`, 'i'),
+  // German postfix: "ein Screenshot ist nicht nötig"
+  new RegExp(`${PROOF_NOUN}[^.]{0,40}\\bnicht\\s+(nötig|noetig|erforderlich)`, 'i'),
   /\bnot\s+(\w+\s+){0,2}picture[- ]verified\b/i,
 ]
 
@@ -793,9 +806,26 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
   const crit = criticality instanceof Map ? criticality : new Map(Object.entries(criticality).map(([k, v]) => [Number(k), v]))
   const declared = pictureBearing instanceof Set ? pictureBearing : new Set(pictureBearing ?? [])
   // The exclusion lives and dies with the evidence. Once the picture axis has a
-  // measurable class of its own, these cards are corrected like any other.
-  const picture = pictureConfounded(reading) ? declared : new Set()
-  const promises = promiseMedians({ cards, open, criticality: crit, ledger, exclude: picture })
+  // measurable class of its own, these cards stop being held out — and are then
+  // corrected from THAT class, numerator and denominator both, never from the
+  // pooled criticality median that mixes in work which rendered nothing.
+  const confounded = pictureConfounded(reading)
+  const picture = confounded ? declared : new Set()
+  // A card belongs in a denominator only if it is corrected from that numerator.
+  // A card owing a rendered proof is corrected from the RENDER class or not at
+  // all — never from the criticality class — so it stays out of the criticality
+  // denominator in BOTH states. Letting it back in when the confounder lapses
+  // would quietly restore the mixing the holdout was built to end.
+  const promises = promiseMedians({ cards, open, criticality: crit, ledger, exclude: declared })
+  const renderClass = confounded ? null : (reading?.byAxis?.picture ?? []).find((c) => c.name === PICTURE_VERIFIED)
+  const renderPromise = renderClass
+    ? summarise(
+        [...declared]
+          .filter((n) => open.map(Number).includes(Number(n)))
+          .map((n) => parseEstimateHours(ledgerEntry(ledger, Number(n))?.baseline ?? cards?.[Number(n)]?.estimate ?? null))
+          .filter((h) => h),
+      ).median
+    : null
   const plan = []
   for (const point of [...open].map(Number).filter((n) => Number.isInteger(n) && n > 0).sort((a, b) => a - b)) {
     const from = cards?.[point]?.estimate ?? null
@@ -814,8 +844,10 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     }
     const hours = parseEstimateHours(baseline)
     const label0 = crit.get(point) ?? UNTAGGED
+    const render = Boolean(renderClass) && declared.has(point)
     const { factor, basis, label, reason: factorReason } = factorForCard(reading, crit.get(point), {
-      promiseMedian: promises.get(label0) ?? null,
+      promiseMedian: render ? renderPromise : (promises.get(label0) ?? null),
+      measuredFrom: render ? renderClass : null,
     })
     if (hours && picture.has(point)) {
       plan.push({
