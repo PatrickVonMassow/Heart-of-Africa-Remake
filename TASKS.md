@@ -11019,3 +11019,41 @@ to land than a mechanism that needs a review.
   Criticality: low — it costs no product behaviour, but the board is what the user plans against,
   and a front stage priced above its own whole makes that plan wrong.
   Bundle: Chat & Tafel.
+
+- [ ] 839. The four-eyes gate on main has become unresolvable, and it refuses every turn end
+  (measured 22.08.2026 while landing points 716, 737 and 829; recorded in the findings carrier and
+  drained here). `mechanism-review-guard` answers UNREVIEWABLE for the open range and names two
+  causes at once, both already on `main`, and neither of them is something a point in flight can
+  close as a side effect.
+  FIRST, contributions carry an UNANSWERED DO-NOT-MERGE verdict from GPT-5.6 Sol —
+  `scripts/clear-claim-guard-core.mjs`, `scripts/clear-claim-guard.mjs`,
+  `scripts/guard-registration-core.mjs`, `scripts/timestamp-guard-core.mjs`,
+  `scripts/guide-brevity-core.mjs`, `scripts/doc-budget-core.mjs` and others. The gate demands, for
+  each, that the finding be fixed and the re-review recorded at a commit DESCENDING from 5ce597c
+  respectively 7db99ea; a verdict on work that does not contain the fix answers nothing.
+  SECOND, contributions carry only a SELF-REVIEW (Claude Opus 5 over Claude-authored work) or no
+  resolvable authoring vendor at all — `scripts/criticality-review-guard-core.mjs` and its test,
+  `docs/analysis_de/vibe-coding-anleitung.md`, `.claude/mechanism-reviews.jsonl`, `.gitignore`. For
+  those, no model can prove cross-vendor independence while the Fable switch is off, so no record
+  by the configured reviewer chain can ever clear them.
+  MEASURED on main, 22.08.2026: 729 commits in the open range, 181 usable records, 217 outstanding
+  end-state files, 7 refusals. The debt predates this session and no landing shrinks it.
+  FINAL STATE: the gate is answerable again. Every recorded DO-NOT-MERGE is either FIXED and
+  re-reviewed at a descending commit, or FILED as its own open point with the acceptance written
+  down — never silently outlived. Every vendorless contribution has a named decision: its authoring
+  vendor is established, or the range is narrowed with `--since` to a reviewable subset, or the rule
+  for such legacy contributions is written into `scripts/mechanism-review-guard.mjs` so the gate
+  states its own limit instead of blocking on it. A contribution that stays unreviewable says WHY
+  and names what would make it reviewable.
+  VERIFIABLE: `node scripts/guard-preflight.mjs --for turn-end --session <id>` reports
+  mechanism-review-guard clean on main; `node scripts/mechanism-review-guard.mjs --status` lists no
+  contribution without an eligible reviewer vendor; and every point number this work files is open
+  in TASKS.md with its accepted-or-owed state named.
+  QUEUE RANK: at the end of the order, behind point 174. Reason: the machine filed this point
+  itself, and the user ruled on 20.08.2026 that such a point does not overtake the release. Stated
+  against that rank: this gate currently refuses every turn end, so the cost of leaving it is paid
+  by every session until it is closed.
+  Criticality: medium — it destroys no work, but it is the four-eyes rule's own enforcement, and a
+  gate that blocks on something no turn can settle teaches the sessions passing through it that the
+  gate is noise.
+  Bundle: Session- & Repo-Hygiene.
