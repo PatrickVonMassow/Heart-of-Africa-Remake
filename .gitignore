@@ -69,6 +69,10 @@ scripts/.tile-cache
 .claude/chat-spool.jsonl
 .claude/chat-spool.jsonl.migrated-*
 .claude/chat-spool/
+# The carrier bell's last observed count and reminder time. This is per-machine
+# delivery state like the spool ledger, never source history.
+.claude/carrier-bell-state.json
+.claude/carrier-bell-state.json.tmp-*
 # The message watcher's own runtime state (point 407). Both belong here for the
 # same reason .claude/batch-claim.json does — batch-doctor's stash sweeps what
 # git does not know about, and each of these has a failure mode when it goes:

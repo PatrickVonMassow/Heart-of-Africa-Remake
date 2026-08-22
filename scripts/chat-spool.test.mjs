@@ -7,13 +7,13 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   CONSUMED_RETENTION_MS,
   claimMessage,
   claimOldest,
   consumedDir,
-  deliverPendingMessages,
+  deliverPendingMessages as deliverPendingMessagesIO,
   isSpooled,
   knownMessages,
   migrateLegacySpool,
@@ -31,6 +31,15 @@ const tmp = () => {
   dirs.push(d)
   return d
 }
+let deliveryPaths
+beforeEach(() => {
+  const base = tmp()
+  deliveryPaths = {
+    carrierFile: join(base, 'findings-carrier.md'),
+    bellStatePath: join(base, 'carrier-bell-state.json'),
+  }
+})
+const deliverPendingMessages = (opts) => deliverPendingMessagesIO({ ...deliveryPaths, ...opts })
 afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
@@ -235,6 +244,57 @@ describe('THE HOOK DUTY: deliverPendingMessages', () => {
     expect(readPending(dir)).toHaveLength(4)
     expect(deliverPendingMessages({ dir, ownsBatch: true })).toContain('4 new')
     expect(deliverPendingMessages({ dir, ownsBatch: true })).toBe('')
+  })
+
+  it('rings for the pending findings carrier without changing it', () => {
+    const base = tmp()
+    const dir = join(base, 'spool')
+    const carrierFile = join(base, 'findings-carrier.md')
+    const bellStatePath = join(base, 'carrier-bell-state.json')
+    const carrier = '- [ ] 2026-08-18T13:00:00.000Z · window-1 · A waiting finding\n'
+    writeFileSync(carrierFile, carrier)
+
+    const out = JSON.parse(deliverPendingMessages({ dir, carrierFile, bellStatePath, ownsBatch: true, now: NOW }))
+    expect(out).toEqual({
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        additionalContext:
+          'FINDINGS CARRIER: 1 waiting; oldest [2026-08-18T13:00:00.000Z] "A waiting finding". ' +
+          'Drain: node scripts/finding.mjs --drain',
+      },
+    })
+    expect(readFileSync(carrierFile, 'utf8')).toBe(carrier)
+  })
+
+  it('gives a chat message the call, then rings the carrier on the next call', () => {
+    const base = tmp()
+    const dir = join(base, 'spool')
+    const carrierFile = join(base, 'findings-carrier.md')
+    const bellStatePath = join(base, 'carrier-bell-state.json')
+    writeFileSync(carrierFile, '- [ ] 2026-08-18T13:00:00.000Z · window-1 · Waiting behind chat\n')
+    spoolMessage(msg({ text: 'the user goes first' }), dir)
+
+    const chat = deliverPendingMessages({ dir, carrierFile, bellStatePath, ownsBatch: true, now: NOW })
+    expect(chat).toContain('the user goes first')
+    expect(chat).not.toContain('FINDINGS CARRIER')
+
+    const bell = deliverPendingMessages({ dir, carrierFile, bellStatePath, ownsBatch: true, now: NOW + 1 })
+    expect(bell).toContain('FINDINGS CARRIER: 1 waiting')
+    expect(bell).not.toContain('the user goes first')
+  })
+
+  it('does not ring again inside the interval, but a risen count rings immediately', () => {
+    const base = tmp()
+    const dir = join(base, 'spool')
+    const carrierFile = join(base, 'findings-carrier.md')
+    const bellStatePath = join(base, 'carrier-bell-state.json')
+    const first = '- [ ] 2026-08-18T13:00:00.000Z · window-1 · First\n'
+    writeFileSync(carrierFile, first)
+
+    expect(deliverPendingMessages({ dir, carrierFile, bellStatePath, ownsBatch: true, now: NOW })).toContain('1 waiting')
+    expect(deliverPendingMessages({ dir, carrierFile, bellStatePath, ownsBatch: true, now: NOW + 1 })).toBe('')
+    writeFileSync(carrierFile, `${first}- [ ] 2026-08-18T13:01:00.000Z · window-2 · Second\n`)
+    expect(deliverPendingMessages({ dir, carrierFile, bellStatePath, ownsBatch: true, now: NOW + 2 })).toContain('2 waiting')
   })
 })
 
