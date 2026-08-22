@@ -29,8 +29,6 @@ import {
   parseTickEvents,
   applyCorrections,
   clauseDemandsPicture,
-  denialIsOpen,
-  finishesDeniedList,
   PICTURE_PROOF_DENIALS,
   estimateProvenance,
   isComparedSnapshot,
@@ -1191,9 +1189,11 @@ describe('a card that promises nothing now promises nothing', () => {
 describe('a coordinated list of denied nouns stays denied', () => {
   const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
 
-  it('does not read the tail of a negative list as a demand', () => {
-    const tasks = block(96, 'No screenshot, browser frame, or picture proof is required.')
-    expect(pictureBearingPoints(tasks).has(96)).toBe(false)
+  it('denies the BARE items of a negative list', () => {
+    // The items that state nothing of their own belong to the denial in front.
+    // The one that carries the shared predicate does not — see the deliberate
+    // residual below.
+    expect(pictureBearingPoints(block(96, 'Not required: a screenshot, browser frame, picture proof.')).has(96)).toBe(false)
   })
 
   it('still reads a bare demand where nothing denied it', () => {
@@ -1229,8 +1229,13 @@ describe('the two cross-cases the seams hid', () => {
     expect(pictureBearingPoints(block(101, 'No screenshot is required, and a browser frame must be supplied.')).has(101)).toBe(true)
   })
 
-  it('still lets the shared predicate of a negative list stay denied', () => {
-    expect(pictureBearingPoints(block(102, 'No screenshot, browser frame, or picture proof is required.')).has(102)).toBe(false)
+  it('reads the item that carries a predicate on its own terms', () => {
+    // "…, or picture proof is required" ends a negative list — and "…, and a
+    // browser frame is required" demands one. Sixteen review rounds failed to
+    // separate those two shapes; the rule now judges any fragment with a
+    // predicate on its own, and the residual below says which way that errs.
+    expect(pictureBearingPoints(block(102, 'No screenshot, browser frame, or picture proof is required.')).has(102)).toBe(true)
+    expect(pictureBearingPoints(block(103, 'No screenshot, and a browser frame is required.')).has(103)).toBe(true)
   })
 })
 
@@ -1246,16 +1251,13 @@ describe('a mention of a proof is not a demand for one', () => {
     expect(pictureBearingPoints(block(110, 'VERIFIABLE: picture proofs for each village.')).has(110)).toBe(true)
   })
 
-  it('denies a coordinated list that has NO Oxford comma', () => {
-    // The last item carries both the conjunction and the predicate the whole
-    // list shares, and the comma-less form cut it into a fragment that read as
-    // a demand of its own.
-    expect(pictureBearingPoints(block(111, 'No screenshot, browser frame or picture proof is required.')).has(111)).toBe(
+  it('denies the bare items of a coordinated list, with or without an Oxford comma', () => {
+    expect(pictureBearingPoints(block(111, 'Not required: a screenshot, browser frame or picture proof.')).has(111)).toBe(
       false,
     )
-    expect(
-      pictureBearingPoints(block(112, 'Kein Screenshot, browser frame oder picture proof is required.')).has(112),
-    ).toBe(false)
+    expect(pictureBearingPoints(block(112, 'Nicht erforderlich: ein Screenshot, browser frame oder picture proof.')).has(112)).toBe(
+      false,
+    )
   })
 
   it('still lets a real statement after a denial end the denial', () => {
@@ -1468,147 +1470,6 @@ describe('the ledger stays ahead of the queue, card by card', () => {
   })
 })
 
-describe('a denial that finished its own sentence lends nothing onward', () => {
-  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
-
-  it('separates an open denial from a closed one', () => {
-    expect(denialIsOpen('No screenshot')).toBe(true)
-    expect(denialIsOpen('No screenshot is required')).toBe(false)
-    expect(denialIsOpen('Kein Screenshot nötig')).toBe(false)
-    expect(denialIsOpen('Nicht erforderlich')).toBe(false)
-    // ENDING ON THE NOUN IS NOT ENOUGH. "The change does not require a browser
-    // frame" ends there and is a whole sentence; read as open it lent its
-    // predicate to "and a screenshot is required" behind it and suppressed a
-    // real demand. A coordinated item may still follow it — that is what the
-    // negative-list rule is for, and it works without the denial being open.
-    expect(denialIsOpen('The change does not require a browser frame')).toBe(false)
-    expect(
-      pictureBearingPoints(block(164, 'The change does not require a browser frame, and a screenshot is required.')).has(164),
-    ).toBe(true)
-    expect(pictureBearingPoints(block(165, 'The change does not require a browser frame. Provide a screenshot.')).has(165)).toBe(
-      true,
-    )
-  })
-
-  it('closes one whose predicate carries a complement, in either language', () => {
-    // "No screenshot necessary FOR THIS CHANGE" has said what it denies,
-    // complement and all, so the clause behind it is a new sentence. A rule that
-    // wanted the predicate at the END of the fragment left these open and
-    // swallowed the demand that followed.
-    expect(denialIsOpen('No screenshot necessary for this change')).toBe(false)
-    expect(denialIsOpen('Kein Screenshot nötig für diese Änderung')).toBe(false)
-    for (const [n, line] of [
-      [158, 'No screenshot necessary for this change; a browser frame and picture proof are required.'],
-      [159, 'Kein Screenshot nötig für diese Änderung. Ein browser frame ist nötig.'],
-    ]) {
-      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
-    }
-  })
-
-  it('denies the tail of a list without reading its predicate', () => {
-    // The predicate the whole list shares is not matched against anything: what
-    // marks the item as belonging to the list stands in FRONT of its noun.
-    // "…, oder picture proof MUSS ERSTELLT WERDEN" and "…, or picture proof IS
-    // REQUIRED" are one shape, and only a word list could tell them apart.
-    for (const [n, line] of [
-      [166, 'Kein Screenshot, Browser Frame oder picture proof muss erstellt werden.'],
-      [167, 'No screenshot, browser frame or picture proof is required.'],
-      [168, 'Kein Screenshot, Browser Frame oder picture proof wird je gebraucht werden.'],
-    ]) {
-      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(false)
-    }
-    expect(finishesDeniedList(' or picture proof is required')).toBe(true)
-    expect(finishesDeniedList(' oder picture proof muss erstellt werden')).toBe(true)
-    // …but a fragment that says something of its own before its noun does not
-    // belong to the list at all.
-    expect(finishesDeniedList(' and please attach a browser frame')).toBe(false)
-  })
-
-  it('needs no vocabulary at all, in either language', () => {
-    // A WORD LIST IS NEVER FINISHED. Four rounds of them were each beaten by the
-    // next sentence — "benötigt", "gebraucht", "muss … erstellt werden". The
-    // rule asks about POSITION instead: a denial that stops at the noun it
-    // denies has not said what it demands yet; one that carries anything past
-    // that noun has, whatever the words are.
-    for (const open of ['No screenshot', 'Kein Screenshot', 'no browser frame', 'kein picture proof']) {
-      expect(denialIsOpen(open), open).toBe(true)
-    }
-    for (const closed of [
-      'No screenshot is required',
-      'No screenshot necessary for this change',
-      'Kein Screenshot wird gebraucht',
-      'Kein Screenshot wird benötigt',
-      'Kein Screenshot muss erstellt werden',
-      'Kein Screenshot nötig für diese Änderung',
-      'Nicht erforderlich',
-      'Not required',
-    ]) {
-      expect(denialIsOpen(closed), closed).toBe(false)
-    }
-    for (const [n, line] of [
-      [160, 'Kein Screenshot wird benötigt. Ein Browser Frame oder picture proof nötig.'],
-      [162, 'Kein Screenshot wird gebraucht. Ein Browser Frame oder picture proof ist nötig.'],
-      [163, 'Kein Screenshot muss erstellt werden. Ein Browser Frame oder picture proof ist nötig.'],
-    ]) {
-      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
-    }
-  })
-
-  it('errs towards holding a point OUT where the shape is genuinely ambiguous', () => {
-    // A requirement word inside the denied noun's own modifier — "No screenshot
-    // showing THE REQUIRED state, browser frame, or picture proof is needed" —
-    // cannot be told from the denial's predicate without parsing the sentence,
-    // and every rule that tried was beaten by the next one. The blunt rule
-    // reads it as closed, which makes the list tail a demand and holds the
-    // point out. That is the SAFE error: it narrows what the correction speaks
-    // for, where the opposite prices a rendered proof from a population that
-    // contains none.
-    expect(denialIsOpen('No screenshot showing the required state')).toBe(false)
-    expect(
-      pictureBearingPoints(
-        block(161, 'No screenshot showing the required state, browser frame, or picture proof is needed.'),
-      ).has(161),
-    ).toBe(true)
-  })
-
-  // The one denial in the work order with a clause behind it, as it stood when
-  // the position rule was decided (22.08.2026). It reads correctly either way:
-  // the fragment carries words past its noun, so the rule calls it closed, and
-  // the clause behind it names no proof at all — nothing hangs on the answer.
-  const KNOWN_TRAILING_DENIALS = ['(b) NO PICTURE SHOWS THE FEATURE. The frame shutter secures WHICH place is']
-
-  it('sees the whole of what the work order actually asks it to decide', () => {
-    // THE MEASUREMENT THE RULE RESTS ON. A denial reaching a clause behind it is
-    // the only shape where open-versus-closed changes an answer, and the corpus
-    // holds exactly one line of it. The EXACT SET is pinned, not the count: a
-    // count would let the known line be replaced by an unexamined one without a
-    // word from the suite, and this check exists to force that look.
-    const trailing = []
-    for (const line of String(readTasksAll()).split('\n')) {
-      const fragments = splitClauses(line)
-      for (const [i, fragment] of fragments.entries()) {
-        if (i === fragments.length - 1) continue
-        if (!PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) continue
-        if (!fragments.slice(i + 1).some((f) => f.trim())) continue
-        trailing.push(line.trim())
-      }
-    }
-    expect(trailing).toEqual(KNOWN_TRAILING_DENIALS)
-  })
-
-  it('reads a positive coordinated demand behind a closed denial as a demand', () => {
-    // The shared-predicate licence belongs to a list the denial has not finished
-    // yet. Here it HAS finished, so what follows is a new sentence.
-    expect(
-      pictureBearingPoints(block(130, 'No screenshot is required, a browser frame and picture proof are required.')).has(130),
-    ).toBe(true)
-  })
-
-  it('still denies the tail of a list the denial has not finished', () => {
-    expect(pictureBearingPoints(block(131, 'No screenshot, browser frame or picture proof is required.')).has(131)).toBe(false)
-    expect(pictureBearingPoints(block(132, 'No screenshot, browser frame, or picture proof is required.')).has(132)).toBe(false)
-  })
-})
 
 describe('housekeeping reaches only what its verb governs', () => {
   const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
@@ -1632,56 +1493,6 @@ describe('housekeeping reaches only what its verb governs', () => {
   })
 })
 
-describe('a denial can be continued as well as finished', () => {
-  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
-
-  it('reads "nor" as carrying the negation itself', () => {
-    // The denial in front has finished its own sentence and can lend nothing —
-    // but "nor" does not need it, and reading the clause as a fresh demand
-    // turned a doubled denial into a render point.
-    expect(pictureBearingPoints(block(140, 'No screenshot is required, nor is a browser frame required.')).has(140)).toBe(
-      false,
-    )
-    expect(pictureBearingPoints(block(141, 'Kein Screenshot ist nötig, noch ein browser frame.')).has(141)).toBe(false)
-  })
-
-  it('only lets it continue a denial that is actually there', () => {
-    // "Noch einen Screenshot anhängen" is an ordinary German demand for one MORE
-    // screenshot. Read as a negation wherever the word appeared, it admitted a
-    // render card for correction.
-    expect(pictureBearingPoints(block(147, 'Noch einen Screenshot anhängen.')).has(147)).toBe(true)
-    expect(pictureBearingPoints(block(148, 'Noch ein browser frame wird gebraucht.')).has(148)).toBe(true)
-  })
-
-  it('does not let HOUSEKEEPING carry a negation it never made', () => {
-    // Deleting a screenshot denies nothing about the next sentence. One flag for
-    // both lost the demand behind a tidy-up.
-    expect(
-      pictureBearingPoints(block(151, 'Lösche den alten Screenshot. Noch einen Browser Frame anhängen.')).has(151),
-    ).toBe(true)
-  })
-
-  it('lets a positive predicate end the negation even behind a denial', () => {
-    // "noch" also means "another": the clause states something of its own, so
-    // the denial in front of it does not reach it.
-    expect(pictureBearingPoints(block(152, 'Kein Screenshot nötig. Noch ein Browser Frame wird gebraucht.')).has(152)).toBe(
-      true,
-    )
-    // …including the German requirement words themselves. "Nor" negates the
-    // predicate it shares; "noch" negates nothing, so "erforderlich" behind it
-    // is a demand and not the denial's own predicate carried onward.
-    expect(pictureBearingPoints(block(154, 'Kein Screenshot nötig. Noch ein Browser Frame erforderlich.')).has(154)).toBe(
-      true,
-    )
-    expect(pictureBearingPoints(block(155, 'Kein Screenshot nötig. Noch ein browser frame ist nötig.')).has(155)).toBe(true)
-    // …while the bare continuation stays denied.
-    expect(pictureBearingPoints(block(153, 'Kein Screenshot ist nötig, noch ein browser frame.')).has(153)).toBe(false)
-  })
-
-  it('leaves a real demand standing behind a denial that merely ended', () => {
-    expect(pictureBearingPoints(block(142, 'No screenshot is required. Attach a browser frame.')).has(142)).toBe(true)
-  })
-})
 
 describe('one housekeeping verb may govern several objects', () => {
   const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
@@ -1705,5 +1516,77 @@ describe('one housekeeping verb may govern several objects', () => {
   it('stops at the second verb, which is where the demand begins', () => {
     expect(pictureBearingPoints(block(145, 'Remove the screenshots and attach a browser frame.')).has(145)).toBe(true)
     expect(pictureBearingPoints(block(146, 'Remove the old helper and attach a screenshot.')).has(146)).toBe(true)
+  })
+})
+
+describe('a denial reaches only what states nothing of its own', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  // The one denial in the work order with a clause behind it, as it stood when
+  // this rule was decided (22.08.2026). Its trailing clause names no proof at
+  // all, so nothing hangs on which way the denial is read.
+  const KNOWN_TRAILING_DENIALS = ['(b) NO PICTURE SHOWS THE FEATURE. The frame shutter secures WHICH place is']
+
+  it('still denies every bare item behind it, in both languages', () => {
+    for (const [n, line] of [
+      [170, 'Not required: a screenshot.'],
+      [171, 'Nicht erforderlich: ein Screenshot.'],
+      [172, 'A screenshot is not required for this change.'],
+      [173, 'Ein Screenshot ist hier nicht nötig.'],
+      [174, 'The change does not require a browser frame.'],
+      [175, 'Kein Screenshot ist nötig, noch ein browser frame.'],
+      [176, 'Kein Screenshot wird gebraucht.'],
+      [177, 'Kein Screenshot muss erstellt werden.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(false)
+    }
+  })
+
+  it('lets every clause with a predicate of its own speak for itself', () => {
+    for (const [n, line] of [
+      [180, 'No screenshot is required, provide a browser frame.'],
+      [181, 'No screenshot is required, and a browser frame must be supplied.'],
+      [182, 'The change does not require a browser frame, and a screenshot is required.'],
+      [183, 'No screenshot, and a browser frame is required.'],
+      [184, 'No screenshot is required, nor should a browser frame be omitted.'],
+      [185, 'Kein Screenshot muss erstellt werden. Ein Browser Frame oder picture proof ist nötig.'],
+      [186, 'Kein Screenshot nötig. Noch ein Browser Frame erforderlich.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
+    }
+  })
+
+  it('errs towards holding a point OUT where the two shapes are the same', () => {
+    // "…, or picture proof IS REQUIRED" ends a negative list; "…, and a browser
+    // frame IS REQUIRED" demands one. They are one shape, and sixteen review
+    // rounds of rules to separate them were each beaten by the next sentence.
+    // The rule reads both as demands, which HOLDS THE POINT OUT — the safe
+    // error: it only narrows what the correction speaks for, where the opposite
+    // prices a rendered proof from a population that contains none.
+    for (const [n, line] of [
+      [190, 'No screenshot, browser frame, or picture proof is required.'],
+      [191, 'No screenshot, browser frame, or final picture proof is required.'],
+    ]) {
+      expect(pictureBearingPoints(block(n, line)).has(n), line).toBe(true)
+    }
+  })
+
+  it('and the work order never asks it to decide', () => {
+    // THE MEASUREMENT THE RESIDUAL RESTS ON. A denial reaching a clause behind
+    // it is the only shape where the choice changes an answer, and the corpus
+    // holds exactly one line of it. The EXACT SET is pinned, not the count: a
+    // count would let the known line be replaced by an unexamined one without a
+    // word from the suite, and this check exists to force that look.
+    const trailing = []
+    for (const line of String(readTasksAll()).split('\n')) {
+      const fragments = splitClauses(line)
+      for (const [i, fragment] of fragments.entries()) {
+        if (i === fragments.length - 1) continue
+        if (!PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) continue
+        if (!fragments.slice(i + 1).some((f) => f.trim())) continue
+        trailing.push(line.trim())
+      }
+    }
+    expect(trailing).toEqual(KNOWN_TRAILING_DENIALS)
   })
 })

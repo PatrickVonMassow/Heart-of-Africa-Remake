@@ -857,22 +857,13 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  * something, and the clause before it does not reach that far.
  *
  * The conjunction that JOINS an item is glue like the article that carries it.
- * The shared PREDICATE is not glue and is listed nowhere: the item that finishes
- * a negative list is recognised by what stands in FRONT of its noun
- * (`finishesDeniedList`), so the predicate behind it is never read.
+ * A PREDICATE is not: a fragment carrying one states something of its own and is
+ * judged on its own, however it is joined on.
  */
 const LIST_GLUE =
   /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 
-/**
- * The conjunction that shows a fragment finishes a coordinated list. It may
- * LEAD the fragment ("…, or picture proof is required") or sit INSIDE it, which
- * is what an English list without an Oxford comma looks like: "No screenshot,
- * browser frame or picture proof is required" cuts into two, and the second half
- * carries both the last item and the predicate the whole list shares.
- */
-const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
 
 /**
  * A DENIAL THAT ALREADY SAID "IS REQUIRED" HAS FINISHED ITS SENTENCE.
@@ -884,80 +875,7 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * behind it is a new sentence with a predicate of its own, and reading it as the
  * tail of the negative list turned a demand into a denial.
  */
-/**
- * HAS THIS DENIAL ALREADY STATED ITS OWN PREDICATE? Only an OPEN one lends it to
- * the item that finishes a coordinated list.
- *
- * IT IS DECIDED BY POSITION, NOT BY VOCABULARY. An open denial is one that stops
- * at the noun it denies — "No screenshot", "Kein Screenshot" — because the
- * sentence has not said what it demands yet: the enumeration runs on into the
- * next fragment and the predicate arrives at the end of it. A denial that
- * carries anything past that noun has said something more, whatever the words,
- * and the clause behind it is a new sentence.
- *
- * FOUR ROUNDS WENT INTO WORD LISTS FIRST, and each was beaten by the next
- * sentence — an end-of-clause predicate, then a copula, then a determiner test,
- * then "benötigt", "gebraucht", "muss … erstellt werden". A list of words is
- * never finished; a position is.
- *
- * MEASURED against the work order (22.08.2026): exactly one denial in the whole
- * file has anything behind it on the same line, and the classification of all
- * 196 picture-bearing points is the same under this rule as under the four it
- * replaced. Where it cannot tell, it reads the denial as CLOSED, which makes the
- * item behind it a demand and holds the point OUT — the safe error, because
- * holding a point out only narrows what the correction speaks for, while
- * admitting a render card prices a rendered proof from a population containing
- * none.
- */
-const NEGATION_GLUE =
-  /^(?:\s|\b(?:no|not|without|kein|keine|keinen|keinem|keiner|ohne|nicht|a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
-export const denialIsOpen = (fragment) => {
-  // The fragment is the negation and the noun it denies, and NOTHING else — no
-  // verb, no complement, no modifier. Anything more and the sentence has said
-  // what it had to say. Ending ON the noun is not enough: "The change does not
-  // require a browser frame" ends there and is complete, and reading it as open
-  // let "and a screenshot is required" behind it be suppressed as denied.
-  const bare = PICTURE_PROOF_MARKERS.reduce(
-    (acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '),
-    String(fragment ?? ''),
-  )
-  return NEGATION_GLUE.test(bare)
-}
-
-/**
- * A NEGATIVE CONTINUATION — "No screenshot is required, NOR is a browser frame
- * required." The denial in front has finished its own sentence and can lend
- * nothing, but "nor" carries the negation itself.
- *
- * It only counts BEHIND a denial. On its own, "Noch einen Screenshot anhängen"
- * is an ordinary German demand for one more screenshot, and reading the word as
- * a negation wherever it appeared admitted a render card for correction.
- */
-export const NEGATIVE_CONTINUATION = /^\s*(nor|noch)\b/i
-
-/**
- * …and it must SAY NOTHING OF ITS OWN either. "Noch" also means "another", so
- * "Noch ein Browser Frame wird gebraucht" is a demand standing behind a denial,
- * not a continuation of it.
- *
- * THE TWO WORDS DIFFER IN WHAT THEY NEGATE. English "nor" negates the predicate
- * it shares — "nor IS a browser frame REQUIRED" is a denial in full, so the
- * shared predicate may come with it. German "noch" negates nothing on its own:
- * "nötig" and "erforderlich" behind it are positive requirements, and lending
- * them the same licence suppressed "Noch ein Browser Frame erforderlich". Only a
- * BARE item continues a denial there.
- */
-export const continuesDenial = (fragment) => {
-  const text = String(fragment ?? '')
-  const lead = NEGATIVE_CONTINUATION.exec(text)
-  if (!lead) return false
-  // "NOR is a browser frame required" puts the shared predicate in FRONT of its
-  // noun, and the word itself carries the negation — naming a proof behind it is
-  // enough. German "noch" negates nothing, so only a bare item continues there.
-  if (/^nor$/i.test(lead[1])) return PICTURE_PROOF_MARKERS.some((re) => re.test(text))
-  return isListContinuation(text)
-}
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
   // Nothing but the proof noun and the words that carry it: no statement of its
@@ -968,29 +886,6 @@ export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) =>
   return LIST_GLUE.test(bare)
 }
 
-/**
- * THE ITEM THAT FINISHES A NEGATIVE LIST, without reading its predicate.
- *
- * "No screenshot, browser frame or picture proof IS REQUIRED" and "Kein
- * Screenshot, Browser Frame oder picture proof MUSS ERSTELLT WERDEN" are the
- * same shape, and the only reason the second failed was that the predicate was
- * matched against a list of words — one more vocabulary that could be missing a
- * language or a mood. What identifies the tail stands entirely in FRONT of its
- * last proof noun: a conjunction joining it to the list, and nothing but glue
- * besides. Whatever follows that noun is the predicate the whole list shares,
- * and it is never read.
- */
-export const finishesDeniedList = (fragment, markers = PICTURE_PROOF_MARKERS) => {
-  const text = String(fragment ?? '')
-  if (!LIST_CONJUNCTION.test(text)) return false
-  let last = -1
-  for (const re of markers) {
-    for (const hit of text.matchAll(new RegExp(re.source, 'gi'))) if (hit.index > last) last = hit.index
-  }
-  if (last < 0) return false
-  const before = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text.slice(0, last))
-  return LIST_GLUE.test(before)
-}
 
 /** Does ONE clause demand a rendered proof? */
 export function clauseDemandsPicture(clause) {
@@ -1017,28 +912,30 @@ export function clauseDemandsPicture(clause) {
  */
 export function lineDemandsPicture(line) {
   // The two clauses that SUPPRESS the proof nouns trailing them are kept apart,
-  // because only one of them can carry a negation onward: a DENIAL denies its
-  // list, while HOUSEKEEPING merely deletes its objects. Conflating them made
-  // "Lösche den alten Screenshot. Noch einen Browser Frame anhängen." lose its
-  // second sentence. The list is cut at commas, so a verb's coordinated objects
-  // arrive as separate fragments and inherit the same way a denied list does.
+  // because they are different statements: a DENIAL denies what it lists, while
+  // HOUSEKEEPING deletes its own objects. Conflating them made "Lösche den alten
+  // Screenshot. Noch einen Browser Frame anhängen." lose its second sentence.
+  //
+  // EITHER REACHES ONLY BARE ITEMS. A fragment carrying a predicate of its own is
+  // judged on its own, whatever stands in front of it. Sixteen review rounds went
+  // into deciding when a trailing predicate belongs to the denial instead — "no
+  // screenshot, browser frame or picture proof IS REQUIRED" — and every rule was
+  // beaten by the next sentence, because the shapes are the same: "no screenshot,
+  // and a browser frame IS REQUIRED" demands one.
+  //
+  // MEASURED, the question never arises: the work order holds exactly one denial
+  // with a clause behind it, that clause names no proof, and the classification of
+  // all 196 picture-bearing points is identical either way. So the rule takes the
+  // side that fails SAFE — an enumerated negative list ending in a shared
+  // predicate is read as a demand and its point is HELD OUT, which only narrows
+  // what the correction speaks for, where the opposite prices a rendered proof
+  // from a population that contains none.
   let denied = false
   let upkept = false
-  // …and whether the denial may still lend its predicate to what trails it.
-  let open = false
   for (const fragment of splitClauses(line)) {
-    // "…, nor is a browser frame required": the negation carries on by itself,
-    // but only behind a real denial and only where it adds nothing of its own.
-    if (denied && continuesDenial(fragment)) continue
-    // The item that ends the list takes its shared predicate with it.
-    if (denied && open && finishesDeniedList(fragment)) {
-      open = false
-      continue
-    }
     if (PICTURE_PROOF_DENIALS.some((re) => re.test(fragment))) {
       denied = true
       upkept = false
-      open = denialIsOpen(fragment)
       continue
     }
     // A bare list item INHERITS the decision in front of it: suppressed after a
@@ -1053,7 +950,6 @@ export function lineDemandsPicture(line) {
     // verb governs it, governs the bare objects behind it too.
     upkept = !demands && PICTURE_PROOF_UPKEEP.some((re) => re.test(fragment))
     denied = false
-    open = false
     if (demands) return true
   }
   return false
