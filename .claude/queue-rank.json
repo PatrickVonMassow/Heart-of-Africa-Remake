@@ -42,12 +42,6 @@
       "origin": "user",
       "place": "last"
     },
-    "597": {
-      "at": "2026-08-21T16:05:59.220Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for TOKENS: it caps the largest measured single jump into context, an unbudgeted 40,000-token tool output.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "598": {
       "at": "2026-08-21T16:05:59.831Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), second rule: the same branch feat/595-598-verification-ladder-brief delivers it, so both are cleared together.",
@@ -186,9 +180,10 @@
       "place": "last"
     },
     "716": {
-      "at": "2026-08-18T13:41:45.936Z",
-      "why": "Batch autonomy defect with a known workaround (the successor adopts the strand); it waits behind the token and communication blocks the user ordered first.",
-      "place": "last"
+      "at": "2026-08-22T10:35:33.147Z",
+      "why": "The user ordered the durable authoring lane forward on 22.08.2026; Sol's audit puts 716 first because it repairs the deployed stand-down path before 834 replaces the plane.",
+      "origin": "user",
+      "place": "ahead"
     },
     "719": {
       "at": "2026-08-21T16:06:01.709Z",
@@ -508,6 +503,18 @@
       "why": "Last is right: the machine filed this point from its own gate run, and the user ruled on 20.08.2026 that such a point does not overtake the release.",
       "origin": "machine",
       "place": "last"
+    },
+    "834": {
+      "at": "2026-08-22T10:35:33.222Z",
+      "why": "The user ordered it forward on 22.08.2026 after a second authoring run died with its session; each further lane death costs about 1.5 h and its whole token spend.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "835": {
+      "at": "2026-08-22T10:35:33.074Z",
+      "why": "Live on main since 12:24 and it kills every intercepted tool call in any session started without CLAUDE_PROJECT_DIR — it costs work in every turn it is not fixed.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -519,7 +526,6 @@
       581,
       595,
       596,
-      597,
       598,
       633,
       659,
@@ -559,7 +565,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T09:58:47.032Z",
+    "at": "2026-08-22T10:35:33.229Z",
     "points": [
       174,
       184,
@@ -675,7 +681,6 @@
       591,
       595,
       596,
-      597,
       598,
       599,
       602,
@@ -804,7 +809,9 @@
       830,
       831,
       832,
-      833
+      833,
+      834,
+      835
     ]
   }
 }

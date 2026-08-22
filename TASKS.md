@@ -77,6 +77,151 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 835. The output budget kills every command it intercepts when `CLAUDE_PROJECT_DIR` is unset
+  (MEASURED 22.08.2026, 12:26-12:36, in an interactive VS Code session, minutes after 8964bab9
+  "Merge branch feat/597-tool-output-budget" landed at 12:24). Every Bash call whose command text
+  the intercept matches dies BEFORE it runs and produces no output of its own — the module error
+  replaces it entirely:
+    `Error: Cannot find module '/scripts/tool-output-budget.mjs'` → exit 1
+  Reproduced with `command head -2 package.json`, `grep -c hooks .claude/settings.json`,
+  `node scripts/batch-claim.mjs --status | head -20` and `node scripts/finding.mjs --record … |
+  tail -4`; the same commands without `head`, `tail` or `grep` succeed. A background poll loop of
+  this session died on it and reported nothing but exit 1, with no hint that a hook was
+  responsible.
+  CAUSE, read at `scripts/tool-output-intercept-core.mjs:44-45`: the hook command is built as
+  `node "$CLAUDE_PROJECT_DIR/scripts/tool-output-budget.mjs"`. In this session that variable is
+  UNSET — measured in both the tool environment and in node — so the path resolves to
+  `/scripts/tool-output-budget.mjs`, which does not exist. Some launch paths export the variable
+  and some do not; the intercept treats it as guaranteed.
+  WHY IT MATTERS: the mechanism built to BOUND tool output instead DESTROYS the tool call, and it
+  fails in the direction that costs work rather than context. It hits exactly the producers point
+  597 lists — `git diff`, `grep`, file reads, `npm ls`, `gh run view` — and a session whose launch
+  path DOES export the variable never sees it, which is how it reaches the next session that does
+  not.
+  FINAL STATE:
+  1. The hook resolves its own script path from a source that cannot be empty — the hook file's own
+     location — and never from an environment variable it does not set itself.
+  2. The intercept FAILS OPEN. If the budget script cannot be found or cannot run, the untouched
+     command passes through with a named warning: an unbudgeted output is a cost, a dead tool call
+     is a defect.
+  3. A failure of the budget is ATTRIBUTED. Whatever the caller sees must name the hook, so a dead
+     command can never again read as the command's own failure.
+  VERIFIABLE: Vitest over the pure command builder — an unset, empty and relative
+  `CLAUDE_PROJECT_DIR` each still yield a runnable absolute path; and over the fail-open path — a
+  missing or non-executable budget script leaves the command's own output and exit code intact
+  while emitting the named warning.
+  QUEUE RANK: at the very front, before point 716. Reason: it is live on `main` right now and
+  breaks every session that starts without the variable, including the one that found it.
+  Criticality: high — a guard that silently destroys the tool calls it was built to bound costs
+  work in every session and teaches its callers to distrust their own commands.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 716. A session that loses the batch lock leaves its own subagent to die mid-step (measured
+  18.08.2026: the point-714 agent was building in its worktree while its parent session stood down
+  after the lock passed to a successor, and the successor's brief described that live agent as
+  provably dead). The stand-down path takes no boundary: it neither transfers the running agent nor
+  detaches it, so the agent keeps working for a session that no longer owns the batch, and whatever
+  it holds uncommitted dies with the parent process. Today it survived only because the SUCCESSOR's
+  agent noticed it was alive, waited it out and pushed its six commits — a rescue nobody designed
+  and nothing guarantees. The reverse cost is on record too: the successor acted on "the previous
+  owner was provably dead" while that owner's agent was writing files, which is how two strands come
+  to edit one worktree.
+  FINAL STATE:
+  - A stand-down is a BOUNDARY, not an exit. A session that loses or releases the lock while an
+    agent of its own is running takes the same two-phase handover a landed point takes: the running
+    work is DECLARED with its branch, worktree and pushed checkpoints, and transferred to whoever
+    owns the batch next — the mechanism `batch-in-flight.mjs --adopt` already provides, driven from
+    the stand-down path rather than only from the boundary.
+  - The claim that an owner is dead is MEASURED before it is stated, and the measurement covers the
+    owner's CHILDREN: a live worktree, a branch tip that moved, a running process. `--agent-check`
+    already judges exactly this and already refuses to declare a working agent dead; the stand-down
+    and the successor's orientation must ASK it instead of concluding from the lock alone.
+  - A successor's orientation never describes an unmeasured agent as dead. Where the state cannot be
+    read, it says so and names what to probe — an honest unknown, since acting on a wrong death is
+    what puts two writers in one tree.
+  THIS IS THE FIX ON TODAY'S PLANE, and it is not point 676 (read against it in full, 20.08.2026).
+  676 replaces the plane itself — daemon-owned detached workers, a lease epoch fencing every
+  mutation, a successor adopting by stable job identity — and under it an Agent-tool child is
+  declared NON-transferable and blocks a boundary until it finishes. It never names the STAND-DOWN
+  path, and it never names the dead-owner verdict, which are precisely this point's two failure
+  directions; fencing a mutation does not stop a session from calling a working agent dead. So this
+  point stays open and is built on mechanisms that exist today (`batch-in-flight.mjs --adopt`,
+  `--agent-check`), and 676 inherits these rules instead of repeating them.
+  VERIFIABLE: Vitest over the pure core — a stand-down with a live declared agent produces a
+  transfer rather than a silent exit; one with no agent produces today's plain stand-down; an
+  adopting successor sees the transferred declaration; and a dead-owner verdict is refused while a
+  child's worktree or branch tip is still moving.
+  Criticality: high — it is the batch singleton's blind side, and both of its failure directions
+  destroy work: an abandoned agent loses whatever it has not pushed, and a wrong death sends two
+  sessions into one worktree.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
+  dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
+  Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
+  high, 22.08.2026, 23 findings, against `docs/handover-architecture.md` and the texts of 676 and
+  716). WHAT IT COSTS TODAY, measured: on 21.08.2026 an authoring run for point 597 died with its
+  parent session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost. The cause is
+  structural: `scripts/author-sol.mjs:337` spawns codex `detached` only so a kill takes the whole
+  group, while `author-sol.mjs` itself is awaited inside the parent session's tool call, and a Sol
+  run has no checkpoint to resume from. Point 676 has owned the cure since 13.08.2026 at
+  criticality high, blocked by nothing — its only cited prerequisite, 675, is closed — and has
+  waited at queue position 198 while the failure it describes kept happening.
+  THIS POINT IS THE FRONT STAGE OF 676, NOT A SECOND 676. The remainder of 676 keeps its number,
+  its spec and its rank: bounded dispatch, checkpoint barrier, two-phase boundary, successor
+  reconciliation beyond the slice claimed here, crash-recoverable landing, board projection,
+  metrics, staged failure trials and the measured baseline trial.
+  THE CUT IS AT STEP 4, NOT STEP 3, and this is the correction Sol's audit forced. Steps 1-3 of the
+  document's "Ordered work" — schemas and invariants, the durable state store, the daemon plus the
+  Sol adapter — deliver DURABLE EXECUTION, not TRANSFERABLE SUPERVISION: a worker merely is not
+  killed, while no transferable declaration, fenced adoption, reconciliation or plan-native landing
+  exists, so a successor can neither prove nor land its work (Sol A2). Worse, ACTIVATING step 3
+  without step 4 is worse than today: without epoch fencing, attempt leases, fail-closed worktree
+  locks and push-time lease validation, two coordinators can drive one batch, two attempts can
+  share one worktree, and a replaced orphan can keep checkpointing and pushing (Sol A6). This point
+  therefore carries steps 1-4 and names step 8 — fenced discovery, adoption, reconciliation — with
+  step 9 for safe landing, as the point at which survivability may be CLAIMED (Sol A3).
+  IT IS BUILT DARK. Steps 1-4 land behind an activation flag with today's path untouched (Sol A20),
+  because evidence-preserving cancellation and lease release arrive only later and there is no
+  rollback path before them. Nothing in the board, the brief or the handover advertises a surviving
+  lane until the step-8 slice is green.
+  BEFORE ANY CODE, TWO THINGS IN ORDER:
+  (a) THE RAW BLIND LISTS ARE RECOVERED. Point 676's own first step — re-run the A/B merge with a
+      model that authored neither list — cannot be validly performed from the present record (Sol
+      A1): raw list A has been replaced by the invalid merger's "merged meaning", the provenance
+      names 56 blind-B ids while the attached index carries 67, and A-only A2 is assigned to B2
+      while the union maps the original B2 to M15. Recovery — the document's git history, the
+      ask-sol and mechanism-review logs — is its own named step. If the raw lists cannot be
+      recovered, the BLIND STAGE IS RE-RUN, not merely re-merged.
+  (b) THE RE-MERGE runs with a model that authored neither list, recorded through
+      `scripts/mechanism-review.mjs --merged-by`. It may add, drop or re-word union entries, and
+      what it settles is what gets built; only source recovery and read-only repository or test
+      mapping are safe before it lands (Sol A15). Steps 1-3 are in any case not freezable — later
+      steps force changes back into schemas, store and adapter (Sol A12-A14), so the stage is
+      planned as revisable, not as final.
+  FOUR ITEMS THE DOCUMENT DOES NOT CARRY ARE FOLDED IN:
+  1. HOW THE DAEMON ITSELF ESCAPES the spawning session's tool-call lifetime, stated mechanically.
+     Step 3 does not say (Sol A4) — and that is precisely the defect that killed the run.
+  2. THE DRILL THAT REPRODUCES THE REAL REGRESSION (Sol A19): kill the spawning parent session
+     mid-authoring, then prove daemon and worker survive and a FRESH session recovers them. A
+     launcher-client exit, a daemon restart and a normal handover are not equivalent.
+  3. A MIGRATION RULE relating today's batch lock to the new renewable coordinator lease and its
+     epoch (Sol A18), or a window exists in which lock ownership and daemon mutation authority
+     disagree.
+  4. ORDERED OWNERSHIP AND TESTS for the prose-only requirements of the document's "Additional
+     omissions" section (Sol A21): daemon authorization, state permissions, retention, resource
+     headroom, experimental sampling.
+  VERIFIABLE: the unit cases the union names per step; each folded item with its own test; the
+  parent-session-death drill; and the stage proven DARK — with the flag off, today's authoring path
+  is the path that runs now. Mechanism review per step, not once at the end; each step green on the
+  unit layer before the next.
+  QUEUE RANK: at the front, directly behind point 716. Reason: the user ordered it forward on
+  22.08.2026 after a second lane died, and Sol's audit puts 716 first because 716 repairs the
+  deployed plane while this point replaces it.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
+  Bundle: unbundled (batch autonomy).
+
 - [ ] 517. The lease-expiry takeover ignores an honoured claim (measured
   05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
   minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
@@ -9578,46 +9723,6 @@ to land than a mechanism that needs a review.
   Criticality: medium — the board is the user's only window into the batch, and it currently
   goes blank exactly when he checks it often.
   Bundle: Chat & Tafel.
-
-- [ ] 716. A session that loses the batch lock leaves its own subagent to die mid-step (measured
-  18.08.2026: the point-714 agent was building in its worktree while its parent session stood down
-  after the lock passed to a successor, and the successor's brief described that live agent as
-  provably dead). The stand-down path takes no boundary: it neither transfers the running agent nor
-  detaches it, so the agent keeps working for a session that no longer owns the batch, and whatever
-  it holds uncommitted dies with the parent process. Today it survived only because the SUCCESSOR's
-  agent noticed it was alive, waited it out and pushed its six commits — a rescue nobody designed
-  and nothing guarantees. The reverse cost is on record too: the successor acted on "the previous
-  owner was provably dead" while that owner's agent was writing files, which is how two strands come
-  to edit one worktree.
-  FINAL STATE:
-  - A stand-down is a BOUNDARY, not an exit. A session that loses or releases the lock while an
-    agent of its own is running takes the same two-phase handover a landed point takes: the running
-    work is DECLARED with its branch, worktree and pushed checkpoints, and transferred to whoever
-    owns the batch next — the mechanism `batch-in-flight.mjs --adopt` already provides, driven from
-    the stand-down path rather than only from the boundary.
-  - The claim that an owner is dead is MEASURED before it is stated, and the measurement covers the
-    owner's CHILDREN: a live worktree, a branch tip that moved, a running process. `--agent-check`
-    already judges exactly this and already refuses to declare a working agent dead; the stand-down
-    and the successor's orientation must ASK it instead of concluding from the lock alone.
-  - A successor's orientation never describes an unmeasured agent as dead. Where the state cannot be
-    read, it says so and names what to probe — an honest unknown, since acting on a wrong death is
-    what puts two writers in one tree.
-  THIS IS THE FIX ON TODAY'S PLANE, and it is not point 676 (read against it in full, 20.08.2026).
-  676 replaces the plane itself — daemon-owned detached workers, a lease epoch fencing every
-  mutation, a successor adopting by stable job identity — and under it an Agent-tool child is
-  declared NON-transferable and blocks a boundary until it finishes. It never names the STAND-DOWN
-  path, and it never names the dead-owner verdict, which are precisely this point's two failure
-  directions; fencing a mutation does not stop a session from calling a working agent dead. So this
-  point stays open and is built on mechanisms that exist today (`batch-in-flight.mjs --adopt`,
-  `--agent-check`), and 676 inherits these rules instead of repeating them.
-  VERIFIABLE: Vitest over the pure core — a stand-down with a live declared agent produces a
-  transfer rather than a silent exit; one with no agent produces today's plain stand-down; an
-  adopting successor sees the transferred declaration; and a dead-owner verdict is refused while a
-  child's worktree or branch tip is still moving.
-  Criticality: high — it is the batch singleton's blind side, and both of its failure directions
-  destroy work: an abandoned agent loses whatever it has not pushed, and a wrong death sends two
-  sessions into one worktree.
-  Bundle: unbundled (batch autonomy).
 
 - [ ] 722. The mechanism gate's HISTORICAL backlog on main is worked off with the rebuilt planner.
   Point 721 made the debt workable — every pass has an eligible reviewer by construction and a
