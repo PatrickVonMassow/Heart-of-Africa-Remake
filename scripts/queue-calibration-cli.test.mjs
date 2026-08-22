@@ -269,5 +269,17 @@ describe('an apply accounts for every card it moves', () => {
     // medians here — and would leave the queue just as stable, which is why the
     // queue alone cannot tell the two apart.
     expect(second.promiseMedians).toEqual(first.promiseMedians)
+    // …AND THE FIXTURE IS SENSITIVE TO THAT DIFFERENCE. Recomputed from the
+    // cards as the first run left them, with no baseline to consult, the medians
+    // are other numbers — so the equality above is a result and not a tautology.
+    const corrected = JSON.parse(readFileSync(dataFile, 'utf8')).points
+    const naive = promiseMedians({
+      cards: corrected,
+      open: openPointsOf(readTasksOpen()),
+      criticality: parseCriticality(readTasksAll()),
+      ledger: {},
+      exclude: pictureBearingPoints(readTasksAll()),
+    })
+    expect(Object.fromEntries(naive)).not.toEqual(first.promiseMedians)
   }, 180_000)
 })

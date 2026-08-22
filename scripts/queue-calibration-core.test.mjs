@@ -1546,6 +1546,13 @@ describe('a denial can be continued as well as finished', () => {
     expect(pictureBearingPoints(block(152, 'Kein Screenshot nötig. Noch ein Browser Frame wird gebraucht.')).has(152)).toBe(
       true,
     )
+    // …including the German requirement words themselves. "Nor" negates the
+    // predicate it shares; "noch" negates nothing, so "erforderlich" behind it
+    // is a demand and not the denial's own predicate carried onward.
+    expect(pictureBearingPoints(block(154, 'Kein Screenshot nötig. Noch ein Browser Frame erforderlich.')).has(154)).toBe(
+      true,
+    )
+    expect(pictureBearingPoints(block(155, 'Kein Screenshot nötig. Noch ein browser frame ist nötig.')).has(155)).toBe(true)
     // …while the bare continuation stays denied.
     expect(pictureBearingPoints(block(153, 'Kein Screenshot ist nötig, noch ein browser frame.')).has(153)).toBe(false)
   })

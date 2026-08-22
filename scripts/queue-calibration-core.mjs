@@ -861,7 +861,7 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  * separate licence `LIST_TAIL_GLUE` grants.
  */
 const LIST_GLUE =
-  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+  /^(?:\s|\b(?:a|an|the|ein|eine|einen|einem|einer|eines|der|die|das|den|dem|des|or|and|nor|noch|oder|und)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
 
 /**
  * The tail of a coordinated list may carry the predicate the whole list shares:
@@ -895,8 +895,13 @@ const LIST_CONJUNCTION = /\b(or|and|nor|noch|oder|und)\b/i
  * behind it is a new sentence with a predicate of its own, and reading it as the
  * tail of the negative list turned a demand into a denial.
  */
-const DENIAL_CARRIES_PREDICATE =
-  /\b(is|are|was|were|be|been)\b[^,;:]{0,30}\b(required|needed|necessary)\b|\bnot\s+(\w+\s+){0,2}(required|needed|necessary|require|requires|need|needs)\b|\bnicht\s+(nötig|noetig|erforderlich)\b|\b(nicht|kein|keine)\s+(nötig|noetig|erforderlich)\b/i
+// This is only ever asked of a fragment already known to be a DENIAL, so the
+// bare presence of the requirement word is the predicate: "Kein Screenshot
+// nötig" has said it as plainly as "No screenshot is required". Reading only the
+// English shapes left the German denials open, and an open denial lends its
+// predicate to the clause behind it — which swallowed "Noch ein Browser Frame
+// erforderlich".
+const DENIAL_CARRIES_PREDICATE = /\b(required|needed|necessary|require|requires|need|needs|nötig|noetig|erforderlich)\b/i
 
 export const denialIsOpen = (fragment) => !DENIAL_CARRIES_PREDICATE.test(String(fragment ?? ''))
 
@@ -914,12 +919,21 @@ export const NEGATIVE_CONTINUATION = /^\s*(nor|noch)\b/i
 /**
  * …and it must SAY NOTHING OF ITS OWN either. "Noch" also means "another", so
  * "Noch ein Browser Frame wird gebraucht" is a demand standing behind a denial,
- * not a continuation of it. Only a fragment that adds nothing beyond the
- * predicate the denial already used may carry the negation on.
+ * not a continuation of it.
+ *
+ * THE TWO WORDS DIFFER IN WHAT THEY NEGATE. English "nor" negates the predicate
+ * it shares — "nor IS a browser frame REQUIRED" is a denial in full, so the
+ * shared predicate may come with it. German "noch" negates nothing on its own:
+ * "nötig" and "erforderlich" behind it are positive requirements, and lending
+ * them the same licence suppressed "Noch ein Browser Frame erforderlich". Only a
+ * BARE item continues a denial there.
  */
-export const continuesDenial = (fragment) =>
-  NEGATIVE_CONTINUATION.test(String(fragment ?? '')) &&
-  isListContinuation(fragment, PICTURE_PROOF_MARKERS, { allowPredicate: true })
+export const continuesDenial = (fragment) => {
+  const text = String(fragment ?? '')
+  const lead = NEGATIVE_CONTINUATION.exec(text)
+  if (!lead) return false
+  return isListContinuation(text, PICTURE_PROOF_MARKERS, { allowPredicate: /^nor$/i.test(lead[1]) })
+}
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS, { allowPredicate = true } = {}) => {
   const text = String(fragment ?? '')
