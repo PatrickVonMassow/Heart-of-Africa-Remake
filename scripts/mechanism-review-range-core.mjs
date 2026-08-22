@@ -1,9 +1,9 @@
-// Pure planning core for authorship-cut mechanism reviews.
+// Pure planning core for end-state mechanism reviews.
 //
-// A range is not one authorship unit.  A file changed only by one vendor can be
-// reviewed as part of that vendor's file group; a file changed by both vendors
-// cannot.  The latter is cut at commit boundaries, so no reviewer is ever asked
-// to judge its own contribution hidden inside somebody else's file group.
+// A convergent review judges the range's artefact at HEAD, not every historical
+// version that led there. Each net-changed path therefore appears once, carrying
+// every author who contributed to its current state. Intermediate versions are
+// named as superseded, and paths whose final state equals the base are dropped.
 import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
@@ -179,72 +179,93 @@ export function contributionsIn(commits = []) {
   return out
 }
 
-/**
- * Group outstanding contributions into reviewable authorship slices.
- *
- * `files` groups contain paths whose every contribution came from one vendor.
- * `commit` groups are the commit-level cuts for paths touched by >1 vendor.
- * Every group names the reviewer selected from the supplied candidate order;
- * an empty reviewer is an explicit unreviewable group, never an implicit one.
- */
-export function planAuthorshipGroups({ commits = [], candidates = REVIEWER_CANDIDATES } = {}) {
+/** One reviewable artefact per file in the range's end state. */
+export function endStateArtifacts({ commits = [], endStateFiles = null } = {}) {
   const contributions = contributionsIn(commits)
-  const authorsByCommit = new Map()
-  for (const contribution of contributions) {
-    if (!authorsByCommit.has(contribution.sha)) authorsByCommit.set(contribution.sha, contribution.authors)
-  }
   const byFile = new Map()
   for (const contribution of contributions) {
     if (!byFile.has(contribution.file)) byFile.set(contribution.file, [])
     byFile.get(contribution.file).push(contribution)
   }
 
-  const exclusive = new Map()
-  const mixedFiles = []
+  // null preserves the useful pure-function default: callers without a measured
+  // net diff plan every touched path. An explicit list is authoritative, and an
+  // explicit empty list means the whole range reverted to its base state.
+  const material = endStateFiles === null
+    ? new Set(byFile.keys())
+    : new Set(uniq(endStateFiles))
+  const artifacts = []
+  const dropped = []
+  const superseded = []
   for (const [file, changes] of byFile) {
-    const vendors = new Set(changes.flatMap((c) => c.authors.map(vendorOf)))
-    if (!vendors.size) vendors.add('unknown')
-    if (vendors.size === 1) {
-      const vendor = [...vendors][0]
-      if (!exclusive.has(vendor)) exclusive.set(vendor, [])
-      exclusive.get(vendor).push(...changes)
-    } else {
-      mixedFiles.push(file)
+    if (!material.has(file)) {
+      dropped.push({
+        file,
+        reason: 'end state identical to the base',
+        commits: changes.map((change) => change.sha),
+      })
+      continue
     }
+    const authors = uniq(changes.flatMap((change) => change.authors))
+    const vendors = uniq(authors.map(vendorOf))
+    const latest = changes.at(-1)
+    artifacts.push({
+      file,
+      authors,
+      vendors: vendors.length ? vendors : ['unknown'],
+      commits: changes.map((change) => change.sha),
+      endStateSha: latest.sha,
+      changes,
+    })
+    if (changes.length > 1) {
+      superseded.push({
+        file,
+        reason: 'intermediate states superseded within the range',
+        commits: changes.slice(0, -1).map((change) => change.sha),
+        retainedAt: latest.sha,
+      })
+    }
+  }
+  return { contributions, artifacts, dropped, superseded }
+}
+
+/**
+ * Group end-state files into reviewable authorship slices.
+ *
+ * Files with the same author-vendor set may travel together. A path touched by
+ * both vendors stays ONE end-state file group; it is explicitly unreviewable
+ * when no third vendor is configured, never expanded back into commit slices.
+ */
+export function planAuthorshipGroups({
+  commits = [],
+  endStateFiles = null,
+  candidates = REVIEWER_CANDIDATES,
+} = {}) {
+  const state = endStateArtifacts({ commits, endStateFiles })
+  const byVendors = new Map()
+  for (const artifact of state.artifacts) {
+    const key = artifact.vendors.join('+')
+    if (!byVendors.has(key)) byVendors.set(key, [])
+    byVendors.get(key).push(artifact)
   }
 
   const groups = []
-  for (const [vendor, changes] of exclusive) {
-    const authors = uniq(changes.flatMap((c) => c.authors))
+  for (const [vendor, artifacts] of byVendors) {
+    const authors = uniq(artifacts.flatMap((artifact) => artifact.authors))
     groups.push({
       kind: 'files',
       vendor,
       authors,
-      files: uniq(changes.map((c) => c.file)),
-      commits: uniq(changes.map((c) => c.sha)),
-      ...reviewerFields(authors, candidates),
-    })
-  }
-
-  // One mixed-path slice per commit. Files touched together by that commit may
-  // stay together: they have the same authors and therefore the same reviewer.
-  for (const commit of commits ?? []) {
-    const files = uniq(commit?.files).filter((file) => mixedFiles.includes(file))
-    if (!files.length) continue
-    const authors = authorsByCommit.get(String(commit.sha)) ?? []
-    groups.push({
-      kind: 'commit',
-      vendor: uniq(authors.map(vendorOf)).join('+') || 'unknown',
-      authors,
-      files,
-      commits: [String(commit.sha)],
+      files: artifacts.map((artifact) => artifact.file),
+      commits: uniq(artifacts.flatMap((artifact) => artifact.commits)),
+      endStateShas: Object.fromEntries(artifacts.map((artifact) => [artifact.file, artifact.endStateSha])),
       ...reviewerFields(authors, candidates),
     })
   }
 
   return {
-    contributions,
-    mixedFiles,
+    ...state,
+    mixedFiles: state.artifacts.filter((artifact) => artifact.vendors.length > 1).map((artifact) => artifact.file),
     groups,
     unreviewable: groups.filter((group) => !group.reviewer),
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   commitsForContributions,
+  endStateArtifacts,
   newestReading,
   eligibleReviewer,
   outstandingContributions,
@@ -32,15 +33,49 @@ describe('authorship-cut mechanism review planning', () => {
     ])
   })
 
-  it('reports a mixed-vendor file and cuts it at commit boundaries', () => {
+  it('keeps a mixed-vendor file as one end-state artefact', () => {
     const file = 'scripts/shared-guard.mjs'
     const plan = planAuthorshipGroups({
       commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'GPT-5.6 Sol', [file])],
     })
     expect(plan.mixedFiles).toEqual([file])
     expect(plan.groups).toEqual([
-      expect.objectContaining({ kind: 'commit', commits: [sha('a')], files: [file], reviewer: 'GPT-5.6 Sol' }),
-      expect.objectContaining({ kind: 'commit', commits: [sha('b')], files: [file], reviewer: 'Opus 5' }),
+      expect.objectContaining({
+        kind: 'files',
+        vendor: 'anthropic+openai',
+        commits: [sha('a'), sha('b')],
+        files: [file],
+        reviewer: '',
+      }),
+    ])
+  })
+
+  it('plans one file once after eight commits touch it', () => {
+    const file = 'scripts/queue-calibration.mjs'
+    const commits = Array.from({ length: 8 }, (_, index) =>
+      commit(String.fromCharCode(97 + index), 'GPT-5.6 Sol', [file]))
+    const plan = planAuthorshipGroups({ commits, endStateFiles: [file] })
+    expect(plan.groups).toHaveLength(1)
+    expect(plan.groups[0]).toMatchObject({
+      kind: 'files',
+      files: [file],
+      reviewer: 'Opus 5',
+    })
+    expect(plan.groups[0].commits).toHaveLength(8)
+    expect(plan.superseded).toEqual([
+      expect.objectContaining({ file, reason: 'intermediate states superseded within the range' }),
+    ])
+  })
+
+  it('drops a path reverted to its base state and names why', () => {
+    const file = 'scripts/reverted-guard.mjs'
+    const state = endStateArtifacts({
+      commits: [commit('a', 'Claude Opus 5', [file]), commit('b', 'Claude Opus 5', [file])],
+      endStateFiles: [],
+    })
+    expect(state.artifacts).toEqual([])
+    expect(state.dropped).toEqual([
+      { file, reason: 'end state identical to the base', commits: [sha('a'), sha('b')] },
     ])
   })
 
