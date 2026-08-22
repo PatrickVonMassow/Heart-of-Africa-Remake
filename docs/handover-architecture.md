@@ -8,23 +8,28 @@ below, every entry accounted for as `only A`, `only B` or `merged with <id>`. Bo
 versioned in `docs/four-eyes/` and the union is `docs/four-eyes/676-union.json`, so the count is
 reproducible: `node scripts/blind-merge.mjs --a … --b … --union …`.
 
-THE DEVIATION IS NOT SETTLED, and saying so is the point of this paragraph. CLAUDE.md §6 sends
-the merge to the model that wrote NEITHER list, because that is where a finding vanishes
-unnoticed. The original merge was performed by Sol, the author of list B. The model that wrote
-neither half is Fable 5, switched off since 20.08.2026, so no third model has been available:
-every merge of this stage so far is the WEAKER TWO-MODEL FALLBACK, and none of them is the valid
-four-eyes result the stage owes.
+THE DEVIATION IS SETTLED. CLAUDE.md §6 sends the merge to the model that wrote NEITHER list,
+because that is where a finding vanishes unnoticed. This stage spent nine days without that
+model: the original merge was performed by Sol, the author of list B, a re-merge on 22.08.2026
+by Claude Opus 5, the author of list A, and both are recorded as the weaker two-model fallback.
+On 22.08.2026 at 18:14 the owner reported that new weekly volume had been released and asked for
+the Fable suspension to be lifted; the switch was set ON at 18:26. The same evening Fable 5 —
+which wrote neither half — folded the stage BLIND: from the two versioned halves alone, before
+reading either fallback union, then compared its result against the recorded fold and justified
+every difference from the halves. That third-model fold is the union below and supersedes both
+fallback folds. The owner's express request that the resulting model rules not be implemented
+before he has seen them stands untouched: this fold executes the standing §6 rule for this one
+stage and changes no model rules.
 
-THAT IS ABOUT TO CHANGE, AND THIS STAGE WAITS FOR IT. On 22.08.2026 at 18:14 the owner reported
-that new weekly volume had been released, asked for the Fable suspension to be lifted, and
-restated the rule he wants back: Sol and Opus 5 write blind, Fable folds the two halves. He asked
-expressly that it not be implemented before he has seen what the model rules then look like, so
-the switch is still off as this is written. When it is flipped, Fable folds this union, and what
-that fold settles is what point 834 builds.
-
-WHAT THIS STAGE HAS BEYOND THE USUAL FALLBACK: the union has been folded TWICE, by two different
-models — Sol first, Claude on 22.08.2026 — and each read the other's work. That is more
-independence than a single fallback fold, and still not the third model the rule prefers.
+WHAT THE THIRD-MODEL FOLD CHANGED. The blind fold reproduced the fallback's accounting shape —
+61 entries, nine merged pairs — and seven of the nine pairs agree; it groups A2 (the survival
+evidence) with B3 (the reference contract) where the fallback grouped A3a there, and it groups
+B30 (the fresh session per landing) with A3c (the handover condition) where the fallback used
+B33. Two fallback glosses are NOT carried into the union because neither half states them: the
+"unverified" caveat on A2's measured 13.08.2026 survival evidence, and the rejection of B53's
+acceptance thresholds — B53 stands as written, beside A8's own landed-throughput condition.
+B15's actor, coordinator epoch, timestamps and last local and pushed commit — the loss Sol's
+audit had found — stand in full in M16.
 
 A CLAIM THAT THE OWNER HAD RULED THE FALLBACK SUFFICIENT stood in this paragraph for about
 twenty minutes on 22.08.2026, and it was false: no such ruling was ever given. It was inferred
@@ -43,19 +48,20 @@ A RE-MERGE was then run by Claude and audited by Sol. Because Claude wrote list 
 same-vendor merge and is recorded as the fallback, not as a third-model result. Its accounting
 holds exactly: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), every
 input entry claimed once, no dangling reference and no duplicate — a count Sol reproduced
-independently. FOUR ROWS had lost a clause and are restored below, marked `RESTORED BY THE
-RE-MERGE`; three of them are list-A clauses dropped by list B's author. One is demonstrably
-consequential: A5b had already pointed at the existing batch lock and its fence as the thing a
-coordinator lease must be reconciled with, M8 dropped it, no union row mentioned a lock or a
+independently. FOUR ROWS had lost a clause and were restored by that re-merge — three of them
+list-A clauses dropped by list B's author — and the third-model fold below keeps every
+restoration. One is demonstrably consequential: A5b had already pointed at the existing batch lock and its fence as the thing a
+coordinator lease must be reconciled with, the first fold dropped it, no union row mentioned a lock or a
 migration afterwards, and Sol's audit of 22.08.2026 had to raise the missing migration rule again
 from scratch.
 
 THE RESTORATIONS ARE NOT A CLEAN BILL. Sol's review of that re-merge found a further loss the
-re-merge had missed — M27 keeps B15's state vocabulary but drops the actor, coordinator epoch,
-timestamps and last local and pushed commit that B15 requires of every point state — which shows
+re-merge had missed — its row for B15 kept the state vocabulary but dropped the actor,
+coordinator epoch, timestamps and last local and pushed commit that B15 requires of every point
+state — which shows
 the sweep was not exhaustive. Structural checks cannot find these: the id accounting balances and
-the two union representations agree while a row is substantively incomplete. Treat the union as a
-specification with known gaps until a third model has folded it.
+the two union representations agree while a row is substantively incomplete. The third-model
+fold of 22.08.2026 closed the known gaps; the B15 fields stand in full in M16 below.
 
 A CORRECTION, WITHDRAWN THE SAME DAY, is recorded here because the document carried it briefly
 and someone may have read it. Half A's own heading claims Fable 5 wrote it. On that label this
@@ -69,69 +75,69 @@ ruled out, and an implementer who does not see them re-proposes them.
 
 | Union entry | Sources | Disposition and merged meaning |
 |---|---|---|
-| M1 | A1+B1 merged | The conflict is caused by session-bound process lifetime, not by parallelism itself; handover must preserve active work. RESTORED BY THE RE-MERGE (A1): the successor already has the information it needs — the in-flight declaration names branch, worktree, pid and log — and lacks only a live process, so the adoption record extends an existing channel rather than opening a new one. |
-| M2 | only A2 | Retain the reported 13 August 2026 detached-Sol survival result as motivating evidence, but mark it unverified because its logs were not attached. |
-| M3 | A3a+B3 merged | Durable authoring uses the detached `author-sol.mjs` contract—isolated branch/worktree, checkpoints, pushes, heartbeat, log and terminal status—not Agent-tool children. |
-| M4 | A3b+B16 merged | Extend the in-flight declaration into a transferable adoption record with batch, job, attempt and process-start identity; PID alone is insufficient. |
-| M5 | A3c+B33 merged | A planned boundary may occur before landing begins or after the landing journal says `landed`, never during landing; authors need only checkpoint. RESTORED BY THE RE-MERGE (B33): after an UNPLANNED crash the successor repeats any human judgment whose completion cannot be proven. M40 journals evidence for crash recovery but never states this rule, so nothing else carried it. |
-| M6 | A4+B26 merged | A successor must adopt supervision by stable job identity, query and control workers, classify results and land them without process reparenting. RESTORED BY THE RE-MERGE (A4): completion has to be noticed WITHOUT a harness notification, because the successor did not spawn the process and no notification is owed to it. |
-| M7 | A5a+B17 merged | A transferred declaration remains probeable and must alert, rather than silently unblock, when its evidence expires or becomes inconsistent. |
-| M8 | A5b+B29 merged | A batch-wide renewable coordinator lease, epoch and fence prevent two sessions from adopting or mutating the same batch. RESTORED BY THE RE-MERGE (A5b): today's batch lock and its fence ALREADY serialise ownership, so the lease is a migration of an existing mechanism and owes a rule relating the two; without it, lock ownership and daemon mutation authority can disagree. |
-| M9 | only A5c | Every unattended detached run remains visible on the progress board with point, owner state, heartbeat and ETA. |
-| M10 | only A6a | **REJECTED:** Raising the three-worker cap does not fix the serial 30–90-minute landing bottleneck and can enlarge the review queue. |
-| M11 | A6b+B43 merged | **REJECTED:** Refilling session-bound Agent children merely to keep a session busy preserves the fatal lifetime dependency and grows context. |
-| M12 | A6c+B47 merged | **REJECTED:** Diff judgment, dual-backend picture verification, landing, work-order edits and board ownership must not move into authoring workers. |
-| M13 | only A7 | Separate short-lived dispatcher and lander coordinator epochs so neither accumulates the other role’s transcript and bookkeeping history. |
-| M14 | only A8 | Preserve full-day measurement through `scripts/measure-context-cost.mjs`: median context at handover, spend above 150k and points landed per day. |
-| M15 | only B2 | Establish a short-lived coordinator plane and session-independent authoring-worker plane. |
-| M16 | only B4 | Add `scripts/detached-agent.mjs` as a model-neutral adapter; an adapter is transferable only after satisfying the durable-worker contract. |
-| M17 | only B5 | Unsupported Agent-tool children remain session-bound and must finish or be safely stopped before a boundary. |
-| M18 | only B6 | Make a daemon—not the main session—the parent and lifecycle owner of transferable workers. |
-| M19 | only B7 | Persist batch, point, attempt, process-start identity, branch, worktree, base SHA, PID, log, heartbeat and launcher lease for every run. |
-| M20 | only B8 | Enforce the three-author global cap in the daemon across all coordinator epochs. |
-| M21 | only B9 | Permit refill only from a bounded, explicitly pre-authorized queue containing concrete points, dependencies, base SHA, branch and worktree. |
-| M22 | only B10 | The daemon may start authorized entries but may not select new work, broaden scope or violate dependency order. |
-| M23 | only B11 | Journal the reason and duration whenever three eligible lanes exist but fewer than three run. |
-| M24 | only B12 | Apply a completed-review backlog limit so parallel authoring cannot create an unbounded stale-branch queue. |
-| M25 | only B13 | Use an append-only checksummed journal under `<git-common-dir>/codex-batches/<batch-id>/events.jsonl` as the durable source of truth. |
-| M26 | only B14 | Atomically replace a derived `snapshot.json` for fast resume while retaining the journal for audit and corruption detection. |
-| M27 | only B15 | Model point states explicitly as queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled or cancelled. |
-| M28 | only B18 | During boundary preparation, request and acknowledge committed-and-pushed checkpoints from all running durable workers without waiting for point completion. |
-| M29 | only B19 | A worker missing the checkpoint deadline becomes non-transferable and blocks handover with explicit recovery choices. |
-| M30 | only B20 | Implement two-phase handover: `--prepare` validates state and obtains checkpoints without creating the final marker. |
-| M31 | only B21 | `--commit` atomically seals state, advances the coordinator epoch, creates the marker and obtains a durable launcher receipt as the old session’s final action. |
-| M32 | only B22 | Forbid all tool work and bookkeeping after successful boundary commit. |
-| M33 | only B23 | Fence the old coordinator epoch when commit is accepted and reject every later mutation carrying that epoch. |
-| M34 | only B24 | Independently record marker creation/deletion, old-session exit, successor start and successor-ready acknowledgment, alerting on missed deadlines. |
-| M35 | only B25 | The resume hook reconstructs from the work order, sealed state, journal tail, launcher table, declarations and local/remote SHAs—not the old transcript. |
-| M36 | only B27 | Reconcile every recorded lane as running, completed, stalled, missing, divergent or orphaned before new dispatch and show unresolved states in red. |
-| M37 | only B28 | Refill only after reconciliation and global-cap acquisition. |
-| M38 | only B30 | Use post-landing as the natural boundary point, with an earlier conservative context watermark when needed. |
-| M39 | only B31 | Preserve serial landing behind a batch-wide landing lock. |
-| M40 | only B32 | Journal candidate and target SHAs, review completion, gates, graphic hashes, merge SHA, bookkeeping and board updates for crash recovery. |
-| M41 | only B34 | Persist both main-session graphics-backend judgments and artifact hashes; worker assertions cannot replace them. |
-| M42 | only B35 | Revalidate completed branches against the current landing base and send conflicts or changed gates to explicit rework. |
-| M43 | only B36 | Permit `ready-for-review` only for a clean worktree with recorded checks and a terminal commit visible on the expected remote branch. |
-| M44 | only B37 | Convert timeout, exit, push failure, dirty worktree or missing evidence into a named alerted failure state without ambiguously freeing ownership. |
-| M45 | only B38 | Prevent duplicate writers through daemon-held attempt leases, process-start identities and fail-closed worktree locks. |
-| M46 | only B39 | Require lease validation before every checkpoint and push; fenced attempts stop while preserving their branches. |
-| M47 | only B40 | Reconstruct only provable facts after registry loss or corruption and quarantine uncertainty. |
-| M48 | only B41 | Refuse handover if the daemon, durable state, remote push destination or successor launch path is unhealthy. |
-| M49 | only B42 | Cancel through the daemon, recording reason and last pushed SHA, waiting for lease release and preserving evidence. |
-| M50 | only B44 | **REJECTED:** Routinely draining all lanes before every boundary is safe but defeats parallelism and recreates the idle tail. |
-| M51 | only B45 | **REJECTED:** Making only the Sol lane durable is insufficient while any other active lane remains session-bound. |
-| M52 | only B46 | **REJECTED:** Opaque child handles or copied transcripts provide neither durable ownership nor context reduction. |
-| M53 | only B48 | **REJECTED:** PID, log activity, marker or local commit alone is inadequate proof; independent identity, lease, heartbeat, SHA and durable-state evidence must agree. |
-| M54 | only B49 | **REJECTED:** Allowing arbitrary work after boundary commit makes its snapshot stale; attempted post-commit mutation must fail and alert. |
-| M55 | only B50 | Generate canonical batch metrics from journal events, launcher timestamps, reason codes, receipts and context samples, then publish them on the board. |
-| M56 | only B51 | Calculate eligible three-lane utilization from active-worker time over time with at least three authorized, dependency-ready points, with explicit excluded intervals. |
-| M57 | only B52 | Report checkpoint wait, marker-to-successor-ready latency, workers carried through boundaries, landing duration and spend above 150k context. |
-| M58 | only B53 | **REJECTED AS THE SOLE ACCEPTANCE TEST:** Its thresholds are useful targets, but utilization can be gamed and must be paired with landed-throughput and baseline comparisons. |
-| M59 | only B54 | Require zero lost attempts, duplicate writers, overlapping coordinator leases, unaccounted idle intervals and silently missed boundaries. |
-| M60 | only B55 | Roll out the proven Sol adapter first; enable another adapter only after the complete failure-drill suite passes. |
-| M61 | only B56 | Retain drain-before-boundary as the explicit safe fallback whenever any active lane is not transferable. |
+| M1 | A1+B1 merged | Decision: the two goals are not inherently conflicting; the conflict is an artefact of coupling worker lifetime and recoverability to the main session's process parentage. The successor already has the information it needs — the in-flight declaration names branch, worktree, pid and log — it lacks only a live process. Handover must therefore cease to mean terminating active work. |
+| M2 | A2+B3 merged | The coupling is provably breakable, and the detached Sol authoring lane (scripts/author-sol.mjs) is the proof and the reference: measured 13.08.2026, it ran through the supervising session's landing of another point, a board rebuild and a failed boundary attempt, and would have survived that session's death. Treat that proven path as the reference worker contract: stable worktree and branch, detached launcher ownership, step commits, periodic pushes, heartbeat, log, and explicit terminal status. |
+| M3 | only A3a | Delegated AUTHORING runs as a detached process (the author-sol.mjs shape), never as an in-process Agent-tool subagent, whenever the point is authored rather than judged. |
+| M4 | only B2 | Split the system into a short-lived coordinator plane and a session-independent worker plane: sessions select work, review, verify, land, and record progress, while durable workers author isolated points. |
+| M5 | only B4 | Add a model-neutral detached-worker adapter around available CLI runners; an adapter is handover-capable only if it satisfies the same checkpoint, push, heartbeat, status, and cancellation contract as author-sol.mjs. |
+| M6 | only B5 | Do not relabel an Agent-tool child as durable: unsupported agents remain session-bound, and a boundary is blocked until those particular children finish or are safely stopped. |
+| M7 | only B6 | Make the OS launcher daemon, rather than a main session, the parent and lifecycle owner of every handover-capable worker so session exit cannot kill it. |
+| M8 | only B7 | Give every run a stable batch id, point id, attempt id, process-start identity, branch, worktree, base SHA, PID, log path, heartbeat path, and launcher lease. |
+| M9 | only B8 | Enforce the cap of three active authoring processes globally in the daemon, not separately in each session, so overlapping coordinator epochs cannot temporarily create six workers. |
+| M10 | only B9 | Let the main session pre-authorize a bounded ready queue of concrete work-order points with dependencies, base SHA, branch, and worktree; the daemon may refill a freed slot only from that queue. |
+| M11 | only B10 | Keep point selection with the main session: the daemon starts already-delegated queue entries but must never invent work, reorder dependency-blocked points, or broaden a point's scope. |
+| M12 | only B11 | Record a reason code and duration whenever fewer than three lanes run despite three eligible points; valid reasons include dependency blocking, review-backlog pressure, adapter unavailable, and durability failure. |
+| M13 | only B12 | Apply an explicit completed-review backlog limit so automatic refilling cannot produce an unbounded pile of stale branches while serial landing remains slower than authoring. |
+| M14 | only B13 | Store an append-only, checksummed event journal at <git-common-dir>/codex-batches/<batch-id>/events.jsonl, in the shared Git common directory outside every worktree and transcript, as the coordination record that survives session replacement. |
+| M15 | only B14 | Maintain an atomically replaced derived snapshot (<git-common-dir>/codex-batches/<batch-id>/snapshot.json) for fast resume while retaining the event journal as the auditable source used to detect partial or contradictory writes. |
+| M16 | only B15 | Represent each point in the snapshot as queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled, or cancelled, and record with each state the actor, the coordinator epoch, timestamps, the last commit, and the last pushed SHA. |
+| M17 | A3b+B16 merged | The in-flight declaration becomes the ADOPTION RECORD: extend it with stable batch, job, attempt, and process-start identities plus a transferable flag — PID alone is insufficient because it can be reused. What is missing today is exactly that nothing tells the successor the run is now its own. |
+| M18 | A5a+B17 merged | A transferable declaration remains probeable across coordinator sessions and expires LOUDLY when heartbeat, log advancement, checkpoint SHA, or launcher ownership stops agreeing: expiry must alert, not merely unblock, or an adopted run dies unnoticed. |
+| M19 | only B18 | Before handover, request a checkpoint from every running durable worker and require acknowledgment that all current work is committed and pushed; completion of the point is not required. |
+| M20 | only B19 | If a worker cannot checkpoint within the bounded interval, mark it non-transferable and block the boundary with its job id and recovery choices instead of silently risking uncommitted work. |
+| M21 | only B20 | Make handover two-phase: --prepare performs bookkeeping, board updates, daemon health checks, checkpoint barriers, landing-lock checks, and successor-input validation without creating the boundary marker. |
+| M22 | only B21 | Make --commit the main session's final repository action: atomically seal the snapshot, record the next coordinator epoch and nonce, create the marker, receive the launcher's durable receipt, and then end the session. |
+| M23 | only B22 | Forbid bookkeeping, guard remediation, status edits, refills, or other tool work after batch-boundary.mjs --commit; all such work belongs before --commit or in the successor. |
+| M24 | only B23 | Fence the old coordinator epoch when the marker is accepted and reject further mutations under that epoch, making accidental post-boundary work an immediate error rather than merely deleting the marker silently. |
+| M25 | only B24 | Record marker creation, deletion, old-session exit, successor start, and successor-ready acknowledgment independently; alert if the marker disappears, the old session remains alive, or no successor becomes ready within the configured deadline. |
+| M26 | only B25 | On startup, the successor reads the work order, sealed batch snapshot, event journal tail, launcher process table, in-flight declarations, and current local and remote branch SHAs; it does not depend on the predecessor's transcript. |
+| M27 | A4+B26 merged | Give the successor the capability it lacks today: resume supervision of processes it did not spawn — adopt by stable job id, query status, renew declarations, request checkpoints, cancel workers, classify outputs, and land completed branches without reparenting their processes; notice completion without a harness notification (poll the log and branch tip through the existing probe) and hand findings back to a worker for a second leg. |
+| M28 | only B27 | Reconcile every recorded lane as running, completed, stalled, missing, divergent, or orphaned before spawning anything; print every mismatch and place unresolved lanes in a red progress-board state. |
+| M29 | only B28 | Refill only after reconciliation and global-cap acquisition, preventing duplicate work when a worker finished or a launcher restarted during the handover gap. |
+| M30 | A5b+B29 merged | Failure mode: two sessions adopt the same run or coordinate at once. Half A holds that the batch lock and its fence already serialise ownership; half B requires the daemon to grant exactly one renewable coordinator lease per batch, with all queue, cancellation, landing, and bookkeeping mutations carrying its epoch so old and new sessions cannot both coordinate. Build the lease; the lock and fence remain the session-side serialisation. |
+| M31 | A3c+B30 merged | The handover condition changes from 'no agent in flight' to 'the point I was LANDING is landed': running authors are handed on, not waited out. Use a fresh main session after each completed landing, or earlier at a conservative context watermark, because one 30-90 minute review-and-landing unit is already a natural atomic coordinator epoch. |
+| M32 | only B31 | Preserve serial landing and require a batch-wide landing lock; durable authoring parallelism does not authorize parallel merges, work-order edits, or progress-board updates. |
+| M33 | only B32 | Journal the candidate SHA, target SHA, diff-review completion, gate results, graphic artifact hashes, merge SHA, bookkeeping update, and board update so a crash mid-landing is detected and recoverable. |
+| M34 | only B33 | Planned boundaries occur only before a landing starts or after its journal reaches 'landed'; after an unplanned crash, the successor repeats any human judgment whose completion cannot be proven. |
+| M35 | only B34 | Keep both graphics-backend judgments in the main session and persist their artifact paths, hashes, backend names, and result in the landing journal; worker claims never substitute for these checks. |
+| M36 | only B35 | Revalidate a completed branch against the current landing base because earlier serial landings may make its recorded base stale; conflicts or changed gates return it to an explicit rework state. |
+| M37 | only B36 | A worker may report ready-for-review only when its worktree is clean, required checks have a recorded result, and its terminal commit is visible on the expected remote branch. |
+| M38 | only B37 | A heartbeat timeout, unexpected exit, push failure, dirty terminal worktree, or missing log changes the lane to a named failure state, frees no ambiguous lease, and raises a board/probe alert. |
+| M39 | only B38 | Prevent duplicate writers with a daemon-held attempt lease and process-start identity; restart only after death is proven, and fail closed if ownership or the worktree lock is uncertain. |
+| M40 | only B39 | Require stale attempts to verify their current lease before every checkpoint and push; a fenced attempt that resumes must stop and leave its branch intact for inspection. |
+| M41 | only B40 | If the local registry is corrupt or missing, reconstruct only provable facts from the work order, launcher records, worktrees, logs, and pushed branches, and quarantine uncertain points instead of declaring them complete. |
+| M42 | only B41 | Refuse a boundary when the daemon, state directory, remote push destination, or successor-launch path is unhealthy; a fast handover is not successful unless the work and the next coordinator are recoverable. |
+| M43 | only B42 | Cancellation caused by obsolete requirements or dependency changes goes through the daemon, records the reason and last pushed SHA, waits for lease release, and preserves the branch rather than deleting evidence. |
+| M44 | only A5c | Failure mode: a detached run outlives its point with nobody landing it. The board now-card and the ETA rule make an unattended run visible to the reader. |
+| M45 | only A6a | Rejected: raising the pool cap. The binding constraint is LANDING throughput (30-90 minutes per point in the main session today), not authoring slots; more parallel authors only queue at the same door. |
+| M46 | A6b+B43 merged | Rejected: the coordinator session refilling authoring slots to stay busy, and continuous refilling with in-process Agent-tool children in particular — the former grows main-session context for no added throughput, the latter perpetuates the original lifetime dependency and makes every fast boundary destructive. |
+| M47 | only B44 | Rejected: routinely draining all three lanes before every boundary, because it solves safety by deliberately sacrificing parallelism and recreates the observed long idle tail. |
+| M48 | only B45 | Rejected: relying on the one detached Sol lane alone while two session-bound lanes remain; the remaining child is still enough to block handover, so durability is a per-active-lane invariant. |
+| M49 | only B46 | Rejected: transferring opaque child handles or copying the old transcript into the successor — neither preserves process ownership, and transcript growth would defeat the measured reason for handover. |
+| M50 | A6c+B47 merged | Rejected: moving diff judgment, dual-backend picture verification, serial landing, work-order bookkeeping, or board ownership into authoring workers; those are the serial duties that define the main session — coordinator responsibilities and quality gates. |
+| M51 | only B48 | Rejected: treating a PID, log activity, boundary marker, or unpushed local commit as sufficient proof by itself; acceptance requires mutually consistent launcher identity, lease, heartbeat, branch SHA, and durable record. |
+| M52 | only B49 | Rejected: making the boundary marker survive arbitrary same-session work, because the launcher could then resume from a stale snapshot; post-marker work must invalidate and alarm, not be hidden. |
+| M53 | only A7 | The larger driver the problem statement understates: main-session context grows mostly from HARVESTING and BOOKKEEPING (diffs, gates, guard remedies, board work), not from spawning — measured 13.08.2026, one point's review plus guard loops dominated the session. Therefore also split the coordinator ROLES: a short-lived dispatcher that only spawns, and a lander that only reviews and lands one point, so neither carries the other's history. |
+| M54 | only A8 | Measure with scripts/measure-context-cost.mjs over a full day, in both scopes: median main-session context at handover, and the share of spend above 150k context (the 87-94 % figure that motivated the boundary). Success is that figure falling while the number of points landed per day does not. |
+| M55 | only B50 | Generate the canonical result from the event journal, launcher timestamps, lane reason codes, boundary receipts, and per-session context-token samples, and publish it in the progress board for each batch. |
+| M56 | only B51 | Report eligible three-lane utilization as time with three active workers divided by time with at least three eligible authorized points, excluding only individually recorded reason intervals. |
+| M57 | only B52 | Report handover checkpoint wait, marker-to-successor-ready latency, running workers carried across each boundary, landing duration, and the share of token spend occurring above 150k context. |
+| M58 | only B53 | Accept the design after a representative multi-point batch reaches at least 90% eligible three-lane utilization, p95 checkpoint wait at most three minutes, p95 successor-ready latency at most five minutes, and less than 10% of tokens above 150k. |
+| M59 | only B54 | Require zero lost worker attempts, duplicate active writers, overlapping coordinator leases, unaccounted idle intervals, or silently missed boundaries; any nonzero count fails the trial regardless of average speed. |
+| M60 | only B55 | Roll out first with the already-proven author-sol.mjs adapter behind a handover-capable flag, then enable other adapters only after crash, stall, push-failure, marker-deletion, daemon-restart, and split-brain drills pass. |
+| M61 | only B56 | Retain the existing drain-before-boundary rule as the explicit safe fallback whenever any active lane lacks the durable contract; degradation is visible and slower, but never loses work. |
 
-All 14 A identifiers and all 56 B identifiers appear exactly once. No supplied section was marked `TRUNCATED`. A2’s empirical claim cannot be independently confirmed from the attached material.
+All 14 A identifiers and all 56 B identifiers appear exactly once: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), counted by `blind-merge.mjs`.
 
 The apparent A6b/B9 disagreement is resolved narrowly: continuous session-local refilling is rejected, but daemon refill from a bounded, pre-authorized queue is allowed while backlog headroom exists. A3c/B33 does not require authors to finish before handover; it requires the serial landing operation itself to be either not started or durably complete.
 
@@ -221,7 +227,7 @@ The attached material does not disclose the existing progress-board source path,
 
 13. Measure a representative trial before changing the default.
 
-    Capture at least one baseline full day under the old drain rule and multiple full-day durable-worker batches with comparable eligible work. Success requires zero safety incidents; p95 checkpoint wait no more than three minutes; p95 marker-to-successor-ready latency no more than five minutes; less than 10% of token spend above 150k; median handover context materially below baseline; and points landed per day no worse than baseline. The 90% eligible three-lane-utilization target is supporting evidence, not a substitute for landed throughput.
+    Capture at least one baseline full day under the old drain rule and multiple full-day durable-worker batches with comparable eligible work. Success requires zero safety incidents; p95 checkpoint wait no more than three minutes; p95 marker-to-successor-ready latency no more than five minutes; less than 10% of token spend above 150k; median handover context materially below baseline; and points landed per day no worse than baseline. The 90% eligible three-lane-utilization target applies together with the landed-throughput condition, not instead of it.
 
 ### Additional omissions found during synthesis
 
@@ -246,4 +252,4 @@ because the raw halves now have a home that cannot drift from them:
 |---|---|---|---|
 | A | Claude Opus 5 | 14 | `docs/four-eyes/676-blind-a-opus5.json` / `.md` |
 | B | GPT-5.6 Sol | 56 | `docs/four-eyes/676-blind-b-sol.json` / `.md` |
-| Union | folded by Claude (Opus 5) — the two-model fallback, not a third model | 61 | `docs/four-eyes/676-union.json` |
+| Union | folded by Claude Fable 5 (22.08.2026) — the third model, which wrote neither half | 61 | `docs/four-eyes/676-union.json` |
