@@ -21759,3 +21759,97 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is a guard, and it blocks a session from recording what the user just
   told it.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 768. Cut CLAUDE.md to its binding sentences and make the cut hold (user instruction
+  20.08.2026: »Auch beim Abschnitt Tech Stack frage ich mich, ob wir den wirklich brauchen. Kürze
+  CLAUDE.md soweit sinnvoll und etabliere einen Mechanismus, der das dauerhaft zusichert, damit das
+  Dokument nicht wieder ausufert.«). MEASURED SHARES of the 2,091 words / 332 lines the file holds:
+  §7.1 acceptance criteria 753 words / 134 lines, §6 working method 545 / 62, §7.2 self-verification
+  293 / 37, §9 closing 95 / 18, §5 commands 87 / 23, §3 tech stack 109 / 17, §2 scope 93 / 14,
+  §4 structure 44 / 10, §1 goal 43 / 8. The document loads at every turn, so §7.1 alone is roughly
+  1.9k tokens per turn.
+  THE TWO CUTS THAT CARRY THE WEIGHT. (1) §7.1 goes down to number plus short title per criterion,
+  with ONE sentence saying that the condition and the evidence live under the same number in
+  `docs/acceptance-criteria-detail.md` and `docs/acceptance-evidence.md`. Nothing is lost: the
+  detail file already holds all 32 complete and verbatim, and each criterion's two pointer lines
+  carry no information its own number does not. Saves roughly 650 words. (2) §3 goes down to its
+  binding sentences — WebGPU primary with automatic WebGL 2 fallback, TSL rather than raw shader
+  source, no Chrome-only behaviour, the localized fallback notice, kokoro in a worker off the
+  startup path, and no runtime dependency without a justified commit — with the mechanics staying
+  in `docs/render-architecture.md` and `docs/tts-architecture.md`. The stack list itself is
+  `package.json`.
+  THE SAME EDIT EXECUTES U6 of point 763 — the "if WebGPU gets stuck, fall back to plain WebGL"
+  escape hatch leaves §3 — so whichever point runs second must not do it twice.
+  WHAT THE MACHINERY NEEDS, and the reason to be careful: `scripts/point-brief-core.mjs` parses
+  §7.1 into number to SHORT TITLE (`acceptanceCriteriaFrom` matches a line beginning with the
+  number, a dot, whitespace and the title in double asterisks), so the compact form must keep
+  exactly that shape, and the criteria's numbering may not move. §7.1 is also the contract the
+  closing reports against, so the cut is checked against `scripts/closing-guard-core.mjs`,
+  `scripts/point-brief-core.mjs` and their tests before it lands.
+  IT IS A FOUR-EYES TASK, and that is the user's own refinement of the instruction above
+  (20.08.2026): »Ich denke, wir brauchen für das ganze Thema einen Vier-Augen-Task, der prüft, was
+  alles aus CLAUDE.md raus kann (ich vermute sehr vieles) und dann per Mechanismus zusichert, dass
+  die Datei nicht wieder ausufert (z. B. gehören da keine Prosa-Begründungen rein).« So the two
+  cuts named above are the MEASURED STARTING POINT, not the answer: the answer comes from a
+  BLIND-PARALLEL run over the WHOLE of `CLAUDE.md` by two models of different vendors on the same
+  instruction, each producing a complete keep/drop list with a reason per entry, merged by meaning
+  through `scripts/blind-merge.mjs` by a third model with every id accounted for as only-A, only-B
+  or merged (CLAUDE.md §6, divergent mode).
+  HIS TEST CASE IS THE STANDARD the run is judged by: §2 forbids multiplayer — would an agent,
+  WITHOUT that line, start building multiplayer unasked? Every surviving line has to answer that
+  question, and the answer must come from two models that cannot see each other's list, never from
+  whoever holds the file open.
+  THE INSTRUCTION BOTH HALVES GET names the three grounds for dropping, and the caveat this batch
+  paid for: a rule a GUARD already enforces — and that ground is only admissible with the guard's
+  actual assertion checked, because the cut of 19./20.08. dropped six rules on it with no such
+  check and at least one claim was false (point 764) — a rule stated more precisely elsewhere
+  (`design.md`, `docs/`), and a rule no agent would break without it.
+  NOT TO BE LOST, because it is the file's only unguarded content: the §7.1 criterion numbers and
+  titles (`point-brief` parses them), the §5 test-layer rule, and §6's model policy, which twelve
+  stamped files echo through `scripts/rule-echo.mjs`.
+  THE MECHANISM HE ASKED FOR IS A RATCHET, and a second rule beside it: NO PROSE RATIONALE in
+  `CLAUDE.md` — a reason belongs beside the switch it governs, in code or in the docs — checked in
+  the same shape as the budget, so a paragraph that argues rather than instructs is a finding.
+  `scripts/doc-budget-core.mjs` already refuses growth
+  past a ceiling, but a ceiling only ever falls by hand, so every cut leaves headroom the next
+  writer may quietly spend — which is how the file grew back the last time. A budget whose measured
+  size sits more than a stated slack BELOW its ceiling becomes a refusal of its own ("lower the
+  ceiling to what you achieved"), so headroom cannot be banked and each document can only ratchet
+  down. The slack is an absolute word count per document, never a percentage, or ordinary editing
+  thrashes against it.
+  THE SECOND QUESTION THE BLIND RUN ANSWERS, carried 20.08.2026 from the split proposal that
+  preceded this point: a delegated author receives this file WHOLE and never touches the 32
+  acceptance criteria, the batch handover, the board rules, the model policy or the release
+  mechanics. So each half's keep/drop list also marks every SURVIVING line agent-facing or
+  session-only, and the merge counts what is left session-only. A split into an agent-facing core
+  and a session part is then built ONLY if that remainder still pays AFTER the cut — the earlier
+  proposal was justified by a 61.6-KB file with a ~19-KB agent core, while the whole document today
+  is 2,091 words, so the saving is measured again rather than assumed. If it is built: neither half
+  is a summary of the other, every rule lives in exactly one of them and nothing is dropped; the
+  point brief (`scripts/point-brief.mjs`) is the mechanism that delivers the core, so a builder gets
+  brief plus core; and the session part stays the full authority for a session that owns the batch,
+  so nothing about the batch, the board or a release becomes less binding.
+  A RULE THAT MOVES KEEPS ITS ENFORCEMENT, split or no split: every guard, hook or test that reads
+  `CLAUDE.md` by section is updated in the same commit, and the doc-budget entries follow what was
+  moved.
+  VERIFIABLE if the split is built: a delegated agent's prompt carries the core and not the session
+  part, `scripts/point-brief.mjs` names which document it assumes, and a test sweeps the section
+  headings so every rule of the old file is findable in exactly one half and in no two.
+  VERIFIABLE: the blind-parallel run is recorded through `scripts/blind-merge.mjs` with every id
+  counted, and `scripts/mechanism-review.mjs --record … --mode blind-parallel --merged-by "<model>"`
+  names the merging model — a same-model fallback is recorded as weaker. Vitest in both directions
+  over the pure core — a document above its ceiling is refused as today; a document more than the
+  slack below its ceiling is refused with the lower-the-ceiling message; a document inside the
+  slack passes; the slack is read per document rather than derived from its size; and an arguing
+  paragraph in `CLAUDE.md` is reported while an instructing one is not. Separately, `point-brief.mjs` still resolves every
+  one of the 32 criteria to its title from the compacted §7.1, the closing guard still finds its
+  contract, and `npm run test:unit` is green.
+  QUEUE RANK: ahead of 762 and 760, behind 769 (decided 20.08.2026, stated here because a point
+  that passes another must say so in its own text). Reason: it is a direct user instruction, it
+  pays back on every turn of every session for as long as the project runs, and 762's budget
+  decision is a strictly smaller piece of the same module — doing 768 first settles both shapes at
+  once.
+  Criticality: medium — no product defect, but it is the per-turn cost of the whole batch, and the
+  user has now asked twice for the growth to be stopped by a mechanism rather than by intent.
+  A guard change is a mechanism, so it needs the other model's recorded review before it lands.
+  Bundle: Session- & Repo-Hygiene.
