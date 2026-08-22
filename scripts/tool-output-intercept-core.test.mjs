@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { expandSegments, headAndArgs } from './command-classify-core.mjs'
 import {
@@ -8,6 +10,7 @@ import {
   READ_LINE_BUDGET,
   interceptToolOutput,
   interceptionEnvelope,
+  toolOutputCommand,
 } from './tool-output-intercept-core.mjs'
 import { preToolUseEnvelope } from './path-scope-guard.mjs'
 
@@ -19,6 +22,47 @@ function decodedCommand(interception) {
 }
 
 describe('PreToolUse output interception', () => {
+  it.each([
+    ['unset', undefined],
+    ['empty', ''],
+    ['relative', '../wrong-project'],
+  ])('builds and runs an absolute hook-relative budget path when CLAUDE_PROJECT_DIR is %s', (_, projectDir) => {
+    const command = toolOutputCommand(`${JSON.stringify(process.execPath)} -e "process.stdout.write('OWN OUTPUT')"`, {
+      hookUrl: pathToFileURL(resolve('scripts/path-scope-guard.mjs')).href,
+    })
+    const env = { ...process.env }
+    if (projectDir === undefined) delete env.CLAUDE_PROJECT_DIR
+    else env.CLAUDE_PROJECT_DIR = projectDir
+    const result = spawnSync('/bin/sh', ['-c', command], { encoding: 'utf8', env, windowsHide: true })
+
+    expect(command).not.toContain('CLAUDE_PROJECT_DIR')
+    expect(command).toContain(resolve('scripts/tool-output-budget-launch.mjs'))
+    expect(command).toContain(resolve('scripts/tool-output-budget.mjs'))
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toBe('OWN OUTPUT')
+  })
+
+  it('quotes a hook path containing spaces so the shell receives both absolute script paths whole', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa output hook '))
+    const launcher = join(dir, 'budget launcher.mjs')
+    const budget = join(dir, 'budget worker.mjs')
+    try {
+      writeFileSync(launcher, `process.stdout.write(JSON.stringify(process.argv.slice(2)))\n`)
+      const command = toolOutputCommand('printf untouched', { launcherPath: launcher, budgetScriptPath: budget })
+      const result = spawnSync('/bin/sh', ['-c', command], { encoding: 'utf8', windowsHide: true })
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(JSON.parse(result.stdout)).toEqual([
+        '--budget-script',
+        budget,
+        '--encoded-command',
+        Buffer.from('printf untouched').toString('base64url'),
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it.each([
     ['git diff', 'git diff HEAD~1', 'git diff'],
     ['git show', 'git --no-pager show HEAD', 'git show'],

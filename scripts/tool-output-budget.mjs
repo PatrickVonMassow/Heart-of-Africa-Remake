@@ -14,6 +14,11 @@ import { shellInvocation } from './tool-output-shell.mjs'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
 
+function report(event, fields = {}) {
+  if (typeof process.send !== 'function') return
+  process.send({ source: 'tool-output-budget', event, ...fields })
+}
+
 function decodeCommand(argv) {
   const at = argv.indexOf('--encoded-command')
   if (at < 0 || !argv[at + 1]) throw new Error('missing --encoded-command')
@@ -39,6 +44,10 @@ async function run() {
   const invocation = shellInvocation(command)
   let captured = ''
   let settled = false
+
+  // This is the fail-open boundary. Before this message the launcher may run
+  // the untouched command; after it, replay could duplicate side effects.
+  report('started')
 
   const child = spawn(invocation.file, invocation.args, {
     cwd: process.cwd(),
@@ -82,6 +91,7 @@ async function run() {
     // No appended newline: the budget is the absolute number of characters the
     // hook admits, not "the budget plus console.log's separator".
     process.stdout.write(result.text)
+    report('completed', { exitCode })
     process.exitCode = exitCode
   }
 
