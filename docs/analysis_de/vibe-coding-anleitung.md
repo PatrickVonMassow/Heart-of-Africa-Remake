@@ -194,10 +194,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last, oder er
-  ist nur dort grün, wo er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen nach gemessener Last.
-  Vor dem Abgeben: ‚auch im **Hauptstand** grün, und **von dem Ort aus** geprüft, an dem es läuft?'"
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
+  misst dein Repository statt deinen Code und ist nur dort grün, wo er lief.
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt** und baut sich seine Voraussetzung
+  **selbst** — wahr wegen des Codes, nie wegen des Checkouts; ein Überspringen ist blind."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -239,14 +239,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Kein Blocker auf die Lücke selbst — eine benannte Lücke ist mehr wert als erfundene Deckung."
 
 - **Die aufgeschriebene Grenze deckt nicht, was sie behauptet.** Der Satz, was ein Mechanismus
-  *nicht* leistet, wird zur Ablage für das, was bloß nicht getan wurde.
+  *nicht* leistet, wird zur Ablage für bloß nicht Getanes.
   → *Prompt:* „Liegt die Information zum **Schließen** vor, wird geschlossen. Jede verbleibende
   Grenze nennt ihre **Richtung**: zu viel durchgelassen oder zu viel verweigert."
 
-- **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
-  zweites Modell kosten ein Vielfaches — pauschal gefordert auch dort, wo sie nichts beweisen.
-  → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung wirklich abweichen kann,
-  und schreib die Grenze samt Begründung in den prüfenden Code."
+- **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, zweiter Lauf, zweites Modell
+  kosten ein Vielfaches — pauschal gefordert auch dort, wo sie nichts beweisen.
+  → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung abweichen kann, und schreib
+  die Grenze samt Begründung in den prüfenden Code."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
@@ -427,4 +427,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b1562ecdf555b0022c1946af73e2d4979f058053c3599bf5545195e4ea10b488 -->
+<!-- GUIDE-FINGERPRINT: 07bd8b251a51c8a3dde886e3b99d5654f1cac3de5e75ac9640b023c2bfdbfd7f -->

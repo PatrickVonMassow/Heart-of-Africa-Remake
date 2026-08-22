@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 14:11 · Quellen-Fingerprint: `b1562ecdf555…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 15:36 · Quellen-Fingerprint: `07bd8b251a51…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1415,10 +1415,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 85 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 85 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
 
-<!-- RETRO-FINGERPRINT: b1562ecdf555b0022c1946af73e2d4979f058053c3599bf5545195e4ea10b488 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T12:11:23.942Z -->
+<!-- RETRO-FINGERPRINT: 07bd8b251a51c8a3dde886e3b99d5654f1cac3de5e75ac9640b023c2bfdbfd7f -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T13:36:34.277Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2148,6 +2148,29 @@ Die Lehre ist billig zu ziehen und teuer zu ignorieren: Ein Werkzeug, das der Pr
 Isolation schickt, wird EINMAL aus der Isolation heraus geprüft, bevor es als fertig gilt. Und ein
 Vorgang, der schreibt und dann committet, räumt seinen Schreibvorgang auf, wenn der Commit nicht
 kommt.
+
+### 3.137a Der Prüffall misst nicht den Code, sondern den Zustand des Repositoriums
+
+Am 22.08.2026 stand dieselbe Bauart zweimal in einer Sitzung, und beide Male war nicht der ORT
+falsch, sondern der ZUSTAND. Drei Fälle der Kalibrier-Prüfung lasen Landungen und Zeitspannen aus
+der echten Git-Historie; auf einer Entwicklermaschine steht die da, im zwei Commits tiefen
+CI-Checkout nicht — main war rot, ohne dass am Code etwas fehlte. Und ein neuer Fall der
+Übergabe-Grenze nahm den echten `main`-Zweig als gepushten Prüfpunkt. Der ist beim Landen
+zwangsläufig ungepusht, weil das schnelle Tor unmittelbar nach dem Merge und vor dem Tick-Push
+läuft: Dieser Fall wäre bei JEDER künftigen Landung rot gewesen.
+
+Der Unterschied zu 3.137 ist wichtig, weil die Gegenmaßnahme eine andere ist. Gegen den falschen
+Ort hilft, einmal aus der Isolation heraus zu messen. Gegen den falschen Zustand hilft das nicht:
+Die Entwicklermaschine hat die volle Historie und einen synchronen main, also besteht der Fall
+dort immer. Hier hilft nur, dass der Fall sich seine Voraussetzung SELBST baut — ein Wegwerf-
+Repositorium mit erfundener Merge-Kette, eine eigene Gegenstelle mit gepushtem Zweig. Ein
+Überspringen ist keine Reparatur, sondern die gefährlichere Fassung desselben Defekts: Die Prüfung
+ist dann genau dort blind, wo sie bewachen soll.
+
+Die Lehre: Eine Behauptung über einen Befehl ist erst dann eine Prüfung, wenn sie wahr oder falsch
+wird WEGEN des Befehls. Alles, was sie aus dem umgebenden Checkout bezieht — Tiefe, Referenzen,
+Synchronität mit der Gegenstelle —, ist eine Annahme, die irgendwann an dem Tag kippt, an dem man
+sie am wenigsten gebrauchen kann.
 
 ### 3.138 Ein Name, zwei Bedeutungen — und der Unterschied ist an der Aufrufstelle unsichtbar
 

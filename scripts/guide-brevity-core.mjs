@@ -143,7 +143,12 @@ export const LIMITS = {
   // tail of the guard-rot entry paid for it. The guide now measures 430 / 3842,
   // so the word ceiling drops by 7 to the exact fit. The line ceiling already sat
   // at its measured value and is unchanged.
-  maxWords: 3842,
+  // LOWERED AGAIN on 22.08.2026: the lesson that a test may measure its own
+  // repository - real history, real main branch - rather than the code went into
+  // the existing "Der Test hing an seiner Umgebung" entry, which already owns the
+  // environment-dependency class; two verbose entries were tightened to pay for it,
+  // so the guide measures 430 / 3841 and the word ceiling drops by one more.
+  maxWords: 3841,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
