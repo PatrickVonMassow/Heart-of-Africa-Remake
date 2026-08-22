@@ -2,6 +2,7 @@
 //
 //   node scripts/chat-reply.mjs "text"     # post to the OUTBOX topic
 //   echo "text" | node scripts/chat-reply.mjs
+//   echo "text" | node scripts/chat-reply.mjs --text-stdin
 //
 // The reply is SIGNED with the same secret and the same canonical form as an
 // incoming message, and the page VERIFIES it. That is not symmetry for its own
@@ -18,6 +19,8 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { deriveTopics, makeEnvelope, publishUrl } from './chat-core.mjs'
 
 const FETCH_TIMEOUT_MS = 15000
+const TEXT_STDIN_FLAG = '--text-stdin'
+const INPUT_HELP = `pass the message as one quoted argument, or pipe it on stdin with ${TEXT_STDIN_FLAG}`
 
 // --- THE RECEIPT OF A SENT REPLY ------------------------------------------------
 //
@@ -63,6 +66,29 @@ async function readStdin() {
 }
 
 /**
+ * Resolve an agent reply before any transport can see it.
+ *
+ * The no-argument stdin form predates `--text-stdin`; the explicit flag is a
+ * synonym that keeps this prose-carrying command consistent with board.mjs.
+ * Unknown flags are never treated as prose: that failure mode publishes a
+ * convincingly signed command-line option in place of the intended answer.
+ */
+export function parseReplyText(args, stdinText = '') {
+  const words = (Array.isArray(args) ? args : []).map((word) => String(word))
+  const unknown = words.find((word) => word.startsWith('-') && word !== TEXT_STDIN_FLAG)
+  if (unknown) throw new Error(`unrecognised option "${unknown}" — ${INPUT_HELP}`)
+
+  const explicitStdin = words.includes(TEXT_STDIN_FLAG)
+  if (explicitStdin && words.length !== 1) {
+    throw new Error(`${TEXT_STDIN_FLAG} cannot be combined with argument text — ${INPUT_HELP}`)
+  }
+
+  const text = (explicitStdin || words.length === 0 ? stdinText : words.join(' ')).trim()
+  if (!text) throw new Error(`refusing an empty message — ${INPUT_HELP}`)
+  return text
+}
+
+/**
  * PUT ONE SIGNED ENVELOPE ON THE OUTBOX — and write NO receipt.
  *
  * Not everything the machine posts to the phone is an ANSWER. The launcher's
@@ -105,19 +131,25 @@ export async function sendReply({ receiptPath = RECEIPT_PATH, ...args }) {
   return r
 }
 
+/** Parse first, so every refusal happens before secrets or transport are touched. */
+export async function sendReplyFromInput({
+  args,
+  stdinText,
+  secretReader = readSecret,
+  transport = sendReply,
+}) {
+  const text = parseReplyText(args, stdinText)
+  const secret = secretReader()
+  if (!secret) throw new Error('no chat secret — run: node scripts/chat-secret.mjs --init')
+  return transport({ secret, text })
+}
+
 if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('scripts/chat-reply.mjs')) {
-  const secret = readSecret()
-  if (!secret) {
-    console.error('no chat secret — run: node scripts/chat-secret.mjs --init')
-    process.exit(1)
-  }
-  const text = (process.argv.slice(2).join(' ') || (await readStdin())).trim()
-  if (!text) {
-    console.error('nothing to send (pass the text as an argument or on stdin)')
-    process.exit(1)
-  }
+  const args = process.argv.slice(2)
+  const needsStdin = args.length === 0 || args.includes(TEXT_STDIN_FLAG)
+  const stdinText = needsStdin ? await readStdin() : ''
   try {
-    const r = await sendReply({ secret, text })
+    const r = await sendReplyFromInput({ args, stdinText })
     console.log(r.ok ? `sent (${r.id})` : `NOT sent: HTTP ${r.status}`)
     process.exit(r.ok ? 0 : 1)
   } catch (e) {
