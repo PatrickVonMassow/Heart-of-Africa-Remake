@@ -26,6 +26,8 @@ import {
   RESPAWN_GRACE_MS,
   WORK_FRESH_MS,
   agentOutputVerdict,
+  deadOwnerVerdict,
+  declaredAgentProbe,
   assessInFlight,
   assessOwnerWork,
   checkEvidence,
@@ -35,6 +37,8 @@ import {
   describeInFlight,
   evidenceVerdict,
   respawnDecision,
+  standDownBoundaryDecision,
+  successorAgentOrientation,
   selfReferentialEvidence,
   slotReasonDecision,
   declaredAgentCount,
@@ -856,6 +860,98 @@ describe('agentOutputVerdict / respawnDecision — an agent is judged by what it
   it('INDEPENDENCE: it needs no lock, no declaration and no launcher — only the stamps', () => {
     expect(verdict({ worktreeAt: NOW - 1000 }).verdict).toBe('alive')
     expect(agentOutputVerdict({ now: NOW, worktreeAt: 'kürzlich' }).verdict).toBe('unmeasurable')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 716: losing the lock is a boundary for the owner's children, and the
+// successor may not turn an owner-process verdict into an agent verdict.
+describe('the stand-down boundary — declared children cross ownership', () => {
+  const agent = declaration({
+    evidence: [
+      { kind: 'worktree', path: '/repo/.claude/worktrees/point-716' },
+      { kind: 'branch', ref: 'feat/716-standdown-boundary' },
+      { kind: 'log', path: '/tmp/agent.log' },
+    ],
+  })
+  const working = respawnDecision({ output: agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW }) })
+  const unknown = respawnDecision({ output: agentOutputVerdict({ now: NOW }) })
+
+  it('extracts every output address for one combined --agent-check', () => {
+    expect(declaredAgentProbe(agent)).toEqual({
+      agent: true,
+      worktrees: ['/repo/.claude/worktrees/point-716'],
+      branches: ['feat/716-standdown-boundary'],
+      logs: ['/tmp/agent.log'],
+    })
+    expect(declaredAgentProbe(declaration({ evidence: [{ kind: 'pid', pid: 7 }] })).agent).toBe(false)
+  })
+
+  it('turns a live declared agent into a transfer, never a silent stand-down', () => {
+    expect(
+      standDownBoundaryDecision({
+        sid: SID,
+        declaration: agent,
+        agentCheck: working,
+        transfer: { available: true, blocked: false },
+      }),
+    ).toEqual({ action: 'transfer', reason: 'agent-working' })
+  })
+
+  it('keeps the parent alive for a working child without a pushed checkpoint', () => {
+    expect(
+      standDownBoundaryDecision({
+        sid: SID,
+        declaration: agent,
+        agentCheck: working,
+        transfer: { available: false, blocked: true },
+      }),
+    ).toEqual({ action: 'block', reason: 'checkpoint-required' })
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: unknown, transfer: { available: false } }),
+    ).toEqual({ action: 'block', reason: 'agent-unmeasurable' })
+  })
+
+  it('keeps today’s plain stand-down when this session has no declared agent', () => {
+    expect(standDownBoundaryDecision({ sid: SID })).toEqual({ action: 'stand-down', reason: 'no-own-agent' })
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: declaration({ evidence: [{ kind: 'pid', pid: 7 }] }) }),
+    ).toEqual({ action: 'stand-down', reason: 'no-declared-agent' })
+    expect(standDownBoundaryDecision({ sid: 'successor', declaration: agent })).toEqual({
+      action: 'stand-down',
+      reason: 'no-own-agent',
+    })
+  })
+
+  it('refuses a dead-owner verdict while a child worktree or branch tip is moving', () => {
+    for (const childOutput of [
+      agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW }),
+      agentOutputVerdict({ branchTipAt: NOW - 60_000, now: NOW }),
+    ]) {
+      expect(deadOwnerVerdict({ ownerInactive: true, childOutput })).toEqual({ dead: false, reason: 'child-working' })
+    }
+    expect(deadOwnerVerdict({ ownerInactive: true, childOutput: agentOutputVerdict({ now: NOW }) })).toEqual({
+      dead: false,
+      reason: 'child-unknown',
+    })
+    expect(
+      deadOwnerVerdict({ ownerInactive: true, childOutput: agentOutputVerdict({ branchTipAt: NOW - 90 * 60_000, now: NOW }) }),
+    ).toEqual({ dead: true, reason: 'owner-inactive-child-quiet' })
+  })
+
+  it('orients the successor from the measurement and names the exact probe', () => {
+    const transferred = { ...agent, transfer: { v: 1, by: SID, at: NOW, checkpoints: [] } }
+    const text = successorAgentOrientation({
+      declaration: transferred,
+      sid: 'successor',
+      agentCheck: working,
+      command: 'node scripts/batch-in-flight.mjs --agent-check --worktree "/repo/w"',
+    })
+    expect(text).toContain('MEASURED WORKING')
+    expect(text).toContain('--adopt')
+    expect(text).toContain('--agent-check')
+    expect(text).not.toContain('provably dead')
+    expect(successorAgentOrientation({ declaration: agent, sid: SID, agentCheck: working })).toBe('')
   })
 })
 

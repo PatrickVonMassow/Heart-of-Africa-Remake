@@ -921,6 +921,90 @@ export function respawnDecision({ output } = {}) {
   return { respawn: false, reason: 'output-unmeasurable', judgedOn: o.judgedOn ?? 'none', detail: o.detail ?? '' }
 }
 
+/**
+ * THE OUTPUT ADDRESSES IN A DECLARED AGENT WAIT. PURE.
+ *
+ * A declaration may name several agents, and `--agent-check` must ask all of
+ * their durable output in one verdict: checking a quiet branch separately from
+ * its moving worktree would print a replacement permission while the same child
+ * was still editing files. Pids are deliberately absent. They identify a
+ * process, not the branch/worktree output whose movement decides whether an
+ * author may be described as gone.
+ */
+export function declaredAgentProbe(declaration) {
+  const out = { agent: false, worktrees: [], branches: [], logs: [] }
+  for (const item of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
+    if (item?.kind === 'worktree' && typeof item.path === 'string' && item.path.trim()) {
+      out.agent = true
+      out.worktrees.push(item.path.trim())
+    } else if (item?.kind === 'branch' && typeof item.ref === 'string' && item.ref.trim()) {
+      out.agent = true
+      out.branches.push(item.ref.trim())
+    } else if (item?.kind === 'log' && typeof item.path === 'string' && item.path.trim()) {
+      out.logs.push(item.path.trim())
+    }
+  }
+  return out
+}
+
+/**
+ * MAY THE PARENT'S NON-OWNER STOP BE A PLAIN STAND-DOWN? PURE.
+ *
+ * A live child turns that exit into a boundary. Transferable work crosses it;
+ * work without a pushed checkpoint keeps the parent alive until it has one; and
+ * an unreadable child is UNKNOWN rather than dead. A declaration that belongs to
+ * somebody else is never this session's to transfer.
+ */
+export function standDownBoundaryDecision({ sid = '', declaration = null, agentCheck = null, transfer = null } = {}) {
+  const plain = (reason) => ({ action: 'stand-down', reason })
+  if (!sid || !declaration || declaration.sessionId !== sid) return plain('no-own-agent')
+  if (!declaredAgentProbe(declaration).agent) return plain('no-declared-agent')
+
+  const measured = agentCheck?.reason
+  const working = measured === 'agent-alive'
+  const unknown = measured === 'output-unmeasurable' || !measured
+  const available = transfer?.available === true
+  if (available) {
+    return { action: 'transfer', reason: working ? 'agent-working' : unknown ? 'agent-unknown' : 'checkpoint-preserved' }
+  }
+  if (working) return { action: 'block', reason: transfer?.blocked === true ? 'checkpoint-required' : 'transfer-unavailable' }
+  if (unknown) return { action: 'block', reason: 'agent-unmeasurable' }
+  return plain('agent-measured-quiet')
+}
+
+/**
+ * MAY THE SUCCESSOR CALL THE PREDECESSOR DEAD? PURE.
+ *
+ * The owner's process and its children are separate measurements. The lock can
+ * establish the former; only the same output verdict as `--agent-check` can
+ * establish the latter. Active or unreadable child output therefore refuses a
+ * dead-owner description. Only measured-quiet output permits one.
+ */
+export function deadOwnerVerdict({ ownerInactive = false, childOutput = null } = {}) {
+  if (ownerInactive !== true) return { dead: false, reason: 'owner-not-measured-inactive' }
+  const child = respawnDecision({ output: childOutput })
+  if (child.reason === 'agent-alive') return { dead: false, reason: 'child-working' }
+  if (child.reason === 'output-unmeasurable') return { dead: false, reason: 'child-unknown' }
+  return { dead: true, reason: 'owner-inactive-child-quiet' }
+}
+
+/** The successor-facing words for the child measurement. PURE. */
+export function successorAgentOrientation({ declaration = null, sid = '', agentCheck = null, command = '' } = {}) {
+  if (!declaration || declaration.sessionId === sid || !declaredAgentProbe(declaration).agent) return ''
+  const probe = command || 'node scripts/batch-in-flight.mjs --agent-check <declared worktree/branch>'
+  const transferred =
+    declaration.transfer && !declaration.adopted
+      ? ' The declaration is TRANSFERRED: adopt it first with `node scripts/batch-in-flight.mjs --adopt`.'
+      : ''
+  if (agentCheck?.reason === 'agent-alive') {
+    return `PREDECESSOR CHILD MEASURED WORKING (${agentCheck.detail}). Do not describe it as dead or start the same work.${transferred} Re-probe with \`${probe}\`.`
+  }
+  if (agentCheck?.reason === 'output-quiet') {
+    return `PREDECESSOR CHILD OUTPUT MEASURED QUIET (${agentCheck.detail}); replacement is permitted only from that measurement, not from the lock.${transferred} Re-run \`${probe}\` immediately before replacing it.`
+  }
+  return `PREDECESSOR CHILD STATE UNKNOWN (${agentCheck?.detail || 'its worktree/branch could not be read'}). The lock does not answer for children, so do not call the agent dead.${transferred} Probe with \`${probe}\`.`
+}
+
 // ---------------------------------------------------------------------------
 // THE POOL RUNS AT ITS CAP, OR SAYS WHY NOT (point 427, 29.07.2026)
 // ---------------------------------------------------------------------------
