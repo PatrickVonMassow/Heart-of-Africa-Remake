@@ -28,7 +28,9 @@ import {
   parseFirstParentChain,
   parseTickEvents,
   clauseDemandsPicture,
+  heldOutForPicture,
   PICTURE_HOLDOUT_REASON,
+  splitClauses,
   PICTURE_VERIFIED,
   pictureBearingPoints,
   pictureVerifiedPoints,
@@ -761,16 +763,33 @@ describe('the holdout does not lift itself on evidence the tool cannot keep', ()
     expect(plan[0].reason).toMatch(/rendered proof/)
   })
 
-  it('keeps that card out of the criticality denominator in this state too', () => {
+  it('keeps the render LANDINGS out of the numerator, not just the cards out of the denominator', () => {
+    const medium = withRenderRows.byAxis.criticality.find((c) => c.name === 'medium')
+    // Pooled: six 1-hour process rows and six 3-hour render rows → a 2-hour
+    // centre belonging to neither. The correction speaks for the process rows.
+    expect(medium.elapsed.median).toBe(2)
+    expect(medium.correctable.median).toBe(1)
     const plan = rewritePlan(withRenderRows, {
       cards: { 10: { estimate: '~4 h' }, 20: { estimate: '~40 h' } },
       open: [10, 20],
       criticality: new Map([[10, 'medium'], [20, 'medium']]),
       pictureBearing: new Set([20]),
     })
-    // Pooled median 2 h against card 10's own 4 h — the 40 h render promise
-    // never reaches the denominator.
-    expect(plan[0]).toMatchObject({ point: 10, to: '~2 h', changed: true })
+    // 1 h over card 10's own 4 h — neither the render landings nor the 40 h
+    // render promise reaches the arithmetic.
+    expect(plan[0]).toMatchObject({ point: 10, to: '~1 h', changed: true })
+  })
+
+  it('will not call a class correctable on render landings alone', () => {
+    const renderOnly = calibrationReading(
+      Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 700 + i, elapsedHours: 3, estimateHours: null, criticality: 'medium', picture: true }),
+      ),
+    )
+    const medium = renderOnly.byAxis.criticality.find((c) => c.name === 'medium')
+    expect(medium.elapsed.n).toBe(6)
+    expect(medium.correctable.n).toBe(0)
+    expect(medium.elapsedComparable).toBe(false)
   })
 })
 
@@ -899,5 +918,61 @@ describe('the holdout reason and the count that reports it are one string', () =
     // The report counts by this substring; a reworded reason would silently
     // report zero held-out cards while still holding them out.
     expect(plan[0].reason).toContain(PICTURE_HOLDOUT_REASON)
+  })
+})
+
+
+describe('a denial reaches only its own clause, at every ordinary boundary', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('cuts at a dash, a comma and a colon as well as a semicolon', () => {
+    expect(splitClauses('a — b, c: d; e')).toHaveLength(5)
+  })
+
+  it('keeps the demand that follows a denial across each of them', () => {
+    const tasks = [
+      block(90, 'No screenshot is required — provide a browser frame.'),
+      block(91, 'No screenshot is required, provide a browser frame.'),
+      block(92, 'Not required: a screenshot; required: a browser frame.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)].sort((a, b) => a - b)).toEqual([90, 91, 92])
+  })
+})
+
+describe('the visual companion is actually visual', () => {
+  const block = (n, line) => [`- [ ] ${n}. A point.`, `  ${line}`, ''].join('\n')
+
+  it('does not read "framework" or "lookup" as a picture', () => {
+    const tasks = [
+      block(93, 'The framework supports both backends.'),
+      block(94, 'The lookup works on both backends.'),
+    ].join('\n')
+    expect([...pictureBearingPoints(tasks)]).toEqual([])
+  })
+
+  it('still reads a real frame beside both backends', () => {
+    expect(pictureBearingPoints(block(95, 'The rendered frame is checked on both backends.')).has(95)).toBe(true)
+  })
+})
+
+describe('the count the report prints is the plan it printed', () => {
+  it('counts exactly the entries carrying the holdout reason', () => {
+    const reading = calibrationReading(
+      Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+      ),
+    )
+    const plan = rewritePlan(reading, {
+      cards: { 10: { estimate: '~4 h' }, 20: { estimate: '~4 h' }, 30: {} },
+      open: [10, 20, 30],
+      criticality: new Map([[10, 'medium'], [20, 'medium'], [30, 'medium']]),
+      pictureBearing: new Set([20, 30]),
+    })
+    const held = heldOutForPicture(plan)
+    expect(held.map((p) => p.point)).toEqual([20])
+    // Card 30 owes a proof too but carries no estimate, so it is NOT counted as
+    // held back — the report says that difference out loud rather than hiding it.
+    expect(plan.find((p) => p.point === 30).reason).toMatch(/no stored estimate/)
+    expect(held.every((p) => p.reason.includes(PICTURE_HOLDOUT_REASON))).toBe(true)
   })
 })

@@ -449,18 +449,28 @@ export function classSummaries(landings, axis) {
     const rated = members.filter((m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours))
     const unknowable = UNKNOWABLE_CLASSES.has(name)
     const elapsed = summarise(members.map((m) => m.elapsedHours))
+    // THE NUMERATOR MUST SPEAK FOR THE SAME POPULATION AS THE DENOMINATOR.
+    // A render card is held out of the correction, so a render LANDING may not
+    // sit inside the median that corrects everything else: pooling six 1-hour
+    // process landings with six 3-hour render ones yields a 2-hour centre that
+    // belongs to neither. Excluding the cards but keeping the landings was the
+    // same confounder, one layer down.
+    const correctable = summarise(
+      members.filter((m) => classesOf(m).picture !== PICTURE_VERIFIED).map((m) => m.elapsedHours),
+    )
     out.push({
       axis,
       name,
       points: members.length,
       elapsed,
+      correctable,
       ratio: summarise(rated.map((m) => m.elapsedHours / m.estimateHours)),
       comparable: !unknowable && rated.length >= MIN_CLASS_SAMPLES,
       // A class can be measured WITHOUT any landing-time snapshot: the elapsed
       // span is read off git, while the ratio needs a promise recorded while the
       // point was still open. Two separate kinds of evidence — and the second one
       // exists only for landings after this command's first run.
-      elapsedComparable: !unknowable && elapsed.n >= MIN_CLASS_SAMPLES,
+      elapsedComparable: !unknowable && correctable.n >= MIN_CLASS_SAMPLES,
       unknowable,
     })
   }
@@ -599,7 +609,7 @@ export function factorForCard(reading, criticality, { promiseMedian = null } = {
   // Applied as a FACTOR, so each card keeps its position relative to its
   // neighbours; only the class's centre moves onto the measurement.
   const promise = asNumber(promiseMedian)
-  const measured = asNumber(ownClass?.elapsed?.median)
+  const measured = asNumber(ownClass?.correctable?.median)
   if (ownClass?.elapsedComparable && promise > 0 && measured > 0) {
     return { factor: measured / promise, basis: `${ELAPSED_BIAS_BASIS}:${label}`, label, reason: null }
   }
@@ -672,7 +682,7 @@ export const PICTURE_VERIFIED = 'picture-verified'
  * report prints beside it can never drift apart into two different truths.
  */
 export const PICTURE_HOLDOUT_REASON =
-  'the point asks for a rendered proof, and no landing this measurement can establish carries one'
+  'the point asks for a rendered proof, and this measurement cannot establish what one costs'
 
 export const PICTURE_PROOF_MARKERS = [
   /\bbrowser frames?\b/i,
@@ -692,7 +702,7 @@ export const PICTURE_PROOF_MARKERS = [
  * which is how a render point's VERIFIABLE actually reads.
  */
 export const PICTURE_BACKEND_MARKER = /\bboth backends\b/i
-export const PICTURE_VISUAL_COMPANION = /\b(picture|screenshot|frame|render|rendered|visual|look|Bild|Ansicht)\w*/i
+export const PICTURE_VISUAL_COMPANION = /\b(pictures?|screenshots?|frames?|framing|renders?|rendered|rendering|visual|visually|Bild|Ansicht)\b/i
 
 /**
  * A mention that DENIES the proof rather than demanding it. Narrow on purpose:
@@ -713,6 +723,16 @@ export const PICTURE_PROOF_DENIALS = [
   /\bnot\s+(\w+\s+){0,2}picture[- ]verified\b/i,
 ]
 
+/**
+ * ONE LINE, CUT INTO THE CLAUSES A DENIAL CAN REACH.
+ *
+ * A denial governs its own clause and no further, so the cut has to include the
+ * ordinary boundaries: a comma and a dash separate two statements as surely as a
+ * semicolon does, and "no screenshot is required — provide a browser frame" was
+ * read as a denial while it was one string.
+ */
+export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|--/)
+
 /** Does ONE clause demand a rendered proof? */
 export function clauseDemandsPicture(clause) {
   const text = String(clause ?? '')
@@ -732,10 +752,14 @@ export function pictureBearingPoints(text) {
     else if (/^- \[/.test(line)) point = null
     if (point === null || out.has(point)) continue
     // The head line carries the point's title, and a title can name the proof.
-    if (line.split(/[;.]/).some(clauseDemandsPicture)) out.add(point)
+    if (splitClauses(line).some(clauseDemandsPicture)) out.add(point)
   }
   return out
 }
+
+/** The cards a plan held out for the render confounder — what the report counts. */
+export const heldOutForPicture = (plan) =>
+  (Array.isArray(plan) ? plan : []).filter((p) => p?.reason?.includes(PICTURE_HOLDOUT_REASON))
 
 /**
  * THE BASELINE LEDGER — what each card promised BEFORE any correction touched it.

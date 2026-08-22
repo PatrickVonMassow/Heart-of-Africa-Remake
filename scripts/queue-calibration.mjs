@@ -35,7 +35,7 @@ import {
   ELAPSED_BIAS_BASIS,
   inheritanceDefaults,
   inheritedEstimateForClass,
-  PICTURE_HOLDOUT_REASON,
+  heldOutForPicture,
   PICTURE_VERIFIED,
   pictureBearingPoints,
   promiseMedians,
@@ -238,7 +238,7 @@ try {
   console.log('CLASSIFICATION LIMIT — PICTURE: render-verify-state.json is git-ignored, bounded to 40 runs and clearedHeads is pruned at branch end; only a retained branch entry establishes picture verification.')
   console.log(
     'CONFOUNDER: a point that owes a rendered proof is HELD OUT of the correction and of its denominator. ' +
-      'Lifting that holdout needs a measurable render class, and the picture evidence above cannot supply one: ' +
+      'Lifting that holdout needs a render class this command can measure, and the picture evidence above cannot supply one: ' +
       `${reading.byAxis.picture.find((c) => c.name === PICTURE_VERIFIED)?.elapsed.n ?? 0} landing(s) survive in a store ` +
       'that is capped and pruned at branch end. It is a decision with its own measurement behind it, not a switch this command flips.',
   )
@@ -254,7 +254,7 @@ try {
     for (const c of reading.byAxis[axis]) {
       console.log(
         `  ${String(c.name).padEnd(15)} points ${String(c.points).padStart(3)}  spans ${String(c.elapsed.n).padStart(3)}  ` +
-          `rated ${String(c.ratio.n).padStart(3)}  ` +
+          `correctable ${String(c.correctable.n).padStart(3)}  rated ${String(c.ratio.n).padStart(3)}  ` +
           `median elapsed ${fmt(c.elapsed.median, ' h').padStart(8)}  median ratio ${fmt(c.ratio.median, '×').padStart(8)}` +
           (c.unknowable
             ? '  (missing-information class — excluded from comparison)'
@@ -285,7 +285,8 @@ try {
     const promise = promises.get(c.name)
     if (!c.comparable && c.elapsedComparable && promise) {
       console.log(
-        `  ${c.name.padEnd(13)} ${fmt(c.elapsed.median / promise, '×')}  (${ELAPSED_BIAS_BASIS}: median ${fmt(c.elapsed.median, ' h')} measured against the ${fmt(promise, ' h')} its open cards promise, n=${c.elapsed.n})`,
+        `  ${c.name.padEnd(13)} ${fmt(c.correctable.median / promise, '×')}  (${ELAPSED_BIAS_BASIS}: median ${fmt(c.correctable.median, ' h')} ` +
+          `over ${c.correctable.n} landing(s) that owed no rendered proof, measured against the ${fmt(promise, ' h')} its open cards promise)`,
       )
     }
   }
@@ -293,11 +294,13 @@ try {
   const plan = rewritePlan(reading, { cards, open, criticality, ledger, pictureBearing })
   // COUNTED FROM THE PLAN ITSELF, never from the marker set: the markers span the
   // whole work order, closed points included, and only an OPEN card can be held out.
-  const heldOut = plan.filter((p) => p.reason?.includes(PICTURE_HOLDOUT_REASON)).length
-  if (heldOut) {
+  const heldOut = heldOutForPicture(plan).length
+  const declaredOpen = plan.filter((p) => pictureBearing.has(p.point)).length
+  if (declaredOpen) {
     console.log(
-      `  ${heldOut} open card(s) asking for a rendered proof are held out of BOTH the correction and its denominator, ` +
-        'because no landing in this window has an established picture check to measure them against.',
+      `  ${declaredOpen} open card(s) ask for a rendered proof and are held out of the correction AND of its denominator; ` +
+        `${heldOut} of them carried an estimate this run would otherwise have corrected, and the rest had none to correct. ` +
+        'This measurement cannot establish what a picture check costs, so it does not price one.',
     )
   }
   const changed = plan.filter((p) => p.changed)
