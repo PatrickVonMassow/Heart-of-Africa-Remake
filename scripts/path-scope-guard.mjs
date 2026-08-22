@@ -88,7 +88,7 @@ export function gatherPathScope({ sessionId = '' } = {}) {
  * stand-down branch is covered without writing the live pause marker. */
 export function preToolUseEnvelope(payload, { gather = gatherPathScope } = {}) {
   const subject = subjectFrom(payload)
-  const interception = interceptToolOutput(payload, { expandSegments, headAndArgs })
+  const interception = interceptToolOutput(payload, { expandSegments, headAndArgs, hookUrl: import.meta.url })
   if (!subject && !interception) return null
 
   const gathered = gather({ sessionId: payload.session_id || '' })

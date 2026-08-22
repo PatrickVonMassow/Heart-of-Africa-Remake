@@ -4,6 +4,8 @@
 // so commands whose output is consumed by their caller stay untouched. The
 // registered scripts/path-scope-guard.mjs hook sees every call in these tool
 // families and rewrites only the producers classified below.
+import { isAbsolute, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const READ_LINE_BUDGET = 200
 export const GREP_RESULT_BUDGET = 100
@@ -38,12 +40,34 @@ export function shellProducer(command, { expandSegments, headAndArgs } = {}) {
   return null
 }
 
-function shellRewrite(command, toolName) {
+function scriptBesideHook(name, hookUrl) {
+  const path = fileURLToPath(new URL(name, hookUrl))
+  return isAbsolute(path) ? path : resolve(path)
+}
+
+const posixQuote = (value) => `'${String(value).replaceAll("'", `'"'"'`)}'`
+const powerShellQuote = (value) => `'${String(value).replaceAll("'", "''")}'`
+
+/**
+ * Build the command which launches the budget boundary. Both scripts are
+ * resolved beside the registered hook, whose module URL cannot become empty
+ * when an unrelated launcher omits CLAUDE_PROJECT_DIR. The dependency
+ * injection is only for pure command-builder and subprocess fixtures.
+ */
+export function toolOutputCommand(command, {
+  toolName = 'Bash',
+  hookUrl = import.meta.url,
+  launcherPath = scriptBesideHook('./tool-output-budget-launch.mjs', hookUrl),
+  budgetScriptPath = scriptBesideHook('./tool-output-budget.mjs', hookUrl),
+  nodePath = process.execPath,
+} = {}) {
   const encoded = Buffer.from(command).toString('base64url')
-  const runner = toolName === 'PowerShell'
-    ? 'node "$env:CLAUDE_PROJECT_DIR/scripts/tool-output-budget.mjs"'
-    : 'node "$CLAUDE_PROJECT_DIR/scripts/tool-output-budget.mjs"'
-  return `${runner} --encoded-command ${encoded}`
+  const absoluteLauncher = isAbsolute(launcherPath) ? launcherPath : resolve(launcherPath)
+  const absoluteBudget = isAbsolute(budgetScriptPath) ? budgetScriptPath : resolve(budgetScriptPath)
+  if (toolName === 'PowerShell') {
+    return `& ${powerShellQuote(nodePath)} ${powerShellQuote(absoluteLauncher)} --budget-script ${powerShellQuote(absoluteBudget)} --encoded-command ${encoded}`
+  }
+  return `${posixQuote(nodePath)} ${posixQuote(absoluteLauncher)} --budget-script ${posixQuote(absoluteBudget)} --encoded-command ${encoded}`
 }
 
 const positiveInt = (value) => Number.isInteger(value) && value > 0
@@ -54,7 +78,7 @@ const positiveInt = (value) => Number.isInteger(value) && value > 0
  * files remain the complete on-disk copy. Shell producers are captured whole by
  * the spill runner and selectively readable with run-logged --show.
  */
-export function interceptToolOutput(payload, { expandSegments, headAndArgs } = {}) {
+export function interceptToolOutput(payload, { expandSegments, headAndArgs, hookUrl = import.meta.url } = {}) {
   if (!payload || typeof payload !== 'object') return null
   const toolName = payload.tool_name
   const input = payload.tool_input && typeof payload.tool_input === 'object' ? payload.tool_input : {}
@@ -64,7 +88,7 @@ export function interceptToolOutput(payload, { expandSegments, headAndArgs } = {
     if (!producer) return null
     return {
       producer,
-      updatedInput: { ...input, command: shellRewrite(input.command, toolName) },
+      updatedInput: { ...input, command: toolOutputCommand(input.command, { toolName, hookUrl }) },
       reason: `${producer} output is captured by the per-call budget; full output spills to local/tool-output-logs.`,
     }
   }
