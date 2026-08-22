@@ -11032,3 +11032,38 @@ to land than a mechanism that needs a review.
   Criticality: medium — it destroys no work, but it stops the batch out of a phantom and trains the
   sessions passing through it to read a real parallel-session alert as noise.
   Bundle: unbundled (batch autonomy).
+
+- [ ] 842. The link witness still has three routes to a clean pass over a real link failure
+  (cross-vendor review of point 517's answer, GPT-5.6 Sol, effort high, 22.08.2026, receipts
+  `835074a1e6e248b4` and `cac0f41b7c8636b9`; verdict do-not-merge on `2d41c53`, the third of
+  three rounds). `scripts/module-link-check.mjs` exists because vitest's transform turns a named
+  import of something the target does not export into `undefined` while real node refuses it at
+  LINK time — the defect that killed `scripts/batch-autostart.mjs`, the 900-second OS recovery
+  tick. Two of the reviewer's routes are closed on `main`: every target is followed now, not only
+  the relative ones, and a DEFAULT binding is checked like a named one. Three remain, and they are
+  filed rather than chased because the round that answers one keeps finding the next, while the
+  defect the witness was written for is pinned and green.
+  WHAT IS STILL OPEN, each named by the reviewer at its line:
+  (a) COMMENT STRIPPING IS LINE-BASED (`stripComments`). A line inside a template literal whose
+      text begins with `//` is removed as if it were a comment, and a `/* */` sequence inside a
+      string is removed as if it were a block comment. Either can delete a real import statement
+      from the scanned text, or split one, and the file then reads as clean.
+  (b) THE CLAUSE MATCHER IS A REGEX, not a parser. The forms it knows are tested one by one, and
+      an unrecognised statement start is counted as UNPARSED and fails loudly — but a statement it
+      MIS-reads is not counted at all: a specifier holding the other quote character, or a clause
+      the `[^'";]` guard cuts short, yields a wrong binding list rather than a refusal.
+  (c) A PACKAGE SPECIFIER RESOLVES FROM THE CHECKER, not from the subject. `await import('pkg')`
+      inside `module-link-check.mjs` resolves against ITS location; a subject in another checkout
+      or worktree with a different `node_modules` is therefore judged against the wrong tree.
+  FINAL STATE: each of the three either cannot produce a clean pass over a link failure any more,
+  or is refused as UNPARSED, which is the module's own stated contract — going blind is a red, not
+  a silence. A real ES-module parser is the obvious answer to (a) and (b) and needs a dependency
+  justified in its commit under CLAUDE.md §3; if that is refused, the contract must instead be
+  narrowed honestly, so the module states what it cannot read and fails there.
+  VERIFIABLE: pure Vitest beside `scripts/module-link-check.mjs`, one case per route, each with a
+  fixture that really is broken — the existing `module-link-check.*-fixture.mjs` files are the
+  pattern. The launcher's own case in `scripts/batch-autostart.test.mjs` stays green throughout.
+  Criticality: medium — the witness is a detector, not a shipped path, and the failure it was
+  built for is caught today; what is at stake is that a LATER launcher defect of the same class
+  slips past it unnoticed, which is exactly how the first one survived.
+  Bundle: Session- & Repo-Hygiene.

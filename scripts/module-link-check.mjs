@@ -47,11 +47,13 @@ const ANY_STATEMENT = /(?:^|[\n;])\s*import\b(?!\s*[.(])/g
 /**
  * THE STATIC IMPORTS OF ONE SOURCE. PURE.
  *
- * Returns `{ imports: [{ specifier, names }], unparsed }` — `names` holds the
- * NAMED bindings only (a default or namespace binding cannot be missing from a
- * module), and `unparsed` counts the import statements no recognised form
- * claimed. A non-zero `unparsed` means this scanner has gone blind, not that the
- * file is clean.
+ * Returns `{ imports: [{ specifier, names, hasDefault }], unparsed }`. A DEFAULT
+ * binding is tracked because it can be missing exactly like a named one — node
+ * refuses `import x from './y.mjs'` against a module with no default export with
+ * the same link error (cross-vendor review, GPT-5.6 Sol, 22.08.2026). A
+ * namespace binding cannot fail and is not tracked. `unparsed` counts the import
+ * statements no recognised form claimed: a non-zero count means this scanner has
+ * gone blind, not that the file is clean.
  */
 export function scanStaticImports(source) {
   const code = stripComments(source)
@@ -67,11 +69,15 @@ export function scanStaticImports(source) {
           .map((part) => part.trim().split(/\s+as\s+/)[0].trim())
           .filter(Boolean)
       : []
-    imports.push({ specifier: m[3], names })
+    // What stands OUTSIDE the braces is the default binding — unless it is a
+    // namespace (`* as ns`), which no module can fail to provide.
+    const outside = clause.replace(/\{[^}]*\}/, '').replace(/,/g, ' ').trim()
+    const hasDefault = outside.length > 0 && !outside.startsWith('*')
+    imports.push({ specifier: m[3], names, hasDefault })
   }
   for (const m of code.matchAll(SIDE_EFFECT)) {
     claimed += 1
-    imports.push({ specifier: m[2], names: [] })
+    imports.push({ specifier: m[2], names: [], hasDefault: false })
   }
   const total = [...code.matchAll(ANY_STATEMENT)].length
   return { imports, unparsed: Math.max(0, total - claimed) }
@@ -96,7 +102,7 @@ export async function missingNamedImports(file) {
   const { imports, unparsed } = scanStaticImports(source)
   const missing = []
   for (const entry of imports) {
-    if (entry.names.length === 0) continue
+    if (entry.names.length === 0 && !entry.hasDefault) continue
     const target = entry.specifier.startsWith('.')
       ? pathToFileURL(resolve(dirname(file), entry.specifier)).href
       : entry.specifier
@@ -107,6 +113,7 @@ export async function missingNamedImports(file) {
       missing.push(`${entry.specifier} -> unloadable (${e && e.message ? e.message.split('\n')[0] : e})`)
       continue
     }
+    if (entry.hasDefault && !('default' in mod)) missing.push(`${entry.specifier} -> default`)
     for (const name of entry.names) {
       if (!(name in mod)) missing.push(`${entry.specifier} -> ${name}`)
     }

@@ -34,6 +34,15 @@ describe('scanStaticImports reads every static form', () => {
     ])
   })
 
+  it('tells a DEFAULT binding from a namespace one — only the first can be missing', () => {
+    const flags = (src) => scanStaticImports(src).imports.map((i) => i.hasDefault)
+    expect(flags("import def from './x.mjs'")).toEqual([true])
+    expect(flags("import def, { a } from './x.mjs'")).toEqual([true])
+    expect(flags("import * as ns from './x.mjs'")).toEqual([false])
+    expect(flags("import { a } from './x.mjs'")).toEqual([false])
+    expect(flags("import './x.mjs'")).toEqual([false])
+  })
+
   it('a side-effect import is a statement, and never swallows the one after it', () => {
     expect(specs("import './a.mjs'\nimport { x } from './b.mjs'")).toEqual(['./b.mjs:x', './a.mjs:'])
   })
@@ -94,5 +103,12 @@ describe('a package or builtin target is checked too, not skipped', () => {
     const { missing } = await missingNamedImports('scripts/module-link-check.unresolvable-fixture.mjs')
     expect(missing).toHaveLength(1)
     expect(missing[0]).toMatch(/^\.\/there-is-no-such-module\.mjs -> unloadable \(/)
+  })
+})
+
+describe('a default binding is a link failure like any other', () => {
+  it('NEGATIVE CONTROL: names a default export the target does not have', async () => {
+    const { missing } = await missingNamedImports('scripts/module-link-check.default-fixture.mjs')
+    expect(missing).toEqual(['./module-link-check.mjs -> default'])
   })
 })
