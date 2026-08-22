@@ -9088,12 +9088,14 @@ to land than a mechanism that needs a review.
   keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
   three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
   underneath, so that a lane stops belonging to a session at all.
-  FIRST STEP, BEFORE ANY CODE: the merge of the two blind lists is RE-RUN by the model that wrote
-  NEITHER of them. The recorded merge was performed by list B's author while a third model
-  existed, which is exactly the anchoring the rule forbids; the deviation is named in the
-  document, and inheriting it silently would make every entry below unaudited. The re-merge is
-  recorded with `scripts/mechanism-review.mjs --merged-by` and may add, drop or re-word entries —
-  what it settles is what this point implements.
+  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
+  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
+  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
+  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
+  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
+  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
+  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
+  restated.
   FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
   model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
   already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
@@ -9112,11 +9114,10 @@ to land than a mechanism that needs a review.
   main-session picture judgments are persisted as evidence a worker may never substitute.
   Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
   transferable.
-  BUILD IT IN THE UNION'S ORDER (schemas and invariants, durable store, daemon plus the Sol
-  adapter, transferable declarations and fencing, bounded dispatch, checkpoint barrier, boundary,
-  successor reconciliation, landing journal, board projection, metrics), each step green on the
-  unit layer before the next, and roll out with the Sol adapter ALONE until the failure drills
-  pass.
+  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
+  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
+  journal, board projection, metrics), each step green on the unit layer before the next, and roll
+  out with the Sol adapter ALONE until the failure drills pass.
   VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
   push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
   duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
