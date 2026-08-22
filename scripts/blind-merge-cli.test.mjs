@@ -126,7 +126,7 @@ describe('the command', () => {
   it('refuses a merger that contradicts the switch', () => {
     const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Opus 5')
     expect(r.status).toBe(1)
-    expect(r.out).toMatch(/is not the model that wrote neither half/)
+    expect(r.out).toMatch(/is not the one this stage owes/)
   })
 
   it('refuses a hand-stated outage in place of the switch-owned merger reason', () => {
@@ -142,7 +142,7 @@ describe('the command', () => {
       'GPT-5.6 Sol was unreachable in this session',
     )
     expect(r.status).toBe(1)
-    expect(r.out).toMatch(/is not the model that wrote neither half/)
+    expect(r.out).toMatch(/is not the one this stage owes/)
     expect(r.out).toMatch(/stated fallback contradicts/)
   })
 

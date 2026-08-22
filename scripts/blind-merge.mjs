@@ -122,6 +122,15 @@ if (isMainModule(import.meta.url)) {
     // AFTER the authors are known, never before: the merger is the model that wrote
     // NEITHER half, so naming it needs both halves' authors in hand.
     const expectedMerger = mergerModel(fableState, [a.model, b.model])
+    // WHETHER THE SELECTION IS A THIRD MODEL OR THE FALLBACK, because the two owe
+    // opposite sentences. Where every roster model wrote a half, selection keeps the
+    // switch's answer and that model DID write one — saying "it wrote neither half"
+    // there states a false condition instead of naming the recorded fallback
+    // (four-eyes finding 3 on this change).
+    const mergerWroteAHalf = [a.model, b.model].some((author) => sameModel(expectedMerger, author))
+    const mergerBecause = mergerWroteAHalf
+      ? 'it wrote a half itself — the recorded two-model fallback'
+      : 'it wrote neither half'
 
     // A list that cannot be counted is refused BEFORE the merge, not after: a
     // missing or repeated ID makes every number below meaningless.
@@ -151,7 +160,7 @@ if (isMainModule(import.meta.url)) {
             `      ${p.b}: ${y?.file ?? ''} — ${y?.defect ?? ''}`,
         )
       }
-      console.log(`\nMERGING MODEL — ${expectedMerger} (it wrote neither half; node scripts/fable-switch.mjs --status)`)
+      console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/fable-switch.mjs --status)`)
       const framing = mergePromptFraming(fableState, [a.model, b.model])
       if (framing) console.log(`\n${framing}`)
       console.log(
@@ -170,16 +179,14 @@ if (isMainModule(import.meta.url)) {
     // the one validated AND the one printed below (four-eyes review: the printed
     // record command used to echo an empty --merged-by for the union-only form).
     const declared = mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? ''))
-    const switchFallback = [a.model, b.model].some((author) => sameModel(expectedMerger, author))
-      ? mergeFallbackReason(fableState)
-      : ''
+    const switchFallback = mergerWroteAHalf ? mergeFallbackReason(fableState) : ''
     const mergerReason = fallback || switchFallback
     const merger = validateMerger({ mergedBy: expectedMerger, authors: [a.model, b.model], fallback: mergerReason })
     if (declared && !sameModel(declared, expectedMerger)) {
       merger.ok = false
       merger.errors.push(
-        `merger "${declared}" is not the model that wrote neither half: ${expectedMerger} owns this merge ` +
-          '(node scripts/fable-switch.mjs --status)',
+        `merger "${declared}" is not the one this stage owes: ${expectedMerger} owns this merge, ` +
+          `${mergerBecause} (node scripts/fable-switch.mjs --status)`,
       )
     }
     if (fallback && fallback !== switchFallback) {

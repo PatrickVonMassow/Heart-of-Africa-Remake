@@ -460,7 +460,7 @@ export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', au
   const errors = []
   if (declared && !sameModel(declared, expected)) {
     errors.push(
-      `--merged-by "${declared}" is not the model that wrote neither list: ${expected} owns this merge ` +
+      `--merged-by "${declared}" is not the one this stage owes: ${expected} owns this merge ` +
         '(node scripts/fable-switch.mjs --status)',
     )
   }

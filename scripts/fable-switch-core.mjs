@@ -135,8 +135,15 @@ function sameModelName(a, b) {
     // "GPT-5.6 Sol" and "Claude Opus 5" both name a vendor word and a model word; the
     // LAST recognised word is the model, which is what the roster entries are keyed on.
     const key = family.includes('sol') ? 'sol' : family.includes('fable') ? 'fable' : family[family.length - 1]
-    const version = text.match(new RegExp(`\\b${key}[\\s-]*(\\d+(?:\\.\\d+)?)`))
-    return { key, version: version?.[1] ?? '' }
+    // THE VERSION IS NOT ALWAYS ATTACHED TO THE KEY WORD (four-eyes finding 1 on this
+    // change): "GPT-5.6 Sol" carries its version on the VENDOR word, so keying the
+    // search on "sol" found no digits and made every Sol version compare equal —
+    // "GPT-5.6 Sol" and "GPT-6 Sol" were one model. The version is therefore the first
+    // one any recognised word carries, wherever in the name it sits.
+    const version = [...text.matchAll(/\b(?:sol|gpt|fable|opus|claude|sonnet|haiku)[\s-]*(\d+(?:\.\d+)?)/g)]
+      .map((m) => m[1])
+      .find(Boolean)
+    return { key, version: version ?? '' }
   }
   const x = parse(a)
   const y = parse(b)
@@ -166,16 +173,20 @@ export function mergerModel(value, authors = []) {
 /** Additional framing owed when the merging model merges its own blind half. */
 export function mergePromptFraming(value, authors = []) {
   const merger = mergerModel(value, authors)
-  const slots = Array.isArray(authors) ? authors : [authors]
-  // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE: the strict reading may only be used
-  // when BOTH halves name their author. A half whose author is unnamed could be the
-  // merger's own, and dropping the framing on that silence would quietly retire it —
-  // so any blank falls back to the older, switch-only reading, which errs towards
-  // demanding decorrelation rather than towards skipping it.
-  const known = slots.length >= 2 && slots.every((author) => String(author ?? '').trim())
-  const selfMerge = known
-    ? authorList(authors).some((author) => sameModelName(merger, author))
-    : !fableIsOn(value)
+  const slots = Array.isArray(authors) ? authors : authors == null ? [] : [authors]
+  // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE. Three states, not two:
+  //   · NOTHING supplied — a caller not using this at all, so the older switch-only
+  //     reading stands and nothing about existing callers shifts.
+  //   · BOTH halves named — the strict reading: framing owed only on a real self-merge.
+  //   · PARTLY named — the caller is telling us who it knows, and one half is unknown.
+  //     That unknown half could be the merger's own, so the framing is OWED. Reading
+  //     the silence the other way retires the framing exactly where it is least safe
+  //     (four-eyes finding 2 on this change: with the switch ON and one half blank the
+  //     previous version dropped it, and a test of mine pinned that unsafe outcome).
+  const named = slots.filter((author) => String(author ?? '').trim())
+  const selfMerge = slots.length === 0
+    ? !fableIsOn(value)
+    : named.length < 2 || named.some((author) => sameModelName(merger, author))
   if (!selfMerge) return ''
   return (
     'DECORRELATED MERGE FRAMING: reconstruct the union from the two numbered evidence lists ' +

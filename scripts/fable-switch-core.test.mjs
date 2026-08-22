@@ -114,11 +114,27 @@ describe('decisions derived from the state', () => {
 
   it('still demands the framing while either half leaves its author unnamed', () => {
     // A half nobody has named could be the merger's own. Reading that silence as "not
-    // the merger" would retire the framing exactly where it is least safe to.
+    // the merger" would retire the framing exactly where it is least safe to — and the
+    // switch state does not change that, which is what the last line here used to get
+    // wrong: it asserted the framing was dropped with Fable ON and a half unnamed.
     expect(mergePromptFraming(off(), [FABLE_MODEL, ''])).toMatch(/DECORRELATED MERGE FRAMING/)
     expect(mergePromptFraming(off(), ['   ', SOL_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
     expect(mergePromptFraming(off(), [FABLE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
-    expect(mergePromptFraming(on(), [FABLE_MODEL, ''])).toBe('')
+    expect(mergePromptFraming(on(), [FABLE_MODEL, ''])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(on(), ['', SOL_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+    // Nothing supplied at all is a caller not using this, and stays as it was.
+    expect(mergePromptFraming(on(), [])).toBe('')
+    expect(mergePromptFraming(on())).toBe('')
+  })
+
+  it('tells two Sol versions apart instead of treating every Sol as one model', () => {
+    // "GPT-5.6 Sol" carries its version on the VENDOR word, so a search keyed on "sol"
+    // found no digits and made every Sol compare equal. A half written by a different
+    // Sol version would then have wrongly disqualified the current one.
+    expect(mergerModel(off(), [FABLE_MODEL, 'GPT-6 Sol'])).toBe(SOL_MODEL)
+    expect(mergerModel(off(), [FABLE_MODEL, 'GPT-5.6 Sol'])).toBe(CLAUDE_MODEL)
+    // A name with no version at all still matches its family, as before.
+    expect(mergerModel(off(), [FABLE_MODEL, 'Sol'])).toBe(CLAUDE_MODEL)
   })
 
   it('adds an independent merge framing only for the same-model fallback', () => {
