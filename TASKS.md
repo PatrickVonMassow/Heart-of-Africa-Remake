@@ -11126,12 +11126,15 @@ to land than a mechanism that needs a review.
   a self-pause at 18:23 lifted only at 18:37 after a hand diagnosis, and the card "Batch pausiert:
   Alarm blieb unbeantwortet" back on the board — while exactly one batch session was running. It
   reproduces: as long as the user chats here while a worker runs, the alarm fires again.
-  NOT ALREADY COVERED: point 515 (placeholder owner, pid equality) does not reach this class. The
-  chat session has a real, distinct session id and genuine tool activity; nothing about it is a
-  placeholder. The classifier already HAS the right shape for the answer — its `exclude` list names
-  the sessions that are second BY DESIGN rather than by accident, today exactly one (the window that
-  claimed the batch through the sanctioned channel). A session the singleton itself classified as a
-  non-worker belongs in that same class.
+  NOT ALREADY COVERED, AND NAMED AGAINST BOTH NEIGHBOURS: point 515 (placeholder owner, pid
+  equality) does not reach this class — the chat session has a real, distinct session id and genuine
+  tool activity; nothing about it is a placeholder. Point 823 edits the SAME function for the
+  neighbouring class and still does not cover it: 823 drops a session whose PROCESS IS GONE or whose
+  boundary is committed, and this session's process is alive, has no boundary and keeps making real
+  tool calls. Under 823's own final state it stays flagged. The classifier already HAS the right
+  shape for the answer — its `exclude` list names the sessions that are second BY DESIGN rather than
+  by accident, today exactly one (the window that claimed the batch through the sanctioned channel).
+  A session the singleton itself classified as a non-worker belongs in that same class.
   FINAL STATE: a session that the singleton has itself pronounced STAND DOWN over never counts as a
   parallel batch session. The pronouncement is the evidence — the same decision that told the
   session not to drive the batch also keeps it out of the detector, so the two can never disagree.

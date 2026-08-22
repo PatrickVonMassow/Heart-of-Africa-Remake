@@ -50,7 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
-| 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831) |
+| 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 18:47 · Quellen-Fingerprint: `67c1fb6f5a3f…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 19:13 · Quellen-Fingerprint: `577d916f182c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1416,10 +1416,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 85 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
+Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 67c1fb6f5a3f51812fc8699013d12c70e46569eea066a1117147444e8bb204f3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T16:47:03.826Z -->
+<!-- RETRO-FINGERPRINT: 577d916f182c248b5eb15869e7f0deeb62115e520b9a07f39f3b45c708be7719 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T17:13:04.645Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2748,3 +2748,35 @@ beide Darstellungen der Vorlage identisch — waren grün, während die Vorlage 
 war und die Verfasserangabe falsch. Eine Zählung beweist, dass nichts verschwunden ist, nicht dass
 etwas stimmt. Verwandt mit §3.153 (die Freigabe, die unsere Werkzeuge nicht ausstellen können) und
 §3.140 (die nur behauptete Ausnahme).
+
+
+### 3.158 Der Wächter hatte die Antwort schon gegeben — und fragte sich nicht
+
+Am 22.08.2026 um 18:23 nannte `.claude/parallel-alert.json` die Sitzung 60142e49 als zweite
+Batch-Sitzung. Sie war die interaktive Chat-Sitzung des Nutzers, und derselbe Singleton hatte ihr
+im selben Zeitraum ausdrücklich STAND DOWN bescheinigt: kein Batch-Arbeiter, beantwortet nur den
+Nutzer. Fünf eskalierende Meldungen blieben unbeantwortet, um 18:23 pausierte der Stapel sich
+selbst, und erst eine Diagnose von Hand hob die Pause um 18:37 wieder auf.
+
+Der Fall sieht aus wie §3.154 und ist ein anderer. Dort maß der Detektor eine Spur statt eines
+Zustands, und die Lehre lautete, den Zustand zu messen. Hier ist die Zustandsmessung richtig: Die
+Chat-Sitzung lebt, ihr Prozess läuft, ihre Werkzeugaufrufe sind echt und frisch. Falsch ist die
+EIGENSCHAFT. Gefragt war »fährt hier ein zweiter am Batch?«, gemessen wurde »ist hier eine zweite
+Sitzung wach?«. Wer den Fix von §3.154 einbaut — tote Prozesse und abgetretene Vorgänger auslassen
+—, fängt diesen Fall nicht: An dieser Sitzung ist nichts tot.
+
+Das Unangenehme liegt eine Ebene darüber. Der Mechanismus hatte die richtige Antwort bereits
+ausgesprochen. Der Stand-down ist eine Entscheidung des Singletons selbst, über genau diese
+Sitzung, im selben Zeitraum, und sie lautet: »du fährst den Batch nicht«. Zwei Teile desselben
+Wächters urteilten damit gegenläufig über dieselbe Sitzung, und keiner las den anderen. Die
+Ausnahmeliste des Klassifikators, die es längst gibt, hätte den Eintrag nur entgegennehmen müssen.
+Solange das nicht geschieht, ist der Alarm reproduzierbar: Er feuert jedes Mal, wenn der Nutzer
+zusieht und dabei schreibt — also genau dann, wenn ein pausierter Stapel am meisten kostet.
+
+**Lehre:** Bevor ein Detektor eine Eigenschaft schätzt, gehört die Frage gestellt, ob das System
+sie an anderer Stelle schon ENTSCHIEDEN hat. Eine geschätzte Antwort neben einer vorhandenen
+entschiedenen ist keine zweite Meinung, sondern ein Widerspruch mit Alarmrecht. Prüffragen:
+*Welche Eigenschaft brauche ich wirklich — messe ich sie, oder nur eine, die meistens mit ihr
+zusammenfällt?* Und: *Hat mein eigener Mechanismus über diesen Fall schon geurteilt?* Verwandt mit
+§3.154 (die Frischemessung auf eine Lebendigkeitsfrage) und §3.149 (zwei Leser, ein Datensatz,
+zwei Antworten).
