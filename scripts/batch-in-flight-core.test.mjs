@@ -84,8 +84,13 @@ import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
   adoptTransferred,
+  checkAgentOutput,
+  checkDeclaredAgentOutput,
   commandNamesRun,
+  declaredAgentCheckCommand,
   gatherHandoverTransfer,
+  gatherStandDownBoundary,
+  gatherSuccessorAgentOrientation,
   processCommandOf,
   runRecordFor,
   gatherInFlight,
@@ -887,6 +892,31 @@ describe('the stand-down boundary — declared children cross ownership', () => 
     expect(declaredAgentProbe(declaration({ evidence: [{ kind: 'pid', pid: 7 }] })).agent).toBe(false)
   })
 
+  it('asks every declared path in one --agent-check verdict', () => {
+    const command = declaredAgentCheckCommand(agent)
+    expect(command).toContain('--worktree "/repo/.claude/worktrees/point-716"')
+    expect(command).toContain('--branch "feat/716-standdown-boundary"')
+    expect(command).toContain('--log "/tmp/agent.log"')
+    const checked = checkDeclaredAgentOutput(agent, {
+      now: NOW,
+      worktreeProbe: () => null,
+      branchProbe: () => NOW - 60_000,
+      logProbe: () => null,
+    })
+    expect(checked).toMatchObject({ checked: true, respawn: false, reason: 'agent-alive' })
+    // The newest of several children decides; one quiet branch can never permit
+    // replacement while another declared worktree is moving.
+    expect(
+      checkAgentOutput({
+        worktree: ['/quiet', '/moving'],
+        branch: ['quiet-branch'],
+        now: NOW,
+        worktreeProbe: (path) => (path === '/moving' ? NOW - 1000 : NOW - 90 * 60_000),
+        branchProbe: () => NOW - 90 * 60_000,
+      }),
+    ).toMatchObject({ respawn: false, reason: 'agent-alive' })
+  })
+
   it('turns a live declared agent into a transfer, never a silent stand-down', () => {
     expect(
       standDownBoundaryDecision({
@@ -952,6 +982,46 @@ describe('the stand-down boundary — declared children cross ownership', () => 
     expect(text).toContain('--agent-check')
     expect(text).not.toContain('provably dead')
     expect(successorAgentOrientation({ declaration: agent, sid: SID, agentCheck: working })).toBe('')
+  })
+
+  it('writes the transfer at stand-down, and the successor sees and adopts it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const path = statePathsFor(lockPath).inFlightPath
+    try {
+      // `main` is a local+origin checkpoint in this checkout. The declaration is
+      // written directly because the test exercises the handover seam, not the
+      // CLI's separate self-reference refusal.
+      writeDeclaration(declaration({ evidence: [{ kind: 'branch', ref: 'main' }] }), path)
+      const boundary = gatherStandDownBoundary(SID, {
+        lockPath,
+        now: NOW,
+        agentProbes: { branchProbe: () => NOW - 60_000 },
+      })
+      expect(boundary).toMatchObject({ action: 'transferred', reason: 'agent-working' })
+      expect(readDeclaration(path).transfer).toMatchObject({ by: SID })
+
+      const orientation = gatherSuccessorAgentOrientation('session-successor', {
+        lockPath,
+        now: NOW,
+        agentProbes: { branchProbe: () => NOW - 60_000 },
+      })
+      expect(orientation).toContain('MEASURED WORKING')
+      expect(orientation).toContain('--adopt')
+
+      const adopted = adoptTransferred('session-successor', {
+        lockPath,
+        now: NOW + 1,
+        probeSet: { refTipAt: () => NOW, probePid: () => null, worktreeActiveAt: () => null, mtimeOf: () => null },
+      })
+      expect(adopted).toMatchObject({ adopted: true, reason: 'adopted' })
+      expect(readDeclaration(path)).toMatchObject({
+        sessionId: 'session-successor',
+        adopted: { from: SID, at: NOW + 1 },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
