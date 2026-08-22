@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 16:01 · Quellen-Fingerprint: `fd10e209aea3…`
+Zuletzt aktualisiert: Samstag, 22.08.2026, 17:32 · Quellen-Fingerprint: `347d7d4d7c55…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1417,8 +1417,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 86 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 85 Prozess-/Meta-TASKS-Punkte (davon 31 offen).
 
-<!-- RETRO-FINGERPRINT: fd10e209aea39a8a7f79709dd842f9689aa2e792e4cc5f6312a12edce9e374ba -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T14:01:50.675Z -->
+<!-- RETRO-FINGERPRINT: 347d7d4d7c55888a4c8c21984114b163dafe47fa86b3898dff27930c1704914a -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T15:32:23.993Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2716,3 +2716,34 @@ obwohl sie ihn nichts angeht?* Wo ein Eintrag einer Analyse nur wegen des Mechan
 bleibt, ist nicht der Eintrag das Ergebnis, sondern der Mechanismus der Befund — er gehört als
 eigener Punkt aufgeschrieben, sonst entscheidet er beim nächsten Mal wieder mit. Verwandt mit
 §3.134 (die behauptete, nie geprüfte Wächterdeckung) und §3.140 (die nur behauptete Ausnahme).
+
+### 3.157 Das Etikett war der einzige Beweis — und es log
+
+Die Architektur-Vorlage für die dauerhafte Autorenspur entstand am 13.08.2026 aus zwei blind
+geschriebenen Hälften. Hälfte A trägt in ihrer eigenen ersten Zeile »Proposal A — Fable 5«, und
+die Sitzung wiederholte beim Übergeben an die Zusammenführung »written blind by Fable 5«. Beides
+ist falsch. Die Sitzungsaufzeichnung hält für jede Nachricht fest, welches Modell sie erzeugt hat,
+und der Werkzeugaufruf, der Hälfte A schrieb, kam von `claude-opus-5`. Die Sitzung lief an dem Tag
+auf zwei Modellen und wechselte genau einmal, um 12:49:10Z; die Blindstufe beginnt um 15:33:16Z,
+zwei Stunden und vierundvierzig Minuten nach Fables letzter Nachricht. Delegiert war auch nichts:
+Die Aufzeichnung enthält keinen einzigen Nebenstrang.
+
+Das Etikett stand fünf Tage und wurde in der Vorlage wiederholt. Am 22.08.2026 hat diese Sitzung
+es dann geglaubt, die *richtige* Verfasserangabe der Vorlage auf seine Grundlage umgeschrieben,
+daraus die Erlaubnis abgeleitet, selbst zusammenzuführen — und genau das getan und aufgezeichnet.
+Aufgefallen ist es nur, weil die Gegenlese sich weigerte, ein Etikett als Beweis zu nehmen, und
+nach Metadaten fragte. Vier Commits des Zweigs sind diese Korrektur und ihre Rücknahme.
+
+Die verallgemeinerbare Beobachtung: *Woran hängt eine Erlaubnis, und wer stellt die Angabe aus,
+von der sie abhängt?* Hier entscheidet die Verfasserschaft, wer eine Vier-Augen-Vorlage
+zusammenführen darf — und die Werkzeuge nehmen die Antwort aus einem Feld, das die geprüfte Partei
+selbst schreibt. Eine selbst behauptete Angabe ist genau so vertrauenswürdig wie derjenige, der von
+ihr profitiert. Zwei Lehren folgen daraus, und die zweite ist die unbequemere. Erstens: Wo eine
+Angabe eine Erlaubnis trägt, muss sie gegen eine Quelle prüfbar sein, die der Begünstigte nicht
+schreibt — hier die Modell-Metadaten der Nachrichten, und zwar pro Nachricht, denn ein
+Modellwechsel innerhalb einer Sitzung macht die Antwort auf Sitzungsebene wertlos. Zweitens: Die
+strukturellen Prüfungen, die wir im selben Zug gebaut haben — jede Kennung genau einmal verbucht,
+beide Darstellungen der Vorlage identisch — waren grün, während die Vorlage inhaltlich unvollständig
+war und die Verfasserangabe falsch. Eine Zählung beweist, dass nichts verschwunden ist, nicht dass
+etwas stimmt. Verwandt mit §3.153 (die Freigabe, die unsere Werkzeuge nicht ausstellen können) und
+§3.140 (die nur behauptete Ausnahme).
