@@ -116,20 +116,37 @@ put it is the mistake this line exists to stop.
   lane until the step-8 slice is green — and that is an INTERLOCK, not a habit: the flag REFUSES to
   enable while steps 8 and 9 are not green, and a test pins that refusal (Sol A8; controlling what
   is advertised does not control what is switched on).
-  BEFORE ANY CODE, TWO THINGS IN ORDER:
-  (a) THE RAW BLIND LISTS ARE RECOVERED. Point 676's own first step — re-run the A/B merge with a
-      model that authored neither list — cannot be validly performed from the present record (Sol
-      A1): raw list A has been replaced by the invalid merger's "merged meaning", the provenance
-      names 56 blind-B ids while the attached index carries 67, and A-only A2 is assigned to B2
-      while the union maps the original B2 to M15. Recovery — the document's git history, the
-      ask-sol and mechanism-review logs — is its own named step. If the raw lists cannot be
-      recovered, the BLIND STAGE IS RE-RUN, not merely re-merged.
-  (b) THE RE-MERGE runs with a model that authored neither list, recorded through
-      `scripts/mechanism-review.mjs --merged-by`. It may add, drop or re-word union entries, and
-      what it settles is what gets built; only source recovery and read-only repository or test
-      mapping are safe before it lands (Sol A15). Steps 1-3 are in any case not freezable — later
-      steps force changes back into schemas, store and adapter (Sol A12-A14), so the stage is
-      planned as revisable, not as final.
+  BEFORE ANY CODE, ONE HARD PREREQUISITE REMAINS (this replaces the two recovery items the point
+  carried until 22.08.2026, 18:20; both are done, and the spec examination below refused a text
+  that still ordered them as work — Sol A1):
+  (a) THE RECOVERY STAGE IS COMPLETE ON THIS BRANCH. The recovered raw halves, corrected
+      provenance, provisional re-merge record and repaired four-eyes tooling are inputs to this
+      point and are not repeated.
+  (b) THE RECORDED TWO-MODEL FALLBACK DOES NOT AUTHORIZE IMPLEMENTATION. Its union is a
+      specification with known gaps until a model that authored neither raw half folds it — the
+      demonstrated one is M27, which keeps B15's state vocabulary and drops the actor, epoch,
+      timestamps and commit identities B15 requires. That neutral fold runs through
+      `scripts/mechanism-review.mjs --merged-by`; it may add, drop or re-word union entries, and
+      what it settles is what gets built. Fable is the only currently identified qualifying
+      merger and is off, so this point is BLOCKED BEFORE CODE until the owner enables Fable or
+      supplies another qualifying third model. Only read-only repository and test mapping are
+      safe before that fold lands. Steps 1-3 remain revisable: a named later step reopens
+      schemas, store and adapter, and re-tests and re-reviews every reopened part.
+      WHAT UNBLOCKS IT IS ALREADY IN MOTION: on 22.08.2026 at 18:14 the owner reported new weekly
+      volume, asked for the Fable suspension to be lifted, and restated the rule he wants back —
+      Sol and Opus 5 blind, Fable folding — while asking expressly that it not be implemented
+      before he has seen the resulting model rules. The switch is therefore still off, and it is
+      flipped only on his instruction. A claim that he had ruled the opposite stood in the branch
+      documents for about twenty minutes on 22.08.2026 and is withdrawn; it was inferred from the
+      standing switch setting, and point 840 exists to make that class of claim checkable.
+  THE READ-ONLY TEST MAPPING IS DONE, since it is one of the two things safe before the fold. The
+  union's "Ordered work" names `scripts/__tests__/<name>.test.mjs` and `tests/<name>.spec.ts`;
+  NEITHER convention exists in this repository. Vitest lives beside its subject as
+  `scripts/*.test.mjs` and `src/**/*.test.ts[x]` (`npm run test:unit`), browser suites are
+  `scripts/verify/*.mjs` driven by `npm test -- <suite>`, and there is no `playwright.config`
+  and no `tests/` directory. Every test path the union names is therefore translated, not
+  created: `scripts/__tests__/batch-schema.test.mjs` becomes `scripts/batch-schema.test.mjs`,
+  and the board's browser check becomes a suite under `scripts/verify/`.
   FOUR ITEMS THE DOCUMENT DOES NOT CARRY ARE FOLDED IN:
   1. HOW THE DAEMON ITSELF ESCAPES the spawning session's tool-call lifetime, stated mechanically.
      Step 3 does not say (Sol A4) — and that is precisely the defect that killed the run.
@@ -154,9 +171,11 @@ put it is the mistake this line exists to stop.
   parent-session-death drill; and the stage proven DARK — with the flag off, today's authoring path
   is the path that runs now. Mechanism review per step, not once at the end; each step green on the
   unit layer before the next.
-  QUEUE RANK: at the front, directly behind point 716. Reason: the user ordered it forward on
-  22.08.2026 after a second lane died, and Sol's audit puts 716 first because 716 repairs the
-  deployed plane while this point replaces it.
+  QUEUE RANK: at the front, directly behind point 716 — but BLOCKED BEFORE CODE by (b) since
+  22.08.2026, 18:20, so the queue passes it and the next unblocked point is worked until the
+  Fable switch is flipped. Reason for the rank: the user ordered it forward on 22.08.2026 after a
+  second lane died, and Sol's audit puts 716 first because 716 repairs the deployed plane while
+  this point replaces it.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
