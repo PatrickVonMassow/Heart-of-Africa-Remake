@@ -252,14 +252,21 @@ function briefFor(number) {
  * and reported as "nothing was committed" while it sat on the branch all along.
  */
 export function commitsSince(base, { cwd = process.cwd(), ref = 'HEAD' } = {}) {
-  const field = '%H%x1f%s%x1f%(trailers:key=Rescue,valueonly,separator=;)%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)'
+  // The full body is intentional. The commit-msg hook accepts Rescue in its own
+  // `-m` paragraph (the convention before this wrapper existed), while git's
+  // `%(trailers:key=Rescue)` sees only the final contiguous trailer block and
+  // would miss it. NUL cannot occur in a commit message, so it is a safe record
+  // separator even when the body contains arbitrary newlines.
+  const field = '%H%x1f%s%x1f%B%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)%x00'
   const log = git(['log', `--format=${field}`, `${base}..${ref}`], { cwd }) ?? ''
   return log
-    .split('\n')
+    .split('\0')
+    .map((record) => record.trim())
     .filter(Boolean)
-    .map((line) => {
-      const [sha, subject, rescue, trailers] = line.split(UNIT)
-      return { sha, subject: subject ?? '', rescue: rescue ?? '', trailers: trailers ?? '' }
+    .map((record) => {
+      const [sha, subject, body, trailers] = record.split(UNIT)
+      const rescue = /^\s*Rescue:\s*(\S.*)$/im.exec(body ?? '')?.[1] ?? ''
+      return { sha, subject: subject ?? '', rescue, trailers: trailers ?? '' }
     })
 }
 

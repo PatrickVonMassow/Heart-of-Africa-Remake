@@ -59,7 +59,7 @@ export function authorCommitMessage({ subject = '', rescue = '', final = false }
   const heading = plainSubject || (final ? AUTHOR_COMPLETION_SUBJECT : 'Checkpoint authoring work')
   if (final) return `${heading}\n\n${SOL_TRAILER}`
   const reason = oneLine(rescue) || 'the authoring run is still in progress'
-  return `${heading} [skip ci]\n\nRescue: ${reason}\n\n${SOL_TRAILER}`
+  return `${heading} [skip ci]\n\nRescue: ${reason}\n${SOL_TRAILER}`
 }
 
 /** A completion message exists only for a run the existing judge found clean. */

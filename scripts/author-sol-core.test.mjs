@@ -48,6 +48,7 @@ describe('author commit messages', () => {
     const message = authorCommitMessage({ subject: 'Add branch selection', rescue: 'the guard tests are still in progress' })
     expect(message.split('\n')[0]).toBe('Add branch selection [skip ci]')
     expect(message).toContain('\nRescue: the guard tests are still in progress\n')
+    expect(message).toContain(`Rescue: the guard tests are still in progress\n${SOL_TRAILER}`)
     expect(message).toContain(SOL_TRAILER)
     expect(evaluateCommitMessage(message).block).toBe(false)
   })
