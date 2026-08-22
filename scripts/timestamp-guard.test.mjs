@@ -4,7 +4,7 @@
 // mandated outcomes: current stamp allows, missing stamp blocks, stale/wrong
 // stamp blocks, unreadable transcript blocks (bounded by the loop escape).
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -17,12 +17,23 @@ import {
   berlinStamp,
   evaluate,
   extractLastAssistantText,
+  inspectLastAssistantText,
   timestampReplyCondition,
 } from './timestamp-guard-core.mjs'
+import { buildRaceFixture, raceTranscriptPath } from './timestamp-race-fixture.mjs'
 
 // Vitest runs with cwd = repo root; import.meta.url is an http URL under the
 // jsdom environment, so the guard path is resolved from cwd instead.
 const GUARD = join(process.cwd(), 'scripts', 'timestamp-guard.mjs')
+const RACE_FIXTURE = join(process.cwd(), 'scripts', 'fixtures', 'timestamp-guard-302ms-race.json')
+// The transcript the race fixture quotes is a private session log and cannot be
+// committed, so the re-derivation case can only run where it lives. It is anchored
+// on THAT FILE and nothing else: a directory probe would demand this one historical
+// session from any machine that ever ran Claude in this checkout, and an early
+// `return` would record a pass without measuring anything. `skipIf` on the file is
+// the honest form — where the log is present the case runs, where it is not the
+// suite reports a SKIP that is visible in the run rather than a silent green.
+const RACE_SOURCE = raceTranscriptPath()
 
 /** One transcript JSONL line in the real Claude Code shape (assistant
  *  messages stream one entry per content block, sharing message.id). */
@@ -67,7 +78,7 @@ describe('acceptedStamps tolerance window', () => {
 })
 
 describe('extractLastAssistantText', () => {
-  it('returns the first text block of the LAST assistant message id', () => {
+  it('returns the first text block of the last assistant message after the last tool result', () => {
     const jsonl = [
       assistantText('**old stamp** first reply', { id: 'a' }),
       line('user', [{ type: 'tool_result', content: 'x' }], { id: '' }),
@@ -81,6 +92,7 @@ describe('extractLastAssistantText', () => {
     const jsonl = [
       assistantText('main reply', { id: 'a' }),
       assistantText('subagent chatter', { id: 'sub', sidechain: true }),
+      line('user', [{ type: 'tool_result' }], { id: '', sidechain: true }),
     ].join('\n')
     expect(extractLastAssistantText(jsonl)).toBe('main reply')
   })
@@ -88,6 +100,19 @@ describe('extractLastAssistantText', () => {
     expect(extractLastAssistantText('not json\n{"broken')).toBe(null)
     expect(extractLastAssistantText('')).toBe(null)
     expect(extractLastAssistantText(`not json\n${assistantText('ok')}`)).toBe('ok')
+  })
+
+  it('does not return intermediate narration while the final reply row is pending', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const pending = fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n')
+    expect(extractLastAssistantText(pending)).toBe(null)
+    expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
+  })
+
+  it('returns the final stamped reply once the raced row is flushed', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const flushed = [...fixture.rowsBeforeFinalReply, fixture.finalReplyRow].map(JSON.stringify).join('\n')
+    expect(extractLastAssistantText(flushed)).toBe(fixture.finalReplyRow.message.content[0].text)
   })
 })
 
@@ -103,9 +128,13 @@ describe('evaluate', () => {
     const verdict = evaluate({ lastText: 'Alles erledigt, Tests grün.', now })
     expect(verdict?.decision).toBe('block')
     expect(verdict?.reason).toContain('**Donnerstag, 23.07.2026, 10:00**')
+    expect(verdict?.reason).toContain('"Alles erledigt, Tests grün."')
   })
   it('blocks a stale stamp (hours off) and a yesterday stamp', () => {
-    expect(evaluate({ lastText: '**Donnerstag, 23.07.2026, 07:00** Report.', now })?.decision).toBe('block')
+    const staleText = '**Donnerstag, 23.07.2026, 07:00** Report.'
+    const stale = evaluate({ lastText: staleText, now })
+    expect(stale?.decision).toBe('block')
+    expect(stale?.reason).toContain(JSON.stringify(staleText))
     expect(evaluate({ lastText: '**Mittwoch, 22.07.2026, 10:00** Report.', now })?.decision).toBe('block')
   })
   it('blocks a wrong-format stamp (unbold, prose date)', () => {
@@ -160,6 +189,198 @@ describe('end-to-end guard process', () => {
     expect(verdict2?.decision).toBe('block')
   })
 
+  it('replays the measured 302 ms race without judging the intermediate narration', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    // The 302 ms is READ OFF the two real rows, never off a copy of the figure:
+    // the reply row's own timestamp against the Stop feedback row's own.
+    expect(
+      Date.parse(fixture.stopFeedbackRow.timestamp) - Date.parse(fixture.finalReplyRow.timestamp),
+    ).toBe(302)
+
+    // The fixture is a REAL slice, so the rows carry their own ids and flags and
+    // the narration that was wrongly judged is genuinely in it — not implied.
+    const narration = fixture.rowsBeforeFinalReply[0]
+    expect(narration.message.id).toBe('msg_011CeDW3R8CZhKYQ7jp2sAyw')
+    expect(narration.isSidechain).toBe(false)
+    expect(narration.message.content[0].text).toBe(fixture.narrationText)
+    expect(fixture.narrationText).toBe('Jetzt die \u00c4nderung.')
+
+    const p = join(dir, 'measured-race.jsonl')
+    writeFileSync(p, fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n') + '\n')
+    expect(runGuard({ transcript_path: p }, { session: fixture.sessionId })).toBe(null)
+
+    const flushed = [...fixture.rowsBeforeFinalReply, fixture.finalReplyRow].map(JSON.stringify).join('\n')
+    expect(
+      evaluate({
+        lastText: extractLastAssistantText(flushed),
+        now: new Date(fixture.stopFeedbackRow.timestamp),
+      }),
+    ).toBe(null)
+  })
+
+  it('pins the regression: without the tool-result boundary the narration is what gets judged', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const pending = fixture.rowsBeforeFinalReply.map(JSON.stringify).join('\n')
+
+    // The slice may skip rows, but it may not skip a row that would have CHANGED
+    // the answer — and the recorded count of what the elided middle holds is only
+    // a claim here. The case below re-derives it from the transcript wherever
+    // that transcript exists; this is the shape the claim has to have.
+    expect(fixture.source.elidedRows).toMatchObject({
+      from: 712,
+      to: 929,
+      count: 218,
+      assistantTextRows: 0,
+      sidechainTextRows: 0,
+    })
+
+    // The superseded rule verbatim: the first text block of the last assistant
+    // message carrying text, with no boundary at the last tool_result.
+    let preFix = null
+    for (const row of pending.split('\n')) {
+      const entry = JSON.parse(row)
+      const content = entry.message && entry.message.content
+      if (entry.type !== 'assistant' || entry.isSidechain || !Array.isArray(content)) continue
+      const block = content.find((b) => b && b.type === 'text' && b.text.trim() !== '')
+      if (block) preFix = block.text
+    }
+    expect(preFix).toBe(fixture.narrationText)
+
+    // …and judging it blocks. The refusal the user was actually served is kept
+    // verbatim in the fixture, and it is the NO-MATCH branch: it asserts the
+    // reply did not begin with the stamp and names no line it saw. Word-for-word
+    // equality is not available and would be the wrong test — this point CHANGED
+    // that wording on purpose — so what is pinned is the branch and the defect:
+    // the served text quotes nothing, the regenerated one quotes the narration.
+    const served = String(fixture.stopFeedbackRow.message.content)
+    expect(served).toContain('Your last reply does NOT begin with it.')
+    expect(served).not.toContain('Jetzt die \u00c4nderung.')
+
+    const verdict = evaluate({
+      lastText: preFix,
+      now: new Date(fixture.stopFeedbackRow.timestamp),
+    })
+    expect(verdict?.decision).toBe('block')
+    expect(verdict?.reason).toContain('does NOT begin with the timestamp')
+    expect(verdict?.reason).toContain('"Jetzt die \u00c4nderung."')
+
+    // The landed rule returns no judgement at all on the same rows.
+    expect(inspectLastAssistantText(pending)).toEqual({ text: null, hasToolResultBoundary: true })
+  })
+
+  // The fixture asserting its own provenance proves nothing, so the derivation is
+  // repeated here against the source — the same split the document-cut accounting
+  // uses for the files it reads out of the user's home.
+  it.skipIf(!existsSync(RACE_SOURCE))('re-derives the whole fixture from the real transcript', () => {
+    const committed = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const rebuilt = buildRaceFixture(readFileSync(RACE_SOURCE, 'utf8'))
+
+    // Every row, id, flag, timestamp and the elided-row COUNT come back identical
+    // — so "no assistant text between 712 and 929" is re-measured, not restated.
+    // totalRows is the one field that may legitimately move (a resumed session
+    // only ever appends), so it is compared as a floor rather than for equality;
+    // the rows this fixture quotes are historical and cannot change.
+    const strip = (f) => ({ ...f, source: { ...f.source, totalRows: undefined } })
+    expect(strip(rebuilt)).toEqual(strip(committed))
+    expect(rebuilt.source.totalRows).toBeGreaterThanOrEqual(committed.source.totalRows)
+    expect(rebuilt.source.elidedRows.assistantTextRows).toBe(0)
+    expect(rebuilt.source.elidedRows.sidechainTextRows).toBe(0)
+  })
+
+  // The builder's strict parsing IS the elided-row measurement, so it needs a case
+  // that does not depend on the private log — otherwise restoring the old silent
+  // `continue` would leave the suite green wherever the transcript is absent.
+  it('refuses to measure an elided range it cannot read, naming the row', () => {
+    const rows = []
+    for (let n = 1; n <= 953; n++) rows.push(JSON.stringify({ type: 'attachment', row: n }))
+    rows[710] = JSON.stringify({
+      type: 'assistant',
+      message: { id: 'narr', content: [{ type: 'text', text: 'Zwischenzeile.' }] },
+    })
+    for (let n = 930; n <= 949; n++) {
+      rows[n - 1] = JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result' }] } })
+    }
+    rows[949] = JSON.stringify({
+      type: 'assistant',
+      timestamp: '2026-08-20T06:15:18.404Z',
+      message: { id: 'final', content: [{ type: 'text', text: '**Donnerstag, 20.08.2026, 08:14**' }] },
+    })
+    rows[952] = JSON.stringify({
+      type: 'user',
+      timestamp: '2026-08-20T06:15:18.706Z',
+      message: { role: 'user', content: 'Stop hook feedback: …' },
+    })
+
+    // Readable throughout: the count is produced and the 302 ms falls out of the rows.
+    const clean = buildRaceFixture(rows.join('\n'))
+    expect(clean.source.elidedRows).toMatchObject({ count: 218, assistantTextRows: 0 })
+    expect(
+      Date.parse(clean.stopFeedbackRow.timestamp) - Date.parse(clean.finalReplyRow.timestamp),
+    ).toBe(302)
+
+    // One unreadable row inside that range and the count is not produced at all.
+    const corrupt = [...rows]
+    corrupt[799] = '{not json'
+    expect(() => buildRaceFixture(corrupt.join('\n'))).toThrow(/row 800 is not valid JSON/)
+
+    // A blank line is not corruption and must not stop the measurement.
+    const blank = [...rows]
+    blank[799] = ''
+    expect(buildRaceFixture(blank.join('\n')).source.elidedRows.assistantTextRows).toBe(0)
+  })
+
+  it('measures the residual tool-free-turn race the core documents: a false ALLOW', () => {
+    // The core's doc comment claims the leftover exposure is under-enforcement,
+    // not a fabricated fault. Prove it rather than assert it: a previous turn
+    // that ended with a tool result and a stamped reply, then a new tool-free
+    // turn whose reply has not been flushed yet.
+    const now = new Date('2026-08-20T06:15:18.706Z')
+    const recent = berlinStamp(new Date(now.getTime() - 4 * 60000))
+    const raced = [
+      line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
+      line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),
+      assistantText(`**${recent}** Vorherige Antwort.`, { id: 'prev-final' }),
+    ].join('\n')
+
+    // The previous turn's reply is what gets judged…
+    expect(extractLastAssistantText(raced)).toBe(`**${recent}** Vorherige Antwort.`)
+    // …and it passes, so the unflushed new reply is never checked at all.
+    expect(evaluate({ lastText: extractLastAssistantText(raced), now })).toBe(null)
+
+    // Only once the previous turn falls outside the window does it flip into the
+    // false refusal — the far rarer half of the residual.
+    const old = berlinStamp(new Date(now.getTime() - (MINUTES_BACK + 5) * 60000))
+    const stale = [
+      line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
+      line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),
+      assistantText(`**${old}** Vorherige Antwort.`, { id: 'prev-final' }),
+    ].join('\n')
+    expect(evaluate({ lastText: extractLastAssistantText(stale), now })?.decision).toBe('block')
+  })
+
+  it('still blocks genuinely unstamped and stale final replies after a tool result', () => {
+    const fixture = JSON.parse(readFileSync(RACE_FIXTURE, 'utf8'))
+    const p = join(dir, 'bad-finals.jsonl')
+    const writeFinal = (text) => {
+      const final = {
+        ...fixture.finalReplyRow,
+        message: { ...fixture.finalReplyRow.message, content: [{ type: 'text', text }] },
+      }
+      writeFileSync(
+        p,
+        [...fixture.rowsBeforeFinalReply, final].map(JSON.stringify).join('\n') + '\n',
+      )
+    }
+
+    writeFinal('Fertig — ohne Zeitstempel.')
+    const unstamped = runGuard({ transcript_path: p }, { session: 'race-unstamped' })
+    expect(unstamped?.decision).toBe('block')
+    expect(unstamped?.reason).toContain('"Fertig — ohne Zeitstempel."')
+
+    writeFinal('**Donnerstag, 20.08.2026, 05:14** · Kontext: 186.738 Tokens')
+    expect(runGuard({ transcript_path: p }, { session: 'race-stale' })?.decision).toBe('block')
+  })
+
   it('(d) blocks a missing/garbled transcript, bounded by the loop escape', () => {
     const missing = { transcript_path: join(dir, 'nope.jsonl') }
     // First three attempts block…
@@ -210,13 +431,15 @@ describe('the context reading in the header', () => {
   })
 
   it('blocks a reply that carries the stamp but drops the reading', () => {
+    const lastText = `${stamp()} Kurze Bestätigung.`
     const verdict = evaluate({
-      lastText: `${stamp()} Kurze Bestätigung.`,
+      lastText,
       headerSuffix: SUFFIX,
       enforceSuffix: true,
     })
     expect(verdict?.decision).toBe('block')
     expect(verdict.reason).toContain('CONTEXT READING')
+    expect(verdict.reason).toContain(JSON.stringify(lastText))
   })
 
   it('allows the complete header', () => {

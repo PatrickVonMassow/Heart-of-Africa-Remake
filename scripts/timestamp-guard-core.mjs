@@ -57,17 +57,41 @@ export function acceptedStamps(now = new Date()) {
 export const TIMESTAMP_RE = /^\*\*([A-Za-zÄÖÜäöüß]+, \d{2}\.\d{2}\.\d{4}, \d{2}:\d{2})\*\*/
 
 /**
- * The beginning of the LAST assistant message in a session transcript
- * (JSONL). Assistant messages stream as one entry per content block sharing
- * message.id, so the visible reply's start is the FIRST text block of the
- * LAST message id that has any text. Sidechain (subagent) entries are not
- * shown to the user and are skipped. Returns the text, or null when no
- * assistant text exists / the input is empty.
+ * Inspect the beginning of the final-answer candidate in a session transcript.
+ *
+ * A tool-using turn writes assistant narration before its tool call, then a
+ * user `tool_result`, and only later the final assistant reply. Stop can race
+ * that last transcript write. Text from before the LAST tool result therefore
+ * cannot be the final answer and is discarded at that boundary. Without a tool
+ * result, an ordinary text-only answer remains judgeable as before.
+ *
+ * Assistant messages can stream as several entries sharing message.id, so the
+ * visible reply's start is the FIRST text block of the LAST message id after
+ * the boundary. Sidechain (subagent) entries are not visible to the user and
+ * neither their text nor their tool results affect the main transcript.
+ *
+ * RESIDUAL RACE, KNOWINGLY LEFT OPEN (point 769). A turn that calls NO tool has
+ * no tool result of its own, so the boundary falls in the PREVIOUS turn and the
+ * text after it is that turn's already-answered reply. Lose the same write race
+ * there and the guard judges that older reply instead of the new one — and it
+ * mostly PASSES: the previous stamp is usually inside MINUTES_BACK, so the
+ * verdict is a false ALLOW that lets an unstamped reply through unchecked. Only
+ * once the previous turn is more than MINUTES_BACK old does it flip into a false
+ * stale-stamp refusal. The exposure is therefore the opposite of the case this
+ * point fixed — under-enforcement, not a fabricated fault — and it needs a
+ * tool-less turn, which is the rarer shape here. Closing it means moving the
+ * boundary to the last USER-PROMPT row, which is a different rule than the one
+ * this point chose; it stays a separate decision. Until then the refusal text
+ * quotes the line actually judged, so a raced block is at least recognisable as
+ * one rather than reading as "your reply was wrong".
  */
-export function extractLastAssistantText(jsonl) {
-  if (typeof jsonl !== 'string' || jsonl.trim() === '') return null
+export function inspectLastAssistantText(jsonl) {
+  if (typeof jsonl !== 'string' || jsonl.trim() === '') {
+    return { text: null, hasToolResultBoundary: false }
+  }
   const firstTextById = new Map()
   let lastTextKey = null
+  let hasToolResultBoundary = false
   let lineNo = 0
   for (const line of jsonl.split('\n')) {
     lineNo += 1
@@ -78,10 +102,16 @@ export function extractLastAssistantText(jsonl) {
     } catch {
       continue // a single corrupt line never hides the rest of the transcript
     }
-    if (!entry || entry.type !== 'assistant' || entry.isSidechain) continue
+    if (!entry || entry.isSidechain) continue
     const message = entry.message
     const content = message && message.content
     if (!Array.isArray(content)) continue
+    if (content.some((block) => block && block.type === 'tool_result')) {
+      firstTextById.clear()
+      lastTextKey = null
+      hasToolResultBoundary = true
+    }
+    if (entry.type !== 'assistant') continue
     const textBlock = content.find(
       (b) => b && b.type === 'text' && typeof b.text === 'string' && b.text.trim() !== '',
     )
@@ -90,7 +120,15 @@ export function extractLastAssistantText(jsonl) {
     if (!firstTextById.has(key)) firstTextById.set(key, textBlock.text)
     lastTextKey = key
   }
-  return lastTextKey === null ? null : firstTextById.get(lastTextKey)
+  return {
+    text: lastTextKey === null ? null : firstTextById.get(lastTextKey),
+    hasToolResultBoundary,
+  }
+}
+
+/** The final-answer text, or null while no judgeable answer follows the last tool result. */
+export function extractLastAssistantText(jsonl) {
+  return inspectLastAssistantText(jsonl).text
 }
 
 /**
@@ -113,6 +151,13 @@ export const HEADER_SUFFIX_RE = / · Kontext: (?:\d{1,3}(?:\.\d{3})*|--) Tokens/
  */
 function copyLine(now, suffix = '') {
   return `**${berlinStamp(now)}**${suffix}`
+}
+
+/** A bounded, quoted account of the line the guard actually judged. */
+function observedOpening(lastText) {
+  const firstLine = lastText.trimStart().split(/\r?\n/, 1)[0].trimEnd()
+  const bounded = firstLine.length > 160 ? `${firstLine.slice(0, 159)}…` : firstLine
+  return JSON.stringify(bounded)
 }
 
 /** What the preflight can decide before the reply exists: the exact opening it
@@ -147,15 +192,18 @@ export function evaluate({ lastText, now = new Date(), headerSuffix = '', enforc
   if (!match) {
     return {
       decision: 'block',
-      reason: `${rule} Your last reply does NOT begin with it. ${shortAckDemand(expected)}`,
+      reason:
+        `${rule} The final-answer line the guard actually saw begins ` +
+        `${observedOpening(lastText)} and does NOT begin with the timestamp. ${shortAckDemand(expected)}`,
     }
   }
   if (!acceptedStamps(now).has(match[1])) {
     return {
       decision: 'block',
       reason:
-        `${rule} Your last reply begins with "**${match[1]}**", which is not the ` +
-        `current Berlin time (stale or wrong). ${shortAckDemand(expected)}`,
+        `${rule} The final-answer line the guard actually saw was ${observedOpening(lastText)}. ` +
+        `Its timestamp "**${match[1]}**" is not the current Berlin time (stale or wrong). ` +
+        shortAckDemand(expected),
     }
   }
   // THE SECOND HALF OF THE HEADER. The stamp was never the whole rule — the
@@ -172,7 +220,8 @@ export function evaluate({ lastText, now = new Date(), headerSuffix = '', enforc
     return {
       decision: 'block',
       reason:
-        `${rule} The stamp is right, but the CONTEXT READING after it is missing — the header is ` +
+        `${rule} The final-answer line the guard actually saw was ${observedOpening(lastText)}. ` +
+        `The stamp is right, but the CONTEXT READING after it is missing — the header is ` +
         `both halves, and the reading is the half that keeps getting dropped. ${shortAckDemand(expected)}`,
     }
   }

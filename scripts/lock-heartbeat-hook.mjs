@@ -66,6 +66,10 @@
 //     tool-response turns here, release at the bound, and surface a same-mechanism
 //     commit run once outside the measured ordinary range. Pure decisions live
 //     in handover-repair-loop-core.mjs.
+// (10) THE CONTEXT-PERMIT RESULT (point 745): a permit is consumed before one
+//      otherwise-refused call. This already-wired all-tools PostToolUse hook is
+//      where that call's actual result exists, so it appends the correlated,
+//      bounded result record without adding another settings entry.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
@@ -79,6 +83,7 @@ import { armWaitMarker } from './wait-marker.mjs'
 import { observeOwnerLoops } from './handover-repair-loop.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
+import { recordContextPermitResult } from './context-fence-permit.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -299,6 +304,14 @@ try {
   }
 } catch {
   /* an observer may never break a tool call */
+}
+
+// (10) context permit result — silent and fail-open. Session/call matching is
+// performed against the pending consumed permit under the permit's own mutex.
+try {
+  recordContextPermitResult(data)
+} catch {
+  /* permit audit bookkeeping may never break a completed tool call */
 }
 
 process.exit(0)

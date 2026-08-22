@@ -49,6 +49,7 @@ import {
   commissionDecision,
   commissionRefusal,
   COMMISSION_OVERRIDE_CMD,
+  estimateCompareDecision,
 } from './board-queue-core.mjs'
 import { gateSets } from './user-gate-core.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
@@ -138,6 +139,23 @@ describe('queueEntries — every open point gets a card, and never two', () => {
       meta: '~3 h',
       stub: false,
     })
+  })
+  // POINT 730 — a card nobody has estimated inherits the MEASURED median of its
+  // criticality class, and the "no estimate yet" marker stays for the rest.
+  it('inherits the measured median of its class when nobody estimated the point', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe('~1 h · Klassenmedian')
+  })
+  it('keeps the "no estimate yet" marker when the point\'s class was never measured', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'maximum']]) }
+    expect(queueEntries({ open: [412], calibration })[0].meta).toBe(QUEUE_STUB_META)
+    // …and with no measurement at all, nothing about the card changes.
+    expect(queueEntries({ open: [412] })[0].meta).toBe(QUEUE_STUB_META)
+  })
+  it('never overrides a stored estimate with an inherited one', () => {
+    const calibration = { defaults: { medium: 1 }, criticality: new Map([[412, 'medium']]) }
+    const data = { points: { 412: { title: null, body: 'Text.', estimate: '~3 h' } } }
+    expect(queueEntries({ open: [412], data, calibration })[0].meta).toBe('~3 h')
   })
   it('REFUSES to re-add a point another section already claims', () => {
     // The double-listing trap: the point moved to the now-card must not come
@@ -383,6 +401,11 @@ describe('the one-time import from a hand-written board', () => {
   it('does not import the generator’s own stub as prose', () => {
     const html = board(renderQueueCard({ point: 4, title: 'Vier', body: null, meta: QUEUE_STUB_META }))
     expect(importQueueFromHtml(html).points[4].body).toBeNull()
+  })
+
+  it('does not import an inherited class median as an authored estimate', () => {
+    const html = board(renderQueueCard({ point: 4, title: 'Vier', body: 'Text.', meta: '~2 h · Klassenmedian' }))
+    expect(importQueueFromHtml(html).points[4].estimate).toBeNull()
   })
 })
 
@@ -656,6 +679,25 @@ describe('parseSetArgs — the flags behind one `set` call', () => {
       title: 'Ein Titel',
       estimate: '~2 h Der Text.',
     })
+  })
+  it('parses an optional exact estimate guard without storing it as card text', () => {
+    expect(parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '~2 h'])).toMatchObject({
+      point: '452',
+      estimate: '~1 h',
+      ifEstimate: '~2 h',
+    })
+    expect(() => parseSetArgs(['452', '--estimate', '~1 h', '--if-estimate', '--title'])).toThrow(
+      /--if-estimate needs an estimate value/,
+    )
+  })
+  it('makes the compare-and-set decision by exact stored value', () => {
+    expect(estimateCompareDecision('~2 h', '~2 h')).toEqual({ matched: true, current: '~2 h', expected: '~2 h' })
+    expect(estimateCompareDecision('~2,5 h', '~2 h')).toEqual({
+      matched: false,
+      current: '~2,5 h',
+      expected: '~2 h',
+    })
+    expect(estimateCompareDecision(null, '~2 h').matched).toBe(false)
   })
   it('names which field --text-stdin fills — the umlaut-safe path for a TITLE', () => {
     expect(parseSetArgs(['452', '--text-stdin']).stdinField).toBe('body')

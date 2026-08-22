@@ -1,0 +1,95 @@
+{
+  "source": {
+    "sessionId": "4e67c9a0-d702-4cf2-a0d6-db243bc1971a",
+    "date": "2026-08-19",
+    "ceiling": 150000,
+    "boundaryCommittedTokens": 194613,
+    "attendedReadingTokens": 265517,
+    "attendedReadingAt": "2026-08-19T16:26:03.002Z"
+  },
+  "operations": [
+    {
+      "id": "15.commit",
+      "sourceAt": "2026-08-19T15:20:00.573Z",
+      "tokens": 155550,
+      "sourceTool": "Bash",
+      "description": "commit the completed fence wiring",
+      "operation": "call",
+      "budgetFits": true,
+      "control": "commit"
+    },
+    {
+      "id": "15.push",
+      "sourceAt": "2026-08-19T15:20:00.573Z",
+      "tokens": 155550,
+      "sourceTool": "Bash",
+      "description": "push the completed fence wiring",
+      "operation": "call",
+      "budgetFits": true,
+      "control": "push"
+    },
+    {
+      "id": "73.answer",
+      "sourceAt": "2026-08-19T15:28:37.064Z",
+      "tokens": 199225,
+      "sourceTool": "assistant text",
+      "description": "answer after the batch boundary had been committed",
+      "operation": "answer",
+      "budgetFits": false
+    },
+    {
+      "id": "82.read",
+      "sourceAt": "2026-08-19T16:09:57.737Z",
+      "tokens": 226349,
+      "sourceTool": "Bash",
+      "description": "read document sizes",
+      "operation": "read",
+      "budgetFits": false
+    },
+    {
+      "id": "95.write",
+      "sourceAt": "2026-08-19T16:16:07.454Z",
+      "tokens": 238614,
+      "sourceTool": "Write",
+      "description": "write the proposed context programme",
+      "operation": "call",
+      "budgetFits": false
+    },
+    {
+      "id": "96.audit",
+      "sourceAt": "2026-08-19T16:16:23.402Z",
+      "tokens": 245904,
+      "sourceTool": "Bash",
+      "description": "start a delegated audit of the programme",
+      "operation": "call",
+      "budgetFits": false
+    },
+    {
+      "id": "106.read",
+      "sourceAt": "2026-08-19T16:26:03.002Z",
+      "tokens": 265517,
+      "sourceTool": "Bash",
+      "description": "read this session's context watermark status",
+      "operation": "read",
+      "budgetFits": false
+    },
+    {
+      "id": "109.write",
+      "sourceAt": "2026-08-19T16:28:25.740Z",
+      "tokens": 268020,
+      "sourceTool": "Write",
+      "description": "write the ready-to-file point carrier",
+      "operation": "call",
+      "budgetFits": false
+    },
+    {
+      "id": "110.answer",
+      "sourceAt": "2026-08-19T16:28:51.173Z",
+      "tokens": 276061,
+      "sourceTool": "assistant text",
+      "description": "answer the user about the measured hole",
+      "operation": "answer",
+      "budgetFits": false
+    }
+  ]
+}

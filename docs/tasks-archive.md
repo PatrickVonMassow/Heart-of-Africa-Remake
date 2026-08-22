@@ -21328,3 +21328,434 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — one measured occurrence cost a full hour, and the rule fires whenever any
   editor window happens to be open.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 769. The timestamp guard can judge an intermediate narration line and demand a stamp that was
+  already sent (PROVEN 20.08.2026 in session d5fcb9cf, and it explains a pattern the user has been
+  seeing for a long time: a correct reply is blocked as missing its stamp, the assistant then
+  "corrects" something that was never wrong, and the chat fills with self-corrections).
+  THE MEASUREMENT: the blocked reply began `**Donnerstag, 20.08.2026, 08:14** · Kontext: 186.738
+  Tokens`. Replaying the pure core over that exact text with `now = 08:15` returns null — ALLOW.
+  `TIMESTAMP_RE` matches it and `acceptedStamps()` contains 08:14 under `MINUTES_BACK` 15 /
+  `MINUTES_AHEAD` 3. The stamp was never stale and the core never objected. The refusal carried the
+  wording of the no-match branch, which means the guard evaluated a DIFFERENT text.
+  WHICH TEXT: `extractLastAssistantText` returns the first text block of the LAST assistant message
+  carrying text. Rebuilding the transcript without the final reply row makes it return exactly
+  "Jetzt die Änderung." — an intermediate narration line emitted before a tool call, which carries
+  no stamp and produces precisely the observed refusal. TIMING: the reply row is stamped
+  06:15:18.404Z and the Stop-hook feedback row 06:15:18.706Z, 302 ms apart — the window in which
+  the harness runs the Stop hook while the transcript write is still pending.
+  THE DEFECT IS STRUCTURAL, not a tuning question: ANY turn that emits narration before its final
+  answer can be judged on that narration, and the guard's own message then instructs the assistant
+  to re-send a stamp it already sent. That is how a guard manufactures the self-correction the
+  project's own rules tell us to avoid.
+  FINAL STATE: the guard judges only text that can be the final answer — the cleanest statement of
+  what the rule means is that it judges the text FOLLOWING the last `tool_result`, so an
+  intermediate line can never be the subject. Two weaker fallbacks were weighed and are recorded
+  here as rejected unless the clean form proves impossible: re-reading the transcript once after a
+  short delay so the flush wins the race, and treating a turn as compliant if ANY assistant text
+  since the last user message carries an accepted stamp. Whatever form lands, the refusal text says
+  what it actually saw, so a raced block can never again read as "your reply was wrong".
+  VERIFIABLE: Vitest over the pure extractor and the guard core — a transcript whose last assistant
+  message is an intermediate narration line before a tool call yields NO judgement rather than a
+  refusal; the same transcript with the final stamped reply appended is allowed; a genuinely
+  unstamped final reply is still refused; a stale stamp outside the window is still refused; and
+  the 302 ms race is replayed as a fixture so the case pins the real event rather than a
+  constructed one.
+  QUEUE RANK: ahead of 762 and 760, behind 614 and 764 (decided 20.08.2026, stated here because a
+  point that passes another must say so in its own text). Reason: it fires at the exit of EVERY
+  turn of every session, and the fault it invents is then written into the chat as a correction —
+  it is the only open point that actively degrades work while it waits.
+  IN FLIGHT — A BRANCH ALREADY STANDS (21.08.2026, handed over at a context boundary).
+  `feat/769-764-timestamp-header-guard` carries the authoring by GPT-5.6 Sol at `efa2ca44` plus a
+  recorded cross-vendor verdict of merge-with-fixes at `28d48437`. `inspectLastAssistantText`
+  discards every text candidate before the last `tool_result`, so pre-result narration can no
+  longer be judged; the wrapper allows silently when a tool result is the last thing in the
+  transcript; and every refusal now quotes the line it actually saw. The delegated reader verified
+  the fix against the real transcript of session d5fcb9cf — narration at row 710, last
+  `tool_result` at row 947, final reply row 949 (06:15:18.404Z), Stop feedback row 952
+  (06:15:18.706Z) — and the pre-flush slice genuinely yields null now. `npm run test:unit` green
+  (358 files, 12,344 passed, 5 skipped); lint and audit green through the pre-push gate.
+  TWO FIXES ARE OWED before the verdict can become merge:
+  1. `scripts/fixtures/timestamp-guard-302ms-race.json` is a hand-built reconstruction — two
+     synthetic rows, no `message.id`, no `isSidechain`, none of the ~20 real intervening rows. This
+     point's VERIFIABLE clause demands the race be replayed as a fixture that pins the REAL event,
+     so it must be a real slice of the rows named above, keeping ids, flags, timestamps and row
+     shapes (text bodies may be truncated).
+  2. A RESIDUAL RACE IS UNDOCUMENTED: a turn that uses NO tools is still exposed, because the last
+     `tool_result` then belongs to a PREVIOUS turn and that turn's minutes-old stamped reply becomes
+     the judged text — a stale-stamp refusal. Name it in a comment. Extending the boundary to a
+     real user-prompt row would close it, but that goes beyond the form this point chose, so it is
+     the author's call.
+  Criticality: high — it does not corrupt anything, but it produces false refusals at the exit of
+  every turn, and the correction it demands is a fabricated fault. A guard change is a mechanism,
+  so it needs the other model's recorded review before it lands.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 820. The criticality gate cannot be cleared by the review shape the tooling produces, so
+  every HIGH point blocks at the exit of the session that lands it (measured 21.08.2026 while
+  landing point 769). `scripts/criticality-review-guard-core.mjs` `passShape()` requires
+  `pass.total >= 2`. A record carrying `pass 1/1` therefore matches NEITHER clean bucket — not
+  `valid.filter(r.pass === undefined)` and not the compositions — so `clean` stays empty, the
+  `!clean.length` branch refuses with kind `unresolved`, and it names a review whose findings
+  were long since answered. At 769 it named `efa589e`, although Sol's `merge` on `520d4e0`
+  descends strictly from it, is later in time and carries the right `descendsFrom`. THE COUNTER-
+  PART: `scripts/review-sol.mjs` emits exactly `pass 1/1` whenever an explicit `--since` narrows
+  a fitting range — its own usage says so — and the MECHANISM gate accepts those same records.
+  The gate rejects the normal case by construction, and its refusal text demands a re-review that
+  has already been recorded: the same fault point 769 removed from the timestamp guard, standing
+  at this gate instead.
+  THE OBVIOUS FIX IS WRONG AND WAS ALREADY REFUSED. Lowering the floor to 1 was implemented,
+  tested and reviewed on 21.08.2026 (`e1d242ac`, reverted by `864a90e7`); GPT-5.6 Sol recorded
+  DO-NOT-MERGE, receipt 8975fca1f90d035d, and the reason is decisive: the completeness loop
+  checks pass INDICES only and never compares `pass.files` against the files the HIGH point
+  actually changed, so a scoped `1/1` merge row would clear a point containing files no reviewer
+  read. That is the third-landing-round hole reopened. Do not re-attempt the one-line form.
+  SECOND HALF OF THE SAME DEFECT: a point BOTH vendors authored can obtain no unscoped clean
+  record at all. Asked for one whole-point round over 769, `review-sol` split the range by
+  authorship into 13 passes across two vendors and declared one of them UNREVIEWABLE, because
+  `.claude/mechanism-reviews.jsonl` has no discernible author vendor. For such a point the gate's
+  condition cannot be met by honest means, which is why 769 stands ticked and merged with its
+  gate still refusing.
+  FINAL STATE: a composition clears when its recorded pass FILES cover every file the point
+  changed, whatever the pass count — coverage proved against the point's own diff rather than
+  inferred from an index sequence — and a point whose file set has no single eligible reviewer
+  has a named, recorded way to be cleared that is not "record a review nobody could run". The
+  refusal text says which files are still uncovered, so it can never again demand work already
+  done.
+  VERIFIABLE: pure cases over `evaluateCriticalityReview` — a complete composition whose pass
+  files cover the point's file set clears; the same composition missing one changed file does
+  not; a `1/1` refusal keeps its individual standing; an incomplete multi-pass split still
+  refuses; and the 769 ledger is replayed as a fixture so the case pins the real event.
+  QUEUE RANK: ahead of 779 and everything behind it. Reason: it fires at the exit of every
+  session that lands a HIGH-criticality point, it demands work that is already done, and until it
+  is fixed each such landing ends on a refusal that no honest action can clear — it degrades the
+  batch while it waits, which is the standard that put 769 first.
+  Criticality: high — it is a guard, and it blocks the turn exit of every session landing a HIGH
+  point.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 745. One remaining-budget function, asked before the call rather than after it (user
+  19.08.2026: "'Passt das, was ich jetzt anfange, überhaupt noch unter die Decke' klingt nach
+  der richtigen Frage, anstatt an einem willkürlichen Punkt zuzumachen"). The fence
+  (`scripts/context-fence-core.mjs`) asks BACKWARDS — "is the measurement already past the
+  mark?" — so the growth that pushed it there has already been paid when it answers. It
+  already classifies exactly the expensive kinds of call (agent spawn, browser suite,
+  delegated ask, authoring, a direct verify call); what it does not do is ask whether THIS
+  call still fits.
+  FINAL STATE: one function answers every admission question from the same numbers — ceiling,
+  current reading, the type cost of this call from point 742's series, the cost of leaving
+  from point 744 — and the fence refuses when the remainder cannot hold the call plus the
+  handover. The separately derived global trigger of point 743 is SUBSUMED by it and removed
+  in the same commit rather than kept beside it: two estimates of the same quantity can
+  disagree, and then the stricter one is doing nothing while the looser one decides
+  (GPT-5.6 Sol, audit 19.08.2026). What remains beside the function is the ceiling and one
+  conservative emergency brake.
+  THE READING LAGS BY ONE TURN, and the function must carry that: `parseContextTokens` sums
+  the input and cache tokens of the LAST api event, so it contains neither the current
+  assistant output and its tool arguments nor the tool result about to arrive (verified in the
+  code 19.08.2026). The remainder is therefore reduced by a reserve for all three before the
+  comparison; a check that trusts the raw reading is systematically too permissive.
+  THE FAIL DIRECTIONS ARE THREE, NOT ONE, and mixing them is the way this point does damage:
+  an UNREADABLE measurement keeps failing OPEN and loudly, exactly as today — a guard that
+  denied on an assumption would break the measurement rule; a call that is not classified as a
+  START stays allowed, so no exit path, commit, push, board or boundary call can ever be
+  refused; and only a call ALREADY classified as a start, whose type cost is unknown, is
+  treated conservatively. That conservative branch COUNTS how often it fires, because a
+  silent brake that defers work nobody sees is worse than the overshoot it prevents.
+  EVERY CONTEXT-GROWING CALL IS ADMITTED AGAINST THE SAME BUDGET, not only the ones today's
+  fence classifies as a START (GPT-5.6 Sol, review 19.08.2026: a session that never issues a
+  `START_SCRIPTS` command, or that grows purely through reads, crosses the ceiling with the
+  whole programme built). The exemption is therefore not "everything except starts" but
+  "control operations whose output is BOUNDED BY CONSTRUCTION" — a commit, a push, a board
+  call, a focus stamp, the boundary — and each of those is exempt because point 597's budget
+  caps what it can return, not because of what it is called. A large READ is not a control
+  operation and is admitted like any other growth.
+  THE LAG IS A LEDGER, NOT A RESERVE (GPT-5.6 Sol, review 19.08.2026). Subtracting a
+  statistical reserve cannot bound anything, and it is spent TWICE when one assistant turn
+  makes several tool calls against the same stale reading. So the function keeps a per-turn
+  PENDING DEBIT: every admitted call books its projected cost immediately, the remainder is
+  computed as reading minus outstanding debits, and the debits are reconciled against the
+  actual growth when the next complete reading arrives. A reading that has not moved is
+  therefore not free budget.
+  THE HANDOVER IS RESERVED BEFORE ANY WORK, not admitted at zero (GPT-5.6 Sol, review
+  19.08.2026): point 744's mechanically capped handover cost is subtracted from the remainder
+  from the session's first call onward, so the exit is always affordable and never has to be
+  waved through. "Exit-path calls are always allowed" then stops being a hole and becomes a
+  consequence — the budget for them was never lent out.
+  THE EMERGENCY LEVER LIVES HERE, because this point owns the admission decision (user
+  19.08.2026: prevention by default, "mit einem Notfall-Hebel, der das erlaubt, wenn es gar
+  nicht anders geht"). It is a PERMIT, not a switch: `context-fence-override.mjs --session
+  <id> --point <N> --reason "<why>" --max-tokens <n>` writes a short-lived, session-bound,
+  point-bound, SINGLE-USE permit that the fence consumes atomically for exactly one otherwise
+  refused operation. An append-only record stores timestamp, session, point, repository head,
+  the reading, the projected cost, the reason, the caller and the ACTUAL result, so a lever
+  pulled often is visible as a pattern rather than as a habit. An environment variable or a
+  persistent "off" state is explicitly NOT this lever: it would not be deliberate and it would
+  not be once. The same permit is what points 748 and 746 honour, so there is one lever and
+  not three.
+  VERIFIABLE: Vitest over the pure function — a call that fits, one that does not, one whose
+  type cost is unknown, an unreadable reading (allowed), an exit-path call at zero remaining
+  budget (allowed), and a case proving the lag reserve is subtracted; a case where three calls
+  in one turn against an unmoved reading are each debited rather than each granted the same
+  remainder; a case proving the handover reserve is subtracted from the first call onward; and
+  over the permit — consumed exactly once, refused for another session, another point or after
+  expiry, and every use recorded. AND AN END-TO-END CASE THROUGH THE REAL HOOK, not only the
+  pure function: `context-fence-guard.mjs` is armed in `.claude/settings.json` (measured
+  19.08.2026), so a fixture command must be shown actually intercepted — a decision function
+  nobody calls prevents nothing. Plus a replay against
+  the transcript of the 19.08.2026 session showing at which call it would have refused, and
+  that none of the refusals is an exit path.
+  THE RESIDUAL IS NAMED WITH ITS SIDE, because "never" is a claim this point cannot honestly
+  make (GPT-5.6 Sol, review 19.08.2026, and it is right): while an UNREADABLE measurement fails
+  open, a session whose transcript cannot be parsed is ungoverned, and that branch stays open
+  deliberately — denying on an assumption breaks the measurement rule and would be the worse
+  failure. So the claim is: with the budget enforced, the ledger booking every admitted call,
+  the output cap in place and the handover reserved, the only remaining path across the ceiling
+  is an unreadable reading — and THAT is what the incident record of point 742 exists to count.
+  If it turns out to fire, closing it is a point of its own, not a silent tightening here.
+  Criticality: high — it decides what may run at all, and its failure mode is a session that
+  locks itself out of its own exit.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 779. Three repeated questions have no command, so each one is paid as a context dump
+  (measured 20.08.2026, all three in a single session). They are filed together because they are
+  one thesis with three instances: a question a session asks REPEATEDLY becomes a command, and
+  until it does, every asking pays for it again in tokens that then ride along in every later
+  answer of the same turn.
+  1. »WANN HAT DER NUTZER X GESAGT« HAT KEIN WERKZEUG. Answering "why is this card still on the
+     board" needed the timeline of one user answer across five session transcripts under
+     `/home/node/.claude/projects/-workspace-hoa/*.jsonl`. None of the 418 scripts reads those
+     transcripts, so the search ran as hand-written node one-liners and pulled roughly 25,000
+     tokens of raw prose into the session context — for FOUR timestamps. The same turn hand-wrote
+     the same JSONL walker twice.
+     WANTED: `scripts/user-said.mjs --grep "<term>" [--since <iso>] [--sessions N]`, printing ONE
+     line per human message (timestamp, 8-char session id, first 120 characters) and `--full` for
+     a single hit. Same source, same answer, about twenty lines instead of twenty-five thousand
+     tokens.
+  2. `batch-claim.mjs` HAS NO `--wait`. Taking the batch over is three steps: claim, wait for the
+     owner's clean release, claim again. Step two has no support — the script knows only
+     `--session`, `--status`, `--withdraw`, `--why`, `--git-path`, `--unmerged`. So the waiting
+     session writes its own poll loop against a JSON shape it has to GUESS: the first attempt here
+     keyed on a `lock` field that does not exist, reported FREE while the owner held a fresh
+     heartbeat, and cost a full extra turn (~10,000 tokens) plus a wrong statement to the user.
+     WANTED: `--wait [--timeout <min>]`, blocking until the lock is free or the claim is spent and
+     exiting 0/1, plus `--take` as the explicit second half. Nobody parses that JSON by hand again.
+  3. 418 SCRIPTS HAVE NO INDEX. To learn that removing a board card is `board.mjs vdzk-remove`, a
+     turn ran `ls scripts | grep -iE 'board|question|decision'`, took seventy lines of file names
+     into context, and then read `board.mjs --help` on top.
+     WANTED: either `node scripts/help.mjs <topic>`, resolving a topic to the owning script and its
+     usage line, or a generated `docs/command-index.md` kept honest by a unit test — one line per
+     script, name and one-sentence purpose. The cheapest correct version greps the scripts' own
+     usage strings, so nothing is maintained twice.
+  FINAL STATE: all three exist as commands, and none of them requires a caller to parse another
+  script's JSON or to list a directory to find a name.
+  VERIFIABLE: Vitest over the pure halves — the transcript reader returns one line per human
+  message and honours `--since`/`--sessions` against a fixture; `--wait` returns as soon as a
+  fixture lock frees and exits non-zero on timeout; the index (or `help.mjs`) resolves a known
+  topic to its script and goes red when a script gains or loses its usage line. Plus the measured
+  25,000-token search reproduced as a twenty-line answer.
+  Criticality: medium — no product defect, but it is the token cost the whole 738–759 programme is
+  about, in the one shape that programme does not cover: a question with no command behind it.
+  BUILT AND GREEN ON ITS BRANCH, WAITING ONLY FOR A LANDING (delegated author 21.08.2026,
+  reported after the owning session had sealed its boundary, so it could not reach this file).
+  Branch `feat/779-three-missing-commands`, head cb8aeee7, pushed and clean; all three items
+  delivered — the transcript reader repaired (`--sessions`, main-checkout fallback, corpus
+  footer, reliable non-zero exit), `batch-claim --wait/--take` added, and `help.mjs` plus a
+  generated `docs/command-index.md` with 257 entries. Gates on the final head: unit GREEN
+  (360 files, 12,372 passed, 5 skipped), build GREEN, lint GREEN, no browser suite needed. Two
+  cross-vendor reviews stand in `.claude/mechanism-reviews.jsonl`: a42515bb merge-with-fixes,
+  then cb8aeee7 MERGE. The blocking finding was real: `claimWaitDecision` counted a bare
+  reason `released` as a finished wait, and since only the acquire path clears
+  `batch-claim.json`, a stale released record survives under the next owner — so `--wait`
+  exited 0 saying "run --take now" against a fixture reporting the lock held and its owner
+  alive, which is verbatim the failure this point exists to prevent.
+  FOR THE LANDING SESSION: delete the parked branch `origin/feat/user-said-command` when this
+  lands — its only commit d7a59ef8 is an ancestor of this branch, so nothing is lost; `help.mjs`
+  indexes top-level `scripts/*.mjs` only, not `scripts/verify/*.mjs`, matching this point's own
+  framing and deliberately not charged here; and the byte-for-byte drift test goes red whenever
+  any script's FIRST COMMENT SENTENCE changes, not only its usage line, so
+  `node scripts/help.mjs --write` becomes a routine step after comment edits.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 748. The attended window is fenced by nothing, and it is the largest remaining source
+  (measured 19.08.2026 ON THE SESSION THAT WROTE THIS PROGRAMME). Every guard in this project,
+  the context fence included, STANDS DOWN for a session that does not own the batch lock —
+  correctly, because a subagent must not be judged by the batch's rules. But an attended chat
+  window is not a subagent, and it is not the batch worker either: it falls through the same
+  hole. This session sat at 265,517 tokens, 115,517 past the mark, having handed the batch over
+  an hour earlier, and nothing refused it a single call. Points 742 to 747 govern the batch and
+  would leave this untouched, so the "share of usage above 150k" they are meant to remove would
+  keep being fed from here.
+  FINAL STATE: NO SESSION CLASS IS EXEMPT FROM THE CEILING; what differs between the three is
+  the REMEDY, not whether the budget applies (GPT-5.6 Sol, review 19.08.2026 — an exempt
+  subagent is a whole class of sessions with no ceiling at all, and a subagent is exactly what
+  the expensive work runs in). All three are admitted through point 745's prospective budget,
+  so the decision is "does this call still fit", not "are we already past the mark" — denial
+  after the mark detects the condition one call too late. The remedies:
+  a SUBAGENT past its budget is refused the call and told to return what it has, because it has
+  a caller who can carry on; the BATCH OWNER is taken over the boundary as points 745 and 743
+  describe; an ATTENDED MAIN WINDOW cannot take a boundary, because a person is talking to it,
+  so its refusal names `/clear` and nothing else. That is the same remedy point 542 already
+  wired for `batch-claim.mjs`, applied
+  to the window rather than to one command, and it rests on the same user decision (19.08.2026:
+  "Bevor die Batch geholt wird, den Benutzer zu clear auffordern und danach zu weiter oder so").
+  In all three, point 745's emergency permit is the one deliberate way through.
+  THE FENCE MUST NOT SILENCE THE CONVERSATION: reads, answers, commits and pushes stay allowed
+  in every case — a window that cannot answer the person in front of it is worse than an
+  expensive one. A large READ is admitted against the budget like any other growth; what is
+  never refused is the ANSWER.
+  HOW THE THREE ARE TOLD APART is the real work of this point and must not be guessed: the
+  subagent case is what today's `heldByOtherLiveOwner` conflates with the attended one, and
+  getting it wrong either fences every subagent or fences nothing. The point NAMES the identity
+  signal it uses — what a subagent process carries that a main window does not — rather than
+  leaving it to the implementation, because fixtures for a pure three-way decision prove the
+  decision and not the classification (GPT-5.6 Sol, review 19.08.2026).
+  THE TRIGGER IS THE READING, NOT THE ROLE (carried over 20.08.2026 from point 770, where the user
+  asked it outright: »Warum machst du eigentlich hier die ganze Zeit weiter, obwohl du inzwischen
+  bei weit über 150k bist?« — the session he was reading stood at 253,185 tokens against the
+  `CONTEXT_WATERMARK_TOKENS` of 150,000 in `scripts/context-watermark-core.mjs`, held no batch lock,
+  and was therefore measured against nothing, because `scripts/batch-boundary.mjs --context` is the
+  only enforcement path and a batch OWNER is the only session that runs it). The number is already
+  computed every turn for the header by `scripts/dashboard-reminder-hook.mjs` — the reading point
+  740 put in front of the user and nobody else judges — so watching it costs nothing new to
+  measure, and the cost argument does not care which kind of session it is: every further turn
+  re-sends the whole context.
+  IT SPEAKS ONCE, AND NOT AT A BAD MOMENT: the reading fires a single time per session rather than
+  every turn, and it stays silent mid-merge, with a verification running, and on an unreadable
+  reading (`--`), which is guessed at never — the same exemptions the batch boundary already makes.
+  A session that IS the batch owner keeps its existing boundary behaviour unchanged.
+  WHILE THE FENCE STANDS IN `observe` it refuses nothing (CLAUDE.md §6), so the attended remedy is
+  delivered in its ASKING form first — the window says it has passed the mark and names `/clear` —
+  and becomes the refusal above when the fence arms. The visible half must not wait for the arming
+  point: an unwatched attended window is what this measured.
+  VERIFIABLE: Vitest over the three-way decision with a fixture per case — subagent past its
+  budget (refused, return-what-you-have named), batch owner past it (refused, boundary named),
+  attended window past it (refused, `/clear` named), and each of them within budget (allowed);
+  a case per class proving an ANSWER is never refused; a case proving the permit lets exactly
+  one refused call through in each class; a classification case per real session shape, driven
+  from the signal the point names rather than from a hand-built fixture; plus a replay
+  against this session's own transcript showing the calls it would have refused and confirming
+  no answer, read, commit or push is among them.
+  On the reading itself: a reading below the mark says nothing; one above it asks once; a second
+  turn above it stays silent; a merge in progress or a running verification suppresses it; an
+  unreadable reading suppresses it rather than guessing; and a batch owner keeps its boundary
+  behaviour unchanged.
+  Criticality: high — it extends a denying mechanism to a session a human is using, so a false
+  deny is felt immediately by the user rather than by a batch nobody watches.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 730. The board's queue estimates are calibrated for a slower batch than the one running
+  (user 19.08.2026, reading the live board: »Seit den Umstellungen gestern scheint die
+  Abarbeitung der Punkte schneller zu laufen als bisher. Die Schätzungen der zukünftigen Tasks
+  sind daher vermutlich übertrieben lange. Prüfe das und überarbeite sie wo notwendig.«).
+  MEASURED 19.08.2026 from the first-parent merges: the eleven points landed between 623
+  (18.08., 20:23) and 701 (19.08., 11:55) took 15.5 h of wall clock — one landing every ~1.4 h —
+  against 32.1 h for the eight before them (628 → 623), one every ~4.0 h. The 316 cards in
+  `.claude/board-queue.json` carry a median estimate of 3 h and a mean of 3.0 h, 952 h in total,
+  and not one of them was derived from a measurement. An estimate is DEFINED in
+  `scripts/dashboard-guard-core.mjs` as the time by which the work is VISIBLY DONE — merged,
+  verified, board updated — so it is a falsifiable promise to the reader, and it is currently
+  wrong in one direction for the whole queue.
+  FINAL STATE:
+  - THE CALIBRATION IS MEASURED, NOT GUESSED. One command reads the landed points out of git and
+    reports, as a DISTRIBUTION rather than an average, the actual elapsed time per point (the
+    branch's first commit to the TICK that marks the landing) beside the estimate that point's
+    card carried, plus the queue-drain cadence (tick to tick), which is the smaller number
+    whenever the pool ran several points at once. The two are reported separately and never
+    averaged into one figure. BOTH ENDPOINTS ARE THE TICK, not the merge, and that is the whole
+    of it: the estimate promises the time by which the work is VISIBLY DONE, and gate, picture
+    check and board update all sit AFTER the merge. Measuring to the merge would calibrate the
+    promise against a moment the reader never sees.
+  - THE READING IS SPLIT BY WHAT ACTUALLY DISTINGUISHES A POINT — its criticality tag, whether it
+    was delegated or authored in the main session, and whether a picture verification was part of
+    it. A single global correction factor is adopted ONLY if the measurement shows the classes do
+    not differ; otherwise each class carries its own.
+  - THE STORED ESTIMATES ARE REWRITTEN FROM THAT READING for every open point, as a machine step
+    over `.claude/board-queue.json` through the existing `board-queue.mjs set <N> --estimate`
+    path, never a hand pass over 200 cards. What it wrote is printed per card, so the change is
+    reviewable in one screen, and a card whose class has NO landed comparable keeps its estimate
+    with that reason named rather than being moved on a guess.
+  - A NEW CARD INHERITS THE MEASURED DEFAULT: filing a point without an estimate takes the
+    measured median of its class, and the existing "no estimate yet" marker stays for the case
+    where no class fits.
+  - THE READING STAYS REPEATABLE. Re-run later, the same command says whether the estimates still
+    match the batch's speed, so the NEXT shift is noticed rather than assumed; every run names
+    the measurement window it used.
+  VERIFIABLE: the command runs on the real merge history and prints the per-point
+  estimate-versus-actual distribution and the cadence beside it; after the rewrite no estimate in
+  `.claude/board-queue.json` contradicts the measurement by more than the reported spread; Vitest
+  over the pure comparison, the class split and the rewrite plan with recorded fixtures —
+  including a case where the classes differ enough that a single global factor is REFUSED, and a
+  case where a class has no landed comparable and its cards keep their estimate with a named
+  reason.
+  A MEASUREMENT OF THE SPEED-UP ITSELF ALREADY EXISTS — take it as the starting point rather
+  than raising it again (measured 19.08.2026 from the merge history and
+  `.claude/mechanism-reviews.jsonl`). Not only the cadence moved: the per-point branch runtime
+  collapsed, 6.4/12.9/17.3/29.4/31.9 h on 17.–18.08. against 0.2–1.3 h on 19.08. Parallelism is
+  NOT the cause — the 19.08. points ran with FEWER concurrent branches. The cause is the review
+  loop: 86 do-not-merge against 26 merge on 18.08., while every point landed on 19.08. cleared in
+  ONE round, and those 18.08. rejections were MECHANICAL rather than substantive (the ledger
+  quotes "files listed in the diffstat were not included"). The break sits exactly at 19.08.
+  03:26, where points 714 → 717 → 684 fixed the review material.
+  TWO CONFOUNDERS THAT BIND THIS POINT: the window is n=8, all process/infrastructure points of
+  middling size with NO render point carrying a picture check in it — the picture lane was broken
+  and unnoticed until 19.08. (points 732/733) — so the factor must NOT be carried over to render
+  points; and point 713 still stands at 14 do-not-merge, so the loop is not universally healed.
+  Both belong in the reading as named limits, not as a footnote.
+  Criticality: medium — nothing in the code depends on an estimate, but the board is what the
+  user plans by, and a queue that promises 952 h for work running at three times that speed
+  misinforms every reading of it.
+  Bundle: Chat & Tafel.
+
+- [x] 828. `chat-reply.mjs` publishes an unrecognised flag AS the message, so a reply to the user
+  can be the word `--text-stdin` (user report 22.08.2026, 02:40: »Deine Ausgabe ist kaputt. Du
+  hast gerade das hier geantwortet: Agent:--text-stdin«). MEASURED in the same turn: the session
+  answered a real question with `node scripts/chat-reply.mjs --text-stdin <<'EOF' …`, the script
+  took `--text-stdin` as its positional message, signed it, published it, and exited 0 with a
+  receipt. The answer itself was never sent and nothing anywhere said so — the send LOOKED
+  successful at every layer.
+  WHY THE MISTAKE IS THE PROJECT'S, NOT THE SESSION'S: `scripts/board.mjs` accepts `--text-stdin`
+  for exactly this purpose and its usage line advertises it — »Any "<text>" may be replaced by
+  --text-stdin and piped in — use that for German prose.« The two commands that carry German
+  prose to the same reader therefore disagree about how prose is handed in, and the one that
+  disagrees fails SILENTLY and OUTWARD, in front of the user.
+  FINAL STATE: (1) `chat-reply.mjs` REFUSES an argument beginning with `-` that it does not
+  recognise, naming it and naming the two ways in (a quoted argument, or a pipe on stdin), and
+  exits non-zero WITHOUT publishing; (2) it ACCEPTS `--text-stdin` as the synonym for the pipe it
+  already supports, so the flag that reads correctly at every other prose-carrying command reads
+  correctly here too; (3) an empty or whitespace-only message is refused the same way rather than
+  published.
+  VERIFIABLE: Vitest over the pure argument parse — a bare quoted message publishes, `--text-stdin`
+  with piped input publishes THAT input, an unknown `--flag` refuses and names both ways in, an
+  empty stdin refuses, and no refusal path reaches the transport.
+  Criticality: high — it is the only channel the user reads the batch's answers on, and its
+  failure mode is a confidently signed reply with the wrong content and a clean exit code.
+  Bundle: Chat & Tafel.
+
+- [x] 821. The main-write fence judges the session, not the target path, so an unlocked session
+  cannot even write its own scratchpad (measured 21.08.2026, 16:34, in a chat session holding no
+  batch lock). A `Write` to
+  `/tmp/claude-1000/-workspace-hoa/<sid>/scratchpad/pull-745-748-front.mjs` was refused with
+  "MAIN WRITE REFUSED — The call is Write in the main checkout", although the target lies OUTSIDE
+  the repository altogether. The decision is evidently taken from the session and its working
+  directory rather than from where the write actually lands.
+  WHAT IT COST, IN THE SAME TURN: that session was carrying a user instruction (pull 745 and 748
+  to the head of the work order) and a user instruction to be remembered permanently. It could
+  write neither — not the work order, which the fence is meant to protect, and not a scratch file
+  or a memory file, which it is not. Both had to travel as findings-carrier entries and were only
+  executed a session later, by the batch owner. The fence turned a two-minute instruction into a
+  cross-session relay.
+  FINAL STATE: the fence judges the RESOLVED TARGET PATH. A write inside the main checkout is
+  refused exactly as now; a write outside it — the session scratchpad, the user-level memory
+  directory, anything not under the repository root — is not the fence's business and goes
+  through. A symlink or `..` that resolves back into the checkout is still refused, so the
+  widening cannot be used as a way in.
+  SIDE FINDING OF THE SAME TURN, filed here because it has no better home: point 748 states in
+  its own prose that it builds on 745's prospective budget, and that dependency exists in no
+  machine-readable field. A rank change to 748 alone would break it and nothing would notice.
+  VERIFIABLE: pure cases over the fence's decision — a repository path refused, a scratchpad path
+  allowed, a user-memory path allowed, and a path that escapes into the checkout through a symlink
+  or `..` refused.
+  Criticality: high — it is a guard, and it blocks a session from recording what the user just
+  told it.
+  Bundle: Session- & Repo-Hygiene.

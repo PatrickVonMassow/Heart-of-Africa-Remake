@@ -88,6 +88,18 @@ jobs:
           # repository's own history (verifyCarried compares a file's blob at HEAD
           # against HEAD~1). At the default depth 1 there is no parent, so such a
           # check goes red for the checkout rather than for the code.
+          #
+          # AND NO DEEPER, both directions measured on 22.08.2026 when the queue
+          # calibration suite reddened here for want of merge parents:
+          #   · fetch-depth: 0 with filter: blob:none checks out in six seconds
+          #     (commits and trees are ~8 MiB of a 7.4 GiB pack), but the
+          #     calibration reads a file out of history PER LANDING, so every read
+          #     becomes a lazy fetch and the unit step ran past the job timeout.
+          #   · fetch-depth: 600 with blobs is a 1.4 GiB clone — the fixture's
+          #     `--limit 30` reaches back over ~227 first-parent commits.
+          # The dependency belongs to the suite, not to the checkout: point 829
+          # gives it its own fixture history, and until then those cases skip here
+          # and say why.
           fetch-depth: 2
       - uses: actions/setup-node@v4
         continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}

@@ -8,6 +8,8 @@ const ROOT = resolve(process.cwd())
 const EXCLUDED = new Set([
   'TASKS.md',
   'design.md',
+  // Generated command syntax lists both --on and --off; it records no current state.
+  'docs/command-index.md',
   'docs/tasks-archive.md',
   'scripts/author-routing-core.mjs',
   'src/config/fableEscalationDoc.test.ts',
