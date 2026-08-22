@@ -494,10 +494,42 @@ put it is the mistake this line exists to stop.
      an idle session, not correctness), and the watcher is NOT stopped by a pause —
      or, if it must stop for resource reasons, the launcher poll replaces it for
      the pause's duration and the pause card names the delay that then applies.
-  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
-  parallel-session alert in the pure core's tests, and the same setup replayed
-  against the real detector stays silent; a Vitest case pins that the pause path
-  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
+  10. THE LOCK PATH RESOLVES TO THE WORKTREE, SO THE SINGLETON HAS ONE LOCK PER
+     CHECKOUT (measured 23.08.2026, 01:07-01:14, and it produced a real double
+     session). The point boundary of session e068b59e spawned its successor with a
+     cwd inside `.claude/worktrees/point-834`. That session's acquire wrote — and
+     went on heartbeating — `.claude/worktrees/point-834/.claude/batch-lock.json`
+     (fence 3), while `/workspace/hoa/.claude/batch-lock.json` did not exist at
+     00:57. Cause: `repoPath('.claude/batch-lock.json')` resolves against the
+     checkout the process runs in, and every worktree carries its own tracked
+     `.claude/`. The main-tree lock therefore read as FREE, the 900-second watchdog
+     spawned a SECOND full batch session beside a live one, and `batch-singleton
+     status` answered "live parallel sessions: none" while both were committing.
+     Worse than the miscount: the worktree session's own guards read its private
+     lock as proof of ownership, so nothing would have refused it a merge, a
+     TASKS.md tick or a landing — the hard singleton was not outvoted, it was
+     bypassed, and the split was held by agreement between two sessions instead.
+     FINAL STATE: the batch lock, the pause marker and every file the singleton
+     treats as batch-global resolve to the MAIN checkout (git's common dir), never
+     to the worktree, whatever the process's cwd; and a worktree-local copy found
+     beside them is reported as torn by `batch-doctor`, never honoured.
+  11. THE SPAWN DECISION ASKS THE REGISTER, NOT THE REPOSITORY (same incident).
+     Before launching the duplicate, the launcher tick recorded "no owner lock —
+     taking over; no live batch-writer process measured" while the session it was
+     about to duplicate was committing and pushing on its feature branch. The
+     evidence that would have stopped it already exists and already works:
+     `batch-in-flight --agent-check` judged the same session "alive" from git
+     metadata in the same minute. FINAL STATE: the spawn decision consults that
+     evidence — recent commits on open `feat/*` branches and worktree activity —
+     and a measured live writer VETOES the spawn even when no lock names it.
+  VERIFIABLE: a lock acquired from a process whose cwd is a worktree lands in
+  the main checkout and is seen by a second process running elsewhere; a
+  worktree-local lock file is reported torn rather than honoured; the spawn
+  decision refuses to launch while an open feat/* branch has advanced inside
+  the agent-check grace; and a lock carrying a placeholder id plus one live
+  session produces no parallel-session alert in the pure core's tests, and the
+  same setup replayed against the real detector stays silent; a Vitest case pins
+  that the pause path writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
   the lock's recorded owner byte-identical while a real id still restamps; the
   doctor reports the pid-mine/id-foreign lock as torn and repairs it; a stood-down
   session with no mutating action since the note raises no parallel-session alert
