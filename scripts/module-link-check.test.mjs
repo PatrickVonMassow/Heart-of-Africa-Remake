@@ -83,3 +83,16 @@ describe('missingNamedImports against the real repository', () => {
     expect(missing).toEqual(["./batch-ownership-core.mjs -> pidCorroboration"])
   })
 })
+
+describe('a package or builtin target is checked too, not skipped', () => {
+  it('NEGATIVE CONTROL: a misspelt name from a node: builtin is a missing import', async () => {
+    const { missing } = await missingNamedImports('scripts/module-link-check.builtin-fixture.mjs')
+    expect(missing).toEqual(['node:fs -> readFileSyc'])
+  })
+
+  it('reports a target that cannot be loaded at all rather than passing over it', async () => {
+    const { missing } = await missingNamedImports('scripts/module-link-check.unresolvable-fixture.mjs')
+    expect(missing).toHaveLength(1)
+    expect(missing[0]).toMatch(/^\.\/there-is-no-such-module\.mjs -> unloadable \(/)
+  })
+})

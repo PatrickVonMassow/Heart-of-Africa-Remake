@@ -78,21 +78,35 @@ export function scanStaticImports(source) {
 }
 
 /**
- * ASK EVERY RELATIVE TARGET FOR THE NAMES THE SUBJECT WANTS.
+ * ASK EVERY TARGET FOR THE NAMES THE SUBJECT WANTS.
  *
- * Only relative specifiers are followed: a package's exports are its own
- * business and installing one is a different failure. The targets ARE loaded —
- * they are the same modules the unit suite already imports — while the subject
- * itself is never loaded, which is the whole point.
+ * EVERY target, not only the relative ones (cross-vendor review, GPT-5.6 Sol,
+ * 22.08.2026). Node refuses `import { readFileSyc } from 'node:fs'` exactly as
+ * it refuses a mis-sourced local name, and the launcher imports from `node:fs`,
+ * `node:child_process` and `node:path` — skipping those would have left the
+ * check reporting a clean file over a link error it exists to catch.
+ *
+ * The targets ARE loaded — they are the modules the unit suite already imports —
+ * while the subject itself is never loaded, which is the whole point. A target
+ * that cannot be resolved or loaded at all is reported too: an import node
+ * cannot follow is a link failure, not a file to pass over in silence.
  */
 export async function missingNamedImports(file) {
   const source = readFileSync(file, 'utf8')
   const { imports, unparsed } = scanStaticImports(source)
   const missing = []
   for (const entry of imports) {
-    if (!entry.specifier.startsWith('.') || entry.names.length === 0) continue
-    const target = pathToFileURL(resolve(dirname(file), entry.specifier)).href
-    const mod = await import(target)
+    if (entry.names.length === 0) continue
+    const target = entry.specifier.startsWith('.')
+      ? pathToFileURL(resolve(dirname(file), entry.specifier)).href
+      : entry.specifier
+    let mod
+    try {
+      mod = await import(target)
+    } catch (e) {
+      missing.push(`${entry.specifier} -> unloadable (${e && e.message ? e.message.split('\n')[0] : e})`)
+      continue
+    }
     for (const name of entry.names) {
       if (!(name in mod)) missing.push(`${entry.specifier} -> ${name}`)
     }
