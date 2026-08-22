@@ -446,17 +446,35 @@ export function classSummaries(landings, axis) {
   }
   const out = []
   for (const [name, members] of groups) {
-    const rated = members.filter((m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours))
     const unknowable = UNKNOWABLE_CLASSES.has(name)
     const elapsed = summarise(members.map((m) => m.elapsedHours))
     // THE NUMERATOR MUST SPEAK FOR THE SAME POPULATION AS THE DENOMINATOR.
     // A render card is held out of the correction, so a render LANDING may not
     // sit inside the median that corrects everything else: pooling six 1-hour
     // process landings with six 3-hour render ones yields a 2-hour centre that
-    // belongs to neither. Excluding the cards but keeping the landings was the
-    // same confounder, one layer down.
-    const correctable = summarise(
-      members.filter((m) => classesOf(m).picture !== PICTURE_VERIFIED).map((m) => m.elapsedHours),
+    // belongs to neither.
+    //
+    // WHICH LANDINGS THOSE ARE IS READ FROM THE SPEC, exactly as it is for a
+    // queued card. The verification store is capped and pruned, so a landing
+    // that DID owe a rendered proof can arrive here with no surviving
+    // attestation and would otherwise slip back into the numerator the
+    // denominator excludes it from. Both signals are used: the spec says what
+    // was owed, the attestation says what was proven, and either one holds the
+    // landing out.
+    const correctableRows = members.filter((m) => !owesRenderedProof(m))
+    const correctable = summarise(correctableRows.map((m) => m.elapsedHours))
+    const rated = members.filter((m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours))
+    // TWO POPULATIONS, TWO PURPOSES, KEPT APART.
+    //
+    // `ratio` covers the WHOLE class and answers the question the axes ask: do
+    // these classes differ? Blinding it to render work would make the picture
+    // axis permanently unmeasurable and silently mute the global-factor test.
+    //
+    // `correctableRatio` covers only what a correction may be measured on. It is
+    // the one a card's factor comes from, so render work can reach a card by
+    // neither route — not through the elapsed median and not through the ratio.
+    const correctableRated = correctableRows.filter(
+      (m) => asNumber(m.elapsedHours) !== null && asNumber(m.estimateHours),
     )
     out.push({
       axis,
@@ -465,6 +483,7 @@ export function classSummaries(landings, axis) {
       elapsed,
       correctable,
       ratio: summarise(rated.map((m) => m.elapsedHours / m.estimateHours)),
+      correctableRatio: summarise(correctableRated.map((m) => m.elapsedHours / m.estimateHours)),
       comparable: !unknowable && rated.length >= MIN_CLASS_SAMPLES,
       // A class can be measured WITHOUT any landing-time snapshot: the elapsed
       // span is read off git, while the ratio needs a promise recorded while the
@@ -561,6 +580,7 @@ export function globalFactorDecision(byAxis, { tolerance = GLOBAL_FACTOR_TOLERAN
 export function calibrationReading(landings, { cadenceHours = [], window = null, tolerance } = {}) {
   const rows = Array.isArray(landings) ? landings : []
   const rated = rows.filter((r) => asNumber(r.elapsedHours) !== null && asNumber(r.estimateHours))
+  const correctableRated = rated.filter((r) => !owesRenderedProof(r))
   const byAxis = Object.fromEntries(AXES.map((axis) => [axis, classSummaries(rows, axis)]))
   const overall = {
     landings: rows.length,
@@ -574,9 +594,17 @@ export function calibrationReading(landings, { cadenceHours = [], window = null,
     overall,
     cadence: summarise(cadenceHours),
     byAxis,
-    decision: { ...decision, factor: decision.adopted ? overall.ratio.median : null },
+    // An ADOPTED global factor is applied to cards, so it too is measured on the
+    // population a card may be corrected from.
+    decision: {
+      ...decision,
+      factor: decision.adopted ? summarise(correctableRated.map((r) => r.elapsedHours / r.estimateHours)).median : null,
+    },
+    // The factors a CARD may take, so they rest on the correctable population.
     factors: Object.fromEntries(
-      byAxis.criticality.filter((c) => c.comparable).map((c) => [c.name, c.ratio.median]),
+      byAxis.criticality
+        .filter((c) => !c.unknowable && c.correctableRatio.n >= MIN_CLASS_SAMPLES)
+        .map((c) => [c.name, c.correctableRatio.median]),
     ),
   }
 }
@@ -592,7 +620,7 @@ export function calibrationReading(landings, { cadenceHours = [], window = null,
 export function factorForCard(reading, criticality, { promiseMedian = null } = {}) {
   const label = criticality ?? UNTAGGED
   const ownClass = (reading?.byAxis?.criticality ?? []).find((c) => c.name === label)
-  const ratioComparable = Boolean(ownClass?.comparable) && (ownClass?.ratio?.n ?? 0) >= MIN_CLASS_SAMPLES
+  const ratioComparable = !ownClass?.unknowable && (ownClass?.correctableRatio?.n ?? 0) >= MIN_CLASS_SAMPLES
   if (ratioComparable) {
     if (reading?.decision?.adopted && asNumber(reading.decision.factor)) {
       return { factor: reading.decision.factor, basis: 'global', label, reason: null }
@@ -757,6 +785,17 @@ export function pictureBearingPoints(text) {
   return out
 }
 
+/**
+ * DOES THIS LANDING OWE A RENDERED PROOF? The spec first, the attestation second.
+ *
+ * `owesPicture` is read off the point's own work-order text by the caller, the
+ * same way a queued card is read. `picture` is the surviving attestation from
+ * the verification store. Either one is enough: a proof that was owed but whose
+ * record was pruned still belonged to the render lane.
+ */
+export const owesRenderedProof = (landing) =>
+  landing?.owesPicture === true || classesOf(landing).picture === PICTURE_VERIFIED
+
 /** The cards a plan held out for the render confounder — what the report counts. */
 export const heldOutForPicture = (plan) =>
   (Array.isArray(plan) ? plan : []).filter((p) => p?.reason?.includes(PICTURE_HOLDOUT_REASON))
@@ -854,6 +893,20 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     const from = cards?.[point]?.estimate ?? null
     const entry = ledgerEntry(ledger, point)
     const baseline = entry?.baseline ?? from
+    // BEFORE the inherited-note branch: a card owing a rendered proof is held out
+    // whatever kind of estimate it carries, so the reported count means what it
+    // says — every open card owing a proof and carrying one is in it.
+    if (from !== null && from !== undefined && picture.has(point)) {
+      plan.push({
+        point,
+        from,
+        baseline,
+        to: from,
+        changed: false,
+        reason: `${PICTURE_HOLDOUT_REASON} — the confounder forbids carrying this factor here, so the estimate is kept`,
+      })
+      continue
+    }
     if (String(from ?? '').includes(INHERITED_ESTIMATE_NOTE) || String(baseline ?? '').includes(INHERITED_ESTIMATE_NOTE)) {
       plan.push({
         point,
@@ -870,17 +923,6 @@ export function rewritePlan(reading, { cards = {}, open = [], criticality = new 
     const { factor, basis, label, reason: factorReason } = factorForCard(reading, crit.get(point), {
       promiseMedian: promises.get(label0) ?? null,
     })
-    if (hours && picture.has(point)) {
-      plan.push({
-        point,
-        from,
-        baseline,
-        to: from,
-        changed: false,
-        reason: `${PICTURE_HOLDOUT_REASON} — the confounder forbids carrying this factor here, so the estimate is kept`,
-      })
-      continue
-    }
     if (!hours) {
       plan.push({ point, from, baseline, to: from, changed: false, reason: 'no stored estimate to correct — the card keeps its "no estimate yet" marker' })
       continue
@@ -969,7 +1011,10 @@ export function inheritanceDefaults(reading) {
     // this the moment it HAS measured landings — a ratio snapshot adds nothing
     // to a median the git history already answers.
     if (!c.comparable && !c.elapsedComparable) continue
-    const hours = roundHours(c.elapsed.median)
+    // The SAME population the eligibility was judged on. Taking the pooled median
+    // here handed a new card a number measured partly on render work that no
+    // card of this kind is ever corrected from.
+    const hours = roundHours(c.correctable.median)
     if (hours) out[c.name] = hours
   }
   return out

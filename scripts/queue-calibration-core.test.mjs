@@ -29,6 +29,7 @@ import {
   parseTickEvents,
   clauseDemandsPicture,
   heldOutForPicture,
+  owesRenderedProof,
   PICTURE_HOLDOUT_REASON,
   splitClauses,
   PICTURE_VERIFIED,
@@ -365,10 +366,16 @@ describe('is one global factor honest?', () => {
 })
 
 describe('the rewrite plan', () => {
-  /** Landings that make medium and high comparable and separate them. */
+  /**
+   * Landings that make medium and high comparable and separate them.
+   *
+   * NONE of them owes a rendered proof, and that is now load-bearing rather than
+   * incidental: a correction may only be measured on landings a card can be
+   * corrected from, so a render landing here would make its class uncorrectable.
+   */
   const rows = [
     ...classOf(6, 0.25, { criticality: 'medium', picture: false, delegated: true }),
-    ...classOf(6, 1.2, { criticality: 'high', picture: true, delegated: true, elapsedHours: 2.4 }),
+    ...classOf(6, 1.2, { criticality: 'high', picture: false, delegated: true, elapsedHours: 2.4 }),
   ].map((r, i) => ({ ...r, point: 500 + i }))
   const reading = calibrationReading(rows, { cadenceHours: [1, 2, 3] })
 
@@ -418,7 +425,7 @@ describe('the rewrite plan', () => {
 
   it('uses a global factor only for a class that itself has landed comparables', () => {
     const flat = [
-      ...classOf(6, 0.5, { criticality: 'high', picture: true, delegated: true }),
+      ...classOf(6, 0.5, { criticality: 'high', picture: false, delegated: true }),
       ...classOf(6, 0.52, { criticality: 'low', picture: false, delegated: true }),
       ...mainSessionLandings(3, { criticality: 'high' }),
     ].map((r, i) => ({ ...r, point: 600 + i }))
@@ -974,5 +981,95 @@ describe('the count the report prints is the plan it printed', () => {
     // held back — the report says that difference out loud rather than hiding it.
     expect(plan.find((p) => p.point === 30).reason).toMatch(/no stored estimate/)
     expect(held.every((p) => p.reason.includes(PICTURE_HOLDOUT_REASON))).toBe(true)
+  })
+})
+
+
+describe('a landing that OWED a proof but kept no record of it', () => {
+  // The verification store is capped and pruned, so a render landing can arrive
+  // with picture: false. Its own spec still said a rendered proof was owed, and
+  // that is the signal the queued cards are read by.
+  const pruned = (n) =>
+    Array.from({ length: n }, (_, i) =>
+      landing({ point: 700 + i, elapsedHours: 3, estimateHours: null, criticality: 'medium', picture: false, owesPicture: true }),
+    )
+  const process6 = Array.from({ length: 6 }, (_, i) =>
+    landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+  )
+
+  it('counts as owing a proof on either signal', () => {
+    expect(owesRenderedProof({ owesPicture: true, picture: false })).toBe(true)
+    expect(owesRenderedProof({ owesPicture: false, picture: true })).toBe(true)
+    expect(owesRenderedProof({ owesPicture: false, picture: false })).toBe(false)
+  })
+
+  it('stays out of the numerator although its attestation was pruned', () => {
+    const reading = calibrationReading([...process6, ...pruned(6)])
+    const medium = reading.byAxis.criticality.find((c) => c.name === 'medium')
+    expect(medium.elapsed.median).toBe(2)
+    expect(medium.correctable.median).toBe(1)
+    expect(medium.correctable.n).toBe(6)
+  })
+
+  it('stays out of the RATIO too, not only out of the elapsed median', () => {
+    const rows = [
+      ...Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 600 + i, elapsedHours: 1, estimateHours: 2, criticality: 'medium' }),
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        landing({ point: 700 + i, elapsedHours: 8, estimateHours: 2, criticality: 'medium', owesPicture: true }),
+      ),
+    ]
+    const medium = calibrationReading(rows).byAxis.criticality.find((c) => c.name === 'medium')
+    // The REPORTED ratio still covers the whole class — blinding it would mute
+    // the axis comparison that decides whether one global factor is honest.
+    expect(medium.ratio.n).toBe(12)
+    // The ratio a CARD is corrected by covers only the correctable population.
+    expect(medium.correctableRatio.n).toBe(6)
+    expect(medium.correctableRatio.median).toBe(0.5)
+  })
+
+  it('a new card inherits the correctable median, not the pooled one', () => {
+    const reading = calibrationReading([...process6, ...pruned(6)])
+    expect(inheritanceDefaults(reading)).toMatchObject({ medium: 1 })
+  })
+})
+
+describe('a held-out card is held out whatever kind of estimate it carries', () => {
+  const reading = calibrationReading(
+    Array.from({ length: 6 }, (_, i) =>
+      landing({ point: 600 + i, elapsedHours: 1, estimateHours: null, criticality: 'medium' }),
+    ),
+  )
+
+  it('takes an INHERITED estimate on a render card into the holdout count', () => {
+    const plan = rewritePlan(reading, {
+      cards: { 20: { estimate: `~2 h ${INHERITED_ESTIMATE_NOTE}` } },
+      open: [20],
+      criticality: new Map([[20, 'medium']]),
+      pictureBearing: new Set([20]),
+    })
+    expect(plan[0].reason).toContain(PICTURE_HOLDOUT_REASON)
+    expect(heldOutForPicture(plan)).toHaveLength(1)
+  })
+
+  it('still reports a render card with NO estimate as having none', () => {
+    const plan = rewritePlan(reading, {
+      cards: {},
+      open: [30],
+      criticality: new Map([[30, 'medium']]),
+      pictureBearing: new Set([30]),
+    })
+    expect(plan[0].reason).toMatch(/no stored estimate/)
+    expect(heldOutForPicture(plan)).toHaveLength(0)
+  })
+
+  it('leaves a NON-render card with an inherited estimate on its own branch', () => {
+    const plan = rewritePlan(reading, {
+      cards: { 10: { estimate: `~2 h ${INHERITED_ESTIMATE_NOTE}` } },
+      open: [10],
+      criticality: new Map([[10, 'medium']]),
+    })
+    expect(plan[0].reason).toMatch(/inherited class median/)
   })
 })

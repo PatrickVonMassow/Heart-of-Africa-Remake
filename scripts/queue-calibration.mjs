@@ -164,6 +164,8 @@ try {
 
   const merges = attributeMerges(firstParentChain(), allTicks)
   const picturePoints = verifiedPicturePoints()
+  // What each LANDED point's own spec demanded, read exactly as a queued card's is.
+  const owedPicture = pictureBearingPoints(tasksAll)
   const rows = landings.map((l) => {
     const found = merges.get(l.point)
     const { elapsedHours, spanBasis } = found
@@ -183,6 +185,7 @@ try {
       estimateSource: source,
       criticality: criticality.get(l.point) ?? null,
       pictureClass: picturePoints.has(l.point) ? 'picture-verified' : 'picture-unestablished',
+      owesPicture: owedPicture.has(l.point),
     }
   })
   const cadenceHours = rows.slice(1).map((r, i) => (r.landedAt - rows[i].landedAt) / HOUR)
@@ -276,7 +279,13 @@ try {
     )
   }
   console.log('APPLIED FACTORS (criticality — the only axis a queued point already has):')
-  for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}`)
+  if (reading.decision.adopted && reading.decision.factor) {
+    // A card takes the GLOBAL factor whenever one was adopted, whatever its own
+    // class ratio reads. Printing the per-class ratios here said otherwise.
+    console.log(`  ALL CLASSES  ${fmt(reading.decision.factor, '×')}  (one global factor adopted — the classes do not differ enough to separate)`)
+  } else {
+    for (const [name, f] of Object.entries(reading.factors)) console.log(`  ${name.padEnd(13)} ${fmt(f, '×')}  (ratio)`)
+  }
 
   const pictureBearing = pictureBearingPoints(tasksAll)
   // The SAME exclusion the plan uses, so the printed factor is the applied one.
@@ -299,7 +308,7 @@ try {
   if (declaredOpen) {
     console.log(
       `  ${declaredOpen} open card(s) ask for a rendered proof and are held out of the correction AND of its denominator; ` +
-        `${heldOut} of them carried an estimate this run would otherwise have corrected, and the rest had none to correct. ` +
+        `${heldOut} of them carry an estimate that is kept as it stands; the remaining ${declaredOpen - heldOut} carry none at all. ` +
         'This measurement cannot establish what a picture check costs, so it does not price one.',
     )
   }
