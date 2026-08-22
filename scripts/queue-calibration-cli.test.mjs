@@ -15,16 +15,22 @@
 // AND THE CHECKOUT IS PROVEN UNTOUCHED. `--state-dir` points the command at a
 // throwaway directory; these tests assert that the repository's own state files
 // are byte-identical afterwards rather than trusting that routing to hold.
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { readTasksAll, readTasksOpen } from './tasks-source.mjs'
 import { openPointsOf } from './board-queue-core.mjs'
-import { isComparedSnapshot, parseCriticality, pictureBearingPoints, promiseMedians } from './queue-calibration-core.mjs'
+import {
+  isComparedSnapshot,
+  MIN_CLASS_SAMPLES,
+  parseCriticality,
+  pictureBearingPoints,
+  promiseMedians,
+} from './queue-calibration-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'queue-calibration.mjs')
 // Three different promises, so a class median is a real median and not the one
@@ -35,6 +41,115 @@ const CORRECTABLE_ESTIMATES = ['~2 h', '~3 h', '~5 h']
 // medians below would move, and the denominator check would see it. With only
 // correctable cards in the fixture, dropping the exclusion changed nothing.
 const RENDER_ESTIMATE = '~20 h'
+
+/**
+ * One class with enough process cards to earn a factor, plus a render card in
+ * the SAME class. Selecting from the work order keeps the fixture's classes
+ * true while making its git history entirely synthetic.
+ */
+function calibrationSubjects() {
+  const all = readTasksAll()
+  const open = openPointsOf(readTasksOpen())
+  const criticality = parseCriticality(all)
+  const owed = pictureBearingPoints(all)
+  const correctable = new Map()
+  const held = new Map()
+  for (const point of open) {
+    const name = criticality.get(point)
+    if (!name) continue
+    const groups = owed.has(point) ? held : correctable
+    groups.set(name, [...(groups.get(name) ?? []), point])
+  }
+  const count = MIN_CLASS_SAMPLES + 1
+  const name = [...correctable.keys()]
+    .filter((candidate) => (correctable.get(candidate)?.length ?? 0) >= count && (held.get(candidate)?.length ?? 0) > 0)
+    .sort((a, b) => (correctable.get(b)?.length ?? 0) - (correctable.get(a)?.length ?? 0))[0]
+  if (!name) throw new Error(`the calibration fixture needs ${count} correctable cards and one render holdout in the same class`)
+  return { name, correctable: correctable.get(name).slice(0, count), held: held.get(name) }
+}
+
+const gitIn = (repo, args, at = null) => {
+  const stamp = at === null ? {} : { GIT_AUTHOR_DATE: `${at} +0000`, GIT_COMMITTER_DATE: `${at} +0000` }
+  const result = spawnSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', '-C', repo, ...args], {
+    encoding: 'utf8',
+    windowsHide: true,
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Calibration Fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+      GIT_COMMITTER_NAME: 'Calibration Fixture',
+      GIT_COMMITTER_EMAIL: 'fixture@example.invalid',
+      ...stamp,
+    },
+  })
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.stdout}`)
+  return result.stdout
+}
+
+/** A complete first-parent chain whose merge parents never come from this checkout. */
+function buildHistoryFixture(points) {
+  const repo = mkdtempSync(join(tmpdir(), 'queue-cal-history-'))
+  const initialized = spawnSync('git', ['init', '-q', '-b', 'main', repo], { encoding: 'utf8', windowsHide: true })
+  if (initialized.status !== 0) throw new Error(`git init failed: ${initialized.stderr || initialized.stdout}`)
+
+  const ticks = new Set()
+  const tasks = () => `${points.map((point) => `- [${ticks.has(point) ? 'x' : ' '}] ${point}. Fixture point`).join('\n')}\n`
+  writeFileSync(join(repo, 'TASKS.md'), tasks())
+  gitIn(repo, ['add', 'TASKS.md'])
+  gitIn(repo, ['commit', '-q', '-m', 'Start calibration history'], 1_750_000_000)
+
+  points.forEach((point, i) => {
+    const tickAt = 1_750_000_000 + (i + 1) * 86_400
+    const branch = `feat/${point}-calibration-fixture`
+    gitIn(repo, ['switch', '-q', '-c', branch])
+    writeFileSync(join(repo, `point-${point}.txt`), `fixture work for ${point}\n`)
+    gitIn(repo, ['add', `point-${point}.txt`])
+    gitIn(repo, ['commit', '-q', '-m', `Build fixture point ${point}`], tickAt - 28_800)
+    gitIn(repo, ['switch', '-q', 'main'])
+    gitIn(repo, ['merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch], tickAt - 1_800)
+    ticks.add(point)
+    writeFileSync(join(repo, 'TASKS.md'), tasks())
+    gitIn(repo, ['add', 'TASKS.md'])
+    gitIn(repo, ['commit', '-q', '-m', `Land fixture point ${point}`], tickAt)
+  })
+  return repo
+}
+
+/**
+ * A disposable mutant with the correction's only factor provider disabled.
+ * Its dependencies remain the reviewed checkout modules; only this copy is
+ * changed, and it lives outside the repository.
+ */
+function buildNoCorrectionMutant() {
+  const root = mkdtempSync(join(tmpdir(), 'queue-cal-mutant-'))
+  const scripts = join(root, 'scripts')
+  mkdirSync(scripts)
+  const declaration = 'export function factorForCard(reading, criticality, { promiseMedian = null } = {}) {'
+  const replacement = `${declaration}\n  return { factor: null, basis: null, label: criticality ?? UNTAGGED, reason: 'disabled by the fixture mutant' }\n}\n\nfunction workingFactorForCard(reading, criticality, { promiseMedian = null } = {}) {`
+  const core = readFileSync(resolve(REPO_ROOT, 'scripts', 'queue-calibration-core.mjs'), 'utf8')
+  const mutated = core.replace(declaration, replacement)
+  if (mutated === core) throw new Error('the no-correction mutation no longer matches factorForCard')
+  writeFileSync(join(scripts, 'queue-calibration-core.mjs'), mutated)
+  writeFileSync(join(scripts, 'queue-calibration.mjs'), readFileSync(SCRIPT))
+  for (const name of ['atomic-write.mjs', 'repo-paths.mjs', 'tasks-source.mjs', 'board-queue-core.mjs']) {
+    symlinkSync(resolve(REPO_ROOT, 'scripts', name), join(scripts, name))
+  }
+  return { root, script: join(scripts, 'queue-calibration.mjs') }
+}
+
+const SUBJECTS = calibrationSubjects()
+let historyRepo = ''
+let mutant = null
+
+beforeAll(() => {
+  historyRepo = buildHistoryFixture(SUBJECTS.correctable)
+  mutant = buildNoCorrectionMutant()
+})
+
+afterAll(() => {
+  if (historyRepo) rmSync(historyRepo, { recursive: true, force: true })
+  if (mutant?.root) rmSync(mutant.root, { recursive: true, force: true })
+})
 
 /** Existence and content of the state files this command would write by default. */
 const checkoutState = () =>
@@ -50,11 +165,8 @@ const checkoutState = () =>
  * has to be present, or the fixture cannot tell a correction that excludes it
  * from one that does not.
  */
-function seedQueueData(dir, count = 12) {
-  const owed = pictureBearingPoints(readTasksAll())
-  const open = openPointsOf(readTasksOpen())
-  const correctable = open.filter((p) => !owed.has(p)).slice(0, count)
-  const held = open.filter((p) => owed.has(p)).slice(0, count)
+function seedQueueData(dir) {
+  const { correctable, held } = SUBJECTS
   const points = {}
   correctable.forEach((point, i) => {
     points[String(point)] = { title: `Point ${point}`, body: [], estimate: CORRECTABLE_ESTIMATES[i % CORRECTABLE_ESTIMATES.length] }
@@ -69,60 +181,35 @@ const estimatesOf = (path) => {
   return new Map(Object.entries(points).map(([k, v]) => [Number(k), v.estimate ?? null]))
 }
 
-// THE HISTORY THIS SUITE MEASURES IS THE CHECKOUT'S OWN, AND CI DOES NOT HAVE IT.
-// The command takes its landings off `git log --first-parent main` and each
-// landing's span off `git log <merge>^1..<merge>^2`. In a shallow checkout those
-// parents are absent: every span reads as unknown, no class earns a factor, the
-// correction applies to nothing, and the three cases marked below would assert
-// `expected 0 to be greater than 0` — red FOR THE CHECKOUT rather than for the
-// code, which is what they did on main from 04:19 to 07:56 on 22.08.2026.
-//
-// Deepening CI was measured and rejected in both directions (the reasons are
-// written out beside `fetch-depth` in .github/workflows/ci.yml): blobless full
-// depth turns each landing's read into a lazy fetch and runs past the job
-// timeout, and a depth that reaches the fixture's thirty landings costs a 1.4 GiB
-// clone. So the dependency has to leave the suite, not the checkout: point 829
-// gives these cases a fixture history of their own. Until it lands they say why
-// they cannot run here instead of failing for it — and they still run in full on
-// every developer checkout, which is where the correction is actually changed.
-const shallowCheckout = () => {
-  const probe = spawnSync('git', ['rev-parse', '--is-shallow-repository'], {
-    encoding: 'utf8',
-    cwd: REPO_ROOT,
-    windowsHide: true,
-  })
-  return probe.status === 0 && probe.stdout.trim() === 'true'
-}
-const HISTORY_IS_SHALLOW = shallowCheckout()
+const movedCards = (before, after) =>
+  [...after.entries()].filter(([point, estimate]) => before.get(point) !== estimate).map(([point]) => point).sort((a, b) => a - b)
 
-// AND THE BRANCH LANE HAS NO `main` AT ALL. The shallow probe above answers a
-// different question than the one a `feat/**` CI run asks: that checkout is the
-// BRANCH, fetched two commits deep, so the revision `main` the command reads does
-// not exist in it and `git log --first-parent main` dies with `bad revision`
-// before any span is measured. The three cases above then skip for shallowness
-// while the suite's own `beforeAll` still fails for the missing ref — red for the
-// checkout again, one lane further along. Point 829 removes the dependency; until
-// then the whole suite says why it cannot run where its base ref is absent.
-// EXIT 1 AND NOTHING ELSE. `--verify --quiet` answers 1 for "this revision does not
-// resolve"; 128 is a broken or unreadable repository and a null status is a Git that
-// never ran. Treating those as a missing ref would skip the suite for the very
-// failures it should go red for, so they fall through to the run (cross-vendor review).
-const baseRefMissing = () => {
-  const probe = spawnSync('git', ['rev-parse', '--verify', '--quiet', 'main^{commit}'], {
-    encoding: 'utf8',
-    cwd: REPO_ROOT,
-    windowsHide: true,
-  })
-  return probe.status === 1
+const correctionClasses = (store) => {
+  const classes = Object.keys(store.applied)
+  expect(classes.length, 'the synthesized spans must produce a correction').toBeGreaterThan(0)
+  return classes
 }
-const BASE_REF_MISSING = baseRefMissing()
 
+const correctedCards = (before, after) => {
+  const moved = movedCards(before, after)
+  expect(moved.length, 'the seeded cards must actually move').toBeGreaterThan(0)
+  return moved
+}
+
+// Git reads ONLY the synthesized merge/tick chain. HOA_REPO_ROOT deliberately
+// keeps the command's task parsing and board writer on the reviewed checkout;
+// neither its depth nor the existence of a local `main` can affect a result.
+// These command-level cases genuinely need the checkout's current TASKS.md,
+// archive and queue writer because those are what classify and rewrite an open
+// card. Checked-out files are sufficient; no commit or merge history is needed.
 const run = (dir, ...args) => {
+  const script = typeof args[0] === 'object' ? args.shift().script : SCRIPT
   const before = checkoutState()
-  const result = spawnSync(process.execPath, [SCRIPT, '--state-dir', dir, '--limit', '30', ...args], {
+  const result = spawnSync(process.execPath, [script, '--state-dir', dir, '--limit', '30', '--since', 'all', ...args], {
     encoding: 'utf8',
     windowsHide: true,
-    cwd: process.cwd(),
+    cwd: historyRepo,
+    env: { ...process.env, HOA_REPO_ROOT: REPO_ROOT },
     input: '',
   })
   // THE CHECKOUT IS NOT THE COMMAND'S WORKSPACE. Asserted per run, because a
@@ -131,7 +218,7 @@ const run = (dir, ...args) => {
   return result
 }
 
-describe.skipIf(BASE_REF_MISSING)('the report and the store are one reading', () => {
+describe('the report and the store are one reading', () => {
   let out = ''
   let store = null
   let seeded = []
@@ -149,8 +236,10 @@ describe.skipIf(BASE_REF_MISSING)('the report and the store are one reading', ()
 
   it('has a fixture with something to measure and something to correct', () => {
     // Guards every assertion below against degenerating as the work order moves.
-    expect(seeded.length).toBeGreaterThan(0)
-    expect(store.rows.length).toBeGreaterThan(0)
+    expect(seeded).toEqual(SUBJECTS.correctable)
+    expect(store.rows.map((row) => row.point)).toEqual(SUBJECTS.correctable)
+    expect(store.rows.every((row) => row.criticality === SUBJECTS.name)).toBe(true)
+    expect(store.rows.every((row) => row.attribution === 'named' && row.spanBasis === 'branch-to-landing')).toBe(true)
   })
 
   it('prints for each landing what actually holds it out, not how it was verified', () => {
@@ -216,10 +305,9 @@ describe.skipIf(BASE_REF_MISSING)('the report and the store are one reading', ()
     expect(store.window.toAt).toBe(store.rows[store.rows.length - 1].landedAt)
   })
 
-  it.skipIf(HISTORY_IS_SHALLOW)('keeps the denominator and the factor beside the numbers they produced', () => {
-    const classes = Object.keys(store.applied)
+  it('keeps the denominator and the factor beside the numbers they produced', () => {
     // An empty `applied` would make every check below vacuous.
-    expect(classes.length).toBeGreaterThan(0)
+    const classes = correctionClasses(store)
     for (const name of classes) {
       const { factor, basis } = store.applied[name]
       expect(factor).toBeGreaterThan(0)
@@ -246,8 +334,8 @@ describe.skipIf(BASE_REF_MISSING)('the report and the store are one reading', ()
   })
 })
 
-describe.skipIf(BASE_REF_MISSING)('an apply accounts for every card it moves', () => {
-  it.skipIf(HISTORY_IS_SHALLOW)('moves exactly the cards it reports, and remembers what each promised', () => {
+describe('an apply accounts for every card it moves', () => {
+  it('moves exactly the cards it reports, and remembers what each promised', () => {
     const dir = mkdtempSync(join(tmpdir(), 'queue-cal-apply-'))
     const { correctable, held } = seedQueueData(dir)
     const dataFile = join(dir, 'board-queue.json')
@@ -257,8 +345,7 @@ describe.skipIf(BASE_REF_MISSING)('an apply accounts for every card it moves', (
     const after = estimatesOf(dataFile)
 
     // WHAT ACTUALLY CHANGED, read off the queue data — never off the report.
-    const moved = [...after.entries()].filter(([p, v]) => before.get(p) !== v).map(([p]) => p).sort((a, b) => a - b)
-    expect(moved.length, 'the seeded cards must actually move').toBeGreaterThan(0)
+    const moved = correctedCards(before, after)
     expect(after.size, 'no card may be added or dropped').toBe(before.size)
 
     // …and what the command SAID it changed. A run that moved five cards while
@@ -286,7 +373,7 @@ describe.skipIf(BASE_REF_MISSING)('an apply accounts for every card it moves', (
     for (const point of held) expect(after.get(point)).toBe(RENDER_ESTIMATE)
   }, 120_000)
 
-  it.skipIf(HISTORY_IS_SHALLOW)('still divides by the promise that was actually made, on the second run', () => {
+  it('still divides by the promise that was actually made, on the second run', () => {
     // A STABLE QUEUE PROVES NOTHING HERE: the correction moves a class onto its
     // measured median, so a second run over corrected values would land on a
     // factor of one and leave the cards alone either way. What distinguishes the
@@ -302,8 +389,7 @@ describe.skipIf(BASE_REF_MISSING)('an apply accounts for every card it moves', (
     expect(run(dir, '--apply').status).toBe(0)
     const afterFirst = estimatesOf(dataFile)
     const first = JSON.parse(readFileSync(storeFile, 'utf8'))
-    const moved = [...afterFirst.entries()].filter(([p, v]) => promised.get(p) !== v).map(([p]) => p)
-    expect(moved.length).toBeGreaterThan(0)
+    const moved = correctedCards(promised, afterFirst)
 
     expect(run(dir, '--apply').status).toBe(0)
     const afterSecond = estimatesOf(dataFile)
@@ -329,5 +415,37 @@ describe.skipIf(BASE_REF_MISSING)('an apply accounts for every card it moves', (
       exclude: pictureBearingPoints(readTasksAll()),
     })
     expect(Object.fromEntries(naive)).not.toEqual(first.promiseMedians)
+  }, 180_000)
+})
+
+describe('the fixture rejects a correction that applies to nothing', () => {
+  it('trips the denominator, moved-card and second-run non-vacuity checks', () => {
+    const reportDir = mkdtempSync(join(tmpdir(), 'queue-cal-broken-report-'))
+    seedQueueData(reportDir)
+    const report = run(reportDir, { script: mutant.script })
+    expect(report.status, report.stderr).toBe(0)
+    const store = JSON.parse(readFileSync(join(reportDir, 'queue-calibration.json'), 'utf8'))
+    expect(store.applied).toEqual({})
+    expect(() => correctionClasses(store)).toThrow()
+
+    const applyDir = mkdtempSync(join(tmpdir(), 'queue-cal-broken-apply-'))
+    seedQueueData(applyDir)
+    const applyFile = join(applyDir, 'board-queue.json')
+    const beforeApply = estimatesOf(applyFile)
+    const apply = run(applyDir, { script: mutant.script }, '--apply')
+    expect(apply.status, apply.stderr).toBe(0)
+    const afterApply = estimatesOf(applyFile)
+    expect(movedCards(beforeApply, afterApply)).toEqual([])
+    expect(() => correctedCards(beforeApply, afterApply)).toThrow()
+
+    const twiceDir = mkdtempSync(join(tmpdir(), 'queue-cal-broken-twice-'))
+    seedQueueData(twiceDir)
+    const twiceFile = join(twiceDir, 'board-queue.json')
+    const promised = estimatesOf(twiceFile)
+    const first = run(twiceDir, { script: mutant.script }, '--apply')
+    expect(first.status, first.stderr).toBe(0)
+    const afterFirst = estimatesOf(twiceFile)
+    expect(movedCards(promised, afterFirst)).toEqual([])
+    expect(() => correctedCards(promised, afterFirst)).toThrow()
   }, 180_000)
 })
