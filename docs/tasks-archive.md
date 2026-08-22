@@ -21731,3 +21731,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — it is the only channel the user reads the batch's answers on, and its
   failure mode is a confidently signed reply with the wrong content and a clean exit code.
   Bundle: Chat & Tafel.
+
+- [x] 821. The main-write fence judges the session, not the target path, so an unlocked session
+  cannot even write its own scratchpad (measured 21.08.2026, 16:34, in a chat session holding no
+  batch lock). A `Write` to
+  `/tmp/claude-1000/-workspace-hoa/<sid>/scratchpad/pull-745-748-front.mjs` was refused with
+  "MAIN WRITE REFUSED — The call is Write in the main checkout", although the target lies OUTSIDE
+  the repository altogether. The decision is evidently taken from the session and its working
+  directory rather than from where the write actually lands.
+  WHAT IT COST, IN THE SAME TURN: that session was carrying a user instruction (pull 745 and 748
+  to the head of the work order) and a user instruction to be remembered permanently. It could
+  write neither — not the work order, which the fence is meant to protect, and not a scratch file
+  or a memory file, which it is not. Both had to travel as findings-carrier entries and were only
+  executed a session later, by the batch owner. The fence turned a two-minute instruction into a
+  cross-session relay.
+  FINAL STATE: the fence judges the RESOLVED TARGET PATH. A write inside the main checkout is
+  refused exactly as now; a write outside it — the session scratchpad, the user-level memory
+  directory, anything not under the repository root — is not the fence's business and goes
+  through. A symlink or `..` that resolves back into the checkout is still refused, so the
+  widening cannot be used as a way in.
+  SIDE FINDING OF THE SAME TURN, filed here because it has no better home: point 748 states in
+  its own prose that it builds on 745's prospective budget, and that dependency exists in no
+  machine-readable field. A rank change to 748 alone would break it and nothing would notice.
+  VERIFIABLE: pure cases over the fence's decision — a repository path refused, a scratchpad path
+  allowed, a user-memory path allowed, and a path that escapes into the checkout through a symlink
+  or `..` refused.
+  Criticality: high — it is a guard, and it blocks a session from recording what the user just
+  told it.
+  Bundle: Session- & Repo-Hygiene.
