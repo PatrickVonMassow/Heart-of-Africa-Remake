@@ -154,7 +154,10 @@ export const LIMITS = {
   // ceiling, so buying room would have meant deleting a beginner lesson to make
   // space for a refinement, and the retrospective is where that belongs. Four
   // entries were tightened anyway, so the guide measures 428 / 3826 and BOTH
-  // ceilings follow it down. The ratchet only ever moves this way.
+  // ceilings follow it down to the exact fit. A ceiling still RISES only by the
+  // measured size of genuinely new tips, as the rule above allows and the +1 line
+  // / +21 words of 30.07.2026 did; what never happens is a ceiling left standing
+  // above a guide that has shrunk.
   maxWords: 3826,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
