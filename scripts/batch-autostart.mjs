@@ -51,8 +51,13 @@ import {
   PENDING_STALE_MS,
   LAUNCHER_TICK_MS,
 } from './batch-singleton.mjs'
-import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
-import { takeoverDecision } from './batch-claim-core.mjs'
+import { handBackToClaimant, readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
+import {
+  assessClaim,
+  ownerIsHolding,
+  resolveBoundaryDestination,
+  takeoverDecision,
+} from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessCiWait, assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import {
@@ -100,7 +105,7 @@ import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
-import { ownerActivityDecision } from './batch-ownership-core.mjs'
+import { ownerActivityDecision, pidCorroboration } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
@@ -824,29 +829,6 @@ if (open === 0) {
   bail()
 }
 
-// --- THE USER TOOK THE BATCH BACK (point 395) ---------------------------------
-// A live claim RESERVES the batch for the window the user is sitting at.
-// Spawning a headless successor into that reservation would take it straight back
-// off them — the owner releases at its next clean turn end, and this tick could
-// easily fall in between. The reservation OUTLIVES the release (point 461): a
-// released record is never honoured again, but the freed lock stays that window's
-// while its process lives, and this tick is exactly one of the automated
-// acquirers the user's window used to have to race. The whole verdict — including
-// the PICK-UP WINDOW after a release (point 446) and the line that says why — is
-// `takeoverDecision`, which composes the one reading of a claim
-// (`assessClaim` → `reservationDecision`) the resume hook, the boundary and the
-// owner's Stop guard share, so the doors cannot drift apart and the launcher's
-// own gate is provable in the fast layer. Same bounds as everywhere else: a claim
-// from a closed window is ignored and the window caps an untaken one, so this can
-// never strand the batch.
-{
-  const takeover = takeoverDecision({ claim: readClaim(), now, maxAgeMs: claimMaxAgeMs(), probePid })
-  if (!takeover.spawn) {
-    log(takeover.message)
-    bail()
-  }
-}
-
 const curHead = head()
 
 // --- Owner liveness (the hard-singleton assessment) ---------------------------
@@ -871,13 +853,11 @@ const work = assessOwnerWork({
   worktreeActiveAt,
   mtimeOf,
 })
-// …AND FOR THE VERDICT TOO, SINCE POINT 556. An expired lease is necessary but no
-// longer sufficient: the tick hands `work` in, and `leaseTakeoverDecision` inside
-// `assessOwner` refuses to dispossess an owner whose pid is alive AND whose
-// declared work is still moving. On 08.08.2026 this very tick printed both signals
-// in the same line it used to take the batch anyway, producing the double session.
-// The launcher is the ONLY caller that passes `work` — it is the only one that has
-// it — so every other door keeps comparing numbers.
+// …AND FOR THE VERDICT. The tick is the reader that can keep renewing OUTSIDE one
+// blocked owner call: `assessOwner` returns the evidence-backed extension and the
+// shared destination below either persists it, yields to a claim, or spawns. The
+// launcher is the only caller that passes `work`, so every other door keeps
+// comparing the persisted lease numbers.
 const ownerActivity = ownerActivityDecision({
   lock,
   work,
@@ -886,6 +866,65 @@ const ownerActivity = ownerActivityDecision({
 })
 state.ownerActivity = ownerActivity.state
 const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work, activity: ownerActivity })
+
+// --- ONE DESTINATION FOR A CLAIM, HANDOVER OR EXPIRED LEASE -------------------
+// The claim must be judged with the owner context the other readers use. The
+// process probe is deliberate here: a handed-over lock has ended semantically,
+// but until this tick releases it the live predecessor is still the owner the
+// claimant has been waiting behind. A pending-spawn placeholder and the claimant's
+// own lock remain excluded by the shared `ownerIsHolding` predicate.
+const claim = readClaim()
+const claimantAssessment = claim
+  ? assessClaim({
+      claim,
+      ownerSid: lock?.sessionId ?? '',
+      ownerHolding: ownerIsHolding({
+        lock,
+        claimantSid: claim.sessionId,
+        alive: pidCorroboration(lock, probe).live === true,
+      }),
+      now,
+      maxAgeMs: claimMaxAgeMs(),
+      probePid,
+    })
+  : null
+const destination = resolveBoundaryDestination({
+  assessment: claimantAssessment,
+  ownerAlive: assessment.alive === true,
+  leaseExpired: assessment.leaseExpired === true,
+  renewalUntil: assessment.renewalUntil ?? null,
+})
+
+if (destination.action === 'reserve') {
+  // A released claim is bounded where `markClaimReleased` writes its stamp: two
+  // launcher ticks from this release. A dead claimant or an elapsed reservation
+  // reaches `spawn` above immediately, so this can never park the batch forever.
+  const handed = lock ? handBackToClaimant(lock.sessionId, claim, { now }) : { released: false, stamped: false }
+  const line = takeoverDecision({ assessment: claimantAssessment, now, maxAgeMs: claimMaxAgeMs() }).message
+  log(line ?? `skip: batch reserved for claiming session ${destination.claimantSid}`)
+  if (lock) {
+    log(
+      handed.released && handed.stamped
+        ? `RELEASED and RESERVED for claiming window ${destination.claimantSid}; pick-up is bounded to two launcher ticks from this release`
+        : `reservation release incomplete (released=${handed.released}, stamped=${handed.stamped}) — NOT spawning; the next tick retries`,
+    )
+  }
+  bail()
+}
+if (destination.action === 'renew') {
+  const renewed = updateOwnLock(lock.sessionId, { leaseUntil: destination.renewalUntil })
+  log(
+    renewed
+      ? `LEASE RENEWED through ${new Date(destination.renewalUntil).toISOString()}: declared evidence is still advancing — NOT spawning`
+      : 'lease renewal lost the owner race — NOT spawning from the stale reading; the next tick re-reads ownership',
+  )
+  if (assessment.detail) log(`  ${assessment.detail}`)
+  bail()
+}
+if (destination.action === 'wait' && destination.reason.startsWith('reserved')) {
+  log(takeoverDecision({ assessment: claimantAssessment, now, maxAgeMs: claimMaxAgeMs() }).message)
+  bail()
+}
 
 // --- Verify the previous spawn ------------------------------------------------
 // LIVING IS NOT WORKING (point 433, §4 of docs/batch-resilience.md). This used to

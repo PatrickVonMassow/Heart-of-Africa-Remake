@@ -281,11 +281,13 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     // exactly the trap: it says 'process' while the log is demonstrably fresh.
     expect(work.judgedOn).toBe('process')
     expect(work.corroboratedBy).toBe('log')
-    // …and the owner therefore keeps its batch, which is the rule this branch states.
+    // …and the launcher gets the exact evidence-backed renewal to persist.
     const silent = lock({ claimedAt: NOW - 63 * 60_000, leaseUntil: NOW - 3 * 60_000 })
     expect(assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe, work })).toMatchObject({
       alive: true,
-      reason: 'lease-expired-owner-working',
+      reason: 'lease-renewal-due',
+      leaseExpired: true,
+      renewalUntil: NOW - 5_000 + LEASE_MS,
     })
     // A log that has gone SILENT leaves only the breathing pid — taken over.
     const quiet = assessOwnerWork({

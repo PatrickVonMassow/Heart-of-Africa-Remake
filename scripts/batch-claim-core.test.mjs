@@ -917,6 +917,22 @@ describe('resolveBoundaryDestination — every ownership exit uses one decision'
     })
   })
 
+  it('matches --status for an old claim while a live owner still holds', () => {
+    const old = claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 })
+    const ownerHolding = ownerIsHolding({
+      lock: { sessionId: OWNER, kind: 'session' },
+      claimantSid: CLAIMANT,
+      alive: true,
+    })
+    const assessment = assessClaim({ claim: old, ownerHolding, now: NOW, probePid: aliveClaimant })
+    expect(assessment).toMatchObject({ honour: true, reason: 'honour' })
+    expect(resolveBoundaryDestination({ assessment, ownerAlive: false })).toMatchObject({
+      action: 'reserve',
+      spawn: false,
+      claimantSid: CLAIMANT,
+    })
+  })
+
   it('renews advancing evidence only when no claim is waiting', () => {
     expect(resolveBoundaryDestination({ leaseExpired: true, renewalUntil: NOW + 60_000 })).toMatchObject({
       action: 'renew',

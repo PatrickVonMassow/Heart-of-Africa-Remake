@@ -21,10 +21,10 @@
 // whole apparatus exists to prevent (the e9407cae incident).
 //
 // FOUR BOUNDS, each measurable rather than a matter of taste:
-//   1. IT IS BOUNDED BY REAL CLAIMANT ACTIVITY. A living editor window does not
-//      reserve the batch indefinitely: `CLAIM_MAX_AGE_MS` runs from the claim,
-//      release, or a newer attributable `activityAt`. Re-running the claimant's
-//      own command refreshes the claim; mere process existence does not.
+//   1. IT IS BOUNDED BY REAL CLAIMANT IDENTITY while a live owner still holds:
+//      the claim has somebody to wait for, and closes with its window. Once the
+//      lock is free, `CLAIM_MAX_AGE_MS` runs from the claim, release, or a newer
+//      attributable `activityAt`, so an untaken reservation cannot last forever.
 //   2. THE CLAIMANT MUST BE ALIVE, and alive by IDENTITY: the recorded pid must
 //      exist AND have started when the claim says it did. A reused pid is a
 //      stranger. This is the same rule `checkEvidence` applies to a declared
@@ -108,8 +108,8 @@ export function claimIsBounded(claim) {
 }
 
 /**
- * IS THERE A LIVE SESSION OWNER? PURE. Callers retain this context for release
- * and diagnostics; reservation expiry itself no longer pauses on this answer.
+ * IS THERE A LIVE SESSION OWNER? PURE. A human claim's pending clock pauses while
+ * this is true; once the owner is gone, the take-up window is the bound.
  *
  * IT IS NOT LOCK EXISTENCE (four-eyes review, Fable 5, 30.07.2026, finding 1).
  * Derived as `!!lock?.sessionId` it also matched the LAUNCHER's `pending-spawn`
@@ -504,12 +504,13 @@ export function resolveBoundaryDestination({
  */
 export function takeoverDecision({
   claim = null,
+  assessment: suppliedAssessment = null,
   now,
   maxAgeMs = CLAIM_MAX_AGE_MS,
   probePid = null,
   tolerance = PID_START_TOLERANCE_MS,
 } = {}) {
-  const assessment = claim ? assessClaim({ claim, now, maxAgeMs, probePid, tolerance }) : null
+  const assessment = suppliedAssessment ?? (claim ? assessClaim({ claim, now, maxAgeMs, probePid, tolerance }) : null)
   const destination = resolveBoundaryDestination({ assessment })
   const { reason, claimantSid } = destination
   const ageMs = Number.isFinite(assessment?.ageMs) ? assessment.ageMs : null
