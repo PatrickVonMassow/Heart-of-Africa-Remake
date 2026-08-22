@@ -455,12 +455,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "821": {
-      "at": "2026-08-21T17:27:18.047Z",
-      "why": "Guard: eine Sitzung ohne Batch-Lock kann nicht festhalten, was der Nutzer ihr gerade gesagt hat — die Anweisung reist sonst ueber den Traeger in die naechste Sitzung",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "822": {
       "at": "2026-08-21T17:30:39.905Z",
       "why": "Hinter 174 einsortiert: Es fehlinformiert die Tafel, blockiert aber weder Batch noch Release",
@@ -497,11 +491,11 @@
       "origin": "machine",
       "place": "last"
     },
-    "828": {
-      "at": "2026-08-22T04:23:27.198Z",
-      "why": "Der Nutzer hat den kaputten Chat-Ausgabepfad selbst gemeldet (22.08.2026, 02:40); bis er behoben ist, kann jede Antwort an ihn still verloren gehen.",
-      "origin": "user",
-      "place": "ahead"
+    "829": {
+      "at": "2026-08-22T06:31:21.103Z",
+      "why": "Behind point 174 at the end: the machine filed it itself (user ruling 20.08.2026), and the red it describes is already closed by the declared precondition, so nothing waits on it.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -554,7 +548,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T04:23:27.209Z",
+    "at": "2026-08-22T06:31:21.109Z",
     "points": [
       174,
       184,
@@ -791,14 +785,13 @@
       817,
       818,
       819,
-      821,
       822,
       823,
       824,
       825,
       826,
       827,
-      828
+      829
     ]
   }
 }
