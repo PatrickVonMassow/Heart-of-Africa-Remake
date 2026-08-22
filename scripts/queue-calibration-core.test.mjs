@@ -950,6 +950,13 @@ describe('a denial reaches only its own clause, at every ordinary boundary', () 
     ].join('\n')
     expect([...pictureBearingPoints(tasks)].sort((a, b) => a - b)).toEqual([90, 91, 92])
   })
+
+  it('carries a denial whose noun sits past the boundary', () => {
+    // Point 92 above passes either way, because its second half is a real
+    // demand. This is the case that actually tests the carry.
+    expect(pictureBearingPoints(block(99, 'Not required: a screenshot.')).has(99)).toBe(false)
+    expect(pictureBearingPoints(block(100, 'Nicht erforderlich: ein Screenshot.')).has(100)).toBe(false)
+  })
 })
 
 describe('the visual companion is actually visual', () => {

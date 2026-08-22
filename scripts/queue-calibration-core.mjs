@@ -781,6 +781,10 @@ export const PICTURE_PROOF_DENIALS = [
   // German postfix: "ein Screenshot ist nicht nötig"
   new RegExp(`${PROOF_NOUN}[^.]{0,40}\\bnicht\\s+(nötig|noetig|erforderlich)`, 'i'),
   /\bnot\s+(\w+\s+){0,2}picture[- ]verified\b/i,
+  // A DENIAL WITH ITS NOUN ON THE OTHER SIDE OF A BOUNDARY: "Not required: a
+  // screenshot." The fragment names no proof at all, so nothing marked it as a
+  // denial and the bare noun behind the colon read as a demand.
+  /^\s*(not|no longer|nicht|kein|keine)\s+(required|needed|necessary|nötig|noetig|erforderlich)\s*$/i,
 ]
 
 /**
@@ -802,10 +806,18 @@ export const splitClauses = (line) => String(line ?? '').split(/[;.,:]|—|–|-
  * that carries a word of its own ("provide a browser frame") does state
  * something, and the denial before it does not reach that far.
  */
-const LIST_GLUE = /^(?:\s|\b(?:or|and|nor|a|an|the|is|are|was|were|be|been|required|needed|necessary|oder|und|kein|keine|ein|eine|nötig|noetig|erforderlich)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+const LIST_GLUE = /^(?:\s|\b(?:a|an|the|ein|eine|der|die|das)\b|[^a-zA-Z\u00c0-\u024f]+)*$/i
+
+/** "…, or picture proof is required" — a fragment openly hanging off the last. */
+const LIST_CONJUNCTION = /^\s*(or|and|nor|oder|und)\b/i
 
 export const isListContinuation = (fragment, markers = PICTURE_PROOF_MARKERS) => {
-  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), String(fragment ?? ''))
+  const text = String(fragment ?? '')
+  if (LIST_CONJUNCTION.test(text)) return true
+  // Nothing but the proof noun and the words that carry it: no statement of its
+  // own. A fragment that says something ("provide …", "required") is a statement
+  // and ends whatever the fragment before it decided.
+  const bare = markers.reduce((acc, re) => acc.replace(new RegExp(re.source, 'gi'), ' '), text)
   return LIST_GLUE.test(bare)
 }
 
