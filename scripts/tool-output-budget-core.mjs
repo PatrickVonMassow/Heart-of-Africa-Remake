@@ -16,7 +16,9 @@ export const FIRST_CAUSE_HARD_MAX = 64 * 1024
 export const DISTINCT_CAUSE_EXCERPT = 6 * 1024
 export const PER_CALL_MAX_CHARS = ERROR_OUTPUT_BUDGET
 
-const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]/g
+// Constructed so the linter does not mistake an intentional ESC matcher for an
+// accidental control character embedded in a regex literal.
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g')
 const FAILURE_START = /^\s*(?:FAIL\s{2,}|[×✕]\s+)(\S.*)$/
 
 const cleanPath = (path) => String(path || 'the captured log').replace(/[\r\n]/g, ' ').slice(0, 300)
