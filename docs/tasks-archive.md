@@ -22054,3 +22054,43 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   passes by skipping; the fixture and the "still fails when the correction is broken" case are what
   the point pins.
   Bundle: Testinfrastruktur.
+
+- [x] 716. A session that loses the batch lock leaves its own subagent to die mid-step (measured
+  18.08.2026: the point-714 agent was building in its worktree while its parent session stood down
+  after the lock passed to a successor, and the successor's brief described that live agent as
+  provably dead). The stand-down path takes no boundary: it neither transfers the running agent nor
+  detaches it, so the agent keeps working for a session that no longer owns the batch, and whatever
+  it holds uncommitted dies with the parent process. Today it survived only because the SUCCESSOR's
+  agent noticed it was alive, waited it out and pushed its six commits — a rescue nobody designed
+  and nothing guarantees. The reverse cost is on record too: the successor acted on "the previous
+  owner was provably dead" while that owner's agent was writing files, which is how two strands come
+  to edit one worktree.
+  FINAL STATE:
+  - A stand-down is a BOUNDARY, not an exit. A session that loses or releases the lock while an
+    agent of its own is running takes the same two-phase handover a landed point takes: the running
+    work is DECLARED with its branch, worktree and pushed checkpoints, and transferred to whoever
+    owns the batch next — the mechanism `batch-in-flight.mjs --adopt` already provides, driven from
+    the stand-down path rather than only from the boundary.
+  - The claim that an owner is dead is MEASURED before it is stated, and the measurement covers the
+    owner's CHILDREN: a live worktree, a branch tip that moved, a running process. `--agent-check`
+    already judges exactly this and already refuses to declare a working agent dead; the stand-down
+    and the successor's orientation must ASK it instead of concluding from the lock alone.
+  - A successor's orientation never describes an unmeasured agent as dead. Where the state cannot be
+    read, it says so and names what to probe — an honest unknown, since acting on a wrong death is
+    what puts two writers in one tree.
+  THIS IS THE FIX ON TODAY'S PLANE, and it is not point 676 (read against it in full, 20.08.2026).
+  676 replaces the plane itself — daemon-owned detached workers, a lease epoch fencing every
+  mutation, a successor adopting by stable job identity — and under it an Agent-tool child is
+  declared NON-transferable and blocks a boundary until it finishes. It never names the STAND-DOWN
+  path, and it never names the dead-owner verdict, which are precisely this point's two failure
+  directions; fencing a mutation does not stop a session from calling a working agent dead. So this
+  point stays open and is built on mechanisms that exist today (`batch-in-flight.mjs --adopt`,
+  `--agent-check`), and 676 inherits these rules instead of repeating them.
+  VERIFIABLE: Vitest over the pure core — a stand-down with a live declared agent produces a
+  transfer rather than a silent exit; one with no agent produces today's plain stand-down; an
+  adopting successor sees the transferred declaration; and a dead-owner verdict is refused while a
+  child's worktree or branch tip is still moving.
+  Criticality: high — it is the batch singleton's blind side, and both of its failure directions
+  destroy work: an abandoned agent loses whatever it has not pushed, and a wrong death sends two
+  sessions into one worktree.
+  Bundle: unbundled (batch autonomy).
