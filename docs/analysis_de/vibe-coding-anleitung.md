@@ -164,6 +164,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
   nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
 
+- **Zwei Helfer, die sich für den einzigen halten.** Du lässt nur einen gleichzeitig schreiben,
+  und die Regel hält auch — bis einer aus einer anderen Arbeitskopie startet und dort seine
+  **eigene** Sperrdatei anlegt. Beide sehen sich als Besitzer, keiner sieht den anderen.
+  → *Prompt:* „Alles, was **einmalig** sein soll — Sperre, Zustand, Marker —, muss auf einen
+  **festen Ort** zeigen, nicht auf einen relativen Pfad neben dem Arbeitsverzeichnis. Und wer
+  fragt, ob noch jemand arbeitet, fragt das **Repository** (letzte Commits, bewegte Zweige),
+  nicht eine Anmeldeliste."
+
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
   verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
@@ -429,4 +437,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 19f3ef5195f74f661cd51d67e1a358f9d4c1ddf3d453621b942c83621e5df172 -->
+<!-- GUIDE-FINGERPRINT: 79042f1535f21218870e16130c8067188423bb7e6912e5bd09ec2a4ddcad5673 -->

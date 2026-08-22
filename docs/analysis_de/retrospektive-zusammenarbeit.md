@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 22:26 · Quellen-Fingerprint: `19f3ef5195f7…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 01:20 · Quellen-Fingerprint: `79042f1535f2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1358,7 +1358,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 17 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 18 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1418,8 +1418,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
 
-<!-- RETRO-FINGERPRINT: 19f3ef5195f74f661cd51d67e1a358f9d4c1ddf3d453621b942c83621e5df172 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T20:26:03.711Z -->
+<!-- RETRO-FINGERPRINT: 79042f1535f21218870e16130c8067188423bb7e6912e5bd09ec2a4ddcad5673 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-22T23:20:15.148Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2842,4 +2842,41 @@ Verweigerung; sie macht die überflüssige Frage nur höflicher.
 dem man sie sonst erneut stellt — mit seinen Worten, sodass die Abweisung ihn zitiert statt
 mich. Prüffrage bei jeder Karte in „Von dir zu klären": *Hat er das schon einmal entschieden
 — und wenn ja, warum steht die Frage überhaupt noch offen?* Verwandt mit §3.112 (der
+verdrahtete, aber wirkungslose Mechanismus).
+
+### 3.161 Der Singleton wurde nicht überstimmt, sondern umgangen
+
+In der Nacht zum 23.08.2026 liefen zwei autonome Batch-Sitzungen gleichzeitig auf demselben
+Repository. Die eine baute seit einer Viertelstunde an Punkt 834 und committete gerade, die
+andere war neunzig Sekunden zuvor vom 900-Sekunden-Wächter gestartet worden, weil der Starter
+gemessen hatte: „no owner lock, no live batch-writer process". Beides war aus seiner Sicht wahr.
+
+Die Ursache liegt eine Ebene unter dem Streit um den Besitz. Die Sperre wird über
+`repoPath('.claude/batch-lock.json')` aufgelöst, und das löst gegen den Checkout auf, in dem der
+Prozess läuft. Jeder Worktree trägt sein eigenes eingechecktes `.claude/`. Die Nachfolgesitzung
+war aus der Punktgrenze heraus mit einem Arbeitsverzeichnis IM Worktree gestartet worden, hat
+dort ihre eigene Sperre angelegt und pflegt deren Heartbeat bis heute — während die Datei im
+Hauptbaum schlicht nicht existierte. Der harte Singleton hatte damit eine Sperrdatei pro
+Checkout statt einer pro Batch. Er hat nicht falsch entschieden; er hat über zwei verschiedene
+Fragen entschieden und beide mit „ja" beantwortet.
+
+Der teuerste Teil ist nicht die doppelte Sitzung, sondern was sie durfte. Die Guards der
+Worktree-Sitzung lasen deren private Sperre als Eigentumsnachweis. Kein Merge, kein Abhaken,
+keine Landung wäre ihr verweigert worden. Getrennt wurden die beiden Sitzungen am Ende nicht
+durch Mechanik, sondern durch eine Absprache: Die eine erklärte sich zur delegierten Autorin
+und rührt Board, `main` und die Landung nicht an. Das ist die richtige Rettung und ein
+schlechter Zustand — eine Vereinbarung zwischen zwei Modellen anstelle einer Sperre.
+
+Bemerkenswert ist, dass die Evidenz vollständig vorlag. `batch-in-flight --agent-check` hat die
+angeblich nicht existente Sitzung in derselben Minute korrekt als „alive" erkannt, geurteilt an
+den Git-Metadaten ihres Zweigs. Der Starter fragte das Register, der Prüfer fragte das
+Repository, und nur der Prüfer hatte recht.
+
+**Lehre:** Ein Singleton ist nur so global wie der Pfad, an dem er hängt. Sobald eine
+Ausschlussregel eine Datei benennt, ist die Auflösung dieses Pfades Teil der Regel — und ein
+relativer Pfad macht aus einer Regel so viele Regeln, wie es Arbeitsverzeichnisse gibt.
+Prüffragen bei jedem exklusiven Zustand: *Gegen welchen Baum löst sein Pfad auf, wenn der
+Prozess woanders steht?* und *Wenn eine zweite Instanz trotzdem läuft — erfährt sie es aus
+demselben Zustand, oder glaubt sie ihrer eigenen Kopie?* Und für die Erkennung: Wer fragt, ob
+noch jemand arbeitet, fragt das Repository, nicht die Anmeldeliste. Verwandt mit §3.112 (der
 verdrahtete, aber wirkungslose Mechanismus).
