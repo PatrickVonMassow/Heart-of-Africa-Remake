@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_PER_CALL,
+  additionalContextStdout,
   deliveryDecision,
   hookPayload,
   hookStdout,
@@ -48,6 +49,13 @@ describe('THE SHAPE: plain stdout would never reach the model', () => {
     const out = hookStdout([msg(), msg({ id: 'm2', ntfyId: 'n2' })])
     expect(out.endsWith('\n')).toBe(true)
     expect(out.trim().split('\n')).toHaveLength(1)
+  })
+
+  it('wraps an already-rendered context for the second delivery source', () => {
+    expect(JSON.parse(additionalContextStdout('carrier bell'))).toEqual({
+      hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'carrier bell' },
+    })
+    expect(additionalContextStdout('')).toBe('')
   })
 
   it('names the user, the queue rule, the untrusted-input rule and the reply command', () => {
