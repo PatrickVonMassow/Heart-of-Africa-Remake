@@ -127,35 +127,6 @@ put it is the mistake this line exists to stop.
   list and the quarantine safety of point 860 stay pinned by their existing tests.
   Criticality: HIGH — these are the lanes that fire exactly when nobody is watching.
   Bundle: Urlaubsfestigkeit.
-- [ ] 867. An exhausted vendor allowance parks its point on a probe, not on the user. Point 861's
-  inventory row Q2: an OpenAI author or reviewer run can return `allowance-exhausted` while that
-  vendor's result is mandatory, because cross-vendor evidence may not be substituted. Routing to the
-  other vendor already exists for work policy permits; what is missing is what happens to the point
-  that genuinely needs the unavailable vendor.
-  FINAL STATE: such a point carries a durable per-point provider probe: it is set aside with the
-  vendor and the earliest sensible retry recorded, the batch works another point, and the point
-  returns to the queue by itself as soon as a probe succeeds. Mandatory cross-vendor evidence is never
-  weakened to make the wait go away.
-  VERIFIABLE: a simulated `allowance-exhausted` on a mandatory cross-vendor step sets the point aside
-  with a recorded probe and leaves the batch working; a later successful probe returns exactly that
-  point; no path records a same-vendor review as cross-vendor.
-  Criticality: medium — it costs throughput rather than correctness, but it is a full stop during an
-  absence.
-  Bundle: Urlaubsfestigkeit.
-- [ ] 868. The Windows launcher can be re-armed without an attended session. Point 861's inventory
-  row G3: when the launcher is disabled or unknown, Linux re-arms its own daemon, but Windows needs an
-  elevated user command — so the point and context boundary is blocked and the current owner must keep
-  working until a human is at the machine. That is the one residual the 23.08.2026 order cannot reach
-  by policy alone.
-  FINAL STATE: an install-time, privilege-bearing watchdog that can re-arm the scheduled task without
-  an attended batch turn, installed once by the user ahead of an absence. A running session gains no
-  general elevation from it; it may only ask that one watchdog to re-arm the one task.
-  VERIFIABLE: with the launcher task deleted, the watchdog restores it without any elevated command in
-  the session; the session itself still cannot perform an unrelated elevated action; a third run of the
-  installer reports that nothing changed.
-  Criticality: medium — it is narrow, but it is the only lane where the machine still cannot help
-  itself.
-  Bundle: Urlaubsfestigkeit.
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
@@ -1857,6 +1828,35 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 867. An exhausted vendor allowance parks its point on a probe, not on the user. Point 861's
+  inventory row Q2: an OpenAI author or reviewer run can return `allowance-exhausted` while that
+  vendor's result is mandatory, because cross-vendor evidence may not be substituted. Routing to the
+  other vendor already exists for work policy permits; what is missing is what happens to the point
+  that genuinely needs the unavailable vendor.
+  FINAL STATE: such a point carries a durable per-point provider probe: it is set aside with the
+  vendor and the earliest sensible retry recorded, the batch works another point, and the point
+  returns to the queue by itself as soon as a probe succeeds. Mandatory cross-vendor evidence is never
+  weakened to make the wait go away.
+  VERIFIABLE: a simulated `allowance-exhausted` on a mandatory cross-vendor step sets the point aside
+  with a recorded probe and leaves the batch working; a later successful probe returns exactly that
+  point; no path records a same-vendor review as cross-vendor.
+  Criticality: medium — it costs throughput rather than correctness, but it is a full stop during an
+  absence.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 868. The Windows launcher can be re-armed without an attended session. Point 861's inventory
+  row G3: when the launcher is disabled or unknown, Linux re-arms its own daemon, but Windows needs an
+  elevated user command — so the point and context boundary is blocked and the current owner must keep
+  working until a human is at the machine. That is the one residual the 23.08.2026 order cannot reach
+  by policy alone.
+  FINAL STATE: an install-time, privilege-bearing watchdog that can re-arm the scheduled task without
+  an attended batch turn, installed once by the user ahead of an absence. A running session gains no
+  general elevation from it; it may only ask that one watchdog to re-arm the one task.
+  VERIFIABLE: with the launcher task deleted, the watchdog restores it without any elevated command in
+  the session; the session itself still cannot perform an unrelated elevated action; a third run of the
+  installer reports that nothing changed.
+  Criticality: medium — it is narrow, but it is the only lane where the machine still cannot help
+  itself.
+  Bundle: Urlaubsfestigkeit.
 - [ ] 744. Leaving is the most expensive step of a session, and nobody has measured it
   (19.08.2026). Every token spent on the handover is a token subtracted from the working
   window: the trigger of point 743 is literally the ceiling minus the cost of leaving, so this
