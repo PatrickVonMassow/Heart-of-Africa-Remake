@@ -171,6 +171,8 @@ describe('escalate — the full climb, on real files', () => {
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(paused).toMatch(/Eskalation/)
+    expect(paused).toMatch(/Korruptionsklasse „forbidden-serving-model“/)
+    expect(paused).toMatch(/Weiterarbeiten, nicht Warten/)
     expect(paused).toMatch(/batch-paused/)
     expect(h.cards).toHaveLength(1)
     expect(h.cards[0][0]).toMatch(/Batch pausiert/)

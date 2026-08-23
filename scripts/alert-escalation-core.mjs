@@ -231,7 +231,19 @@ export function escalationDecision({
     }
     return paused
       ? { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: 'last rung reached, and the batch is ALREADY paused — the alert goes out, the pause is not re-applied' }
-      : { key, action: 'pause-and-send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: `last rung: this alert has gone unanswered through ${rung} risings — the batch pauses so it cannot be slept through` }
+      : {
+          key,
+          action: 'pause-and-send',
+          rung,
+          nextRung: rung + 1,
+          priority: prio(rung),
+          dueInMs: 0,
+          reset: false,
+          alertClass,
+          reason:
+            `last rung: corruption class "${alertClass}" authorizes a pause because continuing could damage ` +
+            'the work or propagate the corruption',
+        }
   }
 
   return { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: `rung ${rung}: the condition is still there ${Math.round(since / 60000)} min later` }
@@ -265,9 +277,12 @@ export function clearLadder(state, key) {
 
 /** The German pause text for the last rung — the morning reader's sentence. */
 export function escalationPauseReason(title, decision, stamp) {
+  const alertClass = String(decision?.alertClass ?? 'unbekannte Korruptionsklasse')
   return (
-    `Eskalation: Die Meldung „${title}“ wurde ${decision.rung + 1} Mal mit steigendem Abstand gesendet und blieb unbeantwortet. ` +
-    `Der Batch pausiert deshalb absichtlich — eine Benachrichtigung kann man verschlafen, einen pausierten Batch nicht. ` +
+    `Eskalation: Die Meldung „${title}“ wurde ${decision.rung + 1} Mal mit steigendem Abstand gesendet. ` +
+    `Sie gehört zur Korruptionsklasse „${alertClass}“, die diese Pause autorisiert. ` +
+    `Der Batch pausiert, weil weiteres Arbeiten den Arbeitsstand beschädigen oder die erkannte Korruption ausweiten könnte — ` +
+    `hier ist Weiterarbeiten, nicht Warten, die unsichere Handlung. ` +
     `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — oder von selbst, ` +
     `sobald die Restart-Uhr in dieser Datei abgelaufen ist (Punkt 445). ` +
     `[${stamp}]`

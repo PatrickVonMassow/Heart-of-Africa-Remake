@@ -134,11 +134,16 @@ describe('escalationDecision — only the closed corruption list may PAUSE the b
     expect(total).toBeGreaterThanOrEqual(2 * 60 * MIN)
   })
 
-  it('writes the pause reason in the morning reader’s language, naming the alert and the way out', () => {
+  it('names the corruption class, why continuing is unsafe, and the way out', () => {
     const reason = escalationPauseReason('FORBIDDEN MODEL', escalationDecision(corruption), '30.07.2026, 04:00')
     expect(reason).toMatch(/Eskalation/)
     expect(reason).toMatch(/FORBIDDEN MODEL/)
+    expect(reason).toMatch(/Korruptionsklasse „forbidden-serving-model“/)
+    expect(reason).toMatch(/weiteres Arbeiten.*beschädigen.*Korruption ausweiten/)
+    expect(reason).toMatch(/Weiterarbeiten, nicht Warten, die unsichere Handlung/)
+    expect(reason).not.toMatch(/Benachrichtigung kann man verschlafen/)
     expect(reason).toMatch(/batch-paused/)
+    expect(reason).toMatch(/Restart-Uhr/)
   })
 })
 
