@@ -122,10 +122,22 @@ describe('defer-for-user — reading the flags', () => {
     expect(mixed.stdout).toBe('')
   })
 
-  it('still answers a single -h, and leaves a dash-shaped field value alone', () => {
-    expect(run('-h').code).toBe(0)
-    const r = run('42', '--act', 'release-tag', '--detail', '-v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
+  it('still answers a single -h with the usage on stdout', () => {
+    const r = run('-h')
+    expect(r.code).toBe(0)
+    expect(r.stdout).toMatch(/node scripts\/defer-for-user\.mjs <point> --act/)
+  })
+
+  it('leaves an unknown dash-shaped value alone even when two fields carry the same one', () => {
+    // The SAME dash-shaped value in both fields: a check that took every dash
+    // for a flag would refuse this line as a repeat, so the write it performs
+    // is the discriminator — not the absence of one phrase from stderr.
+    const value = '-v1.2.0 tag pushed'
+    const r = run('42', '--act', 'release-tag', '--detail', value, '--prepared', value)
     expect(r.stderr).not.toMatch(/given more than once/)
+    expect(r.code).toBe(0)
+    expect(tasks()).toContain('AWAITING-CONFIRMATION')
+    expect(tasks()).toContain(value)
   })
 
   it('still answers a single --help on stdout', () => {
