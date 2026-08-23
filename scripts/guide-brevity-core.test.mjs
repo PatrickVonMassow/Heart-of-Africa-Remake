@@ -517,3 +517,38 @@ describe('auditGuide — the last three shelters', () => {
     expect(violations.map((v) => v.kind)).toContain('project-specific')
   })
 })
+
+// Round eight: the rules ask about the RENDERED text, and the path boundary is
+// "not a word character" rather than a list of delimiters.
+describe('auditGuide — markup is not a hiding place', () => {
+  const O = '„'
+
+  it('refuses a prompt whose only letters sit in an HTML comment', () => {
+    const { ok, violations } = auditGuide(
+      doc(`- **Kommentar-Anweisung** Ein Risiko.\n  → *Prompt:* ${O}<!-- Anweisung -->"`),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('empty-prompt')
+  })
+
+  it('refuses a second sentence wrapped in an HTML tag', () => {
+    const { violations } = auditGuide(
+      doc(`- **Tag-Fortsetzung** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(≈ 1,5x. <strong>Und danach.</strong>)*`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('recognises a path wrapped in emphasis', () => {
+    for (const wrapped of ['**../../src/main.ts**', '_./scripts/x.mjs_', '`docs/a.md`']) {
+      const { violations } = auditGuide(
+        doc(`- **Pfad in Auszeichnung** Siehe ${wrapped} dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+      )
+      expect(violations.map((v) => v.kind), wrapped).toContain('project-specific')
+    }
+  })
+
+  it('does not read a repository path out of an ordinary word', () => {
+    const d = doc(`- **Kein Pfad** Die Meilensteine/Schritte helfen nicht.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
+  })
+})

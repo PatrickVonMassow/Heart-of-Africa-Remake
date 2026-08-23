@@ -189,7 +189,10 @@ export const PROJECT_MARKERS = [
     // conventions a tool-neutral guide may name; `scripts/verify/x.mjs` is not.
     // A LEADING `./`, `../` or `/` is the ordinary way to write such a path and
     // must not be an escape hatch (cross-vendor review, 23.08.2026).
-    re: /(?:^|[\s("'`[<|])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
+    // The LEFT BOUNDARY is "not a word character", not a list of delimiters: the
+    // list kept missing one — a bracket, then emphasis (cross-vendor review,
+    // 23.08.2026, rounds 7 and 8).
+    re: /(?<!\w)(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -331,14 +334,21 @@ const REVIEW_QUESTION = 'Sieht das richtig aus?'
 // was consumed whole while `includes('≈')` was the whole rule (cross-vendor
 // review, 23.08.2026, round 4).
 const NOTE_MAX_CHARS = 77
-// Emphasis is formatting, so it is stripped before the sentence test: it hid a
-// second sentence as `≈ 1,5x. **Und danach geschah noch etwas.**` (cross-vendor
-// review, 23.08.2026, round 7).
-const withoutEmphasis = (note) => note.replace(/[*_`~]/g, '')
+// WHAT THE READER ACTUALLY SEES. Every rule below asks about the RENDERED text,
+// because each layer of markup was in turn used to hide the thing the rule looks
+// for: emphasis around a second sentence, an HTML tag around the same sentence,
+// and an HTML comment supplying letters to an otherwise empty prompt
+// (cross-vendor review, 23.08.2026, rounds 7 and 8). Chasing those one character
+// at a time is how a guard ends up with three holes instead of one rule.
+export const renderedText = (text) =>
+  String(text ?? '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[*_`~]/g, '')
 const isCostNote = (note) =>
   note.includes('≈') &&
   note.length <= NOTE_MAX_CHARS &&
-  !/[.!?][\s\p{P}]*\p{L}/u.test(withoutEmphasis(note))
+  !/[.!?][\s\p{P}]*\p{L}/u.test(renderedText(note))
 const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**
@@ -425,7 +435,7 @@ export function auditGuide(text, limits = LIMITS) {
       const marker = entry.lines[actionIdx]
       const tail = entry.lines.slice(actionIdx).join('\n').replace(ACTION_RE, '')
       const where = entry.line + actionIdx
-      if (!/\p{L}/u.test(tail)) {
+      if (!/\p{L}/u.test(renderedText(tail))) {
         push('empty-prompt', where, `„${entry.title}" führt „→ *Prompt:*" ohne Anweisung`)
       } else if (PROMPT_RE.test(marker)) {
         // A PROMPT IS QUOTED, and the quotes are its BOUNDARIES, not merely
@@ -444,7 +454,7 @@ export function auditGuide(text, limits = LIMITS) {
           push('unclosed-prompt', where, `„${entry.title}" schließt den Prompt nicht`)
         } else if (opens > 1 || closes > 1) {
           push('prose-after-prompt', where, `„${entry.title}" führt einen zweiten Anführungsblock — der Prompt ist nicht der Schluss`)
-        } else if (!/\p{L}/u.test(body.slice(1, body.search(new RegExp(`[${CLOSING_QUOTES.join('')}]`))))) {
+        } else if (!/\p{L}/u.test(renderedText(body.slice(1, body.search(new RegExp(`[${CLOSING_QUOTES.join('')}]`)))))) {
           // THE LETTERS MUST BE IN THE PROMPT. Looking for them anywhere in the
           // tail let an allowed note supply them while the quotes stayed empty:
           // `→ *Prompt:* „" *(Sieht das richtig aus?)*` (cross-vendor review,
