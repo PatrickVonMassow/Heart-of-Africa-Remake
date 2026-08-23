@@ -44,18 +44,40 @@ export function readModelHandoff(value) {
     requestedAt,
     probeAfter,
     offending: cleanHits(value.offending),
+    decisionRecord: value.decisionRecord && typeof value.decisionRecord === 'object' ? value.decisionRecord : null,
   }
 }
 
-const stateFor = ({ route, targetIndex, sessionId, now, hits, probeAfter = null }) => ({
-  version: MODEL_HANDOFF_VERSION,
-  route: cleanRoute(route),
-  targetIndex,
-  requestedBy: String(sessionId ?? '').trim(),
-  requestedAt: now,
-  probeAfter,
-  offending: cleanHits(hits),
-})
+export function modelHandoffDecisionRecord({ route, targetIndex, now, hits, probeAfter = null } = {}) {
+  const lanes = cleanRoute(route)
+  const target = lanes[targetIndex]?.model ?? 'recorded allowed serving lane'
+  const offending = cleanHits(hits).map((hit) => hit.sha.slice(0, 12)).join(', ') || 'unknown commit'
+  const next = Number.isFinite(probeAfter)
+    ? `Nächster Versuch: ${new Date(probeAfter).toISOString()}.`
+    : `Nächster Versuch: sofortige Übergabe an ${target}.`
+  return {
+    title: `Entscheidungsprotokoll: Verbotener Autor wird an ${target} übergeben`.slice(0, 160),
+    body:
+      `Automatische Entscheidung [${new Date(now).toISOString()}]: Die verdächtige Lane darf ihre eigenen ` +
+      `Trailer ${offending} nicht bestätigen. Verifikationsziel: ${target}. ${next} Die Baseline bleibt bis zum ` +
+      `Transcript-Beweis unverändert. Retroaktives Veto: Antworte mit „Veto“ und nenne die stattdessen zu ` +
+      `verwendende erlaubte Lane; ein Veto darf die Trailer-Prüfung nicht überspringen.`,
+  }
+}
+
+const stateFor = ({ route, targetIndex, sessionId, now, hits, probeAfter = null }) => {
+  const cleanedRoute = cleanRoute(route)
+  return {
+    version: MODEL_HANDOFF_VERSION,
+    route: cleanedRoute,
+    targetIndex,
+    requestedBy: String(sessionId ?? '').trim(),
+    requestedAt: now,
+    probeAfter,
+    offending: cleanHits(hits),
+    decisionRecord: modelHandoffDecisionRecord({ route: cleanedRoute, targetIndex, now, hits, probeAfter }),
+  }
+}
 
 const routeIndexOf = (model, route) => route.findIndex((lane) => sameModel(model, lane.model) || sameModel(model, lane.id))
 
@@ -81,47 +103,52 @@ export function modelHandoffDecision({
     if (!sid || initialRoute.length < 2) {
       const delay = Number.isFinite(probeMs) && probeMs > 0 ? probeMs : MODEL_HANDOFF_PROBE_MS
       const probeRoute = initialRoute.length ? initialRoute : cleanRoute(route)
-      if (!sid || !probeRoute.length) return { action: 'block', reason: 'no owner session or recorded serving route can carry the breach' }
-      return {
+      if (!probeRoute.length) return { action: 'block', reason: 'no recorded serving route can carry the breach' }
+      const requester = sid || 'model-guard-clocked-probe'
+      const next = {
         action: 'probe',
-        state: stateFor({ route: probeRoute, targetIndex: 0, sessionId: sid, now, hits: found, probeAfter: now + delay }),
+        state: stateFor({ route: probeRoute, targetIndex: 0, sessionId: requester, now, hits: found, probeAfter: now + delay }),
         retryAfter: now + delay,
         reason: 'no next allowed lane is recorded; probe the serving chain on a clock',
       }
+      return { ...next, decisionRecord: next.state.decisionRecord }
     }
-    return {
+    const next = {
       action: 'handoff',
       state: stateFor({ route: initialRoute, targetIndex: 1, sessionId: sid, now, hits: found }),
       reason: `the suspect primary may not verify itself; hand over to ${initialRoute[1].model}`,
     }
+    return { ...next, decisionRecord: next.state.decisionRecord }
   }
 
   // Re-running the Stop hook in the requesting session must not consume a lane
   // that has not run. It only retries the same durable handoff transport.
   if (sid && sid === recorded.requestedBy) {
-    return { action: 'handoff', state: { ...recorded, offending: found }, reason: 'the requesting session still awaits its recorded target' }
+    return { action: 'handoff', state: { ...recorded, offending: found }, decisionRecord: recorded.decisionRecord, reason: 'the requesting session still awaits its recorded target' }
   }
 
   if (!String(currentModel ?? '').trim()) {
     const retryAfter = now + (Number.isFinite(probeMs) && probeMs > 0 ? probeMs : MODEL_HANDOFF_PROBE_MS)
-    return {
+    const next = {
       action: 'probe',
       state: stateFor({ route: recorded.route, targetIndex: recorded.targetIndex, sessionId: sid || recorded.requestedBy, now, hits: found, probeAfter: retryAfter }),
       retryAfter,
       reason: 'the target transcript names no serving model; it cannot prove the baseline and is retried on a clock',
     }
+    return { ...next, decisionRecord: next.state.decisionRecord }
   }
 
   const actualIndex = routeIndexOf(currentModel, recorded.route)
   if (actualIndex >= recorded.targetIndex) {
     if ((unidentified ?? []).length) {
       const retryAfter = now + (Number.isFinite(probeMs) && probeMs > 0 ? probeMs : MODEL_HANDOFF_PROBE_MS)
-      return {
+      const next = {
         action: 'probe',
         state: stateFor({ route: recorded.route, targetIndex: 0, sessionId: sid || recorded.requestedBy, now, hits: found, probeAfter: retryAfter }),
         retryAfter,
         reason: 'the trusted lane found unidentified trailers beside the breach; baseline proof is incomplete',
       }
+      return { ...next, decisionRecord: next.state.decisionRecord }
     }
     const verifiedThrough = Math.max(...found.map((hit) => hit.when))
     if (!Number.isFinite(verifiedThrough) || verifiedThrough <= Number(baselineMs)) {
@@ -138,20 +165,22 @@ export function modelHandoffDecision({
 
   const nextIndex = recorded.targetIndex + 1
   if (nextIndex < recorded.route.length) {
-    return {
+    const next = {
       action: 'handoff',
       state: stateFor({ route: recorded.route, targetIndex: nextIndex, sessionId: sid || recorded.requestedBy, now, hits: found }),
       reason: `${recorded.route[recorded.targetIndex].model} was not served; hand over to ${recorded.route[nextIndex].model}`,
     }
+    return { ...next, decisionRecord: next.state.decisionRecord }
   }
 
   const retryAfter = now + (Number.isFinite(probeMs) && probeMs > 0 ? probeMs : MODEL_HANDOFF_PROBE_MS)
-  return {
+  const next = {
     action: 'probe',
     state: stateFor({ route: recorded.route, targetIndex: 0, sessionId: sid || recorded.requestedBy, now, hits: found, probeAfter: retryAfter }),
     retryAfter,
     reason: 'no allowed lane was reachable; probe the recorded chain again on a clock',
   }
+  return { ...next, decisionRecord: next.state.decisionRecord }
 }
 
 /** The launcher's explicit model and one-way verification prompt. */
