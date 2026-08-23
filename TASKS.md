@@ -107,6 +107,40 @@ put it is the mistake this line exists to stop.
   (Lane set by user order of 23.08.2026 — fix this directly, ahead of the queue, with cross-vendor
   four-eyes review; Sol reviews the result.)
   Bundle: Urlaubsfestigkeit.
+- [ ] 860. The alert ladder's last rung pauses the batch, which is now the forbidden outcome. The
+  escalation ladder (point 434) ends a repeated unanswered alert by PAUSING the batch with a board
+  card — built when an alert could be slept through and a paused batch was the safe floor. The
+  user's order of 23.08.2026 inverts that floor: a lasting standstill must never happen, recovery
+  and decide-and-record replace waiting for a human.
+  FINAL STATE: the rungs still climb interval and priority, but a pause verdict survives ONLY where
+  continuing would corrupt the work itself (forbidden serving model, failed repository integrity —
+  the closed list lives beside the core); every other ladder end keeps the batch running and files
+  a decision card RECORDING what was decided and how to veto it retroactively. Existing pause
+  callers are reclassified against that list in the same change.
+  VERIFIABLE: unit cases over the ladder core — a generic stalled/staleness alert can no longer
+  return a pause verdict however often it repeats; a corruption-class alert still can; the
+  continue-verdict names the decision card it demands.
+  Criticality: HIGH — the ladder is the one mechanism that deliberately manufactures the standstill
+  the user has now forbidden.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 861. Every state that parks the batch on the user gets a recovery path or a recorded default.
+  The user's order of 23.08.2026: they are away for long stretches and may not see the phone —
+  problems need RECOVERY mechanisms, not alerts; a stop behind a 'Von dir zu klären' card is to be
+  avoided; in doubt the batch decides by its own judgment and files a card recording the decision
+  for retroactive veto.
+  FINAL STATE: an inventory in docs/batch-autonomy.md of every state that today halts work waiting
+  on a human — pause markers and their restart clocks, user-gated points, doctor mandates, quota
+  waits, ladder pauses (point 860), blocking decision cards — and for each one the chosen lane:
+  a self-recovery mechanism where the machine can fix the cause, otherwise an own-judgment default
+  that continues work and files the veto card; only genuinely irreversible or outward-facing steps
+  keep their confirm gates. Lanes that need code land as their own follow-up points; lanes that are
+  pure policy change in place with the inventory.
+  VERIFIABLE: the inventory names every halting state a repo-wide search for pause/gate/mandate/
+  card-block paths finds, each with its lane and its follow-up point or in-place change; no state
+  is left implicitly 'wait for the user'.
+  Criticality: HIGH — it turns the 23.08.2026 order from one fixed incident into the standing shape
+  of the batch.
+  Bundle: Urlaubsfestigkeit.
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
