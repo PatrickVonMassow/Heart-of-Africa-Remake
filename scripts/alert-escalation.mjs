@@ -149,6 +149,7 @@ export async function escalate({
   key = null,
   priority = 'default',
   alertClass = 'generic',
+  recurring = false,
   now = Date.now(),
   env = process.env,
   // Injected in the unit layer so the REAL rung logic is exercised there: the
@@ -177,9 +178,11 @@ export async function escalate({
         paused,
         priority,
         alertClass,
+        recurring,
       }),
       // Kept on the returned decision for the card prose and an audit reader.
       alertClass,
+      recurring: recurring === true,
     }
 
     if (decision.action === 'suppress') {

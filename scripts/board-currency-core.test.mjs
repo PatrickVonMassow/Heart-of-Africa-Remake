@@ -253,6 +253,13 @@ describe('delta E — the watchdog alert decision', () => {
     expect(d.notify).toBe(true)
     expect(d.title).toBe('Board unreachable')
     expect(d.message).toContain('HTTP 404')
+    expect(d.recurring).toBe(false)
+  })
+
+  it('declares a one-transport hiccup as a recurring event, not an unanswered condition', () => {
+    const d = watchdogDecision({ verdict: 'transport', reason: 'viewer answered', state: {}, now })
+    expect(d.notify).toBe(true)
+    expect(d.recurring).toBe(true)
   })
 
   it('repeats itself at most once per fault', () => {

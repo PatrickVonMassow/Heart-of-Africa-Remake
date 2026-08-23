@@ -511,6 +511,7 @@ try {
       `The launcher reaped ${leaked.length} of its own earlier headless spawn(s) (pid ${leaked.map((s) => s.pid).join(', ')}) ` +
         'that were still running without owning the batch — a background task the session was waiting on never exited.',
       'low',
+      { recurring: true },
     )
   }
   state.spawns = pruneSpawns({ spawns: state.spawns, probePid })
@@ -619,7 +620,7 @@ if (pause.state === 'retry') {
       `The pause clock ran out (attempt ${state.pauseAttempt}) and the launcher resumed the batch. It was parked for: ` +
         `${(pause.reason || 'no reason recorded').split('\n')[0]}`,
       'low',
-      { key: 'pause-retry' },
+      { key: 'pause-retry', recurring: true },
     )
   }
 }
@@ -1039,7 +1040,7 @@ if (
     evidence: { ownerSession: lock?.sessionId ?? null },
   })
   log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
-  await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
+  await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high', { recurring: true })
 }
 
 // THE SILENCE REPORT IS GONE (point 434). It existed because the launcher could
@@ -1345,6 +1346,7 @@ if (dispossessed) {
         `and the launcher is starting a successor. Nothing was killed — the old process keeps running and stands ` +
         `down at its next hook. It had declared: ${what}.`,
       'high',
+      { recurring: true },
     )
   }
 }
@@ -1739,7 +1741,12 @@ log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervis
 // night for a condition that repairs itself; the probes stay in the log, and the
 // first spawn after the block clears announces itself normally.
 if (announceSpawn({ quota: state.quota })) {
-  await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
+  await notify(
+    'Resurrected',
+    `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`,
+    'low',
+    { recurring: true },
+  )
 } else {
   log(`quota probe launched — no push (the block has stood ${Math.round((now - state.quota.since) / 60000)} min)`)
 }

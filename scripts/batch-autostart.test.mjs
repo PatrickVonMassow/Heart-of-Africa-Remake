@@ -331,7 +331,7 @@ describe('the board watchdog child', () => {
     expect(code).toMatch(/probe\(\(\) => liveCheckUrl\(BOARD_CONTENT_URL/)
     expect(code).toMatch(/liveBoardVerdict\(\{/)
     expect(code).toMatch(/watchdogDecision\(\{/)
-    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority, \{ recurring: d\.recurring === true \}\)/)
   })
 
   it('RETRIES a failed probe and corroborates it against the other transport (point 562)', () => {
@@ -377,7 +377,7 @@ describe('the board watchdog child', () => {
     // throws. Reporting the intention would let the launcher key a fault whose
     // alert never left the machine — and a keyed fault is never announced
     // again, so one transient POST failure would silence it for good.
-    expect(code).toMatch(/const sent = d\.notify && !quiet \? await notify\(/)
+    expect(code).toMatch(/const sent = d\.notify && !quiet\s*\? await notify\(/)
     expect(code).toMatch(/notified: !!sent/)
   })
 })
@@ -632,5 +632,25 @@ describe('the launcher acts on the pause record', () => {
     const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
     expect(drill, 'no --pause-report hook').toBeGreaterThanOrEqual(0)
     expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
+  })
+})
+
+// Recurring healthy-flow and remediation notices are EVENTS: another identical
+// occurrence is new information, not evidence that a request went unanswered.
+// The launcher itself cannot be imported, so this source contract pins the
+// declaration at each otherwise-unreachable call site.
+describe('the launcher declares recurring event notifications', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it.each([
+    'Leaked worker reaped',
+    'Batch resumed itself',
+    'Rogue spawn killed',
+    'Batch lease expired',
+    'Resurrected',
+  ])('%s stays on the event ceiling', (title) => {
+    const start = source.indexOf(`'${title}'`)
+    expect(start, `notification ${title} is missing`).toBeGreaterThanOrEqual(0)
+    expect(source.slice(start, start + 1_000)).toMatch(/\{\s*(?:key:\s*'[^']+',\s*)?recurring:\s*true\s*\}/)
   })
 })

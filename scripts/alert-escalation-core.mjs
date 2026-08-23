@@ -13,15 +13,18 @@
 //   rung 0  send immediately          — the first time the condition is seen
 //   rung 1  not before 15 min later
 //   rung 2  not before 30 min later
-//   rung 3  not before 60 min later   — priority rises with the rung
-//   rung 4  not before 120 min later  — decide once, and write the decision down
-//   above   silence: the durable decision card now carries the answer
+//   rung 3  not before 60 min later   — condition priority rises with the rung
+//   rung 4  not before 120 min later  — decide once, or hold an event at its ceiling
+//   above   silence: a condition's durable decision card now carries the answer
 //
 // Four buzzes over ~3.5 hours instead of eight identical ones, then a state the
 // morning reader cannot miss. The LAST RUNG no longer manufactures a standstill:
-// it records the decision to continue and the user's retroactive veto route.
-// Only a condition on the closed corruption list may still pause, because there
-// continuing is the unsafe act rather than the safe floor.
+// for a CONDITION it records the decision to continue and the user's retroactive
+// veto route. A recurring EVENT stays on that rung, at the caller's own priority,
+// because each occurrence is news rather than an unanswered request. Only a
+// condition on the closed corruption list may still pause, because there
+// continuing is the unsafe act rather than the safe floor. Event/condition shape
+// and corruption authority are separate caller declarations.
 //
 // WHAT COUNTS AS "IDENTICAL". The watchdog's message carries a rising minute
 // count, so a byte comparison would call every buzz a new alert and the ladder
@@ -143,13 +146,19 @@ export function escalationDecision({
   paused = false,
   priority = 'default',
   alertClass = 'generic',
+  recurring = false,
   gaps = ALERT_GAPS_MS,
   resetMs = ALERT_RESET_MS,
   priorities = ALERT_PRIORITIES,
 } = {}) {
   const pauseRung = gaps.length - 1
   const mayPause = isCorruptionAlertClass(alertClass)
-  const prio = (rung) => higherPriority(priority, priorities[Math.min(rung, priorities.length - 1)] ?? 'default')
+  // Corruption authority wins if a caller makes contradictory declarations:
+  // `recurring` cannot be used to downgrade a closed-list safety condition.
+  const isRecurringEvent = recurring === true && !mayPause
+  const prio = (rung) => isRecurringEvent
+    ? priority
+    : higherPriority(priority, priorities[Math.min(rung, priorities.length - 1)] ?? 'default')
 
   if (!entry) {
     return { key, action: 'send', rung: 0, nextRung: 1, priority: prio(0), dueInMs: 0, reset: false, reason: 'first time this alert is raised' }
@@ -164,7 +173,10 @@ export function escalationDecision({
     return { key, action: 'send', rung: 0, nextRung: 1, priority: prio(0), dueInMs: 0, reset: true, reason: `the same alert last went out ${Math.round(since / 60000)} min ago — the condition is treated as cleared and the ladder restarts` }
   }
 
-  const rung = entry.rung
+  // A short-lived regressed build advanced recurring events above the ceiling.
+  // Clamp those entries back onto it so declaring the event repairs existing
+  // runtime state instead of leaving that healthy flow permanently silent.
+  const rung = isRecurringEvent ? Math.min(entry.rung, pauseRung) : entry.rung
   if (rung > pauseRung) {
     return {
       key,
@@ -186,6 +198,21 @@ export function escalationDecision({
   }
 
   if (rung === pauseRung) {
+    if (isRecurringEvent) {
+      return {
+        key,
+        action: 'send',
+        rung,
+        nextRung: pauseRung,
+        priority: prio(rung),
+        dueInMs: 0,
+        reset: false,
+        reason:
+          `ceiling: this is a recurring EVENT, not an unanswered condition — it stays at the caller's ` +
+          `"${priority}" priority, sends at most once every ${Math.round(gaps[pauseRung] / 60000)} min, ` +
+          'and creates no decision card',
+      }
+    }
     if (!mayPause) {
       const decisionCard = continuationDecisionCard(title)
       return {

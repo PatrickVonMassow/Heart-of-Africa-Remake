@@ -76,7 +76,7 @@ describe('escalationDecision — a repeated identical alert backs off', () => {
     expect(ALERT_GAPS_MS[4]).toBeGreaterThan(ALERT_GAPS_MS[3])
   })
 
-  it('raises every alert’s priority with the rung, so the fourth buzz does not look like the first', () => {
+  it('raises a CONDITION’s priority with the rung, so the fourth buzz does not look like the first', () => {
     const first = escalationDecision({ ...at(null), priority: 'default' }).priority
     const top = escalationDecision({ ...at({ rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 4 }), priority: 'default' }).priority
     expect(first).toBe('default')
@@ -87,6 +87,15 @@ describe('escalationDecision — a repeated identical alert backs off', () => {
     for (let rung = 0; rung <= ALERT_PAUSE_RUNG; rung++) {
       const entry = rung === 0 ? null : { rung, lastSentAt: NOW - ALERT_GAPS_MS[rung], firstSentAt: NOW - 300 * MIN, sends: rung }
       expect(escalationDecision({ ...at(entry), priority: 'urgent' }).priority).toBe('urgent')
+    }
+  })
+
+  it('does NOT raise an EVENT’s priority at any rung — it is delivered as the caller declared it', () => {
+    for (let rung = 0; rung <= ALERT_PAUSE_RUNG; rung++) {
+      const entry = rung === 0
+        ? null
+        : { rung, lastSentAt: NOW - ALERT_GAPS_MS[rung], firstSentAt: NOW - 300 * MIN, sends: rung }
+      expect(escalationDecision({ ...at(entry), priority: 'low', recurring: true }).priority).toBe('low')
     }
   })
 })
@@ -169,6 +178,47 @@ describe('escalationDecision — generic stalled and stale alerts continue and r
     for (const p of PRIORITY_ORDER) {
       expect(escalationDecision({ ...generic, priority: p }).action).toBe('continue-and-record')
     }
+  })
+})
+
+describe('escalationDecision — a recurring EVENT keeps its ceiling', () => {
+  const topEntry = {
+    rung: ALERT_PAUSE_RUNG,
+    lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+    firstSentAt: NOW - 300 * MIN,
+    sends: ALERT_PAUSE_RUNG,
+  }
+  const event = { ...at(topEntry), title: 'Resurrected', priority: 'low', recurring: true }
+
+  it('keeps an event alert ON the ceiling rung, so it never falls permanently silent', () => {
+    const d = escalationDecision(event)
+    expect(d.action).toBe('send')
+    expect(d.nextRung).toBe(ALERT_PAUSE_RUNG)
+    const next = escalationDecision({ ...event, entry: { ...topEntry, rung: d.nextRung } })
+    expect(next.action).toBe('send')
+  })
+
+  it('files no continuation decision card for an event-shaped alert', () => {
+    const d = escalationDecision(event)
+    expect(d.action).toBe('send')
+    expect(d.decisionCard).toBeUndefined()
+    expect(d.reason).toMatch(/creates no decision card/)
+  })
+
+  it('still throttles the event between ceiling sends', () => {
+    const d = escalationDecision({ ...event, entry: { ...topEntry, lastSentAt: NOW - MIN } })
+    expect(d.action).toBe('suppress')
+    expect(d.dueInMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG] - MIN)
+  })
+
+  it('repairs event state that was already advanced above the ceiling', () => {
+    const d = escalationDecision({
+      ...event,
+      entry: { ...topEntry, rung: ALERT_PAUSE_RUNG + 1 },
+    })
+    expect(d.action).toBe('send')
+    expect(d.rung).toBe(ALERT_PAUSE_RUNG)
+    expect(d.nextRung).toBe(ALERT_PAUSE_RUNG)
   })
 })
 

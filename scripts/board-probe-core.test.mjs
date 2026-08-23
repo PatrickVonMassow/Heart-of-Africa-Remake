@@ -217,21 +217,27 @@ describe('board reachability alerts can never manufacture a batch pause', () => 
     expect(d.notify).toBe(true)
     expect(d.title).toBe('Board transport hiccup')
     expect(d.message).toMatch(/not stale/)
+    expect(d.recurring).toBe(true)
     const top = escalationDecision({
       key: 'k',
       title: d.title,
       now: 10_000_000,
       entry: { rung: ALERT_PAUSE_RUNG, lastSentAt: 0, firstSentAt: 0, sends: 5 },
       priority: d.priority,
+      recurring: d.recurring,
     })
-    expect(top.action).toBe('continue-and-record')
+    expect(top.action).toBe('send')
     expect(top.action).not.toBe('pause-and-send')
+    expect(top.nextRung).toBe(ALERT_PAUSE_RUNG)
+    expect(top.priority).toBe(d.priority)
+    expect(top.decisionCard).toBeUndefined()
   })
 
   it('a genuinely UNREACHABLE board still climbs in priority but records continuation', () => {
     const d = alert('unreachable', 'neither the currency transport nor the viewer answered, for 2 consecutive probes')
     expect(d.notify).toBe(true)
     expect(d.title).toBe('Board unreachable')
+    expect(d.recurring).toBe(false)
     const top = escalationDecision({
       key: 'k',
       title: d.title,

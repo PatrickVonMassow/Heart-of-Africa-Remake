@@ -153,7 +153,9 @@ try {
   // throws, so reporting the intention would let the caller key a fault whose
   // one alert never left the machine — and a keyed fault is never announced
   // again. A transient POST failure would silence a standing problem for good.
-  const sent = d.notify && !quiet ? await notify(d.title, d.message, d.priority) : false
+  const sent = d.notify && !quiet
+    ? await notify(d.title, d.message, d.priority, { recurring: d.recurring === true })
+    : false
 
   say({
     verdict: v.verdict,

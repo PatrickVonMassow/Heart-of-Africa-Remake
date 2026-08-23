@@ -318,9 +318,11 @@ export function liveBoardVerdict({
  *
  * Since point 562 it also speaks the probe's own vocabulary (board-probe-core):
  * 'transport' is a fetch that failed while the other transport answered — a real
- * event, reported at 'default' so the ladder can only ever throttle it, never
- * pause the batch on it — and 'flaky' is a failure that has not yet repeated for
- * the whole streak, which is reported to nobody at all.
+ * event, explicitly marked `recurring` so the ladder holds it at the caller's
+ * priority and ceiling without a decision card. A confirmed outage is a
+ * condition: it climbs and records continuation because neither class has
+ * corruption authority. `flaky` is a failure that has not yet repeated for the
+ * whole streak, which is reported to nobody at all.
  *
  * It alerts on a board that is BEHIND or UNREACHABLE, and on a `publishDue` /
  * `publishFailed` that has survived a whole tick — the case where the session is
@@ -350,10 +352,10 @@ export function watchdogDecision({
     priority = 'high'
   } else if (verdict === 'transport') {
     // A TRANSPORT FAILURE IS NOT A STALE BOARD (point 562), and the difference is
-    // carried by the PRIORITY as well as by the words: this single-transport
-    // event stays quieter than a confirmed outage while the ladder throttles it.
-    // Neither verdict is on the ladder's closed corruption list, so even a
-    // repeated outage now records continuation instead of stopping the queue.
+    // carried by an orthogonal EVENT/CONDITION declaration as well as by the
+    // words: this single-transport event stays at its caller priority and at the
+    // ladder ceiling, while a confirmed outage climbs as a condition. Neither
+    // verdict is on the closed corruption list, so neither may stop the queue.
     parts.push(`A board fetch FAILED, but the board is not stale: ${reason || 'the other transport answered'}.`)
   }
   // 'flaky' is deliberately silent here: a failure that has not yet repeated for
@@ -384,5 +386,12 @@ export function watchdogDecision({
         : verdict === 'transport'
           ? 'Board transport hiccup'
           : 'Board publish outstanding'
-  return { notify: true, key, title, message: `${parts.join(' ')} ${BOARD_PAGE_URL}`, priority }
+  return {
+    notify: true,
+    key,
+    title,
+    message: `${parts.join(' ')} ${BOARD_PAGE_URL}`,
+    priority,
+    recurring: verdict === 'transport',
+  }
 }

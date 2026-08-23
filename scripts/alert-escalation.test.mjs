@@ -261,6 +261,36 @@ describe('escalate — the full climb, on real files', () => {
     expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
   })
 
+  it('keeps a recurring event on the ceiling without filing a decision card', async () => {
+    const h = harness()
+    const key = 'resurrected'
+    writeLadder({
+      alerts: {
+        [key]: {
+          rung: ALERT_PAUSE_RUNG,
+          lastSentAt: T0 - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+          firstSentAt: T0 - 300 * MIN_MS,
+          sends: ALERT_PAUSE_RUNG,
+        },
+      },
+    }, h.ladderPath)
+    const v = await escalate({
+      title: 'Resurrected',
+      message: 'successor spawned',
+      key,
+      priority: 'low',
+      recurring: true,
+      env: {},
+      now: T0,
+      ...h,
+    })
+    expect(v).toMatchObject({ deliver: true, priority: 'low' })
+    expect(v.decision).toMatchObject({ action: 'send', nextRung: ALERT_PAUSE_RUNG })
+    expect(h.cards).toHaveLength(0)
+    expect(v.commit()).toBe(true)
+    expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
+  })
+
   it('keeps two different alerts on two ladders, though they share one ntfy topic', async () => {
     // Would have prevented: a CI-red alert being throttled into silence by the
     // watchdog's climb, or vice versa.
@@ -398,6 +428,21 @@ describe('notify — the wiring, on an injected topic', () => {
     expect(escalate.mock.calls[0][0]).toMatchObject({
       priority: 'low',
       alertClass: 'forbidden-serving-model',
+    })
+  })
+
+  it('carries recurring shape separately from priority and corruption class', async () => {
+    vi.stubGlobal('fetch', okFetch())
+    const escalate = vi.fn(async () => ({ deliver: true, priority: 'low', commit: () => {} }))
+    await notify('Resurrected', 'successor spawned', 'low', {
+      topicFile: topicAt(),
+      recurring: true,
+      escalation: { escalate },
+    })
+    expect(escalate.mock.calls[0][0]).toMatchObject({
+      priority: 'low',
+      alertClass: 'generic',
+      recurring: true,
     })
   })
 
