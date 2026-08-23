@@ -12,7 +12,10 @@
 // admitted by the shared Fable switch may run the batch. Every other
 // model — Sonnet and Haiku included — is a policy breach: the batch must stop
 // rather than run on it. Hence an ALLOWLIST, not a Haiku blocklist: an unknown
-// future model name fails closed.
+// future model name fails closed. The list names the FAMILIES those models
+// belong to, not pinned versions — deliberately, see the note at `ALLOWED` —
+// so `Opus 99` would pass; what the tripwire is bought against is the silent
+// swap to another family, not a point release inside an allowed one.
 //
 // SOL AUTHORS UNDER A ROLE SWAP (point 667). Where Sol authors, CLAUDE reviews,
 // runs the suites, judges the picture and lands — so the change is still seen by
@@ -124,8 +127,13 @@ export const MODEL_FAMILY_WORD =
  *
  * The local part is matched WHOLE, not as a prefix (fourth round): `botany@` and
  * `assistant-professor@` are people, and a prefix test called them robots.
+ *
+ * THE DOMAIN ENDS AT `.com` (Sol review of a4975b0): `\b` alone let
+ * `assistant@openai.com.evil` qualify, so a human at a look-alike domain was
+ * read as a model and refused as one. Nothing our harnesses write continues
+ * after the TLD, so any word character, dot or hyphen behind it disqualifies.
  */
-export const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:anthropic|openai)\.com\b/i
+export const MODEL_VENDOR_ADDRESS = /(?:^|[\s<"'(])(?:noreply|no-reply|bot|assistant)@(?:anthropic|openai)\.com(?![\w.-])/i
 
 /** A family word with a VERSION ATTACHED TO IT — `Haiku 4.5`, `llama-3`,
  *  `GPT-5.6 Sol`, `o3`. A digit merely somewhere in the line is not a version:
@@ -217,6 +225,19 @@ export function modelNamesIn(trailer) {
     return names
   }
   if (namesNonClaudeModel(cleaned, raw)) {
+    // SEVERAL NON-CLAUDE CLAIMS IN ONE TRAILER (Sol review of a4975b0): with no
+    // "Claude" token to split on, `GPT-5.6 Sol / GPT-5.6 Sol` collapsed into one
+    // composite name and took the FORBIDDEN path instead of the documented
+    // several-names-is-unidentified one. Only segments that name a model ON
+    // THEIR OWN count as claims, and only when MORE THAN ONE does is the line
+    // read as several — a lone model beside filler words stays the single
+    // composite name that fails the allowlist LOUD, so the smuggling shape of
+    // point 527 (`GPT-5.6 Sol / Haiku`) cannot pass as its allowed half.
+    const claims = cleaned
+      .split(/[/&]/)
+      .map(bareName)
+      .filter((segment) => segment && namesNonClaudeModel(segment))
+    if (claims.length > 1) return claims
     const name = bareName(cleaned)
     return name ? [name] : []
   }

@@ -257,7 +257,8 @@ try {
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
       'makes that cut from point text and recorded review history, while a point\'s own ' +
-      '`Author lane:` tag remains an operator decision. ' +
+      '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
+      'reached §6 Fable escalation threshold). ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +

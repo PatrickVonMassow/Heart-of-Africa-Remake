@@ -295,6 +295,26 @@ describe('the allowlist is matched against the parsed name', () => {
     expect(modelNameIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toBe('Sonnet 5 + Opus 5')
   })
 
+  it('reads several non-Claude claims as several, not as one composite name', () => {
+    // Two claims in one trailer show no single author: unidentified, never the
+    // forbidden breach ritual (Sol review of a4975b0).
+    expect(modelNamesIn('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>')).toHaveLength(2)
+    expect(classifyTrailer('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    // A lone model beside filler stays the composite name that fails LOUD —
+    // the point-527 smuggling shape must not pass as its allowed half.
+    expect(classifyTrailer('GPT-5.6 Sol / Haiku <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+    expect(classifyTrailer('GPT-5.6 Sol / experimental <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+  })
+
+  it('does not read a look-alike domain as a vendor address', () => {
+    // `\b` after `.com` let `assistant@openai.com.evil` qualify as model
+    // evidence and refused the human carrying it (Sol review of a4975b0).
+    expect(classifyTrailer('Alice <assistant@openai.com.evil>', POLICY_NEUTRAL)).toBe('allowed')
+    expect(modelNamesIn('Alice <assistant@openai.com.evil>')).toEqual([])
+    // The genuine vendor forms keep qualifying, mid-line and at the end.
+    expect(classifyTrailer('OpenAI o3 <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+  })
+
   it('no longer passes a forbidden name that merely CARRIES an allowed word', () => {
     for (const t of [
       'Claude Haiku 4.5 (opus mode) <noreply@anthropic.com>',
