@@ -37,7 +37,8 @@
 //   release; changing the PUBLISHED four-section board contract — AND the state
 //   safely prepared before that act, IN WORDS: naming the phrase without saying
 //   what stands prepared is refused. Every accepted verb form is spelled out in
-//   `ACT_FORMS`, so a NOUN built from one of them is not an act.
+//   `ACT_FORMS`, so a NOUN built from one of them is not an act, and a reason
+//   that ASKS rather than states is advisory before any act rule runs.
 // * `SELF-DECIDED(<at>; <summary>)` records that an advisory choice took the
 //   reversible-default lane. Its `Entscheidungsprotokoll:` board card is the
 //   detailed record (decision, evidence, consequence and exact veto action).
@@ -178,6 +179,8 @@ const ACT_FORMS = [
   'retract', 'retracts', 'retracted', 'retracting',
   'revoke', 'revokes', 'revoked', 'revoking',
   'withdraw', 'withdraws', 'withdrew', 'withdrawn', 'withdrawing',
+  'send', 'sends', 'sent', 'sending',
+  'upload', 'uploads', 'uploaded', 'uploading',
 ]
 /** The release lane adds the words that name a public release itself. */
 const RELEASE_FORMS = [
@@ -186,36 +189,66 @@ const RELEASE_FORMS = [
   'deploy', 'deploys', 'deployed', 'deploying',
   'release', 'releases', 'released', 'releasing',
 ]
+/**
+ * The release lane needs the THING released, not merely a released-sounding
+ * word near "production" (third cross-vendor round, GPT-5.6 Sol, 23.08.2026):
+ * "typography for the published notice in production" is a design question, and
+ * proximity alone made it a gate.
+ */
+const RELEASE_OBJECT = /\b(?:release|releases|deployment|deployments|site|page|build|version|tag|poc)\b/
 const ACT_VERB = ACT_FORMS.join('|')
 const RELEASE_VERB = RELEASE_FORMS.join('|')
+
+/**
+ * A QUESTION IS NEVER A CONFIRMATION (third cross-vendor round, GPT-5.6 Sol,
+ * 23.08.2026). Two rounds of counterexamples were all the same shape: an
+ * advisory question whose words happened to name an authorized act. A reason
+ * that asks rather than states is advisory before any act rule runs — which is
+ * the fail direction the 23.08.2026 order prescribes.
+ */
+const ASKS_RATHER_THAN_STATES = (lower) =>
+  lower.includes('?') ||
+  /^\W*(?:choose|pick|decide|select|which|what|whether|should|shall|would|could|do we|can we|are we|is it|how)\b/.test(lower)
 
 const wordsIn = (text) => String(text ?? '').trim().split(/\s+/).filter(Boolean).length
 
 /**
- * A prepared state is NAMED, never merely announced. Both of these passed while
+ * A prepared state is NAMED, never merely announced. All of these passed while
  * recording nothing (cross-vendor review, GPT-5.6 Sol, 23.08.2026): the bare
- * phrase "safe prepared state:" and the bare "prepared locally". The record is
- * what the queue skip is bought with, so it must carry words.
+ * phrase "safe prepared state:", the bare "prepared locally", and a catch-all
+ * third alternative that any prose mentioning "locally … not … publish"
+ * satisfied. The record is what the queue skip is bought with, so it must carry
+ * words — and it is read from the whole CLAUSE, so a state named BEFORE the
+ * word ("the signed build output is prepared locally") counts as well as after.
  */
 const PREPARED_QUALIFIER = /\b(?:locally|without|not|unchanged|unpublished|unpushed|undispatched|undeployed)\b/
 const namesPreparedState = (lower) => {
   const m = /\b(?:safe|safely)\s+prepared\s+state\b[\s:,-]*(.*)$/.exec(lower)
   return Boolean(m) && wordsIn(m[1]) >= 3
 }
+/** The clause the word "prepared" stands in — sanitiseReason has already turned every `;` into `,`. */
+const preparedClause = (lower) => lower.split(',').find((part) => /\bprepared\b/.test(part)) ?? ''
 const namesPreparationInWords = (lower) => {
-  const m = /\bprepared\b[\s:,-]*(.*)$/.exec(lower)
-  return Boolean(m) && PREPARED_QUALIFIER.test(m[1]) && wordsIn(m[1]) >= 3
+  const clause = preparedClause(lower)
+  if (!clause || !PREPARED_QUALIFIER.test(clause)) return false
+  // Three words beyond "prepared" and the qualifier itself: "prepared locally"
+  // names nothing, "the signed build output is prepared locally" names the object.
+  return wordsIn(clause.replace(/\bprepared\b/, ' ').replace(PREPARED_QUALIFIER, ' ')) >= 3
 }
 
 export function classifyConfirmationReason(reason) {
   const text = sanitiseReason(reason, { max: 1000 })
   const lower = text.toLowerCase()
+  if (ASKS_RATHER_THAN_STATES(lower)) {
+    return { verdict: 'advisory', act: '', reason: text, error: 'a question is a decision to take, not an act to confirm' }
+  }
   const tagAct =
     new RegExp(`\\b(?:${ACT_VERB})\\b[^.]{0,100}\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b`).test(lower) ||
     new RegExp(`\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b[^.]{0,100}\\b(?:${ACT_VERB})\\b`).test(lower)
   const publicReleaseAct =
-    new RegExp(`\\b(?:${RELEASE_VERB})\\b[^.]{0,100}\\b(?:public|production)\\b`).test(lower) ||
-    new RegExp(`\\b(?:public|production)\\b[^.]{0,100}\\b(?:${RELEASE_VERB})\\b`).test(lower)
+    RELEASE_OBJECT.test(lower) &&
+    (new RegExp(`\\b(?:${RELEASE_VERB})\\b[^.]{0,100}\\b(?:public|production)\\b`).test(lower) ||
+      new RegExp(`\\b(?:public|production)\\b[^.]{0,100}\\b(?:${RELEASE_VERB})\\b`).test(lower))
   // BOTH directions demand the PUBLIC qualifier (cross-vendor review, GPT-5.6
   // Sol, 23.08.2026). Without it on the second alternative, "should the
   // four-section internal draft change font?" — an advisory question — named an
@@ -227,10 +260,7 @@ export function classifyConfirmationReason(reason) {
   // The PHRASE alone is not the state (cross-vendor review, GPT-5.6 Sol,
   // 23.08.2026): "push the release tag; safe prepared state:" named nothing and
   // was accepted, which is precisely the record the gate is bought with.
-  const prepared =
-    namesPreparedState(lower) ||
-    namesPreparationInWords(lower) ||
-    /\b(?:locally|verified|built|staged|ready|unchanged)\b[^.]{0,120}\b(?:not|no|without|before)\b[^.]{0,80}\b(?:push|publish|dispatch|deploy|tag|change)\w*\b/.test(lower)
+  const prepared = namesPreparedState(lower) || namesPreparationInWords(lower)
   const act = tagAct ? 'release-tag' : publicReleaseAct ? 'public-release' : boardContractAct ? 'board-contract' : ''
   if (!act) {
     return { verdict: 'advisory', act: '', reason: text, error: 'reason does not name an authorized outward-facing act' }

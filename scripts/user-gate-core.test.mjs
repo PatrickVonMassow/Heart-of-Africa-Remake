@@ -102,6 +102,47 @@ describe('classifyConfirmationReason — the closed outward-act rule', () => {
       classifyConfirmationReason('Delete the public release; safe prepared state: the release is still online and the rollback is ready'),
     ).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
   })
+
+  // THE THIRD CROSS-VENDOR ROUND (GPT-5.6 Sol, 23.08.2026). Two rounds of
+  // counterexamples were all one shape — an advisory QUESTION whose words named
+  // an authorized act — so the classifier now refuses a question outright, the
+  // release lane needs the thing released, and the prepared clause is read
+  // whole rather than only after the word.
+  it('never reads a question as an act, however it is worded', () => {
+    for (const reason of [
+      'Choose typography for the published notice in production; safe prepared state: mockups remain entirely local',
+      'Which release page should the tag point at? safe prepared state: nothing is pushed and the build is local',
+      'Should we push the version tag now; safe prepared state: verified locally and no tag pushed',
+    ]) {
+      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'advisory', act: '' })
+    }
+  })
+
+  it('needs the thing released, not a released-sounding word near production', () => {
+    expect(
+      classifyConfirmationReason('Print the published notice in production colours; safe prepared state: mockups remain entirely local'),
+    ).toMatchObject({ verdict: 'advisory', act: '' })
+    expect(
+      classifyConfirmationReason('Remove the deployed site from production; safe prepared state: it is still served and the takedown is staged'),
+    ).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
+  })
+
+  it('reads the prepared clause whole, so the state may be named before the word', () => {
+    expect(classifyConfirmationReason('push the version tag; the signed artifacts are prepared locally')).toMatchObject({
+      verdict: 'confirmation',
+      act: 'release-tag',
+    })
+    // …and incidental prose that merely contains the old catch-all words is not a record.
+    expect(
+      classifyConfirmationReason('Delete the public release; the locally built confirmation copy says do not publish'),
+    ).toMatchObject({ verdict: 'advisory', act: 'public-release' })
+  })
+
+  it('accepts the ordinary synonyms for pushing a tag', () => {
+    expect(
+      classifyConfirmationReason('Send the version tag upstream; safe prepared state: artifacts verified locally and no tag exists remotely'),
+    ).toMatchObject({ verdict: 'confirmation', act: 'release-tag' })
+  })
 })
 
 describe('parseGateLine — one work-order line', () => {
