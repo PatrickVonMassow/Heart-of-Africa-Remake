@@ -459,3 +459,33 @@ describe('auditGuide — the note ceiling sits on its measurement', () => {
     expect(auditGuide(withNote(pad(78))).violations.map((v) => v.kind)).toContain('prose-after-prompt')
   })
 })
+
+// Round six: three bypasses of the note and path rules, each pinned.
+describe('auditGuide — notes together, sentences without a space, paths that climb', () => {
+  const O = '„'
+  const withNotes = (...notes) =>
+    doc(`- **Notizenkette** Ein Risiko.\n  → *Prompt:* ${O}Tu es." ${notes.map((n) => `*(${n})*`).join(' ')}`)
+
+  it('refuses a paragraph split across several valid notes', () => {
+    const half = '≈ 2x ' + 'a'.repeat(45)
+    const { ok, violations } = auditGuide(withNotes(half, half))
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('accepts the two notes the guide really chains', () => {
+    expect(auditGuide(withNotes('≈ 1,5x.', 'Sieht das richtig aus?')).ok).toBe(true)
+  })
+
+  it('refuses a second sentence that skips the space after the period', () => {
+    const { violations } = auditGuide(withNotes('≈ 1,5x.Und danach geschah noch etwas.'))
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('recognises a path that climbs more than one level', () => {
+    const { violations } = auditGuide(
+      doc(`- **Weiter Pfad** Siehe ../../src/main.ts dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('project-specific')
+  })
+})

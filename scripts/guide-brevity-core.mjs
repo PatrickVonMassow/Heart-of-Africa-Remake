@@ -189,7 +189,7 @@ export const PROJECT_MARKERS = [
     // conventions a tool-neutral guide may name; `scripts/verify/x.mjs` is not.
     // A LEADING `./`, `../` or `/` is the ordinary way to write such a path and
     // must not be an escape hatch (cross-vendor review, 23.08.2026).
-    re: /(?:^|[\s("'`])(?:\.{0,2}\/)?(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
+    re: /(?:^|[\s("'`])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -332,7 +332,7 @@ const REVIEW_QUESTION = 'Sieht das richtig aus?'
 // review, 23.08.2026, round 4).
 const NOTE_MAX_CHARS = 77
 const isCostNote = (note) =>
-  note.includes('≈') && note.length <= NOTE_MAX_CHARS && !/[.!?]\s+\S/.test(note)
+  note.includes('≈') && note.length <= NOTE_MAX_CHARS && !/[.!?]\s*\p{L}/u.test(note)
 const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**
@@ -440,7 +440,14 @@ export function auditGuide(text, limits = LIMITS) {
           push('prose-after-prompt', where, `„${entry.title}" führt einen zweiten Anführungsblock — der Prompt ist nicht der Schluss`)
         } else {
           let rest = body.slice(body.search(new RegExp(`[${CLOSING_QUOTES.join('')}]`)) + 1).trim()
+          // THE CEILING IS ON THE NOTES TOGETHER, not on each one: an unlimited
+          // sequence of individually valid notes carried a paragraph past a
+          // per-note limit (cross-vendor review, 23.08.2026, round 6). The guide
+          // carries at most two notes, 29 characters together.
+          let noted = 0
           for (let note = rest.match(NOTE_RE); note && isAllowedNote(note[1].trim()); note = rest.match(NOTE_RE)) {
+            noted += note[1].trim().length
+            if (noted > NOTE_MAX_CHARS) break
             rest = rest.slice(note[0].length).trim()
           }
           // A sentence period, comma or semicolon AFTER the closing quote is the
