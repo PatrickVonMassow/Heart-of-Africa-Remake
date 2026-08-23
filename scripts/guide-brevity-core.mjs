@@ -187,7 +187,9 @@ export const PROJECT_MARKERS = [
   {
     // A SECOND segment is required: `src/` and `docs/` alone are universal
     // conventions a tool-neutral guide may name; `scripts/verify/x.mjs` is not.
-    re: /(?:^|[\s("'`])(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
+    // A LEADING `./`, `../` or `/` is the ordinary way to write such a path and
+    // must not be an escape hatch (cross-vendor review, 23.08.2026).
+    re: /(?:^|[\s("'`])(?:\.{0,2}\/)?(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -207,7 +209,16 @@ export const PROJECT_MARKERS = [
 /** Measure exactly the body that the guide budget governs. */
 export function measureGuide(text) {
   const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n')
-  const body = lines.filter((line) => !/^<!--/.test(line.trim()))
+  // A COMMENT is bookkeeping and contributes nothing — but only the comment
+  // itself. Dropping the whole LINE let `<!-- x --> sichtbare Prosa` render text
+  // at zero lines and zero words, which is unlimited narrative past both
+  // ceilings (cross-vendor review, 23.08.2026).
+  const body = []
+  for (const line of lines) {
+    const visible = line.replace(/<!--[\s\S]*?-->/g, '')
+    if (/^<!--/.test(line.trim()) && visible.trim() === '') continue
+    body.push(visible)
+  }
   return {
     lines: body.length,
     words: body.join(' ').split(/\s+/).filter(Boolean).length,
@@ -221,12 +232,19 @@ export function measureGuide(text) {
  */
 export function sliceSection(text, headingRe) {
   const lines = String(text ?? '').split('\n')
-  const start = lines.findIndex((l) => /^##\s+/.test(l) && headingRe.test(l))
-  if (start < 0) return []
+  // EVERY matching section, not just the first: stopping at the next `##` let a
+  // second `## Weitere Fallstricke` carry entries no per-entry check ever saw,
+  // while the whole-document budgets stayed put (cross-vendor review,
+  // 23.08.2026). The heading lines themselves are never part of the body, so the
+  // concatenation cannot invent stray prose.
   const out = []
-  for (let i = start + 1; i < lines.length; i++) {
-    if (/^##\s+/.test(lines[i])) break
-    out.push({ line: i + 1, text: lines[i] })
+  let inSection = false
+  for (let i = 0; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i])) {
+      inSection = headingRe.test(lines[i])
+      continue
+    }
+    if (inSection) out.push({ line: i + 1, text: lines[i] })
   }
   return out
 }
@@ -289,6 +307,10 @@ export function strayLines(sectionLines) {
 }
 
 const ACTION_RE = /→\s*\*(?:Prompt|Mechanismus)\s*:\*/
+
+/** The closing quote a prompt ends on — the German one the guide uses, and the
+ * plain ASCII one, so the rule does not turn on a typographic detail. */
+const CLOSING_QUOTES = ['\u201C', '"']
 
 /**
  * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
@@ -365,6 +387,30 @@ export function auditGuide(text, limits = LIMITS) {
         entry.line,
         `„${entry.title}" beschreibt das Risiko in ${actionIdx} Zeilen > ${limits.maxRiskLines}`,
       )
+    }
+    // THE MARKER IS NOT THE PROMPT. It used to be accepted anywhere in the entry
+    // with no look at what followed, so an empty `→ *Prompt:*` and one trailed by
+    // further narrative both passed the rule that every pitfall ENDS in an
+    // actionable prompt (cross-vendor review, 23.08.2026).
+    if (actionIdx >= 0) {
+      const tail = entry.lines.slice(actionIdx).join('\n').replace(ACTION_RE, '')
+      if (!/\p{L}/u.test(tail)) {
+        push('empty-prompt', entry.line + actionIdx, `„${entry.title}" führt „→ *Prompt:*" ohne Anweisung`)
+      }
+      const closed = Math.max(...CLOSING_QUOTES.map((mark) => tail.lastIndexOf(mark)))
+      if (closed >= 0) {
+        const after = tail
+          .slice(closed + 1)
+          .replace(/\*\([^)]*\)\*/g, '')
+          .replace(/[\s*.,;:—–-]/g, '')
+        if (after) {
+          push(
+            'prose-after-prompt',
+            entry.line + actionIdx,
+            `„${entry.title}" erzählt nach dem Prompt weiter: „${after.slice(0, 40)}…"`,
+          )
+        }
+      }
     }
   }
 

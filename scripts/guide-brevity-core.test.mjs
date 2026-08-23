@@ -281,3 +281,60 @@ describe('the guide-budget escalation instruction', () => {
     expect(instruction).not.toContain('last step of a raise belongs')
   })
 })
+
+// The four ways past this guard that one cross-vendor reading found on
+// 23.08.2026. Each case is the EVASION, and each must be refused.
+describe('auditGuide — the four evasions', () => {
+  it('counts prose that hides behind a comment on its own line', () => {
+    const hidden = '<!-- x --> ' + 'Erzählte Prosa. '.repeat(20)
+    const before = measureGuide('# Titel\n')
+    const after = measureGuide('# Titel\n' + hidden + '\n')
+    expect(after.lines).toBeGreaterThan(before.lines)
+    expect(after.words).toBeGreaterThan(before.words + 30)
+  })
+
+  it('still ignores a line that is nothing but a comment', () => {
+    const plain = measureGuide('# Titel\n')
+    const stamped = measureGuide('# Titel\n<!-- GUIDE-FINGERPRINT: abc -->\n')
+    expect(stamped).toEqual(plain)
+  })
+
+  it('audits a second pitfall section instead of stopping at the first', () => {
+    const d =
+      doc(entry('Kurz', 2)) +
+      '\n## Weitere Fallstricke\n\n' +
+      entry('Versteckt', LIMITS.maxRiskLines + 2) +
+      '\n'
+    const { ok, violations } = auditGuide(d)
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('risk-too-long')
+  })
+
+  it('refuses a prompt marker with no instruction behind it', () => {
+    const { violations } = auditGuide(doc('- **Leerer Prompt** Ein Risiko.\n  → *Prompt:*'))
+    expect(violations.map((v) => v.kind)).toContain('empty-prompt')
+  })
+
+  it('refuses narrative that continues after the prompt has closed', () => {
+    const d = doc(
+      '- **Weitererzählt** Ein Risiko.\n' +
+        '  → *Prompt:* „Etabliere einen Mechanismus."\n' +
+        '  Und dann geschah an jenem Abend noch Folgendes, was hier gar nicht hingehört.',
+    )
+    const { ok, violations } = auditGuide(d)
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('leaves a cost note after the prompt alone', () => {
+    const d = doc('- **Mit Kostenhinweis** Ein Risiko.\n  → *Prompt:* „Etabliere einen Mechanismus." *(≈ 1,3x.)*')
+    expect(auditGuide(d).ok).toBe(true)
+  })
+
+  it('recognises a repository path written with a leading dot-slash or slash', () => {
+    for (const path of ['./scripts/chat-spool.mjs', '/scripts/chat-spool.mjs', '../src/main.ts']) {
+      const { violations } = auditGuide(doc(`- **Pfad** Siehe ${path} dort.\n  → *Prompt:* „Etabliere einen Mechanismus."`))
+      expect(violations.map((v) => v.kind), path).toContain('project-specific')
+    }
+  })
+})
