@@ -73,7 +73,7 @@ strategy and suite map: `scripts/verify/README.md`.
   its arming point lands. Owner mechanics: `docs/batch-owner-runbook.md`.
 - **Model policy.** GPT-5.6 Sol authors difficult, complex, error-prone, and
   HIGH-criticality points; Opus 5 authors points whose verification is the work.
-  Fable 5's authoring signal is a point's lane tag. Review is cross-vendor and
+  Fable 5 authors tagged points and router escalations. Review is cross-vendor and
   never by an author of the range: Sol reviews Claude work through
   `scripts/review-sol.mjs`, Claude reviews Sol work. `node
   scripts/fable-switch.mjs --status` is the sole answer whether Fable

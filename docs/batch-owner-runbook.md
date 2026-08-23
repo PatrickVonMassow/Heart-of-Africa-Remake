@@ -107,8 +107,8 @@ The first historical run and the reproducible 21 August/four-day fixtures are in
 
 `scripts/author-routing-core.mjs` owns the routing cut. GPT-5.6 Sol authors the
 hard, complex, error-prone, and high-criticality points; Opus 5 authors work
-whose verification is itself the task. Fable 5 is out of the automatic cut and
-authors only a point that tags its lane, as `CLAUDE.md` §6 states. Review is cross-vendor through
+whose verification is itself the task. Fable 5 authors tagged points and automatic
+review-round escalations through `scripts/author-fable.mjs`, as `CLAUDE.md` §6 states. Review is cross-vendor through
 `scripts/review-sol.mjs` for Claude-authored work and Claude for Sol-authored
 work. Serving fallback order is Opus 5, Fable 5, then Opus 4.8; a different
 serving model pauses the batch.
