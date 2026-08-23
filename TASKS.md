@@ -11438,3 +11438,27 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
   read a red as noise.
   Bundle: Testinfrastruktur.
+- [ ] 862. The criticality gate reads an EMPTY authorship as model diversity. FOUND 23.08.2026 by
+  the cross-vendor reading that cleared the 864a90e7 revert's ledger debt: in
+  scripts/criticality-review-guard-core.mjs, rowWellFormed accepts an empty or whitespace
+  authoredBy, and the diversity check !sameModel(r.model, r.authoredBy) then treats the UNKNOWN
+  author as a different model — a fail-open in the exact gate that exists to prove two vendors.
+  The test names the missing-authorship case but covers only an absent key and a non-string
+  value, not the admitted empty string.
+  FINAL STATE: a row with empty or whitespace authorship is not well formed and cannot clear the
+  gate; the test carries the empty-string case beside the two it has.
+  VERIFIABLE: unit cases — an empty and a whitespace authoredBy each refuse to clear; the
+  existing well-formed rows still clear.
+  Criticality: medium — the gate stays conservative everywhere else, but this path can wave a
+  same-model pair through as cross-vendor.
+  Bundle: Modell & Wächter.
+- [ ] 863. The two-trailer wrapper test can stay green while the second trailer is never judged.
+  FOUND 23.08.2026 by the same reading, in scripts/model-guard-core.test.mjs: the wrapper-log
+  test asserts classifyTrailer over the joined field and equality of the split, but its final
+  evaluateCommitTrailers assertion feeds the raw message rather than the parsed field — so a
+  regression in which the wrapper judges only the first trailer would not turn it red.
+  FINAL STATE: the test asserts that EACH split trailer is judged individually on the parsed
+  wrapper output, so dropping the second trailer's judgement turns it red.
+  VERIFIABLE: mutating the wrapper to judge only the first trailer makes the suite fail.
+  Criticality: low — a test-only gap behind a currently correct wrapper.
+  Bundle: Modell & Wächter.
