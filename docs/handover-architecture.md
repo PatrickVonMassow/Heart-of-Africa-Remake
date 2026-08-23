@@ -429,12 +429,15 @@ compensation, and the design owes all three parts:
     2. Otherwise the publication id is searched as a commit trailer in that ref's history →
        found means **LANDED-REWRITTEN**, recorded as such, so nobody later reads it as a clean
        landing.
-    3. Otherwise, if the ref is still at the recorded expected-before oid, or its history contains
-       that oid and nothing derived from this attempt → **ABANDONED.**
+    3. Otherwise, if the ref is still at the recorded expected-before oid → **ABANDONED.** Only
+       the unmoved ref proves it. An earlier wording also concluded ABANDONED when the moved
+       ref's history "contains that oid and nothing derived from this attempt", and that consumed
+       a case the next outcome must quarantine: a rewrite that lost its publication trailer and
+       an unrelated successor leave exactly that evidence, so it decides nothing.
     4. Otherwise → **UNKNOWN, and quarantined.** The ref moved in a way this attempt's own record
        cannot explain — a rewrite that lost the trailer looks exactly like an unrelated successor,
-       and the expected-before oid alone cannot tell them apart. Guessing here is what the whole
-       mechanism exists to avoid.
+       and neither the expected-before oid nor its presence in the history can tell them apart.
+       Guessing here is what the whole mechanism exists to avoid.
   - **Nothing is inferred from the credential's current value,** because a `seq` is reused by a
     later attempt after a failed one and cannot tell landed from superseded from abandoned.
   - **Two things are quarantined, and the earlier wording named only one.** An entry with NO
@@ -496,8 +499,11 @@ latency. **The clock rule is withdrawn.** What actually holds is a rule about wh
 
 - **The ref decides, and only the ref.** Whoever's credential `refs/hoa/coordinator` carries is
   the one publisher. Not "the lock holder", not "whoever's lease is fresh" — the ref.
-- **B advances the ref as the first act of acquisition and publishes nothing before that push has
-  landed.** Until then B is not a publisher, by its own rule.
+- **B advances the ref before it publishes anything — after acquiring the lock and starting a
+  daemon if one is to be started, in the one mandatory order fixed below — and publishes nothing
+  before that push has landed.** Until then B is not a publisher, by its own rule. An earlier
+  sentence here called the advance "the first act of acquisition", which the mandatory order
+  contradicts; it was simply false and is gone.
 - **A remains a publisher until the ref moves,** and that is CORRECT rather than a leak: during
   that interval A is the only party the ref names and B has published nothing, so there is exactly
   one publisher throughout. The instant B's advance lands, A's next lease fails.
@@ -781,7 +787,7 @@ this repository's convention, Vitest beside its subject as `scripts/<name>.test.
 |---|---|---|---|
 | Schema versioning and migration | 1 | `scripts/batch-schema-core.mjs` | a current record accepted, one version ahead REFUSED, one version behind migrated and re-read equal |
 | Idempotency of every daemon mutation | 1, 2 | `scripts/batch-schema-core.mjs`, `scripts/batch-state-core.mjs` | one case per command in the daemon's command table, each applying the same key twice and asserting one state change — plus an ENUMERATING case that fails when a registered command has no idempotency case, so a new command cannot be added without one |
-| Idempotency of boundary and checkpoint retries | 6, 7 | `scripts/batch-checkpoint.mjs`, `scripts/batch-boundary.mjs` | a repeated checkpoint request id acknowledged once; `--commit` run twice sealing once and advancing the fence once |
+| Idempotency of boundary and checkpoint retries | 6, 7 | `scripts/batch-checkpoint.mjs`, `scripts/batch-boundary.mjs` | a repeated checkpoint request id acknowledged once; `--commit` run twice sealing once and the fence asserted UNCHANGED both times — acquisition is that number's only writer, and `--commit` never advances it |
 | Daemon authorization — control | 3 | `scripts/batch-daemon.mjs` | a control request from a foreign uid refused; a worker-supplied string asserted never to reach an exec path |
 | Daemon authorization — state paths | 3 | `scripts/batch-daemon.mjs` | the state directory, its files and the control socket created owner-only, asserted by mode and owner; a state path that is a symlink refused; a state path outside the git common directory refused |
 | Retention of landed and cancelled attempts | 3 | `scripts/batch-daemon-core.mjs` | an aged LANDED attempt keeps its record and loses log and worktree; an aged CANCELLED attempt likewise; a young attempt of either kind keeps both — the aged-cancelled case is what stops "never prune anything" from passing |
