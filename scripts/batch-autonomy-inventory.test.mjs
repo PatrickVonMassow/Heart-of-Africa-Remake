@@ -34,6 +34,7 @@ const HUMAN_WAIT_SIGNAL = new RegExp(
     'CLOCKLESS_CAUSES',
     'outage-pause',
     'AWAITING-USER',
+    'awaiting[- ]confirmation',
     'repo-mandate',
     'ALLOWANCE_EXHAUSTED',
     'AskUserQuestion',

@@ -11,7 +11,7 @@
 // THE MARKER SYNTAX (this is the documentation of record)
 // ---------------------------------------------------------------------------
 //
-//   - [ ] 462. SOME POINT … AWAITING-CONFIRMATION(2026-07-30; push the version tag; safe prepared state: artifacts verified locally and no tag pushed)
+//   - [ ] 462. SOME POINT … AWAITING-CONFIRMATION(2026-07-30; push the version tag; safe prepared state: the build is verified locally and no tag is pushed)
 //   - [ ] 463. SOME POINT … SELF-DECIDED(2026-08-23; migrated advisory question)
 //   - [ ] 462. SOME POINT … USER-ANSWERED(2026-08-07)
 //

@@ -134,7 +134,7 @@
 | `dashboard-sync.mjs` | Stop hook (point 308, user mandate): the »Woran ich gerade arbeite« card must mirror REALITY — the checked-out git branch, the worktree agent pool and the TASKS.md point state — not only the declared focus. | — |
 | `decision-card-guard-core.mjs` | THE CHAT IS AN INBOX, NOT A NOTICE-BOARD — pure decision half of the Stop hook scripts/decision-card-guard.mjs (point 421). | — |
 | `decision-card-guard.mjs` | Stop hook (point 421, user ruling 29.07.2026): a request for a user DECISION exists as a card in "Von dir zu klären" — the chat may carry it as well, never instead. | — |
-| `defer-for-user.mjs` | DEFER A POINT THAT NEEDS THE USER'S DECISION — without stalling the batch (user request 22.07.2026; the mechanism behind it, point 450). | usage: |
+| `defer-for-user.mjs` | DEFER ONE NARROW CONFIRMATION — advisory questions are decided and recorded. | usage: |
 | `deploy-staleness-core.mjs` | IS THE DEPLOYED SITE STILL THE COMMIT `main` STANDS AT? | — |
 | `deploy-staleness.mjs` | THE STALE-SITE WATCHDOG (point 528) — one tick of "does the deployed site still serve `main`", run as its OWN process by scripts/batch-autostart.mjs. | — |
 | `deps-preflight.mjs` | A ONE-LINE DIAGNOSIS INSTEAD OF "'tsc' is not recognized" (point 429, bonus). | — |
@@ -282,7 +282,7 @@
 | `tool-output-intercept-core.mjs` | Pure PreToolUse input rewriting for the large producers named by the output budget. | — |
 | `tool-output-log-retention.mjs` | Retention for the tool-output budget's spill logs. | — |
 | `tool-output-shell.mjs` | Re-run the intercepted command in the caller's configured shell without turning it into a login session. | — |
-| `user-gate-core.mjs` | THE USER GATE — a point that waits on the user never jams the queue (point 450). | — |
+| `user-gate-core.mjs` | THE TYPED USER GATE — advice continues; only a real confirmation waits. | — |
 | `user-said-core.mjs` | WHAT THE USER SAID, AND WHEN — the pure half of scripts/user-said.mjs. | — |
 | `user-said.mjs` | WHAT THE USER SAID, AND WHEN — the CLI half. | usage: node scripts/user-said.mjs [--grep <regex>] [--since <iso\|90m\|6h\|2d\|07:31>] |
 | `vdzk-answer.mjs` | Carrier for an answer written into a session that may not edit the board. | usage: vdzk-answer.mjs --applied "<fragment><br>usage: vdzk-answer.mjs "<fragment>" --answer "<what the user decided> |
