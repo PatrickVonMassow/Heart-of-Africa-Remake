@@ -86,7 +86,6 @@ const HUMAN_WAIT_FILES = [
   'scripts/child-retry.mjs',
   'scripts/dashboard-guard-core.mjs',
   'scripts/defer-for-user.mjs',
-  'scripts/model-guard-core.mjs',
   'scripts/permission-autogrant-core.mjs',
   'scripts/review-sol-core.mjs',
   'scripts/user-gate-core.mjs',
