@@ -338,44 +338,6 @@ put it is the mistake this line exists to stop.
   first stage depends on 744's corrected exit path.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 669. A working author's pushes run CI over, and the supervisor pays for it (measured
-  13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
-  minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
-  `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
-  twelve minutes into the run the branch carried three runs, two `cancelled` and one in
-  progress, and NONE green. The SAME evening the same thing was measured on the CLAUDE lane,
-  where nothing pushes on a timer: a worktree agent committing and pushing at every
-  self-contained step — which CLAUDE.md §6 demands, because an uncommitted block is the one
-  state nothing can rescue — blocked the supervising session's turn end three times in a row,
-  each time for a commit in the middle of an unfinished point. Two consequences, both real:
-  `ci-status-guard` can never find a concluded green run on that branch while the author works,
-  and Actions minutes are spent on runs nobody reads. Measured again 19.08.2026 with TWO author
-  lanes in flight at once: three consecutive runs ended `cancelled` because the next checkpoint
-  overtook them, and while two lanes push in turn SOME run is always unconcluded — so the block
-  is not repeated but CONTINUOUS, and it grows with the agent pool rather than with the point.
-  FINAL STATE, and it has two halves because the two lanes fail for different reasons:
-  (1) THE TIMER LANE. `author-sol.mjs`'s interim pushes are what CLAUDE.md §6 already calls a
-  RESCUE commit — work committed because the run may die, no claim of completeness — so they are
-  written as one: `[skip ci]` in the SUBJECT plus a `Rescue: <what the author was in the middle
-  of>` trailer, which the `commit-msg` hook already demands in that pairing. The run's FINAL
-  commit — the one that claims the work is done — carries neither and goes through CI normally,
-  so the branch ends with exactly one meaningful run. If the author produces no final commit (it
-  died), the branch is left with only skipped runs, which is honest: nobody claims that state is
-  done.
-  (2) THE SUPERVISOR'S GATE. A Claude agent's per-step commits are NOT rescue commits and must
-  keep their CI — but they are not the supervisor's business either. `ci-status-guard` therefore
-  gates the turn end on `main` and on any branch OFFERED FOR LANDING, and reports — without
-  blocking — a branch whose author is still declared in flight. A branch stops being exempt the
-  moment its author's declaration ends, so nothing lands on an unproven run.
-  VERIFIABLE: Vitest over the commit-message builder (an interim commit carries both halves, the
-  final commit neither, and a run that dies leaves no commit claiming completeness); Vitest over
-  the guard's branch selection (main always gates, a landing candidate gates, a branch with a
-  live author reports only, and it gates again once that author is gone); plus the next live run
-  of EACH lane — the Sol lane showing ONE concluded CI run instead of a cancelled chain, the
-  Claude lane showing a supervising session whose turn ends are not held by its agent.
-  Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
-  ends, which is how the batch stalls.
-
 - [ ] 515. The parallel-session detector counts a placeholder owner as a second
   SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
   alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
