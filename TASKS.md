@@ -11246,13 +11246,24 @@ to land than a mechanism that needs a review.
   agent load its unit gate returns INCONCLUSIVE anyway, so the alert buys no information at
   all. Worse, an alert that cries wolf on every turn is the one a session stops reading on the
   turn it is real.
+  MEASURED AGAIN 23.08.2026, 18:07–18:11, by a second route the rule above does NOT cover: the
+  named session was already gone, but its leftover CHILD kept writing under its id — the
+  delegated author run for point 860, whose in-flight declaration the reading session had
+  adopted one turn earlier. Those writes land well AFTER the parent's `retiredAt`, so the rule
+  below would have called them a real violation, when the adoption had just made that child the
+  reader's own work. Two doctor gates in four minutes, both inconclusive under the load that
+  same child produced.
   FINAL STATE: a session whose `authorityState` is `retired` is not counted as parallel, and a
   write timestamped at or before that session's own `retiredAt` is never evidence of concurrent
-  work. A genuinely competing writer still raises the alert unchanged.
+  work. Nor is a write made under a retired session's id while the reader holds that session's
+  ADOPTED in-flight declaration — the adoption is what makes the child the reader's own work, so
+  the alert must consult it before calling a post-`retiredAt` write a violation. A genuinely
+  competing writer still raises the alert unchanged.
   VERIFIABLE: unit cases over the liveness probe — a retired record with a live pid and a
   handover-time write reports NO parallel session; a non-retired record with a live pid and a
-  recent write still reports one; and a retired record that wrote AFTER its `retiredAt` also
-  still reports one, because that is a real violation.
+  recent write still reports one; a retired record that wrote AFTER its `retiredAt` with NO
+  adopted declaration still reports one, because that is a real violation; and the same record
+  with the reader holding its adopted declaration reports none.
   Criticality: low — no product behaviour; the cost is wasted gate time and an alert that
   trains sessions to ignore it.
   Bundle: Session- & Repo-Hygiene.
