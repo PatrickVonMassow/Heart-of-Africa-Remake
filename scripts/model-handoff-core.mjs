@@ -36,6 +36,7 @@ export function readModelHandoff(value) {
   if (!route.length || !Number.isSafeInteger(targetIndex) || targetIndex < 0 || targetIndex >= route.length) return null
   if (!requestedBy || !Number.isFinite(requestedAt)) return null
   if (probeAfter !== null && !Number.isFinite(probeAfter)) return null
+  const offending = cleanHits(value.offending)
   return {
     version: MODEL_HANDOFF_VERSION,
     route,
@@ -43,8 +44,10 @@ export function readModelHandoff(value) {
     requestedBy,
     requestedAt,
     probeAfter,
-    offending: cleanHits(value.offending),
-    decisionRecord: value.decisionRecord && typeof value.decisionRecord === 'object' ? value.decisionRecord : null,
+    offending,
+    decisionRecord: value.decisionRecord && typeof value.decisionRecord === 'object'
+      ? value.decisionRecord
+      : modelHandoffDecisionRecord({ route, targetIndex, now: requestedAt, hits: offending, probeAfter }),
   }
 }
 

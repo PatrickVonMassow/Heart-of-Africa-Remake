@@ -15,6 +15,7 @@ import {
   describeDecision,
   emptyState,
   childRecoveryRecord,
+  fallbackRecoveryDecision,
   outageProbeReason,
   outageWitnesses,
   pointRecord,
@@ -424,6 +425,17 @@ describe('state transitions are pure', () => {
       retryAt: NOW + CHILD_RECOVERY_PROBE_MS,
     })
     expect(rec.body).toMatch(/resume, fix, exchange oder requeue/)
+  })
+
+  it('an internal error becomes the same durable capped exchange shape', () => {
+    const d = fallbackRecoveryDecision({ point: 421, branch: 'feat/421-x', error: 'state write failed', now: NOW })
+    expect(d).toMatchObject({
+      verdict: 'recover',
+      recoveryClass: 'internal-error',
+      recoveryAction: 'exchange',
+      retryAt: NOW + CHILD_RECOVERY_PROBE_MS,
+    })
+    expect(recordRecovery(emptyState(), d).points['421'].recovery.decisionRecord.body).toMatch(/Retroaktives Veto/)
   })
 
   it('childKey falls back to point:branch when no child id is known', () => {

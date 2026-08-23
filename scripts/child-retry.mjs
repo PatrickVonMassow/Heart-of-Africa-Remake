@@ -40,8 +40,7 @@ import {
   POINT_TOKEN_CAP,
   describeDecision,
   emptyState,
-  CHILD_RECOVERY_PROBE_MS,
-  childRecoveryRecord,
+  fallbackRecoveryDecision,
   outageProbeReason,
   recordCompletion,
   recordDeath,
@@ -334,21 +333,16 @@ if (isCli) {
     code = await main()
   } catch (e) {
     // FAIL-OPEN: never trap the session and never manufacture a human terminal.
-    const at = Date.now()
-    const retryAt = at + CHILD_RECOVERY_PROBE_MS
-    const reason = `child-retry could not classify the failure (${e?.message ?? e}); exchange the point and retry the diagnosis on the capped clock`
-    const decisionRecord = childRecoveryRecord({
+    const decision = fallbackRecoveryDecision({
       point: Number(flag('--point')) || null,
       branch: flag('--branch'),
-      recoveryClass: 'internal-error',
-      recoveryAction: 'exchange',
-      reason,
-      decidedAt: at,
-      retryAt,
+      briefRevision: flag('--brief-revision'),
+      error: e?.message ?? e,
     })
-    boardCard(decisionRecord.title, decisionRecord.body)
-    console.log(`RECOVER — ${reason}; next attempt ${new Date(retryAt).toISOString()}`)
-    logLine(`internal error → exchange; next attempt ${new Date(retryAt).toISOString()}: ${e?.message ?? e}`)
+    try { writeState(recordRecovery(readState(), decision)) } catch { /* the board/log still retain the same decision */ }
+    boardCard(decision.decisionRecord.title, decision.decisionRecord.body)
+    console.log(describeDecision(decision))
+    logLine(`internal error → exchange; next attempt ${new Date(decision.retryAt).toISOString()}: ${e?.message ?? e}`)
     code = 0
   }
   process.exit(code)

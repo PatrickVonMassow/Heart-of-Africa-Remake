@@ -136,8 +136,8 @@ describe('the CLI wires terminal decisions without a person-only exit', () => {
   })
 
   it('turns an internal classifier error into a capped exchange record', () => {
-    expect(source).toMatch(/recoveryClass: 'internal-error'/)
-    expect(source).toMatch(/recoveryAction: 'exchange'/)
-    expect(source).toMatch(/retryAt = at \+ CHILD_RECOVERY_PROBE_MS/)
+    expect(source).toMatch(/fallbackRecoveryDecision\(\{/)
+    expect(source).toMatch(/writeState\(recordRecovery\(readState\(\), decision\)\)/)
+    expect(source).toMatch(/boardCard\(decision\.decisionRecord\.title, decision\.decisionRecord\.body\)/)
   })
 })

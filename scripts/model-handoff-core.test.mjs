@@ -87,6 +87,19 @@ describe('forbidden serving-model handoff', () => {
     expect(readModelHandoff({ version: 1, route, targetIndex: 99, requestedBy: 'x', requestedAt: NOW })).toBeNull()
     expect(modelHandoffSpawn({})).toBeNull()
   })
+
+  it('backfills a veto record into valid pre-record state', () => {
+    const state = {
+      version: 1,
+      route,
+      targetIndex: 1,
+      requestedBy: 'old-session',
+      requestedAt: NOW,
+      probeAfter: NOW + 1000,
+      offending: hits,
+    }
+    expect(readModelHandoff(state).decisionRecord.body).toMatch(/Retroaktives Veto/)
+  })
 })
 
 describe('the guard and launcher use the state machine', () => {

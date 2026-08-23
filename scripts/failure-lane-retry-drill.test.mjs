@@ -86,7 +86,7 @@ describe('failure-lane terminal drill', () => {
       nextAttemptAt: corruption.nextAttemptAt,
       decidedAt: NOW,
       capMs: ALERT_GAPS_MS.at(-1),
-      record: { title: corruption.decisionCard, body: corruption.reason },
+      record: corruption.decisionRecord,
     },
     {
       lane: 'D3 forbidden author',

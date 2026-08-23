@@ -252,6 +252,14 @@ export function escalationDecision({
     const repair = corruptionRecovery(alertClass)
     const probeAfterMs = gaps[pauseRung]
     const decisionCard = corruptionDecisionCard(title, alertClass)
+    const nextAttemptAt = now + probeAfterMs
+    const decisionRecord = {
+      title: decisionCard,
+      body:
+        `Automatische Entscheidung: ${repair.remedy} für „${title || 'unnamed alert'}“ ausführen; ` +
+        `nächster Versuch ${new Date(nextAttemptAt).toISOString()}. Retroaktives Veto: „Veto“ mit dem ` +
+        `letzten zulässigen Commit; Doctor-Quarantäne und Rescue-Nachweise bleiben erhalten.`,
+    }
     return {
       key,
       action: 'repair-and-probe',
@@ -260,11 +268,12 @@ export function escalationDecision({
       priority: prio(rung),
       dueInMs: 0,
       probeAfterMs,
-      nextAttemptAt: now + probeAfterMs,
+      nextAttemptAt,
       reset: false,
       alertClass,
       repair,
       decisionCard,
+      decisionRecord,
       reason:
         `last rung: corruption class "${alertClass}" runs ${repair.remedy}, records decision card ` +
         `"${decisionCard}", and probes again in ${Math.round(probeAfterMs / 60000)} min`,

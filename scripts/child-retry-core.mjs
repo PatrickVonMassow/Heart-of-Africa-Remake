@@ -214,6 +214,29 @@ export function childRecoveryRecord({ point, branch, recoveryClass, recoveryActi
   }
 }
 
+/** The outer command's fail-open answer when classification or I/O throws. */
+export function fallbackRecoveryDecision({ point = null, branch = null, briefRevision = null, error = '', now = Date.now() } = {}) {
+  const reason = `child-retry could not classify the failure (${String(error || 'unknown error')}); exchange the point and retry the diagnosis on the capped clock`
+  return recover({
+    point,
+    branch,
+    briefRevision,
+    childKey: childKey({ point, branch }),
+    signature: 'internal-error',
+    transient: false,
+    retriesSpent: 0,
+    tokensUsed: 0,
+    tokenCap: POINT_TOKEN_CAP,
+  }, {
+    action: 'exchange',
+    recoveryClass: 'internal-error',
+    reason,
+    now,
+    backoffs: [CHILD_RECOVERY_PROBE_MS],
+    branchDiagnosis: { exists: Boolean(branch), committedSinceSpawn: false, branch },
+  })
+}
+
 function recover(base, { action, recoveryClass, reason, now, backoffs, branchDiagnosis = null }) {
   const backoffMs = recoveryDelay(backoffs)
   const retryAt = now + backoffMs
