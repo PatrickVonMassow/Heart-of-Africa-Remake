@@ -153,6 +153,16 @@ describe('defer-for-user — reading the flags', () => {
     expect(r.stdout).toMatch(/node scripts\/defer-for-user\.mjs <point> --act/)
   })
 
+  it('reads a flag-shaped token in a value slot as a value, not as a repeated flag', () => {
+    // `-h` twice — but both times where a VALUE belongs. The line is still
+    // refused, and the reason must be the field it failed, never a repeat that
+    // was never typed.
+    const r = run('42', '--act', 'release-tag', '--detail', '-h', '--prepared', '-h')
+    expect(r.stderr).not.toMatch(/given more than once/)
+    expect(r.stderr).toMatch(/detail/)
+    expect(tasks()).not.toContain('AWAITING-CONFIRMATION')
+  })
+
   it('reports a gate it wrote, and clears it back to the head of the queue', () => {
     run('42', '--act', 'release-tag', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
     expect(run('--list').stdout).toMatch(/42 awaits confirmation/)

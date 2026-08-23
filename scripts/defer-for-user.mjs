@@ -103,6 +103,12 @@ const option = (args, name) => {
  */
 const FLAG_ALIASES = new Map([['-h', '--help']])
 
+/** The flags that consume NO value. Every OTHER flag takes the next token, and
+ *  a token sitting in that value slot is never read as a flag — otherwise a
+ *  field whose value is spelled like one would be refused for the wrong reason
+ *  (sixth cross-vendor round, GPT-5.6 Sol, 23.08.2026). */
+const VALUELESS_FLAGS = new Set(['--help', '-h', '--list', '--migrate'])
+
 /**
  * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round, GPT-5.6
  * Sol, 23.08.2026). `indexOf` keeps the FIRST value and drops the rest in
@@ -111,8 +117,10 @@ const FLAG_ALIASES = new Map([['-h', '--help']])
  */
 const repeatedFlag = (args) => {
   const seen = new Set()
-  for (const raw of args) {
-    const arg = String(raw)
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = String(args[i])
+    const previous = i > 0 ? String(args[i - 1]) : ''
+    if (previous.startsWith('-') && !VALUELESS_FLAGS.has(previous)) continue
     const flag = FLAG_ALIASES.get(arg) ?? arg
     if (!flag.startsWith('--')) continue
     // Named as it was TYPED, with the flag it means beside it when the two
