@@ -11245,3 +11245,47 @@ to land than a mechanism that needs a review.
   Criticality: low — no product behaviour; the cost is a reference document that hands a reader
   a broken command, and a test that reads as coverage for a class it cannot detect.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 851. Re-running a cancelled CI run cancels the newer commit's run on the same branch.
+  MEASURED 23.08.2026, 06:4x. `scripts/ci-failure-cause-core.mjs` tells the session that a
+  cancellation can only be cleared by re-running the workflow — "No push in this repository can
+  clear a cancellation — re-run the workflow and confirm it goes green" — and omits what that
+  costs. `.github/workflows/ci.yml` uses concurrency group `ci-${{ github.ref }}` with
+  `cancel-in-progress: true`, so re-running an OLDER sha's run on `main` joins the same group as
+  the run for the branch tip and CANCELS it. Today that turned one cancellation into two:
+  re-running 32617308480 (d0626dcc) cancelled the in-progress 32618119861 (f86464b9), which then
+  needed its own re-run.
+  FINAL STATE: the repair advice names the tip's run rather than the stale one, because the tip's
+  verdict is the one the batch actually needs; where it still advises a re-run of an older run it
+  says to do so only while no run for that ref is in progress, and to re-run the tip afterwards.
+  VERIFIABLE: unit cases over the cause reporter — a cancelled older run while a newer run for the
+  same ref is in progress yields advice that names the NEWER run and does not order an immediate
+  re-run of the older one; a cancelled run that IS the tip yields the plain re-run advice
+  unchanged.
+  Criticality: low — no product behaviour; the cost is a self-inflicted second cancellation and
+  the batch time spent clearing it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 852. A landing gate cannot run while another author lane commits. MEASURED 23.08.2026,
+  07:47, landing point 669 while a parallel worktree authored point 834. `land-point`'s fast gate
+  runs the unit suite, and `scripts/repository-integrity.mjs` asserts that no ref moved during the
+  run; the other lane's checkpoint commit moved `refs/heads/feat/834-durable-authoring-lane`
+  mid-suite, so the gate went red with "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN" although no
+  test failed. The merge had already landed on `main`, so the landing stopped half-way and had to
+  be resumed.
+  WHY IT IS STRUCTURAL: under maximal delegation three lanes commit every few minutes against a
+  ~130 s unit suite, so a landing gets through by luck, and the retry that succeeds is
+  indistinguishable from a retry that hid a real defect (CLAUDE.md §7.2: a retry is SUSPECT and
+  covers nothing). The detector deliberately has no env knob, and its own message names the
+  legitimate case it cannot distinguish.
+  FINAL STATE: the integrity check accepts a set of refs the CALLER declares as foreign and
+  expected — the in-flight declaration already names exactly those branches — so a moved ref
+  belonging to a declared other lane is not a finding, while a moved ref nobody declared still is.
+  The declaration is the only source of that set; no flag lets a caller wave a ref through by hand.
+  VERIFIABLE: unit cases over the integrity check — a ref moved that the declaration names is
+  clean; the same ref moved with no declaration is a finding; a ref moved that the declaration does
+  NOT name is a finding even while other lanes are declared; and `main` moving is a finding under
+  every declaration.
+  Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
+  that train sessions to retry a suspect gate.
+  Bundle: Session- & Repo-Hygiene.
