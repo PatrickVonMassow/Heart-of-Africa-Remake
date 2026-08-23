@@ -262,6 +262,18 @@ describe('delta E — the watchdog alert decision', () => {
     expect(d.recurring).toBe(true)
   })
 
+  it('keeps a transport hiccup plus an overdue publish condition-shaped', () => {
+    const d = watchdogDecision({
+      verdict: 'transport',
+      reason: 'viewer answered',
+      state: { publishDue: { at: now - WATCHDOG_TICK_MS * 2 } },
+      now,
+    })
+    expect(d.message).toMatch(/fetch FAILED.*not stale/i)
+    expect(d.message).toMatch(/publish has been due/i)
+    expect(d.recurring).toBe(false)
+  })
+
   it('repeats itself at most once per fault', () => {
     const args = { verdict: 'behind', live: 'a', expected: 'b', state: {}, now }
     const first = watchdogDecision(args)

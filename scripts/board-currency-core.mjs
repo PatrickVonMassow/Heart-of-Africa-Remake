@@ -362,12 +362,14 @@ export function watchdogDecision({
   // the whole streak is logged by the launcher and reported to nobody.
 
   const dueAt = Number(s.publishDue && s.publishDue.at)
-  if (Number.isFinite(dueAt) && dueAt > 0 && now - dueAt > tickMs) {
+  const publishDueStanding = Number.isFinite(dueAt) && dueAt > 0 && now - dueAt > tickMs
+  if (publishDueStanding) {
     parts.push(`A board publish has been due for ${Math.round((now - dueAt) / 60000)} min and no session has run it.`)
     priority = 'high'
   }
   const failedAt = Number(s.publishFailed && s.publishFailed.at)
-  if (Number.isFinite(failedAt) && failedAt > 0 && now - failedAt > tickMs) {
+  const publishFailureStanding = Number.isFinite(failedAt) && failedAt > 0 && now - failedAt > tickMs
+  if (publishFailureStanding) {
     parts.push(`The last publish FAILED ${Math.round((now - failedAt) / 60000)} min ago and was never retried.`)
     priority = 'urgent'
   }
@@ -392,6 +394,9 @@ export function watchdogDecision({
     title,
     message: `${parts.join(' ')} ${BOARD_PAGE_URL}`,
     priority,
-    recurring: verdict === 'transport',
+    // A transport EVENT can share this message with an overdue/failed publish.
+    // That compound alert is condition-shaped: its identical recurrence says
+    // the publish is still outstanding, not merely that another fetch flickered.
+    recurring: verdict === 'transport' && !publishDueStanding && !publishFailureStanding,
   }
 }
