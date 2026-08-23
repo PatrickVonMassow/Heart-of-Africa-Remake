@@ -11472,4 +11472,25 @@ to land than a mechanism that needs a review.
   a deliberately mis-numbered pointer and a deliberately orphaned section each still fail.
   Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
   read a red as noise.
-  Bundle: Testinfrastruktur.
+  Bundle: Testinfrastruktur.- [ ] 869. The board command cannot be run from a session that has no `CLAUDE_SESSION_ID`. MEASURED
+  23.08.2026 in a chat-responder session: the Stop hook names the exact command for every open
+  decision card — `node scripts/board.mjs vdzk-keep "<title>"` — but that command identifies its
+  session through `selectedSession()` in `scripts/decision-card-guard.mjs`, which reads
+  `CLAUDE_SESSION_ID` from the environment. A chat-responder session does not carry it, and
+  `.claude/decision-card-guard-state.json` held 30 sessions, so the command aborted with "cannot
+  identify this session". `board.mjs` has no `--session` flag, so the only way through was to find
+  the own id by hand in the guard state (the one entry with a set `userMessage.id`, which matches the
+  scratchpad path segment rather than the transcript directory under `projects/`) and to repeat the
+  command with `CLAUDE_SESSION_ID=…` in front of it.
+  WHAT IT COSTS: a command the hook itself prescribes is unusable in the session that is told to run
+  it, and the way around it is manual state archaeology — the class of detour the project has ruled
+  out.
+  FINAL STATE: `board.mjs` takes `--session <id>` exactly as `guard-preflight.mjs` does, and the Stop
+  hook prints the id it already knows inside the command it suggests, so the suggested line runs as
+  printed.
+  VERIFIABLE: with `CLAUDE_SESSION_ID` unset, `node scripts/board.mjs vdzk-keep "<title>" --session
+  <id>` succeeds; without either the id or the flag it still refuses; and the command the Stop hook
+  prints carries the id.
+  Criticality: medium — no product behaviour, but a prescribed command that cannot be run teaches the
+  session to work around its own tooling.
+  Bundle: Chat & Tafel.
