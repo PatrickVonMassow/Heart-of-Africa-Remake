@@ -141,6 +141,15 @@ export function attemptIdentity(fields = {}) {
     (f) => fields[f] === undefined || fields[f] === null || fields[f] === '',
   )
   if (missing.length) return { ok: false, missing, reason: `incomplete identity: ${missing.join(', ')}` }
+  // The constructor must not mint an identity its own comparison layer cannot use:
+  // `sameProcess` requires a positive integer pid and a finite start time, so an
+  // identity carrying anything else could never be recognised as itself.
+  if (!Number.isInteger(fields.pid) || fields.pid < 1) {
+    return { ok: false, missing: ['pid'], reason: 'incomplete identity: pid is not a positive integer' }
+  }
+  if (!Number.isFinite(fields.pidStartedAt)) {
+    return { ok: false, missing: ['pidStartedAt'], reason: 'incomplete identity: pidStartedAt is not a finite time' }
+  }
   const identity = {}
   for (const f of ATTEMPT_IDENTITY_FIELDS) identity[f] = fields[f]
   return { ok: true, identity: Object.freeze(identity) }
@@ -415,7 +424,14 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
   if (current && expectedOid === '') {
     return { ok: false, reason: 'a published credential cannot be leased as absent' }
   }
-  if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
+  // "Carries work" means at least one REAL work ref: an array (a bare string would
+  // spread into characters), every element a non-empty ref name, and none of them
+  // the credential ref — that one is appended by the push itself and is not work.
+  if (!Array.isArray(refs) || refs.some((r) => typeof r !== 'string' || !r)) {
+    return { ok: false, reason: 'refs must be an array of ref names' }
+  }
+  const workRefs = refs.filter((r) => r !== CREDENTIAL_REF)
+  if (!workRefs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
   return {
     ok: true,
     // The VALUE the caller must write into the credential ref, returned beside the
@@ -459,10 +475,15 @@ export function mayMintFence({ fenceStore = null, journalOk = false, journalHigh
   if (typeof fenceStore.generation !== 'string' || !fenceStore.generation) {
     return { ok: false, reason: 'the fence store has lost its generation and refuses to invent one' }
   }
-  if (!Number.isInteger(fenceStore.fence) || fenceStore.fence < 1) {
+  // SAFE integers, because this is the one place a fence is incremented: at 2^53,
+  // fence + 1 === fence, and a mint that "succeeds" without advancing hands the
+  // same number to two coordinators.
+  if (!Number.isSafeInteger(fenceStore.fence) || fenceStore.fence < 1 || !Number.isSafeInteger(fenceStore.fence + 1)) {
     return { ok: false, reason: 'the fence store carries no usable fence' }
   }
-  if (!journalOk) return { ok: false, reason: 'the journal is missing or fails its checksums; minting is refused' }
+  // The same affirmative rule as the probes: `journalOk` is a verdict, and only
+  // `true` is the verdict "checked and sound" — a truthy '"false"' is not.
+  if (journalOk !== true) return { ok: false, reason: 'the journal is missing or fails its checksums; minting is refused' }
   // Null and undefined mean an EMPTY journal, which constrains nothing. Anything
   // else that is not a POSITIVE integer — journal fences start at 1 — is a high
   // water mark that could not be computed, and an uncomputable constraint is a
@@ -606,13 +627,16 @@ export function registerDaemonCommand(table, name, spec) {
 export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } = {}) {
   const spec = table[name]
   if (!spec) return { ok: false, reason: `unknown command: ${name}` }
+  // The validator stays TOTAL: a payload that is not an object is a refusal, not a
+  // TypeError out of Object.hasOwn.
+  if (!payload || typeof payload !== 'object') return { ok: false, reason: `cannot key ${name}: the payload is not an object` }
   // Own properties only — an inherited field is not an answer — and non-finite
-  // numbers are refused: canonical JSON serialises NaN and Infinity both as null,
-  // which would collide two distinct payloads into one key.
+  // numbers are refused AT EVERY DEPTH: canonical JSON serialises NaN and Infinity
+  // as null wherever they sit, so {x:NaN} and {x:null} would collide one key.
   const fieldValue = (f) => (Object.hasOwn(payload, f) ? payload[f] : undefined)
   const missing = spec.keyFields.filter((f) => fieldValue(f) === undefined || fieldValue(f) === null)
   if (missing.length) return { ok: false, reason: `cannot key ${name}: missing ${missing.join(', ')}` }
-  const unkeyable = spec.keyFields.filter((f) => typeof fieldValue(f) === 'number' && !Number.isFinite(fieldValue(f)))
+  const unkeyable = spec.keyFields.filter((f) => containsNonFinite(fieldValue(f)))
   if (unkeyable.length) {
     return { ok: false, reason: `cannot key ${name}: non-finite ${unkeyable.join(', ')}` }
   }
@@ -624,6 +648,16 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
   for (const f of spec.keyFields) picked[f] = fieldValue(f)
   const material = canonicalJson(picked)
   return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex').slice(0, 16)}` }
+}
+
+/** A non-finite number at any depth of a key value. Hoisted out of idempotencyKey
+ *  so the rule reads as one predicate: what canonical JSON would flatten to null
+ *  cannot take part in a key. */
+function containsNonFinite(value) {
+  if (typeof value === 'number') return !Number.isFinite(value)
+  if (Array.isArray(value)) return value.some(containsNonFinite)
+  if (value && typeof value === 'object') return Object.values(value).some(containsNonFinite)
+  return false
 }
 
 /** Applying a key that has already been applied changes nothing and says so. This
@@ -643,12 +677,19 @@ export function applyOnce(applied, key, mutate) {
 // ---------------------------------------------------------------------------
 
 /** Canonical JSON: keys sorted at every depth, so the same entry always hashes to
- *  the same value regardless of who assembled the object. */
+ *  the same value regardless of who assembled the object. Follows JSON.stringify's
+ *  own semantics for the values JSON cannot carry — an unserialisable ARRAY element
+ *  (undefined, a hole, a function) becomes `null`, an unserialisable object VALUE
+ *  drops its key — because `[${undefined}]` would be the invalid text `[,...]`, and
+ *  an invalid frame reads as corruption it is not. */
 export function canonicalJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (Array.isArray(value)) {
+    // Array.from, not map: map skips holes, and a skipped hole joins as ''.
+    return `[${Array.from(value, (v) => canonicalJson(v) ?? 'null').join(',')}]`
+  }
   const keys = Object.keys(value)
-    .filter((k) => value[k] !== undefined)
+    .filter((k) => canonicalJson(value[k]) !== undefined)
     .sort()
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(',')}}`
 }
@@ -674,6 +715,11 @@ export function frameEntry(entry) {
     return { ok: false, reason: 'an entry needs the fence it was written under' }
   }
   if (!own.kind) return { ok: false, reason: 'an entry needs a kind' }
+  // A WRITER frames only the current schema version. Reading an older, migratable
+  // version is the parser's business; writing one — or a future one — never is.
+  if (own.v !== undefined && own.v !== SCHEMA_VERSION) {
+    return { ok: false, reason: `a writer frames only schema version ${SCHEMA_VERSION}, not ${own.v}` }
+  }
   const body = { ...own, v: own.v ?? SCHEMA_VERSION }
   return { ok: true, line: `${canonicalJson({ ...body, c: checksumOf(body) })}\n` }
 }
@@ -683,6 +729,11 @@ export function frameEntry(entry) {
  *  crash, a checksum mismatch in the middle is corruption. */
 export function parseFramedLine(line) {
   if (typeof line !== 'string' || !line.trim()) return { ok: false, reason: 'empty' }
+  // The newline IS the frame delimiter: a line that parses but never reached its
+  // delimiter is a crash between the bytes and the terminator, and reading it as
+  // complete would call the same bytes data or truncation depending on where the
+  // crash fell inside one write.
+  if (!line.endsWith('\n')) return { ok: false, reason: 'truncated: the frame delimiter is missing' }
   let parsed
   try {
     parsed = JSON.parse(line)
@@ -698,6 +749,10 @@ export function parseFramedLine(line) {
   if (!Number.isInteger(body.seq) || body.seq < 1 || !Number.isInteger(body.fence) || body.fence < 1 || !body.kind) {
     return { ok: false, reason: 'malformed: a checksummed line without seq, fence and kind is still not an entry' }
   }
+  // The schema version rule applies to journal lines like to every other record: a
+  // checksummed future-version entry is still a shape this code does not know.
+  const version = checkSchemaVersion(body.v)
+  if (version.verdict === 'refuse') return { ok: false, reason: `version: ${version.reason}` }
   return { ok: true, entry: body }
 }
 

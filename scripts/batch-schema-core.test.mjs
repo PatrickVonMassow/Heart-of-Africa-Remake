@@ -129,6 +129,13 @@ describe('identity — pid and pid start time, never a bare pid', () => {
     expect(attemptIdentity({ ...full, branch: '' }).ok).toBe(false)
   })
 
+  it('refuses an identity its own comparison layer could never recognise', () => {
+    // sameProcess requires a positive integer pid and a finite start time.
+    expect(attemptIdentity({ ...full, pid: 0 }).ok).toBe(false)
+    expect(attemptIdentity({ ...full, pid: '4711' }).ok).toBe(false)
+    expect(attemptIdentity({ ...full, pidStartedAt: NaN }).ok).toBe(false)
+  })
+
   it('a recycled pid is not the same process', () => {
     const a = { pid: 4711, pidStartedAt: NOW }
     expect(sameProcess(a, { pid: 4711, pidStartedAt: NOW + 1500 })).toBe(true)
@@ -364,6 +371,14 @@ describe('the coordinator credential', () => {
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [] }).ok).toBe(false)
   })
 
+  it('work refs are an array of ref names, and the credential ref alone is not work', () => {
+    const next = advancedCredential(current).credential
+    // A bare string would spread into one-character push arguments.
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: 'main' }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', ''] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [CREDENTIAL_REF] }).reason).toMatch(/carry work/)
+  })
+
   it('a publication never changes the generation; recovery mints one', () => {
     const foreign = credential({ generation: 'g-otherrrr', fence: 604, seq: 4 }).credential
     expect(publicationPush({ current, next: foreign, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(false)
@@ -404,6 +419,16 @@ describe('the coordinator credential', () => {
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: -3 }).ok).toBe(false)
     // Null and undefined mean an EMPTY journal, which really does constrain nothing.
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: null }).ok).toBe(true)
+  })
+
+  it('the journal verdict is affirmative, and a fence that cannot advance is not usable', () => {
+    const store = { generation: gen, fence: 604 }
+    expect(mayMintFence({ fenceStore: store, journalOk: 'false' }).ok).toBe(false)
+    expect(mayMintFence({ fenceStore: store, journalOk: {} }).ok).toBe(false)
+    // At 2^53, fence + 1 === fence: a mint that "succeeds" without advancing hands
+    // the same number to two coordinators.
+    expect(mayMintFence({ fenceStore: { generation: gen, fence: 2 ** 53 }, journalOk: true }).ok).toBe(false)
+    expect(mayMintFence({ fenceStore: { generation: gen, fence: Number.MAX_SAFE_INTEGER }, journalOk: true }).ok).toBe(false)
   })
 
   it('the lease and the claimed current credential must agree about absence, in both directions', () => {
@@ -586,6 +611,16 @@ describe('the daemon command table', () => {
     expect(idempotencyKey('probe-cmd', inherited, { table }).reason).toMatch(/missing/)
   })
 
+  it('non-finite values are refused at every depth, and a non-object payload refuses instead of throwing', () => {
+    // {x:NaN} and {x:null} canonicalise identically — the collision one level down.
+    const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1'] })
+    expect(idempotencyKey('probe-cmd', { f1: { x: NaN } }, { table }).reason).toMatch(/non-finite/)
+    expect(idempotencyKey('probe-cmd', { f1: [1, [Infinity]] }, { table }).reason).toMatch(/non-finite/)
+    expect(idempotencyKey('probe-cmd', { f1: { x: null } }, { table }).ok).toBe(true)
+    expect(idempotencyKey('probe-cmd', null, { table }).reason).toMatch(/not an object/)
+    expect(idempotencyKey('probe-cmd', 'payload', { table }).reason).toMatch(/not an object/)
+  })
+
   it('a mutation without a key cannot be applied at all', () => {
     expect(applyOnce(new Set(), '', () => {}).ok).toBe(false)
   })
@@ -632,20 +667,46 @@ describe('journal framing', () => {
   it('catches a tampered record in the middle by its checksum', () => {
     const parsedLine = JSON.parse(frameEntry(entry).line)
     parsedLine.payload.state = 'landed'
-    expect(parseFramedLine(JSON.stringify(parsedLine)).reason).toMatch(/checksum/)
+    expect(parseFramedLine(`${JSON.stringify(parsedLine)}\n`).reason).toMatch(/checksum/)
     const { c: _dropped, ...noChecksum } = parsedLine
-    expect(parseFramedLine(JSON.stringify(noChecksum)).reason).toMatch(/no checksum/)
+    expect(parseFramedLine(`${JSON.stringify(noChecksum)}\n`).reason).toMatch(/no checksum/)
     expect(parseFramedLine('   ').ok).toBe(false)
+  })
+
+  it('a frame that never reached its delimiter is a truncated tail, not data', () => {
+    const line = frameEntry(entry).line
+    expect(parseFramedLine(line).ok).toBe(true)
+    expect(parseFramedLine(line.slice(0, -1)).reason).toMatch(/truncated/)
+  })
+
+  it('a writer frames only the current schema version, and the parser refuses a future one', () => {
+    expect(frameEntry({ ...entry, v: 0 }).ok).toBe(false)
+    expect(frameEntry({ ...entry, v: SCHEMA_VERSION + 1 }).ok).toBe(false)
+    expect(frameEntry({ ...entry, v: SCHEMA_VERSION }).ok).toBe(true)
+    // A correctly checksummed future-version line is still a shape this code does
+    // not know — the schema version rule applies to journal lines too.
+    const future = { ...entry, v: SCHEMA_VERSION + 1 }
+    const line = `${canonicalJson({ ...future, c: checksumOf(future) })}\n`
+    expect(parseFramedLine(line).reason).toMatch(/version/)
+  })
+
+  it('canonical JSON emits valid JSON for the values JSON cannot carry', () => {
+    expect(canonicalJson([undefined, 1])).toBe('[null,1]')
+    expect(canonicalJson([undefined])).toBe('[null]')
+    // eslint-disable-next-line no-sparse-arrays
+    expect(canonicalJson([, 1])).toBe('[null,1]')
+    expect(canonicalJson({ a: 1, b: () => {} })).toBe('{"a":1}')
+    expect(() => JSON.parse(canonicalJson({ list: [undefined, { x: 1 }] }))).not.toThrow()
   })
 
   it('a checksummed line that is not a frame is still refused', () => {
     // The checksum proves integrity, not validity: this line checksums perfectly
     // and still names no position and no fence, so it must not enter as data.
     const bare = { kind: 'record-state', payload: {} }
-    const line = canonicalJson({ ...bare, c: checksumOf(bare) })
+    const line = `${canonicalJson({ ...bare, c: checksumOf(bare) })}\n`
     expect(parseFramedLine(line).reason).toMatch(/malformed/)
     const noKind = { seq: 3, fence: 604, payload: {} }
-    expect(parseFramedLine(canonicalJson({ ...noKind, c: checksumOf(noKind) })).reason).toMatch(/malformed/)
+    expect(parseFramedLine(`${canonicalJson({ ...noKind, c: checksumOf(noKind) })}\n`).reason).toMatch(/malformed/)
   })
 
   it('hashes by meaning rather than by key order', () => {
