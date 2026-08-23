@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
 | 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
@@ -1321,7 +1322,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 02:36 · Quellen-Fingerprint: `4684fb27bab9…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 05:17 · Quellen-Fingerprint: `ffb6889a39f4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1416,10 +1417,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 87 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
+Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 88 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: 4684fb27bab9ac5af7759043922197fa8405ba41bce7f5d803e38bd465ed2b67 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T00:36:34.647Z -->
+<!-- RETRO-FINGERPRINT: ffb6889a39f401c626fcaa648eb459317e88fba291860dcef9ed18aa39de1a41 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T03:17:18.993Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2906,3 +2907,34 @@ oder die Weiche nennt das Ziel gar nicht erst. Prüffrage bei jeder Verzweigung:
 gewählt wird, welches Kommando führt ihn aus, und was schreibt es auf?* Und wo die Antwort fehlt,
 gehört sie als eigener Punkt vor den, der auf sie wartet — nicht hinter ihn. Verwandt mit §3.112
 (der verdrahtete, aber wirkungslose Mechanismus) und mit der Trennung von *benannt* und *gebaut*.
+
+### 3.163 Der Mechanismus stand, aber niemand war gezwungen, ihn zu füttern
+
+Am frühen Morgen des 23.08.2026 fielen zwei Funde in derselben Stunde zusammen, die dieselbe
+Anatomie haben. Erstens: Die Batch-Sitzung der Nacht drehte fünfzehn Prüfrunden zu einem Punkt in
+einem einzigen, nie endenden Turn — und jede Aktualitäts-Sicherung des Boards (Karten-Abgleich,
+Publish-Zwang) hängt an der Stop-Kette, die nur ein Turn-Ende auslöst. Die öffentliche Karte zeigte
+zweieinhalb Stunden lang erledigte Arbeit von 02:30, während die Maschine ununterbrochen arbeitete;
+der Nutzer musste fragen, ob überhaupt noch etwas läuft (Punkt 848). Zweitens: Dieselben fünfzehn
+Runden standen in keiner Zeile des Mechanism-Ledgers. Jedes Prüf-Log endete mit dem fertigen
+Record-Kommando — ausgeführt hat es niemand, und dem Kommando im Log fehlte zudem das
+`--point`-Feld, an dem die Zählung hängt. Die Folge: Die §6-Eskalationsschwelle (fünf erfolglose
+Runden) las 0 statt 14, und die Weiche, die den Punkt längst in eine andere Bahn hätte legen
+müssen, bekam ihre Fahrkarte nie zu sehen. Erst die Nachfolge-Sitzung trug die Verdicts aus den
+Logs nach — dann eskalierte der Router sofort und regelgemäß.
+
+Die gemeinsame Anatomie: Beide Mechanismen existierten, waren getestet und hätten funktioniert —
+ihre EINGABE aber entstand auf keinem erzwungenen Pfad. Ein Guard, der am Turn-Ende ankert, deckt
+genau die Sitzungen nicht, die am längsten arbeiten, und das sind die wertvollsten Fenster. Ein
+Schwellwert, dessen Zähler von einer freiwilligen Protokollzeile lebt, zählt Null, solange die
+Protokollzeile Höflichkeit bleibt. Das ist die Steigerung der Lehre aus §3.135 („formal vorhanden,
+faktisch unsichtbar"): Dort war die Meldung im Erfolgsfall unlesbar, hier ist der ganze Mechanismus
+von einer Zuarbeit abhängig, die kein Werkzeug erzwingt und keine Prüfung vermisst.
+
+**Lehre:** Zu jedem Mechanismus gehört die Frage, WER seine Eingabe schreibt und WAS denjenigen
+dazu zwingt. Ein Zähler, ein Guard oder eine Schwelle ohne erzwungenen Schreibpfad ist kein
+Mechanismus, sondern eine Hoffnung mit Testabdeckung. Der Schreibschritt gehört in das Werkzeug,
+das die Eingabe ohnehin in der Hand hält — das Prüfskript zeichnet sein eigenes Verdict auf, statt
+das Kommando dafür ins Log zu legen; der In-Turn-Schritt stempelt die Karte, statt auf das Turn-Ende
+zu hoffen (Punkt 848). Verwandt mit §3.162 (die Weiche ohne Fahrt) — zusammen ergeben sie die
+Prüffrage: *Wenn dieser Zweig entscheidet, wer schreibt seine Eingabe, und wer fährt sein Ziel?*
