@@ -37,6 +37,17 @@ describe('command index', () => {
     expect(usageLines('const x = 1')).toEqual([])
   })
 
+  it('publishes literal runnable usage for both authoring lane commands', () => {
+    const entries = readCommandEntries()
+    const usages = (name) => entries.find((entry) => entry.name === name)?.usages
+    expect(usages('author-sol.mjs')).toEqual([
+      'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
+    ])
+    expect(usages('author-fable.mjs')).toEqual([
+      'usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
+    ])
+  })
+
   it('removes only trailing JavaScript delimiters from harvested usage', () => {
     expect(usageLines("const usage = 'usage: tool.mjs run | ' +")).toEqual(['usage: tool.mjs run |'])
     expect(usageLines("throw new Error('usage: tool.mjs \"<title>\"|--text-stdin')")).toEqual([

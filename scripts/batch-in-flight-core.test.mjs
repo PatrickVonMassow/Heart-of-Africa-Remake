@@ -1105,6 +1105,13 @@ describe('the declaration file is derived from the caller’s lock path', () => 
       expect(readDeclaration(path)).toMatchObject({ sessionId: SID })
       // The real gather, real probe: this process is alive, so the wait holds.
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: true, reason: 'live' })
+      // A consumer of declaration liveness does not pay for or receive the
+      // separate batch-capacity census.
+      expect(gatherInFlight(SID, { lockPath, includeSlots: false })).toMatchObject({
+        live: true,
+        reason: 'live',
+        slots: null,
+      })
       clearDeclaration(path)
       expect(readDeclaration(path)).toBe(null)
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: false, reason: 'no-declaration' })
@@ -3632,6 +3639,13 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
       refsLoose: false,
       how: 'author',
     })
+    expect(commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' })).toEqual({
+      point: 834,
+      points: [834],
+      refs: [],
+      refsLoose: false,
+      how: 'author',
+    })
   })
 
   it('opens NOTHING on the read-only authoring legs — routing and dry-run', () => {
@@ -3640,6 +3654,9 @@ describe('commissionTarget — the act of opening a point, recognised', () => {
     )
     expect(
       commissionTarget({ toolName: 'Bash', command: 'node scripts/author-sol.mjs --point 697 --dry-run' }).point,
+    ).toBeNull()
+    expect(
+      commissionTarget({ toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834 --dry-run' }).point,
     ).toBeNull()
     // …and a read-only leg beside a real cut does not shield the cut.
     expect(

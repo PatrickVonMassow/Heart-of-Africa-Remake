@@ -145,11 +145,17 @@ export function hookPayload(messages) {
   return { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext } }
 }
 
+/** Wrap any already-rendered context in the one PostToolUse shape the model can
+ * see. Shared by chat and the findings-carrier bell. */
+export function additionalContextStdout(additionalContext) {
+  if (typeof additionalContext !== 'string' || additionalContext.length === 0) return ''
+  return `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext } })}\n`
+}
+
 /** What the hook writes to stdout: the JSON line, or the empty string — and the
  *  empty string means it writes NOTHING, not an empty line. */
 export function hookStdout(messages) {
-  const payload = hookPayload(messages)
-  return payload ? `${JSON.stringify(payload)}\n` : ''
+  return additionalContextStdout(renderChatContext(messages))
 }
 
 /**

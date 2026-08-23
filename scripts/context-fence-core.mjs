@@ -87,6 +87,7 @@ const START_SCRIPTS = {
   'run-all.mjs': 'starting a browser verify run',
   'run-logged.mjs': 'starting a browser verify run',
   'author-sol.mjs': 'delegating a new authoring run',
+  'author-fable.mjs': 'delegating a new authoring run',
   'review-sol.mjs': 'starting a cross-vendor review run',
   'ask-sol.mjs': 'starting a delegated ask run',
   'batch-claim.mjs': 'taking the batch, which is where a session begins its work',

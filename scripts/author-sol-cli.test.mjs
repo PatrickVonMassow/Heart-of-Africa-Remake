@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { uncommittedSummary } from './author-sol-core.mjs'
-import { ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
+import { commitsSince, ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
@@ -73,6 +73,35 @@ const gitRepo = () => {
   return dir
 }
 
+describe('commitsSince', () => {
+  it('reads a hook-valid Rescue paragraph even when Git does not classify it as a trailer', () => {
+    const repo = gitRepo()
+    const base = git(repo, 'rev-parse', 'HEAD')
+    writeFileSync(join(repo, 'work.txt'), 'checkpoint\n')
+    git(repo, 'add', 'work.txt')
+    git(
+      repo,
+      'commit',
+      '-q',
+      '-m',
+      'Checkpoint the parser [skip ci]',
+      '-m',
+      'Rescue: the author is still testing',
+      '-m',
+      'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
+    )
+
+    expect(commitsSince(base, { cwd: repo })).toEqual([
+      {
+        sha: git(repo, 'rev-parse', 'HEAD'),
+        subject: 'Checkpoint the parser [skip ci]',
+        rescue: 'the author is still testing',
+        trailers: 'GPT-5.6 Sol <noreply@openai.com>',
+      },
+    ])
+  })
+})
+
 describe('uncommittedNumstat', () => {
   it('measures the final tracked tree and untracked text and binary files', () => {
     const repo = gitRepo()
@@ -134,12 +163,52 @@ describe('author-sol records a commission before dispatch', () => {
       round: 3,
       authorFraming: AUTHORING_FRAMINGS[0],
       sha: 'b'.repeat(40),
+      model: 'GPT-5.6 Sol',
     })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
 
     const retry = recordAuthoringCommission({ ...input, records: [first.record] })
     expect(retry).toEqual({ written: false, record: first.record })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
+  })
+
+  it('records the commissioned lane model while keeping Sol as the default', () => {
+    const events = []
+    const fable = recordAuthoringCommission({
+      records: [],
+      point,
+      round: 5,
+      framing: AUTHORING_FRAMINGS[0],
+      sha: 'f'.repeat(40),
+      model: 'Fable 5',
+      now: 1_787_130_000_000,
+      append: (record) => events.push(record),
+      commit: () => {},
+    })
+    expect(fable.record.model).toBe('Fable 5')
+    expect(events[0]).toMatchObject({ model: 'Fable 5' })
+
+    const sol = recordAuthoringCommission({
+      records: [],
+      point,
+      round: 0,
+      sha: 'a'.repeat(40),
+      now: 1_787_130_000_000,
+      append: () => {},
+      commit: () => {},
+    })
+    expect(sol.record.model).toBe('GPT-5.6 Sol')
+  })
+
+  it('refuses to reuse one round under a different lane model', () => {
+    expect(() =>
+      recordAuthoringCommission({
+        records: [{ kind: AUTHORING_COMMISSION_KIND, point: Number(point), round: 5, authorFraming: '', model: 'Fable 5' }],
+        point,
+        round: 5,
+        sha: 'a'.repeat(40),
+      }),
+    ).toThrow(/different lane model/)
   })
 
   it('leaves the ledger byte-identical when the commit that seals the append fails', () => {

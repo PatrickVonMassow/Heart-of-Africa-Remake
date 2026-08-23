@@ -50,6 +50,9 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
+| 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
+| 23.08. morgens | Ein Test über einem erzeugten Dokument verglich es mit einer frischen Ernte derselben Quellen — fünf falsche Aufrufzeilen standen jahrelang unter grünem Test, gefunden erst beim Lesen eines Diffs (§3.165) |
 | 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
@@ -1321,7 +1324,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 22.08.2026, 22:26 · Quellen-Fingerprint: `19f3ef5195f7…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 08:04 · Quellen-Fingerprint: `8b5c1994ff3a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1358,10 +1361,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 17 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 18 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors nothing the cut decides | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1416,10 +1419,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 88 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: 19f3ef5195f74f661cd51d67e1a358f9d4c1ddf3d453621b942c83621e5df172 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T20:26:03.711Z -->
+<!-- RETRO-FINGERPRINT: 8b5c1994ff3a01a613169a8d67ef680a4ddabcd6de3cc9b5cbb611ef6d98415a -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T06:04:19.540Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2843,3 +2846,163 @@ dem man sie sonst erneut stellt — mit seinen Worten, sodass die Abweisung ihn 
 mich. Prüffrage bei jeder Karte in „Von dir zu klären": *Hat er das schon einmal entschieden
 — und wenn ja, warum steht die Frage überhaupt noch offen?* Verwandt mit §3.112 (der
 verdrahtete, aber wirkungslose Mechanismus).
+
+### 3.161 Der Singleton wurde nicht überstimmt, sondern umgangen
+
+In der Nacht zum 23.08.2026 liefen zwei autonome Batch-Sitzungen gleichzeitig auf demselben
+Repository. Die eine baute seit einer Viertelstunde an Punkt 834 und committete gerade, die
+andere war neunzig Sekunden zuvor vom 900-Sekunden-Wächter gestartet worden, weil der Starter
+gemessen hatte: „no owner lock, no live batch-writer process". Beides war aus seiner Sicht wahr.
+
+Die Ursache liegt eine Ebene unter dem Streit um den Besitz. Die Sperre wird über
+`repoPath('.claude/batch-lock.json')` aufgelöst, und das löst gegen den Checkout auf, in dem der
+Prozess läuft. Jeder Worktree trägt sein eigenes eingechecktes `.claude/`. Die Nachfolgesitzung
+war aus der Punktgrenze heraus mit einem Arbeitsverzeichnis IM Worktree gestartet worden, hat
+dort ihre eigene Sperre angelegt und pflegt deren Heartbeat bis heute — während die Datei im
+Hauptbaum schlicht nicht existierte. Der harte Singleton hatte damit eine Sperrdatei pro
+Checkout statt einer pro Batch. Er hat nicht falsch entschieden; er hat über zwei verschiedene
+Fragen entschieden und beide mit „ja" beantwortet.
+
+Der teuerste Teil ist nicht die doppelte Sitzung, sondern was sie durfte. Die Guards der
+Worktree-Sitzung lasen deren private Sperre als Eigentumsnachweis. Kein Merge, kein Abhaken,
+keine Landung wäre ihr verweigert worden. Getrennt wurden die beiden Sitzungen am Ende nicht
+durch Mechanik, sondern durch eine Absprache: Die eine erklärte sich zur delegierten Autorin
+und rührt Board, `main` und die Landung nicht an. Das ist die richtige Rettung und ein
+schlechter Zustand — eine Vereinbarung zwischen zwei Modellen anstelle einer Sperre.
+
+Bemerkenswert ist, dass die Evidenz vollständig vorlag. `batch-in-flight --agent-check` hat die
+angeblich nicht existente Sitzung in derselben Minute korrekt als „alive" erkannt, geurteilt an
+den Git-Metadaten ihres Zweigs. Der Starter fragte das Register, der Prüfer fragte das
+Repository, und nur der Prüfer hatte recht.
+
+**Lehre:** Ein Singleton ist nur so global wie der Pfad, an dem er hängt. Sobald eine
+Ausschlussregel eine Datei benennt, ist die Auflösung dieses Pfades Teil der Regel — und ein
+relativer Pfad macht aus einer Regel so viele Regeln, wie es Arbeitsverzeichnisse gibt.
+Prüffragen bei jedem exklusiven Zustand: *Gegen welchen Baum löst sein Pfad auf, wenn der
+Prozess woanders steht?* und *Wenn eine zweite Instanz trotzdem läuft — erfährt sie es aus
+demselben Zustand, oder glaubt sie ihrer eigenen Kopie?* Und für die Erkennung: Wer fragt, ob
+noch jemand arbeitet, fragt das Repository, nicht die Anmeldeliste. Verwandt mit §3.112 (der
+verdrahtete, aber wirkungslose Mechanismus).
+
+### 3.162 Der Wegweiser zeigt auf eine Straße, die nie gebaut wurde
+
+In der Nacht zum 23.08.2026 sollte die nächste Stufe von Punkt 834 beauftragt werden. Der Router
+antwortete korrekt: nach achtzehn erfolglosen Prüfrunden eskaliert der Punkt gemäß §6 in die
+Fable-Bahn. Dort gibt es kein Kommando. Es existiert kein `author-fable.mjs`, und der einzige
+Rekorder, der eine Beauftragung ins Vier-Augen-Ledger schreibt, trägt das Modell fest verdrahtet
+als Sol ein — eine Beauftragung in der eskalierten Bahn ließe sich also nicht einmal wahrheitsgemäß
+protokollieren.
+
+Das ist nicht der verdrahtete, aber wirkungslose Mechanismus aus §3.112. Hier entscheidet die
+Mechanik richtig und vollständig; was fehlt, ist die ausführende Hälfte hinter ihrer Entscheidung.
+Der Unterschied zeigt sich an dem, was die Lücke der Sitzung anbietet: Alle drei naheliegenden
+Auswege sind Regelbrüche. Die Eskalation mit `--anyway` überstimmen heißt, genau die Bahn
+weiterzufahren, die achtzehnmal gescheitert ist. Selbst weiterschreiben heißt, den neunzehnten
+Versuch desselben Modells zu starten, gegen das die Eskalation gerichtet war. Von Hand ins
+append-only-Ledger schreiben heißt, die Haltbarkeitsgarantie der einen Datei zu verletzen, die
+ehrlich sein soll. Eine Sackgasse, die nur durch Regelbruch verlassen werden kann, ist gefährlicher
+als eine offene Lücke: Sie erzeugt Druck genau in dem Moment, in dem niemand zusieht.
+
+**Lehre:** Eine Weiche darf nur Ziele nennen, für die eine Fahrt existiert. Wer einen
+Entscheidungspfad einbaut, baut im selben Zug den ausführenden Befehl und dessen Protokollzeile —
+oder die Weiche nennt das Ziel gar nicht erst. Prüffrage bei jeder Verzweigung: *Wenn dieser Zweig
+gewählt wird, welches Kommando führt ihn aus, und was schreibt es auf?* Und wo die Antwort fehlt,
+gehört sie als eigener Punkt vor den, der auf sie wartet — nicht hinter ihn. Verwandt mit §3.112
+(der verdrahtete, aber wirkungslose Mechanismus) und mit der Trennung von *benannt* und *gebaut*.
+
+### 3.163 Der Mechanismus stand, aber niemand war gezwungen, ihn zu füttern
+
+Am frühen Morgen des 23.08.2026 fielen zwei Funde in derselben Stunde zusammen, die dieselbe
+Anatomie haben. Erstens: Die Batch-Sitzung der Nacht drehte fünfzehn Prüfrunden zu einem Punkt in
+einem einzigen, nie endenden Turn — und jede Aktualitäts-Sicherung des Boards (Karten-Abgleich,
+Publish-Zwang) hängt an der Stop-Kette, die nur ein Turn-Ende auslöst. Die öffentliche Karte zeigte
+zweieinhalb Stunden lang erledigte Arbeit von 02:30, während die Maschine ununterbrochen arbeitete;
+der Nutzer musste fragen, ob überhaupt noch etwas läuft (Punkt 848). Zweitens: Dieselben fünfzehn
+Runden standen in keiner Zeile des Mechanism-Ledgers. Jedes Prüf-Log endete mit dem fertigen
+Record-Kommando — ausgeführt hat es niemand, und dem Kommando im Log fehlte zudem das
+`--point`-Feld, an dem die Zählung hängt. Die Folge: Die §6-Eskalationsschwelle (fünf erfolglose
+Runden) las 0 statt 14, und die Weiche, die den Punkt längst in eine andere Bahn hätte legen
+müssen, bekam ihre Fahrkarte nie zu sehen. Erst die Nachfolge-Sitzung trug die Verdicts aus den
+Logs nach — dann eskalierte der Router sofort und regelgemäß.
+
+Die gemeinsame Anatomie: Beide Mechanismen existierten, waren getestet und hätten funktioniert —
+ihre EINGABE aber entstand auf keinem erzwungenen Pfad. Ein Guard, der am Turn-Ende ankert, deckt
+genau die Sitzungen nicht, die am längsten arbeiten, und das sind die wertvollsten Fenster. Ein
+Schwellwert, dessen Zähler von einer freiwilligen Protokollzeile lebt, zählt Null, solange die
+Protokollzeile Höflichkeit bleibt. Das ist die Steigerung der Lehre aus §3.135 („formal vorhanden,
+faktisch unsichtbar"): Dort war die Meldung im Erfolgsfall unlesbar, hier ist der ganze Mechanismus
+von einer Zuarbeit abhängig, die kein Werkzeug erzwingt und keine Prüfung vermisst.
+
+**Lehre:** Zu jedem Mechanismus gehört die Frage, WER seine Eingabe schreibt und WAS denjenigen
+dazu zwingt. Ein Zähler, ein Guard oder eine Schwelle ohne erzwungenen Schreibpfad ist kein
+Mechanismus, sondern eine Hoffnung mit Testabdeckung. Der Schreibschritt gehört in das Werkzeug,
+das die Eingabe ohnehin in der Hand hält — das Prüfskript zeichnet sein eigenes Verdict auf, statt
+das Kommando dafür ins Log zu legen; der In-Turn-Schritt stempelt die Karte, statt auf das Turn-Ende
+zu hoffen (Punkt 848). Verwandt mit §3.162 (die Weiche ohne Fahrt) — zusammen ergeben sie die
+Prüffrage: *Wenn dieser Zweig entscheidet, wer schreibt seine Eingabe, und wer fährt sein Ziel?*
+
+### 3.164 Der Alarm feuerte auf den Vorgänger, der gerade übergeben hatte
+
+Am Morgen des 23.08.2026 bekam eine frische Batch-Sitzung auf JEDEM ihrer Züge dieselbe Meldung:
+`PARALLEL SESSION DETECTED` — und wurde jedes Mal in einen vollständigen `batch-doctor --gate`
+geschickt, rund drei Minuten, unter der Last des gerade laufenden Autorenlaufs ohnehin mit dem
+Urteil „nicht bewertbar". Die gemeldete Sitzung war der zurückgetretene Vorgänger, der den Batch
+Sekunden zuvor an genau diese Sitzung übergeben hatte. Ihr Eintrag sagte das ausdrücklich:
+`authorityState: "retired"`, `retiredReason: "handover"` — und ihr letzter Schreibzugriff lag
+28 Millisekunden VOR ihrem eigenen Rücktritt, war also die Übergabe selbst. Lebendig war nur ihre
+PID, weil sie die interaktive VS-Code-Sitzung ist, die nie in den Batch schreibt. Die Sonde las
+„lebende PID hat gerade geschrieben" und schloss auf einen Konkurrenten (Punkt 849).
+
+Die Anatomie ist die von §3.158 (der Wächter hatte die Antwort schon gegeben): Das Feld, das die
+Frage entscheidet, stand in genau dem Datensatz, den die Sonde ohnehin öffnete — sie hat es nicht
+gelesen. Neu ist der PREIS. Ein Fehlalarm, der eine Zeile Ausgabe kostet, ist ein Schönheitsfehler;
+dieser hier kostete pro Zug drei Minuten Torlauf für null Information, und zwar auf einer Maschine,
+auf der derselbe Lauf wegen der Agentenlast gar kein Urteil fällen KANN. Damit verkehrt sich die
+Wirkung: Ein Alarm, der auf jedem Zug schreit und nie recht hat, wird abgehakt statt gelesen — und
+er ist dann genau an dem Zug stumm, an dem eine echte zweite Schreiberin danebensteht. Die drei
+Parallel-Session-Vorfälle vom 13./14.07., 23.07. und 20.08. sind der Grund, warum dieser Detektor
+überhaupt existiert; ein Detektor, der sich selbst unglaubwürdig macht, gibt diese Absicherung
+wieder her.
+
+**Lehre:** Ein Detektor wird nicht nur an seiner Trefferquote gemessen, sondern am PREIS seines
+Fehlalarms mal seiner Häufigkeit. Bevor eine Sonde aus indirekten Signalen (lebende PID, junger
+Zeitstempel) auf einen Zustand schließt, liest sie das Feld, in dem dieser Zustand ausdrücklich
+steht — und ein Ereignis, das zum Rücktritt selbst gehört, ist nie Beleg für Arbeit danach. Und
+wenn ein Alarm eine teure Pflichtmaßnahme auslöst, muss die Maßnahme unter den Bedingungen, unter
+denen der Alarm typischerweise feuert, überhaupt ein Urteil fällen können — sonst ist die Pflicht
+nur Zeremonie. Verwandt mit §3.161 (der Singleton wurde umgangen) und §3.158.
+
+### 3.165 Der Test verglich den Erzeuger mit sich selbst
+
+Beim Gegenlesen des Fable-Spur-Punktes am 23.08.2026 fiel im erzeugten Befehlsverzeichnis eine
+Aufrufzeile auf, die keinen Befehl mehr nannte, sondern einen Platzhalter: `node
+scripts/${commandName}.mjs`. Der Ernter hebt die Aufruftexte wörtlich aus dem Quellcode und
+wertet sie nicht aus — sobald eine Aufrufzeile als Vorlage geschrieben wird, landet die Vorlage
+im Nachschlagedokument. Die eigentliche Entdeckung war aber nicht dieser eine Fall, sondern
+seine Nachbarschaft: Es standen fünf weitere Platzhalter im selben Dokument, an vier Stellen,
+und keiner davon war neu. Sie standen dort unbemerkt, obwohl ein Test genau dieses Dokument
+prüft — und obwohl dieser Test grün war (Punkt 850).
+
+Grün war er, weil er das Dokument gegen eine FRISCHE ERNTE DERSELBEN QUELLEN vergleicht. Beide
+Seiten der Gleichung entstehen aus demselben Erzeuger; trägt der Erzeuger einen Fehler, trägt
+ihn die Erwartung genauso, und der Vergleich bestätigt ihn, statt ihn zu finden. Ein solcher
+Test prüft KONSISTENZ, nicht RICHTIGKEIT: Er beweist, dass das eingecheckte Dokument nicht
+veraltet ist — eine echte und nützliche Aussage — und er wird dabei fast unvermeidlich als
+Abdeckung für „das Dokument stimmt" gelesen. Das ist die teure Verwechslung, denn ein Bereich
+mit grünem Test wird nicht noch einmal von Hand angesehen.
+
+Bemerkenswert ist der Weg, auf dem es auffiel: nicht durch den Test, sondern weil ein
+Regenerieren die Datei anfasste und ein zweites Augenpaar den Diff LAS. Die fünf alten Stellen
+hatte niemand je gelesen, weil nie ein Anlass sie in einen Diff gehoben hat.
+
+**Lehre:** Zu jedem Test über einem erzeugten Artefakt gehört die Frage, WOHER seine Erwartung
+kommt. Stammt sie aus demselben Erzeuger, ist der Test ein Aktualitätswächter und darf nie als
+Richtigkeitsnachweis gezählt werden; die Richtigkeit braucht dann eine Aussage, die der
+Erzeuger nicht selbst herstellen kann — hier: dass keine geerntete Aufrufzeile einen
+unaufgelösten Platzhalter enthält. Zweite Regel aus demselben Fall: Wenn ein Fund eine KLASSE
+offenlegt, wird zuerst gezählt, wie viele Fälle sie hat und wem sie gehören. Fünf der sechs
+gehörten nicht zum laufenden Punkt — hätte der Test dort verlangt werden müssen, wäre er an
+fremder Arbeit rot geworden, und die Wahl wäre nur noch zwischen einem weichgeklopften Test und
+einer fremden Reparatur unter falscher Nummer gewesen. Verwandt mit §3.163 (der Mechanismus
+ohne erzwungene Eingabe): Dort fehlte dem Zähler die Zufuhr, hier fehlt dem Vergleich ein
+unabhängiger Maßstab.

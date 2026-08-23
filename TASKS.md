@@ -200,14 +200,72 @@ put it is the mistake this line exists to stop.
   parent-session-death drill; and the stage proven DARK — with the flag off, today's authoring path
   is the path that runs now. Mechanism review per step, not once at the end; each step green on the
   unit layer before the next.
-  QUEUE RANK: at the front, directly behind point 716 — but BLOCKED BEFORE CODE by (b) since
-  22.08.2026, 18:20, so the queue passes it and the next unblocked point is worked until the
-  Fable switch is flipped. Reason for the rank: the user ordered it forward on 22.08.2026 after a
-  second lane died, and Sol's audit puts 716 first because 716 repairs the deployed plane while
-  this point replaces it.
+  THE DESIGN STAGE IS CLOSED, AND WHAT IT LEFT IS LISTED HERE rather than rediscovered while
+  building (twelve cross-vendor rounds over the three mechanisms, GPT-5.6 Sol at effort high,
+  22./23.08.2026, every round recorded in `.claude/mechanism-reviews.jsonl`; the final round was
+  asked to separate what is still false from what is an admitted uncovered case, and it did).
+  Several claims were WITHDRAWN rather than patched — a clock rule that could not be enforced
+  against scheduling delay, an exclusion that did not exist, and a reversibility the design never
+  established — and the text says so where it once claimed otherwise. FIVE ITEMS ARE OWED:
+  (i) BEFORE STEP 1: the daemon's existence is recorded twice — its own durable identity file and
+      a copy in the batch lock — and mechanism 2 claims the two can never disagree. They can: a
+      crash between the two writes, or a daemon exit, leaves them apart. Step 1 defines the
+      crash-safe transition and reconciliation invariant for that pair BEFORE the schemas encode
+      the states, or the schemas encode a lie.
+  (ii) AGAINST STEP 4: one sentence still reads "B advances the ref as the first act of
+      acquisition", which the later mandatory order contradicts — acquire, start the daemon if one
+      is to be started, advance the credential, then publish. The explanation after it re-reads
+      "first act" as "before any publication"; the earlier sentence is simply false and goes.
+  (iii) AGAINST STEP 8: the recovery procedure's third outcome consumes a case its fourth says
+      must be quarantined. A rewrite that lost its publication trailer and an unrelated successor
+      leave the same graph evidence, so ABANDONED must not be concluded from "the history contains
+      the expected-before oid and nothing derived from this attempt"; that case is UNKNOWN.
+  (iv) AGAINST STEP 7: the omissions table's idempotency case still requires a repeated `--commit`
+      to advance the fence once, while step 7 and mechanism 2 say `--commit` never advances it.
+      The case asserts the fence is UNCHANGED.
+  (v) THE ADMITTED RESIDUALS, which are not blockers and are recorded as limits in
+      `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the
+      very defect this point removes, so it is worst before the point lands); work begun on the old
+      path gains nothing from this design; one push of publishing authority survives local
+      dispossession, deliberately, so that exactly one publisher exists at all times; and the
+      drill's check-to-signal interval has one branch it cannot observe.
+  QUEUE RANK AND STATE (re-measured 23.08.2026, 02:30): at the front, now directly behind point
+  846, which blocks it. Clause (b) is DISCHARGED — Fable 5's fold of the two blind halves stands
+  in the four-eyes ledger on this point's own branch (81e1062a), so the code steps are
+  authorized. The FIRST STAGE IS BUILT, pushed and cross-read on `feat/834-durable-authoring-lane`
+  (287674b4, CI green, three Sol rounds without a finding): the three owed mechanisms written into
+  `docs/handover-architecture.md`, the schema-and-invariant core, the dark-lane flag with its
+  refusal interlock, the parent-death drill and the merger-check repair. WHAT REMAINS is the
+  durable state store, the daemon plus the Sol adapter, the fencing and lease work of step 4, and
+  the discovery/adoption/reconciliation of step 8 with step 9 where landing needs it — so the
+  point is NOT ticked and its branch stays open. Reason for the original rank: the user ordered it
+  forward on 22.08.2026 after a second lane died, and Sol's audit puts 716 first because 716
+  repairs the deployed plane while this point replaces it; 716 has since landed.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
+
+- [ ] 848. The board can freeze for hours while a single-turn batch session works, because every
+  currency mechanism bites only at a turn end. MEASURED 23.08.2026 ~05:00: the board's last
+  publish was 02:30 (the point-720 boundary card "Übergabe an eine frische Sitzung"); the
+  watchdog session spawned 01:50 (lock claimed 02:40) then worked point 847 through fifteen
+  Sol review rounds until at least 04:58 in ONE continuous `-p` turn and never rewrote the
+  now-card or republished. `dashboard-guard` enforces card currency in the Stop chain, which a
+  long single-turn session never reaches, and a `batch-in-flight` declaration is visible to the
+  launcher but leaves no trace on the board. Result: the public board showed stale finished
+  work for ~2.5 h of live review ping-pong, and the user had to ask whether the batch was
+  still alive.
+  FINAL STATE: a long-running turn keeps the board current without polling — the recurring
+  in-turn recording steps (a `review-sol.mjs` round completing, `mechanism-review.mjs --record`,
+  a `batch-in-flight` declaration or refresh) stamp the now-card's status line and republish
+  when the card is stale against the declared focus, so review round N is visible on the page
+  while round N+1 runs.
+  VERIFIABLE: a unit case per trigger shows a stale now-card refreshed by the trigger and a
+  current card left untouched (no publish storm), and the board history after one review round
+  carries the round's status without any Stop hook having run.
+  Criticality: low — no product behaviour; the cost is operator blindness during the longest
+  sessions, exactly when visibility matters most.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
   (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
@@ -279,107 +337,6 @@ put it is the mistake this line exists to stop.
   following 747. The ceiling mechanisms bound the damage, this one buys throughput, and its own
   first stage depends on 744's corrected exit path.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 669. A working author's pushes run CI over, and the supervisor pays for it (measured
-  13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
-  minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
-  `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
-  twelve minutes into the run the branch carried three runs, two `cancelled` and one in
-  progress, and NONE green. The SAME evening the same thing was measured on the CLAUDE lane,
-  where nothing pushes on a timer: a worktree agent committing and pushing at every
-  self-contained step — which CLAUDE.md §6 demands, because an uncommitted block is the one
-  state nothing can rescue — blocked the supervising session's turn end three times in a row,
-  each time for a commit in the middle of an unfinished point. Two consequences, both real:
-  `ci-status-guard` can never find a concluded green run on that branch while the author works,
-  and Actions minutes are spent on runs nobody reads. Measured again 19.08.2026 with TWO author
-  lanes in flight at once: three consecutive runs ended `cancelled` because the next checkpoint
-  overtook them, and while two lanes push in turn SOME run is always unconcluded — so the block
-  is not repeated but CONTINUOUS, and it grows with the agent pool rather than with the point.
-  FINAL STATE, and it has two halves because the two lanes fail for different reasons:
-  (1) THE TIMER LANE. `author-sol.mjs`'s interim pushes are what CLAUDE.md §6 already calls a
-  RESCUE commit — work committed because the run may die, no claim of completeness — so they are
-  written as one: `[skip ci]` in the SUBJECT plus a `Rescue: <what the author was in the middle
-  of>` trailer, which the `commit-msg` hook already demands in that pairing. The run's FINAL
-  commit — the one that claims the work is done — carries neither and goes through CI normally,
-  so the branch ends with exactly one meaningful run. If the author produces no final commit (it
-  died), the branch is left with only skipped runs, which is honest: nobody claims that state is
-  done.
-  (2) THE SUPERVISOR'S GATE. A Claude agent's per-step commits are NOT rescue commits and must
-  keep their CI — but they are not the supervisor's business either. `ci-status-guard` therefore
-  gates the turn end on `main` and on any branch OFFERED FOR LANDING, and reports — without
-  blocking — a branch whose author is still declared in flight. A branch stops being exempt the
-  moment its author's declaration ends, so nothing lands on an unproven run.
-  VERIFIABLE: Vitest over the commit-message builder (an interim commit carries both halves, the
-  final commit neither, and a run that dies leaves no commit claiming completeness); Vitest over
-  the guard's branch selection (main always gates, a landing candidate gates, a branch with a
-  live author reports only, and it gates again once that author is gone); plus the next live run
-  of EACH lane — the Sol lane showing ONE concluded CI run instead of a cancelled chain, the
-  Claude lane showing a supervising session whose turn ends are not held by its agent.
-  Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
-  ends, which is how the batch stalls.
-
-- [ ] 720. The findings carrier rings through the delivery that already runs on every tool
-  call, instead of waiting for a turn end the batch owner does not have (user
-  18.08.2026, 15:16).
-
-  WHY HERE AND NOT A NEW CHANNEL. A stood-down window — the one the user talks to,
-  and the one that therefore finds most of what he asks about — can write to the
-  carrier and to nothing else. On 18.08. eight entries waited there up to 9.5
-  hours. The transport was never the problem: `deliverPendingMessages()` in
-  `scripts/chat-spool.mjs` already puts text into the owner's context on EVERY tool
-  call, through `scripts/lock-heartbeat-hook.mjs` (PostToolUse, `*`), and the
-  inbound chat leg is a live subscription that spooled the user's 14:30:45 message
-  at 14:30:46. What is missing is that the carrier has no bell on that path. A
-  SECOND message kind or a second transport was considered and rejected: it would
-  split findings across two stores and re-open the signature and identity question
-  that makes the chat inbox unusable for a session (an inbox envelope carries a
-  direction and an HMAC, no sender, so anything a session posts there arrives as
-  the user's own words).
-
-  FINAL STATE:
-
-  1. `deliverPendingMessages` gains a SECOND SOURCE beside the chat spool: when the
-     reading session OWNS the batch and the carrier holds waiting entries, the
-     delivery emits ONE line — the count, the oldest entry's timestamp, its title,
-     and the drain command (`node scripts/finding.mjs --drain`). It reads the
-     carrier through `parseCarrier`/`carrierPath`; it never writes to it, and the
-     drain stays `finding.mjs --drained "<title>"`.
-
-  2. ZERO BYTES WHILE NOTHING WAITS. The token rule the chat delivery already holds
-     applies unchanged: an empty carrier produces empty stdout, because injected
-     context is re-sent with every later request of the session.
-
-  3. ONE INTERRUPTION PER CALL. A tool call that already delivers a chat message
-     does not also ring the carrier bell — the user's own words go first, and the
-     bell rides the next call.
-
-  4. IT DOES NOT NAG. The line is emitted at most once per REMINDER_INTERVAL
-     (15 minutes, one constant, in the pure core) and again immediately whenever
-     the waiting count RISES, so a new finding is announced at once while an
-     ignored one does not repeat every second.
-
-  5. IT FOLLOWS THE PAUSE DECISION, WHATEVER IT BECOMES. Today
-     `deliverPendingMessages` returns '' while the batch is paused. That
-     suppression is itself under review (a pause is when an instruction matters
-     most); the bell inherits whatever that review decides rather than carving out
-     its own exception.
-
-  6. NON-OWNERS SEE NOTHING. The carrier is drained by the owner alone, so a
-     stood-down window is never told about entries it may not act on.
-
-  VERIFIABLE: Vitest over the pure decision core — waiting entries plus ownership
-  yields one line; an empty carrier yields ''; a non-owner yields ''; a call that
-  carries a chat message yields the chat message only; a second call inside the
-  interval yields ''; a risen count yields the line again. And the process-level
-  shape in the manner of `scripts/chat-delivery-hook.test.mjs`: `node
-  scripts/lock-heartbeat-hook.mjs` against an isolated temp repo writes the exact
-  `hookSpecificOutput` envelope, and writes nothing at all for an empty carrier.
-
-  Criticality: medium — it delivers no verdict of its own and cannot block work; it
-  makes an existing, already-enforced duty visible while it can still be done. Its
-  fail direction is silence, which is today's state.
-
-  Bundle: Chat & Tafel.
 
 - [ ] 515. The parallel-session detector counts a placeholder owner as a second
   SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
@@ -465,10 +422,42 @@ put it is the mistake this line exists to stop.
      an idle session, not correctness), and the watcher is NOT stopped by a pause —
      or, if it must stop for resource reasons, the launcher poll replaces it for
      the pause's duration and the pause card names the delay that then applies.
-  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
-  parallel-session alert in the pure core's tests, and the same setup replayed
-  against the real detector stays silent; a Vitest case pins that the pause path
-  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
+  10. THE LOCK PATH RESOLVES TO THE WORKTREE, SO THE SINGLETON HAS ONE LOCK PER
+     CHECKOUT (measured 23.08.2026, 01:07-01:14, and it produced a real double
+     session). The point boundary of session e068b59e spawned its successor with a
+     cwd inside `.claude/worktrees/point-834`. That session's acquire wrote — and
+     went on heartbeating — `.claude/worktrees/point-834/.claude/batch-lock.json`
+     (fence 3), while `/workspace/hoa/.claude/batch-lock.json` did not exist at
+     00:57. Cause: `repoPath('.claude/batch-lock.json')` resolves against the
+     checkout the process runs in, and every worktree carries its own tracked
+     `.claude/`. The main-tree lock therefore read as FREE, the 900-second watchdog
+     spawned a SECOND full batch session beside a live one, and `batch-singleton
+     status` answered "live parallel sessions: none" while both were committing.
+     Worse than the miscount: the worktree session's own guards read its private
+     lock as proof of ownership, so nothing would have refused it a merge, a
+     TASKS.md tick or a landing — the hard singleton was not outvoted, it was
+     bypassed, and the split was held by agreement between two sessions instead.
+     FINAL STATE: the batch lock, the pause marker and every file the singleton
+     treats as batch-global resolve to the MAIN checkout (git's common dir), never
+     to the worktree, whatever the process's cwd; and a worktree-local copy found
+     beside them is reported as torn by `batch-doctor`, never honoured.
+  11. THE SPAWN DECISION ASKS THE REGISTER, NOT THE REPOSITORY (same incident).
+     Before launching the duplicate, the launcher tick recorded "no owner lock —
+     taking over; no live batch-writer process measured" while the session it was
+     about to duplicate was committing and pushing on its feature branch. The
+     evidence that would have stopped it already exists and already works:
+     `batch-in-flight --agent-check` judged the same session "alive" from git
+     metadata in the same minute. FINAL STATE: the spawn decision consults that
+     evidence — recent commits on open `feat/*` branches and worktree activity —
+     and a measured live writer VETOES the spawn even when no lock names it.
+  VERIFIABLE: a lock acquired from a process whose cwd is a worktree lands in
+  the main checkout and is seen by a second process running elsewhere; a
+  worktree-local lock file is reported torn rather than honoured; the spawn
+  decision refuses to launch while an open feat/* branch has advanced inside
+  the agent-check grace; and a lock carrying a placeholder id plus one live
+  session produces no parallel-session alert in the pure core's tests, and the
+  same setup replayed against the real detector stays silent; a Vitest case pins
+  that the pause path writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
   the lock's recorded owner byte-identical while a real id still restamps; the
   doctor reports the pid-mine/id-foreign lock as torn and repairs it; a stood-down
   session with no mutating action since the note raises no parallel-session alert
@@ -11179,4 +11168,124 @@ to land than a mechanism that needs a review.
   refusing a `MEMORY.md` that exceeds its ceiling.
   Criticality: low — no product behaviour and no lost work; it costs a false red on unrelated
   points, which is a verification-trust problem rather than a defect.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 847. The brevity guard has four ways past it, all found by one cross-vendor reading (GPT-5.6
+  Sol, effort high, 23.08.2026, 02:30, pass 2/3 over `2d80896`, verdict do-not-merge; recorded in
+  `.claude/mechanism-reviews.jsonl`). `scripts/guide-brevity-core.mjs` enforces the measured
+  ceilings of `docs/analysis_de/vibe-coding-anleitung.md`, and the document sits at an EXACT fit
+  (432 lines / the word ceiling beside it) — so every path past the rule is a path that lets the
+  document grow while the guard stays green. The four, at their measured lines:
+  1. LINE 210 — any line beginning with `<!--` is dropped whole from both budgets, so
+     `<!-- x --> visible prose …` renders prose at zero lines and zero words.
+  2. LINES 224-228 — only the FIRST `##` heading containing "Fallstrick" is audited and the scan
+     stops at the next `##`, so moving entries into a second `## Weitere Fallstricke` evades the
+     entry-length, risk-length, prompt and stray-prose checks while the totals stay put.
+  3. LINES 291 and 358-367 — the action check accepts the `→ *Prompt:*` marker ANYWHERE in the
+     entry and never looks at what follows it, so an empty prompt, or one followed by further
+     narrative, passes the rule that every pitfall must END in an actionable prompt.
+  4. LINE 190 — the repository-path detector accepts neither `./` nor a leading `/` before
+     `scripts`, so the ordinary spelling `./scripts/chat-spool.mjs` is not recognised as the
+     project-specific path the rule means to keep out of a beginner's guide.
+  FINAL STATE: each of the four is closed at its own line, and a Vitest case per path pins the
+  evasion as REFUSED — a comment line with trailing prose counted, a second pitfall section
+  audited like the first, a prompt that does not end its entry refused, and the two path
+  spellings recognised. The measured ceilings themselves are NOT reopened: they are the user's
+  ruling and this point only makes them enforceable as written.
+  VERIFIABLE: the four new unit cases red against today's core and green after the fix, and the
+  guide itself still passing unchanged, because nothing in it uses any of the four paths.
+  Criticality: low — no product behaviour and no lost work; it is a guard that measures less
+  than its own sentence, and the cost is a document that could grow past a ruling unnoticed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 849. The parallel-session alert fires on the retired predecessor that already handed over.
+  MEASURED 23.08.2026, 05:30–05:40: a fresh batch session was told `PARALLEL SESSION DETECTED
+  (d0a27cfd-…)` on every one of its turns and sent to `batch-doctor --gate` each time. That
+  session's record in `.claude/session-process.json` is pid 1124 with `authorityState:
+  "retired"`, `retiredReason: "handover"`, and a `batchWriterAt` (1787455737576) that falls
+  BEFORE its own `retiredAt` (1787455765952) — the only recent write it made was the handover
+  itself. Its pid is alive because it is the VS Code extension's long-running interactive
+  session, which never writes to the batch. So the probe reads "a live pid wrote recently" and
+  concludes a competing writer, when what it actually measured was the predecessor standing
+  down.
+  WHAT IT COSTS: every turn pays a full `batch-doctor --gate` — about three minutes, and under
+  agent load its unit gate returns INCONCLUSIVE anyway, so the alert buys no information at
+  all. Worse, an alert that cries wolf on every turn is the one a session stops reading on the
+  turn it is real.
+  FINAL STATE: a session whose `authorityState` is `retired` is not counted as parallel, and a
+  write timestamped at or before that session's own `retiredAt` is never evidence of concurrent
+  work. A genuinely competing writer still raises the alert unchanged.
+  VERIFIABLE: unit cases over the liveness probe — a retired record with a live pid and a
+  handover-time write reports NO parallel session; a non-retired record with a live pid and a
+  recent write still reports one; and a retired record that wrote AFTER its `retiredAt` also
+  still reports one, because that is a real violation.
+  Criticality: low — no product behaviour; the cost is wasted gate time and an alert that
+  trains sessions to ignore it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 850. The generated command index publishes commands nobody can run, and its own test
+  cannot see it. MEASURED 23.08.2026, 06:05, while reviewing point 846: `docs/command-index.md`
+  carries SIX unresolved `${…}` placeholders across four names — `${TEXT_STDIN_FLAG}` ×3,
+  `${WATCH_SCRIPT_PATH}` ×1, `${phaseFlag}` ×1, `${commandName}` ×1. `scripts/help.mjs` lifts
+  each script's usage text out of the SOURCE and never evaluates it, so a usage string written
+  as a template literal is published verbatim: line 293 tells a reader to run
+  `node ${WATCH_SCRIPT_PATH} --check primary`, which is not a command.
+  WHY IT SURVIVED: `scripts/help-core.test.mjs` asserts the document matches a FRESH HARVEST of
+  the same sources. Both sides carry the identical placeholder, so the comparison is green
+  while the document is wrong — the test is structurally incapable of failing on this class,
+  which is why five of the six have stood unnoticed. (The sixth, `${commandName}`, was
+  introduced and repaired inside point 846; it is what exposed the rest.)
+  FINAL STATE: every usage line in the generated index names a runnable command. Each of the
+  five older sites is fixed where it is written — the harvested string stays literal and any
+  runtime substitution happens on the output, not in the text the harvester reads.
+  VERIFIABLE: a regression test of a DIFFERENT shape from the byte-for-byte comparison — it
+  asserts that no harvested usage string contains an unresolved `${…}` placeholder — is RED
+  against today's sources and green after the five repairs, and the byte-for-byte test stays
+  green throughout.
+  Criticality: low — no product behaviour; the cost is a reference document that hands a reader
+  a broken command, and a test that reads as coverage for a class it cannot detect.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 851. Re-running a cancelled CI run cancels the newer commit's run on the same branch.
+  MEASURED 23.08.2026, 06:4x. `scripts/ci-failure-cause-core.mjs` tells the session that a
+  cancellation can only be cleared by re-running the workflow — "No push in this repository can
+  clear a cancellation — re-run the workflow and confirm it goes green" — and omits what that
+  costs. `.github/workflows/ci.yml` uses concurrency group `ci-${{ github.ref }}` with
+  `cancel-in-progress: true`, so re-running an OLDER sha's run on `main` joins the same group as
+  the run for the branch tip and CANCELS it. Today that turned one cancellation into two:
+  re-running 32617308480 (d0626dcc) cancelled the in-progress 32618119861 (f86464b9), which then
+  needed its own re-run.
+  FINAL STATE: the repair advice names the tip's run rather than the stale one, because the tip's
+  verdict is the one the batch actually needs; where it still advises a re-run of an older run it
+  says to do so only while no run for that ref is in progress, and to re-run the tip afterwards.
+  VERIFIABLE: unit cases over the cause reporter — a cancelled older run while a newer run for the
+  same ref is in progress yields advice that names the NEWER run and does not order an immediate
+  re-run of the older one; a cancelled run that IS the tip yields the plain re-run advice
+  unchanged.
+  Criticality: low — no product behaviour; the cost is a self-inflicted second cancellation and
+  the batch time spent clearing it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 852. A landing gate cannot run while another author lane commits. MEASURED 23.08.2026,
+  07:47, landing point 669 while a parallel worktree authored point 834. `land-point`'s fast gate
+  runs the unit suite, and `scripts/repository-integrity.mjs` asserts that no ref moved during the
+  run; the other lane's checkpoint commit moved `refs/heads/feat/834-durable-authoring-lane`
+  mid-suite, so the gate went red with "LIVE REPOSITORY CHANGED WHILE UNIT SUITE RAN" although no
+  test failed. The merge had already landed on `main`, so the landing stopped half-way and had to
+  be resumed.
+  WHY IT IS STRUCTURAL: under maximal delegation three lanes commit every few minutes against a
+  ~130 s unit suite, so a landing gets through by luck, and the retry that succeeds is
+  indistinguishable from a retry that hid a real defect (CLAUDE.md §7.2: a retry is SUSPECT and
+  covers nothing). The detector deliberately has no env knob, and its own message names the
+  legitimate case it cannot distinguish.
+  FINAL STATE: the integrity check accepts a set of refs the CALLER declares as foreign and
+  expected — the in-flight declaration already names exactly those branches — so a moved ref
+  belonging to a declared other lane is not a finding, while a moved ref nobody declared still is.
+  The declaration is the only source of that set; no flag lets a caller wave a ref through by hand.
+  VERIFIABLE: unit cases over the integrity check — a ref moved that the declaration names is
+  clean; the same ref moved with no declaration is a finding; a ref moved that the declaration does
+  NOT name is a finding even while other lanes are declared; and `main` moving is a finding under
+  every declaration.
+  Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
+  that train sessions to retry a suspect gate.
   Bundle: Session- & Repo-Hygiene.

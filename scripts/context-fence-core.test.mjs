@@ -114,6 +114,7 @@ describe('over the mark, a STARTING call is denied — naming the mark', () => {
         }),
     }],
     ['delegating to Sol', { toolName: 'Bash', command: 'node scripts/author-sol.mjs 701' }],
+    ['delegating to Fable', { toolName: 'Bash', command: 'node scripts/author-fable.mjs --point 834' }],
     ['a cross-vendor review run', { toolName: 'Bash', command: 'node scripts/review-sol.mjs --commit abc' }],
     ['a delegated ask run', { toolName: 'Bash', command: 'node scripts/ask-sol.mjs --kind audit --brief "x"' }],
   ]

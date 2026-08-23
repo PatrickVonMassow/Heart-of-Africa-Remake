@@ -22272,3 +22272,138 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   take over without forcing something, and it defeats the claim mechanism the whole handover
   protocol rests on.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 720. The findings carrier rings through the delivery that already runs on every tool
+  call, instead of waiting for a turn end the batch owner does not have (user
+  18.08.2026, 15:16).
+
+  WHY HERE AND NOT A NEW CHANNEL. A stood-down window — the one the user talks to,
+  and the one that therefore finds most of what he asks about — can write to the
+  carrier and to nothing else. On 18.08. eight entries waited there up to 9.5
+  hours. The transport was never the problem: `deliverPendingMessages()` in
+  `scripts/chat-spool.mjs` already puts text into the owner's context on EVERY tool
+  call, through `scripts/lock-heartbeat-hook.mjs` (PostToolUse, `*`), and the
+  inbound chat leg is a live subscription that spooled the user's 14:30:45 message
+  at 14:30:46. What is missing is that the carrier has no bell on that path. A
+  SECOND message kind or a second transport was considered and rejected: it would
+  split findings across two stores and re-open the signature and identity question
+  that makes the chat inbox unusable for a session (an inbox envelope carries a
+  direction and an HMAC, no sender, so anything a session posts there arrives as
+  the user's own words).
+
+  FINAL STATE:
+
+  1. `deliverPendingMessages` gains a SECOND SOURCE beside the chat spool: when the
+     reading session OWNS the batch and the carrier holds waiting entries, the
+     delivery emits ONE line — the count, the oldest entry's timestamp, its title,
+     and the drain command (`node scripts/finding.mjs --drain`). It reads the
+     carrier through `parseCarrier`/`carrierPath`; it never writes to it, and the
+     drain stays `finding.mjs --drained "<title>"`.
+
+  2. ZERO BYTES WHILE NOTHING WAITS. The token rule the chat delivery already holds
+     applies unchanged: an empty carrier produces empty stdout, because injected
+     context is re-sent with every later request of the session.
+
+  3. ONE INTERRUPTION PER CALL. A tool call that already delivers a chat message
+     does not also ring the carrier bell — the user's own words go first, and the
+     bell rides the next call.
+
+  4. IT DOES NOT NAG. The line is emitted at most once per REMINDER_INTERVAL
+     (15 minutes, one constant, in the pure core) and again immediately whenever
+     the waiting count RISES, so a new finding is announced at once while an
+     ignored one does not repeat every second.
+
+  5. IT FOLLOWS THE PAUSE DECISION, WHATEVER IT BECOMES. Today
+     `deliverPendingMessages` returns '' while the batch is paused. That
+     suppression is itself under review (a pause is when an instruction matters
+     most); the bell inherits whatever that review decides rather than carving out
+     its own exception.
+
+  6. NON-OWNERS SEE NOTHING. The carrier is drained by the owner alone, so a
+     stood-down window is never told about entries it may not act on.
+
+  VERIFIABLE: Vitest over the pure decision core — waiting entries plus ownership
+  yields one line; an empty carrier yields ''; a non-owner yields ''; a call that
+  carries a chat message yields the chat message only; a second call inside the
+  interval yields ''; a risen count yields the line again. And the process-level
+  shape in the manner of `scripts/chat-delivery-hook.test.mjs`: `node
+  scripts/lock-heartbeat-hook.mjs` against an isolated temp repo writes the exact
+  `hookSpecificOutput` envelope, and writes nothing at all for an empty carrier.
+
+  Criticality: medium — it delivers no verdict of its own and cannot block work; it
+  makes an existing, already-enforced duty visible while it can still be done. Its
+  fail direction is silence, which is today's state.
+
+  Bundle: Chat & Tafel.
+
+- [x] 846. The router can send a point to the Fable lane, but nothing can commission it there
+  (measured 23.08.2026, 01:55, on `feat/834-durable-authoring-lane`). `node
+  scripts/author-sol.mjs --point 834 --dry-run`, run in the `point-834` worktree, answers "point
+  834 routes to the fable lane (Fable 5), not to GPT-5.6 Sol: because 18 unsuccessful review
+  rounds reached the §6 escalation threshold of 5" and refuses. There is no `author-fable.mjs`,
+  and the one recorder that would log such a run — `recordAuthoringCommission` in
+  `scripts/author-sol.mjs` — writes `model: SOL_MODEL_NAME` unconditionally, so even a Fable run
+  driven by hand cannot leave a truthful commission row. `criticality-review-guard` uses exactly
+  those rows as the base for a point's reviewed file set, so an unrecorded commission is not a
+  cosmetic gap: it is a point whose later review coverage cannot be computed.
+  WHAT THAT COSTS TODAY: point 834 stands directly behind this one in the work order, its first stage is
+  built and reviewed on its branch, and its next authoring stage has nowhere to go. The three
+  answers available to a session that meets this are all wrong — override the escalation with
+  `--anyway` and keep the lane that already failed 18 rounds, author it as Claude and re-run the
+  same failure a nineteenth time, or hand-append to the append-only ledger without its durability
+  transaction.
+  A SECOND, SMALLER CONTRADICTION IS SETTLED IN THE SAME PASS: `docs/batch-owner-runbook.md` says
+  "Fable 5 is out of the automatic cut and authors only a point that tags its lane", while
+  `scripts/author-routing-core.mjs` routes to Fable automatically at the escalation threshold.
+  Both texts cannot be the rule. Whichever survives, CLAUDE.md §6, the runbook and the router say
+  the same thing afterwards.
+  FINAL STATE: a point the router assigns to the Fable lane can be commissioned by one command,
+  the way `author-sol.mjs` commissions the Sol lane — same branch-and-worktree contract, same
+  three cheap gates, same "merges nothing", and a commission row that names the model that
+  actually ran. `recordAuthoringCommission` takes the lane's model rather than assuming Sol, and
+  the existing Sol callers keep their behaviour unchanged.
+  VERIFIABLE: Vitest showing a Fable commission row recorded with `model: "Fable 5"` and the Sol
+  path unchanged; the routing dry-run for a Fable-lane point naming the command that serves it
+  instead of refusing; and `criticality-review-guard` computing a file set from a Fable
+  commission base.
+  Criticality: high — it blocks the first open point of the work order, and every wrong way
+  around it either repeats a failed lane or corrupts the four-eyes ledger.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 669. A working author's pushes run CI over, and the supervisor pays for it (measured
+  13.08.2026 on BOTH author lanes). `scripts/author-sol.mjs` pushes the working branch every ~2
+  minutes so a dying run loses nothing. Every push starts a CI run, and the workflow's
+  `concurrency: ci-${{ github.ref }}` with `cancel-in-progress: true` kills the previous one:
+  twelve minutes into the run the branch carried three runs, two `cancelled` and one in
+  progress, and NONE green. The SAME evening the same thing was measured on the CLAUDE lane,
+  where nothing pushes on a timer: a worktree agent committing and pushing at every
+  self-contained step — which CLAUDE.md §6 demands, because an uncommitted block is the one
+  state nothing can rescue — blocked the supervising session's turn end three times in a row,
+  each time for a commit in the middle of an unfinished point. Two consequences, both real:
+  `ci-status-guard` can never find a concluded green run on that branch while the author works,
+  and Actions minutes are spent on runs nobody reads. Measured again 19.08.2026 with TWO author
+  lanes in flight at once: three consecutive runs ended `cancelled` because the next checkpoint
+  overtook them, and while two lanes push in turn SOME run is always unconcluded — so the block
+  is not repeated but CONTINUOUS, and it grows with the agent pool rather than with the point.
+  FINAL STATE, and it has two halves because the two lanes fail for different reasons:
+  (1) THE TIMER LANE. `author-sol.mjs`'s interim pushes are what CLAUDE.md §6 already calls a
+  RESCUE commit — work committed because the run may die, no claim of completeness — so they are
+  written as one: `[skip ci]` in the SUBJECT plus a `Rescue: <what the author was in the middle
+  of>` trailer, which the `commit-msg` hook already demands in that pairing. The run's FINAL
+  commit — the one that claims the work is done — carries neither and goes through CI normally,
+  so the branch ends with exactly one meaningful run. If the author produces no final commit (it
+  died), the branch is left with only skipped runs, which is honest: nobody claims that state is
+  done.
+  (2) THE SUPERVISOR'S GATE. A Claude agent's per-step commits are NOT rescue commits and must
+  keep their CI — but they are not the supervisor's business either. `ci-status-guard` therefore
+  gates the turn end on `main` and on any branch OFFERED FOR LANDING, and reports — without
+  blocking — a branch whose author is still declared in flight. A branch stops being exempt the
+  moment its author's declaration ends, so nothing lands on an unproven run.
+  VERIFIABLE: Vitest over the commit-message builder (an interim commit carries both halves, the
+  final commit neither, and a run that dies leaves no commit claiming completeness); Vitest over
+  the guard's branch selection (main always gates, a landing candidate gates, a branch with a
+  live author reports only, and it gates again once that author is gone); plus the next live run
+  of EACH lane — the Sol lane showing ONE concluded CI run instead of a cancelled chain, the
+  Claude lane showing a supervising session whose turn ends are not held by its agent.
+  Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
+  ends, which is how the batch stalls.

@@ -179,12 +179,6 @@
       "origin": "user",
       "place": "last"
     },
-    "720": {
-      "at": "2026-08-21T16:05:59.675Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for SPEED: findings waited up to 9.5 hours in the carrier while an existing per-tool-call delivery path could have rung them at once.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "722": {
       "at": "2026-08-18T16:54:33.891Z",
       "why": "Nobody is blocked on the historical reading — the gates stand clear after the rule-5 re-baseline, the debt is tracked in the point itself, and the user's queue work (723, the game points) comes first",
@@ -539,6 +533,36 @@
       "why": "Machine-filed, low and cheap: it costs a false red on unrelated points, not lost work, so it waits behind the release like the other detector-hygiene findings of this evening.",
       "origin": "machine",
       "place": "last"
+    },
+    "846": {
+      "at": "2026-08-23T00:30:03.481Z",
+      "why": "Es blockiert Punkt 834, der unmittelbar dahinter steht: dessen naechste Autorenstufe routet in die Fable-Bahn, die kein Kommando bedienen kann — solange 846 offen ist, kann 834 gar nicht weitergebaut werden.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "847": {
+      "at": "2026-08-23T00:30:42.022Z",
+      "why": "Es ist ein Wächter, der weniger misst als sein eigener Satz — kein Produktverhalten, keine verlorene Arbeit, und die Anleitung nutzt heute keinen der vier Wege; es kann hinter der Veröffentlichung stehen.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "848": {
+      "at": "2026-08-23T03:24:17.063Z",
+      "why": "User ruling 23.08.2026, 05:25 in chat: seat 848 directly after 834.",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "849": {
+      "at": "2026-08-23T03:41:54.860Z",
+      "why": "Low criticality, no product behaviour: a noisy alert costs gate time but blocks nothing, so last is right.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "850": {
+      "at": "2026-08-23T04:06:48.522Z",
+      "why": "Low criticality, documentation only; the one instance that blocked a point is already repaired, so last is right.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -567,7 +591,6 @@
       713,
       715,
       719,
-      720,
       733,
       734,
       735,
@@ -588,7 +611,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-22T20:51:29.898Z",
+    "at": "2026-08-23T04:06:48.530Z",
     "points": [
       174,
       184,
@@ -768,7 +791,6 @@
       713,
       715,
       719,
-      720,
       722,
       724,
       725,
@@ -838,7 +860,12 @@
       842,
       843,
       844,
-      845
+      845,
+      846,
+      847,
+      848,
+      849,
+      850
     ]
   }
 }
