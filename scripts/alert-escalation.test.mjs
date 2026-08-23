@@ -149,7 +149,7 @@ describe('escalate — the full climb, on real files', () => {
     expect(readLadder(h.ladderPath).alerts[Object.keys(readLadder(h.ladderPath).alerts)[0]].rung).toBe(2)
   })
 
-  it('PAUSES the batch with a board card at the last rung, and says why in the log', async () => {
+  it('PAUSES the batch with a board card for repository corruption at the last rung', async () => {
     // The rung that makes the difference: an alert can be slept through, a
     // paused batch with a card cannot.
     const h = harness()
@@ -158,11 +158,11 @@ describe('escalate — the full climb, on real files', () => {
     const pause = { isPaused: () => paused != null, setPaused: (r) => (paused = r) }
     for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
       const v = await escalate({
-        title: 'FORBIDDEN MODEL',
-        message: `forbidden commit ${100 + i}`,
+        title: 'REPOSITORY INTEGRITY',
+        message: `broken invariant ${100 + i}`,
         env: {},
         priority: 'high',
-        alertClass: 'forbidden-serving-model',
+        alertClass: 'repository-integrity',
         now,
         ...h,
         pause,
@@ -171,7 +171,7 @@ describe('escalate — the full climb, on real files', () => {
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(paused).toMatch(/Eskalation/)
-    expect(paused).toMatch(/Korruptionsklasse „forbidden-serving-model“/)
+    expect(paused).toMatch(/Korruptionsklasse „repository-integrity“/)
     expect(paused).toMatch(/Weiterarbeiten, nicht Warten/)
     expect(paused).toMatch(/batch-paused/)
     expect(h.cards).toHaveLength(1)
@@ -191,7 +191,7 @@ describe('escalate — the full climb, on real files', () => {
         key: 'forbidden-model',
         env: {},
         priority: 'high',
-        alertClass: 'forbidden-serving-model',
+        alertClass: 'repository-integrity',
         now,
         ...h,
         pause,

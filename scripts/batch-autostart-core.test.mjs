@@ -599,6 +599,12 @@ describe('buildSpawnArgs — print mode, the model chain, and no prompt that can
     expect(SPAWN_MODEL).toMatch(/opus-5/)
     expect(buildSpawnArgs({ fableState: FABLE_OFF })[args.indexOf('--fallback-model') + 1]).toBe('claude-opus-4-8[1m]')
   })
+
+  it('can pin the last trusted handoff lane without falling back toward the suspect', () => {
+    const args = buildSpawnArgs({ model: 'claude-opus-4-8[1m]', fallbackModel: null })
+    expect(args[args.indexOf('--model') + 1]).toBe('claude-opus-4-8[1m]')
+    expect(args).not.toContain('--fallback-model')
+  })
 })
 
 describe('the resume prompt', () => {

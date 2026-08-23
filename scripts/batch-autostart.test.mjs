@@ -85,6 +85,12 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(claudeSites[0]).toMatch(/buildSpawnOptions\(/)
   })
 
+  it('feeds a recorded serving-model handoff into the same spawn builder', () => {
+    expect(source).toMatch(/modelHandoffSpawn\(readJson\(C\('model-guard-handoff\.json'\)\), now\)/)
+    expect(code).toMatch(/model:\s*modelHandoff\.model, fallbackModel:\s*modelHandoff\.fallbackModel/)
+    expect(code).toMatch(/const prompt = modelHandoff\?\.prompt/)
+  })
+
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
     // A literal assignment here would sit outside every test in
     // batch-autostart-core.test.mjs, including the one that stops an inherited

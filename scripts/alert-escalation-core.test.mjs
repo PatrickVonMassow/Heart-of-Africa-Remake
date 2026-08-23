@@ -102,7 +102,7 @@ describe('escalationDecision — a repeated identical alert backs off', () => {
 
 describe('escalationDecision — only the closed corruption list may PAUSE the batch', () => {
   const topEntry = { rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: ALERT_PAUSE_RUNG }
-  const corruption = { ...at(topEntry), title: 'FORBIDDEN MODEL', priority: 'high', alertClass: 'forbidden-serving-model' }
+  const corruption = { ...at(topEntry), title: 'REPOSITORY INTEGRITY', priority: 'high', alertClass: 'repository-integrity' }
 
   it.each(CORRUPTION_ALERT_CLASSES)('allows the explicit %s corruption class to pause', (alertClass) => {
     expect(escalationDecision({ ...corruption, alertClass }).action).toBe('pause-and-send')
@@ -110,6 +110,11 @@ describe('escalationDecision — only the closed corruption list may PAUSE the b
 
   it('does not let an urgent but unknown class acquire pause authority', () => {
     const d = escalationDecision({ ...corruption, alertClass: 'new-unsafe-sounding-class', priority: 'urgent' })
+    expect(d.action).toBe('continue-and-record')
+  })
+
+  it('leaves forbidden-serving-model recovery to its trusted lane handoff', () => {
+    const d = escalationDecision({ ...corruption, alertClass: 'forbidden-serving-model' })
     expect(d.action).toBe('continue-and-record')
   })
 
@@ -152,7 +157,7 @@ describe('escalationDecision — only the closed corruption list may PAUSE the b
     const reason = escalationPauseReason('FORBIDDEN MODEL', escalationDecision(corruption), '30.07.2026, 04:00')
     expect(reason).toMatch(/Eskalation/)
     expect(reason).toMatch(/FORBIDDEN MODEL/)
-    expect(reason).toMatch(/Korruptionsklasse „forbidden-serving-model“/)
+    expect(reason).toMatch(/Korruptionsklasse „repository-integrity“/)
     expect(reason).toMatch(/weiteres Arbeiten.*beschädigen.*Korruption ausweiten/)
     expect(reason).toMatch(/Weiterarbeiten, nicht Warten, die unsichere Handlung/)
     expect(reason).not.toMatch(/Benachrichtigung kann man verschlafen/)

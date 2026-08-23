@@ -109,6 +109,7 @@ import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
+import { modelHandoffSpawn } from './model-handoff-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -1632,10 +1633,12 @@ try {
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
+const modelHandoff = modelHandoffSpawn(readJson(C('model-guard-handoff.json')), now)
 writeJsonAtomic(C('autostart-last.json'), launcherStartRecord({ decision: startDecision, at: now, head: curHead }))
 log(
   `RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount}` +
-    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''})`,
+    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''}` +
+    `${modelHandoff?.model ? `, MODEL HANDOFF ${modelHandoff.state.route[modelHandoff.state.targetIndex].model}` : ''})`,
 )
 // Read BEFORE the spawn: everything appended past this offset is the child's own
 // output, which is where the usage limit says so (point 444).
@@ -1666,7 +1669,8 @@ try {
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
   const fableState = currentFableState()
   if (!fableState.ok) throw new Error(fableState.problem)
-  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix, fableState }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix)
+  child = spawn(exe, buildSpawnArgs({ prompt, fableState, ...(modelHandoff?.model ? { model: modelHandoff.model, fallbackModel: modelHandoff.fallbackModel } : {}) }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
   // ASYNCHRONOUSLY, so without this handler the one failure class the resolver
   // can still produce would take the tick down as an unhandled event instead of
