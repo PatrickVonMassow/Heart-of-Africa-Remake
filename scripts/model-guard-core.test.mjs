@@ -116,9 +116,17 @@ describe('the wrapper log format', () => {
       expect(parsed?.trailers).toBe(`${anthropic},${openai}`)
       expect(splitTrailerField(parsed?.trailers)).toEqual([anthropic, openai])
       expect(classifyTrailer(parsed?.trailers, POLICY_NEUTRAL)).toBe('allowed')
+      // EVERY split trailer is judged individually, FROM the parsed field
+      // (point 863): the closing assertion used to rebuild the message by hand,
+      // so a wrapper that judged only the first trailer stayed green. Judging
+      // each parsed value — and a rebuilt message made of exactly those values
+      // — turns that regression red.
+      const parsedTrailers = splitTrailerField(parsed?.trailers)
+      expect(parsedTrailers).toHaveLength(2)
+      expect(parsedTrailers.map((t) => classifyTrailer(t, POLICY_NEUTRAL))).toEqual(['allowed', 'allowed'])
       expect(
         evaluateCommitTrailers(
-          `Test two model trailers\n\nCo-Authored-By: ${anthropic}\nCo-Authored-By: ${openai}\n`,
+          `Test two model trailers\n\n${parsedTrailers.map((t) => `Co-Authored-By: ${t}`).join('\n')}\n`,
           POLICY_NEUTRAL,
         ).block,
       ).toBe(false)

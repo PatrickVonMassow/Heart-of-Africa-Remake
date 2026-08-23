@@ -235,6 +235,26 @@ describe('evaluateCriticalityReview', () => {
     }
   })
 
+  it('an EMPTY or whitespace authorship never proves model diversity (point 862)', () => {
+    // The recorder writes authoredBy '' legitimately for a commit without a
+    // model trailer, and `!sameModel(model, '')` read that unknown author as a
+    // DIFFERENT model — clearance on absence of evidence. The row stays
+    // well-formed (38 such rows stand in the real ledger and a poison would
+    // redden history); it just can never be the diversity proof.
+    for (const authoredBy of ['', '   ']) {
+      const v = evaluateCriticalityReview({
+        baseline: 'b',
+        head: 'h',
+        ticks: [tick()],
+        records: [{ ...record({ verdict: 'merge' }), authoredBy }],
+      })
+      expect(v.block, JSON.stringify(authoredBy)).toBe(true)
+      // 'self-review', not 'no-review': a review row EXISTS, it just cannot
+      // prove a different model — which is exactly what the reader must fix.
+      expect(v.findings[0].kind).toBe('self-review')
+    }
+  })
+
   it('a single PASS row never clears a whole point — only a complete composition does (third landing round)', () => {
     // The live, pre-existing hole: a record carrying `pass` covers the files
     // that pass read and no more, yet it entered `clean` like a whole-range

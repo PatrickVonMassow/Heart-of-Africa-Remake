@@ -11445,10 +11445,11 @@ to land than a mechanism that needs a review.
   author as a different model — a fail-open in the exact gate that exists to prove two vendors.
   The test names the missing-authorship case but covers only an absent key and a non-string
   value, not the admitted empty string.
-  FINAL STATE: a row with empty or whitespace authorship is not well formed and cannot clear the
-  gate; the test carries the empty-string case beside the two it has.
-  VERIFIABLE: unit cases — an empty and a whitespace authoredBy each refuse to clear; the
-  existing well-formed rows still clear.
+  FINAL STATE: a row with empty or whitespace authorship can never PROVE model diversity, so it
+  cannot clear the gate. Well-formedness is untouched on purpose: 38 legitimate empty-authorship
+  rows stand in the ledger (merges, user edits), and poisoning them would redden history.
+  VERIFIABLE: unit cases — an empty and a whitespace authoredBy each refuse to clear as no-review;
+  the existing well-formed rows still clear.
   Criticality: medium — the gate stays conservative everywhere else, but this path can wave a
   same-model pair through as cross-vendor.
   Bundle: Modell & Wächter.
