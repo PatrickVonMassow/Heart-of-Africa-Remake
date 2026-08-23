@@ -77,31 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 854. The serving-model tripwire reads two co-author trailers as one unknown model. MEASURED
-  23.08.2026, 08:55 on `main`. Commit `c54e461` carries two `Co-Authored-By` trailers — the author
-  model and the cross-vendor reviewer — and `node scripts/model-guard.mjs --status` shows the hit's
-  trailer field as those two lines CONCATENATED with no separator, so the parsed identity matches
-  no allowlist entry. The guard then raises its full breach ritual ("create `.claude/batch-paused`
-  (reason: forbidden serving model) and stop"), although BOTH named models are on that very
-  allowlist by the guard's own message.
-  TWO FAILURES MEET HERE: `scripts/model-guard-core.mjs` reduces a commit's trailers to one string
-  instead of judging each trailer on its own; and CLAUDE.md §6 says every commit names its author
-  model in a trailer without saying whether a SECOND model trailer is allowed at all, so a session
-  that credits its reviewer manufactures a forbidden-model incident.
-  WHAT IT COSTS: the false breach lands on a pushed commit that can no longer be amended, and the
-  sanctioned remedy — advancing `.claude/model-guard-baseline.json` — is reserved to the user, so
-  the batch stands blocked on a premise that does not hold. A tripwire that fires on an allowed
-  pair is also the one a session learns to wave through on the day it is real.
-  FINAL STATE: the guard judges each `Co-Authored-By` trailer separately and passes when every
-  model named is allowed; a trailer naming a model outside the allowlist still raises the incident
-  unchanged; and the rule text says in one line whether a commit may carry a second model trailer.
-  VERIFIABLE: unit cases over the trailer reading — a commit with an allowed author trailer and an
-  allowed reviewer trailer passes; the same commit with one forbidden trailer still raises; a
-  single trailer claiming two models remains a finding as it is today; and a bare model-less
-  trailer keeps its own existing verdict.
-  Criticality: medium — no product behaviour, but it halts the batch on a false breach and the
-  only sanctioned way out needs the user.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
