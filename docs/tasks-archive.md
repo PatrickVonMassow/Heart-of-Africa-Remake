@@ -22578,3 +22578,21 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   rather than a batch pause.
   Criticality: HIGH — it is the half of the 23.08.2026 order that the inventory could only write down.
   Bundle: Urlaubsfestigkeit.
+
+- [x] 865. A pause record without a clock must prove it came from the user. Point 861's inventory rows
+  P3, P4 and P8: an empty or legacy `.claude/batch-paused`, a `retry-after: never`, an unreadable
+  clock and the causes `serving-model`, `awaiting-user` and `retries-exhausted` are all classified
+  clockless today, so a corrupt or ambiguous marker is indistinguishable from a deliberate user stop
+  and parks the batch for as long as nobody looks.
+  FINAL STATE: the pause record is typed and only a proved `user-stop` may be clockless. An untyped,
+  legacy or malformed record is snapshotted into the decision card, replaced atomically with a short
+  recovery clock and retried by the launcher. The serving-model tripwire never lets the suspect model
+  bless itself: it hands over to the next allowed lane of the recorded routing chain, which verifies
+  the trailers and advances the baseline only on proof, and probes on a clock when no allowed lane is
+  reachable.
+  VERIFIABLE: an empty marker, a `retry-after: never` and a malformed clock each resume on their
+  recovery clock and leave a decision card; a record typed `user-stop` stays held with no clock; a
+  forbidden serving model starts the next allowed lane instead of parking, and the baseline advances
+  only after that lane verified the trailers.
+  Criticality: HIGH — it decides whether an ambiguous marker costs a retry or a whole absence.
+  Bundle: Urlaubsfestigkeit.
