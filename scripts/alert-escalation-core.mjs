@@ -80,7 +80,6 @@ export function higherPriority(a, b) {
  * Unknown, absent and newly invented classes all fall toward continuation.
  */
 export const CORRUPTION_ALERT_CLASSES = Object.freeze([
-  'forbidden-serving-model',
   'repository-integrity',
 ])
 

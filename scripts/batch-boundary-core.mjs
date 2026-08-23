@@ -713,6 +713,7 @@ export const CLOSING_SET_SCRIPTS = [
   'finding',
   'mechanism-review',
   'retro-refresh',
+  'batch-pause',
   'batch-boundary',
   'batch-claim',
   'batch-doctor',

@@ -31,6 +31,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import { notify } from './notify.mjs'
+import { boardCard } from './alert-escalation.mjs'
 import {
   acquire,
   updateOwnLock,
@@ -98,7 +99,7 @@ import { currentFableState } from './fable-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
-import { classifyPause, describePause, formatPauseRecord, planPause } from './batch-pause-core.mjs'
+import { classifyPause, describePause, formatPauseRecord, pauseRecovery, planPause } from './batch-pause-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -108,6 +109,7 @@ import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
+import { modelHandoffSpawn } from './model-handoff-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -382,8 +384,9 @@ function readRunLogSegment(from) {
       now,
       ...verdict,
       // What the tick does with it: park (hold/wait) or resume (retry/none).
-      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait',
+      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait' || verdict.state === 'recover',
       clearsTheRecord: verdict.state === 'retry',
+      replacesWithRecoveryClock: verdict.state === 'recover',
       note: describePause(verdict),
     }))
     process.exit(0)
@@ -588,8 +591,23 @@ try {
 // guard below would re-pause this very tick and the clock would have bought
 // nothing. A retry means the next spawn gets a fresh ladder — and if it fails
 // again, the pause returns one rung higher.
-const pause = classifyPause({ text: (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })(), now })
-let batchParked = pause.state === 'hold' || pause.state === 'wait'
+const pauseText = (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })()
+let pause = classifyPause({ text: pauseText, now })
+if (pause.state === 'recover') {
+  const recovery = pauseRecovery({ text: pauseText, now })
+  if (boardCard(recovery.title, recovery.body)) {
+    try {
+      writeTextAtomic(C('batch-paused'), recovery.record)
+      pause = classifyPause({ text: recovery.record, now })
+      log(`${describePause(classifyPause({ text: pauseText, now }))}; decision card recorded; retry at ${new Date(recovery.retryAfter).toISOString()}`)
+    } catch (e) {
+      log(`AMBIGUOUS PAUSE snapshot recorded but its recovery clock could not be written (${e?.message ?? e})`)
+    }
+  } else {
+    log('AMBIGUOUS PAUSE recovery deferred — its decision card could not be recorded')
+  }
+}
+let batchParked = pause.state === 'hold' || pause.state === 'wait' || pause.state === 'recover'
 const pauseKey = batchParked ? `${pause.state}:${pause.pausedAt ?? ''}:${pause.retryAfter ?? ''}:${pause.cause ?? ''}` : ''
 if (batchParked && state.pauseJournalKey !== pauseKey) {
   journal(ACTIVITY_EVENTS.PAUSE, {
@@ -1615,10 +1633,12 @@ try {
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
+const modelHandoff = modelHandoffSpawn(readJson(C('model-guard-handoff.json')), now)
 writeJsonAtomic(C('autostart-last.json'), launcherStartRecord({ decision: startDecision, at: now, head: curHead }))
 log(
   `RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount}` +
-    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''})`,
+    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''}` +
+    `${modelHandoff?.model ? `, MODEL HANDOFF ${modelHandoff.state.route[modelHandoff.state.targetIndex].model}` : ''})`,
 )
 // Read BEFORE the spawn: everything appended past this offset is the child's own
 // output, which is where the usage limit says so (point 444).
@@ -1649,7 +1669,8 @@ try {
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
   const fableState = currentFableState()
   if (!fableState.ok) throw new Error(fableState.problem)
-  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix, fableState }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix)
+  child = spawn(exe, buildSpawnArgs({ prompt, fableState, ...(modelHandoff?.model ? { model: modelHandoff.model, fallbackModel: modelHandoff.fallbackModel } : {}) }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
   // ASYNCHRONOUSLY, so without this handler the one failure class the resolver
   // can still produce would take the tick down as an unhandled event instead of

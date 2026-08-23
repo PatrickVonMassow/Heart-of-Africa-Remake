@@ -11,6 +11,7 @@ import {
   readState,
   requireState,
   servingChain,
+  servingRoute,
   servingFallbackModelId,
   servingPolicyLine,
   statePathFrom,
@@ -62,6 +63,11 @@ describe('decisions derived from the state', () => {
   it('includes Fable in the serving chain only while on', () => {
     expect(servingChain(on())).toEqual(['Opus 5', FABLE_MODEL, 'Opus 4.8'])
     expect(servingChain(off())).toEqual(['Opus 5', 'Opus 4.8'])
+    expect(servingRoute(on()).map((lane) => lane.id)).toEqual([
+      'claude-opus-5[1m]',
+      'claude-fable-5',
+      'claude-opus-4-8[1m]',
+    ])
     expect(servingFallbackModelId(on())).toBe('claude-fable-5')
     expect(servingFallbackModelId(off())).toBe('claude-opus-4-8[1m]')
   })
@@ -72,6 +78,9 @@ describe('decisions derived from the state', () => {
     expect(servingPolicyLine(off())).toContain('Opus 5, then Opus 4.8')
     expect(servingPolicyLine(off())).toContain('Fable 5, Sonnet, Haiku')
     expect(servingPolicyLine(off())).toContain('node scripts/fable-switch.mjs --status')
+    expect(servingPolicyLine(off())).toContain('trusted handoff to the next allowed lane')
+    expect(servingPolicyLine(off())).toContain('Only that fresh lane')
+    expect(servingPolicyLine(off())).not.toContain('.claude/batch-paused')
   })
 
   it('selects Fable as merger while on and Sol while off', () => {

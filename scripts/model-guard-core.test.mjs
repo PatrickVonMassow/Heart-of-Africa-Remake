@@ -508,11 +508,12 @@ describe('the two block texts', () => {
     expect(text).toContain('do not pause the batch over it')
   })
 
-  it('the named one keeps demanding the pause', () => {
+  it('the named one demands a fresh trusted-lane handoff', () => {
     const text = formatForbiddenReason([{ sha: 'a69d1bd', trailer: 'Claude Haiku 4.5 <x@y>' }])
     expect(text).toContain('SERVING-MODEL TRIPWIRE')
     expect(text).toContain('a69d1bd')
-    expect(text).toContain('.claude/batch-paused')
+    expect(text).toContain('next allowed lane')
+    expect(text).toContain('transcript metadata')
   })
 
   it('the named one names the unnamed commits standing beside it', () => {

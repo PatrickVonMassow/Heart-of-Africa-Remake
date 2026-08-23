@@ -555,8 +555,8 @@ function fableTimingNotices(hits, fableState) {
   })
 }
 
-/** The HARD stop: a named model outside the allowlist. Unchanged in substance —
- *  pause the batch and wait for the user (point 309, incident 24.07.2026).
+/** The HARD stop: a named model outside the allowlist. The wrapper transfers the
+ *  batch to a fresh allowed lane rather than asking the suspect to repair itself.
  *  `alsoUnidentified` are the unnamed commits found in the same window: they are
  *  NAMED here rather than dropped, because advancing the baseline past the
  *  forbidden ones would otherwise clear them unseen (four-eyes review). */
@@ -567,10 +567,10 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
       `outside the allowlist in force at each commit's own time (Opus 5, Opus 4.8 and GPT-5.6 Sol ` +
       `may author throughout; Fable 5 may author only while its recorded policy is ON; Sonnet and Haiku ` +
-      `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work: create ` +
-      '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user has ' +
-      'confirmed an allowed model may .claude/model-guard-baseline.json be advanced past these ' +
-      'commits.',
+      `are never admitted; user policy 25.07./13.08.2026).${switchRefusal} Do NOT continue batch work. ` +
+      'The tripwire records a handoff to the next allowed lane of the serving chain. Only that fresh lane, ' +
+      'after transcript metadata proves which model answered and it re-reads every trailer, may advance ' +
+      '.claude/model-guard-baseline.json past these commits; an unreachable chain probes on a clock.',
     ...fableTimingNotices(hits, fableState),
     ...(unnamed.length
       ? [
@@ -599,7 +599,7 @@ export function formatUnidentifiedReason(hits, { backupRefs = [], fableState } =
     `  · an ALLOWED model (${phrase}) → advance .claude/model-guard-baseline.json`,
     '    past these commits and carry on; no user interruption is owed.',
     '  · a model outside the allowlist, or no transcript covers the commit → treat it as the ',
-    '    forbidden case: create .claude/batch-paused (reason: forbidden serving model) and stop.',
+    '    forbidden case: record the trusted-lane handoff; only that lane may advance the baseline.',
     '',
     'Then stop it recurring: write your own model into the trailer —',
     '`Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',

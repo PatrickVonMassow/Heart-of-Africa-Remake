@@ -38,16 +38,16 @@ describe('setPaused writes a clocked park by default', () => {
     expect(classifyPause({ text: readFileSync(path, 'utf8'), now: Date.now() + PAUSE_RETRY_LADDER_MS[0] + 1 }).state).toBe('retry')
   })
 
-  it('a cause on the unsafe list parks without one', () => {
+  it('a serving-model cause now probes on a clock', () => {
     setPaused('a serving model outside the allowlist answered', { ...opts(), cause: 'serving-model' })
     const v = pauseState(Date.now(), opts())
-    expect(v.state).toBe('hold')
+    expect(v.state).toBe('wait')
     expect(v.cause).toBe('serving-model')
   })
 
-  it('an explicit retryAfter beats the plan — the caller may still decide', () => {
+  it('an explicit clockless value without a user-stop type is recovered', () => {
     setPaused('held by hand', { ...opts(), retryAfter: null })
-    expect(pauseState(Date.now(), opts()).state).toBe('hold')
+    expect(pauseState(Date.now(), opts()).state).toBe('recover')
   })
 
   it('the reason comes back without the metadata, and clearPaused removes the file', () => {
@@ -59,7 +59,7 @@ describe('setPaused writes a clocked park by default', () => {
   })
 })
 
-describe('the rung is shared, so a repeating cause reaches a human', () => {
+describe('the rung is shared, so a repeating cause reaches a capped probe', () => {
   it('takes the launcher\'s retry count when the caller names none', () => {
     writeFileSync(statePath, JSON.stringify({ failCount: 0, pauseAttempt: 1 }))
     expect(retryAttempts(opts())).toBe(1)
@@ -73,10 +73,16 @@ describe('the rung is shared, so a repeating cause reaches a human', () => {
 
   // The oscillation the four-eyes review found: without a shared rung an unanswered
   // alert or a standing outage re-parked at 20 minutes for ever and never escalated.
-  it('climbs to a clockless park once the ladder is spent', () => {
+  it('keeps a recovery clock once the ladder is spent', () => {
     writeFileSync(statePath, JSON.stringify({ pauseAttempt: PAUSE_RETRY_LADDER_MS.length }))
     const plan = setPaused('the outage is still there', opts())
-    expect(plan.clockless).toBe(true)
+    expect(plan.clockless).toBe(false)
+    expect(pauseState(Date.now(), opts()).state).toBe('wait')
+  })
+
+  it('writes the only clockless form as a typed user-stop', () => {
+    setPaused('the user asked to stop', { ...opts(), cause: 'user-stop' })
+    expect(readFileSync(path, 'utf8')).toMatch(/type: user-stop/)
     expect(pauseState(Date.now(), opts()).state).toBe('hold')
   })
 

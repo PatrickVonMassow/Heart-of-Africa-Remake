@@ -8,6 +8,9 @@ export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
 export const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5'
 export const SOL_MODEL = 'GPT-5.6 Sol'
+export const OPUS_MODEL = 'Opus 5'
+export const OPUS_FALLBACK_MODEL = 'Opus 4.8'
+export const OPUS_MODEL_ID = 'claude-opus-5[1m]'
 export const FABLE_MODEL_ID = 'claude-fable-5'
 export const OPUS_FALLBACK_MODEL_ID = 'claude-opus-4-8[1m]'
 
@@ -94,7 +97,16 @@ export function fableIsOn(value) {
 
 /** The Claude serving chain in force. */
 export function servingChain(value) {
-  return Object.freeze(['Opus 5', ...(fableIsOn(value) ? [FABLE_MODEL] : []), 'Opus 4.8'])
+  return Object.freeze(servingRoute(value).map((lane) => lane.model))
+}
+
+/** The same recorded chain with the CLI ids needed for an explicit lane handoff. */
+export function servingRoute(value) {
+  return Object.freeze([
+    Object.freeze({ model: OPUS_MODEL, id: OPUS_MODEL_ID }),
+    ...(fableIsOn(value) ? [Object.freeze({ model: FABLE_MODEL, id: FABLE_MODEL_ID })] : []),
+    Object.freeze({ model: OPUS_FALLBACK_MODEL, id: OPUS_FALLBACK_MODEL_ID }),
+  ])
 }
 
 /** The launcher CLI's first fallback model, from the same serving chain. */
@@ -110,8 +122,9 @@ export function servingPolicyLine(value) {
   return (
     `THE SERVING MODEL of this session — the one running the batch — is ${chain.join(', then ')}. ` +
     `${forbidden.join(', ')} and every other model are NOT acceptable under the recorded Fable switch ` +
-    `(${SWITCH_COMMAND} --status): if the serving model is outside that chain, do NOT work — create ` +
-    '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via scripts/notify.mjs instead.'
+    `(${SWITCH_COMMAND} --status): if the serving model is outside that chain, do NOT work — the ` +
+    'serving-model tripwire records and starts a trusted handoff to the next allowed lane. Only that fresh ' +
+    'lane may verify the offending trailers and advance the baseline; an unreachable chain probes on a clock.'
   )
 }
 

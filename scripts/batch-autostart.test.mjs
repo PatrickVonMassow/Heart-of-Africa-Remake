@@ -85,6 +85,12 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(claudeSites[0]).toMatch(/buildSpawnOptions\(/)
   })
 
+  it('feeds a recorded serving-model handoff into the same spawn builder', () => {
+    expect(source).toMatch(/modelHandoffSpawn\(readJson\(C\('model-guard-handoff\.json'\)\), now\)/)
+    expect(code).toMatch(/model:\s*modelHandoff\.model, fallbackModel:\s*modelHandoff\.fallbackModel/)
+    expect(code).toMatch(/const prompt = modelHandoff\?\.prompt/)
+  })
+
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
     // A literal assignment here would sit outside every test in
     // batch-autostart-core.test.mjs, including the one that stops an inherited
@@ -618,6 +624,14 @@ describe('the launcher acts on the pause record', () => {
     expect(lineOf(/if \(batchParked\)/, 'the pause guard')).toBeLessThan(
       lineOf(/openPointCount\(\)/, 'the work-order read'),
     )
+  })
+
+  it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
+    const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
+    const block = codeLines.slice(recovery, recovery + 18).join('\n')
+    expect(block).toMatch(/boardCard\(recovery\.title, recovery\.body\)/)
+    expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
+    expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
   })
 
   it('writes its own runaway park with a planned clock, not a bare marker', () => {

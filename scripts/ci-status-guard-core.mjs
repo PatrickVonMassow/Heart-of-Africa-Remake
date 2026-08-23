@@ -756,7 +756,8 @@ export function waitReason(target, classification) {
     `is still running. A push is not landed until its run is GREEN, and an unfinished ` +
     `run is a wait, not a pass. Sleep about 90 s, then end the turn again — this clears ` +
     `by itself once the run concludes green, fails open after ${Math.round(WAIT_BUDGET_MS / 60000)} ` +
-    `minutes, and the user pausing the batch via .claude/batch-paused clears it too.`
+    `minutes, and an explicit user stop recorded with \`node scripts/batch-pause.mjs --user-stop "<reason>"\` ` +
+    `clears it too.`
   )
 }
 
@@ -803,8 +804,8 @@ export function blockReason(classification, headSha, refName = 'HEAD') {
       head +
       outside +
       `${c.detail ?? ''}. ${c.remedy ?? ''} ${trail}` +
-      `Once that run is green this clears by itself; the user pausing the batch ` +
-      `via .claude/batch-paused also clears it.`
+      `Once that run is green this clears by itself; an explicit user stop recorded with ` +
+      `\`node scripts/batch-pause.mjs --user-stop "<reason>"\` also clears it.`
     )
   }
 
@@ -814,6 +815,7 @@ export function blockReason(classification, headSha, refName = 'HEAD') {
     `Reproduce the fast gate locally (npm run build && npm run lint && ` +
     `node scripts/audit-check.mjs && npm run test:unit), fix the cause, commit and push — ` +
     `CI green is part of done. ${trail}` +
-    `Only a fixing push (or the user pausing the batch via .claude/batch-paused) clears this.`
+    `Only a fixing push (or an explicit user stop recorded with ` +
+    `\`node scripts/batch-pause.mjs --user-stop "<reason>"\`) clears this.`
   )
 }

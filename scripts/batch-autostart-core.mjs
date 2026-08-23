@@ -40,13 +40,13 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 /** 0 = wait indefinitely (the runtime's own documented value). */
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
-import { servingFallbackModelId } from './fable-switch-core.mjs'
+import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
 
 /** Model policy (CLAUDE.md §6). rule:model-policy@1758947b
  *  The session starts on Opus 5. Its one CLI fallback is the next member of the
  *  chain reported by scripts/fable-switch.mjs; the model guard enforces that
  *  same allowlist from inside the spawned session. */
-export const SPAWN_MODEL = 'claude-opus-5[1m]'
+export const SPAWN_MODEL = OPUS_MODEL_ID
 
 /**
  * ONE TURN, SEVERAL CALLS (point 593) — the German rendering of the paragraph the
@@ -264,8 +264,12 @@ export function standingAlertDue({ lastAt = null, now = Date.now(), intervalMs =
  * and defaultMode "dontAsk" is the settings ceiling.
  */
 export function buildSpawnArgs({ prompt = RESUME_PROMPT, model = SPAWN_MODEL, fallbackModel, fableState } = {}) {
-  const fallback = fallbackModel || servingFallbackModelId(fableState)
-  return ['-p', prompt, '--model', model, '--fallback-model', fallback, '--dangerously-skip-permissions']
+  const fallback = fallbackModel === null ? null : fallbackModel || servingFallbackModelId(fableState)
+  return [
+    '-p', prompt, '--model', model,
+    ...(fallback ? ['--fallback-model', fallback] : []),
+    '--dangerously-skip-permissions',
+  ]
 }
 
 /**
