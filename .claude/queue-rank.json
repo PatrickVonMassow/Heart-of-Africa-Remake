@@ -547,10 +547,10 @@
       "place": "last"
     },
     "848": {
-      "at": "2026-08-23T03:23:32.528Z",
-      "why": "User ruling 23.08.2026, 05:25: 848 stands directly after 834.",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-08-23T03:24:17.063Z",
+      "why": "User ruling 23.08.2026, 05:25 in chat: seat 848 directly after 834.",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "settled": {
