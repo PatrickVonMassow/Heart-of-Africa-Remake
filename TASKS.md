@@ -11289,3 +11289,59 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but it stops landings half-way and manufactures reds
   that train sessions to retry a suspect gate.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 853. The guard preflight names a remediation that cannot clear its own block. MEASURED
+  23.08.2026, 08:44 on `main`. `scripts/batch-progress-guard.mjs` judges the parallel-session alert
+  twice from two different sources: its preflight gather sets `unhandledAlert` from
+  `parallel.length > 0` — a LIVE `detectParallel` probe — while the guard's own run path judges
+  only `readUnhandledAlert()`. At the measurement `readUnhandledAlert()` returned null, because
+  `batch-doctor --gate` had marked the alert handled at 06:40:47Z and said so in its own log; but
+  `detectParallel` still reported the retired predecessor session `d2c90ac9` from its last tool
+  call at 06:35:51Z, so `guard-preflight --for turn-end` went on printing "would-block:
+  batch-progress-guard … Run `node scripts/batch-doctor.mjs --gate` in this turn" after that very
+  command had already run green in the same turn.
+  NOT A DUPLICATE OF 849: that point owns the false positive itself — a RETIRED predecessor being
+  counted as a live parallel writer — and fixing it would silence this measurement. What stays
+  behind is the divergence: two code paths in one guard judge the same question from two different
+  sources, so the preflight can block where the guard allows for any cause, and its remedy text is
+  chosen from the source it did not consult. 849 is worked first; this point is what remains after
+  it and must not be worked beside it, because both edit the same liveness reading.
+  WHY IT MATTERS: the named remediation cannot clear the condition it is offered for. Only the
+  ageing-out of the stale liveness window clears it, and a session that believes the advice pays a
+  full unit/build/lint gate — measured ~140 s — for every repetition. A preflight that disagrees
+  with its own guard also teaches sessions to discount it, which is the opposite of what it is for.
+  FINAL STATE: both paths judge the alert from ONE source, so the preflight verdict and the guard
+  verdict cannot disagree. Where a live parallel detection is genuinely a reason to block, the
+  preflight names THAT cause and its actual remedy instead of the doctor gate.
+  VERIFIABLE: unit cases over the gather — a handled alert plus a live `detectParallel` hit yields
+  the same verdict as the guard's own path; a genuinely unhandled alert still blocks; and the
+  block text for a live-parallel cause names that cause rather than the doctor gate.
+  Criticality: low — no product behaviour; the cost is repeated full gates and a preflight whose
+  verdicts a session learns to ignore.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 854. The serving-model tripwire reads two co-author trailers as one unknown model. MEASURED
+  23.08.2026, 08:55 on `main`. Commit `c54e461` carries two `Co-Authored-By` trailers — the author
+  model and the cross-vendor reviewer — and `node scripts/model-guard.mjs --status` shows the hit's
+  trailer field as those two lines CONCATENATED with no separator, so the parsed identity matches
+  no allowlist entry. The guard then raises its full breach ritual ("create `.claude/batch-paused`
+  (reason: forbidden serving model) and stop"), although BOTH named models are on that very
+  allowlist by the guard's own message.
+  TWO FAILURES MEET HERE: `scripts/model-guard-core.mjs` reduces a commit's trailers to one string
+  instead of judging each trailer on its own; and CLAUDE.md §6 says every commit names its author
+  model in a trailer without saying whether a SECOND model trailer is allowed at all, so a session
+  that credits its reviewer manufactures a forbidden-model incident.
+  WHAT IT COSTS: the false breach lands on a pushed commit that can no longer be amended, and the
+  sanctioned remedy — advancing `.claude/model-guard-baseline.json` — is reserved to the user, so
+  the batch stands blocked on a premise that does not hold. A tripwire that fires on an allowed
+  pair is also the one a session learns to wave through on the day it is real.
+  FINAL STATE: the guard judges each `Co-Authored-By` trailer separately and passes when every
+  model named is allowed; a trailer naming a model outside the allowlist still raises the incident
+  unchanged; and the rule text says in one line whether a commit may carry a second model trailer.
+  VERIFIABLE: unit cases over the trailer reading — a commit with an allowed author trailer and an
+  allowed reviewer trailer passes; the same commit with one forbidden trailer still raises; a
+  single trailer claiming two models remains a finding as it is today; and a bare model-less
+  trailer keeps its own existing verdict.
+  Criticality: medium — no product behaviour, but it halts the batch on a false breach and the
+  only sanctioned way out needs the user.
+  Bundle: Session- & Repo-Hygiene.

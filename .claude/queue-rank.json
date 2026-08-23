@@ -84,12 +84,6 @@
       "why": "Small landing-chain hardening; the red is loud and the remedy obvious, so it waits behind the release-critical fixes",
       "place": "last"
     },
-    "669": {
-      "at": "2026-08-21T16:05:59.526Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for SPEED: with two author lanes in flight some CI run is always unconcluded, so the supervisor's turn end is blocked continuously.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "670": {
       "at": "2026-08-13T15:12:02.801Z",
       "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes",
@@ -534,12 +528,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "846": {
-      "at": "2026-08-23T00:30:03.481Z",
-      "why": "Es blockiert Punkt 834, der unmittelbar dahinter steht: dessen naechste Autorenstufe routet in die Fable-Bahn, die kein Kommando bedienen kann — solange 846 offen ist, kann 834 gar nicht weitergebaut werden.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "847": {
       "at": "2026-08-23T00:30:42.022Z",
       "why": "Es ist ein Wächter, der weniger misst als sein eigener Satz — kein Produktverhalten, keine verlorene Arbeit, und die Anleitung nutzt heute keinen der vier Wege; es kann hinter der Veröffentlichung stehen.",
@@ -563,6 +551,30 @@
       "why": "Low criticality, documentation only; the one instance that blocked a point is already repaired, so last is right.",
       "origin": "machine",
       "place": "last"
+    },
+    "851": {
+      "at": "2026-08-23T06:22:10.145Z",
+      "why": "Maschinell gemeldeter Befund ohne Produktverhalten; er kostet eine selbst verursachte zweite Stornierung, keine Arbeit — er steht wie 845–850 hinter der Veröffentlichung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "852": {
+      "at": "2026-08-23T06:22:10.218Z",
+      "why": "Maschinell gemeldeter Befund; er hält eine Landung nur auf, und die In-Flight-Deklaration nennt die fremde Bahn heute schon, sodass die Landung wiederholbar bleibt — er steht wie 845–851 hinter der Veröffentlichung.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "853": {
+      "at": "2026-08-23T06:46:41.044Z",
+      "why": "Machine-filed hygiene finding; it costs a wasted gate run per repetition and no product behaviour, so it keeps its appended place behind the release like the findings before it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "854": {
+      "at": "2026-08-23T06:54:08.442Z",
+      "why": "Machine-filed hygiene finding; it keeps its appended place behind the release like the findings before it, even though it currently blocks — the block is cleared by a user confirmation, not by working the point earlier.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -579,7 +591,6 @@
       659,
       660,
       663,
-      669,
       686,
       687,
       688,
@@ -611,7 +622,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-23T04:06:48.530Z",
+    "at": "2026-08-23T06:54:08.449Z",
     "points": [
       174,
       184,
@@ -765,7 +776,6 @@
       664,
       665,
       668,
-      669,
       670,
       676,
       677,
@@ -861,11 +871,14 @@
       843,
       844,
       845,
-      846,
       847,
       848,
       849,
-      850
+      850,
+      851,
+      852,
+      853,
+      854
     ]
   }
 }
