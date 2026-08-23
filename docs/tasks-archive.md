@@ -22475,3 +22475,19 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: mutating the wrapper to judge only the first trailer makes the suite fail.
   Criticality: low — a test-only gap behind a currently correct wrapper.
   Bundle: Modell & Wächter.
+
+- [x] 862. The criticality gate reads an EMPTY authorship as model diversity. FOUND 23.08.2026 by
+  the cross-vendor reading that cleared the 864a90e7 revert's ledger debt: in
+  scripts/criticality-review-guard-core.mjs, rowWellFormed accepts an empty or whitespace
+  authoredBy, and the diversity check !sameModel(r.model, r.authoredBy) then treats the UNKNOWN
+  author as a different model — a fail-open in the exact gate that exists to prove two vendors.
+  The test names the missing-authorship case but covers only an absent key and a non-string
+  value, not the admitted empty string.
+  FINAL STATE: a row with empty or whitespace authorship can never PROVE model diversity, so it
+  cannot clear the gate. Well-formedness is untouched on purpose: 38 legitimate empty-authorship
+  rows stand in the ledger (merges, user edits), and poisoning them would redden history.
+  VERIFIABLE: unit cases — an empty and a whitespace authoredBy each refuse to clear as no-review;
+  the existing well-formed rows still clear.
+  Criticality: medium — the gate stays conservative everywhere else, but this path can wave a
+  same-model pair through as cross-vendor.
+  Bundle: Modell & Wächter.
