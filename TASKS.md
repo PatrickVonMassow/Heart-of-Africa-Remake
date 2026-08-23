@@ -11246,13 +11246,24 @@ to land than a mechanism that needs a review.
   agent load its unit gate returns INCONCLUSIVE anyway, so the alert buys no information at
   all. Worse, an alert that cries wolf on every turn is the one a session stops reading on the
   turn it is real.
+  MEASURED AGAIN 23.08.2026, 18:07–18:11, by a second route the rule above does NOT cover: the
+  named session was already gone, but its leftover CHILD kept writing under its id — the
+  delegated author run for point 860, whose in-flight declaration the reading session had
+  adopted one turn earlier. Those writes land well AFTER the parent's `retiredAt`, so the rule
+  below would have called them a real violation, when the adoption had just made that child the
+  reader's own work. Two doctor gates in four minutes, both inconclusive under the load that
+  same child produced.
   FINAL STATE: a session whose `authorityState` is `retired` is not counted as parallel, and a
   write timestamped at or before that session's own `retiredAt` is never evidence of concurrent
-  work. A genuinely competing writer still raises the alert unchanged.
+  work. Nor is a write made under a retired session's id while the reader holds that session's
+  ADOPTED in-flight declaration — the adoption is what makes the child the reader's own work, so
+  the alert must consult it before calling a post-`retiredAt` write a violation. A genuinely
+  competing writer still raises the alert unchanged.
   VERIFIABLE: unit cases over the liveness probe — a retired record with a live pid and a
   handover-time write reports NO parallel session; a non-retired record with a live pid and a
-  recent write still reports one; and a retired record that wrote AFTER its `retiredAt` also
-  still reports one, because that is a real violation.
+  recent write still reports one; a retired record that wrote AFTER its `retiredAt` with NO
+  adopted declaration still reports one, because that is a real violation; and the same record
+  with the reader holding its adopted declaration reports none.
   Criticality: low — no product behaviour; the cost is wasted gate time and an alert that
   trains sessions to ignore it.
   Bundle: Session- & Repo-Hygiene.
@@ -11408,26 +11419,3 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
   read a red as noise.
   Bundle: Testinfrastruktur.
-- [ ] 864. The parallel-session alert fires on the batch's own adopted child.
-  MEASURED 23.08.2026, 18:07–18:11: the Stop guard reported `PARALLEL SESSION DETECTED
-  (8d1bbb6c…)` and ordered the three-minute doctor gate, twice in four minutes, while that session
-  was already dead. What still wrote under its id was its leftover child process — the delegated
-  author run for point 860, whose in-flight declaration THIS session had adopted one turn earlier.
-  The adoption makes that child the current owner's own work by policy, but the alert counts it as a
-  second writer, and it re-arms every turn for as long as the run lasts.
-  WHAT IT COSTS: one doctor gate per turn over the whole authoring run, each one landing on a busy
-  machine and therefore returning `inconclusive (load)` — a ritual that produces no verdict and
-  trains the session to read a red as noise.
-  Point 431's third half already retired exactly this false alarm for the case where a session names
-  ITSELF; a handed-over author run is the same case one session later.
-  FINAL STATE: an alert names a second writer only when there IS one — either `otherSessionsIn`
-  (scripts/batch-doctor-core.mjs) also excludes the session ids whose declaration the reader has
-  adopted, or the alert is raised from a live foreign top-level session rather than from file writes
-  made by its child. The other direction stays intact: a genuinely concurrent second window must
-  still raise it.
-  VERIFIABLE: unit cases over the pure alert reader — an alert naming a session whose declaration the
-  reader adopted yields no other-writer; the same alert without the adoption still does; the
-  self-naming case of point 431 keeps its result.
-  Criticality: medium — no product behaviour, but it burns a fixed toll per turn and devalues the one
-  gate that is supposed to catch a torn tree.
-  Bundle: Session- & Repo-Hygiene.
