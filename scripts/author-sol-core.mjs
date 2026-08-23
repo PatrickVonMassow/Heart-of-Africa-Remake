@@ -163,7 +163,14 @@ export function authoringCodexArgs({
  * "what did Sol write" unanswerable afterwards, which is the question every
  * check below it depends on.
  */
-export function readinessProblems({ branch = '', worktree = '', mainCheckout = '', dirty = '', point = '' } = {}) {
+export function readinessProblems({
+  branch = '',
+  worktree = '',
+  mainCheckout = '',
+  dirty = '',
+  point = '',
+  authorName = 'Sol',
+} = {}) {
   const problems = []
   const b = String(branch ?? '').trim()
   // THE RULE IS `feat/<point>-<slug>`, SO THAT IS WHAT IS CHECKED. Listing `main`
@@ -186,7 +193,7 @@ export function readinessProblems({ branch = '', worktree = '', mainCheckout = '
     problems.push('this is the MAIN checkout — the lane authors in an isolated worktree, never here')
   }
   if (String(dirty ?? '').trim()) {
-    problems.push('the tree already has uncommitted changes — what Sol then wrote could not be told apart from them')
+    problems.push(`the tree already has uncommitted changes — what ${authorName} then wrote could not be told apart from them`)
   }
   return problems
 }
@@ -194,8 +201,8 @@ export function readinessProblems({ branch = '', worktree = '', mainCheckout = '
 /** The house rules the authoring prompt states, one per line. Exported so the
  *  test pins them: a rule that quietly falls out of the prompt is a rule the
  *  lane stops following, and nothing else would notice. */
-export const HOUSE_RULES = Object.freeze([
-  `Every commit ends with the trailer \`${SOL_TRAILER}\` — it is the ONLY machine-readable`,
+export const houseRulesFor = (trailer = SOL_TRAILER) => Object.freeze([
+  `Every commit ends with the trailer \`${trailer}\` — it is the ONLY machine-readable`,
   '  record of who authored it, and a commit without it is REFUSED by a git hook.',
   'COMMIT AT EVERY SELF-CONTAINED STEP, not at the end. An uncommitted tree is the one state',
   '  nothing can rescue: if this run is killed, only what is committed survives.',
@@ -215,6 +222,8 @@ export const HOUSE_RULES = Object.freeze([
   '  A guessed spec costs a rebuild, which is more expensive than the question.',
 ])
 
+export const HOUSE_RULES = houseRulesFor()
+
 /**
  * The prompt an authoring run is given.
  *
@@ -226,13 +235,24 @@ export const HOUSE_RULES = Object.freeze([
  * reviewed, and these are the findings to answer. That is where the four eyes
  * actually close, so it is the same command rather than a separate one.
  */
-export function buildAuthoringPrompt({ point = '', brief = '', branch = '', findings = '', framing = '' } = {}) {
+export function buildAuthoringPrompt({
+  point = '',
+  brief = '',
+  branch = '',
+  findings = '',
+  framing = '',
+  authorModel = SOL_MODEL_NAME,
+  authorTrailer = SOL_TRAILER,
+  reviewer = 'Claude',
+  laneDescription = 'the hard and critical ones included',
+} = {}) {
   const answering = String(findings ?? '').trim()
   const stance = String(framing ?? '').trim()
+  const houseRules = houseRulesFor(authorTrailer)
   return [
-    `You are AUTHORING work-order point ${point} for this repository as ${SOL_MODEL_NAME}.`,
+    `You are AUTHORING work-order point ${point} for this repository as ${authorModel}.`,
     'You were chosen for it: this project runs two authoring lanes from different vendors, and',
-    'the points are yours to write — the hard and critical ones included. A Claude session then REVIEWS what you',
+    `the points are yours to write — ${laneDescription}. A ${reviewer} session then REVIEWS what you`,
     'wrote, runs the browser suites, judges the rendered picture and lands it — so write for a',
     'reviewer who will read every line, and leave nothing you would not defend.',
     '',
@@ -241,7 +261,7 @@ export function buildAuthoringPrompt({ point = '', brief = '', branch = '', find
     '',
     'THE HOUSE RULES, which are not negotiable:',
     // A rule that runs over one line continues INDENTED, not as a second bullet.
-    ...HOUSE_RULES.map((rule) => (/^\s/.test(rule) ? `    ${rule.trim()}` : `  - ${rule}`)),
+    ...houseRules.map((rule) => (/^\s/.test(rule) ? `    ${rule.trim()}` : `  - ${rule}`)),
     '',
     ...(stance
       ? [
@@ -443,7 +463,11 @@ export function parseAuthoringAnswer(text) {
  * as this lane's own work.
  */
 export function namesSolAsAuthor(trailers) {
-  return modelNamesIn(trailers).some((name) => sameModel(name, SOL_MODEL_NAME))
+  return namesModelAsAuthor(trailers, SOL_MODEL_NAME)
+}
+
+export function namesModelAsAuthor(trailers, model) {
+  return modelNamesIn(trailers).some((name) => sameModel(name, model))
 }
 
 /** Summarise Git's `--numstat` output without trusting path spelling. */
@@ -468,7 +492,18 @@ export function uncommittedSummary({ dirty = '', numstat = '' } = {}) {
   return { changedPaths, measuredPaths, binaryPaths, insertions, deletions }
 }
 
-export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty = '', numstat = '', branchAfter = '', branch = '' } = {}) {
+export function judgeAuthoring({
+  outcome = {},
+  commits = [],
+  parsed = {},
+  dirty = '',
+  numstat = '',
+  branchAfter = '',
+  branch = '',
+  authorModel = SOL_MODEL_NAME,
+  fableState,
+  runtime = 'codex',
+} = {}) {
   const list = Array.isArray(commits) ? commits : []
   const uncommitted = uncommittedSummary({ dirty, numstat })
   const problems = []
@@ -487,13 +522,13 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
     problems.push(`the run ended on \`${branchAfter}\`, not on \`${branch}\` — what it committed cannot be attributed to this point`)
   }
   for (const commit of list) {
-    const verdict = classifyTrailer(commit?.trailers ?? '')
+    const verdict = classifyTrailer(commit?.trailers ?? '', fableState)
     if (verdict === 'forbidden') {
       problems.push(`${short(commit.sha)} names a model outside the author allowlist (${String(commit.trailers).trim()})`)
     } else if (verdict === 'unidentified') {
       problems.push(`${short(commit.sha)} carries a trailer naming no single model — it cannot show who wrote it`)
-    } else if (!namesSolAsAuthor(commit?.trailers)) {
-      problems.push(`${short(commit.sha)} does not name ${SOL_MODEL_NAME} as its author — this lane's commits must`)
+    } else if (!namesModelAsAuthor(commit?.trailers, authorModel)) {
+      problems.push(`${short(commit.sha)} does not name ${authorModel} as its author — this lane's commits must`)
     }
   }
   if (uncommitted.changedPaths) {
@@ -502,7 +537,7 @@ export function judgeAuthoring({ outcome = {}, commits = [], parsed = {}, dirty 
         `${uncommitted.insertions} insertion(s), ${uncommitted.deletions} deletion(s) — run CHECKPOINT IT NOW before the review`,
     )
   }
-  if (!outcome?.ok) problems.push(`the codex run did not finish cleanly: ${outcome?.cause || 'no cause was reported'}`)
+  if (!outcome?.ok) problems.push(`the ${runtime} run did not finish cleanly: ${outcome?.cause || 'no cause was reported'}`)
   else if (!parsed?.ok) problems.push(`the run gave no usable closing report (${parsed?.error || 'no reason given'})`)
   // A RUN THAT SAYS ITS GATES ARE NOT GREEN IS NOT A CLEAN RUN (second
   // cross-vendor round). `GATES: not run` parsed perfectly well and the command
@@ -541,18 +576,24 @@ export function formatAuthoringReport({
   reviewer = 'Opus 5',
   pushed = null,
   framing = '',
+  commandName = 'author-sol',
+  authorModel = SOL_MODEL_NAME,
+  authorDetail = `(effort ${SOL_REASONING_EFFORT})`,
+  authorTrailer = SOL_TRAILER,
+  reviewCommand = '',
 } = {}) {
   const lines = []
   const commits = judged.commits ?? []
+  const authorLabel = `${authorModel}${authorDetail ? ` ${authorDetail}` : ''}`
   if (judged.delivered) {
     lines.push(
-      `author-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) authored ${commits.length} commit(s) on ${branch}:`,
+      `${commandName}: ${authorLabel} authored ${commits.length} commit(s) on ${branch}:`,
       ...commits.map((c) => `    ${short(c.sha)}  ${c.subject ?? ''}`),
     )
   } else if (judged.uncommitted?.changedPaths) {
-    lines.push(`author-sol: ${SOL_MODEL_NAME} left UNCOMMITTED WORK on ${branch}.`)
+    lines.push(`${commandName}: ${authorModel} left UNCOMMITTED WORK on ${branch}.`)
   } else {
-    lines.push(`author-sol: ${SOL_MODEL_NAME} authored NOTHING on ${branch}.`)
+    lines.push(`${commandName}: ${authorModel} authored NOTHING on ${branch}.`)
   }
   if (judged.uncommitted?.changedPaths) {
     const { changedPaths, measuredPaths = 0, binaryPaths = 0, insertions = 0, deletions = 0 } = judged.uncommitted
@@ -564,7 +605,7 @@ export function formatAuthoringReport({
     lines.push(
       `  UNCOMMITTED SIZE: ${changedPaths} changed path(s), ${insertions} insertion(s), ${deletions} deletion(s)` +
         `${qualifications.length ? `; ${qualifications.join(', ')}` : ''}.`,
-      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${SOL_TRAILER}'` +
+      `  CHECKPOINT IT NOW: git add -A && git commit -m 'Checkpoint uncommitted authoring work' -m '${authorTrailer}'` +
         ` && git push -u origin ${branch}`,
     )
   }
@@ -580,16 +621,17 @@ export function formatAuthoringReport({
   if (!judged.delivered) return lines.join('\n')
   lines.push(
     '',
-    `  IT IS NOT REVIEWED, AND ${SOL_MODEL_NAME} MAY NOT REVIEW IT. The role swap makes the rest yours`,
+    `  IT IS NOT REVIEWED, AND ${authorModel} MAY NOT REVIEW IT. The role swap makes the rest yours`,
     `  (${reviewer}), in this order:`,
     '    1. READ the diff and judge it — you are the second pair of eyes, so read the change',
     '       before any explanation of it,',
     '    2. run the gates and, for a render change, the picture on both backends,',
-    `    3. hand the findings back for a second leg:  node scripts/author-sol.mjs --point ${point} --findings <file>`,
+    ...(reviewCommand ? [`       Commission the review with: ${reviewCommand}`] : []),
+    `    3. hand the findings back for a second leg:  node scripts/${commandName}.mjs --point ${point} --findings <file>`,
     '    4. record the review where a mechanism was touched:',
     `       node scripts/mechanism-review.mjs --record <sha> --model "${reviewer}" --verdict <v> --evidence "<what you read>" --mode review --point ${point}` +
       `${String(framing).trim() ? ` --author-framing "${String(framing).trim()}"` : ''}`,
-    `    5. then land it:  node scripts/land-point.mjs ${point} --model "${SOL_MODEL_NAME}"`,
+    `    5. then land it:  node scripts/land-point.mjs ${point} --model "${authorModel}"`,
   )
   return lines.join('\n')
 }
