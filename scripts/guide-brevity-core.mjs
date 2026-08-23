@@ -69,7 +69,7 @@
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
 export const LIMITS = {
-  maxLines: 430,
+  maxLines: 428,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -148,7 +148,10 @@ export const LIMITS = {
   // the existing "Der Test hing an seiner Umgebung" entry, which already owns the
   // environment-dependency class; two verbose entries were tightened to pay for it,
   // so the guide measures 430 / 3841 and the word ceiling drops by one more.
-  maxWords: 3841,
+  // LOWERED after the 22.08.2026 queue-ranking edit tightened the guide by two
+  // body lines and 18 words. The edit landed without moving these exact-fit
+  // ceilings, so the real-document test correctly exposed stale headroom.
+  maxWords: 3823,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
