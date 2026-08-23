@@ -300,8 +300,12 @@ describe('the allowlist is matched against the parsed name', () => {
     // forbidden breach ritual (Sol review of a4975b0).
     expect(modelNamesIn('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>')).toHaveLength(2)
     expect(classifyTrailer('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
-    // Textual conjunctions are the same two claims as the symbols.
+    // Textual conjunctions and the plus sign are the same two claims as the
+    // slash — each case pairs two ALLOWED names, so it can only pass through
+    // the split (the unsplit composite would read forbidden, not unidentified).
     expect(classifyTrailer('GPT-5.6 Sol and GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer('GPT-5.6 Sol und GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer('GPT-5.6 Sol + GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
     // A forbidden model among the claims stays the breach it is.
     expect(classifyTrailer('GPT-5.6 Sol + Codex 2 <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
     // A lone model beside filler stays the composite name that fails LOUD —
