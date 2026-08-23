@@ -2976,18 +2976,24 @@ impossible, not skipping the inspection.
   --consequence "<what changes>" --veto-action "<the exact action that undoes
   it>"`: the point keeps a `SELF-DECIDED` marker, stays workable, and the
   `Entscheidungsprotokoll:` card carries the record for retroactive veto. Only
-  the narrow confirmation class U3 may park a point: add a *Von dir zu klären*
-  card, run `node scripts/defer-for-user.mjs <N> "<outward-facing or
-  hard-to-reverse act>; safe prepared state: <what is prepared>"`, and move on to
-  the next workable point. Such points remain open and are skipped; the user's
+  the narrow confirmation class U3 may park a point, and its act is SELECTED
+  rather than described: add a *Von dir zu klären* card, run `node
+  scripts/defer-for-user.mjs <N> --act <release-tag|public-release|board-contract>
+  --detail "<the concrete act>" --prepared "<what stands safely prepared>"`, and
+  move on to the next workable point. Such points remain open and are skipped; the user's
   answer clears them with `defer-for-user.mjs --clear <N>`, records
   `USER-ANSWERED`, and returns them to the head of the queue.
   THE SYNTAX OF RECORD is `scripts/user-gate-core.mjs` (points 450 and 864): the
   marker sits at the END of the point's `- [ ] N.` head line, carries a date and a
-  reason, and is written only through `defer-for-user.mjs` — which refuses an
-  advisory reason, refuses a confirmation reason that names no outward act and no
-  safe prepared state, and refuses to run in a linked worktree at all, because
-  TASKS.md is main-only. Every reader that picks work goes through that core: the
+  reason, and is written only through `defer-for-user.mjs` — which accepts an act
+  only from the closed list, demands at least three words of detail and of
+  prepared state, and refuses to run in a linked worktree at all, because
+  TASKS.md is main-only. THE ACT IS A CHOICE, NOT A SENTENCE: three cross-vendor
+  rounds showed that reading free prose for "is this outward-facing" parks
+  ordinary product decisions — "copy for the withdrawal dialog in production"
+  named an authorized act — and no widening of the patterns closed it. Prose is
+  still read for UNTYPED legacy markers alone, where a wrong guess preserves an
+  existing gate instead of creating one. Every reader that picks work goes through that core: the
   queue generator, the queue-order guard, the pool's workable set and the
   session-start headline, so none of them can offer a gated point — and none of
   them treats an advisory marker as a gate.

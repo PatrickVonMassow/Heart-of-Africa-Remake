@@ -54,7 +54,7 @@ import {
 import { gateSets } from './user-gate-core.mjs'
 import { POOL_CAP } from './batch-in-flight-core.mjs'
 
-const CONFIRMATION_REASON = 'push the version tag; safe prepared state: verified locally and no tag pushed'
+const CONFIRMATION_REASON = 'release-tag: push the version tag, safe prepared state: verified locally and no tag pushed'
 const confirmationLine = (point, title = 'GATED', stamp = '2026-07-29') =>
   `- [ ] ${point}. ${title} AWAITING-CONFIRMATION(${stamp}; ${CONFIRMATION_REASON})`
 

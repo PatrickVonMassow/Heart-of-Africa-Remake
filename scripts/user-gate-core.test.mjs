@@ -6,9 +6,12 @@ import {
   CONFIRMATION_MARKER,
   SELF_DECIDED_MARKER,
   advisoryDecisionCard,
+  CONFIRMATION_ACTS,
   answeredPoints,
   clearMarkers,
   classifyConfirmationReason,
+  classifyLegacyReason,
+  formatConfirmationReason,
   gateReport,
   gateSets,
   gatedPoints,
@@ -23,16 +26,62 @@ import {
 } from './user-gate-core.mjs'
 
 const tasks = (...lines) => lines.join('\n')
-const confirmation = 'push the version tag; safe prepared state: artifacts verified locally and no tag pushed'
-const confirmationStored = confirmation.replace(';', ',')
+const confirmation = 'release-tag: push the version tag, safe prepared state: the build is verified locally and no tag is pushed'
+const confirmationStored = confirmation
+/** The untyped prose the LEGACY heuristic still has to judge. */
+const legacyProse = 'push the version tag; safe prepared state: the build is verified locally and no tag is pushed'
 
-describe('classifyConfirmationReason — the closed outward-act rule', () => {
+describe('classifyConfirmationReason — the TYPED form is exact', () => {
+  // THE STRUCTURAL ANSWER TO THREE ROUNDS OF COUNTEREXAMPLES (GPT-5.6 Sol,
+  // 23.08.2026). Every one of them was an advisory question whose words happened
+  // to name an outward act, and each widening produced the next. A typed
+  // confirmation now SELECTS its act, so no sentence can be mistaken for one.
+  it.each(Object.keys(CONFIRMATION_ACTS))('recognises the composed form for act %s', (act) => {
+    const composed = formatConfirmationReason({ act, detail: 'do the concrete thing', prepared: 'nothing is out yet' })
+    expect(composed.ok).toBe(true)
+    expect(classifyConfirmationReason(composed.reason)).toMatchObject({ verdict: 'confirmation', act })
+  })
+
+  it('refuses PROSE outright, however outward-facing it reads', () => {
+    for (const reason of [
+      legacyProse,
+      'dispatch the public release; prepared locally without deploying it',
+      'Delete the v1.2.0 release tag; safe prepared state: nothing removed yet and the tag still stands',
+      'which card colour should we use?',
+      '   ',
+    ]) {
+      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'advisory' })
+    }
+  })
+
+  it('refuses an unknown act key and a field that names nothing', () => {
+    expect(formatConfirmationReason({ act: 'ship-it', detail: 'do the thing now', prepared: 'nothing is out yet' })).toMatchObject({ ok: false })
+    expect(formatConfirmationReason({ act: 'release-tag', detail: 'push', prepared: 'nothing is out yet' })).toMatchObject({ ok: false })
+    expect(formatConfirmationReason({ act: 'release-tag', detail: 'push the v1 tag', prepared: 'ready' })).toMatchObject({ ok: false })
+    // …and the stored shape is rejected the same way when it is read back.
+    expect(classifyConfirmationReason('release-tag: push, safe prepared state: ok')).toMatchObject({ verdict: 'advisory' })
+  })
+
+  it('keeps the composed reason inside one work-order line', () => {
+    const { reason } = formatConfirmationReason({
+      act: 'release-tag',
+      detail: 'push the v1.2.0 tag (after the closing)',
+      prepared: 'the build is verified locally; no tag is pushed',
+    })
+    expect(reason).not.toMatch(/[()\r\n]/)
+    expect(reason.length).toBeLessThanOrEqual(160)
+    expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation', act: 'release-tag' })
+  })
+})
+
+describe('classifyLegacyReason — the prose heuristic, for untyped markers alone', () => {
   it.each([
-    'push the version tag; safe prepared state: artifacts verified locally and no tag pushed',
+    'push the version tag; safe prepared state: the build is verified locally and no tag is pushed',
     'dispatch the public release; prepared locally without deploying it',
     'change the published four-section contract; safe prepared state: replacement built and not published',
-  ])('accepts a named act plus its safe prepared state: %s', (reason) => {
-    expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation' })
+  ])('reads a named act plus its safe prepared state as a confirmation: %s', (reason) => {
+    expect(classifyLegacyReason(reason)).toMatchObject({ verdict: 'confirmation' })
+    expect(classifyConfirmationReason(reason, { legacy: true })).toMatchObject({ verdict: 'confirmation' })
   })
 
   it.each([
@@ -40,108 +89,35 @@ describe('classifyConfirmationReason — the closed outward-act rule', () => {
     'please confirm the release design',
     'push the version tag',
     'outward-facing action; everything is ready',
-  ])('classifies advice or an incomplete reason toward continuation: %s', (reason) => {
-    expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'advisory' })
+  ])('reads advice or an incomplete reason as continuation: %s', (reason) => {
+    expect(classifyLegacyReason(reason)).toMatchObject({ verdict: 'advisory' })
   })
 
-  // THE THREE WAYS THE FIRST CLASSIFIER GOT IT WRONG (cross-vendor review,
-  // GPT-5.6 Sol, 23.08.2026). Each of these ran through the shipped command.
-  it('does not let an unpublished four-section draft park its point', () => {
-    expect(
-      classifyConfirmationReason('Should the four-section internal draft change font? prepared locally without publishing it'),
-    ).toMatchObject({ verdict: 'advisory', act: '' })
+  // The counterexamples of the three review rounds. They can no longer reach a
+  // typed marker at all; here they decide only whether an ALREADY PARKED legacy
+  // marker keeps its gate, and each still falls the way the 23.08.2026 order says.
+  it.each([
+    'Should the four-section internal draft change font? prepared locally without publishing it',
+    'Choose copy for the withdrawal dialog in production; safe prepared state: mockups remain entirely local',
+    'Choose typography for the published notice in production; safe prepared state: mockups remain entirely local',
+    'Please choose whether to push the version tag; safe prepared state: the build is verified locally and no tag is pushed',
+    'Review the changeability of the published four-section contract; safe prepared state: mockups remain entirely local',
+    'push the release tag; safe prepared state:',
+    'push the release tag; prepared locally',
+    'Delete the public release; the locally built confirmation copy says do not publish',
+  ])('keeps an ordinary product decision out of the gate: %s', (reason) => {
+    expect(classifyLegacyReason(reason)).toMatchObject({ verdict: 'advisory' })
   })
 
-  it('treats UNDOING a released artefact as outward-facing too', () => {
-    for (const reason of [
-      'Delete the v1.2.0 release tag; safe prepared state: nothing removed yet and the tag still stands',
-      'Retract the poc tag; safe prepared state: the replacement is built and the tag still stands',
-    ]) {
-      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation', act: 'release-tag' })
-    }
-  })
-
-  it('refuses the bare phrase "safe prepared state" as a prepared state', () => {
-    expect(classifyConfirmationReason('push the release tag; safe prepared state:')).toMatchObject({
-      verdict: 'advisory',
-      act: 'release-tag',
-    })
-    expect(classifyConfirmationReason('push the release tag; safe prepared state: built and not pushed')).toMatchObject({
-      verdict: 'confirmation',
-    })
-  })
-
-  // THE SECOND CROSS-VENDOR ROUND (GPT-5.6 Sol, 23.08.2026) found the same two
-  // shapes one level deeper: an act word that is really a NOUN, and a second
-  // spelling of "prepared" that names nothing either.
-  it('does not read a NOUN built from an act verb as an act', () => {
-    expect(
-      classifyConfirmationReason('Choose copy for the withdrawal dialog in production; safe prepared state: mockups remain entirely local'),
-    ).toMatchObject({ verdict: 'advisory', act: '' })
-    // …while the verb itself, in any of its forms, still is one.
-    for (const reason of [
-      'Withdraw the public release; safe prepared state: it is still served and the rollback is staged',
-      'The public release was withdrawn by hand; safe prepared state: nothing is served yet and the rollback is staged',
-    ]) {
-      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
-    }
-  })
-
-  it('refuses "prepared locally" with nothing prepared named', () => {
-    expect(classifyConfirmationReason('push the release tag; prepared locally')).toMatchObject({
-      verdict: 'advisory',
-      act: 'release-tag',
-    })
-    expect(classifyConfirmationReason('push the release tag; prepared locally without pushing it')).toMatchObject({
-      verdict: 'confirmation',
-    })
-  })
-
-  it('covers taking a public release DOWN as well as putting it up', () => {
-    expect(
-      classifyConfirmationReason('Delete the public release; safe prepared state: the release is still online and the rollback is ready'),
-    ).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
-  })
-
-  // THE THIRD CROSS-VENDOR ROUND (GPT-5.6 Sol, 23.08.2026). Two rounds of
-  // counterexamples were all one shape — an advisory QUESTION whose words named
-  // an authorized act — so the classifier now refuses a question outright, the
-  // release lane needs the thing released, and the prepared clause is read
-  // whole rather than only after the word.
-  it('never reads a question as an act, however it is worded', () => {
-    for (const reason of [
-      'Choose typography for the published notice in production; safe prepared state: mockups remain entirely local',
-      'Which release page should the tag point at? safe prepared state: nothing is pushed and the build is local',
-      'Should we push the version tag now; safe prepared state: verified locally and no tag pushed',
-    ]) {
-      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'advisory', act: '' })
-    }
-  })
-
-  it('needs the thing released, not a released-sounding word near production', () => {
-    expect(
-      classifyConfirmationReason('Print the published notice in production colours; safe prepared state: mockups remain entirely local'),
-    ).toMatchObject({ verdict: 'advisory', act: '' })
-    expect(
-      classifyConfirmationReason('Remove the deployed site from production; safe prepared state: it is still served and the takedown is staged'),
-    ).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
-  })
-
-  it('reads the prepared clause whole, so the state may be named before the word', () => {
-    expect(classifyConfirmationReason('push the version tag; the signed artifacts are prepared locally')).toMatchObject({
-      verdict: 'confirmation',
-      act: 'release-tag',
-    })
-    // …and incidental prose that merely contains the old catch-all words is not a record.
-    expect(
-      classifyConfirmationReason('Delete the public release; the locally built confirmation copy says do not publish'),
-    ).toMatchObject({ verdict: 'advisory', act: 'public-release' })
-  })
-
-  it('accepts the ordinary synonyms for pushing a tag', () => {
-    expect(
-      classifyConfirmationReason('Send the version tag upstream; safe prepared state: artifacts verified locally and no tag exists remotely'),
-    ).toMatchObject({ verdict: 'confirmation', act: 'release-tag' })
+  it.each([
+    'Delete the v1.2.0 release tag; safe prepared state: nothing removed yet and the tag still stands',
+    'Retract the poc tag; safe prepared state: the replacement is built and the tag still stands',
+    'Send the version tag upstream; safe prepared state: the build is verified locally and no tag exists remotely',
+    'Withdraw the public release; safe prepared state: it is still served and the rollback is staged',
+    'Remove the deployed site from production; safe prepared state: it is still served and the takedown is staged',
+    'push the version tag; the signed build output is prepared locally',
+  ])('still reads a real outward act as one: %s', (reason) => {
+    expect(classifyLegacyReason(reason)).toMatchObject({ verdict: 'confirmation' })
   })
 })
 
@@ -204,7 +180,7 @@ describe('parseGateLine — one work-order line', () => {
   })
 
   it('does not let an answer-marker mention inside the reason answer the gate', () => {
-    const line = `- [ ] 5. X AWAITING-CONFIRMATION(2026-08-07; push the version tag after checking USER-ANSWERED; safe prepared state: verified locally and no tag pushed)`
+    const line = `- [ ] 5. X AWAITING-CONFIRMATION(2026-08-07; release-tag: push the version tag after checking USER-ANSWERED, safe prepared state: verified locally and no tag pushed)`
     expect(parseGateLine(line)).toMatchObject({ gated: true, answered: false })
   })
 
@@ -305,40 +281,55 @@ describe('sanitiseReason — a reason survives on one work-order line', () => {
 
 describe('typed work-order rewrites', () => {
   const base = tasks('- [ ] 20. A POINT.', '  detail', '- [ ] 21. ANOTHER POINT.', '- [x] 22. A DONE POINT.')
+  const tagAct = {
+    act: 'release-tag',
+    detail: 'push the version tag',
+    prepared: 'the build is verified locally and no tag is pushed',
+  }
 
   it('writes only a validated AWAITING-CONFIRMATION on the head line', () => {
-    const r = markGated(base, 20, { since: '2026-08-07', reason: confirmation })
+    const r = markGated(base, 20, { since: '2026-08-07', ...tagAct })
     expect(r.ok).toBe(true)
     expect(r.text.split('\n')[0]).toBe(`- [ ] 20. A POINT. AWAITING-CONFIRMATION(2026-08-07; ${confirmationStored})`)
     expect(r.text.split('\n')[1]).toBe('  detail')
     expect(gatedPoints(r.text).has(20)).toBe(true)
   })
 
-  it('refuses an advisory reason and an incomplete confirmation reason unchanged', () => {
-    for (const reason of ['which colour should we use?', 'push the version tag', '   ']) {
-      const r = markGated(base, 20, { since: '2026-08-07', reason })
+  it('refuses an unselected act and an unnamed field unchanged', () => {
+    for (const fields of [
+      { act: 'which colour should we use?', detail: 'pick one of them', prepared: 'nothing is out yet' },
+      { act: '', detail: 'push the version tag', prepared: 'nothing is out yet' },
+      { act: 'release-tag', detail: '', prepared: 'nothing is out yet' },
+      { act: 'release-tag', detail: 'push the version tag', prepared: '' },
+      {},
+    ]) {
+      const r = markGated(base, 20, { since: '2026-08-07', ...fields })
       expect(r.ok).toBe(false)
       expect(r.text).toBe(base)
     }
   })
 
   it('re-stamps an existing marker instead of doubling it', () => {
-    const once = markGated(base, 20, { since: '2026-08-01', reason: confirmation }).text
-    const corrected = 'push the poc tag; safe prepared state: build verified locally and no tag pushed'
-    const twice = markGated(once, 20, { since: '2026-08-07', reason: corrected }).text
+    const once = markGated(base, 20, { since: '2026-08-01', ...tagAct }).text
+    const twice = markGated(once, 20, {
+      since: '2026-08-07',
+      act: 'release-tag',
+      detail: 'push the poc tag',
+      prepared: 'the build is verified locally and no tag is pushed',
+    }).text
     expect(twice.match(/AWAITING-CONFIRMATION/g)).toHaveLength(1)
     expect(gateSets(twice).reasons.get(20)).toContain('poc tag')
   })
 
   it('refuses ticked/missing points and retains the source', () => {
-    expect(markGated(base, 22, { reason: confirmation })).toMatchObject({ ok: false, text: base })
-    expect(markGated(base, 999, { reason: confirmation })).toMatchObject({ ok: false, text: base })
+    expect(markGated(base, 22, tagAct)).toMatchObject({ ok: false, text: base })
+    expect(markGated(base, 999, tagAct)).toMatchObject({ ok: false, text: base })
     expect(markAnswered(base, 999)).toMatchObject({ ok: false })
     expect(clearMarkers(base, 999)).toMatchObject({ ok: false })
   })
 
   it('turns a confirmation into an answer at the queue head', () => {
-    const gatedText = markGated(base, 21, { since: '2026-08-01', reason: confirmation }).text
+    const gatedText = markGated(base, 21, { since: '2026-08-01', ...tagAct }).text
     const r = markAnswered(gatedText, 21, { at: '2026-08-07' })
     expect(r).toMatchObject({ ok: true, wasGated: true })
     expect(gatedPoints(r.text).has(21)).toBe(false)
@@ -357,7 +348,7 @@ describe('typed work-order rewrites', () => {
 
   it('keeps CRLF and rejects a junk stamp without corrupting the marker', () => {
     const crlf = ['- [ ] 20. A POINT.', '  detail', ''].join('\r\n')
-    const r = markGated(crlf, 20, { since: 'later)', reason: confirmation })
+    const r = markGated(crlf, 20, { since: 'later)', ...tagAct })
     expect(r.text.split('\n')[0]).toBe(`- [ ] 20. A POINT. AWAITING-CONFIRMATION(${confirmationStored})\r`)
     expect(gatedPoints(r.text.replace(/\r\n/g, '\n')).has(20)).toBe(true)
   })
@@ -408,19 +399,22 @@ describe('advisory decision record and legacy migration', () => {
 
   it('reports and rewrites every legacy marker, with ambiguity continuing', () => {
     const source = tasks(
-      `- [ ] 1. RELEASE. AWAITING-USER(2026-08-01; ${confirmation})`,
+      `- [ ] 1. RELEASE. AWAITING-USER(2026-08-01; ${legacyProse})`,
       '- [ ] 2. COLOUR. AWAITING-USER(2026-08-02; choose blue or green)',
       '- [ ] 3. UNKNOWN. AWAITING-USER',
       '- [x] 4. DONE. AWAITING-USER(2026-08-03; old question)',
     )
     const migrated = migrateLegacyGates(source, { at: '2026-08-23' })
     expect(migrated.entries).toEqual([
-      { point: 1, verdict: 'confirmation', reason: confirmationStored },
+      { point: 1, verdict: 'confirmation', reason: legacyProse.replace(';', ',') },
       { point: 2, verdict: 'self-decided', reason: 'choose blue or green' },
       { point: 3, verdict: 'self-decided', reason: '' },
       { point: 4, verdict: 'stale-removed', reason: 'old question' },
     ])
+    // The migrated gate is written in the TYPED form, or the strict reader —
+    // the only one the queue uses — would drop the very gate migration keeps.
     expect(migrated.text).toContain(`AWAITING-CONFIRMATION(2026-08-01; ${confirmationStored})`)
+    expect([...gatedPoints(migrated.text)]).toEqual([1])
     expect(migrated.text).toContain('SELF-DECIDED(2026-08-23; choose blue or green)')
     expect(migrated.text).toContain('SELF-DECIDED(2026-08-23; legacy marker had no recorded reason)')
     expect(migrated.text).not.toContain('AWAITING-USER')

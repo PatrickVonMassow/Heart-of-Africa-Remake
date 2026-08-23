@@ -4,7 +4,7 @@
 // this gate. An advisory question takes --self-decide, which writes a workable
 // SELF-DECIDED marker and its complete retroactive-veto card.
 //
-//   node scripts/defer-for-user.mjs <point> "<act and safe prepared state>"
+//   node scripts/defer-for-user.mjs <point> --act <key> --detail "<what>" --prepared "<what stands prepared>"
 //   node scripts/defer-for-user.mjs --self-decide <point> --question "<question>" --decision "<decision>" --evidence "<evidence>" --consequence "<consequence>" --veto-action "<exact action>"
 //   node scripts/defer-for-user.mjs --migrate
 //   node scripts/defer-for-user.mjs --clear <point>     # the answer arrived
@@ -32,6 +32,7 @@ import { writeTextAtomic } from './atomic-write.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { notify } from './notify.mjs'
 import {
+  CONFIRMATION_ACTS,
   clearMarkers,
   gateReport,
   markAnswered,
@@ -47,7 +48,8 @@ const today = () => new Date().toISOString().slice(0, 10)
 
 const USAGE = [
   'usage:',
-  '  node scripts/defer-for-user.mjs <point> "<outward act and safe prepared state>"',
+  `  node scripts/defer-for-user.mjs <point> --act <${Object.keys(CONFIRMATION_ACTS).join('|')}> --detail "<the concrete act>" --prepared "<the safe prepared state>"`,
+  ...Object.entries(CONFIRMATION_ACTS).map(([key, what]) => `      --act ${key}  — ${what}`),
   '  node scripts/defer-for-user.mjs --self-decide <point> --question "<question>" --decision "<decision>" --evidence "<evidence>" --consequence "<consequence>" --veto-action "<exact action>"',
   '  node scripts/defer-for-user.mjs --migrate',
   '  node scripts/defer-for-user.mjs --clear <point>',
@@ -100,7 +102,8 @@ function recordDecisionCard(card) {
   }
 }
 
-const [a, b] = process.argv.slice(2)
+const args = process.argv.slice(2)
+const [a, b] = args
 
 if (a === '--help' || a === '-h' || a === undefined) {
   console.log(USAGE)
@@ -137,7 +140,6 @@ if (a === '--migrate') {
 
 if (a === '--self-decide') {
   refuseInWorktree()
-  const args = process.argv.slice(2)
   const n = Number(b)
   if (!Number.isFinite(n)) {
     console.error(USAGE)
@@ -210,25 +212,23 @@ if (a === '--clear') {
 
 refuseInWorktree()
 const n = Number(a)
-const reason = String(b ?? '').trim()
 if (!Number.isFinite(n)) {
   console.error(USAGE)
   process.exit(1)
 }
-if (!reason) {
-  console.error(
-    'defer-for-user: a confirmation needs a REASON naming the outward act and safe prepared state.\n' +
-      `${USAGE}`,
-  )
-  process.exit(1)
-}
+// THE ACT IS SELECTED FROM A CLOSED LIST, never described in prose: a sentence
+// that merely sounded outward-facing used to park an advisory question.
+const act = option(args, '--act')
+const detail = option(args, '--detail')
+const prepared = option(args, '--prepared')
 
 const before = read()
-const marked = markGated(before, n, { since: today(), reason })
+const marked = markGated(before, n, { since: today(), act, detail, prepared })
 if (!marked.ok) {
-  console.error(`defer-for-user: ${marked.error}`)
+  console.error(`defer-for-user: ${marked.error}\n${USAGE}`)
   process.exit(1)
 }
+const reason = parseUserGates(marked.text).gated.find((g) => g.point === n)?.reason ?? ''
 write(marked.text)
 
 // EVERYTHING GATED IS A DIFFERENT SITUATION and the user must hear about it:
