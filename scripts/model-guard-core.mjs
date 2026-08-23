@@ -233,8 +233,10 @@ export function modelNamesIn(trailer) {
     // read as several — a lone model beside filler words stays the single
     // composite name that fails the allowlist LOUD, so the smuggling shape of
     // point 527 (`GPT-5.6 Sol / Haiku`) cannot pass as its allowed half.
+    // The separators are symbols AND the textual conjunctions (Sol's confirming
+    // pass): `GPT-5.6 Sol and GPT-5.6 Sol` is the same two claims as with `/`.
     const claims = cleaned
-      .split(/[/&]/)
+      .split(/[/&+]|\b(?:and|und)\b/i)
       .map(bareName)
       .filter((segment) => segment && namesNonClaudeModel(segment))
     if (claims.length > 1) return claims
