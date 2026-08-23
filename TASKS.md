@@ -11353,3 +11353,24 @@ to land than a mechanism that needs a review.
   Criticality: medium — it silently turns the reviewer credit the rule now invites into permanent
   review debt on every commit that uses it.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 857. The docs suite's acceptance-pointer checks match nothing and fail vacuously. MEASURED
+  23.08.2026 on the merge-base of `feat/854-trailer-separator`, so it is PRE-EXISTING and belongs to
+  no point that touched it. Six checks in the `docs` suite report "0 evidence pointers judged" / "0
+  detail pointers judged" and fail with "no pointers matched": every evidence pointer names its own
+  criterion; every evidence pointer has a section in `docs/acceptance-evidence.md`; no orphaned
+  evidence section; and the same three for the detail pointers. The parser reads the acceptance
+  pointers out of CLAUDE.md §7.1, but §7.1 now carries only the numbered TITLES — its own preamble
+  moved each criterion's condition and evidence into `docs/acceptance-criteria-detail.md` and
+  `docs/acceptance-evidence.md` under the same number. So the parser matches nothing, and the two
+  orphan checks then report all 32 sections as orphaned.
+  WHAT IT COSTS: six red checks that no change can turn green, so the `docs` suite is permanently red
+  and every session that runs it must first classify the same six against a baseline before it can
+  trust its own run — the exact ritual that teaches a session to wave a red through. It also means
+  the pointer coverage §7.1 promises is currently unchecked in BOTH directions.
+  FINAL STATE: the checks read the pointer relation from where it now lives, judge a non-zero number
+  of pointers, and go green on a clean tree; a genuinely orphaned or mis-numbered section still fails.
+  VERIFIABLE: the `docs` suite reports a non-zero judged count for both pointer families and passes;
+  a deliberately mis-numbered pointer and a deliberately orphaned section each still fail.
+  Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
+  read a red as noise.
+  Bundle: Testinfrastruktur.
