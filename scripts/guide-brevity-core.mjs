@@ -199,10 +199,14 @@ export const LIMITS = {
   //
   // 23.08.2026, the unattended-halt pitfall: the lesson out of the
   // fortnight-alone work went in at 8 lines / 81 words, and the room for it came
-  // from SIX existing entries rather than from a raise. The guide measures
-  // 444 / 3952 afterwards, so the word ceiling RATCHETS DOWN by 35 to exactly
+  // from existing entries rather than from a raise. The cross-vendor review then
+  // named two of those cuts as losses of reader-needed guidance — the
+  // forward-progress invariant and the backlog half of the sorting rule — so both
+  // were restored and paid for out of genuine repetition instead (a risk line
+  // that only rephrased its own headline, three times over). The guide measures
+  // 444 / 3929 afterwards, so the word ceiling RATCHETS DOWN by 58 to exactly
   // that. The line ceiling stays 444 because the file does.
-  maxWords: 3952,
+  maxWords: 3929,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
