@@ -52,6 +52,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
 | 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
 | 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
+| 23.08. morgens | Ein Test über einem erzeugten Dokument verglich es mit einer frischen Ernte derselben Quellen — fünf falsche Aufrufzeilen standen jahrelang unter grünem Test, gefunden erst beim Lesen eines Diffs (§3.165) |
 | 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
@@ -1323,7 +1324,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 05:45 · Quellen-Fingerprint: `3f39b409e9b3…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 06:14 · Quellen-Fingerprint: `1a16e97ab2a2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1420,8 +1421,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 88 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: 3f39b409e9b32307466ac77e9f1594f79c9f292e0239928e4899d82801dbbfbb -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T03:45:50.995Z -->
+<!-- RETRO-FINGERPRINT: 1a16e97ab2a2efca8872275f79aea4ee8c096a6f597fa80a6f1fd0ce98519f42 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T04:14:03.848Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2970,3 +2971,38 @@ steht — und ein Ereignis, das zum Rücktritt selbst gehört, ist nie Beleg fü
 wenn ein Alarm eine teure Pflichtmaßnahme auslöst, muss die Maßnahme unter den Bedingungen, unter
 denen der Alarm typischerweise feuert, überhaupt ein Urteil fällen können — sonst ist die Pflicht
 nur Zeremonie. Verwandt mit §3.161 (der Singleton wurde umgangen) und §3.158.
+
+### 3.165 Der Test verglich den Erzeuger mit sich selbst
+
+Beim Gegenlesen des Fable-Spur-Punktes am 23.08.2026 fiel im erzeugten Befehlsverzeichnis eine
+Aufrufzeile auf, die keinen Befehl mehr nannte, sondern einen Platzhalter: `node
+scripts/${commandName}.mjs`. Der Ernter hebt die Aufruftexte wörtlich aus dem Quellcode und
+wertet sie nicht aus — sobald eine Aufrufzeile als Vorlage geschrieben wird, landet die Vorlage
+im Nachschlagedokument. Die eigentliche Entdeckung war aber nicht dieser eine Fall, sondern
+seine Nachbarschaft: Es standen fünf weitere Platzhalter im selben Dokument, an vier Stellen,
+und keiner davon war neu. Sie standen dort unbemerkt, obwohl ein Test genau dieses Dokument
+prüft — und obwohl dieser Test grün war (Punkt 850).
+
+Grün war er, weil er das Dokument gegen eine FRISCHE ERNTE DERSELBEN QUELLEN vergleicht. Beide
+Seiten der Gleichung entstehen aus demselben Erzeuger; trägt der Erzeuger einen Fehler, trägt
+ihn die Erwartung genauso, und der Vergleich bestätigt ihn, statt ihn zu finden. Ein solcher
+Test prüft KONSISTENZ, nicht RICHTIGKEIT: Er beweist, dass das eingecheckte Dokument nicht
+veraltet ist — eine echte und nützliche Aussage — und er wird dabei fast unvermeidlich als
+Abdeckung für „das Dokument stimmt" gelesen. Das ist die teure Verwechslung, denn ein Bereich
+mit grünem Test wird nicht noch einmal von Hand angesehen.
+
+Bemerkenswert ist der Weg, auf dem es auffiel: nicht durch den Test, sondern weil ein
+Regenerieren die Datei anfasste und ein zweites Augenpaar den Diff LAS. Die fünf alten Stellen
+hatte niemand je gelesen, weil nie ein Anlass sie in einen Diff gehoben hat.
+
+**Lehre:** Zu jedem Test über einem erzeugten Artefakt gehört die Frage, WOHER seine Erwartung
+kommt. Stammt sie aus demselben Erzeuger, ist der Test ein Aktualitätswächter und darf nie als
+Richtigkeitsnachweis gezählt werden; die Richtigkeit braucht dann eine Aussage, die der
+Erzeuger nicht selbst herstellen kann — hier: dass keine geerntete Aufrufzeile einen
+unaufgelösten Platzhalter enthält. Zweite Regel aus demselben Fall: Wenn ein Fund eine KLASSE
+offenlegt, wird zuerst gezählt, wie viele Fälle sie hat und wem sie gehören. Fünf der sechs
+gehörten nicht zum laufenden Punkt — hätte der Test dort verlangt werden müssen, wäre er an
+fremder Arbeit rot geworden, und die Wahl wäre nur noch zwischen einem weichgeklopften Test und
+einer fremden Reparatur unter falscher Nummer gewesen. Verwandt mit §3.163 (der Mechanismus
+ohne erzwungene Eingabe): Dort fehlte dem Zähler die Zufuhr, hier fehlt dem Vergleich ein
+unabhängiger Maßstab.
