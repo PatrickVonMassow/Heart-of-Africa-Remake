@@ -90,12 +90,17 @@ describe('parseWorkablePoints — open minus what waits on the user (point 450)'
     '- [ ] 210. Fix',
     '- [ ] 211. Fix AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
     '- [ ] 212. Fix USER-ANSWERED(2026-08-07)',
+    // An OPEN untyped marker, whose prose would once have gated it. It owes
+    // migration and stays workable — the ticked leftover below cannot show that,
+    // because a ticked point is excluded either way (cross-vendor review,
+    // GPT-5.6 Sol, 23.08.2026).
+    '- [ ] 213. Fix AWAITING-USER(2026-01-02; push the version tag; safe prepared state: verified locally and no tag pushed)',
     '- [x] 209. Done AWAITING-USER(2026-01-01; leftover)',
   ].join('\n')
   it('drops the gated point but keeps the answered one and the plain one', () => {
-    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212])
+    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212, 213])
     // The full open set is unchanged — the done-claim rule still judges 211.
-    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212])
+    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212, 213])
   })
   it('is total on non-string input', () => {
     expect(parseWorkablePoints(null).size).toBe(0)

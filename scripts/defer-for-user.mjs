@@ -94,6 +94,22 @@ const option = (args, name) => {
   return value.startsWith('--') ? '' : value.trim()
 }
 
+/**
+ * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round, GPT-5.6
+ * Sol, 23.08.2026). `indexOf` keeps the FIRST value and drops the rest in
+ * silence, so `--decision old --decision new` recorded "old" and said nothing.
+ * Whichever the author meant, one of them was going to be wrong.
+ */
+const repeatedFlag = (args) => {
+  const seen = new Set()
+  for (const arg of args) {
+    if (!String(arg).startsWith('--')) continue
+    if (seen.has(arg)) return arg
+    seen.add(arg)
+  }
+  return ''
+}
+
 /** Add an idempotent decision record before changing TASKS: a marker without
  * its promised card is the worse half-written state. */
 function recordDecisionCard(card) {
@@ -117,6 +133,12 @@ const [a, b] = args
 if (a === '--help' || a === '-h' || a === undefined) {
   console.log(USAGE)
   process.exit(a === undefined ? 1 : 0)
+}
+
+const repeated = repeatedFlag(args)
+if (repeated) {
+  console.error(`defer-for-user: ${repeated} is given more than once — say it exactly once.\n${USAGE}`)
+  process.exit(1)
 }
 
 if (a === '--list') {
