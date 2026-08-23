@@ -90,7 +90,7 @@ describe('the wrapper log format', () => {
     }
 
     try {
-      execFileSync('git', ['init', '--quiet', repo], { env })
+      execFileSync('git', ['init', '--quiet', repo], { env, windowsHide: true })
       execFileSync(
         'git',
         [
@@ -104,11 +104,12 @@ describe('the wrapper log format', () => {
           '-m',
           `Co-Authored-By: ${anthropic}\nCo-Authored-By: ${openai}`,
         ],
-        { env },
+        { env, windowsHide: true },
       )
       const log = execFileSync('git', ['-C', repo, 'log', '-1', `--format=${RECENT_LOG_FORMAT}`], {
         env,
         encoding: 'utf8',
+        windowsHide: true,
       })
       const parsed = parseLogLine(log.trim())
 
