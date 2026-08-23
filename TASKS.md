@@ -95,6 +95,85 @@ put it is the mistake this line exists to stop.
   Criticality: HIGH — it turns the 23.08.2026 order from one fixed incident into the standing shape
   of the batch.
   Bundle: Urlaubsfestigkeit.
+- [ ] 864. An advisory question parks its point; only a true confirmation may. Point 861's inventory
+  rows U1-U4, C1 and C4: `AWAITING-USER` today carries BOTH an advisory product question and a
+  genuinely outward-facing confirmation, and either one makes the point non-commissionable until the
+  user answers. The user's order of 23.08.2026 removes the first case: in doubt the batch decides and
+  files the decision for retroactive veto.
+  FINAL STATE: the gate is typed. An advisory question is decided from the brief and the repository
+  evidence, recorded as SELF-DECIDED with an `Entscheidungsprotokoll:` card naming decision, evidence,
+  consequence and the exact veto action, and the point stays workable. Only an act that is
+  outward-facing or hard to reverse and not durably authorized may carry AWAITING-CONFIRMATION, whose
+  reason must name that act and the safe prepared state. Existing untyped markers migrate to
+  confirmation only where their recorded reason itself names such an act; ambiguity falls towards
+  continuation. `defer-for-user.mjs` refuses an advisory reason, and every reader that picks work
+  (queue generator, queue-order guard, workable set, session-start headline) honours the new type.
+  VERIFIABLE: a marker written with an advisory reason is refused; a confirmation marker with a named
+  outward-facing act is accepted and skips its point; a migration command reports each existing marker
+  with its verdict and reason; a queue in which every open point is advisory yields a workable point
+  rather than a batch pause.
+  Criticality: HIGH — it is the half of the 23.08.2026 order that the inventory could only write down.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 865. A pause record without a clock must prove it came from the user. Point 861's inventory rows
+  P3, P4 and P8: an empty or legacy `.claude/batch-paused`, a `retry-after: never`, an unreadable
+  clock and the causes `serving-model`, `awaiting-user` and `retries-exhausted` are all classified
+  clockless today, so a corrupt or ambiguous marker is indistinguishable from a deliberate user stop
+  and parks the batch for as long as nobody looks.
+  FINAL STATE: the pause record is typed and only a proved `user-stop` may be clockless. An untyped,
+  legacy or malformed record is snapshotted into the decision card, replaced atomically with a short
+  recovery clock and retried by the launcher. The serving-model tripwire never lets the suspect model
+  bless itself: it hands over to the next allowed lane of the recorded routing chain, which verifies
+  the trailers and advances the baseline only on proof, and probes on a clock when no allowed lane is
+  reachable.
+  VERIFIABLE: an empty marker, a `retry-after: never` and a malformed clock each resume on their
+  recovery clock and leave a decision card; a record typed `user-stop` stays held with no clock; a
+  forbidden serving model starts the next allowed lane instead of parking, and the baseline advances
+  only after that lane verified the trailers.
+  Criticality: HIGH — it decides whether an ambiguous marker costs a retry or a whole absence.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 866. A spent failure ladder keeps probing instead of ending on a person. Point 861's inventory
+  rows P5, P6, P7 and D3: the runaway watchdog, the child-outage circuit breaker, the corruption
+  alert ceiling and a proved forbidden author all terminate today in a state whose only exit is a
+  human — `no-retry`, "decide by hand", an outage pause that retries nothing, a clockless ceiling.
+  FINAL STATE: every failure lane ends in a capped, repeating probe rather than a terminal park. An
+  outage is re-probed on a clock. A non-transient child death is diagnosed from its branch and either
+  resumed, fixed, or exchanged for another point, with the scheduling choice recorded for veto. A
+  spent point budget requeues the point instead of stopping the queue. A corruption class names its
+  own repair — doctor quarantine or repair — and keeps the closed list point 860 pinned.
+  VERIFIABLE: each of the four lanes, driven to its terminal state in a drill, produces a next attempt
+  at its capped interval and a decision record; none of them leaves a clockless pause; the corruption
+  list and the quarantine safety of point 860 stay pinned by their existing tests.
+  Criticality: HIGH — these are the lanes that fire exactly when nobody is watching.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 867. An exhausted vendor allowance parks its point on a probe, not on the user. Point 861's
+  inventory row Q2: an OpenAI author or reviewer run can return `allowance-exhausted` while that
+  vendor's result is mandatory, because cross-vendor evidence may not be substituted. Routing to the
+  other vendor already exists for work policy permits; what is missing is what happens to the point
+  that genuinely needs the unavailable vendor.
+  FINAL STATE: such a point carries a durable per-point provider probe: it is set aside with the
+  vendor and the earliest sensible retry recorded, the batch works another point, and the point
+  returns to the queue by itself as soon as a probe succeeds. Mandatory cross-vendor evidence is never
+  weakened to make the wait go away.
+  VERIFIABLE: a simulated `allowance-exhausted` on a mandatory cross-vendor step sets the point aside
+  with a recorded probe and leaves the batch working; a later successful probe returns exactly that
+  point; no path records a same-vendor review as cross-vendor.
+  Criticality: medium — it costs throughput rather than correctness, but it is a full stop during an
+  absence.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 868. The Windows launcher can be re-armed without an attended session. Point 861's inventory
+  row G3: when the launcher is disabled or unknown, Linux re-arms its own daemon, but Windows needs an
+  elevated user command — so the point and context boundary is blocked and the current owner must keep
+  working until a human is at the machine. That is the one residual the 23.08.2026 order cannot reach
+  by policy alone.
+  FINAL STATE: an install-time, privilege-bearing watchdog that can re-arm the scheduled task without
+  an attended batch turn, installed once by the user ahead of an absence. A running session gains no
+  general elevation from it; it may only ask that one watchdog to re-arm the one task.
+  VERIFIABLE: with the launcher task deleted, the watchdog restores it without any elevated command in
+  the session; the session itself still cannot perform an unrelated elevated action; a third run of the
+  installer reports that nothing changed.
+  Criticality: medium — it is narrow, but it is the only lane where the machine still cannot help
+  itself.
+  Bundle: Urlaubsfestigkeit.
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
