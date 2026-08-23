@@ -192,7 +192,9 @@ export const PROJECT_MARKERS = [
     // The LEFT BOUNDARY is "not a word character", not a list of delimiters: the
     // list kept missing one — a bracket, then emphasis (cross-vendor review,
     // 23.08.2026, rounds 7 and 8).
-    re: /(?<!\w)(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
+    // …and "word character" means the UNICODE one: ASCII \w read `docs/a.md` out
+    // of the ordinary German token `Menüdocs/a.md` (round 9).
+    re: /(?<![\p{L}\p{N}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/u,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -344,11 +346,18 @@ export const renderedText = (text) =>
   String(text ?? '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<[^>]*>/g, '')
+    // A LINK renders its text, never its destination — an empty label with a URL
+    // behind it supplied the letters of an otherwise empty prompt (round 9).
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[*_`~]/g, '')
 const isCostNote = (note) =>
   note.includes('≈') &&
   note.length <= NOTE_MAX_CHARS &&
-  !/[.!?][\s\p{P}]*\p{L}/u.test(renderedText(note))
+  // NOTHING MAY FOLLOW a sentence-ending mark. Asking for a LETTER after it let
+  // a digit open the second sentence — `≈ 1,5x. 2 Minuten später …` (round 9).
+  // A note written with an English decimal point is refused by this, and that is
+  // the safe direction: the guide's own six cost notes use the German comma.
+  !/[.!?]\s*\S/u.test(renderedText(note).trim())
 const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**

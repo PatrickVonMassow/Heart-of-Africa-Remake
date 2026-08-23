@@ -552,3 +552,33 @@ describe('auditGuide — markup is not a hiding place', () => {
     expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
   })
 })
+
+// Round nine: a link destination, a digit and a German umlaut.
+describe('auditGuide — what renders, what ends a sentence, what is a word', () => {
+  const O = '„'
+
+  it('refuses a prompt whose letters are only a link destination', () => {
+    const { ok, violations } = auditGuide(
+      doc(`- **Nur ein Ziel** Ein Risiko.\n  → *Prompt:* ${O}[](https://example.invalid)"`),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('empty-prompt')
+  })
+
+  it('keeps a link LABEL as the instruction it renders', () => {
+    const d = doc(`- **Beschrifteter Link** Ein Risiko.\n  → *Prompt:* ${O}[Etabliere einen Mechanismus](https://example.invalid)"`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('empty-prompt')
+  })
+
+  it('refuses a second sentence that opens with a digit', () => {
+    const { violations } = auditGuide(
+      doc(`- **Ziffer danach** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(≈ 1,5x. 2 Minuten später ging es weiter)*`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('does not read a repository path out of a word carrying an umlaut', () => {
+    const d = doc(`- **Kein Pfad** Das Menüdocs/a.md ist kein Pfad.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
+  })
+})
