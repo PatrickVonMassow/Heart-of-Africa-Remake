@@ -5,6 +5,7 @@
 // about the night it was written for.
 import { describe, it, expect } from 'vitest'
 import {
+  CHILD_RECOVERY_PROBE_MS,
   MAX_RETRIES,
   OUTAGE_WINDOW_MS,
   POINT_TOKEN_CAP,
@@ -13,13 +14,15 @@ import {
   childKey,
   describeDecision,
   emptyState,
-  outagePauseReason,
+  childRecoveryRecord,
+  outageProbeReason,
   outageWitnesses,
   pointRecord,
   promptHint,
   recordCompletion,
   recordDeath,
   recordRetry,
+  recordRecovery,
   retryDecision,
 } from './child-retry-core.mjs'
 
@@ -123,14 +126,16 @@ describe('retryDecision — a transient death retries with backoff, up to the ca
     expect(d.retryAt).toBe(NOW + RETRY_BACKOFF_MS[0])
   })
 
-  it('raises the backoff on the second retry and refuses the third', () => {
+  it('raises the backoff on the second retry and requeues at the cap after it', () => {
     const one = retryDecision({ ...base, death: 'API Error: 500', state: { deaths: [], points: { 421: { retries: 1 } } } })
     expect(one.verdict).toBe('retry')
     expect(one.backoffMs).toBe(RETRY_BACKOFF_MS[1])
     expect(one.backoffMs).toBeGreaterThan(RETRY_BACKOFF_MS[0])
 
     const two = retryDecision({ ...base, death: 'API Error: 500', state: { deaths: [], points: { 421: { retries: MAX_RETRIES } } } })
-    expect(two.verdict).toBe('no-retry')
+    expect(two.verdict).toBe('recover')
+    expect(two.recoveryAction).toBe('requeue')
+    expect(two.retryAt).toBe(NOW + CHILD_RECOVERY_PROBE_MS)
     expect(two.reason).toMatch(/retries already spent/)
   })
 
@@ -142,17 +147,19 @@ describe('retryDecision — a transient death retries with backoff, up to the ca
     expect(d.promptHint).toContain('abc123')
   })
 
-  it('refuses when the branch moved since the first spawn — that is a new spawn', () => {
+  it('exchanges when the branch moved since the first spawn — that is a new queue choice', () => {
     const d = retryDecision({ ...base, branch: 'feat/421-y', death: 'ECONNRESET', state: { deaths: [], points: { 421: { retries: 0, branch: 'feat/421-x' } } } })
-    expect(d.verdict).toBe('no-retry')
+    expect(d.verdict).toBe('recover')
+    expect(d.recoveryAction).toBe('exchange')
     expect(d.reason).toMatch(/branch changed/)
   })
 
-  it('refuses when the brief was re-cut since the first spawn', () => {
+  it('exchanges when the brief was re-cut since the first spawn', () => {
     // Would have prevented: a retry replaying a brief that no longer describes the
     // point, producing work nobody asked for.
     const d = retryDecision({ ...base, briefRevision: 'def456', death: 'ECONNRESET', state: { deaths: [], points: { 421: { retries: 0, briefRevision: 'abc123' } } } })
-    expect(d.verdict).toBe('no-retry')
+    expect(d.verdict).toBe('recover')
+    expect(d.recoveryAction).toBe('exchange')
     expect(d.reason).toMatch(/brief revision changed/)
   })
 })
@@ -174,37 +181,52 @@ describe('retryDecision — CONTINUE rather than repeat when the child committed
   })
 })
 
-describe('retryDecision — a non-transient death is never retried', () => {
-  it('refuses a red gate', () => {
+describe('retryDecision — a non-transient death is diagnosed from its branch', () => {
+  it('fixes a red gate on the existing branch', () => {
     const d = retryDecision({ ...base, death: 'the regression gate is red: 3 tests failed' })
-    expect(d.verdict).toBe('no-retry')
+    expect(d.verdict).toBe('recover')
+    expect(d.recoveryAction).toBe('fix')
+    expect(d.branchDiagnosis).toMatchObject({ exists: true, branch: 'feat/421-x' })
     expect(d.reason).toMatch(/gate-red/)
   })
 
-  it('refuses a guard block', () => {
-    expect(retryDecision({ ...base, death: 'board-first-guard blocked the call' }).verdict).toBe('no-retry')
+  it('fixes a guard block on the existing branch', () => {
+    expect(retryDecision({ ...base, death: 'board-first-guard blocked the call' })).toMatchObject({ verdict: 'recover', recoveryAction: 'fix' })
   })
 
-  it('refuses an escalated brief', () => {
+  it('exchanges an escalated brief for another workable point', () => {
     // Would have prevented: an agent that asked a question being answered with the
     // same question, twice.
-    expect(retryDecision({ ...base, death: 'escalated: the brief does not name the file' }).verdict).toBe('no-retry')
+    expect(retryDecision({ ...base, death: 'escalated: the brief does not name the file' })).toMatchObject({ verdict: 'recover', recoveryAction: 'exchange' })
   })
 
-  it('refuses a death it does not recognise', () => {
-    expect(retryDecision({ ...base, death: 'agent exited' }).verdict).toBe('no-retry')
+  it('resumes an unrecognised death when its branch has committed work', () => {
+    expect(retryDecision({ ...base, death: 'agent exited', committedSinceSpawn: true })).toMatchObject({ verdict: 'recover', recoveryAction: 'resume' })
+  })
+
+  it('exchanges when the named branch does not exist', () => {
+    expect(retryDecision({ ...base, death: 'the regression gate is red', branchExists: false })).toMatchObject({ verdict: 'recover', recoveryAction: 'exchange' })
+  })
+
+  it('always carries a capped next attempt and veto decision record', () => {
+    const d = retryDecision({ ...base, death: 'agent exited' })
+    expect(d.retryAt).toBe(NOW + CHILD_RECOVERY_PROBE_MS)
+    expect(d.decisionRecord.title).toMatch(/^Entscheidungsprotokoll:/)
+    expect(d.decisionRecord.body).toMatch(/Retroaktives Veto/)
   })
 })
 
 describe('retryDecision — two children, one signature, one window = OUTAGE', () => {
-  it('pauses instead of retrying when a second child dies of the same thing', () => {
+  it('clocks a probe instead of retrying when a second child dies of the same thing', () => {
     // THE NIGHT OF 29./30.07.2026: both agents died on one 500. Two retries each
     // would have bought four more deaths.
     const state = { deaths: [{ key: 'agent-2', signature: 'http-500', at: NOW - 3 * 60 * 1000 }], points: {} }
     const d = retryDecision({ ...base, death: 'API Error: 500', state })
-    expect(d.verdict).toBe('outage-pause')
+    expect(d.verdict).toBe('outage-probe')
+    expect(d.recoveryAction).toBe('probe-outage')
+    expect(d.retryAt).toBe(NOW + CHILD_RECOVERY_PROBE_MS)
     expect(d.witnesses).toHaveLength(2)
-    expect(d.reason).toMatch(/environment outage/)
+    expect(d.reason).toMatch(/shared outage/)
   })
 
   it('does NOT call it an outage when the same child dies twice', () => {
@@ -224,33 +246,35 @@ describe('retryDecision — two children, one signature, one window = OUTAGE', (
     expect(retryDecision({ ...base, death: 'API Error: 500', state }).verdict).toBe('retry')
   })
 
-  it('outranks the retry budget — an outage pauses even on the first death of a point', () => {
+  it('outranks the retry budget — an outage is clocked even on the first death of a point', () => {
     const state = { deaths: [{ key: 'agent-9', signature: 'http-529', at: NOW - 1000 }], points: {} }
-    expect(retryDecision({ ...base, death: 'Overloaded', state }).verdict).toBe('outage-pause')
+    expect(retryDecision({ ...base, death: 'Overloaded', state }).verdict).toBe('outage-probe')
   })
 
-  it('writes the pause reason in the morning reader’s language, naming the cause and the way out', () => {
+  it('writes the probe reason in the morning reader’s language, naming the cause and clock', () => {
     const state = { deaths: [{ key: 'agent-2', signature: 'http-500', at: NOW - 1000 }], points: {} }
     const d = retryDecision({ ...base, death: 'API Error: 500', state })
-    const reason = outagePauseReason(d, '30.07.2026, 04:00')
+    const reason = outageProbeReason(d, '30.07.2026, 04:00')
     expect(reason).toMatch(/Umgebungsausfall/)
     expect(reason).toMatch(/http-500/)
     expect(reason).toMatch(/batch-paused/)
+    expect(reason).toMatch(/Restart-Uhr/)
   })
 })
 
-describe('retryDecision — a child that reported a step complete is never retried', () => {
-  it('refuses when the caller reports completion', () => {
+describe('retryDecision — a child that reported a step complete is exchanged, never rebuilt', () => {
+  it('exchanges when the caller reports completion', () => {
     // Would have prevented the 30.07. incident in docs/batch-resilience.md §Layer 5b:
     // a successor rebuilding two finished points.
     const d = retryDecision({ ...base, death: 'API Error: 500', reportedComplete: true })
-    expect(d.verdict).toBe('no-retry')
+    expect(d.verdict).toBe('recover')
+    expect(d.recoveryAction).toBe('exchange')
     expect(d.reason).toMatch(/reported a step complete/)
   })
 
-  it('refuses on a LATER death too, because the completion is remembered in the state', () => {
+  it('exchanges on a LATER death too, because completion is remembered', () => {
     const state = recordCompletion(emptyState(), { point: 421 })
-    expect(retryDecision({ ...base, death: 'API Error: 500', state }).verdict).toBe('no-retry')
+    expect(retryDecision({ ...base, death: 'API Error: 500', state })).toMatchObject({ verdict: 'recover', recoveryAction: 'exchange' })
   })
 
   it('recordCompletion keeps the point’s accumulated tokens when the caller reports none', () => {
@@ -262,18 +286,25 @@ describe('retryDecision — a child that reported a step complete is never retri
   })
 })
 
-describe('retryDecision — the token cap bounds one point', () => {
-  it('refuses once the point has eaten its budget', () => {
+describe('retryDecision — the token cap requeues one point without stopping the queue', () => {
+  it('requeues once the point has eaten its budget', () => {
     // Would have prevented: one stubborn point converting a night's token budget
     // into three identical failed builds.
     const d = retryDecision({ ...base, death: 'API Error: 500', tokensUsed: POINT_TOKEN_CAP })
-    expect(d.verdict).toBe('no-retry')
+    expect(d.verdict).toBe('recover')
+    expect(d.recoveryAction).toBe('requeue')
+    expect(d.decisionRecord.body).toMatch(/übrige Queue läuft weiter/)
     expect(d.reason).toMatch(/cap/)
   })
 
   it('reads the accumulated tokens from the state when the caller reports none', () => {
     const state = { deaths: [], points: { 421: { retries: 0, tokens: POINT_TOKEN_CAP + 1 } } }
-    expect(retryDecision({ ...base, death: 'API Error: 500', state }).verdict).toBe('no-retry')
+    expect(retryDecision({ ...base, death: 'API Error: 500', state })).toMatchObject({ verdict: 'recover', recoveryAction: 'requeue' })
+  })
+
+  it('reopens a critical point but still records its capped next attempt', () => {
+    const d = retryDecision({ ...base, death: 'API Error: 500', tokensUsed: POINT_TOKEN_CAP, critical: true })
+    expect(d).toMatchObject({ verdict: 'recover', recoveryAction: 'reopen', retryAt: NOW + CHILD_RECOVERY_PROBE_MS })
   })
 
   it('allows the retry below the cap', () => {
@@ -295,14 +326,19 @@ describe('retryDecision — stand-down', () => {
     expect(d.verdict).toBe('stand-down')
   })
 
-  it('never spawns a spawner: no verdict but retry carries a prompt hint', () => {
+  it('never gives a spawn prompt to a session that must stand down', () => {
     for (const d of [
-      retryDecision({ ...base, death: 'gate red: build failed' }),
       retryDecision({ ...base, death: 'API Error: 500', paused: true }),
-      retryDecision({ ...base, death: 'API Error: 500', state: { deaths: [{ key: 'x', signature: 'http-500', at: NOW }], points: {} } }),
+      retryDecision({ ...base, death: 'API Error: 500', ownsLock: false }),
     ]) {
       expect(d.promptHint).toBeNull()
     }
+  })
+
+  it('a recovery carries an action prompt but never an immediate blind respawn', () => {
+    const d = retryDecision({ ...base, death: 'gate red: build failed' })
+    expect(d.promptHint).toMatch(/^FIX/)
+    expect(d.promptHint).not.toMatch(/re-spawn/i)
   })
 })
 
@@ -343,7 +379,51 @@ describe('state transitions are pure', () => {
 
   it('recordRetry books the attempt against the point and pins branch + brief revision', () => {
     const next = recordRetry(emptyState(), { point: 421, branch: 'feat/421-x', briefRevision: 'abc123', tokensUsed: 42 })
-    expect(pointRecord(next, 421)).toEqual({ retries: 1, tokens: 42, branch: 'feat/421-x', briefRevision: 'abc123', completedSteps: 0 })
+    expect(pointRecord(next, 421)).toEqual({ retries: 1, tokens: 42, branch: 'feat/421-x', briefRevision: 'abc123', completedSteps: 0, recovery: null })
+  })
+
+  it('recordRecovery persists the scheduling choice, clock and veto record', () => {
+    const decision = retryDecision({ ...base, death: 'agent exited' })
+    const next = recordRecovery(emptyState(), decision)
+    expect(pointRecord(next, 421).recovery).toMatchObject({
+      class: 'non-transient',
+      action: 'exchange',
+      nextAttemptAt: NOW + CHILD_RECOVERY_PROBE_MS,
+    })
+    expect(pointRecord(next, 421).recovery.decisionRecord.body).toMatch(/Retroaktives Veto/)
+  })
+
+  it('a recorded recovery cannot be repeated before its capped clock', () => {
+    const first = retryDecision({ ...base, death: 'agent exited', tokensUsed: 1234 })
+    const state = recordRecovery(emptyState(), first)
+    const held = retryDecision({ ...base, death: 'agent exited', state, now: NOW + 1 })
+    expect(held).toMatchObject({
+      verdict: 'scheduled',
+      recoveryAction: 'exchange',
+      retryAt: NOW + CHILD_RECOVERY_PROBE_MS,
+      promptHint: null,
+    })
+    expect(pointRecord(state, 421).tokens).toBe(1234)
+  })
+
+  it('the same terminal diagnosis produces the next capped attempt when its clock is due', () => {
+    const first = retryDecision({ ...base, death: 'agent exited' })
+    const state = recordRecovery(emptyState(), first)
+    const due = retryDecision({ ...base, death: 'agent exited', state, now: first.retryAt })
+    expect(due).toMatchObject({ verdict: 'recover', retryAt: first.retryAt + CHILD_RECOVERY_PROBE_MS })
+  })
+
+  it('childRecoveryRecord names all four scheduling choices accepted by veto', () => {
+    const rec = childRecoveryRecord({
+      point: 421,
+      branch: 'feat/421-x',
+      recoveryClass: 'test',
+      recoveryAction: 'fix',
+      reason: 'test evidence',
+      decidedAt: NOW,
+      retryAt: NOW + CHILD_RECOVERY_PROBE_MS,
+    })
+    expect(rec.body).toMatch(/resume, fix, exchange oder requeue/)
   })
 
   it('childKey falls back to point:branch when no child id is known', () => {

@@ -5,9 +5,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { POINT_TOKEN_CAP } from './child-retry-core.mjs'
-import { readState, writeState, tokenCap, committedOnBranch, logLine, boardCard } from './child-retry.mjs'
+import { readState, writeState, tokenCap, committedOnBranch, diagnoseBranch, logLine, boardCard } from './child-retry.mjs'
 
 let dir
 beforeEach(() => {
@@ -85,14 +85,29 @@ describe('committedOnBranch — judged by OUTPUT, never by a log', () => {
   })
 })
 
+describe('diagnoseBranch — terminal scheduling reads durable git evidence', () => {
+  it('distinguishes a missing branch from an existing one', () => {
+    expect(diagnoseBranch('feat/does-not-exist-9f3a')).toEqual({
+      exists: false,
+      committedSinceSpawn: false,
+      branch: 'feat/does-not-exist-9f3a',
+    })
+    expect(diagnoseBranch('HEAD')).toMatchObject({ exists: true, branch: 'HEAD' })
+  })
+
+  it('fails closed to missing evidence outside a repository', () => {
+    expect(diagnoseBranch('HEAD', { cwd: dir })).toEqual({ exists: false, committedSinceSpawn: false, branch: 'HEAD' })
+  })
+})
+
 describe('the reason reaches the morning reader', () => {
   it('logLine appends a timestamped line', () => {
     const p = join(dir, 'child-retry.log')
     logLine('point 421 died: http-500 → retry', p)
-    logLine('point 421 died: http-500 → outage-pause', p)
+    logLine('point 421 died: http-500 → outage-probe', p)
     const text = readFileSync(p, 'utf8')
     expect(text.split('\n').filter(Boolean)).toHaveLength(2)
-    expect(text).toMatch(/outage-pause/)
+    expect(text).toMatch(/outage-probe/)
   })
 
   it('logLine swallows an unwritable path instead of losing the decision with it', () => {
@@ -104,5 +119,25 @@ describe('the reason reaches the morning reader', () => {
   it('boardCard reports failure instead of throwing when the board command cannot run', () => {
     expect(boardCard('t', 'q', { cwd: dir })).toBe(false)
     expect(existsSync(join(dir, '.batch-dashboard.html'))).toBe(false)
+  })
+})
+
+describe('the CLI wires terminal decisions without a person-only exit', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'child-retry.mjs'), 'utf8')
+
+  it('persists recovery state and its decision card', () => {
+    expect(source).toMatch(/recordRecovery\(next, decision\)/)
+    expect(source).toMatch(/boardCard\(decision\.decisionRecord\.title, decision\.decisionRecord\.body\)/)
+  })
+
+  it('writes the outage pause with the decision clock, never a clockless marker', () => {
+    expect(source).toMatch(/setPaused\(reason, \{ cause: 'outage', retryAfter: decision\.retryAt \}\)/)
+    expect(source).not.toMatch(/outage-pause|NO-RETRY|by hand/)
+  })
+
+  it('turns an internal classifier error into a capped exchange record', () => {
+    expect(source).toMatch(/recoveryClass: 'internal-error'/)
+    expect(source).toMatch(/recoveryAction: 'exchange'/)
+    expect(source).toMatch(/retryAt = at \+ CHILD_RECOVERY_PROBE_MS/)
   })
 })

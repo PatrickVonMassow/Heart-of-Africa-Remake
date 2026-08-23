@@ -12,11 +12,13 @@
 //   1. TRANSIENCE IS AN ALLOWLIST, never a guess. HTTP 5xx/429/529,
 //      ECONNRESET/ETIMEDOUT and the harness's own "API error" death are
 //      transient. EVERYTHING else — a red gate, a guard block, an escalated
-//      brief, an unrecognised message — is NOT, and the default is no retry.
+//      brief, an unrecognised message — is NOT, and the default is branch
+//      diagnosis followed by resume, repair, or exchange.
 //      A death whose text merely CONTAINS a number must never read as a 500:
 //      the non-transient markers are matched FIRST and win.
 //   2. THE SAME SIGNATURE ACROSS TWO CHILDREN IN ONE WINDOW IS AN OUTAGE.
-//      Not bad luck, not a retryable accident — pause the batch and report it.
+//      Not bad luck, not an immediate retryable accident — put the shared
+//      environment on a clock and probe it again.
 //      This is the clause that would have prevented that night.
 //   3. NEVER REPEAT WORK THAT LANDED. A child that reported a step complete is
 //      never retried (its output is on the branch and belongs to the merge, not
@@ -24,8 +26,9 @@
 //      re-prompted to CONTINUE rather than to repeat.
 //   4. THE SAME BRANCH AND THE SAME BRIEF REVISION, or it is not a retry. A
 //      changed brief is a new spawn and goes through the ordinary door.
-//   5. BOUNDED. At most two retries per point, rising backoff, and a token cap
-//      per point so one stubborn item cannot eat a night's budget.
+//   5. BOUNDED, NOT TERMINAL. At most two immediate retries per point, rising
+//      backoff, and a token cap. A spent point is requeued while the queue keeps
+//      moving; every terminal diagnosis repeats at the capped interval.
 //
 // Where two verdicts are close this file chooses the CHEAPER MISTAKE: not
 // retrying costs one deliberate re-spawn in the morning; retrying into an
@@ -39,6 +42,9 @@ export const MAX_RETRIES = 2
  *  (the 29./30.07. 500s cleared inside minutes), short enough that a night is
  *  not spent waiting. Index = number of retries already spent. */
 export const RETRY_BACKOFF_MS = [2 * 60 * 1000, 8 * 60 * 1000]
+
+/** Every non-immediate child recovery repeats on the lane's existing cap. */
+export const CHILD_RECOVERY_PROBE_MS = RETRY_BACKOFF_MS.at(-1)
 
 /** How far back the outage detector looks. Two children dying of the same thing
  *  inside a quarter of an hour is a shared cause; a day apart is not. */
@@ -176,6 +182,62 @@ export function pointRecord(state, point) {
     branch: rec?.branch ?? null,
     briefRevision: rec?.briefRevision ?? null,
     completedSteps: Number(rec?.completedSteps) || 0,
+    recovery: rec?.recovery && typeof rec.recovery === 'object' ? rec.recovery : null,
+  }
+}
+
+const recoveryDelay = (backoffs) => {
+  const values = (Array.isArray(backoffs) ? backoffs : []).filter((n) => Number.isFinite(n) && n > 0)
+  return values.at(-1) ?? CHILD_RECOVERY_PROBE_MS
+}
+
+const recoveryPrompt = ({ action, point, branch }) => {
+  const where = branch ? ` on ${branch}` : ''
+  if (action === 'fix') return `FIX point ${point}${where}: inspect the recorded failure and repair it before resuming the branch.`
+  if (action === 'resume') return `RESUME point ${point}${where}: preserve the branch commits and continue from its recorded head.`
+  if (action === 'reopen') return `REOPEN critical point ${point}${where}: its priority outweighs the spent child budget; diagnose before another spawn.`
+  if (action === 'requeue') return `REQUEUE point ${point}${where}: keep the queue moving and reconsider this point at the recorded probe time.`
+  if (action === 'probe-outage') return `PROBE the shared outage at the recorded time; do not spawn another child before the clock.`
+  return `EXCHANGE point ${point}${where} for the next workable queue item; reconsider this branch at the recorded probe time.`
+}
+
+/** A durable decision record carried both in state and onto the board. */
+export function childRecoveryRecord({ point, branch, recoveryClass, recoveryAction, reason, decidedAt, retryAt }) {
+  const subject = `Punkt ${point ?? '?'}: ${recoveryAction}`
+  return {
+    title: `Entscheidungsprotokoll: Kind-Ausfall wird als ${recoveryAction} eingeplant — ${subject}`.slice(0, 160),
+    body:
+      `Automatische Entscheidung [${new Date(decidedAt).toISOString()}]: ${subject}${branch ? ` auf Branch ${branch}` : ''}. ` +
+      `Evidenzklasse: ${recoveryClass}. Grund: ${reason}. Nächster Versuch: ${new Date(retryAt).toISOString()}. ` +
+      `Folge: Die übrige Queue läuft weiter. Retroaktives Veto: Antworte mit „Veto“ und nenne ` +
+      `resume, fix, exchange oder requeue sowie den letzten zulässigen Branch-Stand.`,
+  }
+}
+
+function recover(base, { action, recoveryClass, reason, now, backoffs, branchDiagnosis = null }) {
+  const backoffMs = recoveryDelay(backoffs)
+  const retryAt = now + backoffMs
+  const decisionRecord = childRecoveryRecord({
+    point: base.point,
+    branch: base.branch,
+    recoveryClass,
+    recoveryAction: action,
+    reason,
+    decidedAt: now,
+    retryAt,
+  })
+  return {
+    ...base,
+    verdict: recoveryClass === 'outage' ? 'outage-probe' : 'recover',
+    recoveryClass,
+    recoveryAction: action,
+    branchDiagnosis,
+    reason,
+    backoffMs,
+    retryAt,
+    promptMode: action,
+    promptHint: recoveryPrompt({ action, point: base.point, branch: base.branch }),
+    decisionRecord,
   }
 }
 
@@ -199,7 +261,7 @@ export function outageWitnesses({ deaths = [], signature, key, now = Date.now(),
 /**
  * THE DECISION. Pure: everything it reads is an argument.
  *
- * @returns {{verdict: 'retry'|'no-retry'|'outage-pause'|'stand-down', ...}}
+ * @returns {{verdict: 'retry'|'recover'|'outage-probe'|'scheduled'|'stand-down', ...}}
  */
 export function retryDecision({
   point,
@@ -209,6 +271,8 @@ export function retryDecision({
   death = '',
   reportedComplete = false,
   committedSinceSpawn = false,
+  branchExists = Boolean(branch),
+  critical = false,
   state = emptyState(),
   now = Date.now(),
   paused = false,
@@ -232,6 +296,11 @@ export function retryDecision({
   const { transient, signature, label } = classifyDeath(death)
   const key = childKey({ childId, point, branch })
   const rec = pointRecord(state, point)
+  const branchDiagnosis = {
+    exists: branchExists === true,
+    committedSinceSpawn: committedSinceSpawn === true,
+    branch: branch ?? rec.branch,
+  }
 
   const base = {
     point: point ?? null,
@@ -245,8 +314,39 @@ export function retryDecision({
     tokenCap,
   }
 
+  const scheduledAt = Number(rec.recovery?.nextAttemptAt)
+  if (!reportedComplete && Number.isFinite(scheduledAt) && scheduledAt > now) {
+    return {
+      ...base,
+      verdict: 'scheduled',
+      recoveryClass: rec.recovery.class,
+      recoveryAction: rec.recovery.action,
+      retryAt: scheduledAt,
+      backoffMs: scheduledAt - now,
+      decisionRecord: rec.recovery.decisionRecord ?? null,
+      reason: `point ${point} already has a ${rec.recovery.action} decision; its capped clock is due at ${new Date(scheduledAt).toISOString()}`,
+      promptMode: null,
+      promptHint: null,
+    }
+  }
+
   if (!transient) {
-    return { ...base, verdict: 'no-retry', reason: `${label} — a death outside the transient allowlist is fixed by a person, not by a second attempt`, backoffMs: 0, promptMode: null, promptHint: null }
+    const fixable = ['gate-red', 'guard-block', 'merge-conflict'].includes(signature)
+    const action = !branchDiagnosis.exists
+      ? 'exchange'
+      : fixable
+        ? 'fix'
+        : branchDiagnosis.committedSinceSpawn
+          ? 'resume'
+          : 'exchange'
+    return recover(base, {
+      action,
+      recoveryClass: 'non-transient',
+      reason: `${label} — branch evidence chooses ${action}; this diagnosis is probed again at the child lane's cap`,
+      now,
+      backoffs,
+      branchDiagnosis,
+    })
   }
 
   // THE CLAUSE OF THE NIGHT: two children, one signature, one window.
@@ -254,35 +354,75 @@ export function retryDecision({
   if (witnesses.length >= outageThreshold) {
     return {
       ...base,
-      verdict: 'outage-pause',
-      reason: `${witnesses.length} children died of ${signature} inside ${Math.round(outageWindowMs / 60000)} min — that is an environment outage, not bad luck; pause and report instead of retrying into it`,
+      ...recover(base, {
+        action: 'probe-outage',
+        recoveryClass: 'outage',
+        reason: `${witnesses.length} children died of ${signature} inside ${Math.round(outageWindowMs / 60000)} min — that is a shared outage; re-probe it on a clock instead of retrying into it`,
+        now,
+        backoffs,
+        branchDiagnosis,
+      }),
       witnesses,
-      backoffMs: 0,
-      promptMode: null,
-      promptHint: null,
     }
   }
 
   if (reportedComplete || rec.completedSteps > 0) {
-    return { ...base, verdict: 'no-retry', reason: 'the child reported a step complete — its work is on the branch and belongs to the merge; a retry would rebuild what already exists', backoffMs: 0, promptMode: null, promptHint: null }
+    return recover(base, {
+      action: 'exchange',
+      recoveryClass: 'completed',
+      reason: 'the child reported a step complete — preserve its branch output and exchange it for the next workable point instead of rebuilding it',
+      now,
+      backoffs,
+      branchDiagnosis,
+    })
   }
 
   // A retry is the SAME spawn once more. A different branch or a re-cut brief is
   // a new spawn and must not inherit this point's retry budget.
   if (rec.branch && branch && rec.branch !== branch) {
-    return { ...base, verdict: 'no-retry', reason: `the branch changed since the first spawn (${rec.branch} → ${branch}) — that is a new spawn, not a retry`, backoffMs: 0, promptMode: null, promptHint: null }
+    return recover(base, {
+      action: 'exchange',
+      recoveryClass: 'branch-changed',
+      reason: `the branch changed since the first spawn (${rec.branch} → ${branch}) — schedule it as a new queue choice, not a retry`,
+      now,
+      backoffs,
+      branchDiagnosis,
+    })
   }
   if (rec.briefRevision && briefRevision && rec.briefRevision !== briefRevision) {
-    return { ...base, verdict: 'no-retry', reason: `the brief revision changed since the first spawn (${rec.briefRevision} → ${briefRevision}) — re-cut briefs get a fresh spawn, not a retry`, backoffMs: 0, promptMode: null, promptHint: null }
+    return recover(base, {
+      action: 'exchange',
+      recoveryClass: 'brief-changed',
+      reason: `the brief revision changed since the first spawn (${rec.briefRevision} → ${briefRevision}) — schedule the re-cut brief as a fresh queue choice`,
+      now,
+      backoffs,
+      branchDiagnosis,
+    })
   }
 
   if (rec.retries >= maxRetries) {
-    return { ...base, verdict: 'no-retry', reason: `${rec.retries} retries already spent on point ${point} (cap ${maxRetries}) — a third transient death is a pattern, not an accident`, backoffMs: 0, promptMode: null, promptHint: null }
+    const action = critical ? 'reopen' : 'requeue'
+    return recover(base, {
+      action,
+      recoveryClass: 'retry-budget-spent',
+      reason: `${rec.retries} retries already spent on point ${point} (cap ${maxRetries}) — ${critical ? 'criticality reopens it with diagnosis' : 'requeue it while other work continues'}`,
+      now,
+      backoffs,
+      branchDiagnosis,
+    })
   }
 
   const spent = Number.isFinite(tokensUsed) ? tokensUsed : rec.tokens
   if (spent >= tokenCap) {
-    return { ...base, verdict: 'no-retry', reason: `point ${point} has consumed ${spent} tokens (cap ${tokenCap}) — the budget is the stop condition; re-open it deliberately`, backoffMs: 0, promptMode: null, promptHint: null }
+    const action = critical ? 'reopen' : 'requeue'
+    return recover(base, {
+      action,
+      recoveryClass: 'token-budget-spent',
+      reason: `point ${point} has consumed ${spent} tokens (cap ${tokenCap}) — ${critical ? 'criticality reopens it with diagnosis' : 'requeue it while other work continues'}`,
+      now,
+      backoffs,
+      branchDiagnosis,
+    })
   }
 
   const backoffMs = backoffs[Math.min(rec.retries, backoffs.length - 1)]
@@ -335,6 +475,33 @@ export function recordRetry(state, { point, branch, briefRevision, tokensUsed })
         branch: branch ?? rec.branch,
         briefRevision: briefRevision ?? rec.briefRevision,
         completedSteps: rec.completedSteps,
+        recovery: null,
+      },
+    },
+  }
+}
+
+/** Persist a terminal diagnosis and its capped next attempt. This is the queue's
+ * durable scheduling record even when the board write is temporarily down. */
+export function recordRecovery(state, decision) {
+  const key = String(decision?.point)
+  const rec = pointRecord(state, decision?.point)
+  return {
+    deaths: [...stateDeaths(state)],
+    points: {
+      ...statePoints(state),
+      [key]: {
+        ...rec,
+        tokens: Number.isFinite(decision?.tokensUsed) ? decision.tokensUsed : rec.tokens,
+        branch: decision?.branch ?? rec.branch,
+        briefRevision: decision?.briefRevision ?? rec.briefRevision,
+        recovery: {
+          class: decision?.recoveryClass ?? 'unknown',
+          action: decision?.recoveryAction ?? 'exchange',
+          decidedAt: Number(decision?.retryAt) - Number(decision?.backoffMs),
+          nextAttemptAt: Number(decision?.retryAt),
+          decisionRecord: decision?.decisionRecord ?? null,
+        },
       },
     },
   }
@@ -354,15 +521,14 @@ export function recordCompletion(state, { point, tokensUsed }) {
   }
 }
 
-/** The German pause text for an outage verdict — the morning reader's sentence,
- *  not a log line. */
-export function outagePauseReason(decision, stamp) {
+/** The German clocked-probe text for a shared outage. */
+export function outageProbeReason(decision, stamp) {
   return (
     `Umgebungsausfall: ${decision.witnesses?.length ?? 2} Agenten sind innerhalb von ` +
     `${Math.round(OUTAGE_WINDOW_MS / 60000)} Minuten am selben Fehler gestorben (${decision.signature}). ` +
-    `Der Batch pausiert absichtlich, statt in den Ausfall hinein neu zu starten. ` +
-    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — oder von selbst, sobald die ` +
-    `Restart-Uhr in dieser Datei abgelaufen ist (Punkt 445); bitte trotzdem prüfen, ob die API wieder antwortet. ` +
+    `Der Batch setzt eine Uhr, statt in den Ausfall hinein neu zu starten. ` +
+    `Der nächste Probeversuch ist ${new Date(decision.retryAt).toISOString()}; .claude/batch-paused trägt genau diese ` +
+    `Restart-Uhr und kann daher keinen menschlichen Endzustand bilden. ` +
     `[${stamp}]`
   )
 }
@@ -370,6 +536,7 @@ export function outagePauseReason(decision, stamp) {
 /** One human line for the console and the log — English, this is machine-facing. */
 export function describeDecision(d) {
   const head = `${d.verdict.toUpperCase()} — ${d.reason}`
-  if (d.verdict !== 'retry') return head
-  return `${head}\n  wait ${Math.round(d.backoffMs / 1000)} s, then re-spawn.\n  ${d.promptHint}`
+  if (d.verdict === 'retry') return `${head}\n  wait ${Math.round(d.backoffMs / 1000)} s, then re-spawn.\n  ${d.promptHint}`
+  if (!['recover', 'outage-probe'].includes(d.verdict)) return head
+  return `${head}\n  next attempt ${new Date(d.retryAt).toISOString()} (cap ${Math.round(d.backoffMs / 1000)} s).\n  ${d.promptHint}`
 }
