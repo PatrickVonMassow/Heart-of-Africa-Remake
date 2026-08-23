@@ -134,12 +134,52 @@ describe('author-sol records a commission before dispatch', () => {
       round: 3,
       authorFraming: AUTHORING_FRAMINGS[0],
       sha: 'b'.repeat(40),
+      model: 'GPT-5.6 Sol',
     })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
 
     const retry = recordAuthoringCommission({ ...input, records: [first.record] })
     expect(retry).toEqual({ written: false, record: first.record })
     expect(events.map(([event]) => event)).toEqual(['append', 'commit'])
+  })
+
+  it('records the commissioned lane model while keeping Sol as the default', () => {
+    const events = []
+    const fable = recordAuthoringCommission({
+      records: [],
+      point,
+      round: 5,
+      framing: AUTHORING_FRAMINGS[0],
+      sha: 'f'.repeat(40),
+      model: 'Fable 5',
+      now: 1_787_130_000_000,
+      append: (record) => events.push(record),
+      commit: () => {},
+    })
+    expect(fable.record.model).toBe('Fable 5')
+    expect(events[0]).toMatchObject({ model: 'Fable 5' })
+
+    const sol = recordAuthoringCommission({
+      records: [],
+      point,
+      round: 0,
+      sha: 'a'.repeat(40),
+      now: 1_787_130_000_000,
+      append: () => {},
+      commit: () => {},
+    })
+    expect(sol.record.model).toBe('GPT-5.6 Sol')
+  })
+
+  it('refuses to reuse one round under a different lane model', () => {
+    expect(() =>
+      recordAuthoringCommission({
+        records: [{ kind: AUTHORING_COMMISSION_KIND, point: Number(point), round: 5, authorFraming: '', model: 'Fable 5' }],
+        point,
+        round: 5,
+        sha: 'a'.repeat(40),
+      }),
+    ).toThrow(/different lane model/)
   })
 
   it('leaves the ledger byte-identical when the commit that seals the append fails', () => {

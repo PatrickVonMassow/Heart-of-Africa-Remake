@@ -79,6 +79,7 @@ describe('callKind / shellKind — the growth is charged to a KIND, read off the
     expect(shellKind('npm run test:unit')).toBe(CALL_KINDS.FAST_GATE)
     expect(shellKind('npm run build && npm run lint')).toBe(CALL_KINDS.FAST_GATE)
     expect(shellKind('cat material | node scripts/ask-sol.mjs --kind diagnose')).toBe(CALL_KINDS.DELEGATED_ASK)
+    expect(shellKind('node scripts/author-fable.mjs --point 834')).toBe(CALL_KINDS.DELEGATED_ASK)
     expect(shellKind('git status --short')).toBe(CALL_KINDS.BASH)
     expect(shellKind('')).toBe(CALL_KINDS.BASH)
   })
