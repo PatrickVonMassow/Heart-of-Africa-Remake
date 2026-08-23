@@ -38,7 +38,7 @@ const FENCE_BEFORE = 7
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const git = (args, cwd) =>
-  execFileSync('git', args, {
+  execFileSync('git', args, { windowsHide: true,
     cwd,
     encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
@@ -49,15 +49,15 @@ function buildSandbox() {
   const originDir = join(sandbox, 'origin.git')
   const repo = join(sandbox, 'repo')
   const worktree = join(sandbox, 'wt')
-  execFileSync('git', ['init', '-q', '--bare', originDir])
-  execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: originDir })
-  execFileSync('git', ['init', '-q', repo])
+  execFileSync('git', ['init', '-q', '--bare', originDir], { windowsHide: true })
+  execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { windowsHide: true, cwd: originDir })
+  execFileSync('git', ['init', '-q', repo], { windowsHide: true })
   writeFileSync(join(repo, 'seed.txt'), 'seed\n')
   git(['add', '.'], repo)
   git(['commit', '-q', '-m', 'seed'], repo)
   git(['remote', 'add', 'origin', originDir], repo)
   git(['push', '-q', 'origin', 'HEAD:main'], repo)
-  execFileSync('git', ['clone', '-q', originDir, worktree])
+  execFileSync('git', ['clone', '-q', originDir, worktree], { windowsHide: true })
   git(['checkout', '-q', '-b', 'feat/drill'], worktree)
   git(['push', '-q', 'origin', 'feat/drill'], worktree)
   mkdirSync(join(repo, '.claude'), { recursive: true })
@@ -108,7 +108,7 @@ async function parentDeathScenario({ keep }) {
   const out = openSync(logPath, 'a')
   // The parent is its own group leader, so the kill below reaches everything a
   // dying session takes — except what correctly escaped it.
-  const parent = spawn(process.execPath, ['scripts/batch-daemon-drill.mjs', '--parent-session', '--repo', repo, '--worktree', worktree, '--ready', readyPath], {
+  const parent = spawn(process.execPath, ['scripts/batch-daemon-drill.mjs', '--parent-session', '--repo', repo, '--worktree', worktree, '--ready', readyPath], { windowsHide: true,
     cwd: process.cwd(),
     detached: true,
     stdio: ['ignore', out, out],

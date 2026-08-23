@@ -24,7 +24,7 @@ import {
 let repo
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), 'batch-state-'))
-  execFileSync('git', ['init', '-q'], { cwd: repo })
+  execFileSync('git', ['init', '-q'], { windowsHide: true, cwd: repo })
 })
 afterEach(() => {
   rmSync(repo, { recursive: true, force: true })
@@ -64,12 +64,12 @@ describe('openStateStore', () => {
   })
 
   it('resolves the SAME store from the main tree and from a linked worktree', () => {
-    execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'seed'], {
+    execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'seed'], { windowsHide: true,
       cwd: repo,
       env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
     })
     const wt = join(repo, 'wt')
-    execFileSync('git', ['worktree', 'add', '-q', wt], { cwd: repo })
+    execFileSync('git', ['worktree', 'add', '-q', wt], { windowsHide: true, cwd: repo })
     expect(stateRootFor(wt)).toBe(stateRootFor(repo))
   })
 })

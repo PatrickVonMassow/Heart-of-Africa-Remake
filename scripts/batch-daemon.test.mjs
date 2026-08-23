@@ -24,7 +24,7 @@ const FENCE = 7
 let sandbox, repo, worktree, worktree2, originDir, record
 
 const git = (args, cwd) =>
-  execFileSync('git', args, {
+  execFileSync('git', args, { windowsHide: true,
     cwd,
     encoding: 'utf8',
     env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
@@ -40,19 +40,19 @@ beforeAll(async () => {
   originDir = join(sandbox, 'origin.git')
   repo = join(sandbox, 'repo')
   worktree = join(sandbox, 'wt')
-  execFileSync('git', ['init', '-q', '--bare', originDir])
-  execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: originDir })
-  execFileSync('git', ['init', '-q', repo])
+  execFileSync('git', ['init', '-q', '--bare', originDir], { windowsHide: true })
+  execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { windowsHide: true, cwd: originDir })
+  execFileSync('git', ['init', '-q', repo], { windowsHide: true })
   writeFileSync(join(repo, 'seed.txt'), 'seed\n')
   git(['add', '.'], repo)
   git(['commit', '-q', '-m', 'seed'], repo)
   git(['remote', 'add', 'origin', originDir], repo)
   git(['push', '-q', 'origin', 'HEAD:main'], repo)
-  execFileSync('git', ['clone', '-q', originDir, worktree])
+  execFileSync('git', ['clone', '-q', originDir, worktree], { windowsHide: true })
   git(['checkout', '-q', '-b', 'feat/stub'], worktree)
   git(['push', '-q', 'origin', 'feat/stub'], worktree)
   worktree2 = join(sandbox, 'wt2')
-  execFileSync('git', ['clone', '-q', originDir, worktree2])
+  execFileSync('git', ['clone', '-q', originDir, worktree2], { windowsHide: true })
   mkdirSync(join(repo, '.claude'), { recursive: true })
   writeFileSync(
     join(repo, '.claude', 'batch-lock.json'),

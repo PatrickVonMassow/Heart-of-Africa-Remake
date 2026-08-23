@@ -27,7 +27,7 @@ import { readSnapshotText, replayJournal, sealSnapshotText } from './batch-state
  *  so every worktree of it reaches the SAME store — that is what makes the record
  *  survive the session and the worktree that wrote it. */
 export function stateRootFor(repoDir) {
-  const commonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd: repoDir, encoding: 'utf8' }).trim()
+  const commonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], { windowsHide: true, cwd: repoDir, encoding: 'utf8' }).trim()
   return join(resolve(repoDir, commonDir), 'codex-batches')
 }
 

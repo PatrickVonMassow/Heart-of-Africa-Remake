@@ -22,7 +22,7 @@ import { classifyLane, daemonPairResolution, mayRefill, registryVerdict, resolve
 
 function git(args, cwd) {
   try {
-    return { ok: true, status: 0, out: execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
+    return { ok: true, status: 0, out: execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() }
   } catch (error) {
     return { ok: false, status: typeof error?.status === 'number' ? error.status : null, out: '', err: error?.stderr?.toString?.() ?? String(error) }
   }

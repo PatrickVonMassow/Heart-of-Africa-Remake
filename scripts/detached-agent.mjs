@@ -79,7 +79,7 @@ export function readJsonIfAny(path) {
 }
 
 function git(args, cwd) {
-  const res = spawnSync('git', args, { cwd, encoding: 'utf8' })
+  const res = spawnSync('git', args, { windowsHide: true, cwd, encoding: 'utf8' })
   return { ok: res.status === 0, out: (res.stdout || '').trim(), err: (res.stderr || '').trim() }
 }
 

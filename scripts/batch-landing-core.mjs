@@ -15,8 +15,8 @@ export const LANDING_STAGES = Object.freeze([
   'candidate', // candidate SHA and target SHA recorded
   'diff-review', // the human/diff judgment completed
   'gates', // build, lint, unit results recorded
-  'picture-webgpu', // first backend judgment, artifact hash recorded (M35)
-  'picture-webgl2', // second backend judgment, artifact hash recorded (M35)
+  'picture-webgpu', // first backend judgment, screenshot hash recorded (M35)
+  'picture-webgl2', // second backend judgment, screenshot hash recorded (M35)
   'merge', // the merge SHA recorded — the published act
   'bookkeeping', // work-order update recorded
   'board', // board update recorded
