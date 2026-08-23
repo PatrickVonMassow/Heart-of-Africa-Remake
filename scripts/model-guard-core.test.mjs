@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   allowedTrailers,
   backupRefsIn,
@@ -20,6 +24,7 @@ import {
   POLICY_NEUTRAL,
   splitTrailerField,
 } from './model-guard-core.mjs'
+import { RECENT_LOG_FORMAT } from './model-guard.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
@@ -68,6 +73,57 @@ describe('parseLogLine', () => {
     expect(parseLogLine('not-a-sha|2026-07-24T20:00:00Z|x')).toBeNull()
     expect(parseLogLine('abcdef1|yesterday-ish|x')).toBeNull()
     expect(parseLogLine(null)).toBeNull()
+  })
+})
+
+describe('the wrapper log format', () => {
+  it('keeps two trailer lines separated for the core to judge independently', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'model-guard-log-'))
+    const anthropic = 'Claude Opus 5 <noreply@anthropic.com>'
+    const openai = 'GPT-5.6 Sol <noreply@openai.com>'
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Test Author',
+      GIT_AUTHOR_EMAIL: 'author@example.com',
+      GIT_COMMITTER_NAME: 'Test Committer',
+      GIT_COMMITTER_EMAIL: 'committer@example.com',
+    }
+
+    try {
+      execFileSync('git', ['init', '--quiet', repo], { env })
+      execFileSync(
+        'git',
+        [
+          '-C',
+          repo,
+          'commit',
+          '--allow-empty',
+          '--quiet',
+          '-m',
+          'Test two model trailers',
+          '-m',
+          `Co-Authored-By: ${anthropic}\nCo-Authored-By: ${openai}`,
+        ],
+        { env },
+      )
+      const log = execFileSync('git', ['-C', repo, 'log', '-1', `--format=${RECENT_LOG_FORMAT}`], {
+        env,
+        encoding: 'utf8',
+      })
+      const parsed = parseLogLine(log.trim())
+
+      expect(parsed?.trailers).toBe(`${anthropic},${openai}`)
+      expect(splitTrailerField(parsed?.trailers)).toEqual([anthropic, openai])
+      expect(classifyTrailer(parsed?.trailers, POLICY_NEUTRAL)).toBe('allowed')
+      expect(
+        evaluateCommitTrailers(
+          `Test two model trailers\n\nCo-Authored-By: ${anthropic}\nCo-Authored-By: ${openai}\n`,
+          POLICY_NEUTRAL,
+        ).block,
+      ).toBe(false)
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
   })
 })
 
@@ -273,7 +329,7 @@ describe('the allowlist is matched against the parsed name', () => {
       expect(isPolicyBreach(t, POLICY_NEUTRAL), t).toBe(false)
     }
     // and the same forms as the git log hands them over: several per commit,
-    // comma-joined by `%(trailers:…,separator=,)`
+    // comma-joined by `%(trailers:…,separator=%x2C)`
     expect(classifyTrailer(HISTORIC_TRAILERS.join(','), POLICY_NEUTRAL)).toBe('allowed')
   })
 

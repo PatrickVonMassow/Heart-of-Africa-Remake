@@ -259,7 +259,7 @@ export function judgeTrailer(trailer, fableState) {
 }
 
 /**
- * Split a `%(trailers:…,separator=,)` field — or one commit-message trailer
+ * Split a `%(trailers:…,separator=%x2C)` field — or one commit-message trailer
  * line — into the values judged SEPARATELY. The separator ALWAYS separates,
  * a bracket notwithstanding.
  *
