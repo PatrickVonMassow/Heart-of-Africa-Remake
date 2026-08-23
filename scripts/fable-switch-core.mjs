@@ -122,8 +122,9 @@ export function servingPolicyLine(value) {
   return (
     `THE SERVING MODEL of this session — the one running the batch — is ${chain.join(', then ')}. ` +
     `${forbidden.join(', ')} and every other model are NOT acceptable under the recorded Fable switch ` +
-    `(${SWITCH_COMMAND} --status): if the serving model is outside that chain, do NOT work — create ` +
-    '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via scripts/notify.mjs instead.'
+    `(${SWITCH_COMMAND} --status): if the serving model is outside that chain, do NOT work — the ` +
+    'serving-model tripwire records and starts a trusted handoff to the next allowed lane. Only that fresh ' +
+    'lane may verify the offending trailers and advance the baseline; an unreachable chain probes on a clock.'
   )
 }
 
