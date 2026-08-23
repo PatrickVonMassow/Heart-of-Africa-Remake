@@ -151,23 +151,35 @@ export function parseGateLine(line) {
   }
   // The LAST marker on the line is the state — a gate written after an answer
   // gates again, an answer written after a gate answers. No precedence rule.
-  const answered = hit[1] === ANSWERED_MARKER
+  const marker = hit[1]
+  const answered = marker === ANSWERED_MARKER
+  const selfDecided = marker === SELF_DECIDED_MARKER
   const payload = String(hit[2] ?? '')
   const stamp = leadingStamp(payload)
   const rest = answered ? '' : payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
   const reason = answered ? '' : sanitiseReason(rest || (stamp ? '' : payload))
+  const classification = marker === CONFIRMATION_MARKER || marker === LEGACY_GATE_MARKER
+    ? classifyConfirmationReason(reason)
+    : null
   // A DEFERRED point is out of the batch entirely, and a ticked one is closed;
   // neither may be gated, but a marker left on either is worth reporting.
   const live = open && !deferred
   return {
     point,
     open,
-    gated: live && !answered,
+    marker,
+    legacy: marker === LEGACY_GATE_MARKER,
+    selfDecided: live && selfDecided,
+    // An untyped marker is read through today's rule immediately: a legacy
+    // advisory must not park the point merely because migration has not run.
+    // The same fail-continuing direction applies to an invalid explicit marker.
+    gated: live && !answered && !selfDecided && classification?.verdict === 'confirmation',
     answered: live && answered,
     since: answered ? '' : stamp,
     at: answered ? stamp : '',
     reason,
-    reasonMissing: !answered && live && reason === '',
+    reasonMissing: !answered && !selfDecided && live && reason === '',
+    classification,
     stale: !live,
   }
 }
@@ -184,15 +196,21 @@ export function parseGateLine(line) {
 export function parseUserGates(tasksText) {
   const gated = []
   const answered = []
+  const selfDecided = []
+  const advisory = []
   const stale = []
   for (const line of String(tasksText ?? '').split('\n')) {
     const parsed = parseGateLine(line)
     if (!parsed) continue
     if (parsed.gated) gated.push({ point: parsed.point, since: parsed.since, reason: parsed.reason, reasonMissing: parsed.reasonMissing })
     else if (parsed.answered) answered.push({ point: parsed.point, at: parsed.at })
+    else if (parsed.selfDecided) selfDecided.push({ point: parsed.point, at: parsed.since, decision: parsed.reason })
+    else if (parsed.open && parsed.classification?.verdict === 'advisory') {
+      advisory.push({ point: parsed.point, marker: parsed.marker, since: parsed.since, reason: parsed.reason, error: parsed.classification.error })
+    }
     else if (parsed.stale && hasMarker(line)) stale.push({ point: parsed.point, kind: parsed.open ? 'deferred' : 'ticked' })
   }
-  return { gated, answered, stale, reasonless: gated.filter((g) => g.reasonMissing).map((g) => g.point) }
+  return { gated, answered, selfDecided, advisory, stale, reasonless: advisory.filter((g) => !g.reason).map((g) => g.point) }
 }
 
 /** Does this line END in either marker? */
@@ -276,6 +294,14 @@ export function markGated(tasksText, point, { since = '', reason = '' } = {}) {
   if (!clean) {
     return { text: String(tasksText ?? ''), ok: false, error: 'a gate needs a reason — record WHY the point waits on the user' }
   }
+  const classified = classifyConfirmationReason(clean)
+  if (classified.verdict !== 'confirmation') {
+    return {
+      text: String(tasksText ?? ''),
+      ok: false,
+      error: `advisory reasons cannot wait on the user — ${classified.error}; decide it and record SELF-DECIDED instead`,
+    }
+  }
   // ONLY a real ISO stamp goes in (four-eyes review, Fable 5): a raw fallback
   // let a bracket in `since` close the marker early and strand the rest of the
   // line as junk no re-stamp could remove. The format already tolerates none.
@@ -285,6 +311,86 @@ export function markGated(tasksText, point, { since = '', reason = '' } = {}) {
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
   if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
   return { text, ok: true, error: '' }
+}
+
+/** Record a reversible advisory decision without making the point unworkable. */
+export function markSelfDecided(tasksText, point, { at = '', decision = '' } = {}) {
+  const clean = sanitiseReason(decision)
+  if (!clean) {
+    return { text: String(tasksText ?? ''), ok: false, error: 'SELF-DECIDED needs the decision that was taken' }
+  }
+  const stamp = leadingStamp(at)
+  const marker = `${SELF_DECIDED_MARKER}(${stamp ? `${stamp}; ` : ''}${clean})`
+  const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
+  if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
+  if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — no advisory decision is needed` }
+  return { text, ok: true, error: '' }
+}
+
+/**
+ * The durable board record for an advisory decision. The labels are explicit
+ * because all four facts are mandatory and a prose blob cannot prove which one
+ * was omitted. The title deliberately does not START with the point number:
+ * dashboard-integrity treats a leading number in this section as a parked
+ * point, whereas SELF-DECIDED must remain visible in the workable queue.
+ */
+export function advisoryDecisionCard(point, { decision = '', evidence = '', consequence = '', vetoAction = '' } = {}) {
+  const fields = {
+    decision: sanitiseReason(decision, { max: 1000 }),
+    evidence: sanitiseReason(evidence, { max: 1000 }),
+    consequence: sanitiseReason(consequence, { max: 1000 }),
+    vetoAction: sanitiseReason(vetoAction, { max: 1000 }),
+  }
+  const missing = Object.entries(fields).filter(([, value]) => !value).map(([key]) => key)
+  if (missing.length) return { ok: false, error: `decision record needs: ${missing.join(', ')}`, title: '', body: '' }
+  return {
+    ok: true,
+    error: '',
+    title: `Entscheidungsprotokoll: Punkt ${Number(point)} läuft weiter`,
+    body:
+      `Entscheidung: ${fields.decision}. Evidenz: ${fields.evidence}. ` +
+      `Folge: ${fields.consequence}. Exakte Veto-Aktion: ${fields.vetoAction}.`,
+  }
+}
+
+const legacyDecision = (point, reason) => advisoryDecisionCard(point, {
+  decision: `Die offene Beratungsfrage wird mit dem sichersten reversiblen Standard entschieden: ${reason || 'keine belastbare Frage aufgezeichnet'}`,
+  evidence: 'Der alte Marker nennt weder einen autorisierten Außenakt noch den davor sicher vorbereiteten Zustand',
+  consequence: `Punkt ${point} bleibt bearbeitbar und der Batch setzt ihn fort`,
+  vetoAction: `Auf dieser Karte mit „Veto“ und der gewünschten Alternative antworten; der nächste Besitzer öffnet Punkt ${point} erneut und macht die daraus entstandenen Änderungen rückgängig`,
+})
+
+/**
+ * Rewrite every legacy marker and return an auditable verdict for every one.
+ * Confirmations retain their original stamp/reason; ambiguous open markers
+ * become SELF-DECIDED and yield the decision card the CLI must publish.
+ */
+export function migrateLegacyGates(tasksText, { at = '' } = {}) {
+  const stamp = leadingStamp(at)
+  const entries = []
+  const cards = []
+  const lines = String(tasksText ?? '').split('\n').map((raw) => {
+    const line = peelCr(raw)
+    const cr = raw.slice(line.length)
+    const parsed = parseGateLine(line)
+    if (!parsed || parsed.marker !== LEGACY_GATE_MARKER) return raw
+    if (parsed.stale) {
+      entries.push({ point: parsed.point, verdict: 'stale-removed', reason: parsed.reason })
+      return `${stripMarkers(line)}${cr}`
+    }
+    if (parsed.classification?.verdict === 'confirmation') {
+      entries.push({ point: parsed.point, verdict: 'confirmation', reason: parsed.reason })
+      const marker = `${CONFIRMATION_MARKER}(${parsed.since ? `${parsed.since}; ` : ''}${parsed.reason})`
+      return `${stripMarkers(line)} ${marker}${cr}`
+    }
+    const summary = parsed.reason || 'legacy marker had no recorded reason'
+    entries.push({ point: parsed.point, verdict: 'self-decided', reason: parsed.reason })
+    const card = legacyDecision(parsed.point, parsed.reason)
+    if (card.ok) cards.push({ point: parsed.point, ...card })
+    const marker = `${SELF_DECIDED_MARKER}(${stamp ? `${stamp}; ` : ''}${sanitiseReason(summary)})`
+    return `${stripMarkers(line)} ${marker}${cr}`
+  })
+  return { text: lines.join('\n'), entries, cards }
 }
 
 /**
@@ -331,12 +437,16 @@ export function clearMarkers(tasksText, point) {
  * without opening the work order.
  */
 export function gateReport(tasksText) {
-  const { gated, answered, stale } = parseUserGates(tasksText)
+  const { gated, answered, selfDecided, advisory, stale } = parseUserGates(tasksText)
   const lines = []
   for (const g of gated) {
     lines.push(`  ${g.point} waits on the user${g.since ? ` since ${g.since}` : ''}: ${g.reason || '— NO REASON RECORDED (repair it)'}`)
   }
   for (const a of answered) lines.push(`  ${a.point} answered${a.at ? ` ${a.at}` : ''} — back at the head of the queue`)
+  for (const s of selfDecided) lines.push(`  ${s.point} self-decided${s.at ? ` ${s.at}` : ''}: ${s.decision}`)
+  for (const a of advisory) {
+    lines.push(`  ${a.point} continues — ${a.marker} is advisory: ${a.reason || '— NO REASON RECORDED'} (${a.error})`)
+  }
   for (const s of stale) {
     lines.push(`  ${s.point} carries a leftover marker on a ${s.kind} point — node scripts/defer-for-user.mjs --forget ${s.point}`)
   }

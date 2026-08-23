@@ -1,162 +1,158 @@
-// The user gate (point 450): marker syntax, parser and the pure work-order
-// rewrites. Everything runs against TEXT FIXTURES — never against the live
-// TASKS.md, which is main-only and changes several times a day.
-import { describe, it, expect } from 'vitest'
+// The typed user gate: parser, classifier and pure work-order rewrites. Every
+// case uses text fixtures — never live TASKS.md, which is main-only.
+import { describe, expect, it } from 'vitest'
 import {
   ANSWERED_MARKER,
-  GATE_MARKER,
+  CONFIRMATION_MARKER,
+  SELF_DECIDED_MARKER,
+  advisoryDecisionCard,
   answeredPoints,
   clearMarkers,
+  classifyConfirmationReason,
   gateReport,
   gateSets,
   gatedPoints,
   markAnswered,
   markGated,
+  markSelfDecided,
+  migrateLegacyGates,
   parseGateLine,
   parseUserGates,
   sanitiseReason,
 } from './user-gate-core.mjs'
 
 const tasks = (...lines) => lines.join('\n')
+const confirmation = 'push the version tag; safe prepared state: artifacts verified locally and no tag pushed'
+const confirmationStored = confirmation.replace(';', ',')
+
+describe('classifyConfirmationReason — the closed outward-act rule', () => {
+  it.each([
+    'push the version tag; safe prepared state: artifacts verified locally and no tag pushed',
+    'dispatch the public release; prepared locally without deploying it',
+    'change the published four-section contract; safe prepared state: replacement built and not published',
+  ])('accepts a named act plus its safe prepared state: %s', (reason) => {
+    expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation' })
+  })
+
+  it.each([
+    'which card colour should we use?',
+    'please confirm the release design',
+    'push the version tag',
+    'outward-facing action; everything is ready',
+  ])('classifies advice or an incomplete reason toward continuation: %s', (reason) => {
+    expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'advisory' })
+  })
+})
 
 describe('parseGateLine — one work-order line', () => {
-  it('reads the date and the reason out of a gate', () => {
-    const p = parseGateLine('- [ ] 462. SOME POINT. AWAITING-USER(2026-07-30; needs the user’s ruling on the chat channel)')
-    expect(p).toMatchObject({ point: 462, gated: true, answered: false, since: '2026-07-30' })
-    expect(p.reason).toContain('ruling on the chat channel')
-    expect(p.reasonMissing).toBe(false)
+  it('reads a typed confirmation with its stamp and reason', () => {
+    const p = parseGateLine(`- [ ] 462. SOME POINT. AWAITING-CONFIRMATION(2026-07-30; ${confirmation})`)
+    expect(p).toMatchObject({ point: 462, marker: CONFIRMATION_MARKER, gated: true, answered: false, since: '2026-07-30' })
+    expect(p.reason).toContain('safe prepared state')
   })
 
-  it('accepts a full ISO timestamp as the since stamp', () => {
-    const p = parseGateLine('- [ ] 7. X AWAITING-USER(2026-07-30T11:22:33.000Z; why)')
-    expect(p.since).toBe('2026-07-30T11:22:33.000Z')
-    expect(p.reason).toBe('why')
+  it('accepts a full ISO timestamp', () => {
+    const p = parseGateLine(`- [ ] 7. X AWAITING-CONFIRMATION(2026-07-30T11:22:33.000Z; ${confirmation})`)
+    expect(p).toMatchObject({ gated: true, since: '2026-07-30T11:22:33.000Z' })
   })
 
-  it('is not a gate line at all when there is no head', () => {
-    expect(parseGateLine('  some prose AWAITING-USER(2026-01-01; x)')).toBeNull()
+  it('classifies a qualifying legacy marker as confirmation before migration', () => {
+    const p = parseGateLine(`- [ ] 7. X AWAITING-USER(2026-07-30; ${confirmation})`)
+    expect(p).toMatchObject({ legacy: true, gated: true, classification: { verdict: 'confirmation' } })
+  })
+
+  it('keeps advisory, ambiguous and reasonless legacy markers workable', () => {
+    for (const line of [
+      '- [ ] 7. X AWAITING-USER(2026-07-30; choose a colour)',
+      '- [ ] 8. X AWAITING-USER(2026-07-30)',
+      '- [ ] 9. X AWAITING-USER',
+    ]) {
+      expect(parseGateLine(line)).toMatchObject({ legacy: true, gated: false, classification: { verdict: 'advisory' } })
+    }
+  })
+
+  it('also keeps an invalid typed confirmation workable', () => {
+    expect(parseGateLine('- [ ] 7. X AWAITING-CONFIRMATION(2026-07-30; choose a colour)')).toMatchObject({
+      gated: false,
+      classification: { verdict: 'advisory' },
+    })
+  })
+
+  it('is not a point gate when there is no head or the marker is prose', () => {
+    expect(parseGateLine('  prose AWAITING-CONFIRMATION(2026-01-01; x)')).toBeNull()
     expect(parseGateLine('')).toBeNull()
     expect(parseGateLine(undefined)).toBeNull()
+    expect(parseGateLine('- [ ] 470. HARDEN THE AWAITING-CONFIRMATION PARSER.')).toMatchObject({ gated: false })
   })
 
-  it('reads an ungated open point as neither gated nor answered', () => {
-    expect(parseGateLine('- [ ] 12. A NORMAL POINT.')).toMatchObject({ point: 12, gated: false, answered: false, stale: false })
-  })
-
-  it('treats a legacy marker with only a date as a gate with no reason recorded', () => {
-    const p = parseGateLine('- [ ] 203. Finder AWAITING-USER(2026-07-22)')
-    expect(p.gated).toBe(true)
-    expect(p.reason).toBe('')
-    expect(p.reasonMissing).toBe(true)
-  })
-
-  it('treats a bare marker with no brackets as a gate too — skipping is the safe direction', () => {
-    const p = parseGateLine('- [ ] 204. Finder AWAITING-USER')
-    expect(p).toMatchObject({ gated: true, since: '', reasonMissing: true })
-  })
-
-  // ---- the four-eyes findings of 07.08.2026 (Fable 5), each a real inversion --
-  it('does NOT gate a point whose own headline merely NAMES the marker', () => {
-    expect(parseGateLine('- [ ] 470. HARDEN THE AWAITING-USER MARKER PARSER against prose.')).toMatchObject({
-      gated: false,
-      answered: false,
-    })
-    expect(parseGateLine('- [ ] 471. DECIDE WHETHER USER-ANSWERED SHOULD AUTO-TICK.')).toMatchObject({
-      gated: false,
-      answered: false,
-    })
-  })
-
-  it('does NOT read a gate whose REASON names the answer marker as answered', () => {
-    const line = '- [ ] 5. X AWAITING-USER(2026-08-07; clarify whether the USER-ANSWERED flow may auto-tick)'
+  it('does not let an answer-marker mention inside the reason answer the gate', () => {
+    const line = `- [ ] 5. X AWAITING-CONFIRMATION(2026-08-07; push the version tag after checking USER-ANSWERED; safe prepared state: verified locally and no tag pushed)`
     expect(parseGateLine(line)).toMatchObject({ gated: true, answered: false })
-    // …and the same through the writer the CLI uses.
-    const written = markGated('- [ ] 5. X.', 5, { since: '2026-08-07', reason: 'does USER-ANSWERED auto-tick?' })
-    expect(written.ok).toBe(true)
-    expect(gatedPoints(written.text).has(5)).toBe(true)
-    expect(answeredPoints(written.text).has(5)).toBe(false)
   })
 
-  it('reads a marker on a CRLF line, ignoring the carriage return', () => {
-    expect(parseGateLine('- [ ] 5. X AWAITING-USER(2026-08-07; why)\r')).toMatchObject({ gated: true, since: '2026-08-07' })
-    expect(gatedPoints('- [ ] 5. X AWAITING-USER(2026-08-07; why)\r\n- [ ] 6. Y\r\n').has(5)).toBe(true)
+  it('preserves CRLF handling and requires the marker to end the line', () => {
+    const line = `- [ ] 5. X AWAITING-CONFIRMATION(2026-08-07; ${confirmation})`
+    expect(parseGateLine(`${line}\r`)).toMatchObject({ gated: true, since: '2026-08-07' })
+    expect(gatedPoints(`${line}\r\n- [ ] 6. Y\r\n`).has(5)).toBe(true)
+    expect(parseGateLine(`${line} and more prose`)).toMatchObject({ gated: false })
   })
 
-  it('does not read a marker that no longer ends the line', () => {
-    expect(parseGateLine('- [ ] 5. X AWAITING-USER(2026-08-07; why) and more prose')).toMatchObject({ gated: false })
-  })
-
-  it('takes a bracket payload that is only prose as the reason', () => {
-    expect(parseGateLine('- [ ] 9. X AWAITING-USER(waiting for the colour decision)')).toMatchObject({
-      gated: true,
-      since: '',
-      reason: 'waiting for the colour decision',
-      reasonMissing: false,
-    })
-  })
-
-  it('takes the LAST marker on the line as the state', () => {
-    expect(parseGateLine('- [ ] 5. X AWAITING-USER(2026-07-30; why) USER-ANSWERED(2026-08-07)')).toMatchObject({
+  it('takes the last trailing marker as state', () => {
+    expect(parseGateLine(`- [ ] 5. X AWAITING-CONFIRMATION(2026-07-30; ${confirmation}) USER-ANSWERED(2026-08-07)`)).toMatchObject({
       gated: false,
       answered: true,
       at: '2026-08-07',
     })
-    // …and a gate written after an answer gates again.
-    expect(parseGateLine('- [ ] 5. X USER-ANSWERED(2026-08-07) AWAITING-USER(2026-08-08; a new question)')).toMatchObject({
+    expect(parseGateLine(`- [ ] 5. X USER-ANSWERED(2026-08-07) AWAITING-CONFIRMATION(2026-08-08; ${confirmation})`)).toMatchObject({
       gated: true,
       answered: false,
       since: '2026-08-08',
     })
   })
 
-  it('never gates a ticked point, but reports the leftover as stale', () => {
-    const p = parseGateLine('- [x] 5. X AWAITING-USER(2026-07-30; why)')
-    expect(p).toMatchObject({ gated: false, answered: false, stale: true, open: false })
+  it('reads SELF-DECIDED as workable state', () => {
+    expect(parseGateLine('- [ ] 5. X SELF-DECIDED(2026-08-23; use the repository default)')).toMatchObject({
+      gated: false,
+      selfDecided: true,
+      reason: 'use the repository default',
+    })
   })
 
-  it('ignores a DEFERRED line wholesale', () => {
-    const p = parseGateLine('- [ ] 105. DEFERRED thing AWAITING-USER(2026-07-30; why)')
-    expect(p).toMatchObject({ gated: false, answered: false, stale: true, open: true })
+  it('never gates ticked or deferred points but reports their marker stale', () => {
+    expect(parseGateLine(`- [x] 5. X AWAITING-CONFIRMATION(2026-07-30; ${confirmation})`)).toMatchObject({ gated: false, stale: true })
+    expect(parseGateLine(`- [ ] 105. DEFERRED X AWAITING-CONFIRMATION(2026-07-30; ${confirmation})`)).toMatchObject({ gated: false, stale: true })
   })
 })
 
-describe('parseUserGates — the whole work order', () => {
+describe('parseUserGates — every reader gets the typed workable set', () => {
   const text = tasks(
     '## Open',
-    '- [ ] 10. FIRST POINT.',
-    '  body line mentioning AWAITING-USER(2026-01-01; not a gate, it is prose)',
-    '- [ ] 11. SECOND POINT. AWAITING-USER(2026-07-29; needs the user to choose a transport)',
-    '- [ ] 12. THIRD POINT. AWAITING-USER(2026-07-22)',
-    '- [ ] 13. FOURTH POINT. USER-ANSWERED(2026-08-07)',
-    '- [x] 14. FIFTH POINT. AWAITING-USER(2026-06-01; long answered)',
-    '- [ ] 15. DEFERRED SIXTH POINT. AWAITING-USER(2026-06-01; moot)',
+    '- [ ] 10. NORMAL.',
+    `- [ ] 11. TRUE CONFIRMATION. AWAITING-CONFIRMATION(2026-07-29; ${confirmation})`,
+    '- [ ] 12. LEGACY ADVICE. AWAITING-USER(2026-07-22; choose a transport)',
+    '- [ ] 13. ANSWERED. USER-ANSWERED(2026-08-07)',
+    '- [ ] 14. DECIDED. SELF-DECIDED(2026-08-23; use rail)',
+    '- [x] 15. DONE. AWAITING-USER(2026-06-01; old)',
+    '- [ ] 16. REASONLESS. AWAITING-USER(2026-06-01)',
   )
 
-  it('collects gates, answers and stale leftovers, and ignores prose mentions', () => {
+  it('separates confirmations, answers, decisions, advisories and stale markers', () => {
     const g = parseUserGates(text)
-    expect(g.gated.map((x) => x.point)).toEqual([11, 12])
+    expect(g.gated.map((x) => x.point)).toEqual([11])
     expect(g.answered.map((x) => x.point)).toEqual([13])
-    expect(g.stale.map((x) => x.point).sort((a, b) => a - b)).toEqual([14, 15])
-    expect(g.reasonless).toEqual([12])
+    expect(g.selfDecided.map((x) => x.point)).toEqual([14])
+    expect(g.advisory.map((x) => x.point)).toEqual([12, 16])
+    expect(g.stale).toEqual([{ point: 15, kind: 'ticked' }])
+    expect(g.reasonless).toEqual([16])
   })
 
-  it('exposes the sets and the recorded reasons', () => {
+  it('exposes only true confirmations through the shared gate sets', () => {
     const { gated, answered, reasons, since } = gateSets(text)
-    expect([...gated].sort((a, b) => a - b)).toEqual([11, 12])
+    expect([...gated]).toEqual([11])
     expect([...answered]).toEqual([13])
-    expect(reasons.get(11)).toContain('choose a transport')
+    expect(reasons.get(11)).toContain('version tag')
     expect(since.get(11)).toBe('2026-07-29')
-    expect(gatedPoints(text).has(11)).toBe(true)
-    expect(answeredPoints(text).has(13)).toBe(true)
-  })
-
-  it('handles several gated points at once without losing any', () => {
-    const many = tasks(
-      '- [ ] 1. A AWAITING-USER(2026-01-01; a)',
-      '- [ ] 2. B AWAITING-USER(2026-01-02; b)',
-      '- [ ] 3. C AWAITING-USER(2026-01-03; c)',
-    )
-    expect([...gatedPoints(many)]).toEqual([1, 2, 3])
+    expect(gatedPoints(text).has(12)).toBe(false)
   })
 
   it('is total on rubbish input', () => {
@@ -166,124 +162,131 @@ describe('parseUserGates — the whole work order', () => {
     }
   })
 
-  it('reports every gate with its reason, and names a reasonless one', () => {
+  it('reports why confirmations wait and why legacy advice continues', () => {
     const report = gateReport(text).join('\n')
     expect(report).toContain('11 waits on the user since 2026-07-29')
-    expect(report).toContain('choose a transport')
+    expect(report).toContain('12 continues — AWAITING-USER is advisory')
+    expect(report).toContain('14 self-decided')
     expect(report).toContain('NO REASON RECORDED')
     expect(report).toContain('13 answered')
-    expect(report).toMatch(/14 carries a leftover marker on a ticked point/)
   })
 })
 
-describe('sanitiseReason — a reason must survive on one work-order line', () => {
-  it('strips brackets and newlines that would end the marker or the line', () => {
-    expect(sanitiseReason('needs (a) ruling\non the\r\nboard')).toBe('needs a ruling on the board')
+describe('sanitiseReason — a reason survives on one work-order line', () => {
+  it('strips brackets/newlines and reserves the semicolon separator', () => {
+    expect(sanitiseReason('needs (a) ruling\non the\r\nboard; soon')).toBe('needs a ruling on the board, soon')
   })
 
-  it('turns a semicolon into a comma so the separator stays unambiguous', () => {
-    expect(sanitiseReason('a; b')).toBe('a, b')
-  })
-
-  it('caps an essay', () => {
+  it('caps an essay and answers empty for nothing usable', () => {
     const long = sanitiseReason('x'.repeat(400))
     expect(long.length).toBeLessThanOrEqual(160)
     expect(long.endsWith('…')).toBe(true)
-  })
-
-  it('answers empty for nothing usable', () => {
     for (const bad of ['', '   ', null, undefined, '()']) expect(sanitiseReason(bad)).toBe('')
   })
 })
 
-describe('markGated / markAnswered / clearMarkers — the pure rewrites', () => {
+describe('typed work-order rewrites', () => {
   const base = tasks('- [ ] 20. A POINT.', '  detail', '- [ ] 21. ANOTHER POINT.', '- [x] 22. A DONE POINT.')
 
-  it('writes the marker with the stamp and the reason on the head line only', () => {
-    const r = markGated(base, 20, { since: '2026-08-07', reason: 'needs the user to pick a colour' })
+  it('writes only a validated AWAITING-CONFIRMATION on the head line', () => {
+    const r = markGated(base, 20, { since: '2026-08-07', reason: confirmation })
     expect(r.ok).toBe(true)
-    expect(r.text.split('\n')[0]).toBe('- [ ] 20. A POINT. AWAITING-USER(2026-08-07; needs the user to pick a colour)')
+    expect(r.text.split('\n')[0]).toBe(`- [ ] 20. A POINT. AWAITING-CONFIRMATION(2026-08-07; ${confirmationStored})`)
     expect(r.text.split('\n')[1]).toBe('  detail')
     expect(gatedPoints(r.text).has(20)).toBe(true)
   })
 
-  it('REFUSES a gate with no reason — the record is what the skip is bought with', () => {
-    const r = markGated(base, 20, { since: '2026-08-07', reason: '   ' })
-    expect(r.ok).toBe(false)
-    expect(r.error).toMatch(/needs a reason/)
-    expect(r.text).toBe(base)
+  it('refuses an advisory reason and an incomplete confirmation reason unchanged', () => {
+    for (const reason of ['which colour should we use?', 'push the version tag', '   ']) {
+      const r = markGated(base, 20, { since: '2026-08-07', reason })
+      expect(r.ok).toBe(false)
+      expect(r.text).toBe(base)
+    }
   })
 
-  it('re-stamps an already gated point instead of doubling the marker', () => {
-    const once = markGated(base, 20, { since: '2026-08-01', reason: 'first' }).text
-    const twice = markGated(once, 20, { since: '2026-08-07', reason: 'corrected' }).text
-    expect(twice.match(/AWAITING-USER/g)).toHaveLength(1)
-    expect(gateSets(twice).reasons.get(20)).toBe('corrected')
+  it('re-stamps an existing marker instead of doubling it', () => {
+    const once = markGated(base, 20, { since: '2026-08-01', reason: confirmation }).text
+    const corrected = 'push the poc tag; safe prepared state: build verified locally and no tag pushed'
+    const twice = markGated(once, 20, { since: '2026-08-07', reason: corrected }).text
+    expect(twice.match(/AWAITING-CONFIRMATION/g)).toHaveLength(1)
+    expect(gateSets(twice).reasons.get(20)).toContain('poc tag')
   })
 
-  it('refuses to gate a ticked point and leaves the text untouched', () => {
-    const r = markGated(base, 22, { since: '2026-08-07', reason: 'too late' })
-    expect(r.ok).toBe(false)
-    expect(r.error).toMatch(/already ticked/)
-    expect(r.text).toBe(base)
-  })
-
-  it('reports a point that has no line at all', () => {
-    expect(markGated(base, 999, { reason: 'x' })).toMatchObject({ ok: false })
+  it('refuses ticked/missing points and retains the source', () => {
+    expect(markGated(base, 22, { reason: confirmation })).toMatchObject({ ok: false, text: base })
+    expect(markGated(base, 999, { reason: confirmation })).toMatchObject({ ok: false, text: base })
     expect(markAnswered(base, 999)).toMatchObject({ ok: false })
     expect(clearMarkers(base, 999)).toMatchObject({ ok: false })
   })
 
-  it('turns the gate into an answer, which is what returns it to the queue head', () => {
-    const gatedText = markGated(base, 21, { since: '2026-08-01', reason: 'needs a decision' }).text
+  it('turns a confirmation into an answer at the queue head', () => {
+    const gatedText = markGated(base, 21, { since: '2026-08-01', reason: confirmation }).text
     const r = markAnswered(gatedText, 21, { at: '2026-08-07' })
-    expect(r.ok).toBe(true)
-    expect(r.wasGated).toBe(true)
+    expect(r).toMatchObject({ ok: true, wasGated: true })
     expect(gatedPoints(r.text).has(21)).toBe(false)
     expect(answeredPoints(r.text).has(21)).toBe(true)
     expect(r.text).toContain(`${ANSWERED_MARKER}(2026-08-07)`)
-    expect(r.text).not.toContain(GATE_MARKER)
+    expect(r.text).not.toContain(CONFIRMATION_MARKER)
   })
 
-  it('answers a point that was never gated without pretending it was', () => {
-    const r = markAnswered(base, 21, { at: '2026-08-07' })
-    expect(r).toMatchObject({ ok: true, wasGated: false })
+  it('records SELF-DECIDED while leaving the point workable', () => {
+    const r = markSelfDecided(base, 20, { at: '2026-08-23', decision: 'use the existing compact layout' })
+    expect(r).toMatchObject({ ok: true })
+    expect(r.text).toContain(`${SELF_DECIDED_MARKER}(2026-08-23; use the existing compact layout)`)
+    expect(gatedPoints(r.text).has(20)).toBe(false)
+    expect(parseUserGates(r.text).selfDecided).toEqual([{ point: 20, at: '2026-08-23', decision: 'use the existing compact layout' }])
   })
 
-  it('keeps a CRLF line ending intact, so the marker never detaches (four-eyes finding 2)', () => {
+  it('keeps CRLF and rejects a junk stamp without corrupting the marker', () => {
     const crlf = ['- [ ] 20. A POINT.', '  detail', ''].join('\r\n')
-    const r = markGated(crlf, 20, { since: '2026-08-07', reason: 'why' })
-    expect(r.ok).toBe(true)
-    expect(r.text.split('\n')[0]).toBe('- [ ] 20. A POINT. AWAITING-USER(2026-08-07; why)\r')
-    expect(gatedPoints(r.text).has(20)).toBe(true)
-    // …and after the line endings are normalised, as every board consumer does.
+    const r = markGated(crlf, 20, { since: 'later)', reason: confirmation })
+    expect(r.text.split('\n')[0]).toBe(`- [ ] 20. A POINT. AWAITING-CONFIRMATION(${confirmationStored})\r`)
     expect(gatedPoints(r.text.replace(/\r\n/g, '\n')).has(20)).toBe(true)
-    const back = markAnswered(r.text, 20, { at: '2026-08-08' })
-    expect(back.text.split('\n')[0]).toBe('- [ ] 20. A POINT. USER-ANSWERED(2026-08-08)\r')
   })
 
-  it('never lets a junk since-stamp break the marker (four-eyes finding 5)', () => {
-    const r = markGated('- [ ] 20. A POINT.', 20, { since: 'later)', reason: 'pick a colour' })
-    expect(r.text.split('\n')[0]).toBe('- [ ] 20. A POINT. AWAITING-USER(pick a colour)')
-    expect(gateSets(r.text).reasons.get(20)).toBe('pick a colour')
-  })
-
-  it('forgets a leftover marker on a TICKED point (four-eyes finding 4)', () => {
-    const ticked = '- [x] 9. A DONE POINT. AWAITING-USER(2026-06-01; long answered)'
-    expect(parseUserGates(ticked).stale).toEqual([{ point: 9, kind: 'ticked' }])
-    const r = clearMarkers(ticked, 9)
-    expect(r).toMatchObject({ ok: true, error: '' })
-    expect(r.text).toBe('- [x] 9. A DONE POINT.')
-    expect(parseUserGates(r.text).stale).toEqual([])
-    // …and the report points at the command that can actually do it.
+  it('forgets a stale marker on a ticked point', () => {
+    const ticked = '- [x] 9. DONE. AWAITING-USER(2026-06-01; old)'
+    expect(clearMarkers(ticked, 9)).toMatchObject({ ok: true, text: '- [x] 9. DONE.' })
     expect(gateReport(ticked).join('\n')).toContain('--forget 9')
   })
+})
 
-  it('clears both markers again when the answered point is picked up', () => {
-    const answeredText = markAnswered(markGated(base, 20, { reason: 'x' }).text, 20, { at: '2026-08-07' }).text
-    const r = clearMarkers(answeredText, 20)
-    expect(r.ok).toBe(true)
-    expect(r.text.split('\n')[0]).toBe('- [ ] 20. A POINT.')
-    expect(parseUserGates(r.text)).toMatchObject({ gated: [], answered: [] })
+describe('advisory decision record and legacy migration', () => {
+  it('requires and labels decision, evidence, consequence and exact veto action', () => {
+    expect(advisoryDecisionCard(20, { decision: 'use blue' })).toMatchObject({ ok: false })
+    const card = advisoryDecisionCard(20, {
+      decision: 'use blue',
+      evidence: 'the existing tokens use blue',
+      consequence: 'the point continues',
+      vetoAction: 'reply Veto blue and revert commit abc',
+    })
+    expect(card.ok).toBe(true)
+    expect(card.title).toBe('Entscheidungsprotokoll: Punkt 20 läuft weiter')
+    expect(card.body).toContain('Entscheidung: use blue')
+    expect(card.body).toContain('Evidenz: the existing tokens use blue')
+    expect(card.body).toContain('Folge: the point continues')
+    expect(card.body).toContain('Exakte Veto-Aktion: reply Veto blue and revert commit abc')
+  })
+
+  it('reports and rewrites every legacy marker, with ambiguity continuing', () => {
+    const source = tasks(
+      `- [ ] 1. RELEASE. AWAITING-USER(2026-08-01; ${confirmation})`,
+      '- [ ] 2. COLOUR. AWAITING-USER(2026-08-02; choose blue or green)',
+      '- [ ] 3. UNKNOWN. AWAITING-USER',
+      '- [x] 4. DONE. AWAITING-USER(2026-08-03; old question)',
+    )
+    const migrated = migrateLegacyGates(source, { at: '2026-08-23' })
+    expect(migrated.entries).toEqual([
+      { point: 1, verdict: 'confirmation', reason: confirmationStored },
+      { point: 2, verdict: 'self-decided', reason: 'choose blue or green' },
+      { point: 3, verdict: 'self-decided', reason: '' },
+      { point: 4, verdict: 'stale-removed', reason: 'old question' },
+    ])
+    expect(migrated.text).toContain(`AWAITING-CONFIRMATION(2026-08-01; ${confirmationStored})`)
+    expect(migrated.text).toContain('SELF-DECIDED(2026-08-23; choose blue or green)')
+    expect(migrated.text).toContain('SELF-DECIDED(2026-08-23; legacy marker had no recorded reason)')
+    expect(migrated.text).not.toContain('AWAITING-USER')
+    expect(migrated.cards).toHaveLength(2)
+    expect([...gatedPoints(migrated.text)]).toEqual([1])
   })
 })
