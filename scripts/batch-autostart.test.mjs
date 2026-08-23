@@ -620,6 +620,14 @@ describe('the launcher acts on the pause record', () => {
     )
   })
 
+  it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
+    const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
+    const block = codeLines.slice(recovery, recovery + 18).join('\n')
+    expect(block).toMatch(/boardCard\(recovery\.title, recovery\.body\)/)
+    expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
+    expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+  })
+
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
     const brake = lineOf(/state\.failCount\s*>=\s*RUNAWAY_FAIL_LIMIT/, 'the runaway brake')
     const block = codeLines.slice(brake, brake + 20).join('\n')
