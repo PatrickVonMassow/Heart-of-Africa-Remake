@@ -119,8 +119,6 @@ const repeatedFlag = (args) => {
   const seen = new Set()
   for (let i = 0; i < args.length; i += 1) {
     const arg = String(args[i])
-    const previous = i > 0 ? String(args[i - 1]) : ''
-    if (previous.startsWith('-') && !VALUELESS_FLAGS.has(previous)) continue
     const flag = FLAG_ALIASES.get(arg) ?? arg
     if (!flag.startsWith('--')) continue
     // Named as it was TYPED, with the flag it means beside it when the two
@@ -128,6 +126,10 @@ const repeatedFlag = (args) => {
     // cannot find on their own command line.
     if (seen.has(flag)) return arg === flag ? arg : `${arg} (the same flag as ${flag})`
     seen.add(flag)
+    // Step OVER the value this flag consumes. Judging a value by the token in
+    // front of it was a heuristic, and it lost a real repeat as soon as a value
+    // was itself dash-shaped (sixth cross-vendor round, GPT-5.6 Sol).
+    if (!VALUELESS_FLAGS.has(flag)) i += 1
   }
   return ''
 }

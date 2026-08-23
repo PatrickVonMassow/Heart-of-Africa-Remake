@@ -163,6 +163,22 @@ describe('defer-for-user — reading the flags', () => {
     expect(tasks()).not.toContain('AWAITING-CONFIRMATION')
   })
 
+  it('still sees a repeated flag after a value that is itself dash-shaped', () => {
+    // Judging a value by the token in FRONT of it lost this repeat: the
+    // dash-shaped detail made the first --prepared look like a value, so the
+    // second one counted as its first occurrence and the first value was kept.
+    const before = tasks()
+    const r = run(
+      '42', '--act', 'release-tag',
+      '--detail', '-v1.2.0 tag pushed',
+      '--prepared', '-v1.2.0 tag pushed',
+      '--prepared', 'built locally and nothing pushed',
+    )
+    expect(r.code).toBe(1)
+    expect(r.stderr).toMatch(/--prepared is given more than once/)
+    expect(tasks()).toBe(before)
+  })
+
   it('reports a gate it wrote, and clears it back to the head of the queue', () => {
     run('42', '--act', 'release-tag', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
     expect(run('--list').stdout).toMatch(/42 awaits confirmation/)
