@@ -113,12 +113,13 @@ describe('escalationDecision — only the closed corruption list may PAUSE the b
     expect(d.action).toBe('continue-and-record')
   })
 
-  it('does not let a `recurring` declaration disarm a corruption pause', () => {
+  it.each(CORRUPTION_ALERT_CLASSES)('does not let a `recurring` declaration disarm the %s pause', (alertClass) => {
     // THE ESCAPE HATCH this point exists to close: if `recurring` were read
     // before the corruption class, any caller could keep the batch running
     // through a closed-list safety condition by calling itself an event —
-    // silently, with every other case here still green.
-    const d = escalationDecision({ ...corruption, priority: 'low', recurring: true })
+    // silently, with every other case here still green. Over the WHOLE closed
+    // list, so a per-class special case cannot leave one class disarmable.
+    const d = escalationDecision({ ...corruption, alertClass, priority: 'low', recurring: true })
     expect(d.action).toBe('pause-and-send')
     expect(d.priority).toBe('urgent')
     expect(d.decisionCard).toBeUndefined()
