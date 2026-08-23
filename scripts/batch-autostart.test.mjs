@@ -636,9 +636,11 @@ describe('the launcher acts on the pause record', () => {
 
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
     const brake = lineOf(/state\.failCount\s*>=\s*RUNAWAY_FAIL_LIMIT/, 'the runaway brake')
-    const block = codeLines.slice(brake, brake + 20).join('\n')
-    expect(block).toMatch(/planPause\(\{/)
+    const block = codeLines.slice(brake, brake + 32).join('\n')
+    expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
+    expect(block).toMatch(/boardCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
+    expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 
   it('the --pause-report drill exits before the tick’s first side effect', () => {

@@ -41,6 +41,7 @@ export const BG_WAIT_CEILING_OVERRIDE_ENV = 'HOA_BG_WAIT_CEILING_MS'
 export const BG_WAIT_CEILING_DEFAULT = '0'
 
 import { OPUS_MODEL_ID, servingFallbackModelId } from './fable-switch-core.mjs'
+import { PAUSE_RETRY_LADDER_MS, planPause } from './batch-pause-core.mjs'
 
 /** Model policy (CLAUDE.md §6). rule:model-policy@1758947b
  *  The session starts on Opus 5. Its one CLI fallback is the next member of the
@@ -1201,6 +1202,30 @@ export function detectQuotaSignature(text, { tailLines = QUOTA_SIGNATURE_TAIL_LI
 /** The runaway brake's threshold, exported so the launcher and this decision
  *  cannot disagree about when a pause would be written. */
 export const RUNAWAY_FAIL_LIMIT = 3
+
+/** The runaway terminal is a capped scheduling decision, not a human park. */
+export function runawayRecoveryDecision({
+  failCount = RUNAWAY_FAIL_LIMIT,
+  attempt = 0,
+  now = Date.now(),
+  ladder = PAUSE_RETRY_LADDER_MS,
+} = {}) {
+  const plan = planPause({ cause: 'runaway', attempt, now, ladder })
+  const n = Number.isFinite(attempt) && attempt > 0 ? Math.floor(attempt) : 0
+  const capped = !plan.clockless && n >= ladder.length
+  const decisionRecord = capped
+    ? {
+        title: 'Entscheidungsprotokoll: Runaway-Watchdog prüft am Zeitlimit weiter',
+        body:
+          `Automatische Entscheidung [${new Date(now).toISOString()}]: ${failCount} Starts ohne Git-Fortschritt ` +
+          `haben die ${ladder.length} Stufen des Watchdogs verbraucht. Der Batch wird nicht an eine Person ` +
+          `übergeben; der bestehende Evidence-, Preflight- und Doctor-Pfad läuft nach der gedeckelten Uhr erneut. ` +
+          `Nächster Versuch: ${new Date(plan.retryAfter).toISOString()}. Retroaktives Veto: Antworte mit „Veto“ ` +
+          `und nenne den letzten zulässigen Start oder die stattdessen zu sperrende Fehlerklasse.`,
+      }
+    : null
+  return { ...plan, capped, decisionRecord }
+}
 
 /**
  * WHAT THE LAUNCHER MAKES OF THE PREVIOUS SPAWN. PURE — the state machine that

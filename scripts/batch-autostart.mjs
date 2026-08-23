@@ -94,12 +94,13 @@ import {
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   RUNAWAY_FAIL_LIMIT,
+  runawayRecoveryDecision,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
-import { classifyPause, describePause, formatPauseRecord, pauseRecovery, planPause } from './batch-pause-core.mjs'
+import { classifyPause, describePause, formatPauseRecord, pauseRecovery } from './batch-pause-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -1073,14 +1074,17 @@ if (
 // failure at all, so an unattended fortnight is no longer paused by a budget that
 // comes back on the hour.
 if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
-  // IT PARKS WITH A CLOCK (point 445). The causes this watchdog names — expired
-  // auth, a push that fails, a point that keeps dying — include several that come
-  // back on their own, and the ladder climbs (20 min, 1 h, 3 h) before the park
-  // finally becomes a clockless one for a human. `pauseAttempt` is how many retries
-  // this stall has already had.
-  const plan = planPause({ cause: 'runaway', attempt: state.pauseAttempt || 0, now })
-  const when = plan.clockless ? 'no restart clock — a human is needed' : `retry at ${new Date(plan.retryAfter).toISOString()}`
+  // IT PARKS WITH A CLOCK (point 445). The ladder climbs through 20 min, 1 h and
+  // 3 h, then keeps probing at that cap. `pauseAttempt` is how many wakes this
+  // stall has already had; the terminal rung records the scheduling choice for
+  // retroactive veto instead of handing the batch to a person.
+  const plan = runawayRecoveryDecision({ failCount: state.failCount, attempt: state.pauseAttempt || 0, now })
+  const when = `retry at ${new Date(plan.retryAfter).toISOString()}${plan.capped ? ' (capped probe)' : ''}`
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
+  if (plan.decisionRecord) {
+    const recorded = boardCard(plan.decisionRecord.title, plan.decisionRecord.body)
+    log(`RUNAWAY capped scheduling decision ${recorded ? 'recorded' : 'FAILED to reach the board'} — next attempt ${new Date(plan.retryAfter).toISOString()}`)
+  }
   // ATOMICALLY (four-eyes finding 4): a torn record is the one corruption that
   // could flip this mechanism toward resuming — a half-written stamp read as a
   // past one. tmp + rename makes a half-written file unreachable.
@@ -1091,7 +1095,7 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
       pausedAt: now,
     }))
   } catch { /* ignore */ }
-  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-paused (${when}). Check auth / git push / the current point.`, 'urgent')
+  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-probe scheduled (${when}); evidence and doctor run again on wake.`, 'urgent')
   writeJsonAtomic(C('autostart-state.json'), { ...state })
   process.exit(0)
 }
