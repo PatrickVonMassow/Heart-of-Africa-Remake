@@ -51,7 +51,7 @@ describe('batch-pause command', () => {
     ['--automatic', 'reason'],
     ['--user-stop', 'reason', 'discarded'],
   ])('refuses an incomplete or ambiguous invocation: %j', (argv) => {
-    expect(parsePauseCommand(argv)).toMatchObject({ ok: false, usage: expect.stringContaining('--user-stop') })
+    expect(parsePauseCommand(argv)).toMatchObject({ ok: false, help: expect.stringContaining('--user-stop') })
   })
 
   it('points every stop instruction at the typed writer and distinguishes the clocked case', () => {

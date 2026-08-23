@@ -77,6 +77,7 @@ const HUMAN_WAIT_FILES = [
   'scripts/batch-launcher-core.mjs',
   'scripts/batch-lock.mjs',
   'scripts/batch-pause-core.mjs',
+  'scripts/batch-pause.mjs',
   'scripts/batch-progress-guard.mjs',
   'scripts/batch-resume-hook.mjs',
   'scripts/batch-singleton.mjs',

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// The deliberate writer for a session that is allowed to stop the batch.
+// Deliberate writer for an allowed batch stop.
 //
-//   node scripts/batch-pause.mjs --user-stop "<the user's instruction>"
-//   node scripts/batch-pause.mjs --awaiting-user "<the decision every open item needs>"
+//   node scripts/batch-pause.mjs --user-stop "<reason>"
+//   node scripts/batch-pause.mjs --awaiting-user "<reason>"
 //
 // These cases must not be collapsed into a hand-written `.claude/batch-paused`:
 // only the first is proof that the user stopped the batch and may therefore omit
@@ -11,17 +11,14 @@
 import { isMainModule } from './is-main.mjs'
 import { setPaused } from './batch-lock.mjs'
 
-export const BATCH_PAUSE_COMMAND = 'node scripts/batch-pause.mjs'
-
 export const pauseUsage = () =>
-  `usage: ${BATCH_PAUSE_COMMAND} --user-stop "<the user's instruction>" | ` +
-  '--awaiting-user "<the decision every open item needs>"'
+  'usage: node scripts/batch-pause.mjs --user-stop "<reason>" | --awaiting-user "<reason>"'
 
 export function parsePauseCommand(argv = []) {
   const [mode, rawReason, ...extra] = argv
   const cause = mode === '--user-stop' ? 'user-stop' : mode === '--awaiting-user' ? 'awaiting-user' : null
   const reason = String(rawReason ?? '').trim()
-  if (!cause || !reason || extra.length > 0) return { ok: false, usage: pauseUsage() }
+  if (!cause || !reason || extra.length > 0) return { ok: false, help: pauseUsage() }
   return { ok: true, cause, reason }
 }
 
@@ -43,7 +40,7 @@ export function recordAwaitingUser(reason, options = {}) {
  * cannot drift from every other pause writer. Paths and time are injectable only
  * so Vitest can exercise the real file write without touching the live marker. */
 export function recordPause(command, options = {}) {
-  if (!command?.ok) throw new Error(command?.usage ?? pauseUsage())
+  if (!command?.ok) throw new Error(command?.help ?? pauseUsage())
   return command.cause === 'user-stop'
     ? recordUserStop(command.reason, options)
     : recordAwaitingUser(command.reason, options)
@@ -53,7 +50,7 @@ if (isMainModule(import.meta.url)) {
   try {
     const command = parsePauseCommand(process.argv.slice(2))
     if (!command.ok) {
-      console.error(command.usage)
+      console.error(command.help)
       process.exitCode = 2
     } else {
       const result = recordPause(command)
