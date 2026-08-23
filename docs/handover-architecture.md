@@ -361,7 +361,10 @@ each mutation and accepts only when all of the following hold at that instant: t
 live by the existing test — pid and pid start time match, and the heartbeat is within its lease.
 The daemon serializes mutations against itself, so this read-and-decide is one operation per
 mutation. It records the fence it validated in the journal entry, so a later reader can see which
-regime authorized which write.
+regime authorized which write. Every one of those equalities requires the value PRESENT on both
+sides before it is compared: two absent values compare equal, so a presentation carrying no
+session or no usable fence would otherwise match a lock that lost the same field. Absence-equality
+is identity nowhere in this design — not here, not in the process and attempt comparisons.
 
 **That does NOT make the window zero, and the mechanism says so.** Serializing the daemon's own
 mutations does not serialize the lock file, which `release` and `acquire` write from other
@@ -441,7 +444,10 @@ compensation, and the design owes all three parts:
     marked as such, so nobody later reads a quarantined entry as uniformly local.
 
   "The fence in force at position i" therefore remains the last transition at or before i for the
-  confirmed prefix, and the tail is resolved by evidence rather than read as a fact.
+  confirmed prefix, and the tail is resolved by evidence rather than read as a fact. A position no
+  transition precedes has NO fence in force, and an entry standing there — like one that names no
+  position at all — is quarantined rather than passed: "no rule was in force" is not "no rule
+  applies", because nothing authorized that write either.
 
 **EVERY PUBLISHED MUTATION IS UNCOMPENSABLE, and there are two of them.** A pushed merge can
 already have been fetched, read or built on, and "reverting" it is a new commit, not a reversal.
@@ -616,7 +622,10 @@ actually holds is narrow:
   `refs/hoa/coordinator` → and only now may anything be published.** The very first advance has no
   previous value to lease, so it leases the ref's ABSENCE — `--force-with-lease=refs/hoa/coordinator:`
   with an empty expected oid, which git accepts only while the ref does not exist. Two sessions
-  racing to create it therefore cannot both win, and the loser re-reads and acquires normally. "First act" for the daemon
+  racing to create it therefore cannot both win, and the loser re-reads and acquires normally.
+  The lease and the claimed current credential must AGREE about absence, in both directions:
+  claiming no credential is published while leasing a real oid would skip every advance check and
+  reopen the rollback door those checks close, so the push construction refuses the combination. "First act" for the daemon
   means before any operation; "first act" for the credential means before any publication. The
   daemon start is not a publication, so it precedes the advance without violating it.
 - **AND ONLY WHEN NOTHING OF THE OLD PATH IS STILL RUNNING — probed, not assumed.** Without this,

@@ -46,6 +46,15 @@ describe('the activation interlock', () => {
     expect(activationDecision({ steps: green(...STEPS_REQUIRED_FOR_ACTIVATION) }).ok).toBe(true)
   })
 
+  it('counts only an AFFIRMATIVE green with real evidence — a truthy claim in the wrong shape is a claim', () => {
+    const truthyGreen = green(...STEPS_REQUIRED_FOR_ACTIVATION)
+    truthyGreen[8] = { ...truthyGreen[8], green: 'yes' }
+    expect(activationDecision({ steps: truthyGreen }).missing).toEqual([8])
+    const blankEvidence = green(...STEPS_REQUIRED_FOR_ACTIVATION)
+    blankEvidence[9] = { ...blankEvidence[9], evidence: '   ' }
+    expect(activationDecision({ steps: blankEvidence }).missing).toEqual([9])
+  })
+
   it('the shipped manifest has nothing green — the lane is dark as it stands', () => {
     for (const [n, step] of Object.entries(DURABLE_LANE_STEPS)) {
       expect(step.green, `step ${n}`).toBe(false)
@@ -66,11 +75,23 @@ describe('the door the flag opens', () => {
     expect(mayStartDaemon({ flag: null, steps }).ok).toBe(false)
     expect(mayStartDaemon({ flag: { enabled: true }, steps }).ok).toBe(true)
   })
+
+  it('a hand-edited flag that is merely truthy reads as off', () => {
+    const steps = green(...STEPS_REQUIRED_FOR_ACTIVATION)
+    expect(mayStartDaemon({ flag: { enabled: 1 }, steps }).ok).toBe(false)
+    expect(mayStartDaemon({ flag: { enabled: 'true' }, steps }).ok).toBe(false)
+  })
 })
 
 describe('setting the flag', () => {
   it('turning it OFF is always allowed and needs no evidence — a drain must never be blocked', () => {
     const out = flagChange({ flag: { enabled: true }, enable: false, at: 1, by: 'operator' })
+    expect(out.ok).toBe(true)
+    expect(out.flag.enabled).toBe(false)
+  })
+
+  it('a change request that is not the affirmative true DISABLES — off is the safe direction', () => {
+    const out = flagChange({ flag: { enabled: true }, enable: 'yes', steps: green(...STEPS_REQUIRED_FOR_ACTIVATION) })
     expect(out.ok).toBe(true)
     expect(out.flag.enabled).toBe(false)
   })

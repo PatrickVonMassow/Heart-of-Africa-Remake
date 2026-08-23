@@ -27,6 +27,7 @@ import {
   attemptTransition,
   canonicalJson,
   checkSchemaVersion,
+  checksumOf,
   classifyDaemonPair,
   credential,
   credentialAccepted,
@@ -41,6 +42,7 @@ import {
   publicationPush,
   registerDaemonCommand,
   revalidateAfterWrite,
+  sameAttempt,
   sameProcess,
   validateMutation,
 } from './batch-schema-core.mjs'
@@ -137,6 +139,20 @@ describe('identity — pid and pid start time, never a bare pid', () => {
 
   it('carries the same tolerance the lock already uses, so the copy cannot drift', () => {
     expect(PROCESS_START_TOLERANCE_MS).toBe(PID_START_TOLERANCE_MS)
+  })
+
+  // Two absent values compare equal. None of these comparisons may read that as a match.
+  it('two records that carry no pid at all are not the same process', () => {
+    expect(sameProcess({ pidStartedAt: NOW }, { pidStartedAt: NOW })).toBe(false)
+    expect(sameProcess({ pid: '4711', pidStartedAt: NOW }, { pid: '4711', pidStartedAt: NOW })).toBe(false)
+  })
+
+  it('two records that name no attempt are not the same attempt', () => {
+    const id = { batchId: 'b1', pointId: 834, attemptId: 'a1' }
+    expect(sameAttempt(id, { ...id })).toBe(true)
+    expect(sameAttempt({}, {})).toBe(false)
+    expect(sameAttempt({ batchId: 'b1', pointId: 834 }, { batchId: 'b1', pointId: 834 })).toBe(false)
+    expect(sameAttempt({ ...id, attemptId: '' }, { ...id, attemptId: '' })).toBe(false)
   })
 })
 
@@ -372,6 +388,24 @@ describe('the coordinator credential', () => {
     expect(mayMintFence({ fenceStore: store, journalOk: false }).reason).toMatch(/journal/)
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: 700 }).reason).toMatch(/high water/)
   })
+
+  it('an unreadable high water mark refuses minting instead of constraining nothing', () => {
+    // `fence < NaN` answers false, so the broken evidence would ADMIT the mint.
+    const store = { generation: gen, fence: 604 }
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: NaN }).reason).toMatch(/unreadable/)
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: '700' }).ok).toBe(false)
+    // Null and undefined mean an EMPTY journal, which really does constrain nothing.
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: null }).ok).toBe(true)
+  })
+
+  it('the lease and the claimed current credential must agree about absence, in both directions', () => {
+    // `current: null` beside a lease on a REAL oid skips every advance check while
+    // the remote lease still matches — that push is a rollback door.
+    const first = credential({ generation: gen, fence: 604, seq: 0 }).credential
+    expect(publicationPush({ current: null, next: first, expectedOid: 'oid1', refs: ['main'] }).reason).toMatch(/absence/)
+    const next = advancedCredential(current).credential
+    expect(publicationPush({ current, next, expectedOid: '', refs: ['main'] }).reason).toMatch(/leased as absent/)
+  })
 })
 
 describe('mutation validation — the fence IS the coordinator epoch', () => {
@@ -408,6 +442,22 @@ describe('mutation validation — the fence IS the coordinator epoch', () => {
     expect(revalidateAfterWrite({ validated: presented, lock }).verdict).toBe('stands')
     expect(revalidateAfterWrite({ validated: presented, lock: { ...lock, fence: 605 } }).verdict).toBe('compensate')
     expect(revalidateAfterWrite({ validated: presented, lock: null }).verdict).toBe('compensate')
+  })
+
+  it('refuses a presentation that carries no session or no usable fence — two absences compare equal', () => {
+    // A lock that lost sessionId and fence beside a presentation that never had
+    // them: undefined === undefined passes both equality gates without this rule.
+    const degenerateLock = { pid: 500, pidStartedAt: NOW - 10_000, leaseUntil: NOW + 60_000 }
+    expect(validateMutation({ presented: {}, lock: degenerateLock, probe, now: NOW }).reason).toMatch(/no session/)
+    expect(validateMutation({ presented: { sessionId: 's1' }, lock: degenerateLock, probe, now: NOW }).reason).toMatch(/no usable fence/)
+    expect(validateMutation({ presented: { sessionId: 's1', fence: 0 }, lock, probe, now: NOW }).ok).toBe(false)
+    expect(validateMutation({ presented: { sessionId: '', fence: 604 }, lock, probe, now: NOW }).ok).toBe(false)
+  })
+
+  it('a revalidation that cannot name what it validated compensates rather than standing', () => {
+    const { sessionId: _s, fence: _f, ...bareLock } = lock
+    expect(revalidateAfterWrite({ validated: {}, lock: bareLock }).verdict).toBe('compensate')
+    expect(revalidateAfterWrite({ validated: { sessionId: 's1' }, lock: { ...bareLock, sessionId: 's1' } }).verdict).toBe('compensate')
   })
 })
 
@@ -531,6 +581,16 @@ describe('journal framing', () => {
     expect(parseFramedLine('   ').ok).toBe(false)
   })
 
+  it('a checksummed line that is not a frame is still refused', () => {
+    // The checksum proves integrity, not validity: this line checksums perfectly
+    // and still names no position and no fence, so it must not enter as data.
+    const bare = { kind: 'record-state', payload: {} }
+    const line = canonicalJson({ ...bare, c: checksumOf(bare) })
+    expect(parseFramedLine(line).reason).toMatch(/malformed/)
+    const noKind = { seq: 3, fence: 604, payload: {} }
+    expect(parseFramedLine(canonicalJson({ ...noKind, c: checksumOf(noKind) })).reason).toMatch(/malformed/)
+  })
+
   it('hashes by meaning rather than by key order', () => {
     const a = frameEntry({ seq: 1, fence: 604, kind: 'k', payload: { b: 2, a: 1 } }).line
     const b = frameEntry({ kind: 'k', payload: { a: 1, b: 2 }, fence: 604, seq: 1 }).line
@@ -567,5 +627,21 @@ describe('the journal tail that cannot prove its own order', () => {
     const marked = markUnverifiedTail({ entries, transitions, lastConfirmedSeq: 9, currentFence: 606 })
     expect(marked.filter((e) => e.unverified).map((e) => e.seq)).toEqual([11, 12])
     expect(marked.find((e) => e.seq === 2).unverified).toBeUndefined()
+  })
+
+  it('quarantines an entry standing where no fence was in force, and one that names no position', () => {
+    // "No fence was in force" is not "no rule applies": before the first transition
+    // nothing authorized any write, and an entry without a seq cannot be placed.
+    const marked = markUnverifiedTail({
+      entries: [
+        { seq: 1, fence: 604, kind: 'record-state' },
+        { fence: 605, kind: 'record-state' },
+      ],
+      transitions: [{ seq: 2, fence: 604 }],
+      lastConfirmedSeq: 5,
+      currentFence: 604,
+    })
+    expect(marked[0].quarantine).toMatch(/no fence was in force/)
+    expect(marked[1].quarantine).toMatch(/unplaceable/)
   })
 })

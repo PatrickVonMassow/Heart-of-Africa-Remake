@@ -146,17 +146,24 @@ export function attemptIdentity(fields = {}) {
   return { ok: true, identity: Object.freeze(identity) }
 }
 
-/** Two records describe the same attempt when the triple agrees. The process may
- *  have been restarted under a new pid; that is a different question. */
+/** Two records describe the same attempt when the triple agrees — and only when
+ *  both actually CARRY the triple: two absent ids compare equal, and two records
+ *  that name no attempt are not thereby the same attempt. The process may have been
+ *  restarted under a new pid; that is a different question. */
 export function sameAttempt(a, b) {
-  return Boolean(a && b && a.batchId === b.batchId && a.pointId === b.pointId && a.attemptId === b.attemptId)
+  const present = (v) => v !== undefined && v !== null && v !== ''
+  return Boolean(
+    a && b && ['batchId', 'pointId', 'attemptId'].every((k) => present(a[k]) && a[k] === b[k]),
+  )
 }
 
 /** Pid AND pid start time, within the tolerance the lock already uses. A bare pid
- *  match is the recycled-pid trap. */
+ *  match is the recycled-pid trap — and the pid must actually BE one: two records
+ *  that carry no pid at all also satisfy `a.pid === b.pid`, and matching timestamps
+ *  alone must not read as the same process. */
 export function sameProcess(a, b, { tolerance = PROCESS_START_TOLERANCE_MS } = {}) {
   if (!a || !b) return false
-  if (a.pid !== b.pid) return false
+  if (!Number.isInteger(a.pid) || a.pid !== b.pid) return false
   if (!Number.isFinite(a.pidStartedAt) || !Number.isFinite(b.pidStartedAt)) return false
   return Math.abs(a.pidStartedAt - b.pidStartedAt) <= tolerance
 }
@@ -391,6 +398,16 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
   if (expectedOid === undefined || expectedOid === null) {
     return { ok: false, reason: 'a publication without a lease on the credential ref is refused' }
   }
+  // The lease and the claimed current credential must AGREE about absence, in both
+  // directions. Otherwise the rollback guard above is bypassed by misdescribing the
+  // world to it: `current: null` beside a lease on a REAL oid skips every advance
+  // check while the remote lease still matches — and that push is a rollback door.
+  if (!current && expectedOid !== '') {
+    return { ok: false, reason: "with no current credential the lease is on the ref's absence; a real oid claims one is published" }
+  }
+  if (current && expectedOid === '') {
+    return { ok: false, reason: 'a published credential cannot be leased as absent' }
+  }
   if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
   return {
     ok: true,
@@ -439,6 +456,13 @@ export function mayMintFence({ fenceStore = null, journalOk = false, journalHigh
     return { ok: false, reason: 'the fence store carries no usable fence' }
   }
   if (!journalOk) return { ok: false, reason: 'the journal is missing or fails its checksums; minting is refused' }
+  // Null and undefined mean an EMPTY journal, which constrains nothing. Anything
+  // else that is not an integer is a high water mark that could not be computed,
+  // and an uncomputable constraint is a refusal, not a pass: `fence < NaN` answers
+  // false, which would admit the mint precisely because the evidence broke.
+  if (journalHighWater !== null && journalHighWater !== undefined && !Number.isInteger(journalHighWater)) {
+    return { ok: false, reason: 'the journal high water mark is unreadable; minting is refused' }
+  }
   if (Number.isInteger(journalHighWater) && fenceStore.fence < journalHighWater) {
     return {
       ok: false,
@@ -458,6 +482,16 @@ export function mayMintFence({ fenceStore = null, journalOk = false, journalHigh
  *  repository already uses. */
 export function validateMutation({ presented = {}, lock = null, probe = null, now = 0 } = {}) {
   if (!lock) return { ok: false, reason: 'no batch lock: a daemon with no live lock refuses every mutation' }
+  // The equalities below require the value PRESENT before it is compared: two
+  // absent values compare equal, so a presentation carrying no session or no fence
+  // would otherwise match a lock that lost the same field — absence-equality is
+  // identity nowhere in this design.
+  if (typeof presented.sessionId !== 'string' || !presented.sessionId) {
+    return { ok: false, reason: 'the mutation presents no session' }
+  }
+  if (!Number.isInteger(presented.fence) || presented.fence < 1) {
+    return { ok: false, reason: 'the mutation presents no usable fence' }
+  }
   if (lock.sessionId !== presented.sessionId) return { ok: false, reason: 'the lock names another session' }
   if (lock.fence !== presented.fence) {
     return { ok: false, reason: `stale fence: presented ${presented.fence}, the lock carries ${lock.fence}` }
@@ -485,6 +519,11 @@ export function validateMutation({ presented = {}, lock = null, probe = null, no
  *  immediately after the write and compensates when it moved. */
 export function revalidateAfterWrite({ validated = {}, lock = null } = {}) {
   if (!lock) return { verdict: 'compensate', reason: 'the lock is gone' }
+  // The same absence rule as validation itself: a record that cannot name what it
+  // validated cannot prove the mutation stands, and "cannot prove" compensates.
+  if (typeof validated.sessionId !== 'string' || !validated.sessionId || !Number.isInteger(validated.fence) || validated.fence < 1) {
+    return { verdict: 'compensate', reason: 'the validated identity is unusable, so the mutation cannot be proven to stand' }
+  }
   if (lock.sessionId !== validated.sessionId || lock.fence !== validated.fence) {
     return { verdict: 'compensate', reason: 'the lock moved under the mutation' }
   }
@@ -621,6 +660,12 @@ export function parseFramedLine(line) {
   if (!parsed || typeof parsed !== 'object' || !parsed.c) return { ok: false, reason: 'malformed: no checksum' }
   const { c, ...body } = parsed
   if (checksumOf(body) !== c) return { ok: false, reason: 'checksum mismatch' }
+  // The checksum proves integrity, not validity: a line can checksum perfectly and
+  // still not be a frame `frameEntry` could have written. Reading it back enforces
+  // the same shape writing did, or an unplaceable entry enters the journal as data.
+  if (!Number.isInteger(body.seq) || body.seq < 1 || !Number.isInteger(body.fence) || body.fence < 1 || !body.kind) {
+    return { ok: false, reason: 'malformed: a checksummed line without seq, fence and kind is still not an entry' }
+  }
   return { ok: true, entry: body }
 }
 
@@ -644,9 +689,14 @@ export function fenceInForceAt(transitions, seq) {
 export function markUnverifiedTail({ entries = [], transitions = [], lastConfirmedSeq = 0, currentFence = null } = {}) {
   const currentHasTransition = transitions.some((t) => t.fence === currentFence)
   return entries.map((e) => {
+    // An entry that names no position cannot be classified at all, and a position
+    // no transition precedes has NO fence in force. Neither is "nothing to check":
+    // an entry nothing was in force for cannot be legitimate, so both quarantine.
+    if (!Number.isInteger(e.seq) || e.seq < 1) return { ...e, quarantine: 'unplaceable: the entry names no position' }
     const inForce = fenceInForceAt(transitions, e.seq)
+    if (inForce === null) return { ...e, quarantine: 'no fence was in force at this position' }
     if (!currentHasTransition && e.seq > lastConfirmedSeq) return { ...e, unverified: true }
-    if (inForce !== null && e.fence !== inForce) return { ...e, quarantine: 'fence not in force at this position' }
+    if (e.fence !== inForce) return { ...e, quarantine: 'fence not in force at this position' }
     return e
   })
 }

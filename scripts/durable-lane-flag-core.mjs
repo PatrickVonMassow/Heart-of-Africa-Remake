@@ -44,9 +44,13 @@ export const STEPS_REQUIRED_FOR_ACTIVATION = Object.freeze([1, 2, 3, 4, 8, 9])
  *  is waiting for rather than the first one — an operator who fixes one at a time
  *  learns nothing from a refusal that moves. */
 export function activationDecision({ steps = DURABLE_LANE_STEPS, required = STEPS_REQUIRED_FOR_ACTIVATION } = {}) {
+  // AFFIRMATIVE, the same rule the liveness probes follow: `green` must BE `true`,
+  // not merely truthy, and evidence must be a real string — a manifest that says
+  // green: 'yes' is a claim in the wrong shape, and the wrong shape does not open
+  // this door.
   const missing = required.filter((n) => {
     const step = steps[n]
-    return !step || !step.green || !step.evidence
+    return !step || step.green !== true || typeof step.evidence !== 'string' || !step.evidence.trim()
   })
   if (missing.length) {
     const named = missing.map((n) => `${n} (${steps[n]?.title ?? 'unknown step'})`).join(', ')
@@ -61,7 +65,9 @@ export function activationDecision({ steps = DURABLE_LANE_STEPS, required = STEP
 export function mayStartDaemon({ flag = null, steps = DURABLE_LANE_STEPS } = {}) {
   const interlock = activationDecision({ steps })
   if (!interlock.ok) return { ok: false, reason: interlock.reason, missing: interlock.missing }
-  if (!flag?.enabled) return { ok: false, reason: 'the durable lane is off; today\'s authoring path runs unchanged' }
+  // A flag file is hand-editable, so only the affirmative value counts: anything
+  // that is not exactly `true` — including a truthy 1 or 'yes' — reads as off.
+  if (flag?.enabled !== true) return { ok: false, reason: 'the durable lane is off; today\'s authoring path runs unchanged' }
   return { ok: true }
 }
 
@@ -69,7 +75,9 @@ export function mayStartDaemon({ flag = null, steps = DURABLE_LANE_STEPS } = {})
  *  BEFORE a drain, where its only effect is to stop a new daemon starting behind the
  *  one that is leaving. Only turning it ON is gated. */
 export function flagChange({ flag = null, enable = false, steps = DURABLE_LANE_STEPS, at = null, by = null } = {}) {
-  if (!enable) return { ok: true, flag: { enabled: false, changedAt: at, changedBy: by } }
+  // Anything that is not the affirmative `true` DISABLES: turning off is the safe
+  // direction, so a malformed request lands there rather than at the gated one.
+  if (enable !== true) return { ok: true, flag: { enabled: false, changedAt: at, changedBy: by } }
   const interlock = activationDecision({ steps })
   if (!interlock.ok) return { ok: false, reason: interlock.reason, missing: interlock.missing }
   return { ok: true, flag: { ...flag, enabled: true, changedAt: at, changedBy: by } }
