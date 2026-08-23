@@ -22464,3 +22464,14 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: low — no product behaviour; the cost is that the batch's own model rules read
   differently depending on which copy a session opens.
   Bundle: Modell & Wächter.
+
+- [x] 863. The two-trailer wrapper test can stay green while the second trailer is never judged.
+  FOUND 23.08.2026 by the same reading, in scripts/model-guard-core.test.mjs: the wrapper-log
+  test asserts classifyTrailer over the joined field and equality of the split, but its final
+  evaluateCommitTrailers assertion feeds the raw message rather than the parsed field — so a
+  regression in which the wrapper judges only the first trailer would not turn it red.
+  FINAL STATE: the test asserts that EACH split trailer is judged individually on the parsed
+  wrapper output, so dropping the second trailer's judgement turns it red.
+  VERIFIABLE: mutating the wrapper to judge only the first trailer makes the suite fail.
+  Criticality: low — a test-only gap behind a currently correct wrapper.
+  Bundle: Modell & Wächter.
