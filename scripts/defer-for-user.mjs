@@ -130,15 +130,22 @@ function recordDecisionCard(card) {
 const args = process.argv.slice(2)
 const [a, b] = args
 
-if (a === '--help' || a === '-h' || a === undefined) {
-  console.log(USAGE)
-  process.exit(a === undefined ? 1 : 0)
-}
-
+/* THE REFUSAL COMES FIRST, AND HELP IS NO EXCEPTION (sixth cross-vendor round,
+ * GPT-5.6 Sol, 23.08.2026). Answering `--help` before anything was parsed left
+ * one command line — `--help --help` — that reached an answer past the refusal,
+ * so the rule read as "unless you ask for help". Nothing is lost by closing it:
+ * the refusal prints the very usage that line asked for, only on stderr and
+ * with a non-zero status, so the reader still gets their answer AND is told
+ * they said the flag twice. */
 const repeated = repeatedFlag(args)
 if (repeated) {
   console.error(`defer-for-user: ${repeated} is given more than once — say it exactly once.\n${USAGE}`)
   process.exit(1)
+}
+
+if (a === '--help' || a === '-h' || a === undefined) {
+  console.log(USAGE)
+  process.exit(a === undefined ? 1 : 0)
 }
 
 if (a === '--list') {

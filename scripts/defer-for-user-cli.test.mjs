@@ -101,6 +101,21 @@ describe('defer-for-user — reading the flags', () => {
     expect(tasks()).toBe(before)
   })
 
+  it('refuses a repeated flag even when that flag is --help, and still prints the usage', () => {
+    const r = run('--help', '--help')
+    expect(r.code).toBe(1)
+    expect(r.stderr).toMatch(/--help is given more than once/)
+    // The answer the line asked for is still delivered — the refusal carries it.
+    expect(r.stderr).toMatch(/node scripts\/defer-for-user\.mjs <point> --act/)
+    expect(r.stdout).toBe('')
+  })
+
+  it('still answers a single --help on stdout', () => {
+    const r = run('--help')
+    expect(r.code).toBe(0)
+    expect(r.stdout).toMatch(/node scripts\/defer-for-user\.mjs <point> --act/)
+  })
+
   it('reports a gate it wrote, and clears it back to the head of the queue', () => {
     run('42', '--act', 'release-tag', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
     expect(run('--list').stdout).toMatch(/42 awaits confirmation/)
