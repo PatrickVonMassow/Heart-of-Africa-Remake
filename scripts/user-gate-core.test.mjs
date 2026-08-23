@@ -43,6 +43,33 @@ describe('classifyConfirmationReason — the closed outward-act rule', () => {
   ])('classifies advice or an incomplete reason toward continuation: %s', (reason) => {
     expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'advisory' })
   })
+
+  // THE THREE WAYS THE FIRST CLASSIFIER GOT IT WRONG (cross-vendor review,
+  // GPT-5.6 Sol, 23.08.2026). Each of these ran through the shipped command.
+  it('does not let an unpublished four-section draft park its point', () => {
+    expect(
+      classifyConfirmationReason('Should the four-section internal draft change font? prepared locally without publishing it'),
+    ).toMatchObject({ verdict: 'advisory', act: '' })
+  })
+
+  it('treats UNDOING a released artefact as outward-facing too', () => {
+    for (const reason of [
+      'Delete the v1.2.0 release tag; safe prepared state: nothing removed yet and the tag still stands',
+      'Retract the poc tag; safe prepared state: the replacement is built and the tag still stands',
+    ]) {
+      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation', act: 'release-tag' })
+    }
+  })
+
+  it('refuses the bare phrase "safe prepared state" as a prepared state', () => {
+    expect(classifyConfirmationReason('push the release tag; safe prepared state:')).toMatchObject({
+      verdict: 'advisory',
+      act: 'release-tag',
+    })
+    expect(classifyConfirmationReason('push the release tag; safe prepared state: built and not pushed')).toMatchObject({
+      verdict: 'confirmation',
+    })
+  })
 })
 
 describe('parseGateLine — one work-order line', () => {
@@ -84,6 +111,23 @@ describe('parseGateLine — one work-order line', () => {
     expect(parseGateLine('')).toBeNull()
     expect(parseGateLine(undefined)).toBeNull()
     expect(parseGateLine('- [ ] 470. HARDEN THE AWAITING-CONFIRMATION PARSER.')).toMatchObject({ gated: false })
+  })
+
+  // A HEADLINE ENDING IN THE BARE WORD IS PROSE (cross-vendor review, GPT-5.6
+  // Sol, 23.08.2026): it parsed as state, and the next rewrite deleted it.
+  it('needs the brackets before a typed marker is state at all', () => {
+    for (const line of [
+      '- [ ] 9. RENAME THE MARKER TO SELF-DECIDED',
+      '- [ ] 9. THE ANSWER ARRIVES AS USER-ANSWERED',
+      '- [ ] 9. EVERY GATE BECOMES AWAITING-CONFIRMATION',
+    ]) {
+      const parsed = parseGateLine(line)
+      expect(parsed).toMatchObject({ point: 9, gated: false, answered: false })
+      expect(parsed.marker).toBeUndefined()
+      expect(clearMarkers(line, 9).text).toBe(line)
+    }
+    // The legacy marker keeps them optional — untyped lines predate the rule.
+    expect(parseGateLine('- [ ] 9. X AWAITING-USER')).toMatchObject({ legacy: true })
   })
 
   it('does not let an answer-marker mention inside the reason answer the gate', () => {
@@ -309,5 +353,29 @@ describe('advisory decision record and legacy migration', () => {
     expect(migrated.text).not.toContain('AWAITING-USER')
     expect(migrated.cards).toHaveLength(2)
     expect([...gatedPoints(migrated.text)]).toEqual([1])
+  })
+
+  // EVERY MARKER, NOT ONLY THE STATE (cross-vendor review, GPT-5.6 Sol,
+  // 23.08.2026): a legacy gate hidden behind a later answer was silently left
+  // in place, and two in a row collapsed into one verdict.
+  it('reports a legacy marker standing before a later answer, and each of several', () => {
+    const source = tasks(
+      '- [ ] 1. A AWAITING-USER(2026-08-01; choose a colour) USER-ANSWERED(2026-08-07)',
+      '- [ ] 2. B AWAITING-USER(2026-08-01; first) AWAITING-USER(2026-08-02; second)',
+      '- [x] 3. C AWAITING-USER(2026-08-01; one) AWAITING-USER(2026-08-02; two)',
+    )
+    const migrated = migrateLegacyGates(source, { at: '2026-08-23' })
+    expect(migrated.entries).toEqual([
+      { point: 1, verdict: 'self-decided', reason: 'choose a colour' },
+      { point: 2, verdict: 'self-decided', reason: 'first' },
+      { point: 2, verdict: 'self-decided', reason: 'second' },
+      { point: 3, verdict: 'stale-removed', reason: 'one' },
+      { point: 3, verdict: 'stale-removed', reason: 'two' },
+    ])
+    expect(migrated.text).not.toContain('AWAITING-USER')
+    // The answer is still the LAST marker, so point 1 stays at the queue head.
+    expect(migrated.text.split('\n')[0]).toBe('- [ ] 1. A SELF-DECIDED(2026-08-23; choose a colour) USER-ANSWERED(2026-08-07)')
+    expect(answeredPoints(migrated.text).has(1)).toBe(true)
+    expect(migrated.text.split('\n')[2]).toBe('- [x] 3. C')
   })
 })

@@ -27,16 +27,24 @@
 //   reachable through the shipped command.
 // * The LAST marker on the line is the state. That is what "the answer came
 //   after the gate" means mechanically, and it needs no precedence rule.
+// * A TYPED marker is only a marker WITH its brackets. `AWAITING-CONFIRMATION`,
+//   `SELF-DECIDED` or `USER-ANSWERED` standing bare at the end of a headline is
+//   prose, not state. Only the legacy marker may appear without them.
 // * `AWAITING-CONFIRMATION(<since>; <why>)` is the only gate. Its reason must
-//   name one of the policy's closed outward-facing acts AND the state safely
-//   prepared before that act. The writer refuses everything else.
+//   name one of the policy's closed outward-facing acts — creating, moving,
+//   pushing, publishing, deleting, retracting or revoking a version/poc/release
+//   tag; dispatching or withdrawing the public release; changing the PUBLISHED
+//   four-section board contract — AND the state safely prepared before that
+//   act, in words rather than by naming the phrase. The writer refuses
+//   everything else.
 // * `SELF-DECIDED(<at>; <summary>)` records that an advisory choice took the
 //   reversible-default lane. Its `Entscheidungsprotokoll:` board card is the
 //   detailed record (decision, evidence, consequence and exact veto action).
 // * Legacy `AWAITING-USER` is classified from its OWN reason. It gates only if
 //   that reason meets today's confirmation rule. Missing or ambiguous reasons
 //   fall toward `SELF-DECIDED`/continuation. `--migrate` makes that verdict
-//   explicit and reports every legacy marker with the reason it judged.
+//   explicit and reports EVERY legacy marker on the line — including one that
+//   stands before a later answer — with the reason it judged.
 // * `USER-ANSWERED(<when>)` is what the gate becomes when the answer arrives.
 //   It is not cosmetic: it is what puts the point back at the HEAD of the queue
 //   (`queueOrder` ranks it ahead of everything else), and it stays on the line
@@ -76,13 +84,56 @@ export const REASON_MAX = 160
  * Written against a line whose trailing `\r` has already been peeled.
  */
 const MARKERS = [CONFIRMATION_MARKER, LEGACY_GATE_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
-const MARKER_TAIL_RE = new RegExp(`(?:^|\\s)(${MARKERS.join('|')})(?:\\(([^)]*)\\))?[ \\t]*$`)
+/**
+ * A TYPED MARKER MUST CARRY ITS PAYLOAD BRACKETS (cross-vendor review, GPT-5.6
+ * Sol, 23.08.2026). With the brackets optional for every marker, a head line
+ * whose HEADLINE ends in the bare word — "…RENAME THE MARKER TO SELF-DECIDED" —
+ * parsed as a marker, and the next rewrite deleted that headline text with
+ * `stripMarkers`. Only the LEGACY marker keeps them optional, because untyped
+ * lines written before this rule exist and migration must still see them.
+ */
+const TYPED_MARKERS = [CONFIRMATION_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
+const MARKER_TAIL_RE = new RegExp(
+  `(?:^|\\s)((?:${TYPED_MARKERS.join('|')})\\([^)]*\\)|${LEGACY_GATE_MARKER}(?:\\([^)]*\\))?)[ \\t]*$`,
+)
+const MARKER_TOKEN_RE = new RegExp(`^(${MARKERS.join('|')})(?:\\(([^)]*)\\))?$`)
 const HEAD_RE = /^- \[( |x)\] (\d+)\./
 /** CRLF checkouts are real on this repository (point 439) — peel, never assume. */
 const peelCr = (line) => String(line ?? '').replace(/\r+$/, '')
 
 /** An ISO date or timestamp at the start of a marker's payload, or ''. */
 const leadingStamp = (text) => (String(text ?? '').trim().match(/^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?/) ?? [''])[0]
+
+/** One marker token — `SELF-DECIDED(2026-08-23; …)` — split into name and payload. */
+const readMarkerToken = (token) => {
+  const m = String(token ?? '').match(MARKER_TOKEN_RE)
+  return m ? { marker: m[1], payload: String(m[2] ?? '') } : null
+}
+
+/** A marker payload split into its leading stamp and its recorded reason. */
+const readPayload = (marker, payload) => {
+  const answered = marker === ANSWERED_MARKER
+  const stamp = leadingStamp(payload)
+  const rest = payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
+  return { stamp, reason: answered ? '' : sanitiseReason(rest || (stamp ? '' : payload)) }
+}
+
+/**
+ * Every trailing marker of a line, in the order they stand, plus the line with
+ * all of them removed. Migration needs each one — `parseGateLine` reads only the
+ * LAST, which is the STATE, and a legacy marker standing before a later answer
+ * would otherwise never be seen (cross-vendor review, GPT-5.6 Sol, 23.08.2026).
+ */
+const peelTrailingMarkers = (line) => {
+  let head = String(line)
+  const markers = []
+  for (;;) {
+    const hit = head.match(MARKER_TAIL_RE)
+    if (!hit) return { head, markers }
+    markers.unshift(hit[1])
+    head = head.slice(0, hit.index).replace(/[ \t]+$/, '')
+  }
+}
 
 /**
  * A reason made safe to store on one work-order line: no closing bracket (it
@@ -105,20 +156,38 @@ export function sanitiseReason(reason, { max = REASON_MAX } = {}) {
  * themselves: the reason must name the concrete act and what has safely been
  * prepared without performing it.
  */
+// The verbs that make an act outward-facing. UNDOING a released artefact is as
+// hard to reverse as making it (cross-vendor review, GPT-5.6 Sol, 23.08.2026):
+// "delete the v1.2.0 release tag" fell to advisory while "push" did not.
+const ACT_VERB = 'create|move|push|publish|apply|delete|remove|retract|revoke|withdraw|unpublish'
+/** At least three words must FOLLOW the phrase, or it names no state at all. */
+const namesPreparedState = (lower) => {
+  const m = /\b(?:safe|safely)\s+prepared\s+state\b[\s:,-]*(.*)$/.exec(lower)
+  return Boolean(m) && m[1].trim().split(/\s+/).filter(Boolean).length >= 3
+}
+
 export function classifyConfirmationReason(reason) {
   const text = sanitiseReason(reason, { max: 1000 })
   const lower = text.toLowerCase()
   const tagAct =
-    /\b(?:create|move|push|publish|apply)\w*\b[^.]{0,100}\b(?:version|poc|release)\b[^.]{0,50}\btag\b/.test(lower) ||
-    /\b(?:version|poc|release)\b[^.]{0,50}\btag\b[^.]{0,100}\b(?:create|move|push|publish|apply)\w*\b/.test(lower)
+    new RegExp(`\\b(?:${ACT_VERB})\\w*\\b[^.]{0,100}\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b`).test(lower) ||
+    new RegExp(`\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b[^.]{0,100}\\b(?:${ACT_VERB})\\w*\\b`).test(lower)
   const publicReleaseAct =
-    /\b(?:dispatch|publish|deploy|release)\w*\b[^.]{0,100}\b(?:public|production)\b/.test(lower) ||
-    /\b(?:public|production)\b[^.]{0,100}\b(?:dispatch|publish|deploy|release)\w*\b/.test(lower)
+    /\b(?:dispatch|publish|deploy|release|unpublish|retract|withdraw|revoke)\w*\b[^.]{0,100}\b(?:public|production)\b/.test(lower) ||
+    /\b(?:public|production)\b[^.]{0,100}\b(?:dispatch|publish|deploy|release|unpublish|retract|withdraw|revoke)\w*\b/.test(lower)
+  // BOTH directions demand the PUBLIC qualifier (cross-vendor review, GPT-5.6
+  // Sol, 23.08.2026). Without it on the second alternative, "should the
+  // four-section internal draft change font?" — an advisory question — named an
+  // authorized act and parked its point, which is the exact inversion this
+  // point exists to remove.
   const boardContractAct =
     /\b(?:change|replace|restructure|alter)\w*\b[^.]{0,120}\b(?:published|public)\b[^.]{0,80}\b(?:four[- ]section|4[- ]section|section contract)\b/.test(lower) ||
-    /\b(?:four[- ]section|4[- ]section|section contract)\b[^.]{0,120}\b(?:change|replace|restructure|alter)\w*\b/.test(lower)
+    /\b(?:published|public)\b[^.]{0,80}\b(?:four[- ]section|4[- ]section|section contract)\b[^.]{0,120}\b(?:change|replace|restructure|alter)\w*\b/.test(lower)
+  // The PHRASE alone is not the state (cross-vendor review, GPT-5.6 Sol,
+  // 23.08.2026): "push the release tag; safe prepared state:" named nothing and
+  // was accepted, which is precisely the record the gate is bought with.
   const prepared =
-    /\b(?:safe|safely)\s+prepared\s+state\b/.test(lower) ||
+    namesPreparedState(lower) ||
     /\bprepared\b[^.]{0,120}\b(?:locally|without|not|unchanged|unpublished|unpushed|undispatched|undeployed)\b/.test(lower) ||
     /\b(?:locally|verified|built|staged|ready|unchanged)\b[^.]{0,120}\b(?:not|no|without|before)\b[^.]{0,80}\b(?:push|publish|dispatch|deploy|tag|change)\w*\b/.test(lower)
   const act = tagAct ? 'release-tag' : publicReleaseAct ? 'public-release' : boardContractAct ? 'board-contract' : ''
@@ -151,13 +220,10 @@ export function parseGateLine(line) {
   }
   // The LAST marker on the line is the state — a gate written after an answer
   // gates again, an answer written after a gate answers. No precedence rule.
-  const marker = hit[1]
+  const { marker, payload } = readMarkerToken(hit[1])
   const answered = marker === ANSWERED_MARKER
   const selfDecided = marker === SELF_DECIDED_MARKER
-  const payload = String(hit[2] ?? '')
-  const stamp = leadingStamp(payload)
-  const rest = answered ? '' : payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
-  const reason = answered ? '' : sanitiseReason(rest || (stamp ? '' : payload))
+  const { stamp, reason } = readPayload(marker, payload)
   const classification = marker === CONFIRMATION_MARKER || marker === LEGACY_GATE_MARKER
     ? classifyConfirmationReason(reason)
     : null
@@ -389,9 +455,16 @@ const legacyDecision = (point, reason) => advisoryDecisionCard(point, {
 })
 
 /**
- * Rewrite every legacy marker and return an auditable verdict for every one.
+ * Rewrite every legacy marker and return an auditable verdict for EVERY ONE.
  * Confirmations retain their original stamp/reason; ambiguous open markers
  * become SELF-DECIDED and yield the decision card the CLI must publish.
+ *
+ * EVERY marker on the line, not only the state (cross-vendor review, GPT-5.6
+ * Sol, 23.08.2026). Reading through `parseGateLine` saw the LAST marker alone:
+ * a legacy gate standing before a later `USER-ANSWERED` was neither rewritten
+ * nor reported, and two legacy markers in a row were stripped together but
+ * yielded a single verdict — both against the promise that the report names
+ * every existing marker.
  */
 export function migrateLegacyGates(tasksText, { at = '' } = {}) {
   const stamp = leadingStamp(at)
@@ -400,23 +473,36 @@ export function migrateLegacyGates(tasksText, { at = '' } = {}) {
   const lines = String(tasksText ?? '').split('\n').map((raw) => {
     const line = peelCr(raw)
     const cr = raw.slice(line.length)
-    const parsed = parseGateLine(line)
-    if (!parsed || parsed.marker !== LEGACY_GATE_MARKER) return raw
-    if (parsed.stale) {
-      entries.push({ point: parsed.point, verdict: 'stale-removed', reason: parsed.reason })
-      return `${stripMarkers(line)}${cr}`
+    const head = line.match(HEAD_RE)
+    if (!head) return raw
+    const point = Number(head[2])
+    const { head: bare, markers } = peelTrailingMarkers(line)
+    const tokens = markers.map((token) => ({ token, ...(readMarkerToken(token) ?? { marker: '', payload: '' }) }))
+    if (!tokens.some((t) => t.marker === LEGACY_GATE_MARKER)) return raw
+    // A ticked or DEFERRED point is closed to the batch; its leftovers go,
+    // and each legacy one is still named so the removal is auditable.
+    const live = head[1] === ' ' && !/\bDEFERRED\b/.test(line)
+    if (!live) {
+      for (const t of tokens) {
+        if (t.marker !== LEGACY_GATE_MARKER) continue
+        entries.push({ point, verdict: 'stale-removed', reason: readPayload(t.marker, t.payload).reason })
+      }
+      return `${bare}${cr}`
     }
-    if (parsed.classification?.verdict === 'confirmation') {
-      entries.push({ point: parsed.point, verdict: 'confirmation', reason: parsed.reason })
-      const marker = `${CONFIRMATION_MARKER}(${parsed.since ? `${parsed.since}; ` : ''}${parsed.reason})`
-      return `${stripMarkers(line)} ${marker}${cr}`
-    }
-    const summary = parsed.reason || 'legacy marker had no recorded reason'
-    entries.push({ point: parsed.point, verdict: 'self-decided', reason: parsed.reason })
-    const card = legacyDecision(parsed.point, parsed.reason)
-    if (card.ok) cards.push({ point: parsed.point, ...card })
-    const marker = `${SELF_DECIDED_MARKER}(${stamp ? `${stamp}; ` : ''}${sanitiseReason(summary)})`
-    return `${stripMarkers(line)} ${marker}${cr}`
+    const rebuilt = tokens.map((t) => {
+      if (t.marker !== LEGACY_GATE_MARKER) return t.token
+      const { stamp: since, reason } = readPayload(t.marker, t.payload)
+      if (classifyConfirmationReason(reason).verdict === 'confirmation') {
+        entries.push({ point, verdict: 'confirmation', reason })
+        return `${CONFIRMATION_MARKER}(${since ? `${since}; ` : ''}${reason})`
+      }
+      entries.push({ point, verdict: 'self-decided', reason })
+      const card = legacyDecision(point, reason)
+      if (card.ok) cards.push({ point, ...card })
+      const summary = sanitiseReason(reason || 'legacy marker had no recorded reason')
+      return `${SELF_DECIDED_MARKER}(${stamp ? `${stamp}; ` : ''}${summary})`
+    })
+    return `${[bare, ...rebuilt].join(' ')}${cr}`
   })
   return { text: lines.join('\n'), entries, cards }
 }
