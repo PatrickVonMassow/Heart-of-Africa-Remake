@@ -77,6 +77,36 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
+- [ ] 859. A standstill cannot announce itself: a sick container hangs every tick and no alert
+  goes out. MEASURED 23.08.2026: from 11:22 the host slept or froze — every node spawn timed out
+  (`spawnSync /usr/local/bin/node ETIMEDOUT` in autostart.log from 11:23), the network dropped
+  (chat-watcher `fetch failed` from 11:27) — and until the user's manual VS Code restart at 14:56
+  the batch did NOTHING for 3.5 hours. The launcher daemon LIVED through all of it and logged
+  `tick exceeded 900000 ms — killed` three times, but a hung, failed or unspawnable tick only
+  writes a log line: every alert path (notify via batch-autostart, the stale-site and board
+  watchdogs) runs INSIDE a child process the sick container could not spawn, so not one ntfy
+  alert left the machine. After the container rebuild the launcher was gone besides — a memory
+  note, not machinery, made the successor session run `--start`.
+  WHAT IT COSTS: the user leaves the batch unattended for long stretches; a standstill that
+  cannot announce itself lasts until a human happens to look — 3.5 h here, unbounded in general.
+  FINAL STATE: (1) the launcher daemon itself judges its ticks — consecutive killed/failed/
+  unspawnable ticks, and a resume after a suspend gap — and sends the ntfy alert IN-PROCESS
+  (importing notify.mjs, no child process), through the escalation ladder, plus a one-time
+  recovery notice when ticks come back; (2) a session start re-arms a dead launcher without a
+  human: the session-start path runs the same arming the memory note prescribes; (3) the
+  incident's own shapes (killed tick, spawn ETIMEDOUT, suspend gap, recovery) are the unit
+  fixtures of a pure decision core.
+  VERIFIABLE: unit cases — two consecutive dead ticks yield one alert decision and the third does
+  not double it; a spawn failure alerts with no child involved; a sleep gap of more than two
+  intervals marks a suspend, and the first dead tick after it alerts immediately; the first good
+  tick after an alert yields the recovery notice and resets the run; the arming path arms a
+  dead/stale launcher record and leaves a live one alone.
+  Criticality: HIGH — it is the difference between an autonomous batch and one that dies silently
+  whenever the host hiccups.
+  Author lane: fable
+  (Lane set by user order of 23.08.2026 — fix this directly, ahead of the queue, with cross-vendor
+  four-eyes review; Sol reviews the result.)
+  Bundle: Urlaubsfestigkeit.
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
