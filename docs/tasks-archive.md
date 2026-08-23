@@ -22539,3 +22539,22 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: HIGH — the ladder is the one mechanism that deliberately manufactures the standstill
   the user has now forbidden.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 861. Every state that parks the batch on the user gets a recovery path or a recorded default.
+  The user's order of 23.08.2026: they are away for long stretches and may not see the phone —
+  problems need RECOVERY mechanisms, not alerts; a stop behind a 'Von dir zu klären' card is to be
+  avoided; in doubt the batch decides by its own judgment and files a card recording the decision
+  for retroactive veto.
+  FINAL STATE: an inventory in docs/batch-autonomy.md of every state that today halts work waiting
+  on a human — pause markers and their restart clocks, user-gated points, doctor mandates, quota
+  waits, ladder pauses (point 860), blocking decision cards — and for each one the chosen lane:
+  a self-recovery mechanism where the machine can fix the cause, otherwise an own-judgment default
+  that continues work and files the veto card; only genuinely irreversible or outward-facing steps
+  keep their confirm gates. Lanes that need code land as their own follow-up points; lanes that are
+  pure policy change in place with the inventory.
+  VERIFIABLE: the inventory names every halting state a repo-wide search for pause/gate/mandate/
+  card-block paths finds, each with its lane and its follow-up point or in-place change; no state
+  is left implicitly 'wait for the user'.
+  Criticality: HIGH — it turns the 23.08.2026 order from one fixed incident into the standing shape
+  of the batch.
+  Bundle: Urlaubsfestigkeit.
