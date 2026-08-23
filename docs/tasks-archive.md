@@ -22522,3 +22522,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   (Lane set by user order of 23.08.2026 — fix this directly, ahead of the queue, with cross-vendor
   four-eyes review; Sol reviews the result.)
   Bundle: Urlaubsfestigkeit.
+
+- [x] 860. The alert ladder's last rung pauses the batch, which is now the forbidden outcome. The
+  escalation ladder (point 434) ends a repeated unanswered alert by PAUSING the batch with a board
+  card — built when an alert could be slept through and a paused batch was the safe floor. The
+  user's order of 23.08.2026 inverts that floor: a lasting standstill must never happen, recovery
+  and decide-and-record replace waiting for a human.
+  FINAL STATE: the rungs still climb interval and priority, but a pause verdict survives ONLY where
+  continuing would corrupt the work itself (forbidden serving model, failed repository integrity —
+  the closed list lives beside the core); every other ladder end keeps the batch running and files
+  a decision card RECORDING what was decided and how to veto it retroactively. Existing pause
+  callers are reclassified against that list in the same change.
+  VERIFIABLE: unit cases over the ladder core — a generic stalled/staleness alert can no longer
+  return a pause verdict however often it repeats; a corruption-class alert still can; the
+  continue-verdict names the decision card it demands.
+  Criticality: HIGH — the ladder is the one mechanism that deliberately manufactures the standstill
+  the user has now forbidden.
+  Bundle: Session- & Repo-Hygiene.

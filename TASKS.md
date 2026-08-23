@@ -77,22 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 860. The alert ladder's last rung pauses the batch, which is now the forbidden outcome. The
-  escalation ladder (point 434) ends a repeated unanswered alert by PAUSING the batch with a board
-  card — built when an alert could be slept through and a paused batch was the safe floor. The
-  user's order of 23.08.2026 inverts that floor: a lasting standstill must never happen, recovery
-  and decide-and-record replace waiting for a human.
-  FINAL STATE: the rungs still climb interval and priority, but a pause verdict survives ONLY where
-  continuing would corrupt the work itself (forbidden serving model, failed repository integrity —
-  the closed list lives beside the core); every other ladder end keeps the batch running and files
-  a decision card RECORDING what was decided and how to veto it retroactively. Existing pause
-  callers are reclassified against that list in the same change.
-  VERIFIABLE: unit cases over the ladder core — a generic stalled/staleness alert can no longer
-  return a pause verdict however often it repeats; a corruption-class alert still can; the
-  continue-verdict names the decision card it demands.
-  Criticality: HIGH — the ladder is the one mechanism that deliberately manufactures the standstill
-  the user has now forbidden.
-  Bundle: Session- & Repo-Hygiene.
 - [ ] 861. Every state that parks the batch on the user gets a recovery path or a recorded default.
   The user's order of 23.08.2026: they are away for long stretches and may not see the phone —
   problems need RECOVERY mechanisms, not alerts; a stop behind a 'Von dir zu klären' card is to be
