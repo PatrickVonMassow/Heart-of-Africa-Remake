@@ -32,11 +32,12 @@
 //   prose, not state. Only the legacy marker may appear without them.
 // * `AWAITING-CONFIRMATION(<since>; <why>)` is the only gate. Its reason must
 //   name one of the policy's closed outward-facing acts — creating, moving,
-//   pushing, publishing, deleting, retracting or revoking a version/poc/release
-//   tag; dispatching or withdrawing the public release; changing the PUBLISHED
-//   four-section board contract — AND the state safely prepared before that
-//   act, in words rather than by naming the phrase. The writer refuses
-//   everything else.
+//   pushing, publishing, deleting, removing, retracting, revoking or
+//   withdrawing a version/poc/release tag; dispatching or withdrawing the public
+//   release; changing the PUBLISHED four-section board contract — AND the state
+//   safely prepared before that act, IN WORDS: naming the phrase without saying
+//   what stands prepared is refused. Every accepted verb form is spelled out in
+//   `ACT_FORMS`, so a NOUN built from one of them is not an act.
 // * `SELF-DECIDED(<at>; <summary>)` records that an advisory choice took the
 //   reversible-default lane. Its `Entscheidungsprotokoll:` board card is the
 //   detailed record (decision, evidence, consequence and exact veto action).
@@ -159,22 +160,62 @@ export function sanitiseReason(reason, { max = REASON_MAX } = {}) {
 // The verbs that make an act outward-facing. UNDOING a released artefact is as
 // hard to reverse as making it (cross-vendor review, GPT-5.6 Sol, 23.08.2026):
 // "delete the v1.2.0 release tag" fell to advisory while "push" did not.
-const ACT_VERB = 'create|move|push|publish|apply|delete|remove|retract|revoke|withdraw|unpublish'
-/** At least three words must FOLLOW the phrase, or it names no state at all. */
+//
+// EVERY FORM IS SPELLED OUT rather than closed with `\w*` (second cross-vendor
+// round, GPT-5.6 Sol, 23.08.2026). A trailing `\w*` turned the verbs into their
+// NOUNS: "copy for the withdrawal dialog in production" — an advisory design
+// question — named an authorized act and parked its point. A closed policy list
+// is spelled out; that is what makes it closed.
+const ACT_FORMS = [
+  'create', 'creates', 'created', 'creating',
+  'move', 'moves', 'moved', 'moving',
+  'push', 'pushes', 'pushed', 'pushing',
+  'publish', 'publishes', 'published', 'publishing',
+  'unpublish', 'unpublishes', 'unpublished', 'unpublishing',
+  'apply', 'applies', 'applied', 'applying',
+  'delete', 'deletes', 'deleted', 'deleting',
+  'remove', 'removes', 'removed', 'removing',
+  'retract', 'retracts', 'retracted', 'retracting',
+  'revoke', 'revokes', 'revoked', 'revoking',
+  'withdraw', 'withdraws', 'withdrew', 'withdrawn', 'withdrawing',
+]
+/** The release lane adds the words that name a public release itself. */
+const RELEASE_FORMS = [
+  ...ACT_FORMS,
+  'dispatch', 'dispatches', 'dispatched', 'dispatching',
+  'deploy', 'deploys', 'deployed', 'deploying',
+  'release', 'releases', 'released', 'releasing',
+]
+const ACT_VERB = ACT_FORMS.join('|')
+const RELEASE_VERB = RELEASE_FORMS.join('|')
+
+const wordsIn = (text) => String(text ?? '').trim().split(/\s+/).filter(Boolean).length
+
+/**
+ * A prepared state is NAMED, never merely announced. Both of these passed while
+ * recording nothing (cross-vendor review, GPT-5.6 Sol, 23.08.2026): the bare
+ * phrase "safe prepared state:" and the bare "prepared locally". The record is
+ * what the queue skip is bought with, so it must carry words.
+ */
+const PREPARED_QUALIFIER = /\b(?:locally|without|not|unchanged|unpublished|unpushed|undispatched|undeployed)\b/
 const namesPreparedState = (lower) => {
   const m = /\b(?:safe|safely)\s+prepared\s+state\b[\s:,-]*(.*)$/.exec(lower)
-  return Boolean(m) && m[1].trim().split(/\s+/).filter(Boolean).length >= 3
+  return Boolean(m) && wordsIn(m[1]) >= 3
+}
+const namesPreparationInWords = (lower) => {
+  const m = /\bprepared\b[\s:,-]*(.*)$/.exec(lower)
+  return Boolean(m) && PREPARED_QUALIFIER.test(m[1]) && wordsIn(m[1]) >= 3
 }
 
 export function classifyConfirmationReason(reason) {
   const text = sanitiseReason(reason, { max: 1000 })
   const lower = text.toLowerCase()
   const tagAct =
-    new RegExp(`\\b(?:${ACT_VERB})\\w*\\b[^.]{0,100}\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b`).test(lower) ||
-    new RegExp(`\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b[^.]{0,100}\\b(?:${ACT_VERB})\\w*\\b`).test(lower)
+    new RegExp(`\\b(?:${ACT_VERB})\\b[^.]{0,100}\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b`).test(lower) ||
+    new RegExp(`\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b[^.]{0,100}\\b(?:${ACT_VERB})\\b`).test(lower)
   const publicReleaseAct =
-    /\b(?:dispatch|publish|deploy|release|unpublish|retract|withdraw|revoke)\w*\b[^.]{0,100}\b(?:public|production)\b/.test(lower) ||
-    /\b(?:public|production)\b[^.]{0,100}\b(?:dispatch|publish|deploy|release|unpublish|retract|withdraw|revoke)\w*\b/.test(lower)
+    new RegExp(`\\b(?:${RELEASE_VERB})\\b[^.]{0,100}\\b(?:public|production)\\b`).test(lower) ||
+    new RegExp(`\\b(?:public|production)\\b[^.]{0,100}\\b(?:${RELEASE_VERB})\\b`).test(lower)
   // BOTH directions demand the PUBLIC qualifier (cross-vendor review, GPT-5.6
   // Sol, 23.08.2026). Without it on the second alternative, "should the
   // four-section internal draft change font?" — an advisory question — named an
@@ -188,7 +229,7 @@ export function classifyConfirmationReason(reason) {
   // was accepted, which is precisely the record the gate is bought with.
   const prepared =
     namesPreparedState(lower) ||
-    /\bprepared\b[^.]{0,120}\b(?:locally|without|not|unchanged|unpublished|unpushed|undispatched|undeployed)\b/.test(lower) ||
+    namesPreparationInWords(lower) ||
     /\b(?:locally|verified|built|staged|ready|unchanged)\b[^.]{0,120}\b(?:not|no|without|before)\b[^.]{0,80}\b(?:push|publish|dispatch|deploy|tag|change)\w*\b/.test(lower)
   const act = tagAct ? 'release-tag' : publicReleaseAct ? 'public-release' : boardContractAct ? 'board-contract' : ''
   if (!act) {

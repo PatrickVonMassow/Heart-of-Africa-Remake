@@ -70,6 +70,38 @@ describe('classifyConfirmationReason — the closed outward-act rule', () => {
       verdict: 'confirmation',
     })
   })
+
+  // THE SECOND CROSS-VENDOR ROUND (GPT-5.6 Sol, 23.08.2026) found the same two
+  // shapes one level deeper: an act word that is really a NOUN, and a second
+  // spelling of "prepared" that names nothing either.
+  it('does not read a NOUN built from an act verb as an act', () => {
+    expect(
+      classifyConfirmationReason('Choose copy for the withdrawal dialog in production; safe prepared state: mockups remain entirely local'),
+    ).toMatchObject({ verdict: 'advisory', act: '' })
+    // …while the verb itself, in any of its forms, still is one.
+    for (const reason of [
+      'Withdraw the public release; safe prepared state: it is still served and the rollback is staged',
+      'The public release was withdrawn by hand; safe prepared state: nothing is served yet and the rollback is staged',
+    ]) {
+      expect(classifyConfirmationReason(reason)).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
+    }
+  })
+
+  it('refuses "prepared locally" with nothing prepared named', () => {
+    expect(classifyConfirmationReason('push the release tag; prepared locally')).toMatchObject({
+      verdict: 'advisory',
+      act: 'release-tag',
+    })
+    expect(classifyConfirmationReason('push the release tag; prepared locally without pushing it')).toMatchObject({
+      verdict: 'confirmation',
+    })
+  })
+
+  it('covers taking a public release DOWN as well as putting it up', () => {
+    expect(
+      classifyConfirmationReason('Delete the public release; safe prepared state: the release is still online and the rollback is ready'),
+    ).toMatchObject({ verdict: 'confirmation', act: 'public-release' })
+  })
 })
 
 describe('parseGateLine — one work-order line', () => {
