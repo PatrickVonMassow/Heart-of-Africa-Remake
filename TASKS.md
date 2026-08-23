@@ -11294,3 +11294,26 @@ to land than a mechanism that needs a review.
   Criticality: low — no product behaviour; the cost is wasted gate time and an alert that
   trains sessions to ignore it.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 850. The generated command index publishes commands nobody can run, and its own test
+  cannot see it. MEASURED 23.08.2026, 06:05, while reviewing point 846: `docs/command-index.md`
+  carries SIX unresolved `${…}` placeholders across four names — `${TEXT_STDIN_FLAG}` ×3,
+  `${WATCH_SCRIPT_PATH}` ×1, `${phaseFlag}` ×1, `${commandName}` ×1. `scripts/help.mjs` lifts
+  each script's usage text out of the SOURCE and never evaluates it, so a usage string written
+  as a template literal is published verbatim: line 293 tells a reader to run
+  `node ${WATCH_SCRIPT_PATH} --check primary`, which is not a command.
+  WHY IT SURVIVED: `scripts/help-core.test.mjs` asserts the document matches a FRESH HARVEST of
+  the same sources. Both sides carry the identical placeholder, so the comparison is green
+  while the document is wrong — the test is structurally incapable of failing on this class,
+  which is why five of the six have stood unnoticed. (The sixth, `${commandName}`, was
+  introduced and repaired inside point 846; it is what exposed the rest.)
+  FINAL STATE: every usage line in the generated index names a runnable command. Each of the
+  five older sites is fixed where it is written — the harvested string stays literal and any
+  runtime substitution happens on the output, not in the text the harvester reads.
+  VERIFIABLE: a regression test of a DIFFERENT shape from the byte-for-byte comparison — it
+  asserts that no harvested usage string contains an unresolved `${…}` placeholder — is RED
+  against today's sources and green after the five repairs, and the byte-for-byte test stays
+  green throughout.
+  Criticality: low — no product behaviour; the cost is a reference document that hands a reader
+  a broken command, and a test that reads as coverage for a class it cannot detect.
+  Bundle: Session- & Repo-Hygiene.

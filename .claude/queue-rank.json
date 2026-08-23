@@ -557,6 +557,12 @@
       "why": "Low criticality, no product behaviour: a noisy alert costs gate time but blocks nothing, so last is right.",
       "origin": "machine",
       "place": "last"
+    },
+    "850": {
+      "at": "2026-08-23T04:06:48.522Z",
+      "why": "Low criticality, documentation only; the one instance that blocked a point is already repaired, so last is right.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -605,7 +611,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-23T03:41:54.869Z",
+    "at": "2026-08-23T04:06:48.530Z",
     "points": [
       174,
       184,
@@ -858,7 +864,8 @@
       846,
       847,
       848,
-      849
+      849,
+      850
     ]
   }
 }
