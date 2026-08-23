@@ -28,7 +28,6 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { currentFableState, servingRoute } from './fable-switch.mjs'
 import { readTranscriptMessages } from './authorship-check-core.mjs'
 import { modelHandoffDecision } from './model-handoff-core.mjs'
-import { handoverAndRequest } from './batch-boundary.mjs'
 import { writeJsonAtomic, writeTextAtomic } from './atomic-write.mjs'
 import { formatPauseRecord, PAUSE_TYPES } from './batch-pause-core.mjs'
 
@@ -187,6 +186,9 @@ if (isMainModule(import.meta.url)) {
         await notify('FORBIDDEN MODEL — CLOCKED PROBE', `${list}. ${handoff.reason}`, 'high', { alertClass: 'forbidden-serving-model', recurring: true })
       } else if (handoff.action === 'handoff') {
         writeJsonAtomic(HANDOFF, handoff.state)
+        // Loaded only on a breach: the boundary command is large, and making
+        // every clean Stop/preflight import it exceeded the gather-time budget.
+        const { handoverAndRequest } = await import('./batch-boundary.mjs')
         const transferred = handoverAndRequest({ sid: sessionId, point: null })
         if (transferred?.handed && transferred?.successor?.requested) {
           await notify('FORBIDDEN MODEL — TRUSTED HANDOFF', `${list}. ${handoff.reason}`, 'high', { alertClass: 'forbidden-serving-model', recurring: true })
