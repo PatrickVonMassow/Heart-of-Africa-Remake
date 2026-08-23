@@ -600,7 +600,13 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
   if (!spec) return { ok: false, reason: `unknown command: ${name}` }
   const missing = spec.keyFields.filter((f) => payload[f] === undefined || payload[f] === null)
   if (missing.length) return { ok: false, reason: `cannot key ${name}: missing ${missing.join(', ')}` }
-  const material = spec.keyFields.map((f) => `${f}=${String(payload[f])}`).join(' ')
+  // Canonical JSON rather than joined strings: a delimiter-joined material lets a
+  // VALUE that contains the delimiter and a field name collide two different
+  // payloads into one key — and a collided key silently drops the second mutation
+  // as "already applied".
+  const picked = {}
+  for (const f of spec.keyFields) picked[f] = payload[f]
+  const material = canonicalJson(picked)
   return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex').slice(0, 16)}` }
 }
 
@@ -609,7 +615,9 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
  *  store that persists `applied` arrives in step 2. */
 export function applyOnce(applied, key, mutate) {
   if (!key) return { ok: false, reason: 'a mutation without an idempotency key cannot be applied' }
-  const seen = applied instanceof Set ? applied.has(key) : Boolean(applied?.[key])
+  // Own properties only: a plain object inherits `constructor` and friends, and an
+  // inherited property reading as "already applied" is a mutation that never runs.
+  const seen = applied instanceof Set ? applied.has(key) : Object.hasOwn(applied ?? {}, key)
   if (seen) return { ok: true, applied: false, reason: 'already applied' }
   return { ok: true, applied: true, result: typeof mutate === 'function' ? mutate() : undefined }
 }
@@ -637,6 +645,10 @@ export function checksumOf(entry) {
  *  which regime authorised which write) and its own checksum. */
 export function frameEntry(entry) {
   if (!entry || typeof entry !== 'object') return { ok: false, reason: 'an entry is an object' }
+  // `c` is the frame's own key. An entry that carries one would be checksummed WITH
+  // it and written WITHOUT it, so the line would fail its own read-back — a healthy
+  // journal reading as corrupt.
+  if ('c' in entry) return { ok: false, reason: "an entry may not carry `c`; that key is the frame's checksum" }
   if (!Number.isInteger(entry.seq) || entry.seq < 1) return { ok: false, reason: 'an entry needs a positive seq' }
   if (!Number.isInteger(entry.fence) || entry.fence < 1) {
     return { ok: false, reason: 'an entry needs the fence it was written under' }

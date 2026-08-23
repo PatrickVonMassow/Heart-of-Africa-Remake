@@ -542,6 +542,22 @@ describe('the daemon command table', () => {
     )
   })
 
+  it('a value containing the old delimiter cannot collide two different payloads into one key', () => {
+    // With space-joined material, { f2: 'b f3=c', f3: 'd' } and { f2: 'b', f3: 'c f3=d' }
+    // hashed identically — and a collided key silently drops the second mutation.
+    const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1', 'f2', 'f3'] })
+    const a = idempotencyKey('probe-cmd', { f1: 'a', f2: 'b f3=c', f3: 'd' }, { table })
+    const b = idempotencyKey('probe-cmd', { f1: 'a', f2: 'b', f3: 'c f3=d' }, { table })
+    expect(a.ok).toBe(true)
+    expect(a.key).not.toBe(b.key)
+  })
+
+  it('an inherited property does not read as already applied', () => {
+    const out = applyOnce({}, 'constructor', () => 'ran')
+    expect(out.applied).toBe(true)
+    expect(out.result).toBe('ran')
+  })
+
   it('a mutation without a key cannot be applied at all', () => {
     expect(applyOnce(new Set(), '', () => {}).ok).toBe(false)
   })
@@ -564,6 +580,10 @@ describe('journal framing', () => {
     expect(frameEntry({ ...entry, fence: undefined }).ok).toBe(false)
     expect(frameEntry({ ...entry, kind: undefined }).ok).toBe(false)
     expect(frameEntry(null).ok).toBe(false)
+  })
+
+  it('refuses an entry that carries the frame own checksum key, which would fail its own read-back', () => {
+    expect(frameEntry({ ...entry, c: 'caller-noise' }).reason).toMatch(/checksum/)
   })
 
   it('reads a half-written tail as TRUNCATED, not as data', () => {
