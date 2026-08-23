@@ -77,25 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 864. An advisory question parks its point; only a true confirmation may. Point 861's inventory
-  rows U1-U4, C1 and C4: `AWAITING-USER` today carries BOTH an advisory product question and a
-  genuinely outward-facing confirmation, and either one makes the point non-commissionable until the
-  user answers. The user's order of 23.08.2026 removes the first case: in doubt the batch decides and
-  files the decision for retroactive veto.
-  FINAL STATE: the gate is typed. An advisory question is decided from the brief and the repository
-  evidence, recorded as SELF-DECIDED with an `Entscheidungsprotokoll:` card naming decision, evidence,
-  consequence and the exact veto action, and the point stays workable. Only an act that is
-  outward-facing or hard to reverse and not durably authorized may carry AWAITING-CONFIRMATION, whose
-  reason must name that act and the safe prepared state. Existing untyped markers migrate to
-  confirmation only where their recorded reason itself names such an act; ambiguity falls towards
-  continuation. `defer-for-user.mjs` refuses an advisory reason, and every reader that picks work
-  (queue generator, queue-order guard, workable set, session-start headline) honours the new type.
-  VERIFIABLE: a marker written with an advisory reason is refused; a confirmation marker with a named
-  outward-facing act is accepted and skips its point; a migration command reports each existing marker
-  with its verdict and reason; a queue in which every open point is advisory yields a workable point
-  rather than a batch pause.
-  Criticality: HIGH — it is the half of the 23.08.2026 order that the inventory could only write down.
-  Bundle: Urlaubsfestigkeit.
 - [ ] 865. A pause record without a clock must prove it came from the user. Point 861's inventory rows
   P3, P4 and P8: an empty or legacy `.claude/batch-paused`, a `retry-after: never`, an unreadable
   clock and the causes `serving-model`, `awaiting-user` and `retries-exhausted` are all classified
