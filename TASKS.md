@@ -11374,33 +11374,3 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
   read a red as noise.
   Bundle: Testinfrastruktur.
-- [ ] 858. Twelve model-policy restatements went stale when the reviewer-trailer sentence landed.
-  MEASURED 23.08.2026, 11:04 by `rule-echo` at the point-854 boundary and re-measured 11:08 on
-  `main` at e49f6db9: point 854 added one line to the model-policy rule in CLAUDE.md §6 — a commit
-  may also name its cross-vendor reviewer in a second model trailer — which moved the rule to
-  `1758947b`. Twelve restatements still carry the previous stamp `c9160fcb`: `docs/maximum-qa.md`,
-  `docs/sol-routing.md`, `scripts/author-routing-core.mjs`, `scripts/author-sol-core.mjs`,
-  `scripts/batch-autostart-core.mjs`, `scripts/batch-resume-hook.mjs`,
-  `scripts/model-guard-core.mjs`, `scripts/review-sol-core.mjs`, `scripts/sol-share-core.mjs`, and
-  the memories `hard-cases-go-to-sol.md`, `fable-sparingly.md`, `serving-model-watch.md`.
-  WHY 854's SESSION DID NOT DO IT: the finding surfaced at its Stop hook AFTER
-  `batch-boundary --commit` had sealed the boundary and the batch had passed to the successor at
-  fence 627. It drafted the `scripts/model-guard-core.mjs` wording anyway, the ownership fence
-  refused the write, and the draft was rolled back — so nothing of it survives except this entry.
-  WHAT IT COSTS: a restatement is the copy a session actually reads — the resume hook's model
-  policy, the router's comment, the Sol-share text. While twelve of them predate the rule, the
-  reviewer trailer §6 now invites goes unmentioned everywhere the batch looks the rule up, and
-  `rule-echo` carries a standing stale block that teaches the next session to skip its own report.
-  ALREADY KNOWN ABOUT ONE OF THE TWELVE: `scripts/model-guard-core.mjs` needs no behaviour change.
-  `classifyTrailer` already judges every trailer on its own and lets the worst verdict win, so a
-  commit naming an allowed author and an allowed reviewer passes today; only the comment's closing
-  sentence ("a commit has exactly one authoring model") contradicts the moved rule.
-  FINAL STATE: each of the twelve is READ against the moved rule and its wording made to match —
-  a restatement with nothing to say about the reviewer trailer keeps its own words rather than
-  being padded — and each is stamped with `node scripts/rule-echo.mjs --stamp <file> --quote
-  '<phrase from that file>'`. `node scripts/rule-echo.mjs` then reports model-policy clean.
-  VERIFIABLE: `node scripts/rule-echo.mjs` reports no stale model-policy restatement; the unit
-  layer stays green (four of the stamped files are `*-core.mjs` modules with their own tests).
-  Criticality: low — no product behaviour; the cost is that the batch's own model rules read
-  differently depending on which copy a session opens.
-  Bundle: Modell & Wächter.
