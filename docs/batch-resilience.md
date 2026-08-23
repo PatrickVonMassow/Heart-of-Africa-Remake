@@ -383,19 +383,24 @@ It answers exactly one of four verdicts and never spawns anything:
 - **OUTAGE-PAUSE** — two distinct children dead of the same signature inside 15
   minutes. It pauses the batch, writes a German reason into
   `.claude/batch-paused`, files a board card and sends an urgent notification.
-  Nothing is retried.
+  Nothing is retried immediately. This describes the current verdict; the
+  binding policy is `docs/batch-autonomy.md` inventory P6. The pause is a
+  clocked circuit breaker, not a handoff to the user: the Failure-lane retry
+  follow-up gives the point a durable probe/requeue record and prevents this
+  state from becoming a clockless whole-batch stop.
 - **STAND-DOWN** — the batch is paused, or this session does not own the lock.
   It records nothing in that case; a session that may not act leaves no
   footprints either.
 
 The exit code is always 0 — the verdict is the output, not the status. An
-internal error degrades to "no automatic verdict, decide by hand": fail-open in
-the sense that it never traps the session, but deliberately NOT to "retry",
-because a retry taken on a decision the code could not make is the exact
-retry-into-an-outage this layer exists to prevent. Its runtime state (the outage
-window and the per-point retry/token budget) lives in `.claude/resilience/`;
-deleting it forgets the window, never work. `--status`, `--complete --point <n>`
-and `--forget --point <n>` read and adjust it by hand.
+internal error degrades to "no automatic verdict, decide by hand": “by hand”
+means the owning agent diagnoses from the branch and evidence, never that the
+batch waits for the user. It deliberately does NOT mean “retry”, because a retry
+taken on a decision the code could not make is the exact retry-into-an-outage
+this layer exists to prevent. Its runtime state (the outage window and the
+per-point retry/token budget) lives in `.claude/resilience/`; deleting it forgets
+the window, never work. `--status`, `--complete --point <n>` and `--forget
+--point <n>` let the owning agent read and adjust it explicitly.
 
 **It is deliberately NOT idempotent per death.** Running the identical command
 twice for ONE death books two retries against that point's budget. The command
