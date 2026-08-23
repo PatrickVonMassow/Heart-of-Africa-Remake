@@ -68,7 +68,6 @@ const discoveredHumanWaitFiles = SEARCH_ROOTS
 // together, so neither drift direction passes silently.
 const HUMAN_WAIT_FILES = [
   'docs/batch-owner-runbook.md',
-  'docs/batch-resilience.md',
   'scripts/batch-autostart.mjs',
   'scripts/batch-doctor-core.mjs',
   'scripts/batch-in-flight-core.mjs',
