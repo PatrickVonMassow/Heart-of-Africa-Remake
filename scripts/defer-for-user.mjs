@@ -126,10 +126,13 @@ const repeatedFlag = (args) => {
     // cannot find on their own command line.
     if (seen.has(flag)) return arg === flag ? arg : `${arg} (the same flag as ${flag})`
     seen.add(flag)
-    // Step OVER the value this flag consumes. Judging a value by the token in
-    // front of it was a heuristic, and it lost a real repeat as soon as a value
-    // was itself dash-shaped (sixth cross-vendor round, GPT-5.6 Sol).
-    if (!VALUELESS_FLAGS.has(flag)) i += 1
+    // Step OVER the value this flag consumes — by exactly the rule `option()`
+    // reads values with, so the two never disagree: a token beginning with two
+    // dashes is NO value, and stays visible as a flag of its own. Judging a
+    // value by the token in front of it was a heuristic instead, and it lost a
+    // real repeat as soon as a value was itself dash-shaped (sixth and seventh
+    // cross-vendor rounds, GPT-5.6 Sol).
+    if (!VALUELESS_FLAGS.has(flag) && !String(args[i + 1] ?? '').startsWith('--')) i += 1
   }
   return ''
 }
