@@ -376,13 +376,21 @@ describe('the coordinator credential', () => {
     // A bare string would spread into one-character push arguments.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: 'main' }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', ''] }).ok).toBe(false)
-    // Options and refspecs are not ref names.
+    // Options, forced refspecs, refspecs and revision syntax are not ref names.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['--force', 'main'] }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main:other'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [`+${CREDENTIAL_REF}`] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['HEAD~1'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main@{1}'] }).ok).toBe(false)
     // Naming the credential ref beside real work would duplicate the argument the
-    // push appends itself — refused, not filtered.
+    // push appends itself — refused, not filtered — and a trailing shorthand git
+    // could resolve to it is refused with it.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [CREDENTIAL_REF] }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', CREDENTIAL_REF] }).reason).toMatch(/appended by the push/)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['hoa/coordinator'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['coordinator'] }).ok).toBe(false)
+    // Real work refs still pass.
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['refs/heads/feat-x'] }).ok).toBe(true)
   })
 
   it('a publication never changes the generation; recovery mints one', () => {
@@ -617,20 +625,44 @@ describe('the daemon command table', () => {
     expect(idempotencyKey('probe-cmd', inherited, { table }).reason).toMatch(/missing/)
   })
 
-  it('lossy values are refused at every depth, and a non-object payload refuses instead of throwing', () => {
-    // Everything canonical JSON flattens or drops would collide two payloads into
-    // one key: {x:NaN} with {x:null}, [() => {}] with [null], {x:undefined} with {}.
+  it('key values are scalars the serialisation cannot lose, and a non-object payload refuses instead of throwing', () => {
+    // Composite values are refused WHOLESALE: every attempt to admit "harmless"
+    // objects re-opened a collision (flattened functions, dropped undefined,
+    // prototype-filled holes, unstable accessors). Identity fields are scalars.
     const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1'] })
     expect(idempotencyKey('probe-cmd', { f1: { x: NaN } }, { table }).reason).toMatch(/unkeyable/)
-    expect(idempotencyKey('probe-cmd', { f1: [1, [Infinity]] }, { table }).reason).toMatch(/unkeyable/)
-    expect(idempotencyKey('probe-cmd', { f1: [() => {}] }, { table }).reason).toMatch(/unkeyable/)
-    expect(idempotencyKey('probe-cmd', { f1: { x: undefined } }, { table }).reason).toMatch(/unkeyable/)
-    // eslint-disable-next-line no-sparse-arrays
-    expect(idempotencyKey('probe-cmd', { f1: [, 1] }, { table }).reason).toMatch(/unkeyable/)
-    expect(idempotencyKey('probe-cmd', { f1: { x: null } }, { table }).ok).toBe(true)
-    expect(idempotencyKey('probe-cmd', { f1: [null] }, { table }).ok).toBe(true)
+    expect(idempotencyKey('probe-cmd', { f1: { x: null } }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: [null] }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: () => {} }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: '' }, { table }).reason).toMatch(/unkeyable/)
+    // -0 renders as 0, so admitting both would collide two distinguishable values.
+    expect(idempotencyKey('probe-cmd', { f1: -0 }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: 0 }, { table }).ok).toBe(true)
+    expect(idempotencyKey('probe-cmd', { f1: true }, { table }).ok).toBe(true)
     expect(idempotencyKey('probe-cmd', null, { table }).reason).toMatch(/not an object/)
     expect(idempotencyKey('probe-cmd', 'payload', { table }).reason).toMatch(/not an object/)
+  })
+
+  it('reads each payload field once, and a __proto__ key field still reaches the material', () => {
+    const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1'] })
+    // An accessor answering differently per read must not show validation one
+    // value and the serialisation another.
+    let reads = 0
+    const unstable = {
+      get f1() {
+        reads += 1
+        return reads === 1 ? 'first' : undefined
+      },
+    }
+    expect(idempotencyKey('probe-cmd', unstable, { table }).ok).toBe(true)
+    expect(reads).toBe(1)
+    // Assignment would invoke the legacy __proto__ setter and drop the field, so
+    // two distinct values would both serialise as an empty material.
+    const { table: protoTable } = registerDaemonCommand({}, 'proto-cmd', { compensation: 'x', keyFields: ['__proto__'] })
+    const a = idempotencyKey('proto-cmd', JSON.parse('{"__proto__":"x"}'), { table: protoTable })
+    const b = idempotencyKey('proto-cmd', JSON.parse('{"__proto__":"y"}'), { table: protoTable })
+    expect(a.ok).toBe(true)
+    expect(a.key).not.toBe(b.key)
   })
 
   it('a mutation without a key cannot be applied at all', () => {

@@ -424,15 +424,21 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
   if (current && expectedOid === '') {
     return { ok: false, reason: 'a published credential cannot be leased as absent' }
   }
-  // "Carries work" means at least one REAL work ref: an array (a bare string would
-  // spread into characters), every element a plain ref NAME — no leading dash that
-  // git would read as an option, no colon that makes it a refspec, no whitespace.
-  if (!Array.isArray(refs) || refs.some((r) => typeof r !== 'string' || !r || r.startsWith('-') || /[:\s]/.test(r))) {
+  // "Carries work" means at least one REAL work ref. Fail-closed by POSITIVE
+  // syntax, not by listing what git syntax means something else: a plain ref name
+  // is word characters, dots, dashes and slashes, starting with a word character —
+  // which excludes options (-), forced refspecs (+), revision syntax (~ ^ @{ ..)
+  // and refspecs (:) without enumerating them. A bare string would spread into
+  // one-character push arguments, so the array shape is required too.
+  const plainRefName = (r) =>
+    typeof r === 'string' && /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(r) && !r.includes('..') && !r.endsWith('/')
+  if (!Array.isArray(refs) || !refs.every(plainRefName)) {
     return { ok: false, reason: 'refs must be an array of plain ref names' }
   }
-  // The credential ref is appended by the push itself; naming it in `refs` too
-  // would duplicate the argument, so it is refused rather than filtered out.
-  if (refs.includes(CREDENTIAL_REF)) {
+  // The credential ref is appended by the push itself; naming it — fully or by any
+  // trailing shorthand git could resolve to it — would duplicate or shadow that
+  // argument, so it is refused rather than filtered out.
+  if (refs.some((r) => r === CREDENTIAL_REF || CREDENTIAL_REF.endsWith(`/${r}`))) {
     return { ok: false, reason: 'the credential ref is appended by the push itself and is not work' }
   }
   if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
@@ -634,44 +640,40 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
   // The validator stays TOTAL: a payload that is not an object is a refusal, not a
   // TypeError out of Object.hasOwn.
   if (!payload || typeof payload !== 'object') return { ok: false, reason: `cannot key ${name}: the payload is not an object` }
-  // Own properties only — an inherited field is not an answer — and everything the
-  // serialisation would lose is refused AT EVERY DEPTH, because a lossy value makes
-  // the key non-injective (see containsUnkeyable).
-  const fieldValue = (f) => (Object.hasOwn(payload, f) ? payload[f] : undefined)
-  const missing = spec.keyFields.filter((f) => fieldValue(f) === undefined || fieldValue(f) === null)
+  // Each field is read from the payload EXACTLY ONCE, own properties only — an
+  // inherited field is not an answer, and a second read would let an unstable
+  // accessor show validation one value and the serialisation another. Every check
+  // below runs on this snapshot.
+  const values = spec.keyFields.map((f) => [f, Object.hasOwn(payload, f) ? payload[f] : undefined])
+  const missing = values.filter(([, v]) => v === undefined || v === null).map(([f]) => f)
   if (missing.length) return { ok: false, reason: `cannot key ${name}: missing ${missing.join(', ')}` }
-  const unkeyable = spec.keyFields.filter((f) => containsUnkeyable(fieldValue(f)))
+  const unkeyable = values.filter(([, v]) => !keyableScalar(v)).map(([f]) => f)
   if (unkeyable.length) {
     return { ok: false, reason: `cannot key ${name}: unkeyable ${unkeyable.join(', ')}` }
   }
   // Canonical JSON rather than joined strings: a delimiter-joined material lets a
   // VALUE that contains the delimiter and a field name collide two different
   // payloads into one key — and a collided key silently drops the second mutation
-  // as "already applied".
-  const picked = {}
-  for (const f of spec.keyFields) picked[f] = fieldValue(f)
-  const material = canonicalJson(picked)
+  // as "already applied". fromEntries, not assignment: assigning a `__proto__` key
+  // field would invoke the legacy setter and drop the field from the material.
+  const material = canonicalJson(Object.fromEntries(values))
   return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex').slice(0, 16)}` }
 }
 
-/** Anything, at any depth, that canonical JSON would flatten or drop — a non-finite
- *  number, a function, a symbol, an undefined value, an array hole. The KEY must be
- *  injective over what it admits: two payloads that differ only in a value the
- *  serialisation loses would share one key, and the second mutation would be
- *  silently dropped as already applied. */
-function containsUnkeyable(value) {
-  if (value === null) return false
-  const t = typeof value
-  if (t === 'string' || t === 'boolean') return false
-  if (t === 'number') return !Number.isFinite(value)
-  if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i += 1) {
-      if (!(i in value) || value[i] === undefined || containsUnkeyable(value[i])) return true
-    }
-    return false
-  }
-  if (t === 'object') return Object.values(value).some((v) => v === undefined || containsUnkeyable(v))
-  return true
+/** A key value must be a SCALAR the serialisation cannot lose: a non-empty string,
+ *  a boolean, or a finite number that is not -0 (which would render as 0 and
+ *  collide two distinguishable values). Composite values are refused WHOLESALE
+ *  rather than walked: every attempt to admit "harmless" objects re-opened a
+ *  collision — flattened functions, dropped undefined values, holes filled from a
+ *  prototype, accessors answering differently per read — and identity fields
+ *  (batchId, attemptId, requestId, state, at, fence) are scalars by design. The KEY
+ *  must be injective over what it admits, because a collided key silently drops the
+ *  second mutation as already applied. */
+function keyableScalar(value) {
+  if (typeof value === 'string') return value.length > 0
+  if (typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value) && !Object.is(value, -0)
+  return false
 }
 
 /** Applying a key that has already been applied changes nothing and says so. This
