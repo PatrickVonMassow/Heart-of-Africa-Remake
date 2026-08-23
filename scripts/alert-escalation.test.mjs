@@ -9,11 +9,13 @@ import { join } from 'node:path'
 import {
   boardCard,
   continuationCardBody,
+  corruptionCardBody,
   escalate,
   higherPriority,
   logLine,
   PRIORITY_ORDER,
   readLadder,
+  runCorruptionRepair,
   writeLadder,
 } from './alert-escalation.mjs'
 import { ALERT_GAPS_MS, ALERT_PAUSE_RUNG } from './alert-escalation-core.mjs'
@@ -37,6 +39,7 @@ const harness = () => {
     logPath: join(dir, 'ladder.log'),
     board: (...args) => (cards.push(args), true),
     pause: { isPaused: () => false, setPaused: () => {} },
+    repair: () => ({ ok: true, exitCode: 0 }),
     cards,
   }
 }
@@ -149,15 +152,15 @@ describe('escalate — the full climb, on real files', () => {
     expect(readLadder(h.ladderPath).alerts[Object.keys(readLadder(h.ladderPath).alerts)[0]].rung).toBe(2)
   })
 
-  it('PAUSES the batch with a board card for repository corruption at the last rung', async () => {
-    // The rung that makes the difference: an alert can be slept through, a
-    // paused batch with a card cannot.
+  it('REPAIRS repository corruption, records the choice, and keeps a capped probe', async () => {
     const h = harness()
     let now = T0
-    let paused = null
-    const pause = { isPaused: () => paused != null, setPaused: (r) => (paused = r) }
+    let last
+    const setPaused = vi.fn()
+    const repair = vi.fn(() => ({ ok: false, exitCode: 1 }))
+    const pause = { isPaused: () => false, setPaused }
     for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
-      const v = await escalate({
+      last = await escalate({
         title: 'REPOSITORY INTEGRITY',
         message: `broken invariant ${100 + i}`,
         env: {},
@@ -166,17 +169,21 @@ describe('escalate — the full climb, on real files', () => {
         now,
         ...h,
         pause,
+        repair,
       })
-      v.commit?.()
+      last.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
-    expect(paused).toMatch(/Eskalation/)
-    expect(paused).toMatch(/Korruptionsklasse „repository-integrity“/)
-    expect(paused).toMatch(/Weiterarbeiten, nicht Warten/)
-    expect(paused).toMatch(/batch-paused/)
+    expect(last.decision.action).toBe('repair-and-probe')
+    expect(last.decision.nextRung).toBe(ALERT_PAUSE_RUNG)
+    expect(last.decision.nextAttemptAt).toBeGreaterThan(T0)
+    expect(repair).toHaveBeenCalledOnce()
+    expect(setPaused).not.toHaveBeenCalled()
     expect(h.cards).toHaveLength(1)
-    expect(h.cards[0][0]).toMatch(/Batch pausiert/)
-    expect(readFileSync(h.logPath, 'utf8')).toMatch(/PAUSED THE BATCH/)
+    expect(h.cards[0][0]).toBe(last.decision.decisionCard)
+    expect(h.cards[0][1]).toMatch(/Quarantäne- und Rescue-Nachweise/)
+    expect(h.cards[0][1]).toMatch(/Nächster Versuch:/)
+    expect(readFileSync(h.logPath, 'utf8')).toMatch(/CORRUPTION REPAIR REMAINS/)
   })
 
   it('does not pause a second time while the batch is already paused', async () => {
@@ -317,6 +324,27 @@ describe('the reason reaches the morning reader', () => {
     expect(body).toMatch(/Batch läuft.*weiter/)
     expect(body).toMatch(/Board out of date/)
     expect(body).toMatch(/Retroaktives Veto/)
+  })
+
+  it('the corruption record names the repair result, next attempt, and veto', () => {
+    const body = corruptionCardBody(
+      'Repository integrity',
+      'conflict marker found',
+      {
+        alertClass: 'repository-integrity',
+        repair: { remedy: 'batch-doctor quarantine or repair' },
+        nextAttemptAt: T0 + ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+      },
+      { ok: false, exitCode: 1 },
+      '24.08.2026, 02:00',
+    )
+    expect(body).toMatch(/batch-doctor quarantine or repair/)
+    expect(body).toMatch(/Nächster Versuch:/)
+    expect(body).toMatch(/Retroaktives Veto/)
+  })
+
+  it('a doctor execution failure returns evidence instead of throwing', () => {
+    expect(runCorruptionRepair({ repair: { command: ['scripts/batch-doctor.mjs', '--repair'] } }, { cwd: dir })).toMatchObject({ ok: false })
   })
 
   it('logLine appends a timestamped line', () => {

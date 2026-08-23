@@ -14,9 +14,10 @@ import {
   alertKey,
   clearLadder,
   continuationDecisionCard,
+  corruptionDecisionCard,
+  corruptionRecovery,
   describeEscalation,
   escalationDecision,
-  escalationPauseReason,
   ladderEntry,
 } from './alert-escalation-core.mjs'
 
@@ -100,12 +101,15 @@ describe('escalationDecision — a repeated identical alert backs off', () => {
   })
 })
 
-describe('escalationDecision — only the closed corruption list may PAUSE the batch', () => {
+describe('escalationDecision — only the closed corruption list may run a repair', () => {
   const topEntry = { rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: ALERT_PAUSE_RUNG }
   const corruption = { ...at(topEntry), title: 'REPOSITORY INTEGRITY', priority: 'high', alertClass: 'repository-integrity' }
 
-  it.each(CORRUPTION_ALERT_CLASSES)('allows the explicit %s corruption class to pause', (alertClass) => {
-    expect(escalationDecision({ ...corruption, alertClass }).action).toBe('pause-and-send')
+  it.each(CORRUPTION_ALERT_CLASSES)('gives the explicit %s corruption class its named repair', (alertClass) => {
+    const d = escalationDecision({ ...corruption, alertClass })
+    expect(d.action).toBe('repair-and-probe')
+    expect(d.repair).toEqual(corruptionRecovery(alertClass))
+    expect(d.repair.command).toEqual(['scripts/batch-doctor.mjs', '--repair'])
   })
 
   it('does not let an urgent but unknown class acquire pause authority', () => {
@@ -118,51 +122,55 @@ describe('escalationDecision — only the closed corruption list may PAUSE the b
     expect(d.action).toBe('continue-and-record')
   })
 
-  it.each(CORRUPTION_ALERT_CLASSES)('does not let a `recurring` declaration disarm the %s pause', (alertClass) => {
+  it.each(CORRUPTION_ALERT_CLASSES)('does not let a `recurring` declaration disarm the %s repair', (alertClass) => {
     // THE ESCAPE HATCH this point exists to close: if `recurring` were read
     // before the corruption class, any caller could keep the batch running
     // through a closed-list safety condition by calling itself an event —
     // silently, with every other case here still green. Over the WHOLE closed
     // list, so a per-class special case cannot leave one class disarmable.
     const d = escalationDecision({ ...corruption, alertClass, priority: 'low', recurring: true })
-    expect(d.action).toBe('pause-and-send')
+    expect(d.action).toBe('repair-and-probe')
     expect(d.priority).toBe('urgent')
-    expect(d.decisionCard).toBeUndefined()
-    expect(d.reason).toMatch(/authorizes a pause/)
+    expect(d.decisionCard).toMatch(/^Entscheidungsprotokoll:/)
+    expect(d.reason).toMatch(/quarantine or repair/)
     expect(d.reason).not.toMatch(/recurring EVENT/)
   })
 
-  it('does NOT re-pause a batch that is already paused', () => {
-    // Stand-down: the pause is a state, not an action to repeat.
+  it('stands down its repair while the batch is already paused', () => {
     const d = escalationDecision({ ...corruption, paused: true })
     expect(d.action).toBe('send')
     expect(d.reason).toMatch(/ALREADY paused/)
   })
 
-  it('falls silent above the last rung — the corruption pause and card now carry the message', () => {
-    const d = escalationDecision({ ...corruption, entry: { rung: ALERT_PAUSE_RUNG + 1, lastSentAt: NOW - 10 * MIN, firstSentAt: NOW - 300 * MIN, sends: 5 } })
-    expect(d.action).toBe('suppress')
-    expect(d.reason).toMatch(/corruption-class alert paused/)
+  it('repairs old above-ceiling corruption state onto the capped probe rung', () => {
+    const d = escalationDecision({ ...corruption, entry: { rung: ALERT_PAUSE_RUNG + 1, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 5 } })
+    expect(d.action).toBe('repair-and-probe')
+    expect(d.rung).toBe(ALERT_PAUSE_RUNG)
+    expect(d.nextRung).toBe(ALERT_PAUSE_RUNG)
   })
 
-  it('reaches the pause in under four hours of an unanswered condition', () => {
-    // A ladder that only pauses after a working day would not have caught the
+  it('keeps a clock between capped corruption repairs', () => {
+    const d = escalationDecision({ ...corruption, entry: { rung: ALERT_PAUSE_RUNG + 1, lastSentAt: NOW - 10 * MIN, firstSentAt: NOW - 300 * MIN, sends: 5 } })
+    expect(d.action).toBe('suppress')
+    expect(d.dueInMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG] - 10 * MIN)
+  })
+
+  it('reaches the repair in under four hours of an unanswered condition', () => {
+    // A ladder that only repairs after a working day would not have caught the
     // night either.
     const total = ALERT_GAPS_MS.reduce((a, b) => a + b, 0)
     expect(total).toBeLessThanOrEqual(4 * 60 * MIN)
     expect(total).toBeGreaterThanOrEqual(2 * 60 * MIN)
   })
 
-  it('names the corruption class, why continuing is unsafe, and the way out', () => {
-    const reason = escalationPauseReason('FORBIDDEN MODEL', escalationDecision(corruption), '30.07.2026, 04:00')
-    expect(reason).toMatch(/Eskalation/)
-    expect(reason).toMatch(/FORBIDDEN MODEL/)
-    expect(reason).toMatch(/Korruptionsklasse „repository-integrity“/)
-    expect(reason).toMatch(/weiteres Arbeiten.*beschädigen.*Korruption ausweiten/)
-    expect(reason).toMatch(/Weiterarbeiten, nicht Warten, die unsichere Handlung/)
-    expect(reason).not.toMatch(/Benachrichtigung kann man verschlafen/)
-    expect(reason).toMatch(/batch-paused/)
-    expect(reason).toMatch(/Restart-Uhr/)
+  it('names the corruption class, its repair, decision record, and next attempt', () => {
+    const d = escalationDecision(corruption)
+    expect(d.alertClass).toBe('repository-integrity')
+    expect(d.repair.remedy).toMatch(/doctor quarantine or repair/)
+    expect(d.decisionCard).toBe(corruptionDecisionCard('REPOSITORY INTEGRITY', 'repository-integrity'))
+    expect(d.nextAttemptAt).toBe(NOW + ALERT_GAPS_MS[ALERT_PAUSE_RUNG])
+    expect(d.probeAfterMs).toBe(ALERT_GAPS_MS[ALERT_PAUSE_RUNG])
+    expect(d).not.toHaveProperty('clockless')
   })
 })
 
