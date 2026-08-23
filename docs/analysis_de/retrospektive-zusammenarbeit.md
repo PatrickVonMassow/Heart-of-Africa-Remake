@@ -1321,7 +1321,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 01:30 · Quellen-Fingerprint: `700d677c61ec…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 02:36 · Quellen-Fingerprint: `4684fb27bab9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1416,10 +1416,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 86 Prozess-/Meta-TASKS-Punkte (davon 32 offen).
+Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 87 Prozess-/Meta-TASKS-Punkte (davon 33 offen).
 
-<!-- RETRO-FINGERPRINT: 700d677c61ecc1fcfcebe485b9e19356f014ca272130df3ad029fc9440faab4d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-22T23:30:47.679Z -->
+<!-- RETRO-FINGERPRINT: 4684fb27bab9ac5af7759043922197fa8405ba41bce7f5d803e38bd465ed2b67 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T00:36:34.647Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2880,3 +2880,29 @@ Prozess woanders steht?* und *Wenn eine zweite Instanz trotzdem läuft — erfä
 demselben Zustand, oder glaubt sie ihrer eigenen Kopie?* Und für die Erkennung: Wer fragt, ob
 noch jemand arbeitet, fragt das Repository, nicht die Anmeldeliste. Verwandt mit §3.112 (der
 verdrahtete, aber wirkungslose Mechanismus).
+
+### 3.162 Der Wegweiser zeigt auf eine Straße, die nie gebaut wurde
+
+In der Nacht zum 23.08.2026 sollte die nächste Stufe von Punkt 834 beauftragt werden. Der Router
+antwortete korrekt: nach achtzehn erfolglosen Prüfrunden eskaliert der Punkt gemäß §6 in die
+Fable-Bahn. Dort gibt es kein Kommando. Es existiert kein `author-fable.mjs`, und der einzige
+Rekorder, der eine Beauftragung ins Vier-Augen-Ledger schreibt, trägt das Modell fest verdrahtet
+als Sol ein — eine Beauftragung in der eskalierten Bahn ließe sich also nicht einmal wahrheitsgemäß
+protokollieren.
+
+Das ist nicht der verdrahtete, aber wirkungslose Mechanismus aus §3.112. Hier entscheidet die
+Mechanik richtig und vollständig; was fehlt, ist die ausführende Hälfte hinter ihrer Entscheidung.
+Der Unterschied zeigt sich an dem, was die Lücke der Sitzung anbietet: Alle drei naheliegenden
+Auswege sind Regelbrüche. Die Eskalation mit `--anyway` überstimmen heißt, genau die Bahn
+weiterzufahren, die achtzehnmal gescheitert ist. Selbst weiterschreiben heißt, den neunzehnten
+Versuch desselben Modells zu starten, gegen das die Eskalation gerichtet war. Von Hand ins
+append-only-Ledger schreiben heißt, die Haltbarkeitsgarantie der einen Datei zu verletzen, die
+ehrlich sein soll. Eine Sackgasse, die nur durch Regelbruch verlassen werden kann, ist gefährlicher
+als eine offene Lücke: Sie erzeugt Druck genau in dem Moment, in dem niemand zusieht.
+
+**Lehre:** Eine Weiche darf nur Ziele nennen, für die eine Fahrt existiert. Wer einen
+Entscheidungspfad einbaut, baut im selben Zug den ausführenden Befehl und dessen Protokollzeile —
+oder die Weiche nennt das Ziel gar nicht erst. Prüffrage bei jeder Verzweigung: *Wenn dieser Zweig
+gewählt wird, welches Kommando führt ihn aus, und was schreibt es auf?* Und wo die Antwort fehlt,
+gehört sie als eigener Punkt vor den, der auf sie wartet — nicht hinter ihn. Verwandt mit §3.112
+(der verdrahtete, aber wirkungslose Mechanismus) und mit der Trennung von *benannt* und *gebaut*.
