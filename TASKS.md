@@ -11269,3 +11269,28 @@ to land than a mechanism that needs a review.
   Criticality: low — no product behaviour and no lost work; it is a guard that measures less
   than its own sentence, and the cost is a document that could grow past a ruling unnoticed.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 849. The parallel-session alert fires on the retired predecessor that already handed over.
+  MEASURED 23.08.2026, 05:30–05:40: a fresh batch session was told `PARALLEL SESSION DETECTED
+  (d0a27cfd-…)` on every one of its turns and sent to `batch-doctor --gate` each time. That
+  session's record in `.claude/session-process.json` is pid 1124 with `authorityState:
+  "retired"`, `retiredReason: "handover"`, and a `batchWriterAt` (1787455737576) that falls
+  BEFORE its own `retiredAt` (1787455765952) — the only recent write it made was the handover
+  itself. Its pid is alive because it is the VS Code extension's long-running interactive
+  session, which never writes to the batch. So the probe reads "a live pid wrote recently" and
+  concludes a competing writer, when what it actually measured was the predecessor standing
+  down.
+  WHAT IT COSTS: every turn pays a full `batch-doctor --gate` — about three minutes, and under
+  agent load its unit gate returns INCONCLUSIVE anyway, so the alert buys no information at
+  all. Worse, an alert that cries wolf on every turn is the one a session stops reading on the
+  turn it is real.
+  FINAL STATE: a session whose `authorityState` is `retired` is not counted as parallel, and a
+  write timestamped at or before that session's own `retiredAt` is never evidence of concurrent
+  work. A genuinely competing writer still raises the alert unchanged.
+  VERIFIABLE: unit cases over the liveness probe — a retired record with a live pid and a
+  handover-time write reports NO parallel session; a non-retired record with a live pid and a
+  recent write still reports one; and a retired record that wrote AFTER its `retiredAt` also
+  still reports one, because that is a real violation.
+  Criticality: low — no product behaviour; the cost is wasted gate time and an alert that
+  trains sessions to ignore it.
+  Bundle: Session- & Repo-Hygiene.
