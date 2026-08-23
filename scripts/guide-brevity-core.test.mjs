@@ -688,3 +688,37 @@ describe('auditGuide — the last two predicates read what the reader sees', () 
     expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
   })
 })
+
+// Round fifteen: no terminator may be a symbol, and a character reference
+// renders its character.
+describe('auditGuide — the enders hold no symbol, the reference its character', () => {
+  const O = '„'
+
+  it('recognises a segment named by a symbol the ender list used to hold', () => {
+    for (const path of ['docs/>', 'docs/`']) {
+      const { violations } = auditGuide(
+        doc(`- **Pfad** Siehe ${path} dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+      )
+      expect(violations.map((v) => v.kind), path).toContain('project-specific')
+    }
+  })
+
+  it('refuses a note whose sentence break hides in a character reference', () => {
+    for (const encoded of ['&#46;', '&#x2E;', '&period;', '&excl;', '&hellip;']) {
+      const { ok, violations } = auditGuide(
+        doc(`- **Kodierter Punkt** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(≈ 1,5x${encoded} Und danach geschah noch etwas)*`),
+      )
+      expect(ok, encoded).toBe(false)
+      expect(violations.map((v) => v.kind), encoded).toContain('prose-after-prompt')
+    }
+  })
+
+  it('still accepts the measured cost note, and reads a double-encoded reference literally', () => {
+    for (const note of ['*(≈ 1,5x Aufwand)*', '*(≈ 1,5x&amp;#46; Aufwand)*']) {
+      const { violations } = auditGuide(
+        doc(`- **Kostennotiz** Ein Risiko.\n  → *Prompt:* ${O}Tu es." ${note}`),
+      )
+      expect(violations.map((v) => v.kind), note).not.toContain('prose-after-prompt')
+    }
+  })
+})

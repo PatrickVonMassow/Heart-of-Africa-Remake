@@ -205,7 +205,10 @@ export const PROJECT_MARKERS = [
     // and `docs/.nojekyll` are both ordinary paths (round 11).
     // A COMBINING MARK is part of the word before it: the decomposed spelling of
     // `Menüdocs/a.md` handed the detector a directory name (round 10).
-    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/(?=[^\s/\\)\]}>,;"'`]*[\p{L}\p{N}\p{S}])[^\s/\\)\]}>,;"'`]/u,
+    // NO TERMINATOR MAY BE A SYMBOL: `>` (Sm) and the backtick (Sk) stood in the
+    // ender list, so a segment they "named" could never be seen — the list holds
+    // only punctuation, separators and whitespace (round 15).
+    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/(?=[^\s/\\)\]},;"']*[\p{L}\p{N}\p{S}])[^\s/\\)\]},;"']/u,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -353,16 +356,39 @@ const NOTE_MAX_CHARS = 77
 // and an HTML comment supplying letters to an otherwise empty prompt
 // (cross-vendor review, 23.08.2026, rounds 7 and 8). Chasing those one character
 // at a time is how a guard ends up with three holes instead of one rule.
+// A CHARACTER REFERENCE renders its character: `&#46;` is a period to the
+// reader, and leaving it encoded hid a sentence break from the note rule
+// (round 15). Numeric references decode completely; of the named ones the
+// table carries the HTML basics plus every reference that renders a character
+// some rule here searches for — the sentence enders, the multiplier, quotes
+// and parens. An unknown name stays literal — an invalid reference renders
+// literally in HTML too, and no valid name outside the table renders a
+// character in `[.!?…]` or `≈`, so nothing a rule searches for can hide in one.
+const NAMED_REFS = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  period: '.', comma: ',', excl: '!', quest: '?', colon: ':', semi: ';',
+  hellip: '…', mldr: '…', asymp: '≈', times: '×',
+  lpar: '(', rpar: ')', laquo: '«', raquo: '»',
+  bdquo: '„', ldquo: '“', rdquo: '”',
+}
+const decodeCharacterReferences = (text) =>
+  text.replace(/&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|([a-zA-Z][a-zA-Z0-9]*));/g, (whole, dec, hex, name) => {
+    if (name) return Object.hasOwn(NAMED_REFS, name) ? NAMED_REFS[name] : whole
+    const code = Number.parseInt(dec ?? hex, hex ? 16 : 10)
+    return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole
+  })
 export const renderedText = (text) =>
-  String(text ?? '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<[^>]*>/g, '')
-    // A LINK renders its text, never its destination — an empty label with a URL
-    // behind it supplied the letters of an otherwise empty prompt (round 9).
-    // …and a destination may itself carry a balanced pair of brackets, so the
-    // first `)` is not the end of it (round 10).
-    .replace(/\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, '$1')
-    .replace(/[*_`~]/g, '')
+  decodeCharacterReferences(
+    String(text ?? '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<[^>]*>/g, '')
+      // A LINK renders its text, never its destination — an empty label with a URL
+      // behind it supplied the letters of an otherwise empty prompt (round 9).
+      // …and a destination may itself carry a balanced pair of brackets, so the
+      // first `)` is not the end of it (round 10).
+      .replace(/\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, '$1')
+      .replace(/[*_`~]/g, ''),
+  )
 const isCostNote = (note) => {
   // THE WHOLE RULE READS THE RENDERED NOTE. Asking the raw Markdown whether it
   // carries the multiplier let a hidden `<!-- ≈ -->` license a paragraph of
