@@ -51,6 +51,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
 | 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
+| 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
 | 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
@@ -1322,7 +1323,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 05:17 · Quellen-Fingerprint: `ffb6889a39f4…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 05:45 · Quellen-Fingerprint: `3f39b409e9b3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1419,8 +1420,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 88 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
 
-<!-- RETRO-FINGERPRINT: ffb6889a39f401c626fcaa648eb459317e88fba291860dcef9ed18aa39de1a41 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T03:17:18.993Z -->
+<!-- RETRO-FINGERPRINT: 3f39b409e9b32307466ac77e9f1594f79c9f292e0239928e4899d82801dbbfbb -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T03:45:50.995Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2938,3 +2939,34 @@ das die Eingabe ohnehin in der Hand hält — das Prüfskript zeichnet sein eige
 das Kommando dafür ins Log zu legen; der In-Turn-Schritt stempelt die Karte, statt auf das Turn-Ende
 zu hoffen (Punkt 848). Verwandt mit §3.162 (die Weiche ohne Fahrt) — zusammen ergeben sie die
 Prüffrage: *Wenn dieser Zweig entscheidet, wer schreibt seine Eingabe, und wer fährt sein Ziel?*
+
+### 3.164 Der Alarm feuerte auf den Vorgänger, der gerade übergeben hatte
+
+Am Morgen des 23.08.2026 bekam eine frische Batch-Sitzung auf JEDEM ihrer Züge dieselbe Meldung:
+`PARALLEL SESSION DETECTED` — und wurde jedes Mal in einen vollständigen `batch-doctor --gate`
+geschickt, rund drei Minuten, unter der Last des gerade laufenden Autorenlaufs ohnehin mit dem
+Urteil „nicht bewertbar". Die gemeldete Sitzung war der zurückgetretene Vorgänger, der den Batch
+Sekunden zuvor an genau diese Sitzung übergeben hatte. Ihr Eintrag sagte das ausdrücklich:
+`authorityState: "retired"`, `retiredReason: "handover"` — und ihr letzter Schreibzugriff lag
+28 Millisekunden VOR ihrem eigenen Rücktritt, war also die Übergabe selbst. Lebendig war nur ihre
+PID, weil sie die interaktive VS-Code-Sitzung ist, die nie in den Batch schreibt. Die Sonde las
+„lebende PID hat gerade geschrieben" und schloss auf einen Konkurrenten (Punkt 849).
+
+Die Anatomie ist die von §3.158 (der Wächter hatte die Antwort schon gegeben): Das Feld, das die
+Frage entscheidet, stand in genau dem Datensatz, den die Sonde ohnehin öffnete — sie hat es nicht
+gelesen. Neu ist der PREIS. Ein Fehlalarm, der eine Zeile Ausgabe kostet, ist ein Schönheitsfehler;
+dieser hier kostete pro Zug drei Minuten Torlauf für null Information, und zwar auf einer Maschine,
+auf der derselbe Lauf wegen der Agentenlast gar kein Urteil fällen KANN. Damit verkehrt sich die
+Wirkung: Ein Alarm, der auf jedem Zug schreit und nie recht hat, wird abgehakt statt gelesen — und
+er ist dann genau an dem Zug stumm, an dem eine echte zweite Schreiberin danebensteht. Die drei
+Parallel-Session-Vorfälle vom 13./14.07., 23.07. und 20.08. sind der Grund, warum dieser Detektor
+überhaupt existiert; ein Detektor, der sich selbst unglaubwürdig macht, gibt diese Absicherung
+wieder her.
+
+**Lehre:** Ein Detektor wird nicht nur an seiner Trefferquote gemessen, sondern am PREIS seines
+Fehlalarms mal seiner Häufigkeit. Bevor eine Sonde aus indirekten Signalen (lebende PID, junger
+Zeitstempel) auf einen Zustand schließt, liest sie das Feld, in dem dieser Zustand ausdrücklich
+steht — und ein Ereignis, das zum Rücktritt selbst gehört, ist nie Beleg für Arbeit danach. Und
+wenn ein Alarm eine teure Pflichtmaßnahme auslöst, muss die Maßnahme unter den Bedingungen, unter
+denen der Alarm typischerweise feuert, überhaupt ein Urteil fällen können — sonst ist die Pflicht
+nur Zeremonie. Verwandt mit §3.161 (der Singleton wurde umgangen) und §3.158.
