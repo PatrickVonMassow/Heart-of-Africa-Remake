@@ -1,20 +1,18 @@
-// THE USER GATE — a point that waits on the user never jams the queue (point 450).
+// THE TYPED USER GATE — advice continues; only a real confirmation waits.
 // Pure and side-effect free, so the Vitest layer can sweep every rule against
 // text fixtures without a filesystem (scripts/user-gate-core.test.mjs).
 //
-// WHY THIS EXISTS. Two decisions had been waiting on the user since 29.07.2026,
-// and a fortnight of absence must not stop the batch. `defer-for-user.mjs` has
-// stamped `AWAITING-USER(<date>)` on such a point since 22.07.2026 — but nothing
-// READ it. The marker recorded no reason, no consumer skipped the point, the
-// board still rendered it as ordinary pending work, and "the assistant simply
-// skips it" was a convention living in a comment. This module turns that
-// convention into a mechanism the queue, the pool and the board all share.
+// `AWAITING-USER` used to mix advisory product questions with genuinely
+// outward-facing confirmations. That made either one non-commissionable. The
+// standing autonomy rule of 23.08.2026 reverses the unsafe default: uncertainty
+// continues, and only the closed confirmation class below may park a point.
 //
 // ---------------------------------------------------------------------------
 // THE MARKER SYNTAX (this is the documentation of record)
 // ---------------------------------------------------------------------------
 //
-//   - [ ] 462. SOME POINT … AWAITING-USER(2026-07-30; needs the user's ruling on X)
+//   - [ ] 462. SOME POINT … AWAITING-CONFIRMATION(2026-07-30; push the version tag; safe prepared state: artifacts verified locally and no tag pushed)
+//   - [ ] 463. SOME POINT … SELF-DECIDED(2026-08-23; migrated advisory question)
 //   - [ ] 462. SOME POINT … USER-ANSWERED(2026-08-07)
 //
 // * Both markers live at the END of the point's OWN head line — the `- [ ] N.`
@@ -29,16 +27,16 @@
 //   reachable through the shipped command.
 // * The LAST marker on the line is the state. That is what "the answer came
 //   after the gate" means mechanically, and it needs no precedence rule.
-// * `AWAITING-USER(<since>; <why>)` — `<since>` is an ISO date (or timestamp),
-//   `<why>` is one line of English prose (the work order is English by rule).
-//   The `;` separates them; everything after the first `;` is the reason.
-// * The REASON IS THE POINT of the marker: the queue skips the point *after
-//   recording why*, and the marker is that record — durable, in the work order,
-//   visible to every session and to the user. `defer-for-user.mjs` refuses to
-//   write a gate without one. A LEGACY marker with no reason (or a bare
-//   `AWAITING-USER` with no brackets at all) is still honoured as a gate — the
-//   safe direction is always to skip, never to hand the user's absence a way of
-//   jamming the queue — but it is REPORTED as reasonless so it can be repaired.
+// * `AWAITING-CONFIRMATION(<since>; <why>)` is the only gate. Its reason must
+//   name one of the policy's closed outward-facing acts AND the state safely
+//   prepared before that act. The writer refuses everything else.
+// * `SELF-DECIDED(<at>; <summary>)` records that an advisory choice took the
+//   reversible-default lane. Its `Entscheidungsprotokoll:` board card is the
+//   detailed record (decision, evidence, consequence and exact veto action).
+// * Legacy `AWAITING-USER` is classified from its OWN reason. It gates only if
+//   that reason meets today's confirmation rule. Missing or ambiguous reasons
+//   fall toward `SELF-DECIDED`/continuation. `--migrate` makes that verdict
+//   explicit and reports every legacy marker with the reason it judged.
 // * `USER-ANSWERED(<when>)` is what the gate becomes when the answer arrives.
 //   It is not cosmetic: it is what puts the point back at the HEAD of the queue
 //   (`queueOrder` ranks it ahead of everything else), and it stays on the line
@@ -55,8 +53,15 @@
 // is no candidate, so an idle pool slot owes no reason for it) and
 // defer-for-user.mjs (which writes it).
 
-/** The marker that gates a point on the user. */
-export const GATE_MARKER = 'AWAITING-USER'
+/** The only marker that gates a point on the user. */
+export const CONFIRMATION_MARKER = 'AWAITING-CONFIRMATION'
+export const GATE_MARKER = CONFIRMATION_MARKER
+
+/** Untyped predecessor, read only for deterministic migration. */
+export const LEGACY_GATE_MARKER = 'AWAITING-USER'
+
+/** An advisory choice resolved from evidence while the point stays workable. */
+export const SELF_DECIDED_MARKER = 'SELF-DECIDED'
 
 /** …and the one that records the answer and sends the point to the queue head. */
 export const ANSWERED_MARKER = 'USER-ANSWERED'
@@ -70,7 +75,8 @@ export const REASON_MAX = 160
  * head line's own headline text as much as a reason that names the mechanism.
  * Written against a line whose trailing `\r` has already been peeled.
  */
-const MARKER_TAIL_RE = new RegExp(`(?:^|\\s)(${GATE_MARKER}|${ANSWERED_MARKER})(?:\\(([^)]*)\\))?[ \\t]*$`)
+const MARKERS = [CONFIRMATION_MARKER, LEGACY_GATE_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
+const MARKER_TAIL_RE = new RegExp(`(?:^|\\s)(${MARKERS.join('|')})(?:\\(([^)]*)\\))?[ \\t]*$`)
 const HEAD_RE = /^- \[( |x)\] (\d+)\./
 /** CRLF checkouts are real on this repository (point 439) — peel, never assume. */
 const peelCr = (line) => String(line ?? '').replace(/\r+$/, '')
@@ -91,6 +97,38 @@ export function sanitiseReason(reason, { max = REASON_MAX } = {}) {
     .trim()
   if (!t) return ''
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t
+}
+
+/**
+ * Classify a proposed confirmation reason against the CLOSED U3 authority.
+ * Presentation words such as "outward-facing" do not grant authority by
+ * themselves: the reason must name the concrete act and what has safely been
+ * prepared without performing it.
+ */
+export function classifyConfirmationReason(reason) {
+  const text = sanitiseReason(reason, { max: 1000 })
+  const lower = text.toLowerCase()
+  const tagAct =
+    /\b(?:create|move|push|publish|apply)\w*\b[^.]{0,100}\b(?:version|poc|release)\b[^.]{0,50}\btag\b/.test(lower) ||
+    /\b(?:version|poc|release)\b[^.]{0,50}\btag\b[^.]{0,100}\b(?:create|move|push|publish|apply)\w*\b/.test(lower)
+  const publicReleaseAct =
+    /\b(?:dispatch|publish|deploy|release)\w*\b[^.]{0,100}\b(?:public|production)\b/.test(lower) ||
+    /\b(?:public|production)\b[^.]{0,100}\b(?:dispatch|publish|deploy|release)\w*\b/.test(lower)
+  const boardContractAct =
+    /\b(?:change|replace|restructure|alter)\w*\b[^.]{0,120}\b(?:published|public)\b[^.]{0,80}\b(?:four[- ]section|4[- ]section|section contract)\b/.test(lower) ||
+    /\b(?:four[- ]section|4[- ]section|section contract)\b[^.]{0,120}\b(?:change|replace|restructure|alter)\w*\b/.test(lower)
+  const prepared =
+    /\b(?:safe|safely)\s+prepared\s+state\b/.test(lower) ||
+    /\bprepared\b[^.]{0,120}\b(?:locally|without|not|unchanged|unpublished|unpushed|undispatched|undeployed)\b/.test(lower) ||
+    /\b(?:locally|verified|built|staged|ready|unchanged)\b[^.]{0,120}\b(?:not|no|without|before)\b[^.]{0,80}\b(?:push|publish|dispatch|deploy|tag|change)\w*\b/.test(lower)
+  const act = tagAct ? 'release-tag' : publicReleaseAct ? 'public-release' : boardContractAct ? 'board-contract' : ''
+  if (!act) {
+    return { verdict: 'advisory', act: '', reason: text, error: 'reason does not name an authorized outward-facing act' }
+  }
+  if (!prepared) {
+    return { verdict: 'advisory', act, reason: text, error: 'reason does not name the safe prepared state before that act' }
+  }
+  return { verdict: 'confirmation', act, reason: text, error: '' }
 }
 
 /**
