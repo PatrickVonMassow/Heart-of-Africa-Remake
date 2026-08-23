@@ -110,6 +110,24 @@ describe('defer-for-user — reading the flags', () => {
     expect(r.stdout).toBe('')
   })
 
+  it('refuses the short spelling twice, and a mixed pair, under the flag they mean', () => {
+    const short = run('-h', '-h')
+    expect(short.code).toBe(1)
+    expect(short.stderr).toMatch(/-h \(the same flag as --help\) is given more than once/)
+    expect(short.stdout).toBe('')
+
+    const mixed = run('--help', '-h')
+    expect(mixed.code).toBe(1)
+    expect(mixed.stderr).toMatch(/-h \(the same flag as --help\) is given more than once/)
+    expect(mixed.stdout).toBe('')
+  })
+
+  it('still answers a single -h, and leaves a dash-shaped field value alone', () => {
+    expect(run('-h').code).toBe(0)
+    const r = run('42', '--act', 'release-tag', '--detail', '-v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
+    expect(r.stderr).not.toMatch(/given more than once/)
+  })
+
   it('still answers a single --help on stdout', () => {
     const r = run('--help')
     expect(r.code).toBe(0)

@@ -94,6 +94,15 @@ const option = (args, name) => {
   return value.startsWith('--') ? '' : value.trim()
 }
 
+/** The short spellings this command answers — today only `-h`. A repeat is a
+ *  repeat whichever spelling it was written in, so the check compares the flag
+ *  a token MEANS, not the characters it was typed with (sixth cross-vendor
+ *  round, GPT-5.6 Sol, 23.08.2026: `-h -h` slipped past a check that only ever
+ *  looked at `--`). Single-dash tokens that are NOT a known alias stay out of
+ *  it — a field value may legitimately begin with a dash.
+ */
+const FLAG_ALIASES = new Map([['-h', '--help']])
+
 /**
  * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round, GPT-5.6
  * Sol, 23.08.2026). `indexOf` keeps the FIRST value and drops the rest in
@@ -102,10 +111,15 @@ const option = (args, name) => {
  */
 const repeatedFlag = (args) => {
   const seen = new Set()
-  for (const arg of args) {
-    if (!String(arg).startsWith('--')) continue
-    if (seen.has(arg)) return arg
-    seen.add(arg)
+  for (const raw of args) {
+    const arg = String(raw)
+    const flag = FLAG_ALIASES.get(arg) ?? arg
+    if (!flag.startsWith('--')) continue
+    // Named as it was TYPED, with the flag it means beside it when the two
+    // differ — otherwise `--help -h` would be refused under a name the reader
+    // cannot find on their own command line.
+    if (seen.has(flag)) return arg === flag ? arg : `${arg} (the same flag as ${flag})`
+    seen.add(flag)
   }
   return ''
 }
