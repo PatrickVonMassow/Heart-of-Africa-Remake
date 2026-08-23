@@ -151,6 +151,7 @@ export function recordAuthoringCommission({
   round = 0,
   framing = '',
   sha = '',
+  model = SOL_MODEL_NAME,
   now = Date.now(),
   append = () => {},
   commit = () => {},
@@ -160,9 +161,11 @@ export function recordAuthoringCommission({
   const attempt = Number(round)
   const frame = String(framing ?? '').trim()
   const commitSha = String(sha ?? '').trim()
+  const authorModel = String(model ?? '').trim()
   if (!Number.isSafeInteger(wanted) || wanted < 0) throw new Error('an authoring commission needs a numeric point')
   if (!Number.isSafeInteger(attempt) || attempt < 0) throw new Error('an authoring commission needs a non-negative round')
   if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) throw new Error('an authoring commission needs the current commit sha')
+  if (!authorModel) throw new Error('an authoring commission needs the lane model')
 
   const existing = (Array.isArray(records) ? records : []).find(
     (record) =>
@@ -173,6 +176,9 @@ export function recordAuthoringCommission({
   if (existing) {
     if (String(existing.authorFraming ?? '').trim() !== frame) {
       throw new Error(`authoring round ${attempt} already has a different framing on record`)
+    }
+    if (String(existing.model ?? '').trim() !== authorModel) {
+      throw new Error(`authoring round ${attempt} already has a different lane model on record`)
     }
     return { written: false, record: existing }
   }
@@ -185,7 +191,7 @@ export function recordAuthoringCommission({
     point: wanted,
     round: attempt,
     authorFraming: frame,
-    model: SOL_MODEL_NAME,
+    model: authorModel,
     at,
     atIso: new Date(at).toISOString(),
   }
