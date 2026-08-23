@@ -53,12 +53,15 @@ import {
 } from './author-fable-core.mjs'
 import {
   AUTHOR_TIMEOUT_MS,
+  authorCommitMessage,
+  authorCompletionMessage,
   authoringCodexArgs,
   buildAuthoringPrompt,
   buildSpecExaminationPrompt,
   childEnv,
   formatAuthoringReport,
   judgeAuthoring,
+  interimCommitProblem,
   KILL_GRACE_MS,
   parseAuthoringAnswer,
   PUSH_INTERVAL_MS,
@@ -73,8 +76,8 @@ import {
 
 /** One git read in the WORKTREE this command was started in — never REPO_ROOT's
  *  idea of it: the whole lane exists to work in an isolated checkout. */
-function git(args, { cwd = process.cwd(), required = false } = {}) {
-  const res = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
+function git(args, { cwd = process.cwd(), required = false, input } = {}) {
+  const res = spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024, input })
   if ((res.status !== 0 || res.error) && required) {
     throw new Error(`git ${args.join(' ')} failed: ${(res.stderr || res.error?.message || '').trim()}`)
   }
@@ -265,14 +268,21 @@ function briefFor(number) {
  * and reported as "nothing was committed" while it sat on the branch all along.
  */
 export function commitsSince(base, { cwd = process.cwd(), ref = 'HEAD' } = {}) {
-  const field = '%H%x1f%s%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)'
+  // The full body is intentional. The commit-msg hook accepts Rescue in its own
+  // `-m` paragraph (the convention before this wrapper existed), while git's
+  // `%(trailers:key=Rescue)` sees only the final contiguous trailer block and
+  // would miss it. NUL cannot occur in a commit message, so it is a safe record
+  // separator even when the body contains arbitrary newlines.
+  const field = '%H%x1f%s%x1f%B%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)%x00'
   const log = git(['log', `--format=${field}`, `${base}..${ref}`], { cwd }) ?? ''
   return log
-    .split('\n')
+    .split('\0')
+    .map((record) => record.trim())
     .filter(Boolean)
-    .map((line) => {
-      const [sha, subject, trailers] = line.split(UNIT)
-      return { sha, subject: subject ?? '', trailers: trailers ?? '' }
+    .map((record) => {
+      const [sha, subject, body, trailers] = record.split(UNIT)
+      const rescue = /^\s*Rescue:\s*(\S.*)$/im.exec(body ?? '')?.[1] ?? ''
+      return { sha, subject: subject ?? '', rescue, trailers: trailers ?? '' }
     })
 }
 
@@ -401,6 +411,12 @@ export async function runAuthoringCodex({
     ? setInterval(() => {
         const head = tip()
         if (!head || head === lastPushed) return
+        const checkpoint = commitsSince(`${head}^`, { cwd, ref: head })[0]
+        const problem = interimCommitProblem(checkpoint)
+        if (problem) {
+          onPush({ ok: false, skipped: true, head, why: `checkpoint not pushed: ${problem}` })
+          return
+        }
         const { ok, why } = pushBranch(branch, { cwd })
         if (ok) lastPushed = head
         onPush({ ok, head, why })
@@ -777,16 +793,15 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       rollback: () => restoreLedger(ledgerBefore),
       commit: () => {
         git(['add', '--', recordsPath], { cwd, required: true })
-        git(
-          [
-            'commit',
-            '-m',
-            'Record hostile-test authoring commission',
-            '-m',
-            config.trailer,
-          ],
-          { cwd, required: true },
-        )
+        git(['commit', '-F', '-'], {
+          cwd,
+          required: true,
+          input: authorCommitMessage({
+            subject: 'Record hostile-test authoring commission',
+            rescue: 'the commissioned authoring run has not started yet',
+            trailer: config.trailer,
+          }),
+        })
       },
     })
     if (commissioned.written) {
@@ -815,8 +830,14 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       modelId: config.modelId,
       runtime: config.runtime,
       timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
-      onPush: ({ ok, head, why }) =>
-        console.error(ok ? `${commandName}: pushed ${String(head).slice(0, 7)} while the run continues` : `${commandName}: interim push failed — ${why}`),
+      onPush: ({ ok, skipped, head, why }) =>
+        console.error(
+          ok
+            ? `${commandName}: pushed ${String(head).slice(0, 7)} while the run continues`
+            : skipped
+              ? `${commandName}: interim push deferred — ${why}`
+              : `${commandName}: interim push failed — ${why}`,
+        ),
     })
     const outcome = config.runtime === 'claude' ? fableAuthoringOutcome(run) : classifyOutcome(run)
     const parsed = parseAuthoringAnswer(run.finalMessage)
@@ -828,23 +849,6 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
     // committed its work here, and discarding it would lose it (second
     // cross-vendor round). That it wandered is a PROBLEM, reported as one.
     const commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
-
-    // PUSHED BEFORE ANYTHING IS JUDGED: whatever the run did, what is committed
-    // must not live only in a worktree that a landing may delete underneath it.
-    // (The interval above has usually pushed it already; this is the last one.)
-    let pushed = null
-    if (commits.length) {
-      const res = pushBranch(branch, { cwd })
-      // A failed FINAL push over work the interval ALREADY pushed is not
-      // local-only work, and saying so would send the reader after a problem
-      // that is not there.
-      const tip = git(['rev-parse', `refs/heads/${branch}`], { cwd })
-      pushed = res.ok || (Boolean(tip) && tip === run.lastPushed)
-      if (!res.ok) {
-        console.error(`${commandName}: final push failed — ${res.why}`)
-        if (pushed) console.error('  (the interim push already carried this commit to the remote)')
-      }
-    }
 
     // `-uall` prevents Git from collapsing a wholly untracked directory into
     // one `?? dir/` row, so the path count agrees with the files numstat reads.
@@ -861,6 +865,52 @@ export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.
       fableState,
       runtime: config.runtimeLabel,
     })
+    for (const commit of commits) {
+      const problem = interimCommitProblem(commit)
+      if (problem) judged.problems.push(`${String(commit.sha).slice(0, 8)} is not an interim rescue commit: ${problem}`)
+    }
+    judged.clean = judged.problems.length === 0
+
+    // ONLY A CLEANLY FINISHED RUN CLAIMS COMPLETENESS. This commit is created
+    // after the process is gone, the tree is clean and its report names three
+    // green gates. A killed or malformed run can therefore leave rescue
+    // checkpoints, but can never acquire this unskipped claim from the wrapper.
+    const completionMessage = authorCompletionMessage(judged, config.trailer)
+    if (completionMessage) {
+      git(['commit', '--allow-empty', '-F', '-'], {
+        cwd,
+        required: true,
+        input: completionMessage,
+      })
+      judged.commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
+    } else if (commits.length && interimCommitProblem(commits[0])) {
+      // Once the child has stopped it is safe to put one rescue commit above a
+      // malformed checkpoint. The branch is then durable without starting CI;
+      // the validation problem remains visible and no completion is claimed.
+      git(['commit', '--allow-empty', '-F', '-'], {
+        cwd,
+        required: true,
+        input: authorCommitMessage({
+          rescue: 'the authoring run ended before a valid completion checkpoint',
+          trailer: config.trailer,
+        }),
+      })
+      judged.commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
+    }
+
+    // The last push carries either the sole unskipped completion commit or a
+    // rescue tip. A failed push over the exact tip already sent by the timer is
+    // not local-only work.
+    let pushed = null
+    if (judged.commits.length) {
+      const res = pushBranch(branch, { cwd })
+      const tip = git(['rev-parse', `refs/heads/${branch}`], { cwd })
+      pushed = res.ok || (Boolean(tip) && tip === run.lastPushed)
+      if (!res.ok) {
+        console.error(`${commandName}: final push failed — ${res.why}`)
+        if (pushed) console.error('  (the interim push already carried this commit to the remote)')
+      }
+    }
     const said = String(run.finalMessage ?? '').trim()
     if (said) console.log(`--- ${authorModel} said ---\n${said}\n--- end ---\n`)
     console.log(formatAuthoringReport({

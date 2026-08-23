@@ -40,6 +40,47 @@ export { SOL_MODEL_ID, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
  *  so the `commit-msg` gate and the serving-model tripwire both accept it. */
 export const SOL_TRAILER = allowedTrailers().find((t) => /sol/i.test(t)) ?? ''
 
+export const AUTHOR_COMPLETION_SUBJECT = 'Complete the authored changes'
+
+/**
+ * Build the two messages the wrapper is allowed to create.
+ *
+ * An interim message says, in both machine-readable halves, that the pushed
+ * tree is only a durable checkpoint. A final message is deliberately incapable
+ * of carrying either half: it is created only after the author process has
+ * exited cleanly and its report accounts for all three required gates.
+ *
+ * THE TRAILER IS THE LANE'S, NOT THIS FILE'S: `author-fable.mjs` drives the same
+ * wrapper, so a hard-coded Sol trailer would sign Fable's checkpoints as Sol's —
+ * and that trailer is the only machine-readable record of who authored a commit.
+ */
+export function authorCommitMessage({ subject = '', rescue = '', final = false, trailer = SOL_TRAILER } = {}) {
+  const oneLine = (value) => String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
+  const plainSubject = oneLine(subject)
+    .replace(/\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const heading = plainSubject || (final ? AUTHOR_COMPLETION_SUBJECT : 'Checkpoint authoring work')
+  const signature = String(trailer || SOL_TRAILER)
+  if (final) return `${heading}\n\n${signature}`
+  const reason = oneLine(rescue) || 'the authoring run is still in progress'
+  return `${heading} [skip ci]\n\nRescue: ${reason}\n${signature}`
+}
+
+/** A completion message exists only for a run the existing judge found clean. */
+export function authorCompletionMessage(judged = {}, trailer = SOL_TRAILER) {
+  return judged?.clean === true ? authorCommitMessage({ final: true, trailer }) : null
+}
+
+/** Why a child-authored checkpoint is not safe for an interim push. */
+export function interimCommitProblem(commit = {}) {
+  const subject = String(commit?.subject ?? '')
+  const rescue = String(commit?.rescue ?? '').trim()
+  if (!/\[skip ci\]/i.test(subject)) return 'its subject does not carry [skip ci]'
+  if (!rescue) return 'it does not carry a Rescue reason'
+  return ''
+}
+
 /** An authoring run may take longer than a review: it builds and tests. */
 export const AUTHOR_TIMEOUT_MS = 60 * 60_000
 
@@ -206,6 +247,9 @@ export const houseRulesFor = (trailer = SOL_TRAILER) => Object.freeze([
   '  record of who authored it, and a commit without it is REFUSED by a git hook.',
   'COMMIT AT EVERY SELF-CONTAINED STEP, not at the end. An uncommitted tree is the one state',
   '  nothing can rescue: if this run is killed, only what is committed survives.',
+  'Every commit YOU make is an INTERIM rescue: put `[skip ci]` in its SUBJECT and add a',
+  '  `Rescue: <what you are in the middle of>` trailer. The wrapper alone writes the FINAL',
+  '  unskipped completion commit, after your process exits cleanly and reports all gates green.',
   'Commit messages describe the CHANGE ITSELF, never the point number, and are written in English.',
   'Do NOT push, do NOT merge, do NOT create or move a tag, and do NOT touch TASKS.md,',
   '  the dashboard, .claude/settings.json or the git hooks. The branch is pushed FOR you,',

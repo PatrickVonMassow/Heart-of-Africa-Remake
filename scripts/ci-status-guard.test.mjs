@@ -12,6 +12,10 @@ describe('the CI guard wires the durable observer', () => {
     expect(gather.indexOf('heldByOtherLiveOwner(sessionId)')).toBeLessThan(gather.indexOf('startWaitObserver'))
   })
 
+  it('checks author liveness without running the unrelated slot census', () => {
+    expect(code).toMatch(/gatherInFlight\(sessionId, \{ now, includeSlots: false \}\)/)
+  })
+
   it('persists the renewable record before starting its detached observer', () => {
     expect(code).toMatch(/mutateState\([\s\S]*?reconcileCiWait\([\s\S]*?ciWait: nextWait/)
     expect(code).toMatch(/durableWait = persisted\?\.ciWait[\s\S]*?startWaitObserver\(durableWait\)/)

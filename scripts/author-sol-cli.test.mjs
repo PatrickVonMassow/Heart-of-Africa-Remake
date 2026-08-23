@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AUTHORING_COMMISSION_KIND, AUTHORING_FRAMINGS, FABLE_ESCALATION_ROUNDS } from './author-routing-core.mjs'
 import { uncommittedSummary } from './author-sol-core.mjs'
-import { ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
+import { commitsSince, ledgerSnapshot, recordAuthoringCommission, restoreLedger, uncommittedNumstat } from './author-sol.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const root = resolve(process.cwd())
@@ -72,6 +72,35 @@ const gitRepo = () => {
   git(dir, 'commit', '-q', '-m', 'seed')
   return dir
 }
+
+describe('commitsSince', () => {
+  it('reads a hook-valid Rescue paragraph even when Git does not classify it as a trailer', () => {
+    const repo = gitRepo()
+    const base = git(repo, 'rev-parse', 'HEAD')
+    writeFileSync(join(repo, 'work.txt'), 'checkpoint\n')
+    git(repo, 'add', 'work.txt')
+    git(
+      repo,
+      'commit',
+      '-q',
+      '-m',
+      'Checkpoint the parser [skip ci]',
+      '-m',
+      'Rescue: the author is still testing',
+      '-m',
+      'Co-Authored-By: GPT-5.6 Sol <noreply@openai.com>',
+    )
+
+    expect(commitsSince(base, { cwd: repo })).toEqual([
+      {
+        sha: git(repo, 'rev-parse', 'HEAD'),
+        subject: 'Checkpoint the parser [skip ci]',
+        rescue: 'the author is still testing',
+        trailers: 'GPT-5.6 Sol <noreply@openai.com>',
+      },
+    ])
+  })
+})
 
 describe('uncommittedNumstat', () => {
   it('measures the final tracked tree and untracked text and binary files', () => {
