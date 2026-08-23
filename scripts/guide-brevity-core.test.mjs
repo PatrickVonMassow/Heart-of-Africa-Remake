@@ -419,3 +419,26 @@ describe('auditGuide — the prompt boundary and the note list', () => {
     }
   })
 })
+
+// Round four: a multiplier sign is not a licence for a second sentence.
+describe('auditGuide — the cost note is a note, not a paragraph', () => {
+  it('refuses narrative that follows a valid multiplier inside the note', () => {
+    const { ok, violations } = auditGuide(
+      doc('- **Multiplikator-Tarnung** Ein Risiko.\n  → *Prompt:* „Tu es." *(≈ 1,5x. Und danach geschah noch etwas.)*'),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('accepts the longest cost note the guide actually carries', () => {
+    const note = '*(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*'
+    const d = doc(`- **Langer Kostenhinweis** Ein Risiko.\n  → *Prompt:* „Tu es." ${note}`)
+    expect(auditGuide(d).ok).toBe(true)
+  })
+
+  it('refuses a note that runs past the measured length', () => {
+    const note = `*(≈ 2x ${'sehr '.repeat(30)}lang)*`
+    const { violations } = auditGuide(doc(`- **Zu lange Notiz** Ein Risiko.\n  → *Prompt:* „Tu es." ${note}`))
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+})

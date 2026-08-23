@@ -324,7 +324,15 @@ const CLOSING_QUOTES = ['"', '\u201C']
 // deliberately, so that adding one is a decision rather than a side effect.
 const NOTE_RE = /^\*\(([^)]*)\)\*/
 const REVIEW_QUESTION = 'Sieht das richtig aus?'
-const isAllowedNote = (note) => note.includes('≈') || note === REVIEW_QUESTION
+// The longest cost note measured in the guide is 77 characters and none of the
+// seven carries a sentence break, so a note that starts a SECOND sentence is
+// narrative wearing a multiplier — `*(≈ 1,5x. Und danach geschah noch etwas.)*`
+// was consumed whole while `includes('≈')` was the whole rule (cross-vendor
+// review, 23.08.2026, round 4).
+const NOTE_MAX_CHARS = 100
+const isCostNote = (note) =>
+  note.includes('≈') && note.length <= NOTE_MAX_CHARS && !/[.!?]\s+\S/.test(note)
+const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**
  * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
