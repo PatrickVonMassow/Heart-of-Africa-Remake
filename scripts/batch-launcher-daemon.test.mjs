@@ -399,3 +399,74 @@ describe('runDaemon — a released lock is not waited out', () => {
     }
   })
 })
+
+// --- THE STALL WATCH SPEAKS IN-PROCESS (point 859) -----------------------------
+// The pure judgement is pinned in launcher-stall-core.test; what THIS one proves
+// is that the LOOP acts on it through the injected channel — on 23.08.2026 every
+// alert path lived in a child process the sick container could not spawn, and a
+// wiring nothing exercises would reproduce that with every unit green.
+describe('runDaemon — dead ticks alert through the daemon itself', () => {
+  const stopFrom = (recordPath) => writeJsonAtomic(recordPath, { stopped: true, stoppedAt: Date.now() + 1 })
+
+  it('two dead ticks send one alert, no child involved, and the working tick sends the recovery', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      const tickMs = 10 * 60 * 1000
+      let lock = { sessionId: 's1', claimedAt: Date.now() }
+      const sent = []
+      let ticks = 0
+      const outcome = await runDaemon({
+        recordPath: place.recordPath,
+        logPath: place.logPath,
+        tickMs,
+        pollMs: 20,
+        wakeGapMs: 0,
+        readLock: () => lock,
+        isPaused: () => false,
+        sendAlert: (title, message, priority, opts) => {
+          sent.push({ title, message, priority, opts })
+          return Promise.resolve(true)
+        },
+        tick: () => {
+          ticks += 1
+          if (ticks === 1) {
+            // A DEAD tick (spawn failed / hung and killed — runBatchTick says null
+            // for all three), and a handover a moment later so the next tick is
+            // seconds away instead of a quarter hour.
+            setTimeout(() => {
+              lock = { sessionId: 's1', handedOver: true, handedOverAt: Date.now() }
+            }, 60)
+            return Promise.resolve(null)
+          }
+          if (ticks === 2) {
+            // Still dead — this is the one that must alert. Then a fresh hold and
+            // a second handover, so a third tick follows.
+            setTimeout(() => {
+              lock = { sessionId: 's2', claimedAt: Date.now() }
+            }, 40)
+            setTimeout(() => {
+              lock = { sessionId: 's2', handedOver: true, handedOverAt: Date.now() }
+            }, 120)
+            return Promise.resolve(null)
+          }
+          // Alive again: the recovery notice, then the stop mark ends the loop.
+          stopFrom(place.recordPath)
+          return Promise.resolve(0)
+        },
+      })
+      // The stop mark is honoured at the next publish, which reads as a yield
+      // (the record was taken from this daemon) — same as the sibling tests.
+      expect(outcome).toBe('yielded')
+      expect(ticks).toBe(3)
+      expect(sent).toHaveLength(2)
+      expect(sent[0].title).toMatch(/STALLED/)
+      expect(sent[0].priority).toBe('high')
+      expect(sent[0].opts).toEqual({ key: 'launcher-stall' })
+      expect(sent[1].title).toMatch(/recovered/)
+      expect(sent[1].priority).toBe('default')
+      expect(sent[1].opts).toEqual({ escalate: false })
+    } finally {
+      place.cleanup()
+    }
+  })
+})

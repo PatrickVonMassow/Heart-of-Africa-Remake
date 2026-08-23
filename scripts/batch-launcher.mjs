@@ -46,6 +46,8 @@ import {
   ownershipSignal,
   releaseSpawnDecision,
 } from './batch-launcher-core.mjs'
+import { initialStallState, judgeSleep, judgeTick } from './launcher-stall-core.mjs'
+import { notify } from './notify.mjs'
 import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
 export const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
@@ -223,6 +225,13 @@ export async function runDaemon({
   isPaused = () => pauseState().state !== 'none',
   pollMs = WAKE_POLL_MS,
   wakeGapMs = WAKE_MIN_GAP_MS,
+  // THE DAEMON'S OWN VOICE (point 859). A dead tick used to be a log line and
+  // nothing else — but on 23.08.2026 the container sickened, every child spawn
+  // timed out for 3.5 hours, and every alert path lived in exactly such a
+  // child. This is the one alert that must not need a child process, so it is
+  // sent from THIS process: notify() is an HTTPS POST, judged by the pure core
+  // and throttled by the escalation ladder. Injected so a test alerts a fake.
+  sendAlert = notify,
 } = {}) {
   const existing = launcherState({ recordPath, tickMs })
   if ((existing.state === 'ready' || existing.state === 'running') && Number(existing.record?.pid) !== process.pid) {
@@ -298,6 +307,20 @@ export async function runDaemon({
   if (!publish()) return leave()
   appendLog(logPath, `launcher up (pid ${process.pid}, every ${Math.round(tickMs / 1000)} s)`)
 
+  /** The stall watch's running state (point 859), threaded through the pure
+   *  core. Speaks through `sendAlert`; a failed or refused send never takes
+   *  the launcher down, and the core re-demands it on the next dead tick. */
+  let stall = initialStallState()
+  const speak = async (kind, { title, message, priority, key }) => {
+    let ok = false
+    try {
+      ok = await sendAlert(title, message, priority, key ? { key } : { escalate: false })
+    } catch {
+      /* a broken alert channel must never take the launcher down */
+    }
+    appendLog(logPath, `stall-watch: ${kind} ${ok ? 'sent' : 'not sent (no topic, held back by the ladder, or send failed)'}`)
+  }
+
   while (!stopping) {
     // Checked again right here, before the tick rather than after it: a daemon
     // that lost the record must not spend an interval running the batch first.
@@ -319,11 +342,22 @@ export async function runDaemon({
     // late. Reading here closes it: anything that ends ownership from the tick's
     // start onward is a CHANGE.
     lastSignal = observeOwnership() ?? lastSignal
+    let tickCode = null
     try {
-      const code = await tick({ logPath })
-      appendLog(logPath, `tick finished (exit ${code === null ? 'killed' : code})`)
+      tickCode = await tick({ logPath })
+      appendLog(logPath, `tick finished (exit ${tickCode === null ? 'killed' : tickCode})`)
     } catch (e) {
       appendLog(logPath, `tick threw: ${(e && e.message) || e}`)
+    }
+    // The stall watch (point 859): a NUMBER means a child ran to an exit — the
+    // container can spawn, the ordinary machinery has its voice back. NULL is
+    // the voiceless state: spawn failed, child errored, or hung and was killed.
+    {
+      const verdict = judgeTick({ state: stall, alive: tickCode !== null, now: Date.now() })
+      stall = verdict.state
+      if (verdict.log) appendLog(logPath, `stall-watch: ${verdict.log}`)
+      if (verdict.alert) await speak('alert', verdict.alert)
+      if (verdict.recovery) await speak('recovery notice', verdict.recovery)
     }
     lastTickAt = Date.now()
     if (!publish({ tickInFlight: false })) return leave()
@@ -332,6 +366,7 @@ export async function runDaemon({
     // interval, and neither must a release. The poll only ever shortens this
     // sleep — the tick it brings forward is the same child as always, so the hard
     // singleton below it is untouched and no second owner can come of it.
+    const sleepStartedAt = Date.now()
     await new Promise((resolve) => {
       const deadline = Date.now() + tickMs
       let timer = null
@@ -376,6 +411,14 @@ export async function runDaemon({
       timer = setTimeout(poll, Math.max(1, Math.min(pollMs, tickMs)))
     })
     wake = null
+    // A sleep that overshot by a whole interval was slept THROUGH — the host
+    // suspended or froze (point 859: the incident's timers fired hours late).
+    // The mark only lowers the alert threshold; a healthy first tick clears it.
+    {
+      const verdict = judgeSleep({ state: stall, plannedMs: tickMs, actualMs: Date.now() - sleepStartedAt, tickMs })
+      stall = verdict.state
+      if (verdict.log) appendLog(logPath, `stall-watch: ${verdict.log}`)
+    }
   }
 
   publish({ stopped: true, stoppedAt: Date.now() })
