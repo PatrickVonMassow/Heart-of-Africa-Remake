@@ -11408,3 +11408,26 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
   read a red as noise.
   Bundle: Testinfrastruktur.
+- [ ] 864. The parallel-session alert fires on the batch's own adopted child.
+  MEASURED 23.08.2026, 18:07–18:11: the Stop guard reported `PARALLEL SESSION DETECTED
+  (8d1bbb6c…)` and ordered the three-minute doctor gate, twice in four minutes, while that session
+  was already dead. What still wrote under its id was its leftover child process — the delegated
+  author run for point 860, whose in-flight declaration THIS session had adopted one turn earlier.
+  The adoption makes that child the current owner's own work by policy, but the alert counts it as a
+  second writer, and it re-arms every turn for as long as the run lasts.
+  WHAT IT COSTS: one doctor gate per turn over the whole authoring run, each one landing on a busy
+  machine and therefore returning `inconclusive (load)` — a ritual that produces no verdict and
+  trains the session to read a red as noise.
+  Point 431's third half already retired exactly this false alarm for the case where a session names
+  ITSELF; a handed-over author run is the same case one session later.
+  FINAL STATE: an alert names a second writer only when there IS one — either `otherSessionsIn`
+  (scripts/batch-doctor-core.mjs) also excludes the session ids whose declaration the reader has
+  adopted, or the alert is raised from a live foreign top-level session rather than from file writes
+  made by its child. The other direction stays intact: a genuinely concurrent second window must
+  still raise it.
+  VERIFIABLE: unit cases over the pure alert reader — an alert naming a session whose declaration the
+  reader adopted yields no other-writer; the same alert without the adoption still does; the
+  self-naming case of point 431 keeps its result.
+  Criticality: medium — no product behaviour, but it burns a fixed toll per turn and devalues the one
+  gate that is supposed to catch a torn tree.
+  Bundle: Session- & Repo-Hygiene.
