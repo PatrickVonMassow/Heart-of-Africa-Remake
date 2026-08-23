@@ -620,7 +620,10 @@ export function gatherSlots(
   }
 }
 
-export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, env = process.env } = {}) {
+export function gatherInFlight(
+  sid,
+  { now = Date.now(), lockPath = LOCK_PATH, env = process.env, includeSlots = true } = {},
+) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) {
@@ -639,8 +642,10 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
   })
   // Only worth asking for a wait that would otherwise be allowed: a declaration that
   // is not live blocks anyway, and paying two git calls to explain a block nobody is
-  // getting would be waste on the Stop hook's path.
-  const slots = assessment.live ? gatherSlots(declaration) : null
+  // getting would be waste on the Stop hook's path. Callers that only need declaration
+  // liveness can omit the slot census too; that census walks the work order and branch
+  // diffs, none of which changes whether the declaration itself is live.
+  const slots = assessment.live && includeSlots ? gatherSlots(declaration) : null
   return { declaration, ...assessment, slots }
 }
 

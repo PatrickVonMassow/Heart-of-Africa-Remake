@@ -1105,6 +1105,13 @@ describe('the declaration file is derived from the caller’s lock path', () => 
       expect(readDeclaration(path)).toMatchObject({ sessionId: SID })
       // The real gather, real probe: this process is alive, so the wait holds.
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: true, reason: 'live' })
+      // A consumer of declaration liveness does not pay for or receive the
+      // separate batch-capacity census.
+      expect(gatherInFlight(SID, { lockPath, includeSlots: false })).toMatchObject({
+        live: true,
+        reason: 'live',
+        slots: null,
+      })
       clearDeclaration(path)
       expect(readDeclaration(path)).toBe(null)
       expect(gatherInFlight(SID, { lockPath })).toMatchObject({ live: false, reason: 'no-declaration' })

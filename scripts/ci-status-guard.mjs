@@ -576,7 +576,7 @@ export async function gatherCiStatusInputs({ sessionId = '', readOnly = false } 
   // declaration still resolves to the branch it is authoring.
   let liveAuthorBranches = []
   try {
-    const inFlight = gatherInFlight(sessionId, { now })
+    const inFlight = gatherInFlight(sessionId, { now, includeSlots: false })
     if (inFlight.live) {
       for (const item of inFlight.declaration?.evidence ?? []) {
         if (item?.kind === 'branch' && item.ref) liveAuthorBranches.push(item.ref)
