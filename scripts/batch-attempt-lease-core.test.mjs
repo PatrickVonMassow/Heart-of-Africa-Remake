@@ -1,0 +1,119 @@
+// THE ATTEMPT LEASE'S DECISIONS (point 834, step 4): duplicate writers refused,
+// PID reuse caught by start time, expiry loud but never freeing, a fenced worker
+// stopped before it writes, and worktree claims that fail closed on uncertainty.
+import { describe, it, expect } from 'vitest'
+import {
+  ATTEMPT_LEASE_TTL_MS,
+  claimWorktree,
+  expiredLeaseAlerts,
+  grantAttemptLease,
+  leaseAllowsWrite,
+  releaseWorktree,
+} from './batch-attempt-lease-core.mjs'
+
+const attempt = { batchId: 'b', pointId: 'p834', attemptId: 'a1' }
+const holder = { pid: 100, pidStartedAt: 5000 }
+const grant = (over = {}) =>
+  grantAttemptLease({ attempt, holder, now: 10_000, leaseId: 'L1', ...over })
+
+describe('grantAttemptLease', () => {
+  it('grants a fresh lease and renews for the same process under the same id', () => {
+    const first = grant()
+    expect(first.ok).toBe(true)
+    expect(first.lease.expiresAt).toBe(10_000 + ATTEMPT_LEASE_TTL_MS)
+    const renewed = grant({ existing: first.lease, now: 20_000 })
+    expect(renewed).toMatchObject({ ok: true, renewed: true })
+    expect(renewed.lease.leaseId).toBe('L1')
+    expect(renewed.lease.expiresAt).toBe(20_000 + ATTEMPT_LEASE_TTL_MS)
+  })
+
+  it('refuses a second process while the lease is live — the duplicate writer of M39', () => {
+    const first = grant().lease
+    const second = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: 20_000, leaseId: 'L2' })
+    expect(second.ok).toBe(false)
+    expect(second.reason).toMatch(/duplicate writer/)
+  })
+
+  it('treats a recycled pid as a different process: same number, other start time', () => {
+    const first = grant().lease
+    const recycled = grant({ existing: first, holder: { pid: 100, pidStartedAt: 99_000 }, now: 20_000, leaseId: 'L2' })
+    expect(recycled.ok).toBe(false)
+  })
+
+  it('refuses to re-grant after expiry until death is PROVEN, then only under a new lease id', () => {
+    const first = grant().lease
+    const after = 10_000 + ATTEMPT_LEASE_TTL_MS + 1
+    const unproven = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L2' })
+    expect(unproven).toMatchObject({ ok: false, verdict: 'stale-holder' })
+    const resurrection = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L1', holderProvenDead: true })
+    expect(resurrection.ok).toBe(false)
+    expect(resurrection.reason).toMatch(/NEW lease id/)
+    const regrant = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L2', holderProvenDead: true })
+    expect(regrant.ok).toBe(true)
+    expect(regrant.lease.leaseId).toBe('L2')
+  })
+
+  it('fails closed on an unreadable existing lease instead of treating broken as free', () => {
+    const broken = grant({ existing: { leaseId: 'L0' }, leaseId: 'L2' })
+    expect(broken.ok).toBe(false)
+    expect(broken.reason).toMatch(/uncertain fails closed/)
+  })
+
+  it('refuses an incomplete attempt, holder or clock', () => {
+    expect(grantAttemptLease({ attempt: { batchId: 'b' }, holder, now: 1, leaseId: 'L1' }).ok).toBe(false)
+    expect(grantAttemptLease({ attempt, holder: { pid: 100 }, now: 1, leaseId: 'L1' }).ok).toBe(false)
+    expect(grantAttemptLease({ attempt, holder, now: NaN, leaseId: 'L1' }).ok).toBe(false)
+    expect(grantAttemptLease({ attempt, holder, now: 1 }).ok).toBe(false)
+  })
+})
+
+describe('leaseAllowsWrite — the check before every checkpoint and push (M40)', () => {
+  const lease = grant().lease
+
+  it('allows the holder with the standing lease id inside its term', () => {
+    expect(leaseAllowsWrite({ lease, holder, leaseId: 'L1', now: 20_000 }).verdict).toBe('write')
+  })
+
+  it('fences everything else, and a fenced worker stops with its branch intact', () => {
+    expect(leaseAllowsWrite({ lease: null, holder, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
+    expect(leaseAllowsWrite({ lease, holder, leaseId: 'L2', now: 20_000 }).verdict).toBe('fenced')
+    expect(leaseAllowsWrite({ lease, holder: { pid: 100, pidStartedAt: 99_000 }, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
+    expect(leaseAllowsWrite({ lease, holder, leaseId: 'L1', now: 10_000 + ATTEMPT_LEASE_TTL_MS + 1 }).verdict).toBe('fenced')
+  })
+})
+
+describe('expiredLeaseAlerts', () => {
+  it('alerts per expired lease and stays silent inside the term', () => {
+    const lease = grant().lease
+    expect(expiredLeaseAlerts({ leases: [lease], now: 20_000 })).toEqual([])
+    const alerts = expiredLeaseAlerts({ leases: [lease], now: 10_000 + ATTEMPT_LEASE_TTL_MS + 500 })
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toMatchObject({ pointId: 'p834', attemptId: 'a1' })
+    expect(alerts[0].alert).toMatch(/not proven dead/)
+  })
+})
+
+describe('worktree claims — one worktree, one attempt, fail closed', () => {
+  it('claims once, is idempotent for the holder, and refuses a second attempt', () => {
+    const first = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
+    expect(first.ok).toBe(true)
+    expect(claimWorktree({ claims: first.claims, worktree: '/wt/a', attempt })).toMatchObject({ ok: true, alreadyHeld: true })
+    const second = claimWorktree({ claims: first.claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } })
+    expect(second.ok).toBe(false)
+    expect(second.reason).toMatch(/never share/)
+  })
+
+  it('fails closed on an unreadable claim record', () => {
+    const res = claimWorktree({ claims: { '/wt/a': {} }, worktree: '/wt/a', attempt })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/uncertain fails closed/)
+  })
+
+  it('releases only for the claiming attempt', () => {
+    const { claims } = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
+    expect(releaseWorktree({ claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
+    const released = releaseWorktree({ claims, worktree: '/wt/a', attempt })
+    expect(released.ok).toBe(true)
+    expect(released.claims).toEqual({})
+  })
+})
