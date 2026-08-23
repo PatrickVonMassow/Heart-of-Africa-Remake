@@ -1,12 +1,12 @@
-// DEFER A POINT THAT NEEDS THE USER'S DECISION — without stalling the batch
-// (user request 22.07.2026; the mechanism behind it, point 450).
+// DEFER ONE NARROW CONFIRMATION — advisory questions are decided and recorded.
 //
-// A blocking question must never freeze the batch until an answer arrives, and
-// over a fortnight's absence it must not jam the queue either. So instead of a
-// blocking AskUserQuestion the assistant: (1) marks the point here, (2) gives it
-// a "Von dir zu klären" card on the board, (3) moves on to the next point.
+// Only the closed outward-facing/hard-to-reverse acts in user-gate-core may use
+// this gate. An advisory question takes --self-decide, which writes a workable
+// SELF-DECIDED marker and its complete retroactive-veto card.
 //
-//   node scripts/defer-for-user.mjs <point> "<why the user is needed>"
+//   node scripts/defer-for-user.mjs <point> --act <key> --detail "<what>" --prepared "<what stands prepared>"
+//   node scripts/defer-for-user.mjs --self-decide <point> --question "<question>" --decision "<decision>" --evidence "<evidence>" --consequence "<consequence>" --veto-action "<exact action>"
+//   node scripts/defer-for-user.mjs --migrate
 //   node scripts/defer-for-user.mjs --clear <point>     # the answer arrived
 //   node scripts/defer-for-user.mjs --forget <point>    # remove a leftover marker
 //   node scripts/defer-for-user.mjs --list              # what is waiting, and why
@@ -27,10 +27,20 @@
 // puts the point back at the HEAD of the queue — it waited, so it does not
 // queue behind everything appended while it did.
 import { readFileSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { notify } from './notify.mjs'
-import { clearMarkers, gateReport, markAnswered, markGated, parseUserGates } from './user-gate-core.mjs'
+import {
+  CONFIRMATION_ACTS,
+  clearMarkers,
+  gateReport,
+  markAnswered,
+  markGated,
+  migrateLegacyGates,
+  parseUserGates,
+  prepareAdvisoryDecision,
+} from './user-gate-core.mjs'
 import { parseWorkablePoints } from './queue-order-guard-core.mjs'
 
 const TASKS = repoPath('TASKS.md')
@@ -38,7 +48,10 @@ const today = () => new Date().toISOString().slice(0, 10)
 
 const USAGE = [
   'usage:',
-  '  node scripts/defer-for-user.mjs <point> "<why the user is needed>"',
+  `  node scripts/defer-for-user.mjs <point> --act <${Object.keys(CONFIRMATION_ACTS).join('|')}> --detail "<the concrete act>" --prepared "<the safe prepared state>"`,
+  ...Object.entries(CONFIRMATION_ACTS).map(([key, what]) => `      --act ${key}  — ${what}`),
+  '  node scripts/defer-for-user.mjs --self-decide <point> --question "<question>" --decision "<decision>" --evidence "<evidence>" --consequence "<consequence>" --veto-action "<exact action>"',
+  '  node scripts/defer-for-user.mjs --migrate',
   '  node scripts/defer-for-user.mjs --clear <point>',
   '  node scripts/defer-for-user.mjs --forget <point>',
   '  node scripts/defer-for-user.mjs --list',
@@ -67,16 +80,124 @@ function refuseInWorktree() {
 const read = () => readFileSync(TASKS, 'utf8')
 const write = (text) => writeTextAtomic(TASKS, text)
 
-const [a, b] = process.argv.slice(2)
+/**
+ * A FLAG IS NEVER A VALUE (fifth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+ * `--detail --prepared "verified locally"` used to store the literal
+ * `"--prepared"` as the detail: a typed gate, or a decision card, with a field
+ * nobody wrote. A missing or flag-shaped value is no value, and the field check
+ * downstream then names exactly which one is missing.
+ */
+const option = (args, name) => {
+  const i = args.indexOf(name)
+  if (i < 0) return ''
+  const value = String(args[i + 1] ?? '')
+  return value.startsWith('--') ? '' : value.trim()
+}
+
+/**
+ * A REPEATED FLAG IS A MISTAKE, NOT A CHOICE (fifth cross-vendor round, GPT-5.6
+ * Sol, 23.08.2026). `indexOf` keeps the FIRST value and drops the rest in
+ * silence, so `--decision old --decision new` recorded "old" and said nothing.
+ * Whichever the author meant, one of them was going to be wrong.
+ */
+const repeatedFlag = (args) => {
+  const seen = new Set()
+  for (const arg of args) {
+    if (!String(arg).startsWith('--')) continue
+    if (seen.has(arg)) return arg
+    seen.add(arg)
+  }
+  return ''
+}
+
+/** Add an idempotent decision record before changing TASKS: a marker without
+ * its promised card is the worse half-written state. */
+function recordDecisionCard(card) {
+  try {
+    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', card.title, card.body], {
+      cwd: repoPath('.'),
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    return
+  } catch (error) {
+    if (/open question .* already stands under/i.test(String(error?.stderr ?? ''))) return
+    throw new Error(`decision card could not be recorded: ${String(error?.stderr ?? error?.message ?? error).trim()}`)
+  }
+}
+
+const args = process.argv.slice(2)
+const [a, b] = args
 
 if (a === '--help' || a === '-h' || a === undefined) {
   console.log(USAGE)
   process.exit(a === undefined ? 1 : 0)
 }
 
+const repeated = repeatedFlag(args)
+if (repeated) {
+  console.error(`defer-for-user: ${repeated} is given more than once — say it exactly once.\n${USAGE}`)
+  process.exit(1)
+}
+
 if (a === '--list') {
   const lines = gateReport(read())
-  console.log(lines.length ? `user gates in the work order:\n${lines.join('\n')}` : 'no point is waiting on the user')
+  console.log(lines.length ? `typed user-gate records in the work order:\n${lines.join('\n')}` : 'no typed user-gate record exists')
+  process.exit(0)
+}
+
+if (a === '--migrate') {
+  refuseInWorktree()
+  const before = read()
+  const migrated = migrateLegacyGates(before, { at: today() })
+  if (migrated.entries.length === 0) {
+    console.log('migration: no legacy AWAITING-USER marker exists')
+    process.exit(0)
+  }
+  try {
+    for (const card of migrated.cards) recordDecisionCard(card)
+  } catch (error) {
+    console.error(`defer-for-user: ${error.message}`)
+    process.exit(1)
+  }
+  write(migrated.text)
+  console.log('legacy user-gate migration:')
+  for (const entry of migrated.entries) {
+    console.log(`  ${entry.point}: ${entry.verdict} — reason: ${entry.reason || '— none recorded'}`)
+  }
+  process.exit(0)
+}
+
+if (a === '--self-decide') {
+  refuseInWorktree()
+  const n = Number(b)
+  if (!Number.isFinite(n)) {
+    console.error(USAGE)
+    process.exit(1)
+  }
+  const before = read()
+  const prepared = prepareAdvisoryDecision(before, n, {
+    at: today(),
+    question: option(args, '--question'),
+    decision: option(args, '--decision'),
+    evidence: option(args, '--evidence'),
+    consequence: option(args, '--consequence'),
+    vetoAction: option(args, '--veto-action'),
+  })
+  if (!prepared.ok) {
+    console.error(`defer-for-user: ${prepared.error}`)
+    process.exit(1)
+  }
+  try {
+    recordDecisionCard(prepared.card)
+  } catch (error) {
+    console.error(`defer-for-user: ${error.message}`)
+    process.exit(1)
+  }
+  write(prepared.text)
+  console.log(`point ${n}: advisory question SELF-DECIDED; the decision card records evidence, consequence and exact veto action.`)
+  console.log('The point remains workable. Rebuild the queue if it is not already present: node scripts/board-queue.mjs')
   process.exit(0)
 }
 
@@ -122,25 +243,23 @@ if (a === '--clear') {
 
 refuseInWorktree()
 const n = Number(a)
-const reason = String(b ?? '').trim()
 if (!Number.isFinite(n)) {
   console.error(USAGE)
   process.exit(1)
 }
-if (!reason) {
-  console.error(
-    'defer-for-user: a gate needs a REASON — the queue skips the point after recording why it waits.\n' +
-      `${USAGE}`,
-  )
-  process.exit(1)
-}
+// THE ACT IS SELECTED FROM A CLOSED LIST, never described in prose: a sentence
+// that merely sounded outward-facing used to park an advisory question.
+const act = option(args, '--act')
+const detail = option(args, '--detail')
+const prepared = option(args, '--prepared')
 
 const before = read()
-const marked = markGated(before, n, { since: today(), reason })
+const marked = markGated(before, n, { since: today(), act, detail, prepared })
 if (!marked.ok) {
-  console.error(`defer-for-user: ${marked.error}`)
+  console.error(`defer-for-user: ${marked.error}\n${USAGE}`)
   process.exit(1)
 }
+const reason = parseUserGates(marked.text).gated.find((g) => g.point === n)?.reason ?? ''
 write(marked.text)
 
 // EVERYTHING GATED IS A DIFFERENT SITUATION and the user must hear about it:
@@ -161,8 +280,8 @@ await notify(
   'high',
 )
 
-console.log(`point ${n} marked as waiting on you since ${today()}: ${reason}`)
-if (stranded) console.log('EVERY open point now waits on the user — there is no next point to move on to.')
+console.log(`point ${n} marked AWAITING-CONFIRMATION since ${today()}: ${reason}`)
+if (stranded) console.log('EVERY open point now awaits a true confirmation — there is no next point to move on to.')
 console.log('Now: add its "Von dir zu klären" card, rebuild the board (node scripts/board-queue.mjs) and continue elsewhere.')
 console.log('When the answer arrives: node scripts/defer-for-user.mjs --clear ' + n)
 process.exit(0)

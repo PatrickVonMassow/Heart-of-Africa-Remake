@@ -1620,7 +1620,7 @@ describe('filesNamedIn / openPointSpecs — what a queued point says it touches'
 
   it('carries a point waiting on the user, but FLAGGED (point 450)', () => {
     const tasks = [
-      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-USER(2026-07-29; needs a ruling)',
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
       '  and also src/ui/B.tsx',
       '- [ ] 503. THIRD POINT touching docs/d.md',
       '- [ ] 504. ANSWERED POINT touching docs/e.md USER-ANSWERED(2026-08-07)',

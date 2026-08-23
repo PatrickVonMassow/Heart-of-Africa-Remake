@@ -1,20 +1,18 @@
-// THE USER GATE — a point that waits on the user never jams the queue (point 450).
+// THE TYPED USER GATE — advice continues; only a real confirmation waits.
 // Pure and side-effect free, so the Vitest layer can sweep every rule against
 // text fixtures without a filesystem (scripts/user-gate-core.test.mjs).
 //
-// WHY THIS EXISTS. Two decisions had been waiting on the user since 29.07.2026,
-// and a fortnight of absence must not stop the batch. `defer-for-user.mjs` has
-// stamped `AWAITING-USER(<date>)` on such a point since 22.07.2026 — but nothing
-// READ it. The marker recorded no reason, no consumer skipped the point, the
-// board still rendered it as ordinary pending work, and "the assistant simply
-// skips it" was a convention living in a comment. This module turns that
-// convention into a mechanism the queue, the pool and the board all share.
+// `AWAITING-USER` used to mix advisory product questions with genuinely
+// outward-facing confirmations. That made either one non-commissionable. The
+// standing autonomy rule of 23.08.2026 reverses the unsafe default: uncertainty
+// continues, and only the closed confirmation class below may park a point.
 //
 // ---------------------------------------------------------------------------
 // THE MARKER SYNTAX (this is the documentation of record)
 // ---------------------------------------------------------------------------
 //
-//   - [ ] 462. SOME POINT … AWAITING-USER(2026-07-30; needs the user's ruling on X)
+//   - [ ] 462. SOME POINT … AWAITING-CONFIRMATION(2026-07-30; release-tag: push the v1.2.0 tag, safe prepared state: the build is verified locally and no tag is pushed)
+//   - [ ] 463. SOME POINT … SELF-DECIDED(2026-08-23; migrated advisory question)
 //   - [ ] 462. SOME POINT … USER-ANSWERED(2026-08-07)
 //
 // * Both markers live at the END of the point's OWN head line — the `- [ ] N.`
@@ -29,16 +27,34 @@
 //   reachable through the shipped command.
 // * The LAST marker on the line is the state. That is what "the answer came
 //   after the gate" means mechanically, and it needs no precedence rule.
-// * `AWAITING-USER(<since>; <why>)` — `<since>` is an ISO date (or timestamp),
-//   `<why>` is one line of English prose (the work order is English by rule).
-//   The `;` separates them; everything after the first `;` is the reason.
-// * The REASON IS THE POINT of the marker: the queue skips the point *after
-//   recording why*, and the marker is that record — durable, in the work order,
-//   visible to every session and to the user. `defer-for-user.mjs` refuses to
-//   write a gate without one. A LEGACY marker with no reason (or a bare
-//   `AWAITING-USER` with no brackets at all) is still honoured as a gate — the
-//   safe direction is always to skip, never to hand the user's absence a way of
-//   jamming the queue — but it is REPORTED as reasonless so it can be repaired.
+// * A TYPED marker is only a marker WITH its brackets. `AWAITING-CONFIRMATION`,
+//   `SELF-DECIDED` or `USER-ANSWERED` standing bare at the end of a headline is
+//   prose, not state. Only the legacy marker may appear without them.
+// * `AWAITING-CONFIRMATION(<since>; <act>: <what>, safe prepared state: <what
+//   stands prepared>)` is the only gate, and `<act>` is SELECTED from
+//   `CONFIRMATION_ACTS` — `release-tag`, `public-release`, `board-contract` —
+//   never described. `formatConfirmationReason` is the only way to build one and
+//   demands at least three words in each field.
+//   WHY SELECTED RATHER THAN DESCRIBED (three cross-vendor rounds, GPT-5.6 Sol,
+//   23.08.2026): reading a free sentence for "is this an outward act" is a
+//   bag-of-words guess, and each widening of the patterns produced the next
+//   counterexample — "copy for the withdrawal dialog in production",
+//   "typography for the published notice", "the changeability of the published
+//   four-section contract". Every one PARKED a point on an ordinary product
+//   decision, the exact inversion this point removes. No pattern set closes
+//   that; the input shape does.
+// * `SELF-DECIDED(<at>; <summary>)` records that an advisory choice took the
+//   reversible-default lane. Its `Entscheidungsprotokoll:` board card is the
+//   detailed record (decision, evidence, consequence and exact veto action).
+// * Legacy `AWAITING-USER` NEVER GATES. It owes migration and the point runs
+//   meanwhile — ambiguity continues, as the 23.08.2026 order says. It is also
+//   the ONE place the prose heuristic still runs (`classifyLegacyReason`),
+//   because those lines predate the typed form; there it decides only what
+//   `--migrate` WRITES, never what a reader honours, so no queue or pool
+//   consults it. Missing or ambiguous reasons
+//   fall toward `SELF-DECIDED`/continuation. `--migrate` makes that verdict
+//   explicit and reports EVERY legacy marker on the line — including one that
+//   stands before a later answer — with the reason it judged.
 // * `USER-ANSWERED(<when>)` is what the gate becomes when the answer arrives.
 //   It is not cosmetic: it is what puts the point back at the HEAD of the queue
 //   (`queueOrder` ranks it ahead of everything else), and it stays on the line
@@ -55,8 +71,15 @@
 // is no candidate, so an idle pool slot owes no reason for it) and
 // defer-for-user.mjs (which writes it).
 
-/** The marker that gates a point on the user. */
-export const GATE_MARKER = 'AWAITING-USER'
+/** The only marker that gates a point on the user. */
+export const CONFIRMATION_MARKER = 'AWAITING-CONFIRMATION'
+export const GATE_MARKER = CONFIRMATION_MARKER
+
+/** Untyped predecessor, read only for deterministic migration. */
+export const LEGACY_GATE_MARKER = 'AWAITING-USER'
+
+/** An advisory choice resolved from evidence while the point stays workable. */
+export const SELF_DECIDED_MARKER = 'SELF-DECIDED'
 
 /** …and the one that records the answer and sends the point to the queue head. */
 export const ANSWERED_MARKER = 'USER-ANSWERED'
@@ -70,13 +93,57 @@ export const REASON_MAX = 160
  * head line's own headline text as much as a reason that names the mechanism.
  * Written against a line whose trailing `\r` has already been peeled.
  */
-const MARKER_TAIL_RE = new RegExp(`(?:^|\\s)(${GATE_MARKER}|${ANSWERED_MARKER})(?:\\(([^)]*)\\))?[ \\t]*$`)
+const MARKERS = [CONFIRMATION_MARKER, LEGACY_GATE_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
+/**
+ * A TYPED MARKER MUST CARRY ITS PAYLOAD BRACKETS (cross-vendor review, GPT-5.6
+ * Sol, 23.08.2026). With the brackets optional for every marker, a head line
+ * whose HEADLINE ends in the bare word — "…RENAME THE MARKER TO SELF-DECIDED" —
+ * parsed as a marker, and the next rewrite deleted that headline text with
+ * `stripMarkers`. Only the LEGACY marker keeps them optional, because untyped
+ * lines written before this rule exist and migration must still see them.
+ */
+const TYPED_MARKERS = [CONFIRMATION_MARKER, SELF_DECIDED_MARKER, ANSWERED_MARKER]
+const MARKER_TAIL_RE = new RegExp(
+  `(?:^|\\s)((?:${TYPED_MARKERS.join('|')})\\([^)]*\\)|${LEGACY_GATE_MARKER}(?:\\([^)]*\\))?)[ \\t]*$`,
+)
+const MARKER_TOKEN_RE = new RegExp(`^(${MARKERS.join('|')})(?:\\(([^)]*)\\))?$`)
 const HEAD_RE = /^- \[( |x)\] (\d+)\./
 /** CRLF checkouts are real on this repository (point 439) — peel, never assume. */
 const peelCr = (line) => String(line ?? '').replace(/\r+$/, '')
 
 /** An ISO date or timestamp at the start of a marker's payload, or ''. */
 const leadingStamp = (text) => (String(text ?? '').trim().match(/^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?/) ?? [''])[0]
+
+/** One marker token — `SELF-DECIDED(2026-08-23; …)` — split into name and payload. */
+const readMarkerToken = (token) => {
+  const m = String(token ?? '').match(MARKER_TOKEN_RE)
+  return m ? { marker: m[1], payload: String(m[2] ?? '') } : null
+}
+
+/** A marker payload split into its leading stamp and its recorded reason. */
+const readPayload = (marker, payload) => {
+  const answered = marker === ANSWERED_MARKER
+  const stamp = leadingStamp(payload)
+  const rest = payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
+  return { stamp, reason: answered ? '' : sanitiseReason(rest || (stamp ? '' : payload)) }
+}
+
+/**
+ * Every trailing marker of a line, in the order they stand, plus the line with
+ * all of them removed. Migration needs each one — `parseGateLine` reads only the
+ * LAST, which is the STATE, and a legacy marker standing before a later answer
+ * would otherwise never be seen (cross-vendor review, GPT-5.6 Sol, 23.08.2026).
+ */
+const peelTrailingMarkers = (line) => {
+  let head = String(line)
+  const markers = []
+  for (;;) {
+    const hit = head.match(MARKER_TAIL_RE)
+    if (!hit) return { head, markers }
+    markers.unshift(hit[1])
+    head = head.slice(0, hit.index).replace(/[ \t]+$/, '')
+  }
+}
 
 /**
  * A reason made safe to store on one work-order line: no closing bracket (it
@@ -91,6 +158,239 @@ export function sanitiseReason(reason, { max = REASON_MAX } = {}) {
     .trim()
   if (!t) return ''
   return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t
+}
+
+/**
+ * Classify a proposed confirmation reason against the CLOSED U3 authority.
+ * Presentation words such as "outward-facing" do not grant authority by
+ * themselves: the reason must name the concrete act and what has safely been
+ * prepared without performing it.
+ */
+// The verbs that make an act outward-facing. UNDOING a released artefact is as
+// hard to reverse as making it (cross-vendor review, GPT-5.6 Sol, 23.08.2026):
+// "delete the v1.2.0 release tag" fell to advisory while "push" did not.
+//
+// EVERY FORM IS SPELLED OUT rather than closed with `\w*` (second cross-vendor
+// round, GPT-5.6 Sol, 23.08.2026). A trailing `\w*` turned the verbs into their
+// NOUNS: "copy for the withdrawal dialog in production" — an advisory design
+// question — named an authorized act and parked its point. A closed policy list
+// is spelled out; that is what makes it closed.
+const ACT_FORMS = [
+  'create', 'creates', 'created', 'creating',
+  'move', 'moves', 'moved', 'moving',
+  'push', 'pushes', 'pushed', 'pushing',
+  'publish', 'publishes', 'published', 'publishing',
+  'unpublish', 'unpublishes', 'unpublished', 'unpublishing',
+  'apply', 'applies', 'applied', 'applying',
+  'delete', 'deletes', 'deleted', 'deleting',
+  'remove', 'removes', 'removed', 'removing',
+  'retract', 'retracts', 'retracted', 'retracting',
+  'revoke', 'revokes', 'revoked', 'revoking',
+  'withdraw', 'withdraws', 'withdrew', 'withdrawn', 'withdrawing',
+  'send', 'sends', 'sent', 'sending',
+  'upload', 'uploads', 'uploaded', 'uploading',
+]
+/** The release lane adds the words that name a public release itself. */
+const RELEASE_FORMS = [
+  ...ACT_FORMS,
+  'dispatch', 'dispatches', 'dispatched', 'dispatching',
+  'deploy', 'deploys', 'deployed', 'deploying',
+  'release', 'releases', 'released', 'releasing',
+]
+/**
+ * The release lane needs the THING released, not merely a released-sounding
+ * word near "production" (third cross-vendor round, GPT-5.6 Sol, 23.08.2026):
+ * "typography for the published notice in production" is a design question, and
+ * proximity alone made it a gate.
+ */
+const RELEASE_OBJECT = /\b(?:release|releases|deployment|deployments|site|page|build|version|tag|poc)\b/
+/** The board lane spells its forms out too — `change\\w*` admitted "changeability". */
+const BOARD_FORMS = [
+  'change', 'changes', 'changed', 'changing',
+  'replace', 'replaces', 'replaced', 'replacing',
+  'restructure', 'restructures', 'restructured', 'restructuring',
+  'alter', 'alters', 'altered', 'altering',
+]
+const ACT_VERB = ACT_FORMS.join('|')
+const RELEASE_VERB = RELEASE_FORMS.join('|')
+const BOARD_VERB = BOARD_FORMS.join('|')
+
+/**
+ * A QUESTION IS NEVER A CONFIRMATION (third cross-vendor round, GPT-5.6 Sol,
+ * 23.08.2026). Two rounds of counterexamples were all the same shape: an
+ * advisory question whose words happened to name an authorized act. A reason
+ * that asks rather than states is advisory before any act rule runs — which is
+ * the fail direction the 23.08.2026 order prescribes.
+ */
+const ASKING_VERB = 'choose|pick|decide|select|clarify|confirm whether|review whether'
+const ASKS_RATHER_THAN_STATES = (lower) =>
+  lower.includes('?') ||
+  // …at the start, behind a polite prefix, or anywhere as "whether to <act>".
+  new RegExp(`^\\W*(?:please\\s+|kindly\\s+)?(?:${ASKING_VERB}|which|what|whether|should|shall|would|could|do we|can we|are we|is it|how)\\b`).test(lower) ||
+  new RegExp(`\\b(?:${ASKING_VERB})\\b[^.]{0,40}\\bwhether\\b`).test(lower) ||
+  /\bwhether\s+(?:to|we|it|the)\b/.test(lower)
+
+const wordsIn = (text) => String(text ?? '').trim().split(/\s+/).filter(Boolean).length
+
+/**
+ * A prepared state is NAMED, never merely announced. All of these passed while
+ * recording nothing (cross-vendor review, GPT-5.6 Sol, 23.08.2026): the bare
+ * phrase "safe prepared state:", the bare "prepared locally", and a catch-all
+ * third alternative that any prose mentioning "locally … not … publish"
+ * satisfied. The record is what the queue skip is bought with, so it must carry
+ * words — and it is read from the whole CLAUSE, so a state named BEFORE the
+ * word ("the signed build output is prepared locally") counts as well as after.
+ */
+const PREPARED_QUALIFIER = /\b(?:locally|without|not|unchanged|unpublished|unpushed|undispatched|undeployed)\b/
+const namesPreparedState = (lower) => {
+  const m = /\b(?:safe|safely)\s+prepared\s+state\b[\s:,-]*(.*)$/.exec(lower)
+  return Boolean(m) && wordsIn(m[1]) >= 3
+}
+/** The clause the word "prepared" stands in — sanitiseReason has already turned every `;` into `,`. */
+const preparedClause = (lower) => lower.split(',').find((part) => /\bprepared\b/.test(part)) ?? ''
+const namesPreparationInWords = (lower) => {
+  const clause = preparedClause(lower)
+  if (!clause || !PREPARED_QUALIFIER.test(clause)) return false
+  // Three words beyond "prepared" and the qualifier itself: "prepared locally"
+  // names nothing, "the signed build output is prepared locally" names the object.
+  return wordsIn(clause.replace(/\bprepared\b/, ' ').replace(PREPARED_QUALIFIER, ' ')) >= 3
+}
+
+/**
+ * THE CLOSED ACT KEYS. A confirmation SELECTS one; it does not describe one.
+ * The values are what the operator reads in the usage line.
+ */
+export const CONFIRMATION_ACTS = {
+  'release-tag': 'create, move, push or delete a version/poc/release tag',
+  'public-release': 'dispatch or withdraw the public release',
+  'board-contract': 'change the published four-section board contract',
+}
+
+/** The stored shape of a typed confirmation reason. */
+const STRUCTURED_RE = new RegExp(
+  `^(${Object.keys(CONFIRMATION_ACTS).join('|')}): (.+?), safe prepared state: (.+)$`,
+  'i',
+)
+
+/**
+ * Compose the one reason a typed confirmation may carry.
+ *
+ * THE COMPOSED REASON IS RE-READ BEFORE IT IS BLESSED (fourth cross-vendor
+ * round, GPT-5.6 Sol, 23.08.2026). Validating the FIELDS and then storing
+ * `sanitiseReason(...)` was a lost-gate defect: the 160-character cap cut the
+ * `safe prepared state` clause off the end, the writer reported success, the
+ * marker went into the work order — and the strict reader then classified it
+ * advisory, so the point it was meant to park ran on. Whatever this returns as
+ * `ok` must survive the round trip, so the round trip is what decides.
+ */
+export function formatConfirmationReason({ act = '', detail = '', prepared = '' } = {}) {
+  const key = String(act ?? '').trim().toLowerCase()
+  const clean = (t) => String(t ?? '').replace(/[();\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!Object.hasOwn(CONFIRMATION_ACTS, key)) {
+    return { ok: false, error: `act must be one of: ${Object.keys(CONFIRMATION_ACTS).join(', ')}`, reason: '' }
+  }
+  const [what, safe] = [clean(detail), clean(prepared)]
+  if (wordsIn(what) < 3) return { ok: false, error: 'detail must name the concrete act in at least three words', reason: '' }
+  if (wordsIn(safe) < 3) return { ok: false, error: 'prepared must name the safe prepared state in at least three words', reason: '' }
+  // A FIELD THAT ASKS IS NOT A FIELD THAT ACTS: selecting an act key does not
+  // turn "choose blue or green" into one.
+  for (const [name, value] of [['detail', what], ['prepared', safe]]) {
+    if (ASKS_RATHER_THAN_STATES(value.toLowerCase())) {
+      return { ok: false, error: `${name} asks a question — decide it and record SELF-DECIDED instead`, reason: '' }
+    }
+  }
+  const reason = sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`)
+  const back = reason.match(STRUCTURED_RE)
+  // A CLIPPED RECORD IS ALSO A REFUSAL: `sanitiseReason` marks a cut with an
+  // ellipsis, and half a prepared state is not the state.
+  if (reason.endsWith('…') || !back || wordsIn(back[2]) < 3 || wordsIn(back[3]) < 3) {
+    return {
+      ok: false,
+      error: `the composed reason does not survive one work-order line (${REASON_MAX} characters) — shorten detail or prepared`,
+      reason: '',
+    }
+  }
+  return { ok: true, error: '', reason }
+}
+
+/**
+ * Classify a reason. THE TYPED FORM IS EXACT, THE PROSE FORM IS A HEURISTIC.
+ *
+ * WHY THE SPLIT (three cross-vendor rounds, GPT-5.6 Sol, 23.08.2026). Reading a
+ * free sentence for "does this name an outward act" is a bag-of-words guess, and
+ * three rounds of widening produced a new counterexample each time — "copy for
+ * the withdrawal dialog in production", "typography for the published notice",
+ * "the changeability of the published four-section contract". Every one of them
+ * PARKED a point on an ordinary product decision, which is the exact inversion
+ * the 23.08.2026 order removes. No pattern set closes that; the input shape does.
+ *
+ * So a TYPED marker carries a SELECTED act key and two named fields, which
+ * `formatConfirmationReason` is the only way to build, and this function then
+ * merely recognises. Prose reaches the heuristic only under `{ legacy: true }`,
+ * used by the migration of untyped `AWAITING-USER` lines — and there the
+ * heuristic decides confirmation-versus-self-decided for a marker that ALREADY
+ * parks its point, so a wrong guess preserves an existing gate rather than
+ * creating one. That is the fail direction the order prescribes.
+ */
+export function classifyConfirmationReason(reason, { legacy = false } = {}) {
+  const structured = String(reason ?? '').trim().match(STRUCTURED_RE)
+  if (structured) {
+    const [, key, detail, prepared] = structured
+    const composed = formatConfirmationReason({ act: key, detail, prepared })
+    if (composed.ok) {
+      return { verdict: 'confirmation', act: key.toLowerCase(), reason: sanitiseReason(reason, { max: 1000 }), error: '' }
+    }
+    return { verdict: 'advisory', act: key.toLowerCase(), reason: sanitiseReason(reason, { max: 1000 }), error: composed.error }
+  }
+  if (!legacy) {
+    return {
+      verdict: 'advisory',
+      act: '',
+      reason: sanitiseReason(reason, { max: 1000 }),
+      error: `a confirmation reason must read "<act>: <what>, safe prepared state: <what stands prepared>" with act one of ${Object.keys(CONFIRMATION_ACTS).join(', ')}`,
+    }
+  }
+  return classifyLegacyReason(reason)
+}
+
+/**
+ * The prose heuristic, for UNTYPED legacy markers alone. It answers one
+ * question: does this old reason itself describe a U3 act, so that migration
+ * keeps its gate rather than turning it into a recorded decision?
+ */
+export function classifyLegacyReason(reason) {
+  const text = sanitiseReason(reason, { max: 1000 })
+  const lower = text.toLowerCase()
+  if (ASKS_RATHER_THAN_STATES(lower)) {
+    return { verdict: 'advisory', act: '', reason: text, error: 'a question is a decision to take, not an act to confirm' }
+  }
+  const tagAct =
+    new RegExp(`\\b(?:${ACT_VERB})\\b[^.]{0,100}\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b`).test(lower) ||
+    new RegExp(`\\b(?:version|poc|release)\\b[^.]{0,50}\\btag\\b[^.]{0,100}\\b(?:${ACT_VERB})\\b`).test(lower)
+  const publicReleaseAct =
+    RELEASE_OBJECT.test(lower) &&
+    (new RegExp(`\\b(?:${RELEASE_VERB})\\b[^.]{0,100}\\b(?:public|production)\\b`).test(lower) ||
+      new RegExp(`\\b(?:public|production)\\b[^.]{0,100}\\b(?:${RELEASE_VERB})\\b`).test(lower))
+  // BOTH directions demand the PUBLIC qualifier (cross-vendor review, GPT-5.6
+  // Sol, 23.08.2026). Without it on the second alternative, "should the
+  // four-section internal draft change font?" — an advisory question — named an
+  // authorized act and parked its point, which is the exact inversion this
+  // point exists to remove.
+  const boardContractAct =
+    new RegExp(`\\b(?:${BOARD_VERB})\\b[^.]{0,120}\\b(?:published|public)\\b[^.]{0,80}\\b(?:four[- ]section|4[- ]section|section contract)\\b`).test(lower) ||
+    new RegExp(`\\b(?:published|public)\\b[^.]{0,80}\\b(?:four[- ]section|4[- ]section|section contract)\\b[^.]{0,120}\\b(?:${BOARD_VERB})\\b`).test(lower)
+  // The PHRASE alone is not the state (cross-vendor review, GPT-5.6 Sol,
+  // 23.08.2026): "push the release tag; safe prepared state:" named nothing and
+  // was accepted, which is precisely the record the gate is bought with.
+  const prepared = namesPreparedState(lower) || namesPreparationInWords(lower)
+  const act = tagAct ? 'release-tag' : publicReleaseAct ? 'public-release' : boardContractAct ? 'board-contract' : ''
+  if (!act) {
+    return { verdict: 'advisory', act: '', reason: text, error: 'reason does not name an authorized outward-facing act' }
+  }
+  if (!prepared) {
+    return { verdict: 'advisory', act, reason: text, error: 'reason does not name the safe prepared state before that act' }
+  }
+  return { verdict: 'confirmation', act, reason: text, error: '' }
 }
 
 /**
@@ -113,23 +413,40 @@ export function parseGateLine(line) {
   }
   // The LAST marker on the line is the state — a gate written after an answer
   // gates again, an answer written after a gate answers. No precedence rule.
-  const answered = hit[1] === ANSWERED_MARKER
-  const payload = String(hit[2] ?? '')
-  const stamp = leadingStamp(payload)
-  const rest = answered ? '' : payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
-  const reason = answered ? '' : sanitiseReason(rest || (stamp ? '' : payload))
+  const { marker, payload } = readMarkerToken(hit[1])
+  const answered = marker === ANSWERED_MARKER
+  const selfDecided = marker === SELF_DECIDED_MARKER
+  const { stamp, reason } = readPayload(marker, payload)
+  const classification = marker === CONFIRMATION_MARKER
+    ? classifyConfirmationReason(reason)
+    : marker === LEGACY_GATE_MARKER
+      ? classifyConfirmationReason(reason, { legacy: true })
+      : null
   // A DEFERRED point is out of the batch entirely, and a ticked one is closed;
   // neither may be gated, but a marker left on either is worth reporting.
   const live = open && !deferred
   return {
     point,
     open,
-    gated: live && !answered,
+    marker,
+    legacy: marker === LEGACY_GATE_MARKER,
+    selfDecided: live && selfDecided,
+    // ONLY A TYPED MARKER GATES (fourth cross-vendor round, GPT-5.6 Sol,
+    // 23.08.2026). An untyped line used to gate on the prose heuristic's
+    // verdict, which put that heuristic — and every false positive three review
+    // rounds found in it — back on the live path of every queue and pool
+    // reader. A legacy marker now OWES MIGRATION and continues meanwhile, which
+    // is the direction the 23.08.2026 order prescribes for ambiguity; `--migrate`
+    // is what turns a qualifying one into a gate that holds. An invalid TYPED
+    // marker continues for the same reason.
+    gated: live && marker === CONFIRMATION_MARKER && classification?.verdict === 'confirmation',
+    needsMigration: live && marker === LEGACY_GATE_MARKER,
     answered: live && answered,
     since: answered ? '' : stamp,
     at: answered ? stamp : '',
     reason,
-    reasonMissing: !answered && live && reason === '',
+    reasonMissing: !answered && !selfDecided && live && reason === '',
+    classification,
     stale: !live,
   }
 }
@@ -146,15 +463,21 @@ export function parseGateLine(line) {
 export function parseUserGates(tasksText) {
   const gated = []
   const answered = []
+  const selfDecided = []
+  const advisory = []
   const stale = []
   for (const line of String(tasksText ?? '').split('\n')) {
     const parsed = parseGateLine(line)
     if (!parsed) continue
     if (parsed.gated) gated.push({ point: parsed.point, since: parsed.since, reason: parsed.reason, reasonMissing: parsed.reasonMissing })
     else if (parsed.answered) answered.push({ point: parsed.point, at: parsed.at })
+    else if (parsed.selfDecided) selfDecided.push({ point: parsed.point, at: parsed.since, decision: parsed.reason })
+    else if (parsed.open && parsed.classification?.verdict === 'advisory') {
+      advisory.push({ point: parsed.point, marker: parsed.marker, since: parsed.since, reason: parsed.reason, error: parsed.classification.error })
+    }
     else if (parsed.stale && hasMarker(line)) stale.push({ point: parsed.point, kind: parsed.open ? 'deferred' : 'ticked' })
   }
-  return { gated, answered, stale, reasonless: gated.filter((g) => g.reasonMissing).map((g) => g.point) }
+  return { gated, answered, selfDecided, advisory, stale, reasonless: advisory.filter((g) => !g.reason).map((g) => g.point) }
 }
 
 /** Does this line END in either marker? */
@@ -227,17 +550,24 @@ const stripMarkers = (line) => {
 }
 
 /**
- * Mark a point as waiting on the user. Returns { text, ok, error }.
+ * Mark a point as awaiting a true confirmation. Returns { text, ok, error }.
  *
- * A gate with no reason is REFUSED here (not silently written): recording the
- * why is what the queue skip is bought with. An already gated point is
- * re-stamped rather than doubled, so the reason can be corrected.
+ * THE ACT IS SELECTED, NOT DESCRIBED (three cross-vendor rounds, GPT-5.6 Sol,
+ * 23.08.2026): the caller names one of `CONFIRMATION_ACTS`, what it does, and
+ * what stands safely prepared. Nothing this writes can therefore be an advisory
+ * question that merely sounded outward-facing. An already gated point is
+ * re-stamped rather than doubled, so the record can be corrected.
  */
-export function markGated(tasksText, point, { since = '', reason = '' } = {}) {
-  const clean = sanitiseReason(reason)
-  if (!clean) {
-    return { text: String(tasksText ?? ''), ok: false, error: 'a gate needs a reason — record WHY the point waits on the user' }
+export function markGated(tasksText, point, { since = '', act = '', detail = '', prepared = '' } = {}) {
+  const composed = formatConfirmationReason({ act, detail, prepared })
+  if (!composed.ok) {
+    return {
+      text: String(tasksText ?? ''),
+      ok: false,
+      error: `${composed.error} — an advisory question is decided and recorded as SELF-DECIDED instead`,
+    }
   }
+  const clean = composed.reason
   // ONLY a real ISO stamp goes in (four-eyes review, Fable 5): a raw fallback
   // let a bracket in `since` close the marker early and strand the rest of the
   // line as junk no re-stamp could remove. The format already tolerates none.
@@ -247,6 +577,170 @@ export function markGated(tasksText, point, { since = '', reason = '' } = {}) {
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
   if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — a closed point is not gateable` }
   return { text, ok: true, error: '' }
+}
+
+/** Record a reversible advisory decision without making the point unworkable. */
+export function markSelfDecided(tasksText, point, { at = '', decision = '' } = {}) {
+  const clean = sanitiseReason(decision)
+  if (!clean) {
+    return { text: String(tasksText ?? ''), ok: false, error: 'SELF-DECIDED needs the decision that was taken' }
+  }
+  const stamp = leadingStamp(at)
+  const marker = `${SELF_DECIDED_MARKER}(${stamp ? `${stamp}; ` : ''}${clean})`
+  const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
+  if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
+  if (hit === 'ticked') return { text, ok: false, error: `point ${Number(point)} is already ticked — no advisory decision is needed` }
+  return { text, ok: true, error: '' }
+}
+
+/**
+ * The durable board record for an advisory decision. The labels are explicit
+ * because all four facts are mandatory and a prose blob cannot prove which one
+ * was omitted. The title deliberately does not START with the point number:
+ * dashboard-integrity treats a leading number in this section as a parked
+ * point, whereas SELF-DECIDED must remain visible in the workable queue.
+ */
+export function advisoryDecisionCard(point, { decision = '', evidence = '', consequence = '', vetoAction = '' } = {}) {
+  const fields = {
+    decision: sanitiseReason(decision, { max: 1000 }),
+    evidence: sanitiseReason(evidence, { max: 1000 }),
+    consequence: sanitiseReason(consequence, { max: 1000 }),
+    vetoAction: sanitiseReason(vetoAction, { max: 1000 }),
+  }
+  const missing = Object.entries(fields).filter(([, value]) => !value).map(([key]) => key)
+  if (missing.length) return { ok: false, error: `decision record needs: ${missing.join(', ')}`, title: '', body: '' }
+  return {
+    ok: true,
+    error: '',
+    title: `Entscheidungsprotokoll: Punkt ${Number(point)} läuft weiter`,
+    body:
+      `Entscheidung: ${fields.decision}. Evidenz: ${fields.evidence}. ` +
+      `Folge: ${fields.consequence}. Exakte Veto-Aktion: ${fields.vetoAction}.`,
+  }
+}
+
+/** Validate and prepare both halves of one advisory decision atomically in memory. */
+export function prepareAdvisoryDecision(tasksText, point, {
+  at = '',
+  question = '',
+  decision = '',
+  evidence = '',
+  consequence = '',
+  vetoAction = '',
+} = {}) {
+  const classified = classifyConfirmationReason(question, { legacy: true })
+  if (!classified.reason) {
+    return { text: String(tasksText ?? ''), ok: false, error: 'an advisory decision needs the question it resolves', card: null }
+  }
+  if (classified.verdict === 'confirmation') {
+    return {
+      text: String(tasksText ?? ''),
+      ok: false,
+      error: 'this reason names a true confirmation act — use AWAITING-CONFIRMATION instead of SELF-DECIDED',
+      card: null,
+    }
+  }
+  const card = advisoryDecisionCard(point, { decision, evidence, consequence, vetoAction })
+  if (!card.ok) return { text: String(tasksText ?? ''), ok: false, error: card.error, card: null }
+  const marked = markSelfDecided(tasksText, point, { at, decision })
+  if (!marked.ok) return { ...marked, card: null }
+  return { ...marked, card, question: classified.reason }
+}
+
+/**
+ * Split an untyped reason into the two typed fields. The canonical "…, safe
+ * prepared state: X" form splits exactly; anything else carries the WHOLE
+ * reason as the detail and says the state must be re-read from it — never that
+ * none was recorded, which was wrong whenever the prose named one in passing
+ * (fourth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+ */
+const legacySplit = (reason) => {
+  const text = String(reason ?? '')
+  const split = /^(.*?),?\s*safe prepared state:\s*(.+)$/i.exec(text)
+  if (split && wordsIn(split[1]) >= 3 && wordsIn(split[2]) >= 3) {
+    return { detail: split[1], prepared: split[2] }
+  }
+  return { detail: text, prepared: 'as recorded in the detail, re-record it before acting' }
+}
+
+const legacyDecision = (point, reason) => advisoryDecisionCard(point, {
+  decision: `Die offene Beratungsfrage wird mit dem sichersten reversiblen Standard entschieden: ${reason || 'keine belastbare Frage aufgezeichnet'}`,
+  evidence: 'Der alte Marker nennt weder einen autorisierten Außenakt noch den davor sicher vorbereiteten Zustand',
+  consequence: `Punkt ${point} bleibt bearbeitbar und der Batch setzt ihn fort`,
+  vetoAction: `Auf dieser Karte mit „Veto“ und der gewünschten Alternative antworten; der nächste Besitzer öffnet Punkt ${point} erneut und macht die daraus entstandenen Änderungen rückgängig`,
+})
+
+/**
+ * Rewrite every legacy marker and return an auditable verdict for EVERY ONE.
+ * Confirmations retain their original stamp/reason; ambiguous open markers
+ * become SELF-DECIDED and yield the decision card the CLI must publish.
+ *
+ * EVERY marker on the line, not only the state (cross-vendor review, GPT-5.6
+ * Sol, 23.08.2026). Reading through `parseGateLine` saw the LAST marker alone:
+ * a legacy gate standing before a later `USER-ANSWERED` was neither rewritten
+ * nor reported, and two legacy markers in a row were stripped together but
+ * yielded a single verdict — both against the promise that the report names
+ * every existing marker.
+ */
+export function migrateLegacyGates(tasksText, { at = '' } = {}) {
+  const stamp = leadingStamp(at)
+  const entries = []
+  const cards = []
+  const lines = String(tasksText ?? '').split('\n').map((raw) => {
+    const line = peelCr(raw)
+    const cr = raw.slice(line.length)
+    const head = line.match(HEAD_RE)
+    if (!head) return raw
+    const point = Number(head[2])
+    const { head: bare, markers } = peelTrailingMarkers(line)
+    const tokens = markers.map((token) => ({ token, ...(readMarkerToken(token) ?? { marker: '', payload: '' }) }))
+    if (!tokens.some((t) => t.marker === LEGACY_GATE_MARKER)) return raw
+    // A ticked or DEFERRED point is closed to the batch; its leftovers go,
+    // and each legacy one is still named so the removal is auditable.
+    const live = head[1] === ' ' && !/\bDEFERRED\b/.test(line)
+    if (!live) {
+      for (const t of tokens) {
+        if (t.marker !== LEGACY_GATE_MARKER) continue
+        entries.push({ point, verdict: 'stale-removed', reason: readPayload(t.marker, t.payload).reason })
+      }
+      return `${bare}${cr}`
+    }
+    const rebuilt = tokens.map((t) => {
+      if (t.marker !== LEGACY_GATE_MARKER) return t.token
+      const { stamp: since, reason } = readPayload(t.marker, t.payload)
+      // A legacy line whose reason was ALREADY written in the typed form keeps
+      // it verbatim — composing it again would prefix the act key twice.
+      if (classifyConfirmationReason(reason).verdict === 'confirmation') {
+        entries.push({ point, verdict: 'confirmation', reason })
+        return `${CONFIRMATION_MARKER}(${since ? `${since}; ` : ''}${reason})`
+      }
+      const legacyVerdict = classifyConfirmationReason(reason, { legacy: true })
+      if (legacyVerdict.verdict === 'confirmation') {
+        // The MIGRATED marker must satisfy the STRICT reader, or the gate it is
+        // meant to preserve would evaporate the moment it is written. The old
+        // prose becomes the detail, and the prepared state says truthfully that
+        // the untyped marker never recorded one.
+        const composed = formatConfirmationReason({ act: legacyVerdict.act, ...legacySplit(reason) })
+        if (composed.ok) {
+          entries.push({ point, verdict: 'confirmation', reason })
+          return `${CONFIRMATION_MARKER}(${since ? `${since}; ` : ''}${composed.reason})`
+        }
+        // The old prose qualifies but will not fit the typed form. Rewriting it
+        // to SELF-DECIDED would drop a real gate and composing a truncated
+        // marker would drop it just as silently, so the line is LEFT ALONE and
+        // named: the operator re-records it with --act.
+        entries.push({ point, verdict: 'confirmation-needs-rewrite', reason })
+        return t.token
+      }
+      entries.push({ point, verdict: 'self-decided', reason })
+      const card = legacyDecision(point, reason)
+      if (card.ok) cards.push({ point, ...card })
+      const summary = sanitiseReason(reason || 'legacy marker had no recorded reason')
+      return `${SELF_DECIDED_MARKER}(${stamp ? `${stamp}; ` : ''}${summary})`
+    })
+    return `${[bare, ...rebuilt].join(' ')}${cr}`
+  })
+  return { text: lines.join('\n'), entries, cards }
 }
 
 /**
@@ -293,12 +787,16 @@ export function clearMarkers(tasksText, point) {
  * without opening the work order.
  */
 export function gateReport(tasksText) {
-  const { gated, answered, stale } = parseUserGates(tasksText)
+  const { gated, answered, selfDecided, advisory, stale } = parseUserGates(tasksText)
   const lines = []
   for (const g of gated) {
-    lines.push(`  ${g.point} waits on the user${g.since ? ` since ${g.since}` : ''}: ${g.reason || '— NO REASON RECORDED (repair it)'}`)
+    lines.push(`  ${g.point} awaits confirmation${g.since ? ` since ${g.since}` : ''}: ${g.reason || '— NO REASON RECORDED (repair it)'}`)
   }
   for (const a of answered) lines.push(`  ${a.point} answered${a.at ? ` ${a.at}` : ''} — back at the head of the queue`)
+  for (const s of selfDecided) lines.push(`  ${s.point} self-decided${s.at ? ` ${s.at}` : ''}: ${s.decision}`)
+  for (const a of advisory) {
+    lines.push(`  ${a.point} continues — ${a.marker} is advisory: ${a.reason || '— NO REASON RECORDED'} (${a.error})`)
+  }
   for (const s of stale) {
     lines.push(`  ${s.point} carries a leftover marker on a ${s.kind} point — node scripts/defer-for-user.mjs --forget ${s.point}`)
   }
