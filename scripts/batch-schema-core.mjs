@@ -308,15 +308,29 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null } 
 
   if (copy && !record) return reading('orphaned-copy')
   if (!record) return reading('no-daemon')
-  if (!Number.isFinite(record.generation)) {
+  // A generation is the credential's: a minted random STRING in the real store
+  // (mechanism 2 — "recovery mints a fresh random generation"), a number only in
+  // synthetic fixtures. Both are generations; a record carrying neither is not
+  // comparable to anything. The first shipped version of this table accepted
+  // only numbers, so every REAL daemon record read as impossible-copy — exactly
+  // the false-corruption verdict this table exists to avoid.
+  const generationPresent = (g) => (typeof g === 'string' && g.length > 0) || Number.isFinite(g)
+  if (!generationPresent(record.generation)) {
     return impossible('the record carries no generation, so nothing can be compared to it')
   }
 
   // The copy is only ever written FROM the record, so anything it says that the
   // record does not is a claim no write order could have made.
   if (copy) {
-    if (!Number.isFinite(copy.generation)) return impossible('the copy carries no generation and cannot be placed')
-    if (copy.generation > record.generation) {
+    if (!generationPresent(copy.generation)) return impossible('the copy carries no generation and cannot be placed')
+    if (typeof copy.generation !== typeof record.generation) {
+      return impossible('the copy and the record carry generations of different kinds; the copy was not written from this record')
+    }
+    // Ordering exists only for numeric fixtures; random string generations can
+    // only be equal or different, and a copy from a FUTURE record is impossible
+    // by the write orders, so a differing string copy reads as from an earlier
+    // record below rather than as novelty here.
+    if (Number.isFinite(copy.generation) && copy.generation > record.generation) {
       return impossible(
         `copy generation ${copy.generation} is newer than the record's ${record.generation}; the write orders cannot produce this`,
       )

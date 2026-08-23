@@ -264,6 +264,30 @@ describe('the daemon pair — record and the lock copy of it', () => {
       'impossible-copy',
     ],
     ['record with no generation', { record: { ...record, generation: undefined }, copy, probe: alive }, 'impossible-copy'],
+    // REAL records carry the credential's minted random STRING generation
+    // (mechanism 2); the numeric rows above are synthetic fixtures. The first
+    // shipped table accepted only numbers, so every real daemon record read as
+    // impossible-copy — these rows pin the repair.
+    [
+      'string generations, matching, live record',
+      { record: { ...record, generation: 'gen-real-0001' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: alive },
+      'healthy',
+    ],
+    [
+      'string generations, differing, live record: from an earlier record, never novelty',
+      { record: { ...record, generation: 'gen-real-0002' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: alive },
+      'superseded-copy',
+    ],
+    [
+      'string generations, differing, dead record',
+      { record: { ...record, generation: 'gen-real-0002' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: dead },
+      'cold-record',
+    ],
+    [
+      'generation kinds differ between copy and record',
+      { record: { ...record, generation: 'gen-real-0001' }, copy, probe: alive },
+      'impossible-copy',
+    ],
     // A probe that found the identity and never answered is an unprobed record.
     ['probe without a verdict', { record, copy, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'stale-copy'],
     ['probe without a verdict, no copy', { record, copy: null, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'cold-record'],
