@@ -196,7 +196,13 @@ export const LIMITS = {
   // is +6 lines / +57 words against the measured 438 / 3930, and the ceilings
   // move by exactly that to 444 / 3987, with zero slack. Not escalated to the
   // user, under his general withdrawal of ask-before-raising of 10.08.2026.
-  maxWords: 3987,
+  //
+  // 23.08.2026, the unattended-halt pitfall: the lesson out of the
+  // fortnight-alone work went in at 8 lines / 81 words, and the room for it came
+  // from SIX existing entries rather than from a raise. The guide measures
+  // 444 / 3952 afterwards, so the word ceiling RATCHETS DOWN by 35 to exactly
+  // that. The line ceiling stays 444 because the file does.
+  maxWords: 3952,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
