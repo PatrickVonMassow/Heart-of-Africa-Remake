@@ -110,8 +110,15 @@ export const DOC_BUDGETS = [
     // 20.08.2026 (the 45 / 700 written here was a pre-merge reading),
     // and the longest index entry is 21 words. The whole-file ceiling prevents
     // new duplicate entries; the entry ceiling preserves “the hook only”.
+    // RAISED on 23.08.2026 by ONE genuinely new standing order the user gave
+    // that day — no lasting standstill: self-recovery over alerting, no stop
+    // parked on a user card, decide-and-record with retroactive veto — whose
+    // index line measures 18 words on this tokenizer, written at 26 words and
+    // cut to the entry ceiling first. The word ceiling moves by exactly that
+    // line to the 47 / 728 fit; the line ceiling already held the one-line
+    // headroom the 757 table records, which this line now spends.
     maxLines: 47,
-    maxWords: 710,
+    maxWords: 728,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.
