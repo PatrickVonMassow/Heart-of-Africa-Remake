@@ -424,21 +424,28 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
   if (current && expectedOid === '') {
     return { ok: false, reason: 'a published credential cannot be leased as absent' }
   }
-  // "Carries work" means at least one REAL work ref. Fail-closed by POSITIVE
-  // syntax, not by listing what git syntax means something else: a plain ref name
-  // is word characters, dots, dashes and slashes, starting with a word character —
-  // which excludes options (-), forced refspecs (+), revision syntax (~ ^ @{ ..)
-  // and refspecs (:) without enumerating them. A bare string would spread into
-  // one-character push arguments, so the array shape is required too.
-  const plainRefName = (r) =>
-    typeof r === 'string' && /^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(r) && !r.includes('..') && !r.endsWith('/')
-  if (!Array.isArray(refs) || !refs.every(plainRefName)) {
-    return { ok: false, reason: 'refs must be an array of plain ref names' }
+  // "Carries work" means at least one REAL work ref, and every ref is FULLY
+  // QUALIFIED: it starts with `refs/`, which is what removes the whole family of
+  // shorthand hazards at once — pseudo-refs (HEAD, FETCH_HEAD), raw object ids and
+  // describe-style names are made of allowed characters but never start with
+  // `refs/`, and a fully qualified name is exempt from the DWIM resolution that
+  // makes shorthand ambiguous. The body then excludes options (-), forced refspecs
+  // (+), refspecs (:), revision syntax (~ ^ @{ ..) and empty segments by positive
+  // syntax. A bare string would spread into one-character push arguments, so the
+  // array shape is required too.
+  const qualifiedRefName = (r) =>
+    typeof r === 'string' &&
+    /^refs\/[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(r) &&
+    !r.includes('..') &&
+    !r.includes('//') &&
+    !r.endsWith('/')
+  if (!Array.isArray(refs) || !refs.every(qualifiedRefName)) {
+    return { ok: false, reason: 'refs must be an array of fully qualified ref names (refs/...)' }
   }
-  // The credential ref is appended by the push itself; naming it — fully or by any
-  // trailing shorthand git could resolve to it — would duplicate or shadow that
-  // argument, so it is refused rather than filtered out.
-  if (refs.some((r) => r === CREDENTIAL_REF || CREDENTIAL_REF.endsWith(`/${r}`))) {
+  // The credential ref is appended by the push itself; naming it in `refs` too
+  // would duplicate the argument, so it is refused rather than filtered out. Exact
+  // match suffices BECAUSE the names are fully qualified — no shorthand resolves.
+  if (refs.includes(CREDENTIAL_REF)) {
     return { ok: false, reason: 'the credential ref is appended by the push itself and is not work' }
   }
   if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
@@ -628,6 +635,16 @@ export function registerDaemonCommand(table, name, spec) {
   if (!Array.isArray(spec?.keyFields) || !spec.keyFields.length) {
     return { ok: false, reason: `${name} declares no idempotency key and cannot be registered` }
   }
+  // Unique, non-empty string field names, checked HERE because idempotencyKey
+  // relies on them: a duplicate field would read one accessor twice and break the
+  // single-read snapshot, and a symbol field would survive fromEntries but be
+  // dropped by canonical JSON, colliding distinct values.
+  if (spec.keyFields.some((f) => typeof f !== 'string' || !f)) {
+    return { ok: false, reason: `${name} declares a key field that is not a non-empty string` }
+  }
+  if (new Set(spec.keyFields).size !== spec.keyFields.length) {
+    return { ok: false, reason: `${name} declares duplicate key fields` }
+  }
   return { ok: true, table: Object.freeze({ ...table, [name]: Object.freeze({ ...spec }) }) }
 }
 
@@ -656,8 +673,11 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
   // payloads into one key — and a collided key silently drops the second mutation
   // as "already applied". fromEntries, not assignment: assigning a `__proto__` key
   // field would invoke the legacy setter and drop the field from the material.
+  // The FULL digest: truncating to 16 hex characters leaves 64 bits, where a
+  // birthday collision over unbounded admitted strings is feasible — and a
+  // collided key silently suppresses a mutation.
   const material = canonicalJson(Object.fromEntries(values))
-  return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex').slice(0, 16)}` }
+  return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex')}` }
 }
 
 /** A key value must be a SCALAR the serialisation cannot lose: a non-empty string,

@@ -314,60 +314,60 @@ describe('the coordinator credential', () => {
   })
 
   it('refuses a publication whose credential update would be a no-op', () => {
-    const push = publicationPush({ current, next: current, expectedOid: 'oid1', refs: ['main'] })
+    const push = publicationPush({ current, next: current, expectedOid: 'oid1', refs: ['refs/heads/main'] })
     expect(push.ok).toBe(false)
     expect(push.reason).toMatch(/no-op/)
   })
 
   it('refuses a credential that moves BACKWARDS, which a no-op check alone would let through', () => {
     const back = credential({ generation: gen, fence: 604, seq: 2 }).credential
-    expect(publicationPush({ current, next: back, expectedOid: 'oid1', refs: ['main'] }).reason).toMatch(/backwards/)
+    expect(publicationPush({ current, next: back, expectedOid: 'oid1', refs: ['refs/heads/main'] }).reason).toMatch(/backwards/)
     const olderFence = credential({ generation: gen, fence: 603, seq: 99 }).credential
-    expect(publicationPush({ current, next: olderFence, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next: olderFence, expectedOid: 'oid1', refs: ['refs/heads/main'] }).ok).toBe(false)
     // A new fence with a restarted seq IS an advance.
     const newFence = credential({ generation: gen, fence: 605, seq: 0 }).credential
-    expect(publicationPush({ current, next: newFence, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(true)
+    expect(publicationPush({ current, next: newFence, expectedOid: 'oid1', refs: ['refs/heads/main'] }).ok).toBe(true)
   })
 
   it('refuses a malformed credential on either side rather than comparing undefined', () => {
-    expect(publicationPush({ current, next: { generation: gen, fence: 605 }, expectedOid: 'o', refs: ['main'] }).ok).toBe(
+    expect(publicationPush({ current, next: { generation: gen, fence: 605 }, expectedOid: 'o', refs: ['refs/heads/main'] }).ok).toBe(
       false,
     )
     expect(
-      publicationPush({ current: { generation: gen }, next: advancedCredential(current).credential, expectedOid: 'o', refs: ['main'] })
+      publicationPush({ current: { generation: gen }, next: advancedCredential(current).credential, expectedOid: 'o', refs: ['refs/heads/main'] })
         .ok,
     ).toBe(false)
   })
 
   it('returns the value that must be written into the ref, so lease and payload cannot come apart', () => {
     const next = advancedCredential(current).credential
-    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main'] }).credential).toEqual(next)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['refs/heads/main'] }).credential).toEqual(next)
   })
 
   it('builds one atomic push carrying the work and the credential under a lease', () => {
     const next = advancedCredential(current).credential
-    const push = publicationPush({ current, next, expectedOid: 'oid1', refs: ['main'] })
+    const push = publicationPush({ current, next, expectedOid: 'oid1', refs: ['refs/heads/main'] })
     expect(push.ok).toBe(true)
     expect(push.args).toEqual([
       'push',
       '--atomic',
       `--force-with-lease=${CREDENTIAL_REF}:oid1`,
       'origin',
-      'main',
+      'refs/heads/main',
       CREDENTIAL_REF,
     ])
   })
 
   it('the very first advance leases the ref ABSENCE', () => {
     const first = credential({ generation: gen, fence: 604, seq: 0 }).credential
-    const push = publicationPush({ current: null, next: first, expectedOid: '', refs: ['main'] })
+    const push = publicationPush({ current: null, next: first, expectedOid: '', refs: ['refs/heads/main'] })
     expect(push.ok).toBe(true)
     expect(push.args).toContain(`--force-with-lease=${CREDENTIAL_REF}:`)
   })
 
   it('refuses a publication with no lease at all, and one that carries no work', () => {
     const next = advancedCredential(current).credential
-    expect(publicationPush({ current, next, refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, refs: ['refs/heads/main'] }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [] }).ok).toBe(false)
   })
 
@@ -375,7 +375,7 @@ describe('the coordinator credential', () => {
     const next = advancedCredential(current).credential
     // A bare string would spread into one-character push arguments.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: 'main' }).ok).toBe(false)
-    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', ''] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['refs/heads/main', ''] }).ok).toBe(false)
     // Options, forced refspecs, refspecs and revision syntax are not ref names.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['--force', 'main'] }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main:other'] }).ok).toBe(false)
@@ -386,7 +386,7 @@ describe('the coordinator credential', () => {
     // push appends itself — refused, not filtered — and a trailing shorthand git
     // could resolve to it is refused with it.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [CREDENTIAL_REF] }).ok).toBe(false)
-    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', CREDENTIAL_REF] }).reason).toMatch(/appended by the push/)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['refs/heads/main', CREDENTIAL_REF] }).reason).toMatch(/appended by the push/)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['hoa/coordinator'] }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['coordinator'] }).ok).toBe(false)
     // Real work refs still pass.
@@ -395,7 +395,7 @@ describe('the coordinator credential', () => {
 
   it('a publication never changes the generation; recovery mints one', () => {
     const foreign = credential({ generation: 'g-otherrrr', fence: 604, seq: 4 }).credential
-    expect(publicationPush({ current, next: foreign, expectedOid: 'oid1', refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next: foreign, expectedOid: 'oid1', refs: ['refs/heads/main'] }).ok).toBe(false)
   })
 
   it('refuses a credential from a previous generation, a stale fence and a stale seq', () => {
@@ -449,19 +449,19 @@ describe('the coordinator credential', () => {
     // `current: null` beside a lease on a REAL oid skips every advance check while
     // the remote lease still matches — that push is a rollback door.
     const first = credential({ generation: gen, fence: 604, seq: 0 }).credential
-    expect(publicationPush({ current: null, next: first, expectedOid: 'oid1', refs: ['main'] }).reason).toMatch(/absence/)
+    expect(publicationPush({ current: null, next: first, expectedOid: 'oid1', refs: ['refs/heads/main'] }).reason).toMatch(/absence/)
     const next = advancedCredential(current).credential
-    expect(publicationPush({ current, next, expectedOid: '', refs: ['main'] }).reason).toMatch(/leased as absent/)
+    expect(publicationPush({ current, next, expectedOid: '', refs: ['refs/heads/main'] }).reason).toMatch(/leased as absent/)
   })
 
   it('absence is null or undefined and nothing looser, and the lease is a primitive string', () => {
     // `current: false` is not "no credential is published", and a String OBJECT
     // passes `!== ''` while interpolating into an empty lease.
     const first = credential({ generation: gen, fence: 604, seq: 0 }).credential
-    expect(publicationPush({ current: false, next: first, expectedOid: '', refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current: false, next: first, expectedOid: '', refs: ['refs/heads/main'] }).ok).toBe(false)
     const next = advancedCredential(current).credential
-    expect(publicationPush({ current, next, expectedOid: new String(''), refs: ['main'] }).ok).toBe(false)
-    expect(publicationPush({ current, next, expectedOid: 42, refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: new String(''), refs: ['refs/heads/main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 42, refs: ['refs/heads/main'] }).ok).toBe(false)
   })
 })
 
@@ -549,6 +549,13 @@ describe('the daemon command table', () => {
     }
   })
 
+  it('the shipped table itself satisfies the registration rules — a literal edit cannot bypass the gate', () => {
+    for (const [name, spec] of Object.entries(DAEMON_COMMANDS)) {
+      expect(spec.keyFields.every((f) => typeof f === 'string' && f), name).toBe(true)
+      expect(new Set(spec.keyFields).size, name).toBe(spec.keyFields.length)
+    }
+  })
+
   it('every registered command declares a compensation', () => {
     for (const [name, spec] of Object.entries(DAEMON_COMMANDS)) {
       expect(spec.compensation, name).toBeTruthy()
@@ -583,6 +590,22 @@ describe('the daemon command table', () => {
     expect(ok.ok).toBe(true)
     expect(ok.table['prune-logs'].compensation).toBe('restore-logs')
     expect(DAEMON_COMMANDS['prune-logs']).toBeUndefined()
+
+    // Key fields must be unique non-empty strings: a duplicate would read one
+    // accessor twice and break the single-read snapshot, and a symbol would be
+    // dropped by canonical JSON, colliding distinct values.
+    expect(registerDaemonCommand(DAEMON_COMMANDS, 'dup-cmd', {
+      compensation: 'x',
+      keyFields: ['batchId', 'batchId'],
+    }).reason).toMatch(/duplicate key fields/)
+    expect(registerDaemonCommand(DAEMON_COMMANDS, 'sym-cmd', {
+      compensation: 'x',
+      keyFields: [Symbol('batchId')],
+    }).reason).toMatch(/not a non-empty string/)
+    expect(registerDaemonCommand(DAEMON_COMMANDS, 'empty-cmd', {
+      compensation: 'x',
+      keyFields: [''],
+    }).reason).toMatch(/not a non-empty string/)
   })
 
   it('refuses to register a published act as a compensable mutation', () => {
