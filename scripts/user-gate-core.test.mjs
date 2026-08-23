@@ -18,6 +18,7 @@ import {
   migrateLegacyGates,
   parseGateLine,
   parseUserGates,
+  prepareAdvisoryDecision,
   sanitiseReason,
 } from './user-gate-core.mjs'
 
@@ -164,7 +165,7 @@ describe('parseUserGates — every reader gets the typed workable set', () => {
 
   it('reports why confirmations wait and why legacy advice continues', () => {
     const report = gateReport(text).join('\n')
-    expect(report).toContain('11 waits on the user since 2026-07-29')
+    expect(report).toContain('11 awaits confirmation since 2026-07-29')
     expect(report).toContain('12 continues — AWAITING-USER is advisory')
     expect(report).toContain('14 self-decided')
     expect(report).toContain('NO REASON RECORDED')
@@ -266,6 +267,26 @@ describe('advisory decision record and legacy migration', () => {
     expect(card.body).toContain('Evidenz: the existing tokens use blue')
     expect(card.body).toContain('Folge: the point continues')
     expect(card.body).toContain('Exakte Veto-Aktion: reply Veto blue and revert commit abc')
+  })
+
+  it('prepares both marker and card only for an advisory question', () => {
+    const source = '- [ ] 20. PICK A COLOUR.'
+    const fields = {
+      at: '2026-08-23',
+      question: 'which colour should the compact card use?',
+      decision: 'use blue',
+      evidence: 'the existing token is blue',
+      consequence: 'the card stays consistent',
+      vetoAction: 'reply Veto blue and restore the green token',
+    }
+    const prepared = prepareAdvisoryDecision(source, 20, fields)
+    expect(prepared).toMatchObject({ ok: true, question: fields.question })
+    expect(prepared.text).toContain('SELF-DECIDED(2026-08-23; use blue)')
+    expect(prepared.card.body).toContain('Exakte Veto-Aktion')
+
+    const trueConfirmation = prepareAdvisoryDecision(source, 20, { ...fields, question: confirmation })
+    expect(trueConfirmation).toMatchObject({ ok: false, text: source, card: null })
+    expect(trueConfirmation.error).toMatch(/true confirmation act/)
   })
 
   it('reports and rewrites every legacy marker, with ambiguity continuing', () => {

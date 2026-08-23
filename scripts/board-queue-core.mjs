@@ -947,7 +947,7 @@ export function commissionDecision({
  * honoured (`commissionDecision` asks the gate first), so a reader who followed
  * that printed remedy would record a reason the decision then ignores and be
  * denied again — the block-loop class that cost ~30 turns on 24.07.2026. What
- * lifts a gate is the USER'S WORD, closing the point's AWAITING-USER line in
+ * lifts a gate is the USER'S WORD, closing the point's AWAITING-CONFIRMATION line in
  * the work order, and that is what the refusal says.
  */
 export function commissionRefusal(decision = {}) {
@@ -961,9 +961,9 @@ export function commissionRefusal(decision = {}) {
       : 'the work order does not rank it'
   if (decision?.why === 'user-gated') {
     return (
-      `POINT ${n} IS WAITING ON THE USER (its AWAITING-USER line in the work order), so no work may be opened ` +
+      `POINT ${n} IS WAITING FOR CONFIRMATION (its AWAITING-CONFIRMATION line in the work order), so no work may be opened ` +
       `on it: ${front}. The ONLY thing that lifts this is the user's answer — his word closes the point's ` +
-      'AWAITING-USER line, and the point becomes workable in the same moment. A recorded override is ' +
+      'AWAITING-CONFIRMATION line, and the point becomes workable in the same moment. A recorded override is ' +
       'deliberately NOT honoured for a gated point, so do not record one: work a front candidate, or ask the ' +
       'user (the board carries the decision card).'
     )

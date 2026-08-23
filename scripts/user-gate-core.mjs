@@ -283,7 +283,7 @@ const stripMarkers = (line) => {
 }
 
 /**
- * Mark a point as waiting on the user. Returns { text, ok, error }.
+ * Mark a point as awaiting a true confirmation. Returns { text, ok, error }.
  *
  * A gate with no reason is REFUSED here (not silently written): recording the
  * why is what the queue skip is bought with. An already gated point is
@@ -351,6 +351,34 @@ export function advisoryDecisionCard(point, { decision = '', evidence = '', cons
       `Entscheidung: ${fields.decision}. Evidenz: ${fields.evidence}. ` +
       `Folge: ${fields.consequence}. Exakte Veto-Aktion: ${fields.vetoAction}.`,
   }
+}
+
+/** Validate and prepare both halves of one advisory decision atomically in memory. */
+export function prepareAdvisoryDecision(tasksText, point, {
+  at = '',
+  question = '',
+  decision = '',
+  evidence = '',
+  consequence = '',
+  vetoAction = '',
+} = {}) {
+  const classified = classifyConfirmationReason(question)
+  if (!classified.reason) {
+    return { text: String(tasksText ?? ''), ok: false, error: 'an advisory decision needs the question it resolves', card: null }
+  }
+  if (classified.verdict === 'confirmation') {
+    return {
+      text: String(tasksText ?? ''),
+      ok: false,
+      error: 'this reason names a true confirmation act — use AWAITING-CONFIRMATION instead of SELF-DECIDED',
+      card: null,
+    }
+  }
+  const card = advisoryDecisionCard(point, { decision, evidence, consequence, vetoAction })
+  if (!card.ok) return { text: String(tasksText ?? ''), ok: false, error: card.error, card: null }
+  const marked = markSelfDecided(tasksText, point, { at, decision })
+  if (!marked.ok) return { ...marked, card: null }
+  return { ...marked, card, question: classified.reason }
 }
 
 const legacyDecision = (point, reason) => advisoryDecisionCard(point, {
@@ -440,7 +468,7 @@ export function gateReport(tasksText) {
   const { gated, answered, selfDecided, advisory, stale } = parseUserGates(tasksText)
   const lines = []
   for (const g of gated) {
-    lines.push(`  ${g.point} waits on the user${g.since ? ` since ${g.since}` : ''}: ${g.reason || '— NO REASON RECORDED (repair it)'}`)
+    lines.push(`  ${g.point} awaits confirmation${g.since ? ` since ${g.since}` : ''}: ${g.reason || '— NO REASON RECORDED (repair it)'}`)
   }
   for (const a of answered) lines.push(`  ${a.point} answered${a.at ? ` ${a.at}` : ''} — back at the head of the queue`)
   for (const s of selfDecided) lines.push(`  ${s.point} self-decided${s.at ? ` ${s.at}` : ''}: ${s.decision}`)

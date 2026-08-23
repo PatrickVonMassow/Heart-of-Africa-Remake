@@ -269,14 +269,14 @@ describe('the open-point headline (point 440)', () => {
   it('NAMES the points waiting on the user, and never offers one as the next (point 450)', () => {
     const text = openPointsHeadline([174, 184], { gated: [462, 463] })
     expect(text).toContain('2 open point(s)')
-    expect(text).toContain('WAIT ON THE USER')
+    expect(text).toContain('AWAIT CONFIRMATION')
     expect(text).toContain('462, 463')
     expect(text).toContain('point-brief.mjs 174') // the next point is still a workable one
     expect(text).toContain('--clear')
   })
 
   it('says nothing about gates when none exist — the headline is unchanged', () => {
-    expect(openPointsHeadline([174, 184])).not.toContain('WAIT ON THE USER')
+    expect(openPointsHeadline([174, 184])).not.toContain('AWAIT CONFIRMATION')
     expect(openPointsHeadline([174, 184], { gated: [] })).toBe(openPointsHeadline([174, 184]))
   })
 
@@ -290,7 +290,7 @@ describe('the open-point headline (point 440)', () => {
 
   it('speaks when EVERYTHING waits on the user — silence would read as finished', () => {
     const text = allGatedMessage([462, 463])
-    expect(text).toContain('WAITS ON THE USER')
+    expect(text).toContain('AWAITS CONFIRMATION')
     expect(text).toContain('462, 463')
     expect(text).toContain('do NOT begin one')
     expect(text).toContain('--clear')
