@@ -22272,3 +22272,66 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   take over without forcing something, and it defeats the claim mechanism the whole handover
   protocol rests on.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 720. The findings carrier rings through the delivery that already runs on every tool
+  call, instead of waiting for a turn end the batch owner does not have (user
+  18.08.2026, 15:16).
+
+  WHY HERE AND NOT A NEW CHANNEL. A stood-down window — the one the user talks to,
+  and the one that therefore finds most of what he asks about — can write to the
+  carrier and to nothing else. On 18.08. eight entries waited there up to 9.5
+  hours. The transport was never the problem: `deliverPendingMessages()` in
+  `scripts/chat-spool.mjs` already puts text into the owner's context on EVERY tool
+  call, through `scripts/lock-heartbeat-hook.mjs` (PostToolUse, `*`), and the
+  inbound chat leg is a live subscription that spooled the user's 14:30:45 message
+  at 14:30:46. What is missing is that the carrier has no bell on that path. A
+  SECOND message kind or a second transport was considered and rejected: it would
+  split findings across two stores and re-open the signature and identity question
+  that makes the chat inbox unusable for a session (an inbox envelope carries a
+  direction and an HMAC, no sender, so anything a session posts there arrives as
+  the user's own words).
+
+  FINAL STATE:
+
+  1. `deliverPendingMessages` gains a SECOND SOURCE beside the chat spool: when the
+     reading session OWNS the batch and the carrier holds waiting entries, the
+     delivery emits ONE line — the count, the oldest entry's timestamp, its title,
+     and the drain command (`node scripts/finding.mjs --drain`). It reads the
+     carrier through `parseCarrier`/`carrierPath`; it never writes to it, and the
+     drain stays `finding.mjs --drained "<title>"`.
+
+  2. ZERO BYTES WHILE NOTHING WAITS. The token rule the chat delivery already holds
+     applies unchanged: an empty carrier produces empty stdout, because injected
+     context is re-sent with every later request of the session.
+
+  3. ONE INTERRUPTION PER CALL. A tool call that already delivers a chat message
+     does not also ring the carrier bell — the user's own words go first, and the
+     bell rides the next call.
+
+  4. IT DOES NOT NAG. The line is emitted at most once per REMINDER_INTERVAL
+     (15 minutes, one constant, in the pure core) and again immediately whenever
+     the waiting count RISES, so a new finding is announced at once while an
+     ignored one does not repeat every second.
+
+  5. IT FOLLOWS THE PAUSE DECISION, WHATEVER IT BECOMES. Today
+     `deliverPendingMessages` returns '' while the batch is paused. That
+     suppression is itself under review (a pause is when an instruction matters
+     most); the bell inherits whatever that review decides rather than carving out
+     its own exception.
+
+  6. NON-OWNERS SEE NOTHING. The carrier is drained by the owner alone, so a
+     stood-down window is never told about entries it may not act on.
+
+  VERIFIABLE: Vitest over the pure decision core — waiting entries plus ownership
+  yields one line; an empty carrier yields ''; a non-owner yields ''; a call that
+  carries a chat message yields the chat message only; a second call inside the
+  interval yields ''; a risen count yields the line again. And the process-level
+  shape in the manner of `scripts/chat-delivery-hook.test.mjs`: `node
+  scripts/lock-heartbeat-hook.mjs` against an isolated temp repo writes the exact
+  `hookSpecificOutput` envelope, and writes nothing at all for an empty carrier.
+
+  Criticality: medium — it delivers no verdict of its own and cannot block work; it
+  makes an existing, already-enforced duty visible while it can still be done. Its
+  fail direction is silence, which is today's state.
+
+  Bundle: Chat & Tafel.
