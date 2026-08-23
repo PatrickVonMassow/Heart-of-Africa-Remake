@@ -31,6 +31,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import { notify } from './notify.mjs'
+import { boardCard } from './alert-escalation.mjs'
 import {
   acquire,
   updateOwnLock,
@@ -93,12 +94,13 @@ import {
   supervisedExitTrigger,
   SUCCESSOR_TRIGGERS,
   RUNAWAY_FAIL_LIMIT,
+  runawayRecoveryDecision,
 } from './batch-autostart-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
-import { classifyPause, describePause, formatPauseRecord, planPause } from './batch-pause-core.mjs'
+import { classifyPause, describePause, formatPauseRecord, pauseRecovery } from './batch-pause-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -108,6 +110,7 @@ import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
+import { modelHandoffSpawn } from './model-handoff-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -382,8 +385,9 @@ function readRunLogSegment(from) {
       now,
       ...verdict,
       // What the tick does with it: park (hold/wait) or resume (retry/none).
-      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait',
+      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait' || verdict.state === 'recover',
       clearsTheRecord: verdict.state === 'retry',
+      replacesWithRecoveryClock: verdict.state === 'recover',
       note: describePause(verdict),
     }))
     process.exit(0)
@@ -511,6 +515,7 @@ try {
       `The launcher reaped ${leaked.length} of its own earlier headless spawn(s) (pid ${leaked.map((s) => s.pid).join(', ')}) ` +
         'that were still running without owning the batch — a background task the session was waiting on never exited.',
       'low',
+      { recurring: true },
     )
   }
   state.spawns = pruneSpawns({ spawns: state.spawns, probePid })
@@ -587,8 +592,23 @@ try {
 // guard below would re-pause this very tick and the clock would have bought
 // nothing. A retry means the next spawn gets a fresh ladder — and if it fails
 // again, the pause returns one rung higher.
-const pause = classifyPause({ text: (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })(), now })
-let batchParked = pause.state === 'hold' || pause.state === 'wait'
+const pauseText = (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })()
+let pause = classifyPause({ text: pauseText, now })
+if (pause.state === 'recover') {
+  const recovery = pauseRecovery({ text: pauseText, now })
+  if (boardCard(recovery.title, recovery.body)) {
+    try {
+      writeTextAtomic(C('batch-paused'), recovery.record)
+      pause = classifyPause({ text: recovery.record, now })
+      log(`${describePause(classifyPause({ text: pauseText, now }))}; decision card recorded; retry at ${new Date(recovery.retryAfter).toISOString()}`)
+    } catch (e) {
+      log(`AMBIGUOUS PAUSE snapshot recorded but its recovery clock could not be written (${e?.message ?? e})`)
+    }
+  } else {
+    log('AMBIGUOUS PAUSE recovery deferred — its decision card could not be recorded')
+  }
+}
+let batchParked = pause.state === 'hold' || pause.state === 'wait' || pause.state === 'recover'
 const pauseKey = batchParked ? `${pause.state}:${pause.pausedAt ?? ''}:${pause.retryAfter ?? ''}:${pause.cause ?? ''}` : ''
 if (batchParked && state.pauseJournalKey !== pauseKey) {
   journal(ACTIVITY_EVENTS.PAUSE, {
@@ -619,7 +639,7 @@ if (pause.state === 'retry') {
       `The pause clock ran out (attempt ${state.pauseAttempt}) and the launcher resumed the batch. It was parked for: ` +
         `${(pause.reason || 'no reason recorded').split('\n')[0]}`,
       'low',
-      { key: 'pause-retry' },
+      { key: 'pause-retry', recurring: true },
     )
   }
 }
@@ -1039,7 +1059,7 @@ if (
     evidence: { ownerSession: lock?.sessionId ?? null },
   })
   log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
-  await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
+  await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high', { recurring: true })
 }
 
 // THE SILENCE REPORT IS GONE (point 434). It existed because the launcher could
@@ -1054,14 +1074,17 @@ if (
 // failure at all, so an unattended fortnight is no longer paused by a budget that
 // comes back on the hour.
 if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
-  // IT PARKS WITH A CLOCK (point 445). The causes this watchdog names — expired
-  // auth, a push that fails, a point that keeps dying — include several that come
-  // back on their own, and the ladder climbs (20 min, 1 h, 3 h) before the park
-  // finally becomes a clockless one for a human. `pauseAttempt` is how many retries
-  // this stall has already had.
-  const plan = planPause({ cause: 'runaway', attempt: state.pauseAttempt || 0, now })
-  const when = plan.clockless ? 'no restart clock — a human is needed' : `retry at ${new Date(plan.retryAfter).toISOString()}`
+  // IT PARKS WITH A CLOCK (point 445). The ladder climbs through 20 min, 1 h and
+  // 3 h, then keeps probing at that cap. `pauseAttempt` is how many wakes this
+  // stall has already had; the terminal rung records the scheduling choice for
+  // retroactive veto instead of handing the batch to a person.
+  const plan = runawayRecoveryDecision({ failCount: state.failCount, attempt: state.pauseAttempt || 0, now })
+  const when = `retry at ${new Date(plan.retryAfter).toISOString()}${plan.capped ? ' (capped probe)' : ''}`
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
+  if (plan.decisionRecord) {
+    const recorded = boardCard(plan.decisionRecord.title, plan.decisionRecord.body)
+    log(`RUNAWAY capped scheduling decision ${recorded ? 'recorded' : 'FAILED to reach the board'} — next attempt ${new Date(plan.retryAfter).toISOString()}`)
+  }
   // ATOMICALLY (four-eyes finding 4): a torn record is the one corruption that
   // could flip this mechanism toward resuming — a half-written stamp read as a
   // past one. tmp + rename makes a half-written file unreachable.
@@ -1072,7 +1095,7 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
       pausedAt: now,
     }))
   } catch { /* ignore */ }
-  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-paused (${when}). Check auth / git push / the current point.`, 'urgent')
+  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-probe scheduled (${when}); evidence and doctor run again on wake.`, 'urgent')
   writeJsonAtomic(C('autostart-state.json'), { ...state })
   process.exit(0)
 }
@@ -1345,6 +1368,7 @@ if (dispossessed) {
         `and the launcher is starting a successor. Nothing was killed — the old process keeps running and stands ` +
         `down at its next hook. It had declared: ${what}.`,
       'high',
+      { recurring: true },
     )
   }
 }
@@ -1460,7 +1484,11 @@ if (repoVerdict.alert) {
   const due = !repoVerdict.standing || standingAlertDue({ lastAt: state.repoAlertAt ?? null, now })
   if (due) {
     state.repoAlertAt = now
-    await notify('Repo not clean before spawn', repoVerdict.alert, 'default')
+    await notify('Repo not clean before spawn', repoVerdict.alert, 'default', {
+      // An actual doctor finding is the second and final corruption class. A
+      // doctor that merely could not run proves no damage and stays generic.
+      alertClass: repoVerdict.mandate ? 'repository-integrity' : 'generic',
+    })
   }
 } else {
   delete state.repoAlertAt
@@ -1609,10 +1637,12 @@ try {
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
+const modelHandoff = modelHandoffSpawn(readJson(C('model-guard-handoff.json')), now)
 writeJsonAtomic(C('autostart-last.json'), launcherStartRecord({ decision: startDecision, at: now, head: curHead }))
 log(
   `RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount}` +
-    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''})`,
+    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''}` +
+    `${modelHandoff?.model ? `, MODEL HANDOFF ${modelHandoff.state.route[modelHandoff.state.targetIndex].model}` : ''})`,
 )
 // Read BEFORE the spawn: everything appended past this offset is the child's own
 // output, which is where the usage limit says so (point 444).
@@ -1643,7 +1673,8 @@ try {
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
   const fableState = currentFableState()
   if (!fableState.ok) throw new Error(fableState.problem)
-  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix, fableState }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix)
+  child = spawn(exe, buildSpawnArgs({ prompt, fableState, ...(modelHandoff?.model ? { model: modelHandoff.model, fallbackModel: modelHandoff.fallbackModel } : {}) }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
   // ASYNCHRONOUSLY, so without this handler the one failure class the resolver
   // can still produce would take the tick down as an unhandled event instead of
@@ -1735,7 +1766,12 @@ log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}; supervis
 // night for a condition that repairs itself; the probes stay in the log, and the
 // first spawn after the block clears announces itself normally.
 if (announceSpawn({ quota: state.quota })) {
-  await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
+  await notify(
+    'Resurrected',
+    `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`,
+    'low',
+    { recurring: true },
+  )
 } else {
   log(`quota probe launched — no push (the block has stood ${Math.round((now - state.quota.since) / 60000)} min)`)
 }

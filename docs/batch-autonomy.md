@@ -7,6 +7,94 @@ session limits, and reboots. This document is the FULL failure-mode analysis
 progress could stop, what handles it, and the single residual that is genuinely
 outside the agent's control.
 
+## Human-wait inventory and standing autonomy rule (23.08.2026)
+
+This section is the binding policy for a state that could leave work waiting for
+the user. Later historical sections explain how individual mechanisms were built;
+where their older wording says “wait for the user”, this inventory supersedes it.
+
+The default is **continue with a recorded decision**. If the cause can be repaired
+or re-probed by the machine, it does that. Otherwise it makes the safest reversible
+choice supported by the evidence, continues, and puts a card headed
+`Entscheidungsprotokoll:` in “Von dir zu klären”. That card states the decision,
+evidence, consequence, and exact retroactive-veto action. A question card is a
+record for later veto, not a lock on the queue.
+
+Only two classes may wait without a restart clock:
+
+1. the user explicitly ordered the batch to stop; and
+2. the next act is genuinely outward-facing or hard to reverse and has no durable
+   authorization — today, creating/moving/pushing the version or `poc` tag and
+   dispatching its public release, or changing the published board's four-section
+   contract.
+
+Uncertainty is not a third class. Repository corruption, an unavailable provider,
+an ambiguous legacy marker, and an advisory product choice all have recovery or
+default lanes below. A new human-wait path is incomplete until it is added here
+with either an in-place mechanism or a named follow-up point.
+
+### Inventory
+
+“Current halt” describes the code at this revision, including paths that already
+self-recover. “Delivery” says whether the standing rule is already enforced or
+names the code point that must land; the follow-up names are stable specifications,
+not permission to fold their implementation into this policy-only point.
+
+| ID | Current halt and source path | Chosen lane | Delivery |
+|---|---|---|---|
+| P1 | A valid clocked `.claude/batch-paused` record is classified as `wait`; every guard and launcher stands down until `retry-after` (`scripts/batch-pause-core.mjs`, `scripts/batch-lock.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** The launcher rechecks the clock, removes the expired record, clears the failure count, and attempts an ordinary singleton-protected start. | **In place:** point 445. |
+| P2 | An expired clock is classified as `retry`; a successful spawn clears `pauseAttempt` (`scripts/batch-pause-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** Resume immediately; success resets the ladder. | **In place:** point 445. |
+| P3 | A legacy/empty marker, `retry-after: never`, or an unreadable clock is classified as clockless `hold` (`scripts/batch-pause-core.mjs`, `scripts/batch-pause.mjs`, `scripts/pause-retry-drill.mjs`). | **Recorded default.** Preserve only a typed `user-stop`. For an untyped, legacy, or malformed record, snapshot it in the decision card, choose continuation, replace it atomically with a short recovery clock, and let the launcher retry. | **Follow-up point — Typed pause recovery:** migrate untyped records and distinguish a proven user stop from corrupt metadata. |
+| P4 | `serving-model`, `awaiting-user`, and `retries-exhausted` are clockless causes (`CLOCKLESS_CAUSES` in `scripts/batch-pause-core.mjs`). | **Split by cause.** A proven `user-stop` remains held. `serving-model` uses an allowed fallback and scheduled probes; `awaiting-user` uses the advisory/confirmation split U1–U3; an exhausted ladder keeps probing at its capped interval and never turns elapsed time into a human gate. | The advisory/confirmation split is **in place:** point 864 (Advisory decision defaults); the rest are **Follow-up points — Typed pause recovery and Failure-lane retry.** |
+| P5 | The runaway watchdog writes a clocked pause after repeated no-progress spawns; after three wakes it stays on the three-hour cap and records that scheduling choice (`scripts/batch-autostart-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** Each wake runs the existing evidence/preflight/doctor path; capped probes repeat instead of parking forever. | **In place:** point 866 (Failure-lane retry), on point 445's clock. |
+| P6 | A repeated child `429`/`5xx`/network signature yields `outage-probe`; every non-transient, completed, changed, or spent-budget outcome yields a clocked `recover` choice (`scripts/child-retry-core.mjs`, `scripts/child-retry.mjs`, `docs/batch-resilience.md`). | **Self-recovery plus recorded default.** Branch evidence chooses resume/fix/exchange. A spent point is re-opened when critical and otherwise requeued; the persistent retry state and board card record the choice for veto while the rest of the queue continues. | **In place:** point 866 (Failure-lane retry). |
+| P7 | At the alert ladder ceiling, the point-860 closed corruption list contains only `repository-integrity`; generic alerts `continue-and-record`, while corruption runs `batch-doctor --repair` and stays on the two-hour probe rung (`scripts/alert-escalation-core.mjs`, `scripts/alert-escalation.mjs`). | **Self-recovery.** Doctor quarantine/repair is named in the decision record; ordinary work does not cross an uncleared corruption finding, and the clock never becomes a human handoff. | **In place:** point 860's closed list and point 866's corruption recovery. |
+| P8 | The serving-model tripwire records a trusted-lane handoff; only transcript proof from the recorded allowed lane advances the baseline, and an unavailable route gets a typed 20-minute probe (`scripts/model-handoff-core.mjs`, `scripts/model-guard.mjs`). | **Self-recovery.** Never let the suspect model bless itself. The handoff state records the target, offending trailers, next attempt and veto route. | **In place:** point 866 (Failure-lane retry). |
+| U1 | `AWAITING-USER` makes an open point non-commissionable; only `USER-ANSWERED` currently clears it (`scripts/user-gate-core.mjs`, `scripts/board-queue-core.mjs`, `scripts/board-queue.mjs`, `scripts/batch-in-flight-core.mjs`, `scripts/defer-for-user.mjs`). | **Recorded default for advisory choices.** Decide from the brief and repository evidence, record a `SELF-DECIDED` result plus veto card, and keep the point workable. Do not create an advisory `AWAITING-USER` gate. | Policy changes **in place here**; marker, queue, CLI, and card wiring are **in place:** point 864 (Advisory decision defaults). |
+| U2 | If every open point is gated, the resume hook reports no workable point and the progress guard permits a whole-batch pause (`scripts/batch-resume-hook-core.mjs`, `scripts/batch-resume-hook.mjs`, `scripts/batch-progress-guard.mjs`). | **Recorded default.** Resolve every advisory gate by U1. A queue may be entirely gated only when every remaining next act satisfies U3; it is then a set of explicit confirmations, not an accidental batch pause. | **In place:** point 864 (Advisory decision defaults) — an all-advisory queue yields a workable point; the parallel-remediation decision in `scripts/batch-singleton.mjs` remains D2. |
+| U3 | The same marker currently represents both an advisory question and a true confirmation. | **Retained confirm gate, narrowly typed.** A point may wait only when its next act is outward-facing/hard to reverse and not durably authorized. The reason must name that act and the safe prepared state; unrelated work continues. | Policy changes **in place here**; typed `AWAITING-CONFIRMATION` enforcement is **in place:** point 864 (Advisory decision defaults). |
+| U4 | Existing untyped `AWAITING-USER` markers may predate this split. | **Recorded default.** Migrate a marker to confirmation only when its recorded reason itself names a U3 act; otherwise choose and record the reversible default. Ambiguity falls toward continuation, not confirmation. | **In place:** point 864 (Advisory decision defaults), including the `--migrate` report command. |
+| C1 | A reply that asks a decision without a matching “Von dir zu klären” card is Stop-blocked (`evaluate` in `scripts/decision-card-guard-core.mjs`). | **Mechanical recovery.** Add the card or rewrite the rhetorical/self-answerable question. This guard records communication; it does not authorize waiting. After the follow-up, an advisory card carries the default already taken. | Card remedy **in place** (point 421); semantic change rides **Follow-up point — Advisory decision defaults**. |
+| C2 | On each user message, standing cards must be removed or explicitly kept; carried answers must be applied by the owner (`evaluateCardReviews` / `evaluateCarriedAnswers` in `scripts/decision-card-guard-core.mjs`). | **Mechanical recovery.** Apply/remove/keep from the message and evidence. No further user response is required, so these blocks remain as machine duties. | **In place:** point 421 and its carried-answer extension. |
+| C3 | Generic alert ceilings create `Entscheidungsprotokoll:` cards while continuing (`continuationDecisionCard` in `scripts/alert-escalation-core.mjs`). | **Recorded default.** This is the reference lane: continue first, retain the evidence and retroactive veto on the board. | **In place:** point 860. |
+| C4 | A standing “Von dir zu klären” card plus an `AWAITING-USER` marker can park that point indefinitely; a card without the marker is informational and does not block queue selection (`scripts/board-queue-core.mjs`, `scripts/dashboard-guard-core.mjs`). | **Recorded default or narrow confirm.** Advisory cards become C3-style decision records; only U3 cards retain a point gate. | **In place:** point 864 (Advisory decision defaults). |
+| D1 | Before a launcher start, doctor findings produce `.claude/repo-mandate.json`; the launcher still spawns and tells the successor to run repair first (`repoRepairDecision` / `resumeRepairMandate` in `scripts/batch-doctor-core.mjs`). | **Self-recovery.** Run `batch-doctor --repair`, quarantine/rescue recoverable findings, then repair the named residual by repository evidence. It is an agent mandate, not a request to the user. | **In place:** point 442. Unknown/live worktree deletion stays conservative under existing **point 646**. |
+| D2 | A parallel-session alert Stop-blocks the owner into `batch-doctor --gate` (`block-remediate` in `scripts/batch-progress-guard.mjs`). | **Self-recovery.** Run the gate and repair path in the owning session; an inconclusive loaded-machine run is retried when quiet. No user decision is involved. | **In place:** point 431. |
+| D3 | An unidentified author blocks until transcript evidence identifies the model; a proved forbidden model then enters P8 (`scripts/model-guard-core.mjs`). | **Self-recovery.** Resolve the author from durable evidence; allowed means advance and continue, forbidden means trusted-lane handoff. | **In place:** evidence lookup plus point 866's trusted handoff and capped probe. |
+| Q1 | A main-session usage-limit refusal produces launcher state `quota` (`scripts/batch-autostart-core.mjs`, `scripts/batch-autostart.mjs`). | **Self-recovery.** No failure count and no pause file; probe on every ordinary launcher tick and resume on the first successful start. | **In place:** point 444, exercised by `scripts/quota-drill.mjs`. |
+| Q2 | An OpenAI author/reviewer run can return `allowance-exhausted` while that vendor's result is mandatory (`scripts/review-sol-core.mjs`, `scripts/review-sol.mjs`, `scripts/author-sol.mjs`). | **Self-recovery.** Route work that policy permits to the other vendor. If cross-vendor evidence is mandatory, park that point with a scheduled provider probe and work another point; automatically resume it when the probe succeeds. | Routing is **in place** (points 654/667); durable per-point probe is **Follow-up point — Cross-vendor quota retry**. |
+| G1 | The PermissionRequest hook deliberately leaves `AskUserQuestion` to a human while auto-granting other prompts (`scripts/permission-autogrant-core.mjs`). | **Narrow confirm only.** The batch does not invoke it for uncertainty or advice; it decides and records. It is permitted only to obtain a U3 confirmation. | Policy changes **in place here**; the U3 classifier of point 864 (Advisory decision defaults) is **in place** and supplies the enforceable scope. |
+| G2 | `container-ask-guard` blocks a reply that sends the user into the container (`scripts/container-ask-guard-core.mjs`). | **Self-recovery.** Run the repository command in-session and report its result. This is a machine-remedy gate, never a user wait. | **In place.** |
+| G3 | A disabled/unknown launcher blocks the point/context boundary; Linux can self-arm, Windows requires an elevated user command (`launcherRemedy` in `scripts/batch-launcher-core.mjs`, `block-launcher` in `scripts/batch-progress-guard.mjs`). | **Self-recovery where possible.** Linux starts its daemon. On Windows the current owner keeps working and does not take a boundary; the durable fix is an install-time, privilege-bearing watchdog that can re-arm the task without an attended batch turn. | Linux path **in place** (point 474). Windows path is **Follow-up point — Unattended launcher arming**. |
+| G4 | The document-budget guard can reject an over-budget governing file; historical policy asked the user before raising a ceiling (`scripts/doc-budget-core.mjs`, `scripts/doc-budget-guard.mjs`). | **Recorded default.** First cut or move material. If the decision genuinely belongs in the governed file, raise only by its measured net size with the justification in the same commit and file a veto card; a size ceiling is neither outward-facing nor hard to reverse. | Policy changes **in place here**; the existing guard already demands the measured ceiling and written reason. |
+| G5 | The closing guard blocks release tags until its machine-recorded checklist is complete; the runbook separately requires explicit approval for the tag/public release (`scripts/closing-guard-core.mjs`, `docs/batch-owner-runbook.md`). | **Retained confirm gate.** Prepare and verify everything, then wait only at the exact version/`poc` tag and public-deploy act. | **In place:** closing points 174/633 and the runbook. |
+| G6 | The board runbook requires explicit approval before changing the public four-section contract (`docs/batch-owner-runbook.md`). | **Retained confirm gate.** This changes the user's outward-facing control surface. Routine card additions, decision records, text corrections, and publishes inside the existing contract are durably authorized and continue. | **In place:** runbook policy. |
+
+### Follow-up point boundaries
+
+The five code points above are filed in the work order as points 864-868, in the
+same bundle as this inventory. They stay separate because they own different
+state and failure directions:
+
+- **Typed pause recovery** (point 865) owns the pause-record schema, legacy migration, and
+  the invariant that only a proved `user-stop` is clockless.
+- **Advisory decision defaults** (point 864, shipped) owns question classification,
+  `SELF-DECIDED` / `AWAITING-CONFIRMATION`, queue eligibility, and the veto-card
+  transition.
+- **Failure-lane retry** (point 866, shipped) owns runaway, child outage, corruption-alert, and
+  forbidden-model recovery; it must preserve quarantine and trusted-model safety.
+- **Cross-vendor quota retry** (point 867) owns a per-point provider probe, without weakening
+  mandatory cross-vendor evidence.
+- **Unattended launcher arming** (point 868) owns the Windows privilege boundary and must be
+  installed ahead of absence; it must not grant a running session general
+  elevation.
+
+Until those code points land, this policy changes operator behaviour immediately:
+do not create a new advisory gate; do not treat a card as permission to idle; do
+not turn a spent retry ladder into “wait for the user”; and do not ask the user to
+perform a machine-remedy step. Existing guards remain safety evidence, and an
+agent must not bypass them—the follow-up changes their state transitions.
+
 ## The layered mechanisms
 
 1. **Stop-hook `scripts/batch-progress-guard.mjs`** (per session, loaded at session
@@ -125,13 +213,13 @@ outside the agent's control.
 | 8 | Two sessions (scheduler + a manually opened one) | the HARD SINGLETON (`scripts/batch-singleton.mjs`, 24.07.2026): atomic test-and-set acquire (exactly one winner, proven by real process races), pid-backed liveness (no false-dead under long tool calls), stand-down gates in EVERY guard for non-owners, and the active parallel-session detector with auto-remediation (launcher kills its own rogue spawn; the owner is blocked into `scripts/batch-doctor.mjs` verification). Full analysis: `docs/batch-singleton-analysis.md` | none — a second session refuses to act even if it exists |
 | 9 | A guard has a bug / throws | all guards are **fail-open** (error → allow) so they can never freeze the session; the scheduler still backstops the idle case | none |
 | 10 | The CLI moved — an app update, or a different host entirely | `resolveClaudeCli` (point 490): explicit `HOA_CLAUDE_CLI` → newest bundled Windows `claude.exe` → `PATH` → the usual install dirs, each candidate checked to exist. The Windows-only lookup cost three silent hours the night the batch moved to Linux | none — and a resolver that finds nothing now names the platform and what it searched |
-| 11 | Batch stuck on one item (needs data / a user decision) | the guard says "pick a DIFFERENT open item"; only if ALL are user-blocked does it pause with a `Von dir zu klären` card | correct behaviour — nothing to do without the user |
+| 11 | Batch stuck on one item (needs data / a user decision) | the current guard says “pick a DIFFERENT open item”; if all are user-gated it can still leave no workable item | the binding inventory U1–U4 replaces advisory gates with recorded defaults; only narrowly typed confirmations may remain unworkable |
 | 12 | The launcher is gone (the scheduled task deleted, the daemon never started or killed) | on Linux the session re-arms it itself (`node scripts/batch-launcher.mjs --start`); on Windows the task must be re-created | Windows only: the agent cannot create a scheduled task — re-create it with the command below |
 | 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |
 | 14 | The launcher is DISABLED while the boundary is in use | the guard reads the launcher's REAL state each time — the task's `State` on Windows, the daemon's own record on Linux, both in one ready/running/disabled/unknown vocabulary — and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | Windows: the user must re-arm it (`Enable-ScheduledTask`, elevated). Linux: the session re-arms it itself |
 | 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over after six launcher ticks (90 min), and only while the declaration is the owner's last word |
 | 16 | The user writes from the phone and NOTHING is running (29.07.2026) | (5) the watcher wakes a light responder within seconds under a bounded claim; if the watcher is itself down, (4) still delivers the message into the next spawn prompt | ≤ 15 min in the watcher-down case — the pre-watcher bound, never worse |
-| 17 | **A pause parks the batch and nobody is there to clear it** (point 445) | the park RECORDS its reason and a RETRY-AFTER; the launcher tick resumes the batch when that clock runs out, notes the attempt and clears the `failCount` that caused the park — see below | only the short written-down list of unsafe causes still waits for a human |
+| 17 | **A pause parks the batch and nobody is there to clear it** (point 445) | the park RECORDS its reason and a RETRY-AFTER; the launcher tick resumes the batch when that clock runs out, notes the attempt and clears the `failCount` that caused the park — see below | only a proved explicit user stop may remain clockless; inventory P3–P8 names the code follow-ups for today's other holds |
 
 ### Every park carries a restart clock (point 445)
 
@@ -159,7 +247,7 @@ spawn makes progress. Both halves matter — a counter that never reset would ma
 every park clockless for ever after three retries in the machine's whole history, and
 a counter only the launcher's own parks carried would leave an unanswered alert or a
 standing outage oscillating at rung 1 all night (four-eyes review, Fable 5).
-**Parking without a clock is a short, written-down list**
+**In the current implementation, parking without a clock is a short, written-down list**
 (`CLOCKLESS_CAUSES`): a serving model outside the CLAUDE.md §6 allowlist (retrying
 only spawns the same degraded session — where a fallback exists, the §6 chain runs
 instead of parking at all), the user's own stop, a queue in which every open point
@@ -169,6 +257,8 @@ and `node scripts/pause-retry-drill.mjs` — which parks with a 60-second clock,
 it out on the real wall clock and asserts that the next real tick resumes. The drill
 runs against its own record under `local/` through the launcher's side-effect-free
 `--pause-report` mode, so it never spawns a session and never touches the live park.
+Inventory P3–P8 is the forward rule: the list contracts to a typed `user-stop`;
+the other entries gain durable recovery clocks and do not terminate on a person.
 
 ## The hard singleton (24.07.2026 — replaces the advisory lock)
 
@@ -2876,26 +2966,48 @@ impossible, not skipping the inspection.
   auth, works headless and from the launcher. The launcher notifies on
   resurrection, on a stalled batch (auto-pause), and on a missing claude.exe; the
   batch should notify on a failed `git push` (write `.claude/push-failed`).
-- **A pending user decision NEVER stalls the batch** (user rule 22.07.2026). The
-  assistant does NOT block on `AskUserQuestion` during autonomous work. When a
-  point needs the user: add a *Von dir zu klären* dashboard card, run
-  `node scripts/defer-for-user.mjs <N> "<question>"` (marks the point
-  `AWAITING-USER`, pings the phone), and MOVE ON to the next workable point.
-  `AWAITING-USER` points still count as open (the batch is not done) but are
-  SKIPPED when picking the next item; the user's answer clears them
-  (`defer-for-user.mjs --clear <N>`), which marks them `USER-ANSWERED` and
-  returns them to the HEAD of the queue rather than to their old rank.
-  THE SYNTAX OF RECORD is `scripts/user-gate-core.mjs` (point 450): the marker
-  sits at the END of the point's `- [ ] N.` head line, carries a date and a
-  reason, and is written only through `defer-for-user.mjs` — which refuses a gate
-  with no reason and refuses to run in a linked worktree at all, because TASKS.md
-  is main-only. Every reader that picks work goes through that core: the queue
-  generator, the queue-order guard, the pool's workable set and the session-start
-  headline, so none of them can offer a gated point.
-  RESIDUAL, stated rather than implied: the "pause when EVERY open point is
-  gated" half is NOT built. `setPaused` lives in the lock, and what happens today
-  is a high-priority notification plus a session-start line saying it out loud —
-  where the old behaviour was silence.
+- **A pending advisory decision NEVER stalls a point or the batch** (standing
+  rule 23.08.2026; inventory U1–U4). The assistant does not block on
+  `AskUserQuestion`: it makes the safest reversible judgment, records it as an
+  `Entscheidungsprotokoll:` card for retroactive veto, and continues the point.
+  THE GATE IS TYPED (point 864). An advisory question is decided and recorded
+  with `node scripts/defer-for-user.mjs --self-decide <N> --question "<the
+  question>" --decision "<what was chosen>" --evidence "<what it rests on>"
+  --consequence "<what changes>" --veto-action "<the exact action that undoes
+  it>"`: the point keeps a `SELF-DECIDED` marker, stays workable, and the
+  `Entscheidungsprotokoll:` card carries the record for retroactive veto. Only
+  the narrow confirmation class U3 may park a point, and its act is SELECTED
+  rather than described: add a *Von dir zu klären* card, run `node
+  scripts/defer-for-user.mjs <N> --act <release-tag|public-release|board-contract>
+  --detail "<the concrete act>" --prepared "<what stands safely prepared>"`, and
+  move on to the next workable point. Such points remain open and are skipped; the user's
+  answer clears them with `defer-for-user.mjs --clear <N>`, records
+  `USER-ANSWERED`, and returns them to the head of the queue.
+  THE SYNTAX OF RECORD is `scripts/user-gate-core.mjs` (points 450 and 864): the
+  marker sits at the END of the point's `- [ ] N.` head line, carries a date and a
+  reason, and is written only through `defer-for-user.mjs` — which accepts an act
+  only from the closed list, demands at least three words of detail and of
+  prepared state, and refuses to run in a linked worktree at all, because
+  TASKS.md is main-only. THE ACT IS A CHOICE, NOT A SENTENCE: three cross-vendor
+  rounds showed that reading free prose for "is this outward-facing" parks
+  ordinary product decisions — "copy for the withdrawal dialog in production"
+  named an authorized act — and no widening of the patterns closed it. Prose is
+  read for UNTYPED legacy markers alone, and only to decide what `--migrate`
+  writes: an untyped marker never gates by itself, so no queue or pool ever
+  consults the heuristic. Every reader that picks work goes through that core: the
+  queue generator, the queue-order guard, the pool's workable set and the
+  session-start headline, so none of them can offer a gated point — and none of
+  them treats an advisory marker as a gate.
+  LEGACY MARKERS: an untyped `AWAITING-USER` line does not park its point — it
+  owes migration and the point continues meanwhile. `node
+  scripts/defer-for-user.mjs --migrate` rewrites every such line and reports each
+  one with its verdict and the reason it judged. A reason that itself names a U3
+  act becomes `AWAITING-CONFIRMATION` in the typed form, which is what makes it
+  gate; everything ambiguous or reasonless becomes `SELF-DECIDED` with a decision
+  card; one that qualifies but will not fit a single work-order line is reported
+  as `confirmation-needs-rewrite` and left untouched, to be re-recorded with
+  `--act` rather than silently clipped. An all-advisory queue therefore yields a
+  workable point; `setPaused` is not the remedy for it.
 - **Tool permission prompts** don't fire for the batch: `defaultMode: dontAsk` +
   a trusted workspace (`hasTrustDialogAccepted`) + an allow-list covering every
   tool the batch uses. Avoid editing `.claude/settings.json` mid-batch (the one
@@ -2903,8 +3015,11 @@ impossible, not skipping the inspection.
 
 ## Operating it
 
-- **Pause** (stop all resurrection + the in-session guard): create `.claude/batch-paused`.
-  Resume: delete it.
+- **Pause by explicit user order** (stop all resurrection + the in-session guard):
+  use `setPaused` with cause `user-stop`, so the clockless state is typed and
+  auditable. Resume by clearing that record after the user's explicit go. Do not
+  create an empty marker for an infrastructure or decision problem; inventory
+  P1–P8 owns those recovery paths.
 - **Stop the launcher**: on Linux `node scripts/batch-launcher.mjs --stop` (start
   it again with `--start`, read it with `--status`); on Windows
   `schtasks /delete /tn HoA-Batch-Autostart /f` AND the same for

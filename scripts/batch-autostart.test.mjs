@@ -85,6 +85,12 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(claudeSites[0]).toMatch(/buildSpawnOptions\(/)
   })
 
+  it('feeds a recorded serving-model handoff into the same spawn builder', () => {
+    expect(source).toMatch(/modelHandoffSpawn\(readJson\(C\('model-guard-handoff\.json'\)\), now\)/)
+    expect(code).toMatch(/model:\s*modelHandoff\.model, fallbackModel:\s*modelHandoff\.fallbackModel/)
+    expect(code).toMatch(/const prompt = modelHandoff\?\.prompt/)
+  })
+
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
     // A literal assignment here would sit outside every test in
     // batch-autostart-core.test.mjs, including the one that stops an inherited
@@ -331,7 +337,7 @@ describe('the board watchdog child', () => {
     expect(code).toMatch(/probe\(\(\) => liveCheckUrl\(BOARD_CONTENT_URL/)
     expect(code).toMatch(/liveBoardVerdict\(\{/)
     expect(code).toMatch(/watchdogDecision\(\{/)
-    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority, \{ recurring: d\.recurring === true \}\)/)
   })
 
   it('RETRIES a failed probe and corroborates it against the other transport (point 562)', () => {
@@ -377,7 +383,7 @@ describe('the board watchdog child', () => {
     // throws. Reporting the intention would let the launcher key a fault whose
     // alert never left the machine — and a keyed fault is never announced
     // again, so one transient POST failure would silence it for good.
-    expect(code).toMatch(/const sent = d\.notify && !quiet \? await notify\(/)
+    expect(code).toMatch(/const sent = d\.notify && !quiet\s*\? await notify\(/)
     expect(code).toMatch(/notified: !!sent/)
   })
 })
@@ -620,11 +626,21 @@ describe('the launcher acts on the pause record', () => {
     )
   })
 
+  it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
+    const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
+    const block = codeLines.slice(recovery, recovery + 18).join('\n')
+    expect(block).toMatch(/boardCard\(recovery\.title, recovery\.body\)/)
+    expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
+    expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+  })
+
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
     const brake = lineOf(/state\.failCount\s*>=\s*RUNAWAY_FAIL_LIMIT/, 'the runaway brake')
-    const block = codeLines.slice(brake, brake + 20).join('\n')
-    expect(block).toMatch(/planPause\(\{/)
+    const block = codeLines.slice(brake, brake + 32).join('\n')
+    expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
+    expect(block).toMatch(/boardCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
+    expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 
   it('the --pause-report drill exits before the tick’s first side effect', () => {
@@ -632,5 +648,25 @@ describe('the launcher acts on the pause record', () => {
     const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
     expect(drill, 'no --pause-report hook').toBeGreaterThanOrEqual(0)
     expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
+  })
+})
+
+// Recurring healthy-flow and remediation notices are EVENTS: another identical
+// occurrence is new information, not evidence that a request went unanswered.
+// The launcher itself cannot be imported, so this source contract pins the
+// declaration at each otherwise-unreachable call site.
+describe('the launcher declares recurring event notifications', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it.each([
+    'Leaked worker reaped',
+    'Batch resumed itself',
+    'Rogue spawn killed',
+    'Batch lease expired',
+    'Resurrected',
+  ])('%s stays on the event ceiling', (title) => {
+    const start = source.indexOf(`'${title}'`)
+    expect(start, `notification ${title} is missing`).toBeGreaterThanOrEqual(0)
+    expect(source.slice(start, start + 1_000)).toMatch(/\{\s*(?:key:\s*'[^']+',\s*)?recurring:\s*true\s*\}/)
   })
 })

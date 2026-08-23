@@ -1002,6 +1002,7 @@ describe('every Stop-guard remedy is closing work or explicitly deferred at the 
   it('keeps the reviewed additions to reads and boundary bookkeeping, one by one', () => {
     const closingAdditions = new Map([
       ['batch-launcher', 'arms the successor launcher'],
+      ['batch-pause', 'records the reason this session is ending'],
       ['chat-reply', 'delivers the closing reply'],
       ['pages-deploy-unblock', 'settles the CI handover state'],
       ['rule-echo', 'reads and reports the standing rule'],

@@ -99,7 +99,7 @@ function reportEntries(entries, tasksText = '') {
   // opening the work order, or the skip is indistinguishable from a point
   // quietly falling off the board.
   const gated = gatedEntryPoints(entries)
-  if (gated.length) console.log(`  waiting on the user (skipped, card says so): ${gated.join(', ')}`)
+  if (gated.length) console.log(`  awaiting confirmation (skipped, card says so): ${gated.join(', ')}`)
   // The report is NOT nested inside that condition (four-eyes review, Fable 5):
   // an ANSWERED point — back at the head of the queue — and a leftover marker
   // are exactly the states with no gated card to trigger the report.

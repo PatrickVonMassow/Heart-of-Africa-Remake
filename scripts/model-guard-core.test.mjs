@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   allowedTrailers,
   backupRefsIn,
@@ -20,6 +24,7 @@ import {
   POLICY_NEUTRAL,
   splitTrailerField,
 } from './model-guard-core.mjs'
+import { RECENT_LOG_FORMAT } from './model-guard.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
 
 const FABLE_OFF = readState(JSON.stringify(writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 })))
@@ -68,6 +73,66 @@ describe('parseLogLine', () => {
     expect(parseLogLine('not-a-sha|2026-07-24T20:00:00Z|x')).toBeNull()
     expect(parseLogLine('abcdef1|yesterday-ish|x')).toBeNull()
     expect(parseLogLine(null)).toBeNull()
+  })
+})
+
+describe('the wrapper log format', () => {
+  it('keeps two trailer lines separated for the core to judge independently', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'model-guard-log-'))
+    const anthropic = 'Claude Opus 5 <noreply@anthropic.com>'
+    const openai = 'GPT-5.6 Sol <noreply@openai.com>'
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Test Author',
+      GIT_AUTHOR_EMAIL: 'author@example.com',
+      GIT_COMMITTER_NAME: 'Test Committer',
+      GIT_COMMITTER_EMAIL: 'committer@example.com',
+    }
+
+    try {
+      execFileSync('git', ['init', '--quiet', repo], { env, windowsHide: true })
+      execFileSync(
+        'git',
+        [
+          '-C',
+          repo,
+          'commit',
+          '--allow-empty',
+          '--quiet',
+          '-m',
+          'Test two model trailers',
+          '-m',
+          `Co-Authored-By: ${anthropic}\nCo-Authored-By: ${openai}`,
+        ],
+        { env, windowsHide: true },
+      )
+      const log = execFileSync('git', ['-C', repo, 'log', '-1', `--format=${RECENT_LOG_FORMAT}`], {
+        env,
+        encoding: 'utf8',
+        windowsHide: true,
+      })
+      const parsed = parseLogLine(log.trim())
+
+      expect(parsed?.trailers).toBe(`${anthropic},${openai}`)
+      expect(splitTrailerField(parsed?.trailers)).toEqual([anthropic, openai])
+      expect(classifyTrailer(parsed?.trailers, POLICY_NEUTRAL)).toBe('allowed')
+      // EVERY split trailer is judged individually, FROM the parsed field
+      // (point 863): the closing assertion used to rebuild the message by hand,
+      // so a wrapper that judged only the first trailer stayed green. Judging
+      // each parsed value — and a rebuilt message made of exactly those values
+      // — turns that regression red.
+      const parsedTrailers = splitTrailerField(parsed?.trailers)
+      expect(parsedTrailers).toHaveLength(2)
+      expect(parsedTrailers.map((t) => classifyTrailer(t, POLICY_NEUTRAL))).toEqual(['allowed', 'allowed'])
+      expect(
+        evaluateCommitTrailers(
+          `Test two model trailers\n\n${parsedTrailers.map((t) => `Co-Authored-By: ${t}`).join('\n')}\n`,
+          POLICY_NEUTRAL,
+        ).block,
+      ).toBe(false)
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
   })
 })
 
@@ -273,7 +338,7 @@ describe('the allowlist is matched against the parsed name', () => {
       expect(isPolicyBreach(t, POLICY_NEUTRAL), t).toBe(false)
     }
     // and the same forms as the git log hands them over: several per commit,
-    // comma-joined by `%(trailers:…,separator=,)`
+    // comma-joined by `%(trailers:…,separator=%x2C)`
     expect(classifyTrailer(HISTORIC_TRAILERS.join(','), POLICY_NEUTRAL)).toBe('allowed')
   })
 
@@ -293,6 +358,34 @@ describe('the allowlist is matched against the parsed name', () => {
     expect(modelNamesIn('Patrick von Massow <patrick@example.com>')).toEqual([])
     expect(modelNamesIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toEqual(['Sonnet 5', 'Opus 5'])
     expect(modelNameIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toBe('Sonnet 5 + Opus 5')
+  })
+
+  it('reads several non-Claude claims as several, not as one composite name', () => {
+    // Two claims in one trailer show no single author: unidentified, never the
+    // forbidden breach ritual (Sol review of a4975b0).
+    expect(modelNamesIn('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>')).toHaveLength(2)
+    expect(classifyTrailer('GPT-5.6 Sol / GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    // Textual conjunctions and the plus sign are the same two claims as the
+    // slash — each case pairs two ALLOWED names, so it can only pass through
+    // the split (the unsplit composite would read forbidden, not unidentified).
+    expect(classifyTrailer('GPT-5.6 Sol and GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer('GPT-5.6 Sol und GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    expect(classifyTrailer('GPT-5.6 Sol + GPT-5.6 Sol <noreply@openai.com>', POLICY_NEUTRAL)).toBe('unidentified')
+    // A forbidden model among the claims stays the breach it is.
+    expect(classifyTrailer('GPT-5.6 Sol + Codex 2 <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+    // A lone model beside filler stays the composite name that fails LOUD —
+    // the point-527 smuggling shape must not pass as its allowed half.
+    expect(classifyTrailer('GPT-5.6 Sol / Haiku <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+    expect(classifyTrailer('GPT-5.6 Sol / experimental <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
+  })
+
+  it('does not read a look-alike domain as a vendor address', () => {
+    // `\b` after `.com` let `assistant@openai.com.evil` qualify as model
+    // evidence and refused the human carrying it (Sol review of a4975b0).
+    expect(classifyTrailer('Alice <assistant@openai.com.evil>', POLICY_NEUTRAL)).toBe('allowed')
+    expect(modelNamesIn('Alice <assistant@openai.com.evil>')).toEqual([])
+    // The genuine vendor forms keep qualifying, mid-line and at the end.
+    expect(classifyTrailer('OpenAI o3 <noreply@openai.com>', POLICY_NEUTRAL)).toBe('forbidden')
   })
 
   it('no longer passes a forbidden name that merely CARRIES an allowed word', () => {
@@ -415,11 +508,12 @@ describe('the two block texts', () => {
     expect(text).toContain('do not pause the batch over it')
   })
 
-  it('the named one keeps demanding the pause', () => {
+  it('the named one demands a fresh trusted-lane handoff', () => {
     const text = formatForbiddenReason([{ sha: 'a69d1bd', trailer: 'Claude Haiku 4.5 <x@y>' }])
     expect(text).toContain('SERVING-MODEL TRIPWIRE')
     expect(text).toContain('a69d1bd')
-    expect(text).toContain('.claude/batch-paused')
+    expect(text).toContain('next allowed lane')
+    expect(text).toContain('transcript metadata')
   })
 
   it('the named one names the unnamed commits standing beside it', () => {

@@ -6,7 +6,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { escalate, higherPriority, readLadder, writeLadder, logLine, boardCard, PRIORITY_ORDER } from './alert-escalation.mjs'
+import {
+  boardCard,
+  continuationCardBody,
+  corruptionCardBody,
+  escalate,
+  higherPriority,
+  logLine,
+  PRIORITY_ORDER,
+  readLadder,
+  runCorruptionRepair,
+  writeLadder,
+} from './alert-escalation.mjs'
 import { ALERT_GAPS_MS, ALERT_PAUSE_RUNG } from './alert-escalation-core.mjs'
 import { notify, ntfyTopic } from './notify.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -28,6 +39,7 @@ const harness = () => {
     logPath: join(dir, 'ladder.log'),
     board: (...args) => (cards.push(args), true),
     pause: { isPaused: () => false, setPaused: () => {} },
+    repair: () => ({ ok: true, exitCode: 0 }),
     cards,
   }
 }
@@ -140,23 +152,38 @@ describe('escalate — the full climb, on real files', () => {
     expect(readLadder(h.ladderPath).alerts[Object.keys(readLadder(h.ladderPath).alerts)[0]].rung).toBe(2)
   })
 
-  it('PAUSES the batch with a board card at the last rung, and says why in the log', async () => {
-    // The rung that makes the difference: an alert can be slept through, a
-    // paused batch with a card cannot.
+  it('REPAIRS repository corruption, records the choice, and keeps a capped probe', async () => {
     const h = harness()
     let now = T0
-    let paused = null
-    const pause = { isPaused: () => paused != null, setPaused: (r) => (paused = r) }
+    let last
+    const setPaused = vi.fn()
+    const repair = vi.fn(() => ({ ok: false, exitCode: 1 }))
+    const pause = { isPaused: () => false, setPaused }
     for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
-      const v = await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, priority: 'high', now, ...h, pause })
-      v.commit?.()
+      last = await escalate({
+        title: 'REPOSITORY INTEGRITY',
+        message: `broken invariant ${100 + i}`,
+        env: {},
+        priority: 'high',
+        alertClass: 'repository-integrity',
+        now,
+        ...h,
+        pause,
+        repair,
+      })
+      last.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
-    expect(paused).toMatch(/Eskalation/)
-    expect(paused).toMatch(/batch-paused/)
+    expect(last.decision.action).toBe('repair-and-probe')
+    expect(last.decision.nextRung).toBe(ALERT_PAUSE_RUNG)
+    expect(last.decision.nextAttemptAt).toBeGreaterThan(T0)
+    expect(repair).toHaveBeenCalledOnce()
+    expect(setPaused).not.toHaveBeenCalled()
     expect(h.cards).toHaveLength(1)
-    expect(h.cards[0][0]).toMatch(/Batch pausiert/)
-    expect(readFileSync(h.logPath, 'utf8')).toMatch(/PAUSED THE BATCH/)
+    expect(h.cards[0][0]).toBe(last.decision.decisionCard)
+    expect(h.cards[0][1]).toMatch(/Quarantäne- und Rescue-Nachweise/)
+    expect(h.cards[0][1]).toMatch(/Nächster Versuch:/)
+    expect(readFileSync(h.logPath, 'utf8')).toMatch(/CORRUPTION REPAIR REMAINS/)
   })
 
   it('does not pause a second time while the batch is already paused', async () => {
@@ -165,12 +192,112 @@ describe('escalate — the full climb, on real files', () => {
     const pause = { isPaused: () => true, setPaused }
     let now = T0
     for (let i = 0; i <= ALERT_PAUSE_RUNG + 1; i++) {
-      const v = await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, priority: 'high', now, ...h, pause })
+      const v = await escalate({
+        title: 'FORBIDDEN MODEL',
+        message: `forbidden commit ${100 + i}`,
+        key: 'forbidden-model',
+        env: {},
+        priority: 'high',
+        alertClass: 'repository-integrity',
+        now,
+        ...h,
+        pause,
+      })
       v.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(setPaused).not.toHaveBeenCalled()
     expect(h.cards).toHaveLength(0)
+  })
+
+  it('CONTINUES a generic stalled alert and records the decision plus retroactive veto', async () => {
+    const h = harness()
+    const setPaused = vi.fn()
+    const pause = { isPaused: () => false, setPaused }
+    let now = T0
+    let last
+    for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
+      last = await escalate({
+        title: 'Batch drive is STALLED',
+        message: `No working child for ${30 + i * 15} minutes`,
+        key: 'launcher-stall:episode',
+        env: {},
+        priority: 'urgent',
+        alertClass: 'stalled',
+        now,
+        ...h,
+        pause,
+      })
+      last.commit?.()
+      now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
+    }
+    expect(last.decision.action).toBe('continue-and-record')
+    expect(last.decisionRecorded).toBe(true)
+    expect(setPaused).not.toHaveBeenCalled()
+    expect(h.cards).toHaveLength(1)
+    expect(h.cards[0][0]).toBe(last.decision.decisionCard)
+    expect(h.cards[0][1]).toMatch(/Retroaktives Veto/)
+    expect(h.cards[0][1]).toMatch(/letzten zulässigen Commit oder Zeitraum/)
+    expect(readFileSync(h.logPath, 'utf8')).toMatch(/CONTINUING THE BATCH — decision card recorded/)
+  })
+
+  it('does not advance past the decision rung until the required card is recorded', async () => {
+    const h = harness()
+    const key = 'generic-stall'
+    writeLadder({
+      alerts: {
+        [key]: {
+          rung: ALERT_PAUSE_RUNG,
+          lastSentAt: T0 - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+          firstSentAt: T0 - 300 * MIN_MS,
+          sends: ALERT_PAUSE_RUNG,
+        },
+      },
+    }, h.ladderPath)
+    const v = await escalate({
+      title: 'Batch STALLED',
+      message: 'No progress',
+      key,
+      env: {},
+      priority: 'urgent',
+      now: T0,
+      ...h,
+      board: () => false,
+    })
+    expect(v.decision.action).toBe('continue-and-record')
+    expect(v.decisionRecorded).toBe(false)
+    expect(v.commit()).toBe(false)
+    expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
+  })
+
+  it('keeps a recurring event on the ceiling without filing a decision card', async () => {
+    const h = harness()
+    const key = 'resurrected'
+    writeLadder({
+      alerts: {
+        [key]: {
+          rung: ALERT_PAUSE_RUNG,
+          lastSentAt: T0 - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+          firstSentAt: T0 - 300 * MIN_MS,
+          sends: ALERT_PAUSE_RUNG,
+        },
+      },
+    }, h.ladderPath)
+    const v = await escalate({
+      title: 'Resurrected',
+      message: 'successor spawned',
+      key,
+      priority: 'low',
+      recurring: true,
+      env: {},
+      now: T0,
+      ...h,
+    })
+    expect(v).toMatchObject({ deliver: true, priority: 'low' })
+    expect(v.decision).toMatchObject({ action: 'send', nextRung: ALERT_PAUSE_RUNG })
+    expect(h.cards).toHaveLength(0)
+    expect(v.commit()).toBe(true)
+    expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
   })
 
   it('keeps two different alerts on two ladders, though they share one ntfy topic', async () => {
@@ -187,6 +314,39 @@ describe('escalate — the full climb, on real files', () => {
 })
 
 describe('the reason reaches the morning reader', () => {
+  it('the continuation record says what was decided and how to veto it retroactively', () => {
+    const body = continuationCardBody(
+      'Board out of date',
+      'No publish for 90 minutes',
+      { alertClass: 'staleness' },
+      '23.08.2026, 20:00',
+    )
+    expect(body).toMatch(/Batch läuft.*weiter/)
+    expect(body).toMatch(/Board out of date/)
+    expect(body).toMatch(/Retroaktives Veto/)
+  })
+
+  it('the corruption record names the repair result, next attempt, and veto', () => {
+    const body = corruptionCardBody(
+      'Repository integrity',
+      'conflict marker found',
+      {
+        alertClass: 'repository-integrity',
+        repair: { remedy: 'batch-doctor quarantine or repair' },
+        nextAttemptAt: T0 + ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+      },
+      { ok: false, exitCode: 1 },
+      '24.08.2026, 02:00',
+    )
+    expect(body).toMatch(/batch-doctor quarantine or repair/)
+    expect(body).toMatch(/Nächster Versuch:/)
+    expect(body).toMatch(/Retroaktives Veto/)
+  })
+
+  it('a doctor execution failure returns evidence instead of throwing', () => {
+    expect(runCorruptionRepair({ repair: { command: ['scripts/batch-doctor.mjs', '--repair'] } }, { cwd: dir })).toMatchObject({ ok: false })
+  })
+
   it('logLine appends a timestamped line', () => {
     const p = join(dir, 'a.log')
     logLine('[k] pause-and-send', p)
@@ -287,11 +447,33 @@ describe('notify — the wiring, on an injected topic', () => {
     expect(fetchSpy.mock.calls[0][1].headers.Priority).toBe('urgent')
   })
 
-  it('carries the caller priority into the ladder, so the pause gate can read it', async () => {
+  it('carries priority and class separately, so priority cannot acquire pause authority', async () => {
     vi.stubGlobal('fetch', okFetch())
     const escalate = vi.fn(async () => ({ deliver: true, priority: 'low', commit: () => {} }))
-    await notify('Resurrected', 'successor spawned', 'low', { topicFile: topicAt(), escalation: { escalate } })
-    expect(escalate.mock.calls[0][0]).toMatchObject({ priority: 'low' })
+    await notify('FORBIDDEN MODEL', 'bad commit', 'low', {
+      topicFile: topicAt(),
+      alertClass: 'forbidden-serving-model',
+      escalation: { escalate },
+    })
+    expect(escalate.mock.calls[0][0]).toMatchObject({
+      priority: 'low',
+      alertClass: 'forbidden-serving-model',
+    })
+  })
+
+  it('carries recurring shape separately from priority and corruption class', async () => {
+    vi.stubGlobal('fetch', okFetch())
+    const escalate = vi.fn(async () => ({ deliver: true, priority: 'low', commit: () => {} }))
+    await notify('Resurrected', 'successor spawned', 'low', {
+      topicFile: topicAt(),
+      recurring: true,
+      escalation: { escalate },
+    })
+    expect(escalate.mock.calls[0][0]).toMatchObject({
+      priority: 'low',
+      alertClass: 'generic',
+      recurring: true,
+    })
   })
 
   it('still accepts the old three-argument call shape every existing caller uses', async () => {
@@ -351,5 +533,49 @@ describe('INDEPENDENCE — the ladder acts while the other layers are missing', 
     const again = await escalate({ title: 'x', message: 'y', env: {}, now: T0 + MIN_MS, ...h })
     expect(again.deliver).toBe(true)
     expect(again.decision.rung).toBe(0)
+  })
+})
+
+describe('escalate — an EXPLICIT key is used verbatim (point 859)', () => {
+  it('digit runs collapse only in DERIVED keys; two explicit episode keys stay two ladders', async () => {
+    const h = harness()
+    // Episode one: first alert of a fresh explicit key always goes out.
+    const first = await escalate({
+      title: 'Batch drive is STALLED',
+      message: 'dead for 30 min now',
+      key: 'launcher-stall:1787476800000',
+      priority: 'high',
+      env: {},
+      now: T0,
+      ...h,
+    })
+    expect(first.deliver).toBe(true)
+    first.commit()
+    // The SAME episode key a moment later sits inside the rung gap: suppressed —
+    // this is the throttling the stall watch leans on for its re-demands.
+    const again = await escalate({
+      title: 'Batch drive is STALLED',
+      message: 'dead for 45 min now',
+      key: 'launcher-stall:1787476800000',
+      priority: 'high',
+      env: {},
+      now: T0 + MIN_MS,
+      ...h,
+    })
+    expect(again.deliver).toBe(false)
+    // A LATER EPISODE differs only in its digits. If explicit keys were digit-
+    // collapsed (they are not — escalate uses `key ?? alertKey(...)`), this
+    // would inherit the first episode's rung and be suppressed. It is a fresh
+    // ladder and goes straight out.
+    const nextEpisode = await escalate({
+      title: 'Batch drive is STALLED',
+      message: 'dead for 30 min now',
+      key: 'launcher-stall:1787999900000',
+      priority: 'high',
+      env: {},
+      now: T0 + 2 * MIN_MS,
+      ...h,
+    })
+    expect(nextEpisode.deliver).toBe(true)
   })
 })

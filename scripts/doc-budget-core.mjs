@@ -89,8 +89,12 @@ export const DOC_BUDGETS = [
     // branch of forty commits that stood 658 behind `main`. The rule has no other
     // authority and no guard, so it returns and the ceiling follows it by exactly
     // its own size.
+    // RAISED by the 13 measured words of the §6 reviewer-trailer rule: a commit
+    // may record its cross-vendor reviewer as a second model trailer. The commit
+    // gate already permits two separately allowed lines; this closes the policy
+    // ambiguity without changing that mechanism. The one-word margin remains.
     maxLines: 193,
-    maxWords: 1319,
+    maxWords: 1332,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.
@@ -106,8 +110,15 @@ export const DOC_BUDGETS = [
     // 20.08.2026 (the 45 / 700 written here was a pre-merge reading),
     // and the longest index entry is 21 words. The whole-file ceiling prevents
     // new duplicate entries; the entry ceiling preserves “the hook only”.
+    // RAISED on 23.08.2026 by ONE genuinely new standing order the user gave
+    // that day — no lasting standstill: self-recovery over alerting, no stop
+    // parked on a user card, decide-and-record with retroactive veto — whose
+    // index line measures 18 words on this tokenizer, written at 26 words and
+    // cut to the entry ceiling first. The word ceiling moves by exactly that
+    // line to the 47 / 728 fit; the line ceiling already held the one-line
+    // headroom the 757 table records, which this line now spends.
     maxLines: 47,
-    maxWords: 710,
+    maxWords: 728,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.

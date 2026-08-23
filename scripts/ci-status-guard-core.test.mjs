@@ -224,6 +224,7 @@ describe('blockReason', () => {
     expect(reason).toContain('https://x')
     expect(reason).toContain('npm run test:unit')
     expect(reason).toContain('--log-failed')
+    expect(reason).toContain('batch-pause.mjs --user-stop')
   })
 
   it('tolerates a missing classification', () => {

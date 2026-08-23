@@ -4,15 +4,16 @@
 // it live, but every commit records its author model in the Co-Authored-By
 // trailer. Any commit after the committed baseline authored by a model outside
 // the user's allowlist (Opus 5 / Opus 4.8 / Fable 5 / GPT-5.6 Sol — Sonnet and
-// Haiku are NOT acceptable) blocks the turn end with a pause instruction and
-// pings ntfy.
+// Haiku are NOT acceptable) transfers the batch to the next recorded allowed
+// lane. That fresh lane verifies the trailers; the suspect never advances its
+// own baseline.
 //
 // Decision logic: model-guard-core.mjs (pure, Vitest-covered). This wrapper
 // gathers `git log` output and is fail-OPEN — an internal error never traps
-// the session. While .claude/batch-paused exists the guard stands down, so a
-// degraded session that has PAUSED (the demanded reaction) is not block-looped.
+// the session. While a clocked handoff probe is parked in .claude/batch-paused
+// the guard stands down; the launcher removes that record when the probe is due.
 // Manual drive: node scripts/model-guard.mjs --status
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import {
   backupRefsIn,
@@ -24,10 +25,20 @@ import {
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
-import { currentFableState } from './fable-switch.mjs'
+import { currentFableState, servingRoute } from './fable-switch.mjs'
+import { readTranscriptMessages } from './authorship-check-core.mjs'
+import { modelHandoffDecision } from './model-handoff-core.mjs'
+import { writeJsonAtomic, writeTextAtomic } from './atomic-write.mjs'
+import { formatPauseRecord, PAUSE_TYPES } from './batch-pause-core.mjs'
 
 const BASELINE = repoPath('.claude/model-guard-baseline.json')
 const PAUSE = repoPath('.claude/batch-paused')
+const HANDOFF = repoPath('.claude/model-guard-handoff.json')
+
+// Git parses a literal comma as the next pretty-format option delimiter, so
+// `separator=,` means an EMPTY separator. Encode it to keep distinct trailer
+// values distinct for `splitTrailerField` in the decision core.
+export const RECENT_LOG_FORMAT = '%H|%cI|%(trailers:key=Co-Authored-By,valueonly,separator=%x2C)'
 
 /** Baseline timestamp; self-arms to NOW on first run so historic degraded
  *  commits (the acknowledged 24.07 incident) never re-trigger. `arm: false` reads
@@ -55,7 +66,7 @@ function baselineMs({ arm = true } = {}) {
 function recentLog() {
   try {
     return execSync(
-      'git log --all --since="48 hours ago" --format="%H|%cI|%(trailers:key=Co-Authored-By,valueonly,separator=,)"',
+      `git log --all --since="48 hours ago" --format="${RECENT_LOG_FORMAT}"`,
       { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' },
     )
   } catch {
@@ -97,6 +108,24 @@ export function gatherModelGuardInputs({ arm = true } = {}) {
   return { applicable: true, inputs }
 }
 
+function readJson(path) {
+  try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return null }
+}
+
+function hookPayload() {
+  if (process.stdin.isTTY) return {}
+  try { return JSON.parse(readFileSync(0, 'utf8')) ?? {} } catch { return {} }
+}
+
+function transcriptModel(path) {
+  if (!path) return ''
+  try {
+    return readTranscriptMessages(readFileSync(path, 'utf8')).messages.filter((message) => !message.sidechain).at(-1)?.model ?? ''
+  } catch {
+    return ''
+  }
+}
+
 if (isMainModule(import.meta.url)) {
   try {
     // The main path uses the SAME gather step the preflight does — recomputing
@@ -125,15 +154,57 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     if (hits.length && gathered.applicable) {
-      // The NAMED breach: the alarm the guard was built for. Ping and pause.
+      const payload = hookPayload()
+      const sessionId = String(payload.session_id ?? payload.sessionId ?? '').trim()
+      const currentModel = transcriptModel(payload.transcript_path ?? payload.transcriptPath)
+      const handoff = modelHandoffDecision({
+        hits,
+        unidentified,
+        state: readJson(HANDOFF),
+        route: servingRoute(fableState),
+        sessionId,
+        currentModel,
+        baselineMs: baseline,
+      })
       const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
-      await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
-      process.stdout.write(
-        JSON.stringify({
+      if (handoff.action === 'verify') {
+        writeJsonAtomic(BASELINE, {
+          since: new Date(handoff.verifiedThrough).toISOString(),
+          note: `${handoff.verifiedBy} verified the forbidden trailer handoff: ${list}`,
+        })
+        rmSync(HANDOFF, { force: true })
+        await notify('MODEL HANDOFF VERIFIED', `${handoff.verifiedBy} verified ${list}; the model-guard baseline advanced on proof.`, 'high', { recurring: true })
+      } else if (handoff.action === 'probe') {
+        writeJsonAtomic(HANDOFF, handoff.state)
+        writeTextAtomic(PAUSE, formatPauseRecord({
+          reason: `serving-model handoff probe: ${handoff.reason}`,
+          type: PAUSE_TYPES.AUTOMATIC,
+          cause: 'serving-model',
+          pausedAt: Date.now(),
+          retryAfter: handoff.retryAfter,
+        }))
+        await notify('FORBIDDEN MODEL — CLOCKED PROBE', `${list}. ${handoff.reason}`, 'high', { alertClass: 'forbidden-serving-model', recurring: true })
+      } else if (handoff.action === 'handoff') {
+        writeJsonAtomic(HANDOFF, handoff.state)
+        // Loaded only on a breach: the boundary command is large, and making
+        // every clean Stop/preflight import it exceeded the gather-time budget.
+        const { handoverAndRequest } = await import('./batch-boundary.mjs')
+        const transferred = handoverAndRequest({ sid: sessionId, point: null })
+        if (transferred?.handed && transferred?.successor?.requested) {
+          await notify('FORBIDDEN MODEL — TRUSTED HANDOFF', `${list}. ${handoff.reason}`, 'high', { alertClass: 'forbidden-serving-model', recurring: true })
+        } else {
+          process.stdout.write(JSON.stringify({
+            decision: 'block',
+            reason: `${formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, fableState })}\n` +
+              `The trusted handoff could not start (${transferred?.reason ?? transferred?.successorFailure ?? 'unknown failure'}).`,
+          }))
+        }
+      } else {
+        process.stdout.write(JSON.stringify({
           decision: 'block',
-          reason: formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, fableState }),
-        }),
-      )
+          reason: `${formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified, fableState })}\n${handoff.reason}`,
+        }))
+      }
     } else if (unidentified.length && gathered.applicable) {
       // The UNNAMED case: blocking, but resolvable in-session from the
       // transcripts — no ntfy, no pause file, no user interruption owed.

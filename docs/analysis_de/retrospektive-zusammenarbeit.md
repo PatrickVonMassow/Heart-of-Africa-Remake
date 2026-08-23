@@ -1324,7 +1324,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 08:04 · Quellen-Fingerprint: `8b5c1994ff3a…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 23:16 · Quellen-Fingerprint: `6640b433952e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1361,7 +1361,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 18 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 19 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1377,6 +1377,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and file the decision as a card the user can retroactively veto | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | DRAINED 30.07.2026 — the carrier's work is all in the work order now; what remains is the list of options a /doctor run REJECTED, so nobody re-analyses them | 2 | mittel | queue-order-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
@@ -1392,7 +1393,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A declared \"intended residual\" is where real defects hide — legitimate only when the information to close it is genuinely not at hand | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A point delivered as a rider on another branch is closed with fold-point --delivered, and its push needs a closing card first | 1 | niedrig | point-proof-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Saved games do not constrain design work: the feature is switched off, nobody plays a serious run, and no migration is ever owed for a data change | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 4 | hoch | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 5 | hoch | model-guard.mjs | ✔ Mechanismus |
 | ENDED 17.08.2026 — the 13.08. emergency that pushed the MAXIMUM load to OpenAI (hard cases to Sol via --anyway, pool of one) is over; the normal three-lane split of CLAUDE.md §6 applies again | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1413,16 +1414,16 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 3 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 1 | niedrig | container-ask-guard.mjs | ✔ Mechanismus |
+| A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | WebGPU is testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the limitation applies only to Playwright's bundled Chromium | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 88 Prozess-/Meta-TASKS-Punkte (davon 34 offen).
+Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 91 Prozess-/Meta-TASKS-Punkte (davon 35 offen).
 
-<!-- RETRO-FINGERPRINT: 8b5c1994ff3a01a613169a8d67ef680a4ddabcd6de3cc9b5cbb611ef6d98415a -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T06:04:19.540Z -->
+<!-- RETRO-FINGERPRINT: 6640b433952e9365eda8c88882a402e625a9b380a3d76f1005a0d3044a89af0d -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T21:16:14.079Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3006,3 +3007,81 @@ fremder Arbeit rot geworden, und die Wahl wäre nur noch zwischen einem weichgek
 einer fremden Reparatur unter falscher Nummer gewesen. Verwandt mit §3.163 (der Mechanismus
 ohne erzwungene Eingabe): Dort fehlte dem Zähler die Zufuhr, hier fehlt dem Vergleich ein
 unabhängiger Maßstab.
+
+### 3.166 Ein Feld, drei Leser — und geprüft wurde nur der, der Ja sagt
+
+Am 23.08.2026 stand der Batch still, weil ein Commit seinen Gegenleser ehrte. Zwei
+`Co-Authored-By`-Zeilen — Autor und Cross-Vendor-Prüfer, beide erlaubt — passierten das
+Commit-Tor anstandslos, denn das Tor beurteilt jede Zeile einzeln. Dann kamen die anderen
+Leser desselben Feldes an die Reihe: Der Modellwächter zog die Historie über ein
+`git log`-Format, dessen `separator=,` von Git als leerer Trenner gelesen wird, bekam die
+zwei Zeilen als EINEN zusammengeklebten Namen und rief den Ernstfall aus — Batch angehalten,
+Ausweg nur über den Nutzer (Punkt 854). Und der Review-Planer las den Prüfer-Credit als
+Autorschaft, fand damit keinen unabhängigen Prüfer-Vendor mehr und erklärte jede Range mit
+diesem Commit für unreviewbar — eine Vier-Augen-Schuld, die auf dem Review-Weg nie mehr
+beglichen werden kann (Punkt 856).
+
+Kein Leser war für sich genommen kaputt gebaut worden; jeder folgte seiner eigenen, älteren
+Grammatik desselben Feldes. Die neue Schreibweise wurde nur gegen den Leser geprüft, der sie
+annahm — das Tor am Commit —, und die beiden Leser, die später und seltener laufen, sprachen
+erst im Ernstfall. Das Tückische an der Klasse: Der erste grüne Leser fühlt sich wie eine
+Systemabnahme an, und ein Wächter, der auf ein erlaubtes Muster anschlägt, ist genau der,
+den man am echten Tag aus Gewohnheit wegwinkt.
+
+**Lehre:** Ein gemeinsames Artefakt hat so viele Grammatiken wie Leser. Bevor eine neue
+Schreibform hineindarf, werden die Leser AUFGEZÄHLT (`grep` nach dem Feldnamen ist die
+Mindestform) und jeder gegen die neue Form geprüft — das Ja des annehmenden Tors zählt
+nicht für die Kette dahinter. Und schlägt ein Wächter auf etwas Erlaubtes an, wird zuerst
+seine MESSKETTE verdächtigt, nicht die Regel weichgeklopft: Hier lag der Fehler zwei Glieder
+vor dem Urteil, im Format der Datenbeschaffung.
+
+### 3.167 Der Wächter lebte, aber seine Stimme wohnte im kranken Kanal
+
+Am 23.08.2026 stand die Arbeit dreieinhalb Stunden still, und niemand erfuhr es. Ab 11:22
+wurde der Container krank: Jeder Prozessstart lief in ein Timeout, das Netz fiel weg, der
+Host schlief zwischendurch. Der Launcher-Daemon überlebte das alles — er protokollierte
+dreimal »tick exceeded 900000 ms — killed« — aber ein toter Tick war nur eine Logzeile.
+Jeder Alarmweg des Projekts (ntfy über batch-autostart, die Watchdogs) lief in einem
+Kindprozess, und Kindprozesse waren exakt das, was die kranke Maschine nicht mehr
+herausgab. Der eine beweisbar lebende Prozess hatte keine Stimme. Erlöst hat den Batch
+kein Mechanismus, sondern der Mensch, der zufällig zurückkam und VS Code neu startete.
+
+Die Klasse ist nicht »Alarm fehlte«, sondern: **Der Alarmkanal hing von genau der
+Ressource ab, deren Ausfall er melden sollte.** Dieselbe Falle in zweiter Gestalt: Nach
+dem Container-Neubau brachte den Launcher nichts Maschinelles zurück — nur eine
+Memory-Notiz, also ein Vorsatz, den eine Sitzung lesen musste. Seit Punkt 859 urteilt der
+Daemon über seine eigenen Ticks (reiner Kern, die Vorfalls-Formen als Fixtures) und
+spricht in-Prozess — ein HTTPS-POST braucht kein Kind —, mit Episoden-Schlüssel in der
+Eskalationsleiter, Zustell-Rückmeldung statt Absichts-Buchung und einem Sende-Budget,
+damit die Stimme nie die Schleife würgt, die sie bewacht; und ein Sitzungsstart rüstet
+einen toten Starter selbst wieder auf, ohne je ein absichtliches --stop zu überstimmen.
+Die Prüffrage für jeden künftigen Alarm- oder Heilungsweg: **Welche Ressource braucht
+er — und ist das dieselbe, deren Ausfall er behandelt?** Der Nutzer hat daraus die
+stehende Ordnung gemacht (Punkte 860/861): Selbstheilung vor Alarm, kein Stopp hinter
+einer Warte-Karte, im Zweifel entscheiden und die Entscheidung vetofähig dokumentieren.
+
+### 3.168 Der Dublettencheck ist keine Ordnungsfrage, sondern eine Richtigkeitsfrage
+
+Am Abend des 23.08.2026 meldete der Stop-Wächter zweimal in vier Minuten eine
+Parallelsitzung, obwohl keine da war: Die genannte Sitzung war längst beendet, was noch
+unter ihrer Kennung schrieb, war ihr übriggebliebenes Kind — der delegierte Autorenlauf,
+dessen Deklaration die lesende Sitzung einen Zug zuvor selbst übernommen hatte. Jede
+Meldung bestellte einen dreiminütigen Doktorlauf, der unter der Last genau dieses Kindes
+kein Urteil fällen konnte. Ich habe den Befund aufgenommen und als neuen Punkt angehängt.
+
+Erst die Pflicht, ihn einem Bündel zuzuordnen, führte zu dem Punkt, der dieselbe
+Falschmeldung schon besaß (3.164). Und da zeigte sich, warum die Frage „steht das schon
+irgendwo?" hier mehr wert war als Ordnung: Der bestehende Punkt schrieb als Zielzustand
+fest, ein Schreibzugriff NACH dem Rücktritt der Sitzung sei „ein echter Verstoß" und müsse
+den Alarm weiter auslösen — und genau das ist der heute gemessene Fall. Als eigener Punkt
+gebaut, hätten beide Hälften sauber und grün nebeneinander gelegen, und die eine hätte den
+Fall der anderen als Verstoß eingestuft. Der Defekt wäre nicht durch Doppelarbeit
+entstanden, sondern durch zwei getrennt korrekte Regeln über denselben Gegenstand.
+
+**Lehre:** Der Dublettencheck bei 3.105 wurde als Sparmaßnahme gelesen — er verhindert,
+zweimal dasselbe zu bauen. Er ist aber vor allem der Moment, in dem zwei Beschreibungen
+desselben Mechanismus miteinander verglichen werden, und das ist die einzige Stelle, an
+der ein Widerspruch zwischen ihnen auffallen kann, bevor er Code wird. Prüffrage beim
+Anlegen eines Punktes: *Wenn es das schon gibt — wäre der bestehende Zielzustand für
+meinen Fall richtig, oder erklärt er ihn zum Fehler?* Ein Befund, der einen bestehenden
+Punkt WIDERLEGT, gehört zwingend in diesen Punkt und nicht daneben.

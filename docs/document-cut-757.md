@@ -88,8 +88,8 @@ ceiling is only confirmed against the counter that enforces it.
 
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
-| `CLAUDE.md` | 192 lines / 1,318 words / 9,634 B | 193 / 1,319 | 1 line, 1 word |
-| `MEMORY.md` | 46 lines / 710 words / 5,646 B | 47 / 710 | 1 line, 0 words |
+| `CLAUDE.md` | 193 lines / 1,331 words / 9,712 B | 193 / 1,332 | **0 lines**, 1 word |
+| `MEMORY.md` | 47 lines / 728 words / 5,781 B | 47 / 728 | **0 lines**, 0 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, but two of them hold with nothing to spare, and that is the finding
@@ -116,8 +116,11 @@ memory.
 On 22.08.2026 `CLAUDE.md` moved for the first time since the merge: the
 four-eyes cut of point 768 rewrote the file, and the cross-vendor review of that
 cut put one rule back that had left the file without an enforcer ("Keep branches
-short"). The row above is the reading of that day — 192 lines / 1,319 words —
-and its ceiling followed the restored rule by exactly the four words it costs.
+short"). That reading was 192 lines / 1,318 words, with a 193 / 1,319 ceiling
+that followed the restored rule by exactly the four words it costs. On
+23.08.2026 §6 gained the 13-word rule permitting a second model trailer for the
+cross-vendor reviewer. Its word ceiling rose by those 13 words, preserving one
+word of headroom; its unchanged line ceiling is now exact.
 The global stub is GONE: the user released it in the same ruling and it was
 deleted on 20.08.2026 (backup `local/global-CLAUDE-before-deletion-20-08-2026.md`),
 so its row is history and `doc-budget-guard` simply skips a budget whose file no

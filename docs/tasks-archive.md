@@ -22407,3 +22407,207 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Claude lane showing a supervising session whose turn ends are not held by its agent.
   Criticality: medium — it does not corrupt work, but it blocks the supervising session's turn
   ends, which is how the batch stalls.
+
+- [x] 854. The serving-model tripwire reads two co-author trailers as one unknown model. MEASURED
+  23.08.2026, 08:55 on `main`. Commit `c54e461` carries two `Co-Authored-By` trailers — the author
+  model and the cross-vendor reviewer — and `node scripts/model-guard.mjs --status` shows the hit's
+  trailer field as those two lines CONCATENATED with no separator, so the parsed identity matches
+  no allowlist entry. The guard then raises its full breach ritual ("create `.claude/batch-paused`
+  (reason: forbidden serving model) and stop"), although BOTH named models are on that very
+  allowlist by the guard's own message.
+  TWO FAILURES MEET HERE: `scripts/model-guard-core.mjs` reduces a commit's trailers to one string
+  instead of judging each trailer on its own; and CLAUDE.md §6 says every commit names its author
+  model in a trailer without saying whether a SECOND model trailer is allowed at all, so a session
+  that credits its reviewer manufactures a forbidden-model incident.
+  WHAT IT COSTS: the false breach lands on a pushed commit that can no longer be amended, and the
+  sanctioned remedy — advancing `.claude/model-guard-baseline.json` — is reserved to the user, so
+  the batch stands blocked on a premise that does not hold. A tripwire that fires on an allowed
+  pair is also the one a session learns to wave through on the day it is real.
+  FINAL STATE: the guard judges each `Co-Authored-By` trailer separately and passes when every
+  model named is allowed; a trailer naming a model outside the allowlist still raises the incident
+  unchanged; and the rule text says in one line whether a commit may carry a second model trailer.
+  VERIFIABLE: unit cases over the trailer reading — a commit with an allowed author trailer and an
+  allowed reviewer trailer passes; the same commit with one forbidden trailer still raises; a
+  single trailer claiming two models remains a finding as it is today; and a bare model-less
+  trailer keeps its own existing verdict.
+  Criticality: medium — no product behaviour, but it halts the batch on a false breach and the
+  only sanctioned way out needs the user.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 858. Twelve model-policy restatements went stale when the reviewer-trailer sentence landed.
+  MEASURED 23.08.2026, 11:04 by `rule-echo` at the point-854 boundary and re-measured 11:08 on
+  `main` at e49f6db9: point 854 added one line to the model-policy rule in CLAUDE.md §6 — a commit
+  may also name its cross-vendor reviewer in a second model trailer — which moved the rule to
+  `1758947b`. Twelve restatements still carry the previous stamp `c9160fcb`: `docs/maximum-qa.md`,
+  `docs/sol-routing.md`, `scripts/author-routing-core.mjs`, `scripts/author-sol-core.mjs`,
+  `scripts/batch-autostart-core.mjs`, `scripts/batch-resume-hook.mjs`,
+  `scripts/model-guard-core.mjs`, `scripts/review-sol-core.mjs`, `scripts/sol-share-core.mjs`, and
+  the memories `hard-cases-go-to-sol.md`, `fable-sparingly.md`, `serving-model-watch.md`.
+  WHY 854's SESSION DID NOT DO IT: the finding surfaced at its Stop hook AFTER
+  `batch-boundary --commit` had sealed the boundary and the batch had passed to the successor at
+  fence 627. It drafted the `scripts/model-guard-core.mjs` wording anyway, the ownership fence
+  refused the write, and the draft was rolled back — so nothing of it survives except this entry.
+  WHAT IT COSTS: a restatement is the copy a session actually reads — the resume hook's model
+  policy, the router's comment, the Sol-share text. While twelve of them predate the rule, the
+  reviewer trailer §6 now invites goes unmentioned everywhere the batch looks the rule up, and
+  `rule-echo` carries a standing stale block that teaches the next session to skip its own report.
+  ALREADY KNOWN ABOUT ONE OF THE TWELVE: `scripts/model-guard-core.mjs` needs no behaviour change.
+  `classifyTrailer` already judges every trailer on its own and lets the worst verdict win, so a
+  commit naming an allowed author and an allowed reviewer passes today; only the comment's closing
+  sentence ("a commit has exactly one authoring model") contradicts the moved rule.
+  FINAL STATE: each of the twelve is READ against the moved rule and its wording made to match —
+  a restatement with nothing to say about the reviewer trailer keeps its own words rather than
+  being padded — and each is stamped with `node scripts/rule-echo.mjs --stamp <file> --quote
+  '<phrase from that file>'`. `node scripts/rule-echo.mjs` then reports model-policy clean.
+  VERIFIABLE: `node scripts/rule-echo.mjs` reports no stale model-policy restatement; the unit
+  layer stays green (four of the stamped files are `*-core.mjs` modules with their own tests).
+  Criticality: low — no product behaviour; the cost is that the batch's own model rules read
+  differently depending on which copy a session opens.
+  Bundle: Modell & Wächter.
+
+- [x] 863. The two-trailer wrapper test can stay green while the second trailer is never judged.
+  FOUND 23.08.2026 by the same reading, in scripts/model-guard-core.test.mjs: the wrapper-log
+  test asserts classifyTrailer over the joined field and equality of the split, but its final
+  evaluateCommitTrailers assertion feeds the raw message rather than the parsed field — so a
+  regression in which the wrapper judges only the first trailer would not turn it red.
+  FINAL STATE: the test asserts that EACH split trailer is judged individually on the parsed
+  wrapper output, so dropping the second trailer's judgement turns it red.
+  VERIFIABLE: mutating the wrapper to judge only the first trailer makes the suite fail.
+  Criticality: low — a test-only gap behind a currently correct wrapper.
+  Bundle: Modell & Wächter.
+
+- [x] 862. The criticality gate reads an EMPTY authorship as model diversity. FOUND 23.08.2026 by
+  the cross-vendor reading that cleared the 864a90e7 revert's ledger debt: in
+  scripts/criticality-review-guard-core.mjs, rowWellFormed accepts an empty or whitespace
+  authoredBy, and the diversity check !sameModel(r.model, r.authoredBy) then treats the UNKNOWN
+  author as a different model — a fail-open in the exact gate that exists to prove two vendors.
+  The test names the missing-authorship case but covers only an absent key and a non-string
+  value, not the admitted empty string.
+  FINAL STATE: a row with empty or whitespace authorship can never PROVE model diversity, so it
+  cannot clear the gate. Well-formedness is untouched on purpose: 38 legitimate empty-authorship
+  rows stand in the ledger (merges, user edits), and poisoning them would redden history.
+  VERIFIABLE: unit cases — an empty and a whitespace authoredBy each refuse to clear as no-review;
+  the existing well-formed rows still clear.
+  Criticality: medium — the gate stays conservative everywhere else, but this path can wave a
+  same-model pair through as cross-vendor.
+  Bundle: Modell & Wächter.
+
+- [x] 859. A standstill cannot announce itself: a sick container hangs every tick and no alert
+  goes out. MEASURED 23.08.2026: from 11:22 the host slept or froze — every node spawn timed out
+  (`spawnSync /usr/local/bin/node ETIMEDOUT` in autostart.log from 11:23), the network dropped
+  (chat-watcher `fetch failed` from 11:27) — and until the user's manual VS Code restart at 14:56
+  the batch did NOTHING for 3.5 hours. The launcher daemon LIVED through all of it and logged
+  `tick exceeded 900000 ms — killed` three times, but a hung, failed or unspawnable tick only
+  writes a log line: every alert path (notify via batch-autostart, the stale-site and board
+  watchdogs) runs INSIDE a child process the sick container could not spawn, so not one ntfy
+  alert left the machine. After the container rebuild the launcher was gone besides — a memory
+  note, not machinery, made the successor session run `--start`.
+  WHAT IT COSTS: the user leaves the batch unattended for long stretches; a standstill that
+  cannot announce itself lasts until a human happens to look — 3.5 h here, unbounded in general.
+  FINAL STATE: (1) the launcher daemon itself judges its ticks — consecutive killed/failed/
+  unspawnable ticks, and a resume after a suspend gap — and sends the ntfy alert IN-PROCESS
+  (importing notify.mjs, no child process), through the escalation ladder, plus a one-time
+  recovery notice when ticks come back; (2) a session start re-arms a dead launcher without a
+  human: the session-start path runs the same arming the memory note prescribes; (3) the
+  incident's own shapes (killed tick, spawn ETIMEDOUT, suspend gap, recovery) are the unit
+  fixtures of a pure decision core.
+  VERIFIABLE: unit cases — two consecutive dead ticks yield one alert decision and the third does
+  not double it; a spawn failure alerts with no child involved; a sleep gap of more than two
+  intervals marks a suspend, and the first dead tick after it alerts immediately; the first good
+  tick after an alert yields the recovery notice and resets the run; the arming path arms a
+  dead/stale launcher record and leaves a live one alone.
+  Criticality: HIGH — it is the difference between an autonomous batch and one that dies silently
+  whenever the host hiccups.
+  Author lane: fable
+  (Lane set by user order of 23.08.2026 — fix this directly, ahead of the queue, with cross-vendor
+  four-eyes review; Sol reviews the result.)
+  Bundle: Urlaubsfestigkeit.
+
+- [x] 860. The alert ladder's last rung pauses the batch, which is now the forbidden outcome. The
+  escalation ladder (point 434) ends a repeated unanswered alert by PAUSING the batch with a board
+  card — built when an alert could be slept through and a paused batch was the safe floor. The
+  user's order of 23.08.2026 inverts that floor: a lasting standstill must never happen, recovery
+  and decide-and-record replace waiting for a human.
+  FINAL STATE: the rungs still climb interval and priority, but a pause verdict survives ONLY where
+  continuing would corrupt the work itself (forbidden serving model, failed repository integrity —
+  the closed list lives beside the core); every other ladder end keeps the batch running and files
+  a decision card RECORDING what was decided and how to veto it retroactively. Existing pause
+  callers are reclassified against that list in the same change.
+  VERIFIABLE: unit cases over the ladder core — a generic stalled/staleness alert can no longer
+  return a pause verdict however often it repeats; a corruption-class alert still can; the
+  continue-verdict names the decision card it demands.
+  Criticality: HIGH — the ladder is the one mechanism that deliberately manufactures the standstill
+  the user has now forbidden.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 861. Every state that parks the batch on the user gets a recovery path or a recorded default.
+  The user's order of 23.08.2026: they are away for long stretches and may not see the phone —
+  problems need RECOVERY mechanisms, not alerts; a stop behind a 'Von dir zu klären' card is to be
+  avoided; in doubt the batch decides by its own judgment and files a card recording the decision
+  for retroactive veto.
+  FINAL STATE: an inventory in docs/batch-autonomy.md of every state that today halts work waiting
+  on a human — pause markers and their restart clocks, user-gated points, doctor mandates, quota
+  waits, ladder pauses (point 860), blocking decision cards — and for each one the chosen lane:
+  a self-recovery mechanism where the machine can fix the cause, otherwise an own-judgment default
+  that continues work and files the veto card; only genuinely irreversible or outward-facing steps
+  keep their confirm gates. Lanes that need code land as their own follow-up points; lanes that are
+  pure policy change in place with the inventory.
+  VERIFIABLE: the inventory names every halting state a repo-wide search for pause/gate/mandate/
+  card-block paths finds, each with its lane and its follow-up point or in-place change; no state
+  is left implicitly 'wait for the user'.
+  Criticality: HIGH — it turns the 23.08.2026 order from one fixed incident into the standing shape
+  of the batch.
+  Bundle: Urlaubsfestigkeit.
+
+- [x] 864. An advisory question parks its point; only a true confirmation may. Point 861's inventory
+  rows U1-U4, C1 and C4: `AWAITING-USER` today carries BOTH an advisory product question and a
+  genuinely outward-facing confirmation, and either one makes the point non-commissionable until the
+  user answers. The user's order of 23.08.2026 removes the first case: in doubt the batch decides and
+  files the decision for retroactive veto.
+  FINAL STATE: the gate is typed. An advisory question is decided from the brief and the repository
+  evidence, recorded as SELF-DECIDED with an `Entscheidungsprotokoll:` card naming decision, evidence,
+  consequence and the exact veto action, and the point stays workable. Only an act that is
+  outward-facing or hard to reverse and not durably authorized may carry AWAITING-CONFIRMATION, whose
+  reason must name that act and the safe prepared state. Existing untyped markers migrate to
+  confirmation only where their recorded reason itself names such an act; ambiguity falls towards
+  continuation. `defer-for-user.mjs` refuses an advisory reason, and every reader that picks work
+  (queue generator, queue-order guard, workable set, session-start headline) honours the new type.
+  VERIFIABLE: a marker written with an advisory reason is refused; a confirmation marker with a named
+  outward-facing act is accepted and skips its point; a migration command reports each existing marker
+  with its verdict and reason; a queue in which every open point is advisory yields a workable point
+  rather than a batch pause.
+  Criticality: HIGH — it is the half of the 23.08.2026 order that the inventory could only write down.
+  Bundle: Urlaubsfestigkeit.
+
+- [x] 865. A pause record without a clock must prove it came from the user. Point 861's inventory rows
+  P3, P4 and P8: an empty or legacy `.claude/batch-paused`, a `retry-after: never`, an unreadable
+  clock and the causes `serving-model`, `awaiting-user` and `retries-exhausted` are all classified
+  clockless today, so a corrupt or ambiguous marker is indistinguishable from a deliberate user stop
+  and parks the batch for as long as nobody looks.
+  FINAL STATE: the pause record is typed and only a proved `user-stop` may be clockless. An untyped,
+  legacy or malformed record is snapshotted into the decision card, replaced atomically with a short
+  recovery clock and retried by the launcher. The serving-model tripwire never lets the suspect model
+  bless itself: it hands over to the next allowed lane of the recorded routing chain, which verifies
+  the trailers and advances the baseline only on proof, and probes on a clock when no allowed lane is
+  reachable.
+  VERIFIABLE: an empty marker, a `retry-after: never` and a malformed clock each resume on their
+  recovery clock and leave a decision card; a record typed `user-stop` stays held with no clock; a
+  forbidden serving model starts the next allowed lane instead of parking, and the baseline advances
+  only after that lane verified the trailers.
+  Criticality: HIGH — it decides whether an ambiguous marker costs a retry or a whole absence.
+  Bundle: Urlaubsfestigkeit.
+
+- [x] 866. A spent failure ladder keeps probing instead of ending on a person. Point 861's inventory
+  rows P5, P6, P7 and D3: the runaway watchdog, the child-outage circuit breaker, the corruption
+  alert ceiling and a proved forbidden author all terminate today in a state whose only exit is a
+  human — `no-retry`, "decide by hand", an outage pause that retries nothing, a clockless ceiling.
+  FINAL STATE: every failure lane ends in a capped, repeating probe rather than a terminal park. An
+  outage is re-probed on a clock. A non-transient child death is diagnosed from its branch and either
+  resumed, fixed, or exchanged for another point, with the scheduling choice recorded for veto. A
+  spent point budget requeues the point instead of stopping the queue. A corruption class names its
+  own repair — doctor quarantine or repair — and keeps the closed list point 860 pinned.
+  VERIFIABLE: each of the four lanes, driven to its terminal state in a drill, produces a next attempt
+  at its capped interval and a decision record; none of them leaves a clockless pause; the corruption
+  list and the quarantine safety of point 860 stay pinned by their existing tests.
+  Criticality: HIGH — these are the lanes that fire exactly when nobody is watching.
+  Bundle: Urlaubsfestigkeit.

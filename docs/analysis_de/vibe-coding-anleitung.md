@@ -162,17 +162,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** behoben ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
-  nach; Gebautes erst in der Zukunftsform. Zweimal festgebissen: wechsle das Modell."
+  nach. Zweimal festgebissen: wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
   verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
   echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die das
-  Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
-  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Der Test heißt
-  ‚**gibt es einen Weg vorbei?**'; ‚wartet' etwas: **worauf**? **Vergleiche Ausgeführtes mit dem Repository.**"
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
+  das Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
+  **vergleiche Ausgeführtes mit dem Repository.**"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -181,14 +181,19 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Kontextgröße,
   nicht an den Stunden: lange Sitzungen, Helfer, die ihren Auftrag erst *suchen*.
-  → *Prompt:* „Nenne mir die **gemessenen** Treiber, gib jedem Helfer einen Kurzbrief und fang
-  je Aufgabe einen **frischen Kontext** an. Vor einem Deckel miss den **Startboden**, sonst
-  deckelst du das Aufräumen mit."
+  → *Prompt:* „Nenne mir die **gemessenen** Treiber, gib jedem Helfer einen Kurzbrief und fang je
+  Aufgabe einen **frischen Kontext** an. Vor einem Deckel miss den **Startboden**."
+
+- **Es antwortet nicht das Modell, das du bestellt hast.** Bei Engpass serviert die Umgebung still
+  ein schwächeres weiter.
+  → *Prompt:* „Stell zu Sitzungsbeginn fest, **welches Modell tatsächlich antwortet**, und halte es
+  gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**. Jedes Ergebnis trägt seinen
+  Verfasser."
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe, und bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
-  Jedes Warten bricht beim **Fehler** ab und steht in einer **Datei**, nicht in einem Prozess."
+  Jedes Warten bricht beim **Fehler** ab und steht in einer **Datei**."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
@@ -218,8 +223,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet, nie
   eine Uhr — und schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt nur, wo er
-  schreibt.
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.**
   → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
   Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört; Doc und Code
   ändern sich im **selben** Commit."
@@ -233,9 +237,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   beim **Beurteilen** Gegenlesen — **erst das Ergebnis, dann die Begründung**." *(≈ 2x)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
-  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft, nicht
-  der Prosa geglaubt; ein Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist.
-  Kein Blocker auf die Lücke selbst — eine benannte Lücke ist mehr wert als erfundene Deckung."
+  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft. Ein
+  Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist — blockiere die Lücke aber
+  nicht: benannt ist mehr wert als erfundene Deckung."
 
 - **Die aufgeschriebene Grenze deckt nicht, was sie behauptet.** Der Satz, was ein Mechanismus
   *nicht* leistet, wird zur Ablage für bloß nicht Getanes.
@@ -255,8 +259,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende passiert
   trotzdem nichts — dazwischen hat niemand nachgesehen.
   → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch** und lies das
-  Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch etwas ausführt, melde
-  ein Scheitern im selben Atemzug wie die Freigabe."
+  Ergebnis aus den Protokollen, nicht aus den Tests."
 
 - **Die Messung — und die Gegenprüfung — sah weniger, als sie behauptet.** Nur die letzten *n*
   Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
@@ -296,11 +299,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.** Die
-  nächste Sitzung kennt deinen Chat nicht, der alte Bestand bleibt liegen.
-  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander,
-  schlägt eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit
-  dem **Altbestand** geschieht: nachräumen oder liegen lassen."
+- **Der Halt, den nur ein Mensch aufhebt.** Er kostet nicht zwanzig Minuten, sondern den Rest
+  deiner Abwesenheit — und ein leerer Marker sieht aus wie dein bewusster Stopp.
+  → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr. Ohne Uhr bleibt nur, was **nachweislich**
+  von mir kommt: typisiert, über einen eigenen Befehl. Alles andere wird protokolliert und kurz
+  wiederholt."
+
+- **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.**
+  → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander, schlägt
+  eine Prüfung fehl. Priorisiere das **Ziel** — und sag bei jeder Sortierregel, was mit dem
+  **Altbestand** geschieht: nachräumen oder liegen lassen."
 
 - **Blockiert heißt nicht: du bist dran.** Fehlt eine Berechtigung, bekommst du gern einen
   Befehl gereicht — oft einen, der gar nicht funktionieren kann.
@@ -315,18 +323,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
   verliert mit dem Fehlschlag die nächste Reparatur mit.
   → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern — ein zugesperrter Stand ist
-  nicht mehr reparierbar."
+  **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern."
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
 - **„Nichts geliefert" wurde nie nachgemessen.** Ein Lauf meldet, er habe nichts geschrieben,
-  während fertige, ungesicherte Arbeit danebenliegt — und der nächste Griff räumt sie weg.
+  während fertige, ungesicherte Arbeit danebenliegt.
   → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint.
-  ‚Nichts da' gilt nur für den nachweislich leeren Fall; sonst nenn die **Größe** des Vorhandenen
-  und den Befehl, der es **sichert**."
+  ‚Nichts da' gilt nur für den leeren Fall; sonst nenn die **Größe** des Vorhandenen und den
+  Befehl, der es **sichert**."
 
 - **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
   „es lief durch" beweist den Weg nicht.
@@ -381,19 +388,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
   Zeugen — der seine Sicherheit nicht von dem borgt, was er prüft."
 
-- **Der Test vergleicht den Erzeuger mit sich selbst.** Erwartung und Artefakt kommen aus derselben
-  Quelle: Trägt der Erzeuger den Fehler, trägt ihn die Erwartung mit, und Grün heißt „nicht veraltet".
+- **Der Test vergleicht den Erzeuger mit sich selbst.** Trägt der Erzeuger den Fehler, trägt ihn
+  die Erwartung mit, und Grün heißt nur „nicht veraltet".
   → *Prompt:* „Frag bei jedem Test über einem **erzeugten** Artefakt, **woher die Erwartung kommt**.
-  Aus derselben Quelle prüft er Aktualität, nie Richtigkeit — die braucht eine Aussage, die der
-  Erzeuger **nicht selbst herstellt**."
+  Richtigkeit braucht eine Aussage, die der Erzeuger **nicht selbst herstellt**."
 
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Jeder Auftrag, der eine Sitzung überdauern soll, gehört in eine Datei, die dein
   Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
-  baut aber weder Zustand noch Befehl dafür — dann muss der ehrliche Ausnahmefall den Normalfall
-  nachahmen, und nur eine irreführende Formulierung besteht die Prüfung.
+  baut aber weder Zustand noch Befehl dafür — dann besteht nur eine irreführende Formulierung
+  die Prüfung.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
@@ -435,4 +441,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 8b5c1994ff3a01a613169a8d67ef680a4ddabcd6de3cc9b5cbb611ef6d98415a -->
+<!-- GUIDE-FINGERPRINT: 6640b433952e9365eda8c88882a402e625a9b380a3d76f1005a0d3044a89af0d -->

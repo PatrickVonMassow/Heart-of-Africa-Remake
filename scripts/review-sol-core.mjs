@@ -1,13 +1,15 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@c9160fcb
+// rule:model-policy@1758947b
 // WHY IT EXISTS: our Claude reviewers are one house, with similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different
 // vendor is the strongest decorrelation available, so REVIEWS go to OpenAI's
 // GPT-5.6 Sol at reasoning effort HIGH first and to the first eligible Claude
-// reviewer when Sol cannot be reached. AUTHORSHIP is untouched: Sol writes no commit here, and
-// scripts/model-guard-core.mjs keeps its author allowlist exactly as it was.
+// reviewer when Sol cannot be reached. Since point 667 Sol also AUTHORS under
+// the role swap (scripts/author-sol.mjs, admitted in the model-guard allowlist);
+// what this file protects is the other half of that swap — no model reviews its
+// own work (`solAuthored`, the self-review refusal), whoever wrote the commit.
 //
 // THE FAILURE MODE THIS FILE IS SHAPED AROUND: a review nobody ran must never be
 // recorded as done. That is worse than having no second pair of eyes, because

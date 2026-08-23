@@ -19,8 +19,8 @@
       "place": "last"
     },
     "581": {
-      "at": "2026-08-21T16:05:59.908Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), and the user kept it in front by name: without the boundary one walks out of the village unnoticed while watching the inhabitants. Its branch stands.",
+      "at": "2026-08-23T08:37:05.342Z",
+      "why": "Nutzeranweisung 23.08.2026, 10:36 (Board-Chat): 581 direkt vor 686 schieben",
       "origin": "user",
       "place": "ahead"
     },
@@ -570,11 +570,35 @@
       "origin": "machine",
       "place": "last"
     },
-    "854": {
-      "at": "2026-08-23T06:54:08.442Z",
-      "why": "Machine-filed hygiene finding; it keeps its appended place behind the release like the findings before it, even though it currently blocks — the block is cleared by a user confirmation, not by working the point earlier.",
+    "855": {
+      "at": "2026-08-23T08:09:39.410Z",
+      "why": "Test-only follow-up from a confirming review; low criticality, stands at the end behind the release",
       "origin": "machine",
       "place": "last"
+    },
+    "856": {
+      "at": "2026-08-23T08:23:12.998Z",
+      "why": "Machine-filed planner defect; medium, stands behind the release at its work-order place",
+      "origin": "machine",
+      "place": "last"
+    },
+    "857": {
+      "at": "2026-08-23T09:17:24.447Z",
+      "why": "Machine-filed from a review, criticality medium and not blocking: the six vacuous checks can be classified against a baseline, so it stands behind the release like every other non-urgent machine finding",
+      "origin": "machine",
+      "place": "last"
+    },
+    "865": {
+      "at": "2026-08-23T17:28:38.451Z",
+      "why": "same 23.08.2026 order: an ambiguous pause marker is today indistinguishable from a user stop and would hold the whole absence",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "866": {
+      "at": "2026-08-23T17:28:38.522Z",
+      "why": "same 23.08.2026 order: these four failure lanes end on a person today, and they are exactly the ones that fire while nobody is watching",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -622,7 +646,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-23T06:54:08.449Z",
+    "at": "2026-08-23T20:08:44.659Z",
     "points": [
       174,
       184,
@@ -878,7 +902,13 @@
       851,
       852,
       853,
-      854
+      855,
+      856,
+      857,
+      865,
+      866,
+      867,
+      868
     ]
   }
 }

@@ -98,16 +98,17 @@ try {
   check(resumed.parksTheTick === false, 'the tick no longer parks — it goes on to its ordinary spawn decision')
   check(resumed.clearsTheRecord === true, 'and that verdict is the one that removes the pause record')
 
-  // 3. THE CONTROL: a clockless legacy marker is never resumed.
+  // 3. AN AMBIGUOUS LEGACY MARKER IS SENT TO THE RECOVERY-CLOCK PATH.
   writeFileSync(
     join(SCRATCH, 'legacy'),
     'autostart watchdog: 3 resurrections made no progress (auth expired? model flag?) — investigate, then delete this file.\n',
   )
   const legacy = report('legacy')
   console.log(`tick verdict on a legacy marker: ${JSON.stringify(legacy)}`)
-  check(legacy.state === 'hold', "a marker written without a clock reads as 'hold'")
-  check(legacy.parksTheTick === true, 'and parks the batch — a missing clock is never an expired one')
-  check(legacy.clearsTheRecord === false, 'nothing removes it but a human')
+  check(legacy.state === 'recover', "a marker written without a clock reads as 'recover'")
+  check(legacy.parksTheTick === true, 'and stays parked while its snapshot and recovery clock are recorded')
+  check(legacy.replacesWithRecoveryClock === true, 'the launcher will replace it with a short typed clock')
+  check(legacy.clearsTheRecord === false, 'it is never mistaken for an already-expired clock')
 
   // 4. THE LIVE RECORD WAS NEVER TOUCHED.
   const liveAfter = existsSync(LIVE_PAUSE) ? readFileSync(LIVE_PAUSE, 'utf8') : null
@@ -120,4 +121,4 @@ if (failures.length) {
   console.error(`\nDRILL FAILED (${failures.length}): ${failures.join('; ')}`)
   process.exit(1)
 }
-console.log('\nDRILL PASSED — the live tick reads a spent clock as a resume and a clockless park as a hold.')
+console.log('\nDRILL PASSED — the live tick resumes a spent clock and sends an ambiguous marker to typed recovery.')

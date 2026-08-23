@@ -182,6 +182,26 @@ try {
 // Record this top-level session for the parallel-session detector.
 noteTopLevelSession(sessionId)
 
+// RE-ARM A DEAD LAUNCHER (point 859). A container rebuild kills the daemon and
+// nothing inside the container survives to restart it — a session starting is
+// the one event that reliably follows, so it happens here, for EVERY session
+// (a stood-down window heals the repo-global trigger just as well as the
+// owner). The decision is pure and never reverts a deliberate --stop; failures
+// stay silent because a hook that cannot arm must still orient the session.
+try {
+  const { armLauncherAtSessionStart } = await import('./batch-launcher.mjs')
+  const armed = await armLauncherAtSessionStart()
+  if (armed.attempted) {
+    console.log(
+      armed.armed
+        ? `[batch-resume] LAUNCHER RE-ARMED at session start (pid ${armed.pid}): ${armed.reason}.`
+        : `[batch-resume] LAUNCHER STILL NOT ARMED: ${armed.reason} — start it by hand: node scripts/batch-launcher.mjs --start`,
+    )
+  }
+} catch {
+  /* an unreadable or unstartable launcher must never block session orientation */
+}
+
 const RESUME_BODY =
   'Continue the batch autonomously per CLAUDE.md/TASKS.md — feature-branch workflow ' +
   '(§6): each point on its OWN feat/<point>-<slug> branch off main; implement -> docs -> ' +
@@ -253,11 +273,12 @@ try {
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
 
-      // rule:model-policy@c9160fcb
+      // rule:model-policy@1758947b
       'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
       'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
       'makes that cut from point text and recorded review history, while a point\'s own ' +
-      '`Author lane:` tag remains an operator decision. ' +
+      '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
+      'reached §6 Fable escalation threshold). ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +

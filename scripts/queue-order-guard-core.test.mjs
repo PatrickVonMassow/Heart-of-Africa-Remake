@@ -88,14 +88,19 @@ describe('parseOpenPoints', () => {
 describe('parseWorkablePoints — open minus what waits on the user (point 450)', () => {
   const text = [
     '- [ ] 210. Fix',
-    '- [ ] 211. Fix AWAITING-USER(2026-07-29; needs a ruling)',
+    '- [ ] 211. Fix AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
     '- [ ] 212. Fix USER-ANSWERED(2026-08-07)',
+    // An OPEN untyped marker, whose prose would once have gated it. It owes
+    // migration and stays workable — the ticked leftover below cannot show that,
+    // because a ticked point is excluded either way (cross-vendor review,
+    // GPT-5.6 Sol, 23.08.2026).
+    '- [ ] 213. Fix AWAITING-USER(2026-01-02; push the version tag; safe prepared state: verified locally and no tag pushed)',
     '- [x] 209. Done AWAITING-USER(2026-01-01; leftover)',
   ].join('\n')
   it('drops the gated point but keeps the answered one and the plain one', () => {
-    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212])
+    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212, 213])
     // The full open set is unchanged — the done-claim rule still judges 211.
-    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212])
+    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212, 213])
   })
   it('is total on non-string input', () => {
     expect(parseWorkablePoints(null).size).toBe(0)
@@ -264,7 +269,7 @@ describe('evaluate — end to end on the two raw files', () => {
     // turn end for as long as the user is away.
     const tasks = [
       '- [ ] 203. Open point 203.',
-      '- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)',
+      '- [ ] 211. Open point 211. AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
       '- [x] 209. Done point 209.',
     ].join('\n')
     const r = evaluate({
@@ -291,7 +296,7 @@ describe('evaluate — end to end on the two raw files', () => {
   })
 
   it('a done-claim on a GATED point is still a false claim', () => {
-    const tasks = ['- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)'].join('\n')
+    const tasks = ['- [ ] 211. Open point 211. AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)'].join('\n')
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 211, body: 'Behoben und verifiziert.' }] }),
       tasksMd: tasks,

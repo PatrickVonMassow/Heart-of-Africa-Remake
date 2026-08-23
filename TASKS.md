@@ -351,17 +351,27 @@ put it is the mistake this line exists to stop.
   The cost is not the alert but the escalation: a self-pause that only a human can
   lift, on evidence that was never there.
   FINAL STATE:
-  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
-     never as a foreign owner. The detector may then report "owner unknown"; it may
-     not report parallel sessions.
-  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
-     the ids say — the pid is the stronger evidence and settles it first.
+  1. A lock whose `sessionId` fails `validTransitionSessionId()` counts as owner
+     UNKNOWN, never as a foreign owner — and `acquire()` refuses to write such an
+     id in the first place. Re-measured 23.08.2026: `classifyParallel()` treats
+     only a PROBE owner as unknown (`preflight-` prefix, point 434(8)) and
+     `acquire()` checks only `isProbeSessionId`, so a bare placeholder like `x`
+     still passes both. The detector may report "owner unknown"; it may not report
+     parallel sessions.
+  2. A session whose pid equals the lock's pid is not a second session — but pid
+     equality counts ONLY together with the same process incarnation (the pid's
+     start time) and the current ownership generation, never "whatever the ids
+     say". Without both, pid reuse and a completed ownership transfer are
+     misclassified as self. Re-measured 23.08.2026: `classifyParallel()` consults
+     no pids at all, so this is still open.
   3. Both cases are covered by Vitest in the pure decision core.
   4. The escalation chain itself stays untouched: five unanswered alerts still
      pause the batch. The point removes the false alert, never the response to a
      real one.
   5. A self-pause no longer writes a card into "Von dir zu klären" (user
      05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
+     Still open, re-measured 23.08.2026: `boardCard()` in `alert-escalation.mjs`
+     writes the last-rung pause card through `board.mjs vdzk-add`.
      That section holds GENUINE user decisions only; diagnosing a pause and
      lifting it is the session's own work. The pause is instead reported where the
      session's own state is reported — the now-card — so the reader sees it
@@ -384,16 +394,20 @@ put it is the mistake this line exists to stop.
   moment IS that fenced session, so the handover deadlocks. Ownership was restored
   by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
   does not offer.
-  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
-     an id of the shape a real session carries; a placeholder, a probe id or an
-     empty string leaves the recorded owner untouched and answers the ownership
-     question without writing. Renaming a lock is a side effect of asking a
-     question, so the question must be safe to ask.
+  6. DELIVERED MEANWHILE (re-measured 23.08.2026), and the causal narrative above
+     therefore describes a mechanism that has been rebuilt: `ownsLock()` no longer
+     restamps at all. The only door that changes a live owner's session id is
+     `transitionOwnerSession()`, gated by `validTransitionSessionId()`, which
+     rejects an empty id, a control-character id and a probe id. Nothing is owed
+     here; the item stays as the record of what the incident was about.
   7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
      `pid` is this very process (argv and session match) but the id no longer does,
      one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
      as a torn state and names it in its verdict, rather than reporting "consistent"
-     as it did today. Hand-editing the lock is then never the only path.
+     as it did today. THE REPAIR GOES THROUGH `transitionOwnerSession()`, never a
+     direct lock write, so it keeps that door's validation, its generation checks
+     and its lifecycle journaling. Hand-editing the lock is then never the only
+     path. Re-measured 23.08.2026: batch-doctor still has no torn-id repair.
   8. A SESSION THE SINGLETON ITSELF STOOD DOWN IS NOT A PARALLEL BATCH SESSION
      (measured 18.08.2026 from `.claude/autostart.log`). At 09:18Z and 12:18Z the
      detector reported "PARALLEL SESSIONS DETECTED: owner=d559dcb0 plus 7fe2e051"
@@ -403,8 +417,12 @@ put it is the mistake this line exists to stop.
      wrong: the detector cannot see that it silenced one of the two itself. Five
      unanswered alerts then paused the batch at 14:18; the restart clock lifted it
      at 14:48. So a session carrying the stand-down note and no mutating action
-     since counts as attended-observing — no alert, no escalation. The alarm for a
-     genuinely second WORKING session is untouched. This branch is separate from
+     since counts as attended-observing — no alert, no escalation. THE NOTE IS
+     BOUND TO THE CURRENT CLAIM/WRITER GENERATION: any later claim, reservation,
+     transfer or mutating lifecycle transition invalidates it, so a stale note can
+     never silence a real alarm. Re-measured 23.08.2026: the exclusion still covers
+     only the claimed window (point 395). The alarm for a genuinely second WORKING
+     session is untouched. This branch is separate from
      items 1/2 above: those answer the placeholder owner, this one answers a real
      second process.
   9. A PAUSED BATCH STILL DELIVERS THE USER'S WORDS (measured 18.08.2026 15:0x,
@@ -437,6 +455,18 @@ put it is the mistake this line exists to stop.
      lock as proof of ownership, so nothing would have refused it a merge, a
      TASKS.md tick or a landing — the hard singleton was not outvoted, it was
      bypassed, and the split was held by agreement between two sessions instead.
+     FINAL STATE: ONE CANONICAL LOCK PER REPOSITORY, resolved through the git
+     common directory / the main checkout, so every process in every worktree
+     reads and writes the same lock and a worktree-private
+     `.claude/batch-lock.json` is never authority. Re-measured 23.08.2026:
+     `repo-paths.mjs` resolves through `git rev-parse --show-toplevel`, which is
+     the worktree, not the common directory.
+  HOW IT MUST FIT THE MACHINERY THAT EXISTS NOW. The spec above was written
+  against the 05.08.2026 world; the ownership layer has been rebuilt since, and a
+  build that ignores that will re-open what it repairs. It has to sit on top of
+  claims with release and reservation (e0154839), the transfer of running agents
+  (33ca802b), writer generations (ac38f368, 5b8c72c9) and journaled lifecycle
+  transitions (0038056c).
      FINAL STATE: the batch lock, the pause marker and every file the singleton
      treats as batch-global resolve to the MAIN checkout (git's common dir), never
      to the worktree, whatever the process's cwd; and a worktree-local copy found
@@ -546,13 +576,22 @@ put it is the mistake this line exists to stop.
   worktree away before the branch has been judged is what point 629 exists to prevent.
   Criticality: medium — it reorders the proof but must not dilute it; the both-backend
   picture proof stays exactly as binding as it is today.
-  BRANCH STATE 17.08.2026: `feat/595-598-verification-ladder-brief` DELIVERS this point and is
-  synced with main, gates green, pushed (five conflicts resolved, the real one in
-  `scripts/verify/world.mjs` where main's point-585 check was kept verbatim). What it still owes
-  before it can land: the both-backend picture proof — nine render-relevant suites were
-  re-sectioned and `world.mjs` gained conflict-resolved code, and only ONE cheap browser suite
-  (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
-  NAME only; see their entries.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point and is now ~1615
+  commits behind main — but that number overstates the conflict badly. NONE of the nine
+  re-sectioned suites (events, gamepad, handwriting, health, invariants, report, touch, voice,
+  world) and not `scripts/point-brief.mjs` carry a single main commit since the branch tip. Only
+  two files moved: `scripts/point-brief-core.mjs` (e5737113, sentence-case titles) and
+  `scripts/verify/README.md` (2bac561f, 79b6e4f1, f6c92b65, 35b9f00a). SO: merge main, resolve
+  those two surgically, then read the real diff — do NOT rebuild the suites.
+  THE OWED BOTH-BACKEND PICTURE PROOF NOW RUNS IN A DIFFERENT ENVIRONMENT than the one the
+  17.08. paragraph assumed, and it must be produced under this one: headless EGL routing
+  (fed2fe84), GPU backend probing at bring-up (35b9f00a), a hard failure before app startup when
+  a backend is absent (f6c92b65), bounded verify-run digests (64691b29) and the re-exec-ed
+  default verify launch (764f477b). Those four post-branch README changes must survive the
+  README merge.
+  THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
+  redo it — and open point 596 must not be pulled into this landing.
 
 - [ ] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
   The delegation brief carries a GENERATED orientation: the paths the specification itself
@@ -560,11 +599,19 @@ put it is the mistake this line exists to stop.
   headers. It is marked as a HINT, never as an instruction ("the specification names these
   paths", not "change these files"), and it is generated on every run so it cannot go
   stale.
-  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
-  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
-  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
-  answer to what the ladder point found: a rung that is built and routed to nobody gets used
-  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
+  AND IT NAMES THE PLANNED CHECK — as an ITERATION CHECK SET, not as one suite. Two corrections
+  to the original wording, both from the 23.08.2026 staleness audit.
+  TIMING: a brief is generated BEFORE the implementation diff exists, so the hint cannot
+  initially derive from the real diff→suite mapping. It derives from the PROSPECTIVE paths the
+  specification itself names; once a diff exists, a regenerated brief derives it from that diff.
+  SHAPE: the hint names one or more suite/`--section` pairs — a diff touching several suites
+  cannot be represented by a single pair — and it is stated SEPARATELY from the whole-suite
+  final proof, so the cheap rung can never be read as the acceptance. The singular wording
+  contradicted point 595 itself, where sections are the iteration rung and the proof is the
+  whole suite. Generated like the rest so it cannot go stale, and marked as a hint like the path
+  list. This is the cheapest possible answer to what the ladder point found: a rung that is built
+  and routed to nobody gets used when it stands in the artefact the agent reads FIRST, not in a
+  rule it must remember.
   MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
   a delegated agent are almost always search; five saved responses per point is ~2 % of a
   median point.
@@ -574,13 +621,11 @@ put it is the mistake this line exists to stop.
   after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
   Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
   hint framing address.
-  BRANCH STATE 17.08.2026: `feat/595-598-verification-ladder-brief` DELIVERS this point and is
-  synced with main, gates green, pushed (five conflicts resolved, the real one in
-  `scripts/verify/world.mjs` where main's point-585 check was kept verbatim). What it still owes
-  before it can land: the both-backend picture proof — nine render-relevant suites were
-  re-sectioned and `world.mjs` gained conflict-resolved code, and only ONE cheap browser suite
-  (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
-  NAME only; see their entries.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point too. Main has not
+  touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
+  neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
+  merge surface and the owed both-backend picture proof are described once, under point 595.
 
 - [ ] 844. The board never shows how risky a point is (user request 22.08.2026, 21:19: "Reihe ein
   neues Ticket nach 598 ein: Im Header jeder Dashboard-Karte soll auch die Kritikalität angezeigt
@@ -609,31 +654,6 @@ put it is the mistake this line exists to stop.
   Criticality: low — it is a reading aid on a surface that already works; a wrong badge misinforms
   the reader but changes no gate, and deriving it from the tag is what keeps it honest.
   Bundle: Chat & Tafel.
-
-- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
-  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
-  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
-  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
-  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
-  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
-  is not enough. This is not a calibration miss: there is no knob left to turn, so the
-  per-kind look itself carries too little contrast against the ground it sits on.
-  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
-  pace and eye height the player actually has, in every settlement kind and on the ground
-  colours they stand on — the Bambara village's pale sand is the case that failed, so it
-  is the case that must be shown to work. The contrast comes from the band's own design
-  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
-  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
-  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
-  the ceiling moves with the design rather than being raised past it.
-  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
-  frame from inside the settlement at the boundary in at least the Bambara village and
-  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
-  pinning the contrast the design settles on (the band's value against the sampled ground
-  value stays above the chosen minimum for every settlement kind), so a later ground or
-  palette change cannot quietly erase it again.
-  Criticality: medium — the boundary is what tells the player where the settlement ends
-  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
 - [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
   in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
@@ -783,6 +803,31 @@ put it is the mistake this line exists to stop.
   breaks no player-visible behaviour itself, but a gate whose only exit is a hand waiver decays
   into a formality.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
+  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
+  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
+  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
+  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
+  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
+  is not enough. This is not a calibration miss: there is no knob left to turn, so the
+  per-kind look itself carries too little contrast against the ground it sits on.
+  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
+  pace and eye height the player actually has, in every settlement kind and on the ground
+  colours they stand on — the Bambara village's pale sand is the case that failed, so it
+  is the case that must be shown to work. The contrast comes from the band's own design
+  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
+  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
+  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
+  the ceiling moves with the design rather than being raised past it.
+  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
+  frame from inside the settlement at the boundary in at least the Bambara village and
+  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
+  pinning the contrast the design settles on (the band's value against the sampled ground
+  value stays above the chosen minimum for every settlement kind), so a later ground or
+  palette change cannot quietly erase it again.
+  Criticality: medium — the boundary is what tells the player where the settlement ends
+  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
@@ -1778,6 +1823,35 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+- [ ] 867. An exhausted vendor allowance parks its point on a probe, not on the user. Point 861's
+  inventory row Q2: an OpenAI author or reviewer run can return `allowance-exhausted` while that
+  vendor's result is mandatory, because cross-vendor evidence may not be substituted. Routing to the
+  other vendor already exists for work policy permits; what is missing is what happens to the point
+  that genuinely needs the unavailable vendor.
+  FINAL STATE: such a point carries a durable per-point provider probe: it is set aside with the
+  vendor and the earliest sensible retry recorded, the batch works another point, and the point
+  returns to the queue by itself as soon as a probe succeeds. Mandatory cross-vendor evidence is never
+  weakened to make the wait go away.
+  VERIFIABLE: a simulated `allowance-exhausted` on a mandatory cross-vendor step sets the point aside
+  with a recorded probe and leaves the batch working; a later successful probe returns exactly that
+  point; no path records a same-vendor review as cross-vendor.
+  Criticality: medium — it costs throughput rather than correctness, but it is a full stop during an
+  absence.
+  Bundle: Urlaubsfestigkeit.
+- [ ] 868. The Windows launcher can be re-armed without an attended session. Point 861's inventory
+  row G3: when the launcher is disabled or unknown, Linux re-arms its own daemon, but Windows needs an
+  elevated user command — so the point and context boundary is blocked and the current owner must keep
+  working until a human is at the machine. That is the one residual the 23.08.2026 order cannot reach
+  by policy alone.
+  FINAL STATE: an install-time, privilege-bearing watchdog that can re-arm the scheduled task without
+  an attended batch turn, installed once by the user ahead of an absence. A running session gains no
+  general elevation from it; it may only ask that one watchdog to re-arm the one task.
+  VERIFIABLE: with the launcher task deleted, the watchdog restores it without any elevated command in
+  the session; the session itself still cannot perform an unrelated elevated action; a third run of the
+  installer reports that nothing changed.
+  Criticality: medium — it is narrow, but it is the only lane where the machine still cannot help
+  itself.
+  Bundle: Urlaubsfestigkeit.
 - [ ] 744. Leaving is the most expensive step of a session, and nobody has measured it
   (19.08.2026). Every token spent on the handover is a token subtracted from the working
   window: the trigger of point 743 is literally the ceiling minus the cost of leaving, so this
@@ -11212,13 +11286,24 @@ to land than a mechanism that needs a review.
   agent load its unit gate returns INCONCLUSIVE anyway, so the alert buys no information at
   all. Worse, an alert that cries wolf on every turn is the one a session stops reading on the
   turn it is real.
+  MEASURED AGAIN 23.08.2026, 18:07–18:11, by a second route the rule above does NOT cover: the
+  named session was already gone, but its leftover CHILD kept writing under its id — the
+  delegated author run for point 860, whose in-flight declaration the reading session had
+  adopted one turn earlier. Those writes land well AFTER the parent's `retiredAt`, so the rule
+  below would have called them a real violation, when the adoption had just made that child the
+  reader's own work. Two doctor gates in four minutes, both inconclusive under the load that
+  same child produced.
   FINAL STATE: a session whose `authorityState` is `retired` is not counted as parallel, and a
   write timestamped at or before that session's own `retiredAt` is never evidence of concurrent
-  work. A genuinely competing writer still raises the alert unchanged.
+  work. Nor is a write made under a retired session's id while the reader holds that session's
+  ADOPTED in-flight declaration — the adoption is what makes the child the reader's own work, so
+  the alert must consult it before calling a post-`retiredAt` write a violation. A genuinely
+  competing writer still raises the alert unchanged.
   VERIFIABLE: unit cases over the liveness probe — a retired record with a live pid and a
   handover-time write reports NO parallel session; a non-retired record with a live pid and a
-  recent write still reports one; and a retired record that wrote AFTER its `retiredAt` also
-  still reports one, because that is a real violation.
+  recent write still reports one; a retired record that wrote AFTER its `retiredAt` with NO
+  adopted declaration still reports one, because that is a real violation; and the same record
+  with the reader holding its adopted declaration reports none.
   Criticality: low — no product behaviour; the cost is wasted gate time and an alert that
   trains sessions to ignore it.
   Bundle: Session- & Repo-Hygiene.
@@ -11320,28 +11405,78 @@ to land than a mechanism that needs a review.
   verdicts a session learns to ignore.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 854. The serving-model tripwire reads two co-author trailers as one unknown model. MEASURED
-  23.08.2026, 08:55 on `main`. Commit `c54e461` carries two `Co-Authored-By` trailers — the author
-  model and the cross-vendor reviewer — and `node scripts/model-guard.mjs --status` shows the hit's
-  trailer field as those two lines CONCATENATED with no separator, so the parsed identity matches
-  no allowlist entry. The guard then raises its full breach ritual ("create `.claude/batch-paused`
-  (reason: forbidden serving model) and stop"), although BOTH named models are on that very
-  allowlist by the guard's own message.
-  TWO FAILURES MEET HERE: `scripts/model-guard-core.mjs` reduces a commit's trailers to one string
-  instead of judging each trailer on its own; and CLAUDE.md §6 says every commit names its author
-  model in a trailer without saying whether a SECOND model trailer is allowed at all, so a session
-  that credits its reviewer manufactures a forbidden-model incident.
-  WHAT IT COSTS: the false breach lands on a pushed commit that can no longer be amended, and the
-  sanctioned remedy — advancing `.claude/model-guard-baseline.json` — is reserved to the user, so
-  the batch stands blocked on a premise that does not hold. A tripwire that fires on an allowed
-  pair is also the one a session learns to wave through on the day it is real.
-  FINAL STATE: the guard judges each `Co-Authored-By` trailer separately and passes when every
-  model named is allowed; a trailer naming a model outside the allowlist still raises the incident
-  unchanged; and the rule text says in one line whether a commit may carry a second model trailer.
-  VERIFIABLE: unit cases over the trailer reading — a commit with an allowed author trailer and an
-  allowed reviewer trailer passes; the same commit with one forbidden trailer still raises; a
-  single trailer claiming two models remains a finding as it is today; and a bare model-less
-  trailer keeps its own existing verdict.
-  Criticality: medium — no product behaviour, but it halts the batch on a false breach and the
-  only sanctioned way out needs the user.
+- [ ] 855. The confirming review of the budget fixes names two test gaps its verdict leaves owed.
+  RECORDED 23.08.2026 from GPT-5.6 Sol's confirming pass on `af2ef375` (receipt 1a433eac4b2e2376,
+  verdict merge-with-fixes): (1) `scripts/doc-budget-core.test.mjs` pins the maxWords whole-number
+  validation only for `undefined` and `NaN` — `null`, strings, negative and fractional values are
+  uncovered, and the `NaN` case never asserts the configuration-error kind; (2)
+  `scripts/queue-calibration-cli.test.mjs` relies on the status 1/128/null distinction but no test
+  deterministically exercises those statuses, so a revert to "every nonzero status means missing"
+  would pass unnoticed.
+  FINAL STATE: unit cases cover the invalid maxWords shapes (each asserting the configuration-error
+  kind) and pin the git status 1, 128 and null classifications deterministically; a mutation back to
+  the old nonzero-means-missing reading turns a test red.
+  VERIFIABLE: the new cases fail against the mutated classifier and the loosened validator, and pass
+  against the delivered code.
+  Criticality: low — test coverage only; the delivered behaviour itself was reviewed as correct.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 856. The review planner reads a reviewer credit as authorship and calls the commit unreviewable.
+  MEASURED 23.08.2026, 10:20: `scripts/review-sol.mjs --sha c54e4615 --since c54e4615~1` refuses with
+  "every configured reviewer vendor authored part of this contribution" and keeps
+  `scripts/timestamp-guard.test.mjs` as a mixed-vendor end-state file in EVERY range containing that
+  commit — `c54e4615` was authored by Claude Opus 5 alone and its second `Co-Authored-By` trailer is
+  the cross-vendor reviewer credit that CLAUDE.md §6 permits since point 854. Reading that credit as
+  authorship leaves NO eligible reviewer, so the four-eyes debt on such a commit can never be cleared
+  through the review path, only hand-recorded around it (done once for `c54e4615` via ask-sol).
+  FINAL STATE: the planner's authorship read distinguishes the authoring trailer from a reviewer
+  credit on commits that carry both (the ledger's own review record for the commit, or the §6 rule
+  that the second model trailer names the reviewer, decides which is which); a genuinely mixed-vendor
+  contribution stays unreviewable as today.
+  VERIFIABLE: unit cases over the planner's vendor cut — a commit with one Anthropic author trailer
+  plus one OpenAI reviewer trailer plans an OpenAI review pass; a commit whose CHANGES came from both
+  vendors still refuses; and the c54e4615 shape no longer reports "no eligible reviewer vendor".
+  Criticality: medium — it silently turns the reviewer credit the rule now invites into permanent
+  review debt on every commit that uses it.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 857. The docs suite's acceptance-pointer checks match nothing and fail vacuously. MEASURED
+  23.08.2026 on the merge-base of `feat/854-trailer-separator`, so it is PRE-EXISTING and belongs to
+  no point that touched it. Six checks in the `docs` suite report "0 evidence pointers judged" / "0
+  detail pointers judged" and fail with "no pointers matched": every evidence pointer names its own
+  criterion; every evidence pointer has a section in `docs/acceptance-evidence.md`; no orphaned
+  evidence section; and the same three for the detail pointers. The parser reads the acceptance
+  pointers out of CLAUDE.md §7.1, but §7.1 now carries only the numbered TITLES — its own preamble
+  moved each criterion's condition and evidence into `docs/acceptance-criteria-detail.md` and
+  `docs/acceptance-evidence.md` under the same number. So the parser matches nothing, and the two
+  orphan checks then report all 32 sections as orphaned.
+  WHAT IT COSTS: six red checks that no change can turn green, so the `docs` suite is permanently red
+  and every session that runs it must first classify the same six against a baseline before it can
+  trust its own run — the exact ritual that teaches a session to wave a red through. It also means
+  the pointer coverage §7.1 promises is currently unchecked in BOTH directions.
+  FINAL STATE: the checks read the pointer relation from where it now lives, judge a non-zero number
+  of pointers, and go green on a clean tree; a genuinely orphaned or mis-numbered section still fails.
+  VERIFIABLE: the `docs` suite reports a non-zero judged count for both pointer families and passes;
+  a deliberately mis-numbered pointer and a deliberately orphaned section each still fail.
+  Criticality: medium — no product behaviour, but it keeps a whole suite red and trains the batch to
+  read a red as noise.
+  Bundle: Testinfrastruktur.- [ ] 869. The board command cannot be run from a session that has no `CLAUDE_SESSION_ID`. MEASURED
+  23.08.2026 in a chat-responder session: the Stop hook names the exact command for every open
+  decision card — `node scripts/board.mjs vdzk-keep "<title>"` — but that command identifies its
+  session through `selectedSession()` in `scripts/decision-card-guard.mjs`, which reads
+  `CLAUDE_SESSION_ID` from the environment. A chat-responder session does not carry it, and
+  `.claude/decision-card-guard-state.json` held 30 sessions, so the command aborted with "cannot
+  identify this session". `board.mjs` has no `--session` flag, so the only way through was to find
+  the own id by hand in the guard state (the one entry with a set `userMessage.id`, which matches the
+  scratchpad path segment rather than the transcript directory under `projects/`) and to repeat the
+  command with `CLAUDE_SESSION_ID=…` in front of it.
+  WHAT IT COSTS: a command the hook itself prescribes is unusable in the session that is told to run
+  it, and the way around it is manual state archaeology — the class of detour the project has ruled
+  out.
+  FINAL STATE: `board.mjs` takes `--session <id>` exactly as `guard-preflight.mjs` does, and the Stop
+  hook prints the id it already knows inside the command it suggests, so the suggested line runs as
+  printed.
+  VERIFIABLE: with `CLAUDE_SESSION_ID` unset, `node scripts/board.mjs vdzk-keep "<title>" --session
+  <id>` succeeds; without either the id or the flag it still refuses; and the command the Stop hook
+  prints carries the id.
+  Criticality: medium — no product behaviour, but a prescribed command that cannot be run teaches the
+  session to work around its own tooling.
+  Bundle: Chat & Tafel.

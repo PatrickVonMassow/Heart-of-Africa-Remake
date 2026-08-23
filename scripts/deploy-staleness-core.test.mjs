@@ -213,6 +213,7 @@ describe('stalenessAlert', () => {
     expect(a.message).toContain(MAIN.slice(0, 7))
     expect(a.message).toContain('Re-dispatched')
     expect(a.priority).toBe('default')
+    expect(a.recurring).toBe(true)
   })
 
   it('reports one unchanged fault once', () => {
@@ -245,6 +246,7 @@ describe('stalenessAlert', () => {
     const exhausted = { ...stale, dispatch: { dispatch: false, exhausted: true, reason: 'needs a human' } }
     const first = stalenessAlert(exhausted)
     expect(first.priority).toBe('high')
+    expect(first.recurring).toBe(false)
     expect(stalenessAlert({ ...exhausted, lastKey: first.key }).notify).toBe(false)
     const anHourOn = stalenessAlert({ ...exhausted, now: NOW + 3_600_000, lastKey: first.key })
     expect(anHourOn.notify).toBe(true)

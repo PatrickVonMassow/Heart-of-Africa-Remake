@@ -824,7 +824,8 @@ try {
       `scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <agent branch> --worktree <its worktree> ` +
       `--pid <background run> --log <its log>\` and the stop is allowed while a probe still finds that work ` +
       `alive (it expires, and one dead item ends it — so act as soon as the work lands); ` +
-      `(b) the user asked you to stop — then create .claude/batch-paused and stop; (c) you have just ` +
+      `(b) the user asked you to stop — then run \`node scripts/batch-pause.mjs --user-stop ` +
+      `"<the user's instruction>"\` and stop; (c) you have just ` +
       `MERGED AND TICKED a point — that is a POINT BOUNDARY, so ` +
       `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +
       `dominant cost): \`node scripts/batch-boundary.mjs --prepare <the landed point>\`, its bookkeeping, then ` +
@@ -832,8 +833,9 @@ try {
       `batch-resume-hook re-orients it from TASKS.md. A delegated author still building is handed over WITH the ` +
       `boundary and adopted by the successor when its checkpoints are pushed (point 675); only unpushed, ` +
       `non-transferable work drains first — ending on it throws its work away. If you are blocked on a ` +
-      `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
-      `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
+      `user decision for EVERY open item, that is also a legitimate CLOCKED pause: run \`node ` +
+      `scripts/batch-pause.mjs --awaiting-user "<the decision every open item needs>"\`; its restart clock ` +
+      `is intentional. Add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
       claimNote +
       watermarkNote,
   )

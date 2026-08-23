@@ -14,12 +14,13 @@
 // the race is over the record, and the batch is never touched.
 import { describe, it, expect } from 'vitest'
 import { spawn } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { writeJsonAtomic } from './atomic-write.mjs'
-import { readLauncherRecord, runDaemon, stopDaemon } from './batch-launcher.mjs'
+import { armLauncherAtSessionStart, readLauncherRecord, runDaemon, startDaemon, stopDaemon } from './batch-launcher.mjs'
 import { probePid } from './batch-singleton.mjs'
 
 const LAUNCHER = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'batch-launcher.mjs')).href
@@ -397,5 +398,203 @@ describe('runDaemon — a released lock is not waited out', () => {
     } finally {
       place.cleanup()
     }
+  })
+})
+
+// --- THE STALL WATCH SPEAKS IN-PROCESS (point 859) -----------------------------
+// The pure judgement is pinned in launcher-stall-core.test; what THESE prove is
+// that the LOOP acts on it through the injected channel — on 23.08.2026 every
+// alert path lived in a child process the sick container could not spawn, and a
+// wiring nothing exercises would reproduce that with every unit green. The
+// channel is a fake on purpose: what the loop owes it is bounded awaiting,
+// delivery feedback and re-demands, and those are exactly what is asserted.
+describe('runDaemon — dead ticks alert through the daemon itself', () => {
+  const stopFrom = (recordPath) => writeJsonAtomic(recordPath, { stopped: true, stoppedAt: Date.now() + 1 })
+
+  /** Runs the daemon over a SCRIPT of tick outcomes (null = dead, number =
+   *  alive); between ticks the lock is handed over so the next tick is seconds
+   *  away instead of a quarter hour. Returns { outcome, ticks, sent }. */
+  async function runScripted(place, script, sendAlert, extra = {}) {
+    let lock = { sessionId: 's0', claimedAt: Date.now() }
+    const sent = []
+    let ticks = 0
+    const outcome = await runDaemon({
+      recordPath: place.recordPath,
+      logPath: place.logPath,
+      tickMs: 10 * 60 * 1000,
+      pollMs: 20,
+      wakeGapMs: 0,
+      readLock: () => lock,
+      isPaused: () => false,
+      sendAlert: (title, message, priority, opts) => {
+        const r = sendAlert({ title, message, priority, opts })
+        sent.push({ title, message, priority, opts })
+        return r
+      },
+      tick: () => {
+        const step = ticks
+        ticks += 1
+        if (step >= script.length - 1) {
+          stopFrom(place.recordPath)
+        } else {
+          // Both transitions land AFTER any alert-send budget (the hanging-send
+          // case waits ~100 ms inside the tick's aftermath): the held state must
+          // be OBSERVED by a sleep poll, or two hand-overs in a row collapse to
+          // one unchanged 'ended:' string and the early tick never fires.
+          setTimeout(() => {
+            lock = { sessionId: `s${step + 1}`, claimedAt: Date.now() }
+          }, 300)
+          setTimeout(() => {
+            lock = { sessionId: `s${step + 1}`, handedOver: true, handedOverAt: Date.now() }
+          }, 600)
+        }
+        return Promise.resolve(script[step])
+      },
+      ...extra,
+    })
+    return { outcome, ticks, sent }
+  }
+
+  it('two dead ticks send one alert, no child involved, and the working tick sends the recovery', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      const { outcome, ticks, sent } = await runScripted(place, [null, null, 0], () => Promise.resolve(true))
+      // The stop mark is honoured at the next publish, which reads as a yield
+      // (the record was taken from this daemon) — same as the sibling tests.
+      expect(outcome).toBe('yielded')
+      expect(ticks).toBe(3)
+      expect(sent).toHaveLength(2)
+      expect(sent[0].title).toMatch(/STALLED/)
+      expect(sent[0].priority).toBe('high')
+      expect(sent[0].opts.key).toMatch(/^launcher-stall:\d+$/)
+      expect(sent[1].title).toMatch(/recovered/)
+      expect(sent[1].priority).toBe('default')
+      expect(sent[1].opts).toEqual({ escalate: false })
+    } finally {
+      place.cleanup()
+    }
+  })
+
+  it('a HANGING send loses to its budget: the loop keeps ticking and no recovery notice follows', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      let hangs = 0
+      const { outcome, ticks, sent } = await runScripted(
+        place,
+        [null, null, 0],
+        () => {
+          hangs += 1
+          return new Promise(() => {}) // never settles — the incident's dead network
+        },
+        { alertTimeoutMs: 100 },
+      )
+      expect(outcome).toBe('yielded')
+      expect(ticks).toBe(3) // the loop survived its own voice hanging
+      expect(hangs).toBeGreaterThanOrEqual(1)
+      // Nothing was DELIVERED, so the healthy tick sends no recovery notice —
+      // the only sends ever attempted were the stall alerts themselves.
+      for (const s of sent) expect(s.title).toMatch(/STALLED/)
+    } finally {
+      place.cleanup()
+    }
+  })
+
+  it('a FAILED send is re-demanded on the next dead tick, and never followed by a recovery notice', { timeout: 30_000 }, async () => {
+    const place = arena()
+    try {
+      const { outcome, ticks, sent } = await runScripted(place, [null, null, null, 0], () => Promise.resolve(false))
+      expect(outcome).toBe('yielded')
+      expect(ticks).toBe(4)
+      // Demanded at dead tick 2 AND again at dead tick 3 — the ladder is what
+      // throttles, a failed send must retry — under ONE episode key.
+      expect(sent).toHaveLength(2)
+      expect(sent[0].title).toMatch(/STALLED/)
+      expect(sent[1].title).toMatch(/STALLED/)
+      expect(sent[1].opts.key).toBe(sent[0].opts.key)
+    } finally {
+      place.cleanup()
+    }
+  })
+})
+
+// --- THE SESSION-START ARMING SEAM (point 859) ---------------------------------
+// batch-resume-hook.mjs calls exactly this function; what a hook owes its
+// session is to NEVER throw and to name what happened. Driven with fakes,
+// including the asynchronous spawn failure that would otherwise crash the hook.
+// --- THE ASYNC SPAWN FAILURE, FOR REAL (point 859, Sol pass 2) -----------------
+// The listener in startDaemon exists for a child that EMITS 'error' after the
+// call returned (EAGAIN under pressure — the incident's weather). A pre-formed
+// failure result proves nothing about it, so this child really emits.
+describe('startDaemon — a child that errors asynchronously is a reason, not a crash', () => {
+  it('reports {started:false} with the emitted error instead of an unhandled event', async () => {
+    const place = arena()
+    try {
+      const child = new EventEmitter()
+      child.unref = () => {}
+      const r = await startDaemon({
+        recordPath: place.recordPath,
+        tickMs: TICK_MS,
+        spawner: () => {
+          setTimeout(() => child.emit('error', new Error('spawn EAGAIN')), 20)
+          return child
+        },
+      })
+      expect(r.started).toBe(false)
+      expect(r.reason).toMatch(/could not be spawned: spawn EAGAIN/)
+    } finally {
+      place.cleanup()
+    }
+  })
+})
+
+describe('armLauncherAtSessionStart — the hook cannot be crashed by the launcher', () => {
+  const dead = () => ({ state: 'unknown', record: null })
+  const live = () => ({ state: 'ready', record: { pid: 7 } })
+
+  it('arms a dead launcher and reports the pid', async () => {
+    const r = await armLauncherAtSessionStart({
+      platform: 'linux',
+      worktree: false,
+      readState: dead,
+      start: () => Promise.resolve({ started: true, record: { pid: 123 } }),
+    })
+    expect(r).toMatchObject({ armed: true, attempted: true, pid: 123 })
+  })
+
+  it('does not touch a live one, a stopped one, or an unverifiable checkout', async () => {
+    const noStart = () => {
+      throw new Error('start must not be called')
+    }
+    for (const args of [
+      { platform: 'linux', worktree: false, readState: live, start: noStart },
+      { platform: 'linux', worktree: false, readState: () => ({ state: 'disabled' }), start: noStart },
+      { platform: 'linux', worktree: null, readState: dead, start: noStart },
+      { platform: 'linux', worktree: true, readState: dead, start: noStart },
+      { platform: 'win32', worktree: false, readState: dead, start: noStart },
+    ]) {
+      const r = await armLauncherAtSessionStart(args)
+      expect(r.attempted).toBe(false)
+      expect(r.armed).toBe(false)
+    }
+  })
+
+  it('an ASYNC spawn failure and a thrown start both come back as a reason, never a crash', async () => {
+    const spawnFail = await armLauncherAtSessionStart({
+      platform: 'linux',
+      worktree: false,
+      readState: dead,
+      start: () => Promise.resolve({ started: false, reason: 'the daemon could not be spawned: spawn EAGAIN' }),
+    })
+    expect(spawnFail).toMatchObject({ armed: false, attempted: true })
+    expect(spawnFail.reason).toMatch(/EAGAIN/)
+
+    const threw = await armLauncherAtSessionStart({
+      platform: 'linux',
+      worktree: false,
+      readState: dead,
+      start: () => Promise.reject(new Error('record write refused')),
+    })
+    expect(threw).toMatchObject({ armed: false, attempted: true })
+    expect(threw.reason).toMatch(/arming failed: record write refused/)
   })
 })

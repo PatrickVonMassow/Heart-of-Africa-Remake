@@ -7,7 +7,7 @@
 // may be retried, and the launcher tick (scripts/batch-autostart.mjs) resumes the
 // batch when that clock runs out, noting the attempt.
 //
-// THE RECORD IS TEXT, AND A LEGACY MARKER IS STILL A PARK. The file is written and
+// THE RECORD IS TEXT, AND A LEGACY MARKER IS RECOVERED. The file is written and
 // read by hand as often as by a script, so the format is the reason on its own
 // line(s) followed by `key: value` metadata:
 //
@@ -17,10 +17,10 @@
 //     retry-after: 2026-08-06T09:20:00.000Z
 //     attempt: 1
 //
-// A file WITHOUT a `retry-after` — every marker an older session wrote, and every
-// one a human writes with `echo` — carries no clock and therefore parks until
-// somebody clears it ('hold'). That direction is the safe one: a missing clock may
-// never be read as an expired one, or a genuinely unsafe state would resume itself.
+// Only `type: user-stop` proves that a clockless record came from the user. Every
+// untyped, legacy or malformed record is a recovery request: the launcher first
+// snapshots its raw bytes in a decision card, then replaces it atomically with a
+// short clock. Corruption is never read as an already-expired clock.
 //
 // PARKING WITHOUT A CLOCK IS A SHORT, WRITTEN-DOWN LIST (`CLOCKLESS_CAUSES`).
 // Everything else gets the ladder. Where a retry is safe at all, the batch should
@@ -30,9 +30,16 @@
 // Pure: no fs, no clock of its own, no process state. The fs side lives in
 // scripts/batch-lock.mjs, the tick's decision in scripts/batch-autostart.mjs.
 
+import { createHash } from 'node:crypto'
+
 /** The metadata keys the record understands. Anything else is part of the reason,
  *  so a legacy line like `autostart watchdog: …` is never eaten as metadata. */
-export const PAUSE_KEYS = ['cause', 'paused-at', 'retry-after', 'attempt']
+export const PAUSE_KEYS = ['type', 'cause', 'paused-at', 'retry-after', 'attempt']
+
+export const PAUSE_TYPES = Object.freeze({
+  AUTOMATIC: 'automatic',
+  USER_STOP: 'user-stop',
+})
 
 /** The literal that says "this park has no clock ON PURPOSE" — distinct from a
  *  record that simply predates the mechanism, though both park the same way. */
@@ -43,12 +50,7 @@ export const NEVER = 'never'
  * where an unattended retry would repeat the very thing that stopped the batch.
  */
 export const CLOCKLESS_CAUSES = {
-  'serving-model':
-    'a serving model outside the CLAUDE.md §6 allowlist — retrying only spawns the same degraded session; ' +
-    'the fallback chain is the answer where one is available at all',
   'user-stop': 'the user asked for the batch to stop — only the user restarts it',
-  'awaiting-user': 'every open point waits on a user decision — a retry would find the same queue',
-  'retries-exhausted': 'the clock already ran out its ladder and the cause is still there — a human is needed',
 }
 
 /**
@@ -110,9 +112,11 @@ export function parseInstant(value) {
  * file then says `retry-after: never`, so a reader sees a decision rather than an
  * omission).
  */
-export function formatPauseRecord({ reason, cause = null, retryAfter = null, pausedAt = null, attempt = 0 } = {}) {
+export function formatPauseRecord({ reason, type, cause = null, retryAfter = null, pausedAt = null, attempt = 0 } = {}) {
   const body = String(reason ?? '').trim() || 'paused (no reason recorded)'
   const lines = [body]
+  const recordType = type ?? (cause === 'user-stop' ? PAUSE_TYPES.USER_STOP : PAUSE_TYPES.AUTOMATIC)
+  lines.push(`type: ${recordType}`)
   if (cause) lines.push(`cause: ${cause}`)
   const paused = isoOrNull(pausedAt)
   if (paused) lines.push(`paused-at: ${paused}`)
@@ -138,6 +142,7 @@ export function parsePauseRecord(text) {
   const attempt = Number.parseInt(meta.attempt ?? '', 10)
   return {
     reason: reasonLines.join('\n').trim(),
+    type: meta.type || null,
     cause: meta.cause || null,
     pausedAt: parseInstant(meta['paused-at'] ?? null),
     retryAfter: clockless ? null : parseInstant(retryRaw),
@@ -152,24 +157,28 @@ export function parsePauseRecord(text) {
  * What the launcher should do with the record it found.
  *
  *   text === null  → 'none'   the file does not exist; the batch is not parked
- *   no usable clock→ 'hold'   legacy marker, `never`, or an unreadable stamp
+ *   proved user stop→'hold'   only a typed, internally consistent user stop
+ *   no usable clock→ 'recover' legacy marker, `never`, or an unreadable stamp
  *   clock ahead    → 'wait'   still parked, `waitMs` to go
  *   clock passed   → 'retry'  the launcher clears the record and resumes
  *
- * An EMPTY file is a park ('hold'): `touch .claude/batch-paused` is how a session
- * is told to stop, and an empty record must not read as "not paused".
+ * An EMPTY file is a recovery ('recover'), never an absence and never proof of a
+ * user stop. The launcher leaves it in place until its decision-card snapshot is
+ * durable, then replaces it with a clocked record.
  */
 export function classifyPause({ text, now = Date.now() } = {}) {
   if (text == null) return { state: 'none', reason: '', cause: null, retryAfter: null, attempt: 0, waitMs: 0, why: 'no pause record' }
   const rec = parsePauseRecord(text)
-  const base = { reason: rec.reason, cause: rec.cause, retryAfter: rec.retryAfter, attempt: rec.attempt, pausedAt: rec.pausedAt, waitMs: 0 }
+  const base = { reason: rec.reason, type: rec.type, cause: rec.cause, retryAfter: rec.retryAfter, attempt: rec.attempt, pausedAt: rec.pausedAt, waitMs: 0 }
   if (rec.retryAfter == null) {
+    const provedUserStop = rec.type === PAUSE_TYPES.USER_STOP && rec.cause === 'user-stop' && rec.clocklessOnPurpose
+    if (provedUserStop) return { ...base, state: 'hold', why: 'typed user-stop: the user deliberately stopped the batch' }
     const why = rec.clocklessOnPurpose
-      ? `parked without a clock on purpose${rec.cause ? ` (${rec.cause})` : ''}`
+      ? `retry-after is never, but only a typed user-stop may be clockless${rec.type ? ` (type ${rec.type})` : ''}`
       : rec.hasRetryKey
-        ? 'the retry-after stamp is unreadable — treated as clockless'
+        ? 'the retry-after stamp is unreadable'
         : 'no retry-after recorded (a legacy or hand-written marker)'
-    return { ...base, state: 'hold', why }
+    return { ...base, state: 'recover', why }
   }
   if (rec.retryAfter > now) {
     return { ...base, state: 'wait', waitMs: rec.retryAfter - now, why: `retry due in ${Math.round((rec.retryAfter - now) / 60000)} min` }
@@ -180,25 +189,52 @@ export function classifyPause({ text, now = Date.now() } = {}) {
 /**
  * The clock a NEW park gets: `attempt` is how many retries this cause has already
  * had (0 for the first park). Returns the record fields to write. A cause on the
- * clockless list, and a cause that has climbed off the end of the ladder, park
- * without one.
+ * clockless list parks without one. A cause that has climbed off the end of the
+ * ladder keeps probing at the capped interval instead of becoming a human gate.
  */
 export function planPause({ cause = null, attempt = 0, now = Date.now(), ladder = PAUSE_RETRY_LADDER_MS } = {}) {
   const n = Number.isFinite(attempt) && attempt > 0 ? Math.floor(attempt) : 0
   if (isClocklessCause(cause)) {
     return { cause, attempt: n, retryAfter: null, clockless: true, why: CLOCKLESS_CAUSES[cause] }
   }
-  const delay = ladder[n]
+  const delay = ladder[Math.min(n, ladder.length - 1)]
   if (!Number.isFinite(delay)) {
     return {
       cause: cause ?? 'retries-exhausted',
       attempt: n,
-      retryAfter: null,
-      clockless: true,
-      why: CLOCKLESS_CAUSES['retries-exhausted'],
+      retryAfter: now + PAUSE_RETRY_LADDER_MS[0],
+      clockless: false,
+      why: 'the retry ladder was unusable; probing on the default recovery clock',
     }
   }
-  return { cause, attempt: n, retryAfter: now + delay, clockless: false, why: `retry in ${Math.round(delay / 60000)} min (rung ${n + 1} of ${ladder.length})` }
+  const rung = Math.min(n + 1, ladder.length)
+  return { cause, attempt: n, retryAfter: now + delay, clockless: false, why: `retry in ${Math.round(delay / 60000)} min (rung ${rung} of ${ladder.length}${n >= ladder.length ? ', capped probe' : ''})` }
+}
+
+/** The typed record and durable decision-card copy for an ambiguous pause. */
+export function pauseRecovery({ text = '', now = Date.now(), delayMs = PAUSE_RETRY_LADDER_MS[0] } = {}) {
+  const raw = String(text ?? '')
+  const rec = parsePauseRecord(raw)
+  const delay = Number.isFinite(delayMs) && delayMs > 0 ? delayMs : PAUSE_RETRY_LADDER_MS[0]
+  const snapshot = raw === '' ? '(empty file)' : JSON.stringify(raw)
+  const snapshotKey = createHash('sha256').update(raw).digest('hex').slice(0, 12)
+  const reason = rec.reason || 'ambiguous pause record (no reason recorded)'
+  return {
+    title: `Entscheidungsprotokoll: Unklare Batch-Pause wird wiederholt — ${snapshotKey}`,
+    body:
+      `Automatische Entscheidung: Die Pause war nicht als user-stop bewiesen und wird nach einer kurzen Uhr wiederholt. ` +
+      `Unveränderter Snapshot der gefundenen Datei: ${snapshot}. ` +
+      `Fortsetzung ist der reversible Standard; ein nachträgliches Veto kann die Folgen ab diesem Entscheidungsprotokoll benennen.`,
+    record: formatPauseRecord({
+      reason: `recovery of ambiguous pause: ${reason}`,
+      type: PAUSE_TYPES.AUTOMATIC,
+      cause: 'pause-record-recovery',
+      pausedAt: now,
+      retryAfter: now + delay,
+      attempt: rec.attempt,
+    }),
+    retryAfter: now + delay,
+  }
 }
 
 /** One line for .claude/autostart.log — the tick's own record of what it read. */
@@ -208,6 +244,8 @@ export function describePause(verdict) {
   switch (v.state) {
     case 'hold':
       return `skip: batch is paused with no restart clock (${v.why})${reason}`
+    case 'recover':
+      return `RECOVERING AMBIGUOUS PAUSE — recording its snapshot and adding a restart clock (${v.why})${reason}`
     case 'wait':
       return `skip: batch is paused, ${Math.max(1, Math.round((v.waitMs ?? 0) / 60000))} min left on the restart clock${reason}`
     case 'retry':

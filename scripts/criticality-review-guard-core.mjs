@@ -319,7 +319,14 @@ export function evaluateCriticalityReview({ baseline = null, head = '', ticks = 
     // A self-review in the ledger is worse than none: the gate would read green.
     // Refused at the record command too, but re-checked here — the ledger is a
     // file anyone can hand-edit.
-    const valid = reviews.filter((r) => !sameModel(r.model, r.authoredBy))
+    // AN EMPTY AUTHORSHIP PROVES NOTHING (point 862, found 23.08.2026): the
+    // recorder legitimately writes authoredBy '' for a commit without a model
+    // trailer (a merge, the user's own edit), and `!sameModel(model, '')` then
+    // read the UNKNOWN author as a different model — the one gate that exists
+    // to prove two vendors cleared on absence of evidence. Emptiness stays
+    // WELL-FORMED (38 such rows stand in the ledger; poisoning them would
+    // redden history), it just can never be the diversity proof.
+    const valid = reviews.filter((r) => String(r.authoredBy).trim() && !sameModel(r.model, r.authoredBy))
 
     // This is an exception record, never a review. The wrapper verifies its
     // exact file list against Git's authorship plan and replaces both trusted

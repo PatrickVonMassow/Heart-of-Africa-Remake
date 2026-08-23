@@ -48,6 +48,7 @@ import {
   SPAWN_BACKOFF_CAP_MS,
   QUOTA_SIGNATURE_TAIL_LINES,
   RUNAWAY_FAIL_LIMIT,
+  runawayRecoveryDecision,
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
@@ -69,6 +70,7 @@ import {
   SUCCESSOR_TRIGGERS,
 } from './batch-autostart-core.mjs'
 import { readState, writeState } from './fable-switch-core.mjs'
+import { PAUSE_RETRY_LADDER_MS } from './batch-pause-core.mjs'
 
 const fable = (state) => readState(JSON.stringify(writeState(state, { why: 'test', by: 'test', now: 1 })))
 const FABLE_ON = fable('on')
@@ -599,6 +601,12 @@ describe('buildSpawnArgs — print mode, the model chain, and no prompt that can
     expect(SPAWN_MODEL).toMatch(/opus-5/)
     expect(buildSpawnArgs({ fableState: FABLE_OFF })[args.indexOf('--fallback-model') + 1]).toBe('claude-opus-4-8[1m]')
   })
+
+  it('can pin the last trusted handoff lane without falling back toward the suspect', () => {
+    const args = buildSpawnArgs({ model: 'claude-opus-4-8[1m]', fallbackModel: null })
+    expect(args[args.indexOf('--model') + 1]).toBe('claude-opus-4-8[1m]')
+    expect(args).not.toContain('--fallback-model')
+  })
 })
 
 describe('the resume prompt', () => {
@@ -1052,6 +1060,34 @@ describe('spawnBackoffMs — the ladder rises instead of hammering', () => {
     expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.CRASH })).toBe(true)
     expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.CHILD_EXIT })).toBe(true)
     expect(shouldWaitForSpawnBackoff({ ...recent, triggerKind: SUCCESSOR_TRIGGERS.BOUNDARY })).toBe(false)
+  })
+})
+
+describe('runawayRecoveryDecision — a spent watchdog keeps probing', () => {
+  const NOW = Date.parse('2026-08-24T00:00:00Z')
+
+  it('uses the existing ladder before its ceiling', () => {
+    for (let attempt = 0; attempt < PAUSE_RETRY_LADDER_MS.length; attempt += 1) {
+      const d = runawayRecoveryDecision({ failCount: 3, attempt, now: NOW })
+      expect(d.retryAfter).toBe(NOW + PAUSE_RETRY_LADDER_MS[attempt])
+      expect(d.clockless).toBe(false)
+      expect(d.capped).toBe(false)
+      expect(d.decisionRecord).toBeNull()
+    }
+  })
+
+  it('repeats at the cap and records the scheduling choice for veto', () => {
+    for (const attempt of [PAUSE_RETRY_LADDER_MS.length, PAUSE_RETRY_LADDER_MS.length + 20]) {
+      const d = runawayRecoveryDecision({ failCount: 9, attempt, now: NOW })
+      expect(d).toMatchObject({
+        capped: true,
+        clockless: false,
+        retryAfter: NOW + PAUSE_RETRY_LADDER_MS.at(-1),
+      })
+      expect(d.decisionRecord.title).toMatch(/^Entscheidungsprotokoll:/)
+      expect(d.decisionRecord.body).toMatch(/Evidence-, Preflight- und Doctor-Pfad/)
+      expect(d.decisionRecord.body).toMatch(/Retroaktives Veto/)
+    }
   })
 })
 

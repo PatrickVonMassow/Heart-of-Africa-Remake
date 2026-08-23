@@ -14,6 +14,7 @@ import {
   isClocklessCause,
   parseInstant,
   parsePauseRecord,
+  pauseRecovery,
   planPause,
 } from './batch-pause-core.mjs'
 
@@ -56,7 +57,7 @@ describe('the record round-trips its reason and its clock', () => {
   it('refuses a truncated stamp instead of reading it as a past instant', () => {
     for (const torn of ['2026', '2026-08', '2026-08-06', '2026-08-06T']) {
       expect(parseInstant(torn), `${torn} must not parse`).toBeNull()
-      expect(classifyPause({ text: `torn write\nretry-after: ${torn}\n`, now: NOW }).state).toBe('hold')
+      expect(classifyPause({ text: `torn write\nretry-after: ${torn}\n`, now: NOW }).state).toBe('recover')
     }
   })
 
@@ -93,32 +94,30 @@ describe('what the launcher does with what it found', () => {
     expect(classifyPause({ text, now: NOW }).state).toBe('retry')
   })
 
-  // The whole safety direction of the point: a missing clock may NEVER be read as
-  // an expired one, or a genuinely unsafe park would resume itself.
-  it('a CLOCKLESS legacy marker holds — however old it is', () => {
+  it('a CLOCKLESS legacy marker is recovered — however old it is', () => {
     const legacy = 'autostart watchdog: 3 resurrections made no progress (auth expired? model flag?) — investigate, then delete this file.\n'
     for (const now of [NOW, NOW + 400 * 24 * 60 * MIN]) {
       const v = classifyPause({ text: legacy, now })
-      expect(v.state).toBe('hold')
+      expect(v.state).toBe('recover')
       expect(v.reason).toContain('autostart watchdog')
     }
   })
 
   it('an EMPTY marker file is a park, not an absence', () => {
-    expect(classifyPause({ text: '', now: NOW }).state).toBe('hold')
+    expect(classifyPause({ text: '', now: NOW }).state).toBe('recover')
   })
 
-  it('`retry-after: never` holds and says so', () => {
+  it('an automatic `retry-after: never` is ambiguous and recovered', () => {
     const text = formatPauseRecord({ reason: 'Haiku answered', cause: 'serving-model', retryAfter: null })
     const v = classifyPause({ text, now: NOW })
-    expect(v.state).toBe('hold')
-    expect(v.why).toMatch(/on purpose/)
-    expect(describePause(v)).toMatch(/no restart clock/)
+    expect(v.state).toBe('recover')
+    expect(v.why).toMatch(/only a typed user-stop/)
+    expect(describePause(v)).toMatch(/RECOVERING AMBIGUOUS PAUSE/)
   })
 
   it('an UNREADABLE stamp holds rather than resuming', () => {
     const v = classifyPause({ text: 'something broke\nretry-after: soon\n', now: NOW })
-    expect(v.state).toBe('hold')
+    expect(v.state).toBe('recover')
     expect(v.why).toMatch(/unreadable/)
   })
 })
@@ -132,12 +131,12 @@ describe('the clock a new park gets', () => {
     }
   })
 
-  it('parks without a clock once the ladder is exhausted', () => {
+  it('keeps probing at the capped interval once the ladder is exhausted', () => {
     const plan = planPause({ cause: 'runaway', attempt: PAUSE_RETRY_LADDER_MS.length, now: NOW })
-    expect(plan.clockless).toBe(true)
-    expect(plan.retryAfter).toBeNull()
+    expect(plan.clockless).toBe(false)
+    expect(plan.retryAfter).toBe(NOW + PAUSE_RETRY_LADDER_MS.at(-1))
     expect(plan.cause).toBe('runaway')
-    expect(plan.why).toBe(CLOCKLESS_CAUSES['retries-exhausted'])
+    expect(plan.why).toMatch(/capped probe/)
   })
 
   it('never puts a clock on a cause from the written-down unsafe list', () => {
@@ -158,5 +157,31 @@ describe('the clock a new park gets', () => {
     const text = formatPauseRecord({ reason: 'ntfy unreachable', ...plan, pausedAt: NOW })
     expect(classifyPause({ text, now: NOW }).state).toBe('wait')
     expect(classifyPause({ text, now: NOW + PAUSE_RETRY_LADDER_MS[0] }).state).toBe('retry')
+  })
+})
+
+describe('typed clockless records and ambiguous recovery', () => {
+  it('holds only a typed, internally consistent user-stop with no clock', () => {
+    const proved = formatPauseRecord({ reason: 'the user said stop', cause: 'user-stop', retryAfter: null })
+    expect(classifyPause({ text: proved, now: NOW })).toMatchObject({ state: 'hold', type: 'user-stop', cause: 'user-stop' })
+    expect(classifyPause({ text: proved.replace('type: user-stop', 'type: automatic'), now: NOW }).state).toBe('recover')
+    expect(classifyPause({ text: proved.replace('cause: user-stop', 'cause: serving-model'), now: NOW }).state).toBe('recover')
+  })
+
+  it.each([
+    ['empty', ''],
+    ['never', 'old pause\nretry-after: never\n'],
+    ['malformed clock', 'old pause\nretry-after: soon\n'],
+  ])('snapshots %s bytes and emits an atomic-write-ready short clock', (_, text) => {
+    const recovery = pauseRecovery({ text, now: NOW })
+    expect(recovery.title).toMatch(/[0-9a-f]{12}$/)
+    expect(recovery.body).toContain(text === '' ? '(empty file)' : JSON.stringify(text))
+    expect(classifyPause({ text: recovery.record, now: NOW })).toMatchObject({ state: 'wait', type: 'automatic', cause: 'pause-record-recovery' })
+    expect(classifyPause({ text: recovery.record, now: recovery.retryAfter }).state).toBe('retry')
+  })
+
+  it('uses one idempotent card per byte-distinct snapshot', () => {
+    expect(pauseRecovery({ text: 'one', now: NOW }).title).toBe(pauseRecovery({ text: 'one', now: NOW + MIN }).title)
+    expect(pauseRecovery({ text: 'one', now: NOW }).title).not.toBe(pauseRecovery({ text: 'two', now: NOW }).title)
   })
 })
