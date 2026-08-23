@@ -338,3 +338,44 @@ describe('auditGuide — the four evasions', () => {
     }
   })
 })
+
+// The second cross-vendor round found the first repair of the action check
+// bypassable in two ways and falsely firing in a third. Each is pinned here.
+describe('auditGuide — the action check after its second reading', () => {
+  it('refuses a prompt marker followed by unquoted narrative', () => {
+    const { ok, violations } = auditGuide(
+      doc('- **Ohne Anführung** Ein Risiko.\n  → *Prompt:*\n  Und dann geschah an jenem Abend noch dies und das.'),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('unquoted-prompt')
+  })
+
+  it('refuses narrative dressed as an italic note', () => {
+    const { violations } = auditGuide(
+      doc('- **Als Notiz getarnt** Ein Risiko.\n  → *Prompt:* „Tu es." *(Und danach folgt weitere Erzählung.)*'),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('accepts a cost note and a review question after the prompt', () => {
+    const d = doc('- **Mit beiden Notizen** Ein Risiko.\n  → *Prompt:* „Tu es." *(≈ 1,5x.)* *(Sieht das richtig aus?)*')
+    expect(auditGuide(d).ok).toBe(true)
+  })
+
+  it('leaves a quote INSIDE an unquoted mechanism alone', () => {
+    const d = doc('- **Mechanismus mit Zitat** Ein Risiko.\n  → *Mechanismus:* Prüfe den Status "fertig" vor dem Löschen.')
+    expect(auditGuide(d).ok).toBe(true)
+  })
+
+  it('refuses a mechanism that keeps talking on the next line', () => {
+    const { violations } = auditGuide(
+      doc('- **Mechanismus mit Nachwort** Ein Risiko.\n  → *Mechanismus:* Ein Check, der anschlägt.\n  Und dann geschah noch dies.'),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('tolerates the guide own punctuation after a closed prompt', () => {
+    const d = doc('- **Punkt danach** Ein Risiko.\n  → *Prompt:* „Tu es".')
+    expect(auditGuide(d).ok).toBe(true)
+  })
+})

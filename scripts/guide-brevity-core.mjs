@@ -307,10 +307,20 @@ export function strayLines(sectionLines) {
 }
 
 const ACTION_RE = /→\s*\*(?:Prompt|Mechanismus)\s*:\*/
+const PROMPT_RE = /→\s*\*Prompt\s*:\*/
 
-/** The closing quote a prompt ends on — the German one the guide uses, and the
- * plain ASCII one, so the rule does not turn on a typographic detail. */
-const CLOSING_QUOTES = ['\u201C', '"']
+// THE GUIDE'S OWN QUOTING, measured 23.08.2026: 81 openings `\u201E` and 81
+// ASCII closings, not one `\u201C`. A rule written on `\u201C` alone therefore
+// never fired on the real document at all.
+const OPEN_QUOTE = '\u201E'
+const CLOSING_QUOTES = ['"', '\u201C']
+
+// What may FOLLOW a closed prompt: the cost multiplier and the review question
+// the guide uses, and nothing else. Exempting every italic parenthetical let
+// narrative ride in as `*(Und danach folgt weitere Erzählung.)*`
+// (cross-vendor review, 23.08.2026).
+const NOTE_RE = /^\*\(([^)]*)\)\*/
+const isAllowedNote = (note) => /^(?:≈|Kosten\b|ca\.)/.test(note) || /\?$/.test(note)
 
 /**
  * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
@@ -388,28 +398,42 @@ export function auditGuide(text, limits = LIMITS) {
         `„${entry.title}" beschreibt das Risiko in ${actionIdx} Zeilen > ${limits.maxRiskLines}`,
       )
     }
-    // THE MARKER IS NOT THE PROMPT. It used to be accepted anywhere in the entry
+    // THE MARKER IS NOT THE ACTION. It used to be accepted anywhere in the entry
     // with no look at what followed, so an empty `→ *Prompt:*` and one trailed by
     // further narrative both passed the rule that every pitfall ENDS in an
-    // actionable prompt (cross-vendor review, 23.08.2026).
+    // actionable prompt (cross-vendor review, 23.08.2026, twice).
     if (actionIdx >= 0) {
+      const marker = entry.lines[actionIdx]
       const tail = entry.lines.slice(actionIdx).join('\n').replace(ACTION_RE, '')
+      const where = entry.line + actionIdx
       if (!/\p{L}/u.test(tail)) {
-        push('empty-prompt', entry.line + actionIdx, `„${entry.title}" führt „→ *Prompt:*" ohne Anweisung`)
-      }
-      const closed = Math.max(...CLOSING_QUOTES.map((mark) => tail.lastIndexOf(mark)))
-      if (closed >= 0) {
-        const after = tail
-          .slice(closed + 1)
-          .replace(/\*\([^)]*\)\*/g, '')
-          .replace(/[\s*.,;:—–-]/g, '')
-        if (after) {
-          push(
-            'prose-after-prompt',
-            entry.line + actionIdx,
-            `„${entry.title}" erzählt nach dem Prompt weiter: „${after.slice(0, 40)}…"`,
-          )
+        push('empty-prompt', where, `„${entry.title}" führt „→ *Prompt:*" ohne Anweisung`)
+      } else if (PROMPT_RE.test(marker)) {
+        // A PROMPT IS QUOTED — all 49 in the guide are. That is what separates
+        // the instruction from the prose around it, so an unquoted prompt is
+        // refused rather than guessed at.
+        const open = tail.indexOf(OPEN_QUOTE)
+        const close = Math.max(...CLOSING_QUOTES.map((mark) => tail.lastIndexOf(mark)))
+        if (open < 0) {
+          push('unquoted-prompt', where, `„${entry.title}" schreibt den Prompt ohne „…" — Anweisung und Prosa sind nicht getrennt`)
+        } else if (close < open) {
+          push('unclosed-prompt', where, `„${entry.title}" schließt den Prompt nicht`)
+        } else {
+          let rest = tail.slice(close + 1).trim()
+          for (let note = rest.match(NOTE_RE); note && isAllowedNote(note[1].trim()); note = rest.match(NOTE_RE)) {
+            rest = rest.slice(note[0].length).trim()
+          }
+          // A sentence period, comma or semicolon AFTER the closing quote is the
+          // guide's own punctuation, not a continued story.
+          if (rest.replace(/[\s*.,;:!?\u2014\u2013-]/g, '')) {
+            push('prose-after-prompt', where, `„${entry.title}" erzählt nach dem Prompt weiter: „${rest.slice(0, 40)}…"`)
+          }
         }
+      } else if (entry.lines.slice(actionIdx + 1).some((l) => l.trim() !== '')) {
+        // The unquoted `*Mechanismus:*` form has no delimiter, so its finality is
+        // structural: the mechanism is what stands on the marker's own line, and
+        // anything on a further line is narrative.
+        push('prose-after-prompt', where, `„${entry.title}" erzählt nach dem Mechanismus auf einer weiteren Zeile weiter`)
       }
     }
   }
