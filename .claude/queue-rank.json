@@ -589,20 +589,64 @@
       "place": "last"
     },
     "860": {
-      "at": "2026-08-23T14:49:59.219Z",
-      "why": "ranked by the USER'S OWN ORDER of 23.08.2026 (no-standstill: recovery mechanisms outrank the current ticket), not by the machine",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-08-23T15:10:51.136Z",
+      "why": "the user's order of 23.08.2026: no lasting standstill — the ladder's pause rung manufactures one, so it cannot wait for the release",
+      "origin": "user",
+      "place": "ahead"
     },
     "861": {
-      "at": "2026-08-23T14:49:59.292Z",
-      "why": "ranked by the USER'S OWN ORDER of 23.08.2026 (no-standstill: recovery mechanisms outrank the current ticket), not by the machine",
-      "origin": "machine",
-      "place": "last"
+      "at": "2026-08-23T15:10:51.217Z",
+      "why": "the same 23.08.2026 order made standing: every user-waiting state gets a recovery lane or a recorded default before the release leaves them in place",
+      "origin": "user",
+      "place": "ahead"
     }
   },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      515,
+      553,
+      581,
+      595,
+      596,
+      598,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      744,
+      746,
+      747,
+      749,
+      750,
+      752,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
+  },
   "settled": {
-    "at": "2026-08-23T09:17:24.456Z",
+    "at": "2026-08-23T15:10:51.223Z",
     "points": [
       174,
       184,
@@ -860,51 +904,9 @@
       853,
       855,
       856,
-      857
+      857,
+      860,
+      861
     ]
-  },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      515,
-      553,
-      581,
-      595,
-      596,
-      598,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      713,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      744,
-      746,
-      747,
-      749,
-      750,
-      752,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
