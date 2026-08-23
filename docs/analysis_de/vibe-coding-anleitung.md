@@ -185,6 +185,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   je Aufgabe einen **frischen Kontext** an. Vor einem Deckel miss den **Startboden**, sonst
   deckelst du das Aufräumen mit."
 
+- **Es antwortet nicht das Modell, das du bestellt hast.** Bei Engpass oder Störung serviert die
+  Umgebung stillschweigend ein schwächeres weiter. Die Arbeit läuft, nur schlechter — an der
+  Ausgabe siehst du es nicht, an den Ergebnissen erst Stunden später.
+  → *Prompt:* „Stell zu Beginn jeder Sitzung fest, **welches Modell tatsächlich antwortet**, und
+  halte es gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**, statt
+  weiterzuarbeiten. Jedes Arbeitsergebnis trägt, **welches** Modell es geschrieben hat — sonst
+  weißt du hinterher nicht, was du neu prüfen musst."
+
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
   Aufgabe, und bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
@@ -435,4 +443,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 518c1af46699c73e959978dd64d97f3e4977eb274d90293b4907eca4fe5a7c5c -->
+<!-- GUIDE-FINGERPRINT: f73e170102583b31d745c44112c3d56b3b81c14e765b78ec0adb2c7e9c48e8c9 -->
