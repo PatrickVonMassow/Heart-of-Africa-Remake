@@ -19,6 +19,8 @@ import {
   writeState,
 } from './fable-switch-core.mjs'
 
+export { servingRoute } from './fable-switch-core.mjs'
+
 export const STATE_FILE =
   process.env.FABLE_SWITCH_FILE ||
   statePathFrom(
