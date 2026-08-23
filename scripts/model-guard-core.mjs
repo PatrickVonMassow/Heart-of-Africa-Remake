@@ -1,4 +1,4 @@
-// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@c9160fcb
+// Pure decision core of the serving-model tripwire (point 309). rule:model-policy@1758947b
 // On 24.07.2026 the session silently degraded to Haiku 4.5 and merged defective work; the
 // Co-Authored-By trailer in `git log` is the one mechanical record of WHO
 // actually authored a commit. This module only decides — no I/O; the gathering
@@ -42,7 +42,11 @@
 // `Claude Haiku 4.5 (opus mode)` or a `Claude Sonnet 5 / Claude Opus 5` walked
 // straight through. The name is therefore parsed out first and matched WHOLE,
 // and a trailer claiming more than one model is a finding rather than a pass on
-// its first allowed name: a commit has exactly one authoring model.
+// its first allowed name: ONE TRAILER names exactly one model.
+// THE COMMIT may carry TWO (point 854): CLAUDE.md §6 lets it name its
+// cross-vendor reviewer in a second model trailer, so the trailers are judged
+// SEPARATELY and the commit passes when every model named is allowed. Reducing
+// them to one string is what once raised a breach on an allowed pair.
 
 import { fableIsOn, fableRefusalReason } from './fable-switch-core.mjs'
 
