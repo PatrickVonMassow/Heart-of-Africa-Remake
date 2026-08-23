@@ -482,9 +482,9 @@ const AUTHOR_LANE_CONFIG = Object.freeze({
 
 export const usage = ({ commandName = 'author-sol', model = SOL_MODEL_NAME, reviewerLabel = 'Claude' } = {}) =>
   [
-    `usage: node scripts/${commandName}.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]`,
+    'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
     '           [--anyway] [--dry-run]',
-    `       node scripts/${commandName}.mjs --routing (--point <N> [--rounds <n>] | --all)`,
+    '       node scripts/author-sol.mjs --routing (--point <N> [--rounds <n>] | --all)',
     '',
     `${model} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
     'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
@@ -495,7 +495,7 @@ export const usage = ({ commandName = 'author-sol', model = SOL_MODEL_NAME, revi
     'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
     'another lane is refused unless --anyway is given, and the share switch can turn the whole',
     `lane off:  node scripts/${commandName === 'author-fable' ? 'fable-switch' : 'sol-share'}.mjs --status`,
-  ].join('\n')
+  ].join('\n').replaceAll('scripts/author-sol.mjs', `scripts/${commandName}.mjs`)
 
 export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.slice(2) } = {}) {
   const config = AUTHOR_LANE_CONFIG[authorLane]

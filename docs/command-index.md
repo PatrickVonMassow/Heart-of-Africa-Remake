@@ -14,10 +14,10 @@
 | `attended-context-notice.mjs` | Durable once-per-session state for the attended context-ceiling notice. | — |
 | `audit-check.mjs` | Dependency audit gate (CLAUDE.md §7.1 pt.18). | — |
 | `author-fable-core.mjs` | Pure decisions for the Fable authoring command. | — |
-| `author-fable.mjs` | Commission the Fable authoring lane through the same durable worktree, ledger, push, gate-report and no-merge contract as author-sol.mjs. | — |
+| `author-fable.mjs` | Commission the Fable authoring lane through the same durable worktree, ledger, push, gate-report and no-merge contract as author-sol.mjs. | usage: node scripts/author-fable.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `author-routing-core.mjs` | WHICH AUTHORING LANE A POINT GOES TO (point 667). | — |
 | `author-sol-core.mjs` | THE OPENAI AUTHORING LANE, decided (point 667). | — |
-| `author-sol.mjs` | THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667). | usage: node scripts/${commandName}.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
+| `author-sol.mjs` | THE COMMAND THAT LETS THE OPENAI LANE AUTHOR A POINT (work-order point 667). | usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>] |
 | `authorship-check-core.mjs` | PROVE WHO WROTE AN ARTEFACT FROM THE SESSION TRANSCRIPT (point 840). | — |
 | `authorship-check-io.mjs` | Filesystem adapter shared by every permission path that verifies authorship. | — |
 | `authorship-check.mjs` | Check an artefact's claimed author against per-message session metadata. | usage: node scripts/authorship-check.mjs --artefact <file> --at <ISO timestamp> \\ |

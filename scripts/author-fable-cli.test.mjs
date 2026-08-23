@@ -42,6 +42,13 @@ afterEach(() => {
 })
 
 describe('Fable authoring CLI', () => {
+  it('prints the Fable command name in runtime help', () => {
+    const result = run(fableScript, ['--help'])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('usage: node scripts/author-fable.mjs --point <N>')
+    expect(result.stdout).not.toContain('scripts/author-sol.mjs')
+  })
+
   it('names the serving command in the shared routing report', () => {
     const result = run(solScript, ['--routing', '--point', '834', '--rounds', String(FABLE_ESCALATION_ROUNDS)])
     expect(result.status, result.stderr).toBe(0)
