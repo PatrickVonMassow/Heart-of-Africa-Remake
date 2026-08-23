@@ -569,6 +569,12 @@
       "why": "Machine-filed hygiene finding; it costs a wasted gate run per repetition and no product behaviour, so it keeps its appended place behind the release like the findings before it.",
       "origin": "machine",
       "place": "last"
+    },
+    "854": {
+      "at": "2026-08-23T06:54:08.442Z",
+      "why": "Machine-filed hygiene finding; it keeps its appended place behind the release like the findings before it, even though it currently blocks — the block is cleared by a user confirmation, not by working the point earlier.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -616,7 +622,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-23T06:46:41.051Z",
+    "at": "2026-08-23T06:54:08.449Z",
     "points": [
       174,
       184,
@@ -871,7 +877,8 @@
       850,
       851,
       852,
-      853
+      853,
+      854
     ]
   }
 }
