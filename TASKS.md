@@ -11345,3 +11345,18 @@ to land than a mechanism that needs a review.
   verdicts a session learns to ignore.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 855. The confirming review of the budget fixes names two test gaps its verdict leaves owed.
+  RECORDED 23.08.2026 from GPT-5.6 Sol's confirming pass on `af2ef375` (receipt 1a433eac4b2e2376,
+  verdict merge-with-fixes): (1) `scripts/doc-budget-core.test.mjs` pins the maxWords whole-number
+  validation only for `undefined` and `NaN` — `null`, strings, negative and fractional values are
+  uncovered, and the `NaN` case never asserts the configuration-error kind; (2)
+  `scripts/queue-calibration-cli.test.mjs` relies on the status 1/128/null distinction but no test
+  deterministically exercises those statuses, so a revert to "every nonzero status means missing"
+  would pass unnoticed.
+  FINAL STATE: unit cases cover the invalid maxWords shapes (each asserting the configuration-error
+  kind) and pin the git status 1, 128 and null classifications deterministically; a mutation back to
+  the old nonzero-means-missing reading turns a test red.
+  VERIFIABLE: the new cases fail against the mutated classifier and the loosened validator, and pass
+  against the delivered code.
+  Criticality: low — test coverage only; the delivered behaviour itself was reviewed as correct.
+  Bundle: Session- & Repo-Hygiene.

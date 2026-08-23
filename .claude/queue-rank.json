@@ -571,8 +571,14 @@
       "place": "last"
     },
     "854": {
-      "at": "2026-08-23T06:54:08.442Z",
-      "why": "Machine-filed hygiene finding; it keeps its appended place behind the release like the findings before it, even though it currently blocks — the block is cleared by a user confirmation, not by working the point earlier.",
+      "at": "2026-08-23T08:01:36.662Z",
+      "why": "Nutzeranweisung 23.08.2026, 09:53: Fehlalarm-Ursache sofort beheben — 854 vorziehen",
+      "origin": "user",
+      "place": "ahead"
+    },
+    "855": {
+      "at": "2026-08-23T08:09:39.410Z",
+      "why": "Test-only follow-up from a confirming review; low criticality, stands at the end behind the release",
       "origin": "machine",
       "place": "last"
     }
@@ -622,7 +628,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-23T06:54:08.449Z",
+    "at": "2026-08-23T08:09:39.419Z",
     "points": [
       174,
       184,
@@ -878,7 +884,8 @@
       851,
       852,
       853,
-      854
+      854,
+      855
     ]
   }
 }
