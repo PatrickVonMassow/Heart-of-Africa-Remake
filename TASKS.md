@@ -77,20 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 866. A spent failure ladder keeps probing instead of ending on a person. Point 861's inventory
-  rows P5, P6, P7 and D3: the runaway watchdog, the child-outage circuit breaker, the corruption
-  alert ceiling and a proved forbidden author all terminate today in a state whose only exit is a
-  human — `no-retry`, "decide by hand", an outage pause that retries nothing, a clockless ceiling.
-  FINAL STATE: every failure lane ends in a capped, repeating probe rather than a terminal park. An
-  outage is re-probed on a clock. A non-transient child death is diagnosed from its branch and either
-  resumed, fixed, or exchanged for another point, with the scheduling choice recorded for veto. A
-  spent point budget requeues the point instead of stopping the queue. A corruption class names its
-  own repair — doctor quarantine or repair — and keeps the closed list point 860 pinned.
-  VERIFIABLE: each of the four lanes, driven to its terminal state in a drill, produces a next attempt
-  at its capped interval and a decision record; none of them leaves a clockless pause; the corruption
-  list and the quarantine safety of point 860 stay pinned by their existing tests.
-  Criticality: HIGH — these are the lanes that fire exactly when nobody is watching.
-  Bundle: Urlaubsfestigkeit.
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
