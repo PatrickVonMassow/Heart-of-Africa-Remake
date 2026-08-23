@@ -65,13 +65,40 @@ describe('forbidden serving-model handoff', () => {
     const second = modelHandoffDecision({ hits, state: first.state, sessionId: 'fable-run', currentModel: 'Haiku 4.5', now: NOW + 1 })
     const exhausted = modelHandoffDecision({ hits, state: second.state, sessionId: 'opus48-run', currentModel: 'Haiku 4.5', now: NOW + 2 })
     expect(exhausted).toMatchObject({ action: 'probe', state: { targetIndex: 0 } })
+    expect(exhausted.retryAfter).toBe(NOW + 2 + 20 * 60 * 1000)
+    expect(exhausted.decisionRecord.title).toMatch(/^Entscheidungsprotokoll:/)
+    expect(exhausted.decisionRecord.body).toMatch(/Retroaktives Veto/)
+    expect(exhausted.state.decisionRecord).toEqual(exhausted.decisionRecord)
     expect(modelHandoffSpawn(exhausted.state, NOW + 2)).toMatchObject({ waitMs: exhausted.retryAfter - (NOW + 2) })
     expect(modelHandoffSpawn(exhausted.state, exhausted.retryAfter)).toMatchObject({ model: 'claude-opus-5[1m]' })
+  })
+
+  it('a missing owner session still leaves the serving route on a clock', () => {
+    const decision = modelHandoffDecision({ hits, route, sessionId: '', now: NOW })
+    expect(decision).toMatchObject({
+      action: 'probe',
+      retryAfter: NOW + 20 * 60 * 1000,
+      state: { requestedBy: 'model-guard-clocked-probe', targetIndex: 0 },
+    })
+    expect(decision.decisionRecord.body).toMatch(/Baseline bleibt.*unverändert/)
   })
 
   it('rejects malformed durable state instead of inventing a target', () => {
     expect(readModelHandoff({ version: 1, route, targetIndex: 99, requestedBy: 'x', requestedAt: NOW })).toBeNull()
     expect(modelHandoffSpawn({})).toBeNull()
+  })
+
+  it('backfills a veto record into valid pre-record state', () => {
+    const state = {
+      version: 1,
+      route,
+      targetIndex: 1,
+      requestedBy: 'old-session',
+      requestedAt: NOW,
+      probeAfter: NOW + 1000,
+      offending: hits,
+    }
+    expect(readModelHandoff(state).decisionRecord.body).toMatch(/Retroaktives Veto/)
   })
 })
 

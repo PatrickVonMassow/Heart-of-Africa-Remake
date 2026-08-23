@@ -14,17 +14,18 @@
 //   rung 1  not before 15 min later
 //   rung 2  not before 30 min later
 //   rung 3  not before 60 min later   — condition priority rises with the rung
-//   rung 4  not before 120 min later  — decide once, or hold an event at its ceiling
-//   above   silence: a condition's durable decision card now carries the answer
+//   rung 4  not before 120 min later  — decide once, or hold a probe/event at its ceiling
+//   above   silence: a non-corruption condition's decision card carries the answer
 //
 // Four buzzes over ~3.5 hours instead of eight identical ones, then a state the
 // morning reader cannot miss. The LAST RUNG no longer manufactures a standstill:
 // for a CONDITION it records the decision to continue and the user's retroactive
 // veto route. A recurring EVENT stays on that rung, at the caller's own priority,
-// because each occurrence is news rather than an unanswered request. Only a
-// condition on the closed corruption list may still pause, because there
-// continuing is the unsafe act rather than the safe floor. Event/condition shape
-// and corruption authority are separate caller declarations.
+// because each occurrence is news rather than an unanswered request. A condition
+// on the closed corruption list runs its named repair and stays on the capped
+// rung. It may not continue ordinary work through corruption, but it also may
+// not turn that safety boundary into a clockless human hold. Event/condition
+// shape and corruption authority are separate caller declarations.
 //
 // WHAT COUNTS AS "IDENTICAL". The watchdog's message carries a rising minute
 // count, so a byte comparison would call every buzz a new alert and the ladder
@@ -71,7 +72,7 @@ export function higherPriority(a, b) {
 }
 
 /**
- * THE CLOSED LIST OF ALERT CLASSES ALLOWED TO PAUSE.
+ * THE CLOSED LIST OF ALERT CLASSES ALLOWED TO STOP ORDINARY WORK FOR REPAIR.
  *
  * Priority is presentation, not authority. A generic stall may be urgent and a
  * repository finding may initially be quiet; neither fact decides whether
@@ -83,16 +84,34 @@ export const CORRUPTION_ALERT_CLASSES = Object.freeze([
   'repository-integrity',
 ])
 
+/** Every closed-list class owns an explicit machine-runnable recovery. */
+export const CORRUPTION_RECOVERIES = Object.freeze({
+  'repository-integrity': Object.freeze({
+    command: Object.freeze(['scripts/batch-doctor.mjs', '--repair']),
+    remedy: 'batch-doctor quarantine or repair',
+  }),
+})
+
 const CORRUPTION_ALERT_CLASS_SET = new Set(CORRUPTION_ALERT_CLASSES)
 
 export function isCorruptionAlertClass(alertClass) {
   return CORRUPTION_ALERT_CLASS_SET.has(String(alertClass ?? ''))
 }
 
+export function corruptionRecovery(alertClass) {
+  return CORRUPTION_RECOVERIES[String(alertClass ?? '')] ?? null
+}
+
 /** Stable card title named by the pure verdict and consumed by the I/O half. */
 export function continuationDecisionCard(title = '') {
   const subject = String(title).trim().replace(/\s+/g, ' ') || 'unnamed alert'
   return `Entscheidungsprotokoll: Batch läuft weiter — ${subject}`.slice(0, 160)
+}
+
+export function corruptionDecisionCard(title = '', alertClass = '') {
+  const subject = String(title).trim().replace(/\s+/g, ' ') || 'unnamed alert'
+  const kind = String(alertClass).trim() || 'unknown-corruption'
+  return `Entscheidungsprotokoll: ${kind} wird repariert und erneut geprüft — ${subject}`.slice(0, 160)
 }
 
 /** Keeps a title's last word and a message's first word from merging into one
@@ -133,7 +152,7 @@ export function ladderEntry(state, key) {
 /**
  * THE DECISION. Pure.
  *
- * @returns {{action:'send'|'suppress'|'pause-and-send'|'continue-and-record', rung:number,
+ * @returns {{action:'send'|'suppress'|'repair-and-probe'|'continue-and-record', rung:number,
  *            nextRung:number, priority:string, dueInMs:number, reason:string,
  *            reset:boolean, decisionCard?:string}}
  */
@@ -173,9 +192,10 @@ export function escalationDecision({
   }
 
   // A short-lived regressed build advanced recurring events above the ceiling.
-  // Clamp those entries back onto it so declaring the event repairs existing
-  // runtime state instead of leaving that healthy flow permanently silent.
-  const rung = isRecurringEvent ? Math.min(entry.rung, pauseRung) : entry.rung
+  // Corruption pauses from the previous policy did the same. Clamp both back
+  // onto the capped rung so existing state starts probing rather than staying
+  // permanently silent.
+  const rung = isRecurringEvent || mayPause ? Math.min(entry.rung, pauseRung) : entry.rung
   if (rung > pauseRung) {
     return {
       key,
@@ -185,9 +205,7 @@ export function escalationDecision({
       priority: prio(rung),
       dueInMs: Infinity,
       reset: false,
-      reason: mayPause
-        ? 'the ladder is at its top: the corruption-class alert paused the batch and its board card names why'
-        : 'the ladder is at its top: the decision card records why the batch continued and how to veto that decision retroactively',
+      reason: 'the ladder is at its top: the decision card records why the batch continued and how to veto that decision retroactively',
     }
   }
 
@@ -228,21 +246,38 @@ export function escalationDecision({
           `decision card "${decisionCard}" records the decision and its retroactive veto`,
       }
     }
-    return paused
-      ? { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: 'last rung reached, and the batch is ALREADY paused — the alert goes out, the pause is not re-applied' }
-      : {
-          key,
-          action: 'pause-and-send',
-          rung,
-          nextRung: rung + 1,
-          priority: prio(rung),
-          dueInMs: 0,
-          reset: false,
-          alertClass,
-          reason:
-            `last rung: corruption class "${alertClass}" authorizes a pause because continuing could damage ` +
-            'the work or propagate the corruption',
-        }
+    if (paused) {
+      return { key, action: 'send', rung, nextRung: rung, priority: prio(rung), dueInMs: 0, reset: false, reason: 'last rung reached, and the batch is ALREADY paused — the alert goes out, repair stands down with the paused batch' }
+    }
+    const repair = corruptionRecovery(alertClass)
+    const probeAfterMs = gaps[pauseRung]
+    const decisionCard = corruptionDecisionCard(title, alertClass)
+    const nextAttemptAt = now + probeAfterMs
+    const decisionRecord = {
+      title: decisionCard,
+      body:
+        `Automatische Entscheidung: ${repair.remedy} für „${title || 'unnamed alert'}“ ausführen; ` +
+        `nächster Versuch ${new Date(nextAttemptAt).toISOString()}. Retroaktives Veto: „Veto“ mit dem ` +
+        `letzten zulässigen Commit; Doctor-Quarantäne und Rescue-Nachweise bleiben erhalten.`,
+    }
+    return {
+      key,
+      action: 'repair-and-probe',
+      rung,
+      nextRung: pauseRung,
+      priority: prio(rung),
+      dueInMs: 0,
+      probeAfterMs,
+      nextAttemptAt,
+      reset: false,
+      alertClass,
+      repair,
+      decisionCard,
+      decisionRecord,
+      reason:
+        `last rung: corruption class "${alertClass}" runs ${repair.remedy}, records decision card ` +
+        `"${decisionCard}", and probes again in ${Math.round(probeAfterMs / 60000)} min`,
+    }
   }
 
   return { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: `rung ${rung}: the condition is still there ${Math.round(since / 60000)} min later` }
@@ -272,20 +307,6 @@ export function clearLadder(state, key) {
   const alerts = state?.alerts && typeof state.alerts === 'object' ? { ...state.alerts } : {}
   delete alerts[key]
   return { alerts }
-}
-
-/** The German pause text for the last rung — the morning reader's sentence. */
-export function escalationPauseReason(title, decision, stamp) {
-  const alertClass = String(decision?.alertClass ?? 'unbekannte Korruptionsklasse')
-  return (
-    `Eskalation: Die Meldung „${title}“ wurde ${decision.rung + 1} Mal mit steigendem Abstand gesendet. ` +
-    `Sie gehört zur Korruptionsklasse „${alertClass}“, die diese Pause autorisiert. ` +
-    `Der Batch pausiert, weil weiteres Arbeiten den Arbeitsstand beschädigen oder die erkannte Korruption ausweiten könnte — ` +
-    `hier ist Weiterarbeiten, nicht Warten, die unsichere Handlung. ` +
-    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — oder von selbst, ` +
-    `sobald die Restart-Uhr in dieser Datei abgelaufen ist (Punkt 445). ` +
-    `[${stamp}]`
-  )
 }
 
 /** One English line for the log. */

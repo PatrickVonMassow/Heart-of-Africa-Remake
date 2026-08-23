@@ -68,9 +68,6 @@ const discoveredHumanWaitFiles = SEARCH_ROOTS
 // together, so neither drift direction passes silently.
 const HUMAN_WAIT_FILES = [
   'docs/batch-owner-runbook.md',
-  'docs/batch-resilience.md',
-  'scripts/alert-escalation-core.mjs',
-  'scripts/alert-escalation.mjs',
   'scripts/batch-autostart.mjs',
   'scripts/batch-doctor-core.mjs',
   'scripts/batch-in-flight-core.mjs',
@@ -83,7 +80,6 @@ const HUMAN_WAIT_FILES = [
   'scripts/batch-singleton.mjs',
   'scripts/board-queue-core.mjs',
   'scripts/board-queue.mjs',
-  'scripts/child-retry-core.mjs',
   'scripts/child-retry.mjs',
   'scripts/dashboard-guard-core.mjs',
   'scripts/defer-for-user.mjs',

@@ -40,7 +40,6 @@ import {
   clearLadder,
   describeEscalation,
   escalationDecision,
-  escalationPauseReason,
   higherPriority,
   ladderEntry,
 } from './alert-escalation-core.mjs'
@@ -127,6 +126,43 @@ export function continuationCardBody(title, message, decision, stamp) {
   )
 }
 
+/** Durable record for a corruption-class repair and its next capped probe. */
+export function corruptionCardBody(title, message, decision, repairResult, stamp) {
+  const repair = decision?.repair?.remedy ?? 'named repair'
+  const result = repairResult?.ok
+    ? 'Der Reparaturlauf endete grün.'
+    : `Der Reparaturlauf blieb offen${Number.isInteger(repairResult?.exitCode) ? ` (Exit ${repairResult.exitCode})` : ''}; die nächste Prüfung bleibt eingeplant.`
+  return (
+    `Automatische Entscheidung [${stamp}]: Die Korruptionsklasse „${decision?.alertClass}“ führt ` +
+    `${repair} aus, bevor gewöhnliche Batch-Arbeit fortgesetzt wird. Die Meldung „${title}“ lautete: ` +
+    `${message || '(ohne Nachricht)'}. ${result} Nächster Versuch: ${new Date(decision.nextAttemptAt).toISOString()}. ` +
+    `Retroaktives Veto: Antworte auf diese Karte mit „Veto“ und nenne den letzten zulässigen Commit; ` +
+    `Quarantäne- und Rescue-Nachweise des Doctors bleiben erhalten.`
+  )
+}
+
+/** Execute only the repair named by the closed-list decision. batch-doctor's
+ * evidence rules decide whether quarantine/repair is safe in this process. */
+export function runCorruptionRepair(decision, { cwd = REPO_ROOT } = {}) {
+  const [script, ...args] = decision?.repair?.command ?? []
+  if (!script) return { ok: false, exitCode: null, reason: 'no closed-list repair was named' }
+  try {
+    execFileSync(process.execPath, [script, ...args], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    return { ok: true, exitCode: 0 }
+  } catch (error) {
+    return {
+      ok: false,
+      exitCode: Number.isInteger(error?.status) ? error.status : null,
+      reason: String(error?.stderr ?? error?.message ?? error).trim().slice(0, 500),
+    }
+  }
+}
+
 /**
  * The pause API, imported LAZILY: scripts/batch-lock.mjs resolves its paths with
  * `fileURLToPath(new URL(…, import.meta.url))`, which THROWS under a test runner
@@ -158,6 +194,7 @@ export async function escalate({
   // prove only that failing open works.
   pause = null,
   board = boardCard,
+  repair = runCorruptionRepair,
   ladderPath = LADDER_PATH,
   logPath = LOG_PATH,
 } = {}) {
@@ -167,7 +204,7 @@ export async function escalate({
   try {
     const k = key ?? alertKey(title, message)
     const state = readLadder(ladderPath)
-    const { isPaused, setPaused } = pause ?? (await pauseApi())
+    const { isPaused } = pause ?? (await pauseApi())
     const paused = isPaused()
     const decision = {
       ...escalationDecision({
@@ -190,18 +227,6 @@ export async function escalate({
       return { deliver: false, priority: decision.priority, decision }
     }
 
-    if (decision.action === 'pause-and-send') {
-      const reason = escalationPauseReason(title, decision, berlinStamp(new Date(now)))
-      setPaused(reason)
-      board(
-        'Batch pausiert: Alarm blieb unbeantwortet',
-        `${reason} Bitte prüfen, was die Meldung ausgelöst hat, und die Pause danach aufheben.`,
-      )
-      logLine(`[${k}] PAUSED THE BATCH — ${decision.reason}`, logPath)
-      // The pause is deliberately NOT deferred to the commit: it is the safety
-      // action, and it must happen even if the notification then fails to send.
-    }
-
     let decisionRecorded = true
     if (decision.action === 'continue-and-record') {
       const stamp = berlinStamp(new Date(now))
@@ -212,6 +237,22 @@ export async function escalate({
       logLine(
         `[${k}] CONTINUING THE BATCH — decision card ${decisionRecorded ? 'recorded' : 'FAILED'}: ` +
           `${decision.decisionCard} — ${decision.reason}`,
+        logPath,
+      )
+    }
+
+    let repairResult = null
+    if (decision.action === 'repair-and-probe') {
+      const stamp = berlinStamp(new Date(now))
+      repairResult = repair(decision)
+      decisionRecorded = board(
+        decision.decisionCard,
+        corruptionCardBody(title, message, decision, repairResult, stamp),
+      ) === true
+      logLine(
+        `[${k}] CORRUPTION REPAIR ${repairResult.ok ? 'CLEARED' : 'REMAINS'}; ` +
+          `decision card ${decisionRecorded ? 'recorded' : 'FAILED'}; next attempt ` +
+          `${new Date(decision.nextAttemptAt).toISOString()} — ${decision.reason}`,
         logPath,
       )
     }
@@ -227,7 +268,7 @@ export async function escalate({
         // The continuation verdict is not complete without its durable decision
         // card. Leave the ladder on the due rung when the board write failed so
         // the next identical alert retries the record instead of losing it.
-        if (decision.action === 'continue-and-record' && !decisionRecorded) {
+        if (['continue-and-record', 'repair-and-probe'].includes(decision.action) && !decisionRecorded) {
           logLine(`[${k}] delivered, but the required continuation decision card is still missing`, logPath)
           return false
         }
@@ -247,6 +288,7 @@ export async function escalate({
       priority: higherPriority(priority, decision.priority),
       decision,
       decisionRecorded,
+      repairResult,
       commit,
     }
   } catch (e) {
