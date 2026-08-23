@@ -1324,7 +1324,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 09:30 · Quellen-Fingerprint: `f3784109de8b…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 10:24 · Quellen-Fingerprint: `518c1af46699…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1421,8 +1421,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 87 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 89 Prozess-/Meta-TASKS-Punkte (davon 35 offen).
 
-<!-- RETRO-FINGERPRINT: f3784109de8b9d875106f1101451c1a618e3c8d433f85496fd12441969f2bc26 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T07:30:20.748Z -->
+<!-- RETRO-FINGERPRINT: 518c1af46699c73e959978dd64d97f3e4977eb274d90293b4907eca4fe5a7c5c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T08:24:35.525Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3006,3 +3006,30 @@ fremder Arbeit rot geworden, und die Wahl wäre nur noch zwischen einem weichgek
 einer fremden Reparatur unter falscher Nummer gewesen. Verwandt mit §3.163 (der Mechanismus
 ohne erzwungene Eingabe): Dort fehlte dem Zähler die Zufuhr, hier fehlt dem Vergleich ein
 unabhängiger Maßstab.
+
+### 3.166 Ein Feld, drei Leser — und geprüft wurde nur der, der Ja sagt
+
+Am 23.08.2026 stand der Batch still, weil ein Commit seinen Gegenleser ehrte. Zwei
+`Co-Authored-By`-Zeilen — Autor und Cross-Vendor-Prüfer, beide erlaubt — passierten das
+Commit-Tor anstandslos, denn das Tor beurteilt jede Zeile einzeln. Dann kamen die anderen
+Leser desselben Feldes an die Reihe: Der Modellwächter zog die Historie über ein
+`git log`-Format, dessen `separator=,` von Git als leerer Trenner gelesen wird, bekam die
+zwei Zeilen als EINEN zusammengeklebten Namen und rief den Ernstfall aus — Batch angehalten,
+Ausweg nur über den Nutzer (Punkt 854). Und der Review-Planer las den Prüfer-Credit als
+Autorschaft, fand damit keinen unabhängigen Prüfer-Vendor mehr und erklärte jede Range mit
+diesem Commit für unreviewbar — eine Vier-Augen-Schuld, die auf dem Review-Weg nie mehr
+beglichen werden kann (Punkt 856).
+
+Kein Leser war für sich genommen kaputt gebaut worden; jeder folgte seiner eigenen, älteren
+Grammatik desselben Feldes. Die neue Schreibweise wurde nur gegen den Leser geprüft, der sie
+annahm — das Tor am Commit —, und die beiden Leser, die später und seltener laufen, sprachen
+erst im Ernstfall. Das Tückische an der Klasse: Der erste grüne Leser fühlt sich wie eine
+Systemabnahme an, und ein Wächter, der auf ein erlaubtes Muster anschlägt, ist genau der,
+den man am echten Tag aus Gewohnheit wegwinkt.
+
+**Lehre:** Ein gemeinsames Artefakt hat so viele Grammatiken wie Leser. Bevor eine neue
+Schreibform hineindarf, werden die Leser AUFGEZÄHLT (`grep` nach dem Feldnamen ist die
+Mindestform) und jeder gegen die neue Form geprüft — das Ja des annehmenden Tors zählt
+nicht für die Kette dahinter. Und schlägt ein Wächter auf etwas Erlaubtes an, wird zuerst
+seine MESSKETTE verdächtigt, nicht die Regel weichgeklopft: Hier lag der Fehler zwei Glieder
+vor dem Urteil, im Format der Datenbeschaffung.

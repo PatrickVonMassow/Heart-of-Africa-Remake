@@ -213,6 +213,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
   **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz**."
 
+- **Ein Feld, viele Leser — geprüft wird nur der, der Ja sagt.** Eine neue Schreibweise passiert
+  das annehmende Tor; ein späterer Leser desselben Feldes liest sie mit seiner älteren Grammatik
+  und ruft den Ernstfall aus.
+  → *Prompt:* „Bevor eine **neue Form** in ein geteiltes Artefakt darf, **zähle seine Leser auf**
+  (mindestens: nach dem Feldnamen suchen) und prüfe **jeden** gegen die Form — das Ja des ersten
+  Tors zählt nicht für die Kette dahinter. Schlägt ein Wächter auf Erlaubtes an, verdächtige
+  zuerst seine **Messkette**, nicht die Regel."
+
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet, nie
@@ -435,4 +443,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: f3784109de8b9d875106f1101451c1a618e3c8d433f85496fd12441969f2bc26 -->
+<!-- GUIDE-FINGERPRINT: 518c1af46699c73e959978dd64d97f3e4977eb274d90293b4907eca4fe5a7c5c -->
