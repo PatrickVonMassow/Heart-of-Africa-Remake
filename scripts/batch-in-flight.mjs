@@ -74,6 +74,7 @@ import {
   RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
+import { durableBlock } from './batch-adoption-core.mjs'
 import { boardFilePath } from './dashboard-state.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
@@ -1307,7 +1308,8 @@ if (isMain) {
   }
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
-    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
+    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] ' +
+    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear | ' +
     '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
 
   if (argv[0] === '--handover-check') {
@@ -1421,10 +1423,25 @@ if (isMain) {
     if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
+    // The durable-lane adoption record (point 834, union M17): stable batch,
+    // point and attempt identities plus an explicit transferable flag. The
+    // block is all-or-nothing; batch-adoption-core refuses half of one.
+    const durableFields = {}
+    let transferableFlag = null
     for (let i = 2; i < argv.length; i += 2) {
       const flag = argv[i]
+      if (flag === '--transferable') {
+        // A bare flag: it consumes no value, so step back by one.
+        transferableFlag = true
+        i -= 1
+        continue
+      }
       const value = argv[i + 1]
       if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+      if (flag === '--durable-batch' || flag === '--durable-point' || flag === '--durable-attempt') {
+        durableFields[flag.slice('--durable-'.length)] = String(value).trim()
+        continue
+      }
       if (flag === '--slots-free') {
         // Point 427: not evidence, a REASON. It answers "why do the free pool slots
         // stay free", and the guard demands it only when they demonstrably could not.
@@ -1496,6 +1513,30 @@ if (isMain) {
           'batch. Nothing recorded.',
       )
     }
+    // The all-or-nothing durable block: its process identity is the declared
+    // --pid evidence, because a successor adopts by pid AND start time (M17) —
+    // naming an attempt without its process would leave exactly the guess this
+    // record exists to remove.
+    let durable = null
+    if (transferableFlag !== null || Object.keys(durableFields).length > 0) {
+      const pidEvidence = evidence.find((e) => e.kind === 'pid')
+      if (!pidEvidence) {
+        fail(
+          'a durable adoption record identifies its worker process: declare --pid <worker pid> beside ' +
+            '--durable-batch/--durable-point/--durable-attempt. Nothing recorded.',
+        )
+      }
+      const built = durableBlock({
+        batchId: durableFields.batch,
+        pointId: durableFields.point,
+        attemptId: durableFields.attempt,
+        pid: pidEvidence.pid,
+        pidStartedAt: pidEvidence.startedAt,
+        transferable: transferableFlag === true,
+      })
+      if (!built.ok) fail(`${built.reason}. Nothing recorded.`)
+      durable = built.durable
+    }
     const now = Date.now()
     const declaration = {
       v: 1,
@@ -1510,6 +1551,10 @@ if (isMain) {
       // Empty string when not given, so the decision sees "no reason" rather than
       // an absent field it has to interpret (point 427).
       slotsFree: slotsFreeReason,
+      // Absent for today's declarations; present only where a daemon-owned run
+      // was declared adoptable (point 834). Nothing below reads it yet — the
+      // successor tooling of step 8 does.
+      ...(durable ? { durable } : {}),
     }
     // Verify NOW, so a typo is caught here and not at a turn end that then blocks
     // with a reason nobody expected.
