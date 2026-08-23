@@ -660,3 +660,31 @@ describe('auditGuide — a segment has to name something', () => {
     expect(auditGuide(withText('Siehe docs/.nojekyll dort.')).violations.map((v) => v.kind)).toContain('project-specific')
   })
 })
+
+// Round fourteen: the cost note is judged on what it renders, and a segment may
+// be named by any Unicode symbol rather than only an "other symbol".
+describe('auditGuide — the last two predicates read what the reader sees', () => {
+  const O = '„'
+
+  it('refuses a note whose multiplier is hidden in a comment', () => {
+    const { ok, violations } = auditGuide(
+      doc(`- **Versteckter Multiplikator** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(<!-- ≈ --> Und danach folgt weitere Erzählung.)*`),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('recognises a segment named by a currency or math symbol', () => {
+    for (const path of ['docs/€', 'docs/+', 'docs/📝']) {
+      const { violations } = auditGuide(
+        doc(`- **Pfad** Siehe ${path} dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+      )
+      expect(violations.map((v) => v.kind), path).toContain('project-specific')
+    }
+  })
+
+  it('still leaves a bare directory ended by punctuation alone', () => {
+    const d = doc(`- **Satz** Lege Code unter src/.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
+  })
+})

@@ -205,7 +205,7 @@ export const PROJECT_MARKERS = [
     // and `docs/.nojekyll` are both ordinary paths (round 11).
     // A COMBINING MARK is part of the word before it: the decomposed spelling of
     // `Menüdocs/a.md` handed the detector a directory name (round 10).
-    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/(?=[^\s/\\)\]}>,;"'`]*[\p{L}\p{N}\p{So}])[^\s/\\)\]}>,;"'`]/u,
+    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/(?=[^\s/\\)\]}>,;"'`]*[\p{L}\p{N}\p{S}])[^\s/\\)\]}>,;"'`]/u,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -363,16 +363,21 @@ export const renderedText = (text) =>
     // first `)` is not the end of it (round 10).
     .replace(/\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, '$1')
     .replace(/[*_`~]/g, '')
-const isCostNote = (note) =>
-  note.includes('≈') &&
-  note.length <= NOTE_MAX_CHARS &&
-  // NOTHING MAY FOLLOW a sentence-ending mark. Asking for a LETTER after it let
-  // a digit open the second sentence — `≈ 1,5x. 2 Minuten später …` (round 9).
-  // A note written with an English decimal point is refused by this, and that is
-  // the safe direction: the guide's own six cost notes use the German comma.
-  // An ELLIPSIS ends a sentence the way a period does, and it is ordinary German
-  // typography rather than a contrived case (round 10).
-  !/(?:\.{3}|[.!?\u2026])\s*\S/u.test(renderedText(note).trim())
+const isCostNote = (note) => {
+  // THE WHOLE RULE READS THE RENDERED NOTE. Asking the raw Markdown whether it
+  // carries the multiplier let a hidden `<!-- ≈ -->` license a paragraph of
+  // narrative — the same markup evasion as rounds 7 and 8, one predicate over
+  // (round 14).
+  const shown = renderedText(note).trim()
+  return (
+    shown.includes('≈') &&
+    shown.length <= NOTE_MAX_CHARS &&
+    // An ELLIPSIS ends a sentence the way a period does, and it is ordinary German
+    // typography rather than a contrived case (round 10).
+    !/(?:\.{3}|[.!?\u2026])\s*\S/u.test(shown)
+  )
+}
+
 const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**
