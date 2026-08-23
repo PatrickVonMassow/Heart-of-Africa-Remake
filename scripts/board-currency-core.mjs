@@ -350,11 +350,10 @@ export function watchdogDecision({
     priority = 'high'
   } else if (verdict === 'transport') {
     // A TRANSPORT FAILURE IS NOT A STALE BOARD (point 562), and the difference is
-    // carried by the PRIORITY as well as by the words: an alert raised at
-    // 'default' is an EVENT to the escalation ladder, which throttles it and may
-    // never pause the batch on it (PAUSE_MIN_PRIORITY in
-    // scripts/alert-escalation-core.mjs). On 08.08.2026 a flickering fetch climbed
-    // the ladder as a condition and stopped every point in the queue.
+    // carried by the PRIORITY as well as by the words: this single-transport
+    // event stays quieter than a confirmed outage while the ladder throttles it.
+    // Neither verdict is on the ladder's closed corruption list, so even a
+    // repeated outage now records continuation instead of stopping the queue.
     parts.push(`A board fetch FAILED, but the board is not stale: ${reason || 'the other transport answered'}.`)
   }
   // 'flaky' is deliberately silent here: a failure that has not yet repeated for

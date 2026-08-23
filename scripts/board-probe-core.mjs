@@ -22,14 +22,13 @@
 // 3. THE ESCALATION COUNTS ONLY CONSECUTIVE FAILURES. One success anywhere in
 //    the chain resets the count to zero, so an alternating sequence — which is
 //    exactly what the log showed — can never climb.
-// 4. THE PAUSE STAYS THE LAST STAGE FOR A GENUINELY UNREACHABLE BOARD, and only
-//    for that. Two independent transports are asked: the CURRENCY transport
+// 4. NO REACHABILITY VERDICT MAY PAUSE THE BATCH. Two independent transports
+//    are still asked so the alert tells the truth: the CURRENCY transport
 //    (raw.githubusercontent.com, which carries the fingerprint) and the VIEWER
 //    the reader opens (the Pages host). While EITHER still answers, the board is
-//    reachable and the failure is a transport hiccup — reported at a priority the
-//    escalation ladder may never pause on (`PAUSE_MIN_PRIORITY` in
-//    scripts/alert-escalation-core.mjs). Both failing together is what an outage
-//    looks like, and that one still climbs to the pause.
+//    reachable and the failure is a transport hiccup. Both failing together is
+//    an outage and climbs in interval and priority, but the ladder's closed
+//    corruption list still resolves it by continuing and recording the decision.
 //
 // Side-effect free, so scripts/board-probe-core.test.mjs can sweep every rule
 // without a network. The fetching half is scripts/board-watchdog.mjs.
