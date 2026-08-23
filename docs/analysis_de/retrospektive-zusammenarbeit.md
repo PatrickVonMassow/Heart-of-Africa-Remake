@@ -1324,7 +1324,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 16:51 · Quellen-Fingerprint: `b0671b5f1bb2…`
+Zuletzt aktualisiert: Sonntag, 23.08.2026, 18:21 · Quellen-Fingerprint: `3dfcd0dc15ab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1422,8 +1422,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 91 Prozess-/Meta-TASKS-Punkte (davon 37 offen).
 
-<!-- RETRO-FINGERPRINT: b0671b5f1bb2e97e2d1353790f011027a6c684192c8e9adec0a9dcc4a6068af2 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T14:51:21.260Z -->
+<!-- RETRO-FINGERPRINT: 3dfcd0dc15ab241659477e71fa7a8485d33e550971f82977fca5ffe4c0abe240 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-23T16:21:34.337Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3059,3 +3059,29 @@ Die Prüffrage für jeden künftigen Alarm- oder Heilungsweg: **Welche Ressource
 er — und ist das dieselbe, deren Ausfall er behandelt?** Der Nutzer hat daraus die
 stehende Ordnung gemacht (Punkte 860/861): Selbstheilung vor Alarm, kein Stopp hinter
 einer Warte-Karte, im Zweifel entscheiden und die Entscheidung vetofähig dokumentieren.
+
+### 3.168 Der Dublettencheck ist keine Ordnungsfrage, sondern eine Richtigkeitsfrage
+
+Am Abend des 23.08.2026 meldete der Stop-Wächter zweimal in vier Minuten eine
+Parallelsitzung, obwohl keine da war: Die genannte Sitzung war längst beendet, was noch
+unter ihrer Kennung schrieb, war ihr übriggebliebenes Kind — der delegierte Autorenlauf,
+dessen Deklaration die lesende Sitzung einen Zug zuvor selbst übernommen hatte. Jede
+Meldung bestellte einen dreiminütigen Doktorlauf, der unter der Last genau dieses Kindes
+kein Urteil fällen konnte. Ich habe den Befund aufgenommen und als neuen Punkt angehängt.
+
+Erst die Pflicht, ihn einem Bündel zuzuordnen, führte zu dem Punkt, der dieselbe
+Falschmeldung schon besaß (3.164). Und da zeigte sich, warum die Frage „steht das schon
+irgendwo?" hier mehr wert war als Ordnung: Der bestehende Punkt schrieb als Zielzustand
+fest, ein Schreibzugriff NACH dem Rücktritt der Sitzung sei „ein echter Verstoß" und müsse
+den Alarm weiter auslösen — und genau das ist der heute gemessene Fall. Als eigener Punkt
+gebaut, hätten beide Hälften sauber und grün nebeneinander gelegen, und die eine hätte den
+Fall der anderen als Verstoß eingestuft. Der Defekt wäre nicht durch Doppelarbeit
+entstanden, sondern durch zwei getrennt korrekte Regeln über denselben Gegenstand.
+
+**Lehre:** Der Dublettencheck bei 3.105 wurde als Sparmaßnahme gelesen — er verhindert,
+zweimal dasselbe zu bauen. Er ist aber vor allem der Moment, in dem zwei Beschreibungen
+desselben Mechanismus miteinander verglichen werden, und das ist die einzige Stelle, an
+der ein Widerspruch zwischen ihnen auffallen kann, bevor er Code wird. Prüffrage beim
+Anlegen eines Punktes: *Wenn es das schon gibt — wäre der bestehende Zielzustand für
+meinen Fall richtig, oder erklärt er ihn zum Fehler?* Ein Befund, der einen bestehenden
+Punkt WIDERLEGT, gehört zwingend in diesen Punkt und nicht daneben.
