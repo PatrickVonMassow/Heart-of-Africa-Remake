@@ -1,0 +1,201 @@
+// THE DAEMON AGAINST A REAL SANDBOX (point 834, step 3): a drill daemon in a
+// throwaway repository with a bare origin, a live batch lock owned by this test
+// process, and a real stub worker that commits and pushes. Production start
+// stays REFUSED — the dark pin — and a drill against this checkout is refused
+// too. The parent-death kill itself lives in the drill
+// (scripts/batch-daemon-drill.mjs); this file covers the daemon's contract:
+// exclusive existence, fenced mutations, idempotent retries, checkpoint
+// acknowledgment, cancellation that preserves the branch, drain and restart.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { processStartTime } from './batch-singleton.mjs'
+import { openStateStore, readJournal } from './batch-state.mjs'
+import { readJsonIfAny } from './detached-agent.mjs'
+import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
+
+const BATCH = 'drill-batch'
+const SID = 'test-session'
+const FENCE = 7
+
+let sandbox, repo, worktree, originDir, record
+
+const git = (args, cwd) =>
+  execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+  }).trim()
+
+const request = (cmd, payload = {}) =>
+  controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd, sessionId: SID, fence: FENCE, payload: { batchId: BATCH, ...payload } } })
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+beforeAll(async () => {
+  sandbox = mkdtempSync(join(tmpdir(), 'daemon-sandbox-'))
+  originDir = join(sandbox, 'origin.git')
+  repo = join(sandbox, 'repo')
+  worktree = join(sandbox, 'wt')
+  execFileSync('git', ['init', '-q', '--bare', originDir])
+  execFileSync('git', ['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: originDir })
+  execFileSync('git', ['init', '-q', repo])
+  writeFileSync(join(repo, 'seed.txt'), 'seed\n')
+  git(['add', '.'], repo)
+  git(['commit', '-q', '-m', 'seed'], repo)
+  git(['remote', 'add', 'origin', originDir], repo)
+  git(['push', '-q', 'origin', 'HEAD:main'], repo)
+  execFileSync('git', ['clone', '-q', originDir, worktree])
+  git(['checkout', '-q', '-b', 'feat/stub'], worktree)
+  git(['push', '-q', 'origin', 'feat/stub'], worktree)
+  mkdirSync(join(repo, '.claude'), { recursive: true })
+  writeFileSync(
+    join(repo, '.claude', 'batch-lock.json'),
+    JSON.stringify({ sessionId: SID, pid: process.pid, pidStartedAt: processStartTime(process.pid), leaseUntil: Date.now() + 3_600_000, fence: FENCE }),
+  )
+  writeFileSync(join(repo, '.claude', 'batch-fence.json'), JSON.stringify({ fence: FENCE, generation: 'gen-sandbox-1' }))
+}, 30_000)
+
+afterAll(async () => {
+  try {
+    await request('shutdown', {})
+  } catch {
+    /* already down */
+  }
+  const store = openStateStore({ repoDir: repo, batchId: BATCH })
+  const leftover = readJsonIfAny(store.daemonRecordPath)
+  if (leftover?.pid) {
+    try {
+      process.kill(leftover.pid, 'SIGKILL')
+    } catch {
+      /* already gone */
+    }
+  }
+  rmSync(sandbox, { recursive: true, force: true })
+})
+
+describe('the dark pin', () => {
+  it('refuses a production start while the steps are not green', async () => {
+    const refused = await startDaemon({ repoDir: repo, batchId: BATCH, drill: false })
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/not green/)
+  })
+
+  it('refuses a drill daemon against this checkout', async () => {
+    const refused = await startDaemon({ repoDir: REPO_ROOT, batchId: BATCH, drill: true })
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/sandbox/)
+  })
+})
+
+describe('the daemon lifecycle in the sandbox', () => {
+  it('starts, records its identity, and refuses a second daemon while it lives', async () => {
+    const started = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
+    expect(started.ok, started.reason).toBe(true)
+    record = started.record
+    expect(record.generation).toBe('gen-sandbox-1')
+    expect(record.fence).toBe(FENCE)
+    const second = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
+    expect(second.ok).toBe(false)
+    const copied = writeLockCopy({ repoDir: repo, record, sessionId: SID })
+    expect(copied.ok).toBe(true)
+  }, 20_000)
+
+  it('answers status and refuses a mutation under a stale fence or a foreign session', async () => {
+    const status = await request('status')
+    expect(status.ok).toBe(true)
+    expect(status.journalVerdict).toBe('ok')
+    const stale = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'record-state', sessionId: SID, fence: FENCE - 1, payload: { batchId: BATCH, pointId: 'p1', attemptId: 'x', state: 'queued', at: Date.now() } },
+    })
+    expect(stale.ok).toBe(false)
+    expect(stale.reason).toMatch(/stale fence/)
+    const foreign = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'record-state', sessionId: 'someone-else', fence: FENCE, payload: { batchId: BATCH, pointId: 'p1', attemptId: 'x', state: 'queued', at: Date.now() } },
+    })
+    expect(foreign.ok).toBe(false)
+  })
+
+  it('starts a stub worker that commits and pushes on its own', async () => {
+    const before = git(['rev-parse', 'feat/stub'], originDir)
+    const started = await request('start-attempt', { pointId: 'p1', attemptId: 'a1', branch: 'feat/stub', worktree, adapter: 'stub' })
+    expect(started.ok, started.reason).toBe(true)
+    expect(started.result.pid).toBeGreaterThan(0)
+    let after = before
+    const deadline = Date.now() + 15_000
+    while (after === before && Date.now() < deadline) {
+      await sleep(300)
+      after = git(['rev-parse', 'feat/stub'], originDir)
+    }
+    expect(after, 'the worker pushed a new SHA').not.toBe(before)
+  }, 20_000)
+
+  it('replays an identical start-attempt as already applied instead of spawning twice', async () => {
+    const again = await request('start-attempt', { pointId: 'p1', attemptId: 'a1', branch: 'feat/stub', worktree, adapter: 'stub' })
+    expect(again).toMatchObject({ ok: true, alreadyApplied: true })
+  })
+
+  it('holds the global cap: with three occupied slots the fourth start is refused', async () => {
+    for (const attemptId of ['cap-b', 'cap-c']) {
+      const res = await request('record-state', { pointId: 'p9', attemptId, state: 'running', at: Date.now() })
+      expect(res.ok, res.reason).toBe(true)
+    }
+    const fourth = await request('start-attempt', { pointId: 'p2', attemptId: 'a2', branch: 'feat/stub', worktree, adapter: 'stub' })
+    expect(fourth.ok).toBe(false)
+    expect(fourth.reason).toMatch(/cap/)
+    for (const attemptId of ['cap-b', 'cap-c']) {
+      const res = await request('record-state', { pointId: 'p9', attemptId, state: 'cancelled', reason: 'cap test over', at: Date.now() })
+      expect(res.ok, res.reason).toBe(true)
+    }
+  })
+
+  it('gets a checkpoint acknowledged with the pushed SHA', async () => {
+    const reply = await request('request-checkpoint', { requestId: 'cp-1', waitMs: 15_000 })
+    expect(reply.ok, reply.reason).toBe(true)
+    const answer = reply.result.answers.find((a) => a.attemptId === 'a1')
+    expect(answer).toMatchObject({ acknowledged: true, transferable: true, dirty: false, pushedOk: true })
+    expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(answer.sha)
+    const repeat = await request('request-checkpoint', { requestId: 'cp-1', waitMs: 15_000 })
+    expect(repeat).toMatchObject({ ok: true, alreadyApplied: true })
+  }, 20_000)
+
+  it('cancels the attempt, preserves the branch, and journals the last pushed SHA', async () => {
+    const tip = git(['rev-parse', 'feat/stub'], originDir)
+    const cancelled = await request('cancel-attempt', { attemptId: 'a1', requestId: 'cx-1', reason: 'drill over' })
+    expect(cancelled.ok, cancelled.reason).toBe(true)
+    expect(cancelled.result.branchPreserved).toBe(true)
+    await sleep(300)
+    expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(tip)
+  }, 20_000)
+
+  it('drains: seals the snapshot, releases the record, and the journal replays clean', async () => {
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    const reply = await request('shutdown', { drain: true })
+    expect(reply.ok).toBe(true)
+    const deadline = Date.now() + 10_000
+    while (existsSync(store.daemonRecordPath) && Date.now() < deadline) await sleep(200)
+    expect(existsSync(store.daemonRecordPath)).toBe(false)
+    const snapshot = JSON.parse(readFileSync(store.snapshotPath, 'utf8'))
+    expect(snapshot.sealed).toBe(true)
+    const journal = readJournal(store)
+    expect(journal.verdict).toBe('ok')
+    expect(journal.entries.some((e) => e.kind === 'daemon-lifecycle' && e.event === 'stop')).toBe(true)
+  }, 15_000)
+
+  it('restarts against the same journal and still refuses the replayed start-attempt key', async () => {
+    const restarted = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
+    expect(restarted.ok, restarted.reason).toBe(true)
+    const replayed = await request('start-attempt', { pointId: 'p1', attemptId: 'a1', branch: 'feat/stub', worktree, adapter: 'stub' })
+    expect(replayed).toMatchObject({ ok: true, alreadyApplied: true })
+    const down = await request('shutdown', {})
+    expect(down.ok).toBe(true)
+    await sleep(500)
+  }, 20_000)
+})

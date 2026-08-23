@@ -1,0 +1,269 @@
+#!/usr/bin/env node
+// THE COMMON WORKER CONTRACT — step 3 of the "Ordered work" in
+// docs/handover-architecture.md (work-order point 834, the front stage of 676;
+// union M5).
+//
+// A handover-capable worker satisfies one contract, whatever model runs inside
+// it: heartbeat, log, checkpoint acknowledgment, explicit terminal status,
+// cancellation that preserves the branch, and a lease check before every push.
+// This file is that contract three times over:
+//   - EXPORTED HELPERS the daemon uses to spawn a worker with the escape that
+//     actually survives (mechanism 1): detached, group leader, stdio on a FILE
+//     DESCRIPTOR — never a pipe a dying parent can break — and unref()ed.
+//   - THE WORKER CLI the daemon spawns: `--runner stub` is the hermetic worker
+//     the drills use; `--runner author-sol` WRAPS the proven scripts/author-sol.mjs
+//     without changing its authoring behavior — the wrapper is the daemon's
+//     child and holds the runner's pipes, so the session's death reaches neither.
+//   - THE CONTRACT PATHS a successor probes, all inside the attempt's own state
+//     directory, so adoption needs no live predecessor.
+//
+// STILL DARK: only the daemon spawns this, and no daemon starts while the
+// activation flag refuses (scripts/durable-lane-flag-core.mjs).
+import { spawn, spawnSync } from 'node:child_process'
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { isMainModule } from './is-main.mjs'
+import { leaseAllowsWrite } from './batch-attempt-lease-core.mjs'
+
+/** Every path of the contract, derived from the attempt directory alone. */
+export function attemptPaths(attemptDir) {
+  return {
+    dir: attemptDir,
+    logPath: join(attemptDir, 'worker.log'),
+    heartbeatPath: join(attemptDir, 'heartbeat'),
+    statusPath: join(attemptDir, 'status.json'),
+    leasePath: join(attemptDir, 'lease.json'),
+    checkpointRequestPath: join(attemptDir, 'checkpoint-request.json'),
+    checkpointAckPath: join(attemptDir, 'checkpoint-ack.json'),
+  }
+}
+
+/** THE ESCAPE (mechanism 1, copied from scripts/batch-autostart.mjs, the process
+ *  in this repository that already escapes correctly): `detached` makes the child
+ *  a group leader so the session's group signal never reaches it; the stdio is a
+ *  file descriptor, so nothing the child writes needs a live reader and no
+ *  parent's death can break a write; `unref()` frees the spawning event loop.
+ *  The fd is closed in the PARENT — the child holds its own copy. */
+export function spawnDetached({ cmd, args, cwd, logPath, env = process.env }) {
+  const out = openSync(logPath, 'a')
+  try {
+    const child = spawn(cmd, args, {
+      cwd,
+      env,
+      windowsHide: true,
+      detached: true,
+      stdio: ['ignore', out, out],
+    })
+    child.unref()
+    return { pid: child.pid }
+  } finally {
+    closeSync(out)
+  }
+}
+
+/** Atomic small-file write for status and acks: a reader never sees half a
+ *  record. (The durability fsync lives in the state store; these files are
+ *  advisory runtime state a successor re-probes anyway.) */
+function writeJsonAtomic(path, value) {
+  const tmp = `${path}.tmp-${process.pid}`
+  writeFileSync(tmp, `${JSON.stringify(value)}\n`)
+  renameSync(tmp, path)
+}
+
+export function readJsonIfAny(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function git(args, cwd) {
+  const res = spawnSync('git', args, { cwd, encoding: 'utf8' })
+  return { ok: res.status === 0, out: (res.stdout || '').trim(), err: (res.stderr || '').trim() }
+}
+
+// ---------------------------------------------------------------------------
+// THE WORKER PROCESS
+// ---------------------------------------------------------------------------
+
+export const WORKER_TICK_MS = 250
+export const STUB_WORK_EVERY_MS = 1200
+
+/** Exit codes are part of the contract: the daemon reads them from the status
+ *  file, never from a wait() it may not be alive to perform. */
+export const WORKER_EXIT = Object.freeze({ done: 0, runnerFailed: 1, badInvocation: 2, fenced: 3 })
+
+function parseArgs(argv) {
+  const args = {}
+  for (let i = 0; i < argv.length; i += 2) {
+    const flag = argv[i]
+    const value = argv[i + 1]
+    if (!flag?.startsWith('--') || value === undefined) return null
+    args[flag.slice(2)] = value
+  }
+  return args
+}
+
+async function runWorker(argv) {
+  const args = parseArgs(argv)
+  const required = ['runner', 'point', 'branch', 'worktree', 'attempt-dir', 'lease-id']
+  if (!args || required.some((k) => !args[k])) {
+    console.error(`detached-agent: required flags: ${required.map((k) => `--${k}`).join(' ')}`)
+    process.exit(WORKER_EXIT.badInvocation)
+  }
+  const paths = attemptPaths(args['attempt-dir'])
+  mkdirSync(paths.dir, { recursive: true })
+  const tickMs = Number(args['tick-ms']) > 0 ? Number(args['tick-ms']) : WORKER_TICK_MS
+  const workEveryMs = Number(args['work-every-ms']) > 0 ? Number(args['work-every-ms']) : STUB_WORK_EVERY_MS
+  const self = { pid: process.pid, pidStartedAt: ownStartTime() }
+  const log = (line) => appendFileSync(paths.logPath, `${new Date().toISOString()} ${line}\n`)
+  const status = (phase, extra = {}) => writeJsonAtomic(paths.statusPath, { phase, at: Date.now(), pid: process.pid, ...extra })
+
+  let stopping = null
+  process.on('SIGTERM', () => {
+    // Cancellation preserves the branch (M43): nothing is deleted, nothing is
+    // reset — the worker records the terminal state and leaves.
+    stopping = 'cancelled'
+  })
+
+  /** The lease check before EVERY push (M40): fenced means stop, branch intact. */
+  const mayPush = () => {
+    const lease = readJsonIfAny(paths.leasePath)?.lease ?? null
+    return leaseAllowsWrite({ lease, holder: self, leaseId: args['lease-id'], now: Date.now() })
+  }
+
+  const push = () => {
+    const gate = mayPush()
+    if (gate.verdict !== 'write') return { ok: false, fenced: true, why: gate.reason }
+    const res = git(['push', 'origin', args.branch], args.worktree)
+    return { ok: res.ok, fenced: false, why: res.err }
+  }
+
+  const tip = () => git(['rev-parse', 'HEAD'], args.worktree).out || null
+
+  /** A checkpoint acknowledgment is honest about what it proves: the pushed SHA,
+   *  and whether uncommitted work remains — a wrapper cannot commit on the
+   *  runner's behalf, so `dirty: true` is what makes the daemon mark the attempt
+   *  non-transferable (M20) instead of this file lying. */
+  let lastAckedRequest = null
+  const answerCheckpoint = () => {
+    const request = readJsonIfAny(paths.checkpointRequestPath)
+    if (!request?.requestId || request.requestId === lastAckedRequest) return
+    const pushed = push()
+    if (pushed.fenced) return fencedExit(pushed.why)
+    const dirty = git(['status', '--porcelain'], args.worktree).out !== ''
+    writeJsonAtomic(paths.checkpointAckPath, {
+      requestId: request.requestId,
+      at: Date.now(),
+      sha: tip(),
+      pushedOk: pushed.ok,
+      dirty,
+    })
+    lastAckedRequest = request.requestId
+    log(`checkpoint ${request.requestId}: pushedOk=${pushed.ok} dirty=${dirty}`)
+  }
+
+  const fencedExit = (why) => {
+    log(`fenced: ${why}`)
+    status('fenced', { reason: why, sha: tip() })
+    process.exit(WORKER_EXIT.fenced)
+  }
+
+  status('running', { runner: args.runner })
+  log(`worker up: runner=${args.runner} point=${args.point} branch=${args.branch}`)
+
+  // The daemon grants the lease to THIS process's identity right after the
+  // spawn, so at startup absence means "not yet handed over", not dispossession.
+  // Bounded: a worker no lease ever reaches is fenced like any other.
+  const leaseDeadline = Date.now() + 10_000
+  while (!readJsonIfAny(paths.leasePath)?.lease && Date.now() < leaseDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+
+  let runnerChild = null
+  let runnerExit = null
+  if (args.runner === 'author-sol') {
+    // The proven authoring path, UNCHANGED (M2/M5): this wrapper is the daemon's
+    // child, so it survives the session, and the runner's pipes end HERE — at a
+    // parent that stays alive — never at the session that asked for the work.
+    runnerChild = spawn(process.execPath, ['scripts/author-sol.mjs', '--point', args.point], {
+      cwd: args.worktree,
+      env: process.env,
+      windowsHide: true,
+      stdio: ['ignore', openSync(paths.logPath, 'a'), openSync(paths.logPath, 'a')],
+    })
+    runnerChild.on('close', (code) => {
+      runnerExit = code ?? 1
+    })
+  } else if (args.runner !== 'stub') {
+    console.error(`detached-agent: unknown runner "${args.runner}"`)
+    process.exit(WORKER_EXIT.badInvocation)
+  }
+
+  let lastWorkAt = 0
+  const stubWork = () => {
+    if (Date.now() - lastWorkAt < workEveryMs) return
+    lastWorkAt = Date.now()
+    const file = join(args.worktree, 'stub-progress.txt')
+    appendFileSync(file, `${Date.now()}\n`)
+    git(['add', 'stub-progress.txt'], args.worktree)
+    const committed = git(['-c', 'user.name=stub-worker', '-c', 'user.email=stub@drill', 'commit', '-q', '-m', `stub step at ${Date.now()}`], args.worktree)
+    if (!committed.ok) return log(`stub commit failed: ${committed.err}`)
+    const pushed = push()
+    if (pushed.fenced) return fencedExit(pushed.why)
+    log(`stub step: pushed=${pushed.ok} sha=${tip()}`)
+  }
+
+  // The loop IS the worker: heartbeat, checkpoint answers, work, cancellation.
+  for (;;) {
+    writeFileSync(paths.heartbeatPath, `${Date.now()}\n`)
+    if (stopping) {
+      if (runnerChild) {
+        try {
+          runnerChild.kill('SIGTERM')
+        } catch {
+          /* already gone */
+        }
+      }
+      status(stopping, { sha: tip() })
+      log(`worker leaving: ${stopping}; branch preserved`)
+      process.exit(WORKER_EXIT.done)
+    }
+    answerCheckpoint()
+    if (args.runner === 'stub') stubWork()
+    if (args.runner === 'author-sol' && runnerExit !== null) {
+      const pushed = push()
+      if (pushed.fenced) return fencedExit(pushed.why)
+      status('done', { sha: tip(), runnerExit, pushedOk: pushed.ok })
+      log(`runner exited ${runnerExit}`)
+      process.exit(runnerExit === 0 ? WORKER_EXIT.done : WORKER_EXIT.runnerFailed)
+    }
+    await new Promise((resolve) => setTimeout(resolve, tickMs))
+  }
+}
+
+/** This process's own start time, by the same /proc reading the lock probes use;
+ *  falls back to a coarse now-minus-uptime never worse than the tolerance. */
+function ownStartTime() {
+  try {
+    const stat = readFileSync(`/proc/${process.pid}/stat`, 'utf8')
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ')
+    const startTicks = Number(fields[19])
+    const uptime = Number(readFileSync('/proc/uptime', 'utf8').split(' ')[0])
+    const bootMs = Date.now() - uptime * 1000
+    return bootMs + (startTicks / 100) * 1000
+  } catch {
+    return Date.now() - process.uptime() * 1000
+  }
+}
+
+if (isMainModule(import.meta.url)) {
+  if (!existsSync('scripts/detached-agent.mjs')) {
+    // The spawn plan passes a repo-relative script path; a worker started from
+    // elsewhere would silently resolve author-sol against the wrong tree.
+    console.error('detached-agent: must be started from the repository root')
+    process.exit(WORKER_EXIT.badInvocation)
+  }
+  runWorker(process.argv.slice(2))
+}
