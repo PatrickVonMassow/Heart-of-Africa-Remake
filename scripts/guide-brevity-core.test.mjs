@@ -625,3 +625,21 @@ describe('auditGuide — the second path segment', () => {
     expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
   })
 })
+
+// Round twelve: the segment is defined by what ends it.
+describe('auditGuide — a path segment is anything up to what ends it', () => {
+  const O = '„'
+  it('recognises segments an allowlist would have missed', () => {
+    for (const path of ['docs/@generated.md', 'docs/~draft.md', 'docs/📝.md']) {
+      const { violations } = auditGuide(
+        doc(`- **Pfad** Siehe ${path} dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+      )
+      expect(violations.map((v) => v.kind), path).toContain('project-specific')
+    }
+  })
+
+  it('still leaves the bare directory convention alone', () => {
+    const d = doc(`- **Konvention** Lege den Quelltext unter src/ ab.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
+  })
+})

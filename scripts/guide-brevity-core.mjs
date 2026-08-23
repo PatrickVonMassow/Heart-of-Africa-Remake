@@ -194,11 +194,15 @@ export const PROJECT_MARKERS = [
     // 23.08.2026, rounds 7 and 8).
     // …and "word character" means the UNICODE one: ASCII \w read `docs/a.md` out
     // of the ordinary German token `Menüdocs/a.md` (round 9).
-    // The SECOND SEGMENT is a path segment, not an ASCII word: `docs/Überblick.md`
+    // The SECOND SEGMENT is DEFINED BY WHAT ENDS IT — whitespace, another
+    // separator or a closing delimiter — not by a list of allowed characters: an
+    // allowlist kept missing valid ones (`@`, `~`, an emoji) while the bare
+    // `docs/` a tool-neutral guide may name still ends at the space (round 12).
+    // The old wording said "path segment, not an ASCII word": `docs/Überblick.md`
     // and `docs/.nojekyll` are both ordinary paths (round 11).
     // A COMBINING MARK is part of the word before it: the decomposed spelling of
     // `Menüdocs/a.md` handed the detector a directory name (round 10).
-    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/[\p{L}\p{N}._-]/u,
+    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/[^\s/\\)\]}>,;"'`]/u,
     hint: 'Pfad aus diesem Repository',
   },
   {
