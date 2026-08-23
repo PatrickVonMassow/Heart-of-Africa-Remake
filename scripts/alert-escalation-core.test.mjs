@@ -152,9 +152,9 @@ describe('escalationDecision — generic stalled and stale alerts continue and r
 
   it('names the decision card demanded by the continue verdict', () => {
     const d = escalationDecision(generic)
-    expect(d.decisionCard).toBe('Batch continues after alert: Batch drive is STALLED')
+    expect(d.decisionCard).toBe('Entscheidungsprotokoll: Batch läuft weiter — Batch drive is STALLED')
     expect(d.reason).toContain(d.decisionCard)
-    expect(continuationDecisionCard('  Board   out of date ')).toBe('Batch continues after alert: Board out of date')
+    expect(continuationDecisionCard('  Board   out of date ')).toBe('Entscheidungsprotokoll: Batch läuft weiter — Board out of date')
   })
 
   it('advances above the top only after the continue decision is recorded', () => {

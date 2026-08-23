@@ -121,13 +121,13 @@ export function nextFailureStreak({ streak = 0, kind = 'reachable' } = {}) {
  * Verdicts this adds to the currency ones ('current' / 'behind' / 'settling' /
  * 'unknown'):
  *   'transport'   — a fetch failed while the other transport answered. Reported,
- *                   at a priority the ladder may never pause on, and NEVER as a
- *                   statement about the board's currency.
+ *                   at a quieter priority, and NEVER as a statement about the
+ *                   board's currency.
  *   'flaky'       — everything failed, but not yet for `threshold` consecutive
  *                   probes. Logged by the caller, reported to nobody: one tick
  *                   of silence is the flicker this point was written for.
  *   'unreachable' — everything failed, for `threshold` consecutive probes. The
- *                   genuine outage, and the one that still climbs to the pause.
+ *                   genuine outage; it climbs, then records continuation.
  *
  * `streak` is the count AFTER this probe (i.e. `nextFailureStreak`'s answer), so
  * the caller keeps exactly one number between ticks.

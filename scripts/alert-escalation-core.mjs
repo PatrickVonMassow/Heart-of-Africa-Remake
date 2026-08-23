@@ -90,7 +90,7 @@ export function isCorruptionAlertClass(alertClass) {
 /** Stable card title named by the pure verdict and consumed by the I/O half. */
 export function continuationDecisionCard(title = '') {
   const subject = String(title).trim().replace(/\s+/g, ' ') || 'unnamed alert'
-  return `Batch continues after alert: ${subject}`.slice(0, 160)
+  return `Entscheidungsprotokoll: Batch läuft weiter — ${subject}`.slice(0, 160)
 }
 
 /** Keeps a title's last word and a message's first word from merging into one

@@ -35,8 +35,8 @@ export function ntfyTopic(topicFile = TOPIC_FILE) {
  * Send an alert — through the ESCALATION LADDER (point 434).
  *
  * A repeated IDENTICAL alert no longer repeats identically: it backs off with a
- * rising interval and a rising priority, and its last rung PAUSES the batch with
- * a board card, because an alert can be slept through and a paused batch cannot.
+ * rising interval and a rising priority. Its last rung records continuation;
+ * only an explicitly classified corruption condition may still pause.
  * The decision is `scripts/alert-escalation-core.mjs`; the state, the pause and
  * the card are `scripts/alert-escalation.mjs`, imported LAZILY so this module
  * stays a two-import leaf for every caller — and so a test that imports `notify`
@@ -49,23 +49,28 @@ export function ntfyTopic(topicFile = TOPIC_FILE) {
  *                                   climbing alert rather than two fresh ones.
  * @param {boolean} [opts.escalate]  false sends unthrottled — for the rare alert
  *                                   whose every repetition is genuinely news.
+ * @param {string}  [opts.alertClass] condition class read against the core's
+ *                                   closed corruption list; default is generic.
  * @param {string}  [opts.topicFile] where the topic is read from (tests only).
  * @param {object}  [opts.escalation] injected ladder module (tests only).
  * @returns {Promise<boolean>} true when the message went out. FALSE also means
  *          "held back by the ladder", not only "failed"; the ladder log
  *          (.claude/resilience/alert-escalation.log) says which of the two it was.
  *
- * THE PRIORITY IS PART OF THE CONTRACT, not decoration: an alert posted at
- * `high`/`urgent` is a standing CONDITION and its ladder may end in a paused
- * batch, while one posted at `low`/`default` is an EVENT and can only ever be
- * throttled. A caller that notifies about something routine and recurring must
- * not declare it urgent.
+ * PRIORITY CONTROLS PRESENTATION ONLY. Pause authority comes exclusively from
+ * `alertClass` and the closed list beside the pure decision core.
  */
 export async function notify(
   title,
   message,
   priority = 'default',
-  { key = null, escalate: useLadder = true, topicFile = TOPIC_FILE, escalation = null } = {},
+  {
+    key = null,
+    alertClass = 'generic',
+    escalate: useLadder = true,
+    topicFile = TOPIC_FILE,
+    escalation = null,
+  } = {},
 ) {
   const topic = ntfyTopic(topicFile)
   if (!topic) return false // channel not configured — silent
@@ -74,7 +79,7 @@ export async function notify(
   if (useLadder) {
     try {
       const { escalate } = escalation ?? (await import('./alert-escalation.mjs'))
-      const verdict = await escalate({ title, message, key, priority })
+      const verdict = await escalate({ title, message, key, priority, alertClass })
       if (!verdict.deliver) return false
       if (verdict.priority) effectivePriority = verdict.priority
       commit = verdict.commit ?? null

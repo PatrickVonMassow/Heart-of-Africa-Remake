@@ -1460,7 +1460,11 @@ if (repoVerdict.alert) {
   const due = !repoVerdict.standing || standingAlertDue({ lastAt: state.repoAlertAt ?? null, now })
   if (due) {
     state.repoAlertAt = now
-    await notify('Repo not clean before spawn', repoVerdict.alert, 'default')
+    await notify('Repo not clean before spawn', repoVerdict.alert, 'default', {
+      // An actual doctor finding is the second and final corruption class. A
+      // doctor that merely could not run proves no damage and stays generic.
+      alertClass: repoVerdict.mandate ? 'repository-integrity' : 'generic',
+    })
   }
 } else {
   delete state.repoAlertAt
