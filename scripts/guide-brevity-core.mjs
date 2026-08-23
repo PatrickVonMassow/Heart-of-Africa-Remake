@@ -69,7 +69,7 @@
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
 export const LIMITS = {
-  maxLines: 432,
+  maxLines: 438,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -168,7 +168,23 @@ export const LIMITS = {
   // +40 words against the measured 428 / 3826, and the ceilings move by exactly
   // that, with zero slack. No existing entry was dropped to fit it. Not escalated
   // to the user, under his general withdrawal of ask-before-raising of 10.08.2026.
-  maxWords: 3866,
+  // RAISED on 23.08.2026 by ONE genuinely new lesson: a test whose expectation is
+  // produced by the SAME generator as the artefact it checks. Both sides of the
+  // comparison inherit the generator's defect, so the test proves currency and is
+  // read as coverage for correctness — measured here on a generated command index
+  // that carried five unresolved placeholders for months under a green test
+  // (retrospective 3.165). It is neither the environment-dependent test (that one
+  // is green for the wrong checkout) nor the permissive test loader (that one is
+  // green over a program that will not start): here the YARDSTICK is not
+  // independent of the subject. The decision a reader copies is to ask where a
+  // test's expectation comes from. Written first at six lines, cut to five before
+  // the raise, as the shortening step this rule demands; the surrounding entries
+  // were read for redundancy and none was found that could be cut without dropping
+  // a claim. What remains is +6 lines / +64 words against the measured 432 / 3866,
+  // and the ceilings move by exactly that to 438 / 3930, with zero slack. Not
+  // escalated to the user, under his general withdrawal of ask-before-raising of
+  // 10.08.2026.
+  maxWords: 3930,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

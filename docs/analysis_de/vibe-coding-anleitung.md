@@ -381,6 +381,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
   Zeugen — der seine Sicherheit nicht von dem borgt, was er prüft."
 
+- **Der Test vergleicht den Erzeuger mit sich selbst.** Erwartung und Artefakt kommen aus derselben
+  Quelle: Trägt der Erzeuger den Fehler, trägt ihn die Erwartung mit, und Grün heißt „nicht veraltet".
+  → *Prompt:* „Frag bei jedem Test über einem **erzeugten** Artefakt, **woher die Erwartung kommt**.
+  Aus derselben Quelle prüft er Aktualität, nie Richtigkeit — die braucht eine Aussage, die der
+  Erzeuger **nicht selbst herstellt**."
+
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
   → *Prompt:* „Jeder Auftrag, der eine Sitzung überdauern soll, gehört in eine Datei, die dein
   Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
@@ -429,4 +435,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7dfbd3ba9d7fa1662c87e6a7647cfd12cf162fb40559e73c3218b5b39707a5b8 -->
+<!-- GUIDE-FINGERPRINT: 8b5c1994ff3a01a613169a8d67ef680a4ddabcd6de3cc9b5cbb611ef6d98415a -->
