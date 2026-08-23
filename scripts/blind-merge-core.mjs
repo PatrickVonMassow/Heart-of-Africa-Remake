@@ -103,9 +103,16 @@ export function entryKey(entry) {
  */
 export function readList(name, raw) {
   const entries = Array.isArray(raw) ? raw : Array.isArray(raw?.entries) ? raw.entries : []
+  const authorship = !Array.isArray(raw) && raw?.authorship && typeof raw.authorship === 'object'
+    ? raw.authorship
+    : {}
   return {
     list: String(name ?? '').trim() || '?',
     model: String((Array.isArray(raw) ? '' : raw?.model) ?? '').trim(),
+    // Optional origin evidence. Flags in blind-merge.mjs override these fields;
+    // retaining them here lets a tracked half carry its own check inputs.
+    authoredAt: String((Array.isArray(raw) ? '' : (authorship.at ?? raw?.authoredAt)) ?? '').trim(),
+    transcript: String((Array.isArray(raw) ? '' : (authorship.transcript ?? raw?.transcript)) ?? '').trim(),
     entries: entries.map((e) => ({
       id: String(e?.id ?? '').trim(),
       file: String(e?.file ?? '').trim(),

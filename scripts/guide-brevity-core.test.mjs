@@ -254,7 +254,7 @@ describe('the real vibe-coding guide', () => {
       '„Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft"',
     )
     expect(byTitle['Die Ausnahme existiert nur in der Verweigerung.']).toContain(
-      'Kann ihr ehrlichster Wortlaut meine eigene Prüfung bestehen?',
+      'Kann der ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?',
     )
   })
 

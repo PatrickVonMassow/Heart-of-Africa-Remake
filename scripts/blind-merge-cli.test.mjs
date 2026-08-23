@@ -97,6 +97,39 @@ describe('the command', () => {
     expect(r.out).toMatch(/list B names no model/)
   })
 
+  it('refuses when a claimed list author contradicts per-message transcript metadata', () => {
+    const at = '2026-08-13T15:34:26.009Z'
+    const transcript = write(
+      'origin.jsonl',
+      [
+        JSON.stringify({
+          timestamp: at,
+          type: 'assistant',
+          isSidechain: false,
+          message: { role: 'assistant', model: 'claude-fable-5', id: 'writes-a' },
+        }),
+        JSON.stringify({ timestamp: '2026-08-13T15:34:27.000Z', type: 'user', message: { role: 'user' } }),
+      ].join('\n'),
+    )
+    const r = run(
+      '--a', p('A.json'), '--b', p('B.txt'), '--model-b', 'GPT-5.6 Sol',
+      '--author-at-a', at, '--author-transcript-a', transcript,
+    )
+    expect(r.status).toBe(1)
+    expect(r.out).toContain('DISAGREEMENT')
+    expect(r.out).toContain('four-eyes')
+  })
+
+  it('says an absent transcript leaves the claim unverified instead of calling it agreement', () => {
+    const r = run(
+      '--a', p('A.json'), '--b', p('B.txt'), '--model-b', 'GPT-5.6 Sol',
+      '--author-at-a', '2026-08-13T15:34:26.009Z', '--author-transcript-a', p('gone.jsonl'),
+    )
+    expect(r.status).toBe(0)
+    expect(r.out).toContain('list A authorship: UNVERIFIED')
+    expect(r.out).not.toMatch(/list A authorship: AGREEMENT/)
+  })
+
   it('EXITS 1 ON A LIST WHOSE LINES CARRY NO IDS instead of counting an empty list', () => {
     const bare = write('bare.txt', 'src/x.ts | the ribbon tears\nsrc/y.ts | the save drops gifts')
     const r = run('--a', p('A.json'), '--b', bare)

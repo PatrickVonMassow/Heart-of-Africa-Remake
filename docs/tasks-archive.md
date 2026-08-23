@@ -22145,3 +22145,227 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — it changes no player-visible behaviour, but it multiplies the cost of
   every review of a long-lived branch and it spends that multiple on the scarcest pool.
   Bundle: Modell & Wächter.
+
+- [x] 840. A model label passes as proof of authorship, and authorship decides who may merge
+  (measured 22.08.2026 while recovering the blind halves of the 13.08.2026 handover stage for point
+  834). Half A of that stage carries the heading `# Proposal A — Fable 5, written 13.08.2026 before
+  seeing any other proposal`, and the origin session repeated `written blind by Fable 5` when it
+  handed the two lists to the merge. Both are FALSE. The transcript's per-message `model` field
+  shows `claude-opus-5` generated the tool call that wrote the file; the session ran two models that
+  day and switched exactly once, at 12:49:10Z; the blind stage is first mentioned at 15:33:16Z, two
+  hours and forty-four minutes after Fable's last message; and the transcript holds no sidechain
+  entries, so nothing was delegated either.
+  THE COST WAS PAID TWICE. The mislabel stood for five days and was restated in
+  `docs/handover-architecture.md`. Then this session BELIEVED it, rewrote that document's correct
+  attribution on its strength, concluded that Claude was free to merge a stage Claude had written
+  half of, performed that merge and recorded it — and only the cross-vendor review, which refused to
+  accept a label as evidence, forced the reading that overturned it. Four commits of the branch are
+  that correction and its withdrawal.
+  WHY IT MATTERS BEYOND ONE STAGE: authorship decides a PERMISSION here — who may fold a
+  blind-parallel union, who may review a range — and `scripts/blind-merge.mjs`,
+  `scripts/mechanism-review.mjs` and `scripts/fable-switch-core.mjs` all take the answer from a
+  `model` field the reviewed party writes. A self-asserted label is exactly as trustworthy as
+  whoever benefits from it, and today nothing anywhere compares one against the metadata of the
+  messages that produced the text.
+  FINAL STATE: a claimed author can be checked, and is. A command reads `message.model` from the
+  session transcript at the timestamp of the artefact — per message, never per session, because one
+  session switching models makes the session-level answer worthless — and reports agreement,
+  disagreement or an unreadable transcript. Where a half's claimed author disagrees with the
+  metadata, the four-eyes tooling refuses rather than proceeds. Where the transcript is gone, that
+  is SAID, and the claim is recorded as unverified rather than silently trusted.
+  VERIFIABLE: the command answers correctly for the 676 halves — half A disagrees with its heading
+  and half B agrees with its own — and its cases cover a session with a model switch, a delegated
+  sidechain, a missing transcript and a half whose heading names no model at all.
+  QUEUE RANK: directly behind point 834, whose precondition it guards. Reason: 834's re-merge cannot
+  be trusted until a claimed author can be checked, and this session already spent a full cycle
+  proving that by getting it wrong.
+  Criticality: high — it decides a permission in the rule the project relies on to catch what a
+  single model misses, and it has already produced one invalid recorded merge.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 517. The lease-expiry takeover ignores an honoured claim (measured
+  05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
+  minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
+  successor, although a claim from the user's own window d68e8df9 had stood since
+  14:14 with `honour: true` — the same tick had still respected that claim at
+  12:36Z ("reserved — the user is working in that window"). The boundary path knows
+  the CLAIMING_WINDOW target (`boundaryHandover` in `scripts/batch-boundary.mjs`);
+  the lease-expiry path in `scripts/batch-launcher-core.mjs` does not, and spawns a
+  successor unconditionally. The consequence is that a user who wants to take over
+  WITHOUT forcing anything can wait arbitrarily long: the batch moves from session
+  to session past him.
+  FINAL STATE:
+  1. On lease expiry the launcher reads the claim state before it decides. With an
+     HONOURED claim standing, the lock is RELEASED and RESERVED for the claiming
+     window instead of being handed to a new successor — the same target the
+     boundary path already resolves.
+  2. Both paths reach that decision through ONE shared function, so a future change
+     cannot fix one and leave the other behind; the boundary path keeps its current
+     behaviour byte for byte.
+  3. A claim that is expired, or whose claimant is dead, still yields a successor —
+     the reservation follows the claim's own `honour` verdict, nothing else.
+  4. The reservation is bounded: a claiming window that never takes the lock does
+     not stall the batch forever, and what the bound is, is stated where the
+     reservation is written.
+  MEASURED AGAIN ON A SECOND TRIGGER (06.08.2026, 02:22Z): the same tick took the
+  batch from session 898cbf40 with "LEASE EXPIRED — has not renewed for 55 min", in
+  the same breath as its own reading "declared work advancing — branch
+  refs/heads/feat/483-adults-teach-landscape — tip 2 min old; worktree … active 0 min
+  ago". The owner was alive and stayed alive: two minutes AFTER the takeover it
+  started a `polish` run that rewrote 34 verification frames inside the very worktree
+  the new owner was merging from. The lease renews BEFORE each call, so an owner that
+  legitimately WAITS inside ONE long call — on a delegated agent, on a browser suite —
+  cannot renew at all; the in-flight declaration exists to hold the lock for exactly
+  that case, but it lapses after 45 minutes and nothing extends it while its own
+  evidence is still moving. The lease arithmetic itself is not in question (user
+  30.07.2026) — what is missing is a renewal that runs OUTSIDE the blocked session.
+  FINAL STATE (continued):
+  5. The launcher tick, which already re-reads a declaration's evidence every cycle,
+     EXTENDS the lease while that evidence is provably advancing, and stops the
+     moment it is not. Ownership therefore stays arithmetic — a standstill still
+     loses the batch, because quiet evidence renews nothing — but a wait that is
+     genuinely working keeps it however long the call runs. The 45-minute lapse
+     remains the backstop for a declaration whose evidence went quiet.
+  6. Items 1 and 5 are the same decision and reach it through the shared function of
+     item 2: one place decides what an expired lease means.
+  VERIFIABLE: pure Vitest on the launcher's decision (lease expired + honoured claim
+  → reserve, never spawn; lease expired + no claim → spawn; lease expired + expired
+  claim → spawn; the bound elapses → spawn; lease expired + a declaration whose
+  evidence still advances → renew, never spawn; lease expired + a declaration whose
+  evidence has gone quiet → spawn), and the boundary path's existing tests stay green
+  unchanged.
+  MEASURED AGAIN 21.08.2026, AND IT ADDS A THIRD PATH AND AN EARLIER CAUSE. The user's own
+  window claimed the batch at 07:46 and lost it anyway. `.claude/autostart.log` honoured the
+  claim twice — 05:55:24Z "skip: session 593e0d2f has CLAIMED the batch 9 min ago (reserved)"
+  and the same line at 24 min — then at 06:25:29Z, with the claim 39 minutes old, the claim
+  vanished from the tick's reasoning and it logged only "skip: owner alive". At 06:30:03Z the
+  owner handed over regularly and the launcher logged "HANDOVER accepted: 388cea5f handed the
+  batch over — spawning the successor", starting a FRESH session that then owned the batch.
+  (a) THE HANDOVER BRANCH IS THE THIRD PATH. `scripts/batch-autostart.mjs` spawns
+  unconditionally when the owner hands over; it never asks the claim. This point's item 2
+  already forbids fixing one path and leaving another behind, so this branch joins the same
+  shared decision rather than getting one of its own. Point 752's stage 2b names the missing
+  resolver (`resolveBoundaryDestination`); a grep over `scripts/` shows it does not exist yet,
+  so nothing today redirects a handover to a claiming window.
+  (b) THE LAUNCHER'S CLAIM READING EXPIRES EARLY, which is why (a) never even saw a live claim.
+  `assessClaim` suspends its clock on `ownerHolding` (`scripts/batch-claim-core.mjs:302`), and
+  two readers derive that input through the pure `ownerIsHolding` predicate
+  (`scripts/batch-claim.mjs:150`, `scripts/batch-resume-hook.mjs:318`). The launcher does not:
+  `scripts/batch-autostart.mjs:658` calls `takeoverDecision` with claim, now, maxAgeMs and
+  probePid only, so `ownerHolding` defaults false and every claim expires for the launcher at
+  `CLAIM_MAX_AGE_MS` — while `node scripts/batch-claim.mjs --status` kept answering `honour`
+  for the same record at 21 and at 44 minutes. The comment over `ownerIsHolding` says the
+  predicate is pure so both readers "cannot drift apart" and calls two readers disagreeing
+  about one state "the disease this point was written for". The launcher is the reader that
+  drifted, and it holds the lock in hand at that moment — it reads it a few lines later for
+  the handover branch.
+  FINAL STATE (continued):
+  7. The handover branch reaches the SAME shared decision as items 1 and 5, so an honoured
+     claim reserves the freed lock for the claiming window instead of spawning a successor.
+  8. Every reader of a claim derives `ownerHolding` through `ownerIsHolding`, the launcher
+     included, so no door judges the same record differently from `--status`.
+  VERIFIABLE, added: a case that a claim older than `CLAIM_MAX_AGE_MS` with a LIVE owner
+  holding is honoured by the launcher's own decision exactly as `--status` honours it; a case
+  that a handover with an honoured claim reserves and does not spawn; and a case that a
+  handover with no claim, or a dead claimant, still spawns at once.
+  Criticality: high — it hands the batch past the window that asked for it, so the user cannot
+  take over without forcing something, and it defeats the claim mechanism the whole handover
+  protocol rests on.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 720. The findings carrier rings through the delivery that already runs on every tool
+  call, instead of waiting for a turn end the batch owner does not have (user
+  18.08.2026, 15:16).
+
+  WHY HERE AND NOT A NEW CHANNEL. A stood-down window — the one the user talks to,
+  and the one that therefore finds most of what he asks about — can write to the
+  carrier and to nothing else. On 18.08. eight entries waited there up to 9.5
+  hours. The transport was never the problem: `deliverPendingMessages()` in
+  `scripts/chat-spool.mjs` already puts text into the owner's context on EVERY tool
+  call, through `scripts/lock-heartbeat-hook.mjs` (PostToolUse, `*`), and the
+  inbound chat leg is a live subscription that spooled the user's 14:30:45 message
+  at 14:30:46. What is missing is that the carrier has no bell on that path. A
+  SECOND message kind or a second transport was considered and rejected: it would
+  split findings across two stores and re-open the signature and identity question
+  that makes the chat inbox unusable for a session (an inbox envelope carries a
+  direction and an HMAC, no sender, so anything a session posts there arrives as
+  the user's own words).
+
+  FINAL STATE:
+
+  1. `deliverPendingMessages` gains a SECOND SOURCE beside the chat spool: when the
+     reading session OWNS the batch and the carrier holds waiting entries, the
+     delivery emits ONE line — the count, the oldest entry's timestamp, its title,
+     and the drain command (`node scripts/finding.mjs --drain`). It reads the
+     carrier through `parseCarrier`/`carrierPath`; it never writes to it, and the
+     drain stays `finding.mjs --drained "<title>"`.
+
+  2. ZERO BYTES WHILE NOTHING WAITS. The token rule the chat delivery already holds
+     applies unchanged: an empty carrier produces empty stdout, because injected
+     context is re-sent with every later request of the session.
+
+  3. ONE INTERRUPTION PER CALL. A tool call that already delivers a chat message
+     does not also ring the carrier bell — the user's own words go first, and the
+     bell rides the next call.
+
+  4. IT DOES NOT NAG. The line is emitted at most once per REMINDER_INTERVAL
+     (15 minutes, one constant, in the pure core) and again immediately whenever
+     the waiting count RISES, so a new finding is announced at once while an
+     ignored one does not repeat every second.
+
+  5. IT FOLLOWS THE PAUSE DECISION, WHATEVER IT BECOMES. Today
+     `deliverPendingMessages` returns '' while the batch is paused. That
+     suppression is itself under review (a pause is when an instruction matters
+     most); the bell inherits whatever that review decides rather than carving out
+     its own exception.
+
+  6. NON-OWNERS SEE NOTHING. The carrier is drained by the owner alone, so a
+     stood-down window is never told about entries it may not act on.
+
+  VERIFIABLE: Vitest over the pure decision core — waiting entries plus ownership
+  yields one line; an empty carrier yields ''; a non-owner yields ''; a call that
+  carries a chat message yields the chat message only; a second call inside the
+  interval yields ''; a risen count yields the line again. And the process-level
+  shape in the manner of `scripts/chat-delivery-hook.test.mjs`: `node
+  scripts/lock-heartbeat-hook.mjs` against an isolated temp repo writes the exact
+  `hookSpecificOutput` envelope, and writes nothing at all for an empty carrier.
+
+  Criticality: medium — it delivers no verdict of its own and cannot block work; it
+  makes an existing, already-enforced duty visible while it can still be done. Its
+  fail direction is silence, which is today's state.
+
+  Bundle: Chat & Tafel.
+
+- [x] 846. The router can send a point to the Fable lane, but nothing can commission it there
+  (measured 23.08.2026, 01:55, on `feat/834-durable-authoring-lane`). `node
+  scripts/author-sol.mjs --point 834 --dry-run`, run in the `point-834` worktree, answers "point
+  834 routes to the fable lane (Fable 5), not to GPT-5.6 Sol: because 18 unsuccessful review
+  rounds reached the §6 escalation threshold of 5" and refuses. There is no `author-fable.mjs`,
+  and the one recorder that would log such a run — `recordAuthoringCommission` in
+  `scripts/author-sol.mjs` — writes `model: SOL_MODEL_NAME` unconditionally, so even a Fable run
+  driven by hand cannot leave a truthful commission row. `criticality-review-guard` uses exactly
+  those rows as the base for a point's reviewed file set, so an unrecorded commission is not a
+  cosmetic gap: it is a point whose later review coverage cannot be computed.
+  WHAT THAT COSTS TODAY: point 834 stands directly behind this one in the work order, its first stage is
+  built and reviewed on its branch, and its next authoring stage has nowhere to go. The three
+  answers available to a session that meets this are all wrong — override the escalation with
+  `--anyway` and keep the lane that already failed 18 rounds, author it as Claude and re-run the
+  same failure a nineteenth time, or hand-append to the append-only ledger without its durability
+  transaction.
+  A SECOND, SMALLER CONTRADICTION IS SETTLED IN THE SAME PASS: `docs/batch-owner-runbook.md` says
+  "Fable 5 is out of the automatic cut and authors only a point that tags its lane", while
+  `scripts/author-routing-core.mjs` routes to Fable automatically at the escalation threshold.
+  Both texts cannot be the rule. Whichever survives, CLAUDE.md §6, the runbook and the router say
+  the same thing afterwards.
+  FINAL STATE: a point the router assigns to the Fable lane can be commissioned by one command,
+  the way `author-sol.mjs` commissions the Sol lane — same branch-and-worktree contract, same
+  three cheap gates, same "merges nothing", and a commission row that names the model that
+  actually ran. `recordAuthoringCommission` takes the lane's model rather than assuming Sol, and
+  the existing Sol callers keep their behaviour unchanged.
+  VERIFIABLE: Vitest showing a Fable commission row recorded with `model: "Fable 5"` and the Sol
+  path unchanged; the routing dry-run for a Fable-lane point naming the command that serves it
+  instead of refusing; and `criticality-review-guard` computing a file set from a Fable
+  commission base.
+  Criticality: high — it blocks the first open point of the work order, and every wrong way
+  around it either repeats a failed lane or corrupts the four-eyes ledger.
+  Bundle: Session- & Repo-Hygiene.

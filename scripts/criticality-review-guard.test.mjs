@@ -140,6 +140,32 @@ describe('point file-set measurement', () => {
     expect(rows[2].pointFiles).toBeUndefined()
   })
 
+  it('computes the reviewed file set from a Fable commission base', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 846,
+      sha: 'a'.repeat(40),
+      model: 'Fable 5',
+      at: 1_787_130_000_000,
+      reachable: true,
+    }
+    const review = {
+      point: 846,
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      descendsFrom: [commission.sha],
+      reachable: true,
+    }
+    const calls = []
+    const rows = attachPointFileSets([commission, review], (base, sha) => {
+      calls.push([base, sha])
+      return ['scripts/author-fable.mjs', 'scripts/author-sol.mjs']
+    })
+
+    expect(calls).toEqual([[commission.sha, review.sha]])
+    expect(rows[1].pointFiles).toEqual(['scripts/author-fable.mjs', 'scripts/author-sol.mjs'])
+  })
+
   it('verifies unavailable receipts only for Git’s exact unreviewable file set', () => {
     const commission = {
       kind: 'authoring-commission',

@@ -42,6 +42,15 @@ import { ensureModelProven } from './review-sol.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
 import { routeFor } from './sol-share-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
+import { fableIsOn } from './fable-switch-core.mjs'
+import {
+  authoringClaudeArgs,
+  FABLE_MODEL,
+  FABLE_MODEL_ID,
+  FABLE_TRAILER,
+  fableAuthoringOutcome,
+  parseClaudeAuthoringOutput,
+} from './author-fable-core.mjs'
 import {
   AUTHOR_TIMEOUT_MS,
   authorCommitMessage,
@@ -61,6 +70,7 @@ import {
   SOL_MODEL_ID,
   SOL_MODEL_NAME,
   SOL_REASONING_EFFORT,
+  SOL_TRAILER,
   withheldEnvNames,
 } from './author-sol-core.mjs'
 
@@ -154,6 +164,7 @@ export function recordAuthoringCommission({
   round = 0,
   framing = '',
   sha = '',
+  model = SOL_MODEL_NAME,
   now = Date.now(),
   append = () => {},
   commit = () => {},
@@ -163,9 +174,11 @@ export function recordAuthoringCommission({
   const attempt = Number(round)
   const frame = String(framing ?? '').trim()
   const commitSha = String(sha ?? '').trim()
+  const authorModel = String(model ?? '').trim()
   if (!Number.isSafeInteger(wanted) || wanted < 0) throw new Error('an authoring commission needs a numeric point')
   if (!Number.isSafeInteger(attempt) || attempt < 0) throw new Error('an authoring commission needs a non-negative round')
   if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) throw new Error('an authoring commission needs the current commit sha')
+  if (!authorModel) throw new Error('an authoring commission needs the lane model')
 
   const existing = (Array.isArray(records) ? records : []).find(
     (record) =>
@@ -176,6 +189,9 @@ export function recordAuthoringCommission({
   if (existing) {
     if (String(existing.authorFraming ?? '').trim() !== frame) {
       throw new Error(`authoring round ${attempt} already has a different framing on record`)
+    }
+    if (String(existing.model ?? '').trim() !== authorModel) {
+      throw new Error(`authoring round ${attempt} already has a different lane model on record`)
     }
     return { written: false, record: existing }
   }
@@ -188,7 +204,7 @@ export function recordAuthoringCommission({
     point: wanted,
     round: attempt,
     authorFraming: frame,
-    model: SOL_MODEL_NAME,
+    model: authorModel,
     at,
     atIso: new Date(at).toISOString(),
   }
@@ -334,17 +350,20 @@ export async function runAuthoringCodex({
   branch = '',
   timeoutMs = AUTHOR_TIMEOUT_MS,
   modelId = SOL_MODEL_ID,
+  runtime = 'codex',
   pushEveryMs = PUSH_INTERVAL_MS,
   onPush = () => {},
 }) {
-  const outFile = join(tmpdir(), `author-sol-${process.pid}-${Date.now()}.txt`)
-  const args = authoringCodexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
+  const outFile = runtime === 'codex' ? join(tmpdir(), `author-sol-${process.pid}-${Date.now()}.txt`) : ''
+  const args = runtime === 'claude'
+    ? authoringClaudeArgs({ modelId, prompt })
+    : authoringCodexArgs({ modelId, effort: SOL_REASONING_EFFORT, cwd, outputFile: outFile, prompt })
   // ITS OWN PROCESS GROUP (third cross-vendor round). Signalling the child alone
   // left its shells and test runners alive: they went on writing to the worktree
   // AFTER the commits had been inspected, pushed and reported, so the report
   // described a branch that was still moving. `detached` makes the run a group
   // leader, and the kill below takes the group.
-  const child = spawn('codex', args, {
+  const child = spawn(runtime === 'claude' ? 'claude' : 'codex', args, {
     cwd,
     env: childEnv(process.env),
     windowsHide: true,
@@ -420,16 +439,19 @@ export async function runAuthoringCodex({
   if (pusher) clearInterval(pusher)
 
   let last = ''
-  try {
-    last = readFileSync(outFile, 'utf8')
-  } catch {
-    /* codex writes it only on a completed run; stdout still carries the answer */
+  if (outFile) {
+    try {
+      last = readFileSync(outFile, 'utf8')
+    } catch {
+      /* codex writes it only on a completed run; stdout still carries the answer */
+    }
+    try {
+      rmSync(outFile, { force: true })
+    } catch {
+      /* a leftover temp file is not worth an exit code */
+    }
   }
-  try {
-    rmSync(outFile, { force: true })
-  } catch {
-    /* a leftover temp file is not worth an exit code */
-  }
+  const modelResult = runtime === 'claude' ? parseClaudeAuthoringOutput(stdout) : null
   return {
     spawnError,
     exitCode,
@@ -440,29 +462,61 @@ export async function runAuthoringCodex({
     // the FINAL push cannot report work as local-only that is on the remote
     // (second cross-vendor round).
     lastPushed,
-    finalMessage: last || stdout || '',
+    modelResult,
+    finalMessage: modelResult?.result || last || stdout || '',
   }
 }
 
-export const usage = () =>
+const AUTHOR_LANE_CONFIG = Object.freeze({
+  sol: Object.freeze({
+    lane: 'sol',
+    commandName: 'author-sol',
+    model: SOL_MODEL_NAME,
+    modelId: SOL_MODEL_ID,
+    trailer: SOL_TRAILER,
+    reviewer: 'Opus 5',
+    reviewerLabel: 'Claude',
+    runtime: 'codex',
+    runtimeLabel: 'codex',
+    detail: `(effort ${SOL_REASONING_EFFORT})`,
+    laneDescription: 'the hard and critical ones included',
+  }),
+  fable: Object.freeze({
+    lane: 'fable',
+    commandName: 'author-fable',
+    model: FABLE_MODEL,
+    modelId: FABLE_MODEL_ID,
+    trailer: FABLE_TRAILER,
+    reviewer: SOL_MODEL_NAME,
+    reviewerLabel: SOL_MODEL_NAME,
+    runtime: 'claude',
+    runtimeLabel: 'Claude',
+    detail: '',
+    laneDescription: 'the points the shared router escalates or explicitly tags for Fable',
+  }),
+})
+
+export const usage = ({ commandName = 'author-sol', model = SOL_MODEL_NAME, reviewerLabel = 'Claude' } = {}) =>
   [
     'usage: node scripts/author-sol.mjs --point <N> [--findings <file>] [--rounds <n>] [--timeout <ms>]',
     '           [--anyway] [--dry-run]',
     '       node scripts/author-sol.mjs --routing (--point <N> [--rounds <n>] | --all)',
     '',
-    `${SOL_MODEL_NAME} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
+    `${model} AUTHORS the point in THIS worktree, on THIS branch, committing at every step;`,
     'the branch is pushed for it while it works. It runs the three cheap gates (test:unit, build,',
     'lint) on its own work and merges nothing: the REVIEW, the browser suites, the picture and the',
-    'landing belong to the Claude session that called it, which is what keeps two vendors on the',
+    `landing belong to the ${reviewerLabel} session that called it, which is what keeps two vendors on the`,
     'point and neither reviewing itself.',
     '',
     'The lane is decided by the point itself (--routing shows why). A point the routing gives to',
     'another lane is refused unless --anyway is given, and the share switch can turn the whole',
-    'lane off:  node scripts/sol-share.mjs --status',
-  ].join('\n')
+    `lane off:  node scripts/${commandName === 'author-fable' ? 'fable-switch' : 'sol-share'}.mjs --status`,
+  ].join('\n').replaceAll('scripts/author-sol.mjs', `scripts/${commandName}.mjs`)
 
-if (isMainModule(import.meta.url)) {
-  const argv = process.argv.slice(2)
+export async function runAuthoringCli({ authorLane = 'sol', argv = process.argv.slice(2) } = {}) {
+  const config = AUTHOR_LANE_CONFIG[authorLane]
+  if (!config) throw new Error(`unknown authoring lane ${authorLane}`)
+  const { commandName, model: authorModel } = config
   const knownFlags = new Set([
     '--point',
     '--findings',
@@ -481,20 +535,20 @@ if (isMainModule(import.meta.url)) {
   }
   try {
     if (argv.includes('--help') || argv.includes('-h')) {
-      console.log(usage())
+      console.log(usage(config))
       process.exit(0)
     }
     const unknown = argv.find((arg) => arg.startsWith('-') && !knownFlags.has(arg))
     if (unknown) {
-      console.error(`author-sol: unknown option ${unknown}.\n`)
-      console.error(usage())
+      console.error(`${commandName}: unknown option ${unknown}.\n`)
+      console.error(usage(config))
       process.exit(2)
     }
     const roundsText = flag('--rounds')
     const roundsValue = Number(roundsText)
     if (argv.includes('--rounds') && (!/^\d+$/.test(roundsText) || !Number.isSafeInteger(roundsValue))) {
-      console.error('author-sol: --rounds needs a non-negative integer.\n')
-      console.error(usage())
+      console.error(`${commandName}: --rounds needs a non-negative integer.\n`)
+      console.error(usage(config))
       process.exit(2)
     }
     const roundsOverride = argv.includes('--rounds') ? roundsValue : undefined
@@ -504,7 +558,7 @@ if (isMainModule(import.meta.url)) {
     if (argv.includes('--routing')) {
       if (argv.includes('--all')) {
         if (roundsOverride !== undefined) {
-          console.error('author-sol: --rounds applies to one --point, not --all.')
+          console.error(`${commandName}: --rounds applies to one --point, not --all.`)
           process.exit(2)
         }
         const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
@@ -528,25 +582,28 @@ if (isMainModule(import.meta.url)) {
       }
       const number = flag('--point')
       if (!number) {
-        console.error('author-sol: --routing needs --point <N> or --all.\n')
-        console.error(usage())
+        console.error(`${commandName}: --routing needs --point <N> or --all.\n`)
+        console.error(usage(config))
         process.exit(2)
       }
       const records = readRecords(process.env.AUTHOR_REVIEW_RECORDS_FILE || undefined)
       const decided = laneFor(number, { reworkRounds: roundsOverride, records, fableState })
-      if (!decided.body) console.error(`author-sol: point ${number} is not in the OPEN work order — routing what is known.`)
-      console.log(`author-sol: point ${number} → ${decided.lane || 'blocked'} (${decided.model || 'no model'})`)
+      if (!decided.body) console.error(`${commandName}: point ${number} is not in the OPEN work order — routing what is known.`)
+      console.log(`${commandName}: point ${number} → ${decided.lane || 'blocked'} (${decided.model || 'no model'})`)
       console.log(formatAuthorRoundHistory(decided.roundHistory))
       const step = nextAuthoringStep({ records, point: number, reworkRounds: roundsOverride })
       console.log(`  next step: ${step.kind} — ${step.reason}`)
       for (const why of decided.why) console.log(`  because ${why}`)
+      if (decided.lane === 'fable') {
+        console.log(`  commission: node scripts/author-fable.mjs --point ${number}`)
+      }
       process.exit(0)
     }
 
     const point = flag('--point')
     if (!point) {
-      console.error('author-sol: --point <N> is required.\n')
-      console.error(usage())
+      console.error(`${commandName}: --point <N> is required.\n`)
+      console.error(usage(config))
       process.exit(2)
     }
 
@@ -563,11 +620,11 @@ if (isMainModule(import.meta.url)) {
       try {
         findings = readFileSync(findingsFile, 'utf8')
       } catch (e) {
-        console.error(`author-sol: --findings ${findingsFile}: ${e.message}`)
+        console.error(`${commandName}: --findings ${findingsFile}: ${e.message}`)
         process.exit(2)
       }
       if (!findings.trim()) {
-        console.error(`author-sol: --findings ${findingsFile} is empty — there is nothing to answer.`)
+        console.error(`${commandName}: --findings ${findingsFile} is empty — there is nothing to answer.`)
         process.exit(2)
       }
       return findings
@@ -576,10 +633,10 @@ if (isMainModule(import.meta.url)) {
       const findings = readFindings()
       const brief = briefFor(point)
       if (!brief) {
-        console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
+        console.error(`${commandName}: point-brief.mjs produced no brief for point ${point} — the spec cannot be examined from half its text.`)
         process.exit(2)
       }
-      const examinationRoute = specExaminerFor(decided.roundHistory, SOL_MODEL_NAME)
+      const examinationRoute = specExaminerFor(decided.roundHistory, authorModel)
       const route = examinationRoute.route === 'claude-read'
         ? 'Claude reads this packet directly because Sol authored the round.'
         : 'Run `node scripts/ask-sol.mjs --kind audit` with this packet because Claude authored the round.'
@@ -592,7 +649,7 @@ if (isMainModule(import.meta.url)) {
       })
       const head = git(['rev-parse', 'HEAD'], { cwd: process.cwd() }) ?? '<reviewed-sha>'
       console.log(
-        `author-sol: SPEC EXAMINATION REQUIRED before another authoring commission.\n` +
+        `${commandName}: SPEC EXAMINATION REQUIRED before another authoring commission.\n` +
           `  ${authoringStep.reason}\n` +
           `  cross-vendor route: ${route}\n\n` +
           `${packet}\n\n` +
@@ -620,13 +677,14 @@ if (isMainModule(import.meta.url)) {
       // main; the shared resolver deliberately returns null for that case.
       mainCheckout: mainCheckoutFrom(common, REPO_ROOT) ?? REPO_ROOT,
       dirty: git(['status', '--porcelain'], { cwd }) ?? '',
+      authorName: authorModel,
     })
     // A DRY RUN IS STILL SHOWN THE REFUSALS, but is not stopped by them: it
     // spends nothing and writes nothing, and inspecting the prompt is exactly
     // what one does while the tree is still dirty.
     const dryRun = argv.includes('--dry-run')
     if (problems.length) {
-      console.error(`author-sol: ${dryRun ? 'this run WOULD be refused' : `refusing to start ${SOL_MODEL_NAME} here`}.`)
+      console.error(`${commandName}: ${dryRun ? 'this run WOULD be refused' : `refusing to start ${authorModel} here`}.`)
       for (const p of problems) console.error(`  · ${p}`)
       if (!dryRun) process.exit(2)
     }
@@ -635,14 +693,18 @@ if (isMainModule(import.meta.url)) {
     // Its automatic escalation signal comes from the review ledger. `--rounds`
     // is the deliberate override for a history that the ledger cannot know.
     console.error(
-      `author-sol: lane verdict for point ${point}: ${decided.lane} (${LANE_MODEL[decided.lane]}); ` +
+      `${commandName}: lane verdict for point ${point}: ${decided.lane} (${LANE_MODEL[decided.lane]}); ` +
         `${decided.roundHistory.unsuccessfulRounds} unsuccessful review round(s), ` +
         `${decided.signals.reworkRounds} fresh attempt(s).`,
     )
     console.error(formatAuthorRoundHistory(decided.roundHistory))
-    if (decided.lane !== 'sol' && !argv.includes('--anyway')) {
+    if (decided.lane !== config.lane && !argv.includes('--anyway')) {
+      if (dryRun && decided.lane === 'fable' && config.lane === 'sol') {
+        console.error(`author-sol: this point is commissioned with: node scripts/author-fable.mjs --point ${point}`)
+        process.exit(0)
+      }
       console.error(
-        `author-sol: point ${point} routes to the ${decided.lane} lane (${LANE_MODEL[decided.lane]}), not to ${SOL_MODEL_NAME}:\n` +
+        `${commandName}: point ${point} routes to the ${decided.lane} lane (${LANE_MODEL[decided.lane]}), not to ${authorModel}:\n` +
           `  because ${decided.why[0]}\n` +
           '  Author it in that lane, or override this once with --anyway.',
       )
@@ -651,14 +713,20 @@ if (isMainModule(import.meta.url)) {
 
     // THE SHARE SWITCH CAN TURN THE WHOLE LANE OFF (point 654's lever, extended
     // here to the biggest spender of the two vendors).
-    const share = currentSetting()
-    if (share.problem) console.error(settingProblemLine(share, 'author-sol'))
-    if (routeFor('author', share.setting) !== 'sol' && !argv.includes('--anyway')) {
-      console.error(
-        `author-sol: the share switch is at \`${share.setting}\`, which keeps authoring with Claude.\n` +
-          '  node scripts/sol-share.mjs --more   (override once with --anyway)',
-      )
+    if (config.lane === 'fable' && !fableIsOn(fableState)) {
+      console.error(`${commandName}: ${FABLE_MODEL} is switched off; node scripts/fable-switch.mjs --status`)
       process.exit(3)
+    }
+    if (config.lane === 'sol') {
+      const share = currentSetting()
+      if (share.problem) console.error(settingProblemLine(share, commandName))
+      if (routeFor('author', share.setting) !== 'sol' && !argv.includes('--anyway')) {
+        console.error(
+          `${commandName}: the share switch is at \`${share.setting}\`, which keeps authoring with Claude.\n` +
+            '  node scripts/sol-share.mjs --more   (override once with --anyway)',
+        )
+        process.exit(3)
+      }
     }
 
     const findings = readFindings()
@@ -666,15 +734,28 @@ if (isMainModule(import.meta.url)) {
     // The brief is cut fresh: a stale one describes a work order that has moved.
     const brief = !findings ? briefFor(point) : ''
     if (!findings && !brief) {
-      console.error(`author-sol: point-brief.mjs produced no brief for point ${point} — refusing to author from nothing.`)
+      console.error(`${commandName}: point-brief.mjs produced no brief for point ${point} — refusing to author from nothing.`)
       process.exit(2)
     }
 
-    const prompt = buildAuthoringPrompt({ point, brief, branch, findings, framing: authoringStep.framing })
+    const prompt = buildAuthoringPrompt({
+      point,
+      brief,
+      branch,
+      findings,
+      framing: authoringStep.framing,
+      authorModel,
+      authorTrailer: config.trailer,
+      reviewer: config.reviewerLabel,
+      laneDescription: config.laneDescription,
+    })
     const withheld = withheldEnvNames(process.env)
     if (dryRun) {
-      console.log(`author-sol: DRY RUN — nothing is spent and nothing is written.\n`)
-      console.log(`  codex ${authoringCodexArgs({ cwd: worktree, prompt: '<the prompt>' }).join(' ')}`)
+      console.log(`${commandName}: DRY RUN — nothing is spent and nothing is written.\n`)
+      const dryArgs = config.runtime === 'claude'
+        ? authoringClaudeArgs({ modelId: config.modelId, prompt: '<the prompt>' })
+        : authoringCodexArgs({ cwd: worktree, prompt: '<the prompt>' })
+      console.log(`  ${config.runtime} ${dryArgs.join(' ')}`)
       console.log(`  withheld from its environment: ${withheld.length ? withheld.join(', ') : 'nothing matched'}`)
       console.log(`\n--- the prompt ---\n${prompt}\n--- end ---`)
       process.exit(0)
@@ -683,8 +764,8 @@ if (isMainModule(import.meta.url)) {
     // The identity is PROVEN before a commit is stamped with Sol's name: nothing
     // in a run's output says which model answered, so the attribution rests on
     // the server refusing an unknown id (review-sol.mjs --probe).
-    if (!ensureModelProven({ who: 'author-sol' })) {
-      console.error(`author-sol: the model id is not proven honoured — refusing to attribute commits to ${SOL_MODEL_NAME}.`)
+    if (config.lane === 'sol' && !ensureModelProven({ who: commandName })) {
+      console.error(`${commandName}: the model id is not proven honoured — refusing to attribute commits to ${authorModel}.`)
       process.exit(2)
     }
 
@@ -707,6 +788,7 @@ if (isMainModule(import.meta.url)) {
       round: authoringStep.round,
       framing: authoringStep.framing,
       sha: commissionSha,
+      model: authorModel,
       append: (record) => appendRecord(record, recordsPath),
       rollback: () => restoreLedger(ledgerBefore),
       commit: () => {
@@ -717,6 +799,7 @@ if (isMainModule(import.meta.url)) {
           input: authorCommitMessage({
             subject: 'Record hostile-test authoring commission',
             rescue: 'the commissioned authoring run has not started yet',
+            trailer: config.trailer,
           }),
         })
       },
@@ -726,8 +809,8 @@ if (isMainModule(import.meta.url)) {
       const saved = pushBranch(branch, { cwd })
       console.error(
         saved.ok
-          ? 'author-sol: recorded and pushed the authoring commission before starting it'
-          : `author-sol: recorded the authoring commission locally; its immediate push failed — ${saved.why}`,
+          ? `${commandName}: recorded and pushed the authoring commission before starting it`
+          : `${commandName}: recorded the authoring commission locally; its immediate push failed — ${saved.why}`,
       )
     }
 
@@ -735,7 +818,7 @@ if (isMainModule(import.meta.url)) {
     // delivered range after it so the report and reviewer see only Sol's edits.
     const base = git(['rev-parse', 'HEAD'], { cwd, required: true })
     console.error(
-      `author-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) is authoring point ${point} on ${branch}` +
+      `${commandName}: ${authorModel}${config.detail ? ` ${config.detail}` : ''} is authoring point ${point} on ${branch}` +
         `${findings ? ' — second leg, answering the review' : ''} …`,
     )
     if (withheld.length) console.error(`  withheld from its environment: ${withheld.join(', ')}`)
@@ -744,17 +827,19 @@ if (isMainModule(import.meta.url)) {
       prompt,
       cwd: worktree,
       branch,
+      modelId: config.modelId,
+      runtime: config.runtime,
       timeoutMs: Number(flag('--timeout')) || AUTHOR_TIMEOUT_MS,
       onPush: ({ ok, skipped, head, why }) =>
         console.error(
           ok
-            ? `author-sol: pushed ${String(head).slice(0, 7)} while the run continues`
+            ? `${commandName}: pushed ${String(head).slice(0, 7)} while the run continues`
             : skipped
-              ? `author-sol: interim push deferred — ${why}`
-              : `author-sol: interim push failed — ${why}`,
+              ? `${commandName}: interim push deferred — ${why}`
+              : `${commandName}: interim push failed — ${why}`,
         ),
     })
-    const outcome = classifyOutcome(run)
+    const outcome = config.runtime === 'claude' ? fableAuthoringOutcome(run) : classifyOutcome(run)
     const parsed = parseAuthoringAnswer(run.finalMessage)
     // WHERE THE RUN ENDED, not where it began: nothing stops a sandbox-less run
     // from checking out another branch, and the commits below would then belong
@@ -776,6 +861,9 @@ if (isMainModule(import.meta.url)) {
       branchAfter,
       dirty,
       numstat: dirty ? uncommittedNumstat({ cwd }) : '',
+      authorModel,
+      fableState,
+      runtime: config.runtimeLabel,
     })
     for (const commit of commits) {
       const problem = interimCommitProblem(commit)
@@ -787,7 +875,7 @@ if (isMainModule(import.meta.url)) {
     // after the process is gone, the tree is clean and its report names three
     // green gates. A killed or malformed run can therefore leave rescue
     // checkpoints, but can never acquire this unskipped claim from the wrapper.
-    const completionMessage = authorCompletionMessage(judged)
+    const completionMessage = authorCompletionMessage(judged, config.trailer)
     if (completionMessage) {
       git(['commit', '--allow-empty', '-F', '-'], {
         cwd,
@@ -802,7 +890,10 @@ if (isMainModule(import.meta.url)) {
       git(['commit', '--allow-empty', '-F', '-'], {
         cwd,
         required: true,
-        input: authorCommitMessage({ rescue: 'the authoring run ended before a valid completion checkpoint' }),
+        input: authorCommitMessage({
+          rescue: 'the authoring run ended before a valid completion checkpoint',
+          trailer: config.trailer,
+        }),
       })
       judged.commits = commitsSince(base, { cwd, ref: `refs/heads/${branch}` })
     }
@@ -816,18 +907,35 @@ if (isMainModule(import.meta.url)) {
       const tip = git(['rev-parse', `refs/heads/${branch}`], { cwd })
       pushed = res.ok || (Boolean(tip) && tip === run.lastPushed)
       if (!res.ok) {
-        console.error(`author-sol: final push failed — ${res.why}`)
+        console.error(`${commandName}: final push failed — ${res.why}`)
         if (pushed) console.error('  (the interim push already carried this commit to the remote)')
       }
     }
     const said = String(run.finalMessage ?? '').trim()
-    if (said) console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end ---\n`)
-    console.log(formatAuthoringReport({ point, branch, judged, parsed, pushed, framing: authoringStep.framing }))
+    if (said) console.log(`--- ${authorModel} said ---\n${said}\n--- end ---\n`)
+    console.log(formatAuthoringReport({
+      point,
+      branch,
+      judged,
+      parsed,
+      pushed,
+      framing: authoringStep.framing,
+      reviewer: config.reviewer,
+      commandName,
+      authorModel,
+      authorDetail: config.detail,
+      authorTrailer: config.trailer,
+      reviewCommand: config.lane === 'fable'
+        ? `node scripts/review-sol.mjs --sha <sha> --brief "review point ${point}" --mode review --point ${point}`
+        : '',
+    }))
     // 0 only for a clean run that produced work; 3 says "look at this before you
     // treat it as a delivery", which is what a script chaining on it must see.
     process.exit(judged.clean ? 0 : 3)
   } catch (e) {
-    console.error(`author-sol failed: ${(e && e.message) || e}`)
+    console.error(`${commandName} failed: ${(e && e.message) || e}`)
     process.exit(1)
   }
 }
+
+if (isMainModule(import.meta.url)) await runAuthoringCli()

@@ -55,14 +55,11 @@ describe('effectiveLeaseUntil — the ONE place ownership\'s end is computed', (
     expect(effectiveLeaseUntil({}, { now: NOW })).toBeNull()
   })
 
-  it('is the seam point 517 extends — it takes the evidence today and ignores it', () => {
-    // The signature is the contract: an extension lands INSIDE this function, so
-    // the idle rule below and a lease extension can never become two arithmetics
-    // on one number (point 614's cross-point ruling).
-    const l = lock({ leaseUntil: NOW + 1000 })
-    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: true, at: NOW } })).toBe(
-      effectiveLeaseUntil(l, { now: NOW }),
-    )
+  it('extends from the last advancing evidence, never from quiet or future evidence', () => {
+    const l = lock({ leaseUntil: NOW - 1000 })
+    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: true, at: NOW } })).toBe(NOW + LEASE_MS)
+    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: false, at: NOW } })).toBe(NOW - 1000)
+    expect(effectiveLeaseUntil(l, { now: NOW, evidence: { advancing: true, at: NOW + 1 } })).toBe(NOW - 1000)
   })
 })
 
@@ -378,13 +375,45 @@ describe('the ownership verdict — the order of authority is preserved', () => 
       owns: false,
       reason: 'lease-expired',
     })
-    // …and a live owner whose declared work has PRODUCED something keeps it.
+    // …and a live owner whose declared evidence still advances earns a renewal.
     const kept = ownershipVerdict({
       lock: stale,
       now: NOW,
       corroboration: live,
-      work: { declared: true, advancing: true, corroboratedBy: 'git', summary: 'a commit 2 min ago' },
+      work: {
+        declared: true,
+        advancing: true,
+        corroboratedBy: 'git',
+        summary: 'a commit now',
+        items: [{ ok: true, kind: 'branch', progressAt: NOW }],
+      },
     })
-    expect(kept).toMatchObject({ owns: true, reason: 'lease-expired-owner-working' })
+    expect(kept).toMatchObject({
+      owns: true,
+      reason: 'lease-renewal-due',
+      leaseExpired: true,
+      renewalUntil: NOW + LEASE_MS,
+    })
+
+    // Quiet evidence renews nothing: the same arithmetic yields takeover.
+    expect(ownershipVerdict({
+      lock: stale,
+      now: NOW,
+      corroboration: live,
+      work: { declared: true, advancing: false, items: [], summary: 'quiet' },
+    })).toMatchObject({ owns: false, reason: 'lease-expired' })
+
+    // A live pid is re-observed, not advancing output; it cannot renew forever.
+    expect(ownershipVerdict({
+      lock: stale,
+      now: NOW,
+      corroboration: live,
+      work: {
+        declared: true,
+        advancing: true,
+        corroboratedBy: 'process',
+        items: [{ ok: true, kind: 'pid', progressAt: NOW }],
+      },
+    })).toMatchObject({ owns: false, reason: 'lease-expired' })
   })
 })

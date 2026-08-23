@@ -1387,7 +1387,7 @@ function segmentTarget(seg) {
   // An authoring run IS the commissioning of a point, whichever vendor runs it —
   // unless it is one of the read-only legs, which produce no work at all.
   if (!/--routing\b|--dry-run\b/.test(seg)) {
-    const authored = uniq([...seg.matchAll(/author-sol\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
+    const authored = uniq([...seg.matchAll(/author-(?:sol|fable)\.mjs.*?--point\s+(\d+)/gi)].map((m) => Number(m[1])))
     if (authored.length) return { points: authored, refs: [], how: 'author' }
   }
   if (/\bworktree\s+add\b/.test(seg)) {
@@ -1443,7 +1443,8 @@ function segmentTarget(seg) {
  * CREATES anything, and none is recognised here.
  *
  * A READ-ONLY RUN OPENS NOTHING either: `author-sol.mjs --routing` answers which
- * lane owns a point and `--dry-run` prints the prompt it would send. Refusing
+ * lane owns a point and either author command's `--dry-run` prints the prompt it
+ * would send. Refusing
  * those would deny the very question a session asks BEFORE it commissions.
  */
 export function commissionTarget({ toolName = '', command = '', prompt = '', description = '' } = {}) {

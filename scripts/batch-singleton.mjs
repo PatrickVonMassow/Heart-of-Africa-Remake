@@ -301,9 +301,8 @@ export function assessOwner(lock, {
     corroboration: pidCorroboration(lock, probe),
   })
   if (v.settled) {
-    return v.detail === undefined
-      ? { alive: v.owns, reason: v.reason }
-      : { alive: v.owns, reason: v.reason, detail: v.detail }
+    const { settled: _settled, owns, ...decision } = v
+    return { alive: owns, ...decision }
   }
   const age = now - lock.claimedAt
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
