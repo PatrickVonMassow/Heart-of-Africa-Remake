@@ -607,3 +607,21 @@ describe('auditGuide — the three reachable variants of round ten', () => {
     expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
   })
 })
+
+// Round eleven: the segment after the slash is a path segment.
+describe('auditGuide — the second path segment', () => {
+  const O = '„'
+  it('recognises a second segment that is not ASCII, or starts with a dot', () => {
+    for (const path of ['docs/Überblick.md', 'docs/.nojekyll', 'scripts/_intern.mjs']) {
+      const { violations } = auditGuide(
+        doc(`- **Pfad** Siehe ${path} dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+      )
+      expect(violations.map((v) => v.kind), path).toContain('project-specific')
+    }
+  })
+
+  it('leaves a bare directory word alone', () => {
+    const d = doc(`- **Kein Pfad** Die Doku und der Quelltext gehören zusammen.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
+  })
+})
