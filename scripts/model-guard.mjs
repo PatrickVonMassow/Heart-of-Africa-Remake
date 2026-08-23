@@ -130,9 +130,14 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     if (hits.length && gathered.applicable) {
-      // The NAMED breach: the alarm the guard was built for. Ping and pause.
+      // The NAMED breach: one of the ladder's two closed corruption classes.
       const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
-      await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
+      await notify(
+        'FORBIDDEN MODEL',
+        `Non-allowlisted model commit(s): ${list} — work remains blocked to prevent further contamination`,
+        'high',
+        { alertClass: 'forbidden-serving-model' },
+      )
       process.stdout.write(
         JSON.stringify({
           decision: 'block',

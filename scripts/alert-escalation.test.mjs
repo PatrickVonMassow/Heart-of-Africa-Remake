@@ -6,7 +6,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { escalate, higherPriority, readLadder, writeLadder, logLine, boardCard, PRIORITY_ORDER } from './alert-escalation.mjs'
+import {
+  boardCard,
+  continuationCardBody,
+  escalate,
+  higherPriority,
+  logLine,
+  PRIORITY_ORDER,
+  readLadder,
+  writeLadder,
+} from './alert-escalation.mjs'
 import { ALERT_GAPS_MS, ALERT_PAUSE_RUNG } from './alert-escalation-core.mjs'
 import { notify, ntfyTopic } from './notify.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -148,11 +157,22 @@ describe('escalate — the full climb, on real files', () => {
     let paused = null
     const pause = { isPaused: () => paused != null, setPaused: (r) => (paused = r) }
     for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
-      const v = await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, priority: 'high', now, ...h, pause })
+      const v = await escalate({
+        title: 'FORBIDDEN MODEL',
+        message: `forbidden commit ${100 + i}`,
+        env: {},
+        priority: 'high',
+        alertClass: 'forbidden-serving-model',
+        now,
+        ...h,
+        pause,
+      })
       v.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(paused).toMatch(/Eskalation/)
+    expect(paused).toMatch(/Korruptionsklasse „forbidden-serving-model“/)
+    expect(paused).toMatch(/Weiterarbeiten, nicht Warten/)
     expect(paused).toMatch(/batch-paused/)
     expect(h.cards).toHaveLength(1)
     expect(h.cards[0][0]).toMatch(/Batch pausiert/)
@@ -165,12 +185,112 @@ describe('escalate — the full climb, on real files', () => {
     const pause = { isPaused: () => true, setPaused }
     let now = T0
     for (let i = 0; i <= ALERT_PAUSE_RUNG + 1; i++) {
-      const v = await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, priority: 'high', now, ...h, pause })
+      const v = await escalate({
+        title: 'FORBIDDEN MODEL',
+        message: `forbidden commit ${100 + i}`,
+        key: 'forbidden-model',
+        env: {},
+        priority: 'high',
+        alertClass: 'forbidden-serving-model',
+        now,
+        ...h,
+        pause,
+      })
       v.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(setPaused).not.toHaveBeenCalled()
     expect(h.cards).toHaveLength(0)
+  })
+
+  it('CONTINUES a generic stalled alert and records the decision plus retroactive veto', async () => {
+    const h = harness()
+    const setPaused = vi.fn()
+    const pause = { isPaused: () => false, setPaused }
+    let now = T0
+    let last
+    for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
+      last = await escalate({
+        title: 'Batch drive is STALLED',
+        message: `No working child for ${30 + i * 15} minutes`,
+        key: 'launcher-stall:episode',
+        env: {},
+        priority: 'urgent',
+        alertClass: 'stalled',
+        now,
+        ...h,
+        pause,
+      })
+      last.commit?.()
+      now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
+    }
+    expect(last.decision.action).toBe('continue-and-record')
+    expect(last.decisionRecorded).toBe(true)
+    expect(setPaused).not.toHaveBeenCalled()
+    expect(h.cards).toHaveLength(1)
+    expect(h.cards[0][0]).toBe(last.decision.decisionCard)
+    expect(h.cards[0][1]).toMatch(/Retroaktives Veto/)
+    expect(h.cards[0][1]).toMatch(/letzten zulässigen Commit oder Zeitraum/)
+    expect(readFileSync(h.logPath, 'utf8')).toMatch(/CONTINUING THE BATCH — decision card recorded/)
+  })
+
+  it('does not advance past the decision rung until the required card is recorded', async () => {
+    const h = harness()
+    const key = 'generic-stall'
+    writeLadder({
+      alerts: {
+        [key]: {
+          rung: ALERT_PAUSE_RUNG,
+          lastSentAt: T0 - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+          firstSentAt: T0 - 300 * MIN_MS,
+          sends: ALERT_PAUSE_RUNG,
+        },
+      },
+    }, h.ladderPath)
+    const v = await escalate({
+      title: 'Batch STALLED',
+      message: 'No progress',
+      key,
+      env: {},
+      priority: 'urgent',
+      now: T0,
+      ...h,
+      board: () => false,
+    })
+    expect(v.decision.action).toBe('continue-and-record')
+    expect(v.decisionRecorded).toBe(false)
+    expect(v.commit()).toBe(false)
+    expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
+  })
+
+  it('keeps a recurring event on the ceiling without filing a decision card', async () => {
+    const h = harness()
+    const key = 'resurrected'
+    writeLadder({
+      alerts: {
+        [key]: {
+          rung: ALERT_PAUSE_RUNG,
+          lastSentAt: T0 - ALERT_GAPS_MS[ALERT_PAUSE_RUNG],
+          firstSentAt: T0 - 300 * MIN_MS,
+          sends: ALERT_PAUSE_RUNG,
+        },
+      },
+    }, h.ladderPath)
+    const v = await escalate({
+      title: 'Resurrected',
+      message: 'successor spawned',
+      key,
+      priority: 'low',
+      recurring: true,
+      env: {},
+      now: T0,
+      ...h,
+    })
+    expect(v).toMatchObject({ deliver: true, priority: 'low' })
+    expect(v.decision).toMatchObject({ action: 'send', nextRung: ALERT_PAUSE_RUNG })
+    expect(h.cards).toHaveLength(0)
+    expect(v.commit()).toBe(true)
+    expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
   })
 
   it('keeps two different alerts on two ladders, though they share one ntfy topic', async () => {
@@ -187,6 +307,18 @@ describe('escalate — the full climb, on real files', () => {
 })
 
 describe('the reason reaches the morning reader', () => {
+  it('the continuation record says what was decided and how to veto it retroactively', () => {
+    const body = continuationCardBody(
+      'Board out of date',
+      'No publish for 90 minutes',
+      { alertClass: 'staleness' },
+      '23.08.2026, 20:00',
+    )
+    expect(body).toMatch(/Batch läuft.*weiter/)
+    expect(body).toMatch(/Board out of date/)
+    expect(body).toMatch(/Retroaktives Veto/)
+  })
+
   it('logLine appends a timestamped line', () => {
     const p = join(dir, 'a.log')
     logLine('[k] pause-and-send', p)
@@ -287,11 +419,33 @@ describe('notify — the wiring, on an injected topic', () => {
     expect(fetchSpy.mock.calls[0][1].headers.Priority).toBe('urgent')
   })
 
-  it('carries the caller priority into the ladder, so the pause gate can read it', async () => {
+  it('carries priority and class separately, so priority cannot acquire pause authority', async () => {
     vi.stubGlobal('fetch', okFetch())
     const escalate = vi.fn(async () => ({ deliver: true, priority: 'low', commit: () => {} }))
-    await notify('Resurrected', 'successor spawned', 'low', { topicFile: topicAt(), escalation: { escalate } })
-    expect(escalate.mock.calls[0][0]).toMatchObject({ priority: 'low' })
+    await notify('FORBIDDEN MODEL', 'bad commit', 'low', {
+      topicFile: topicAt(),
+      alertClass: 'forbidden-serving-model',
+      escalation: { escalate },
+    })
+    expect(escalate.mock.calls[0][0]).toMatchObject({
+      priority: 'low',
+      alertClass: 'forbidden-serving-model',
+    })
+  })
+
+  it('carries recurring shape separately from priority and corruption class', async () => {
+    vi.stubGlobal('fetch', okFetch())
+    const escalate = vi.fn(async () => ({ deliver: true, priority: 'low', commit: () => {} }))
+    await notify('Resurrected', 'successor spawned', 'low', {
+      topicFile: topicAt(),
+      recurring: true,
+      escalation: { escalate },
+    })
+    expect(escalate.mock.calls[0][0]).toMatchObject({
+      priority: 'low',
+      alertClass: 'generic',
+      recurring: true,
+    })
   })
 
   it('still accepts the old three-argument call shape every existing caller uses', async () => {
