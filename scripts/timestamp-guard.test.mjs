@@ -336,10 +336,14 @@ describe('end-to-end guard process', () => {
     // turn whose reply has not been flushed yet.
     const now = new Date('2026-08-20T06:15:18.706Z')
     const recent = berlinStamp(new Date(now.getTime() - 4 * 60000))
+    // The NEW turn has to be in the transcript, or this measures nothing but
+    // "the latest valid reply passes" and would stay green under an extraction
+    // that correctly resets at a user prompt (GPT-5.6 Sol, 23.08.2026).
     const raced = [
       line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
       line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),
       assistantText(`**${recent}** Vorherige Antwort.`, { id: 'prev-final' }),
+      line('user', [{ type: 'text', text: 'Neue Frage ohne Werkzeug.' }], { id: 'new-prompt' }),
     ].join('\n')
 
     // The previous turn's reply is what gets judged…
@@ -354,6 +358,7 @@ describe('end-to-end guard process', () => {
       line('assistant', [{ type: 'tool_use' }], { id: 'prev-a' }),
       line('user', [{ type: 'tool_result' }], { id: 'prev-r' }),
       assistantText(`**${old}** Vorherige Antwort.`, { id: 'prev-final' }),
+      line('user', [{ type: 'text', text: 'Neue Frage ohne Werkzeug.' }], { id: 'new-prompt' }),
     ].join('\n')
     expect(evaluate({ lastText: extractLastAssistantText(stale), now })?.decision).toBe('block')
   })
