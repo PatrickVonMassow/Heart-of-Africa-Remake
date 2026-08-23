@@ -163,7 +163,7 @@ export function sameAttempt(a, b) {
  *  alone must not read as the same process. */
 export function sameProcess(a, b, { tolerance = PROCESS_START_TOLERANCE_MS } = {}) {
   if (!a || !b) return false
-  if (!Number.isInteger(a.pid) || a.pid !== b.pid) return false
+  if (!Number.isInteger(a.pid) || a.pid < 1 || a.pid !== b.pid) return false
   if (!Number.isFinite(a.pidStartedAt) || !Number.isFinite(b.pidStartedAt)) return false
   return Math.abs(a.pidStartedAt - b.pidStartedAt) <= tolerance
 }
@@ -375,6 +375,11 @@ export function advancedCredential(current, { fence = current?.fence } = {}) {
 export function publicationPush({ current = null, next = null, expectedOid, refs = [] } = {}) {
   if (!next) return { ok: false, reason: 'no credential to publish' }
   if (!credential(next).ok) return { ok: false, reason: `the credential to publish is malformed: ${credential(next).reason}` }
+  // Absence is null or undefined and NOTHING else: `!current` would read `false`
+  // or `''` as "no credential is published" and skip every advance check below.
+  if (current !== null && current !== undefined && (typeof current !== 'object' || Array.isArray(current))) {
+    return { ok: false, reason: 'the current credential is malformed' }
+  }
   if (current) {
     if (!credential(current).ok) return { ok: false, reason: 'the current credential is malformed' }
     if (next.generation !== current.generation) {
@@ -395,7 +400,9 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
       }
     }
   }
-  if (expectedOid === undefined || expectedOid === null) {
+  // A primitive string, nothing looser: a String OBJECT passes `!== ''` while
+  // interpolating into an empty lease, which claims absence it did not state.
+  if (typeof expectedOid !== 'string') {
     return { ok: false, reason: 'a publication without a lease on the credential ref is refused' }
   }
   // The lease and the claimed current credential must AGREE about absence, in both
@@ -457,10 +464,11 @@ export function mayMintFence({ fenceStore = null, journalOk = false, journalHigh
   }
   if (!journalOk) return { ok: false, reason: 'the journal is missing or fails its checksums; minting is refused' }
   // Null and undefined mean an EMPTY journal, which constrains nothing. Anything
-  // else that is not an integer is a high water mark that could not be computed,
-  // and an uncomputable constraint is a refusal, not a pass: `fence < NaN` answers
-  // false, which would admit the mint precisely because the evidence broke.
-  if (journalHighWater !== null && journalHighWater !== undefined && !Number.isInteger(journalHighWater)) {
+  // else that is not a POSITIVE integer — journal fences start at 1 — is a high
+  // water mark that could not be computed, and an uncomputable constraint is a
+  // refusal, not a pass: `fence < NaN` answers false, which would admit the mint
+  // precisely because the evidence broke.
+  if (journalHighWater !== null && journalHighWater !== undefined && (!Number.isInteger(journalHighWater) || journalHighWater < 1)) {
     return { ok: false, reason: 'the journal high water mark is unreadable; minting is refused' }
   }
   if (Number.isInteger(journalHighWater) && fenceStore.fence < journalHighWater) {
@@ -598,14 +606,22 @@ export function registerDaemonCommand(table, name, spec) {
 export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } = {}) {
   const spec = table[name]
   if (!spec) return { ok: false, reason: `unknown command: ${name}` }
-  const missing = spec.keyFields.filter((f) => payload[f] === undefined || payload[f] === null)
+  // Own properties only — an inherited field is not an answer — and non-finite
+  // numbers are refused: canonical JSON serialises NaN and Infinity both as null,
+  // which would collide two distinct payloads into one key.
+  const fieldValue = (f) => (Object.hasOwn(payload, f) ? payload[f] : undefined)
+  const missing = spec.keyFields.filter((f) => fieldValue(f) === undefined || fieldValue(f) === null)
   if (missing.length) return { ok: false, reason: `cannot key ${name}: missing ${missing.join(', ')}` }
+  const unkeyable = spec.keyFields.filter((f) => typeof fieldValue(f) === 'number' && !Number.isFinite(fieldValue(f)))
+  if (unkeyable.length) {
+    return { ok: false, reason: `cannot key ${name}: non-finite ${unkeyable.join(', ')}` }
+  }
   // Canonical JSON rather than joined strings: a delimiter-joined material lets a
   // VALUE that contains the delimiter and a field name collide two different
   // payloads into one key — and a collided key silently drops the second mutation
   // as "already applied".
   const picked = {}
-  for (const f of spec.keyFields) picked[f] = payload[f]
+  for (const f of spec.keyFields) picked[f] = fieldValue(f)
   const material = canonicalJson(picked)
   return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex').slice(0, 16)}` }
 }
@@ -645,16 +661,20 @@ export function checksumOf(entry) {
  *  which regime authorised which write) and its own checksum. */
 export function frameEntry(entry) {
   if (!entry || typeof entry !== 'object') return { ok: false, reason: 'an entry is an object' }
+  // OWN properties only, taken up front: validation and serialisation must read the
+  // SAME fields. Validating `entry.seq` through the prototype while `{ ...entry }`
+  // drops inherited fields would frame a line that fails its own read-back.
+  const own = { ...entry }
   // `c` is the frame's own key. An entry that carries one would be checksummed WITH
   // it and written WITHOUT it, so the line would fail its own read-back — a healthy
   // journal reading as corrupt.
-  if ('c' in entry) return { ok: false, reason: "an entry may not carry `c`; that key is the frame's checksum" }
-  if (!Number.isInteger(entry.seq) || entry.seq < 1) return { ok: false, reason: 'an entry needs a positive seq' }
-  if (!Number.isInteger(entry.fence) || entry.fence < 1) {
+  if (Object.hasOwn(own, 'c')) return { ok: false, reason: "an entry may not carry `c`; that key is the frame's checksum" }
+  if (!Number.isInteger(own.seq) || own.seq < 1) return { ok: false, reason: 'an entry needs a positive seq' }
+  if (!Number.isInteger(own.fence) || own.fence < 1) {
     return { ok: false, reason: 'an entry needs the fence it was written under' }
   }
-  if (!entry.kind) return { ok: false, reason: 'an entry needs a kind' }
-  const body = { ...entry, v: entry.v ?? SCHEMA_VERSION }
+  if (!own.kind) return { ok: false, reason: 'an entry needs a kind' }
+  const body = { ...own, v: own.v ?? SCHEMA_VERSION }
   return { ok: true, line: `${canonicalJson({ ...body, c: checksumOf(body) })}\n` }
 }
 

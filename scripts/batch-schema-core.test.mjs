@@ -147,6 +147,11 @@ describe('identity — pid and pid start time, never a bare pid', () => {
     expect(sameProcess({ pid: '4711', pidStartedAt: NOW }, { pid: '4711', pidStartedAt: NOW })).toBe(false)
   })
 
+  it('a pid that no process can have is not an identity either', () => {
+    expect(sameProcess({ pid: 0, pidStartedAt: NOW }, { pid: 0, pidStartedAt: NOW })).toBe(false)
+    expect(sameProcess({ pid: -1, pidStartedAt: NOW }, { pid: -1, pidStartedAt: NOW })).toBe(false)
+  })
+
   it('two records that name no attempt are not the same attempt', () => {
     const id = { batchId: 'b1', pointId: 834, attemptId: 'a1' }
     expect(sameAttempt(id, { ...id })).toBe(true)
@@ -394,6 +399,9 @@ describe('the coordinator credential', () => {
     const store = { generation: gen, fence: 604 }
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: NaN }).reason).toMatch(/unreadable/)
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: '700' }).ok).toBe(false)
+    // Journal fences start at 1, so zero and negatives are broken evidence too.
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: 0 }).ok).toBe(false)
+    expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: -3 }).ok).toBe(false)
     // Null and undefined mean an EMPTY journal, which really does constrain nothing.
     expect(mayMintFence({ fenceStore: store, journalOk: true, journalHighWater: null }).ok).toBe(true)
   })
@@ -405,6 +413,16 @@ describe('the coordinator credential', () => {
     expect(publicationPush({ current: null, next: first, expectedOid: 'oid1', refs: ['main'] }).reason).toMatch(/absence/)
     const next = advancedCredential(current).credential
     expect(publicationPush({ current, next, expectedOid: '', refs: ['main'] }).reason).toMatch(/leased as absent/)
+  })
+
+  it('absence is null or undefined and nothing looser, and the lease is a primitive string', () => {
+    // `current: false` is not "no credential is published", and a String OBJECT
+    // passes `!== ''` while interpolating into an empty lease.
+    const first = credential({ generation: gen, fence: 604, seq: 0 }).credential
+    expect(publicationPush({ current: false, next: first, expectedOid: '', refs: ['main'] }).ok).toBe(false)
+    const next = advancedCredential(current).credential
+    expect(publicationPush({ current, next, expectedOid: new String(''), refs: ['main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 42, refs: ['main'] }).ok).toBe(false)
   })
 })
 
@@ -558,6 +576,16 @@ describe('the daemon command table', () => {
     expect(out.result).toBe('ran')
   })
 
+  it('non-finite key values are refused, and inherited payload fields are not answers', () => {
+    // Canonical JSON serialises NaN and Infinity both as null — two distinct
+    // payloads, one key, second mutation silently dropped.
+    const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1'] })
+    expect(idempotencyKey('probe-cmd', { f1: NaN }, { table }).reason).toMatch(/non-finite/)
+    expect(idempotencyKey('probe-cmd', { f1: Infinity }, { table }).reason).toMatch(/non-finite/)
+    const inherited = Object.create({ f1: 'from-the-prototype' })
+    expect(idempotencyKey('probe-cmd', inherited, { table }).reason).toMatch(/missing/)
+  })
+
   it('a mutation without a key cannot be applied at all', () => {
     expect(applyOnce(new Set(), '', () => {}).ok).toBe(false)
   })
@@ -584,6 +612,15 @@ describe('journal framing', () => {
 
   it('refuses an entry that carries the frame own checksum key, which would fail its own read-back', () => {
     expect(frameEntry({ ...entry, c: 'caller-noise' }).reason).toMatch(/checksum/)
+  })
+
+  it('validates the same fields it serialises — inherited frame fields are not an entry', () => {
+    // Prototype reads would validate seq, fence and kind that `{ ...entry }` then
+    // drops, framing a line the parser itself rejects.
+    const inherited = Object.create(entry)
+    expect(frameEntry(inherited).ok).toBe(false)
+    const partlyOwn = Object.assign(Object.create(entry), { payload: { state: 'running' } })
+    expect(frameEntry(partlyOwn).ok).toBe(false)
   })
 
   it('reads a half-written tail as TRUNCATED, not as data', () => {
