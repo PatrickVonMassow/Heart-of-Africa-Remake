@@ -87,7 +87,7 @@ put it is the mistake this line exists to stop.
   driven by hand cannot leave a truthful commission row. `criticality-review-guard` uses exactly
   those rows as the base for a point's reviewed file set, so an unrecorded commission is not a
   cosmetic gap: it is a point whose later review coverage cannot be computed.
-  WHAT THAT COSTS TODAY: point 834 is the first open point in the work order, its first stage is
+  WHAT THAT COSTS TODAY: point 834 stands directly behind this one in the work order, its first stage is
   built and reviewed on its branch, and its next authoring stage has nowhere to go. The three
   answers available to a session that meets this are all wrong — override the escalation with
   `--anyway` and keep the lane that already failed 18 rounds, author it as Claude and re-run the
@@ -263,11 +263,18 @@ put it is the mistake this line exists to stop.
       path gains nothing from this design; one push of publishing authority survives local
       dispossession, deliberately, so that exactly one publisher exists at all times; and the
       drill's check-to-signal interval has one branch it cannot observe.
-  QUEUE RANK: at the front, directly behind point 716 — but BLOCKED BEFORE CODE by (b) since
-  22.08.2026, 18:20, so the queue passes it and the next unblocked point is worked until the
-  Fable switch is flipped. Reason for the rank: the user ordered it forward on 22.08.2026 after a
-  second lane died, and Sol's audit puts 716 first because 716 repairs the deployed plane while
-  this point replaces it.
+  QUEUE RANK AND STATE (re-measured 23.08.2026, 02:30): at the front, now directly behind point
+  846, which blocks it. Clause (b) is DISCHARGED — Fable 5's fold of the two blind halves stands
+  in the four-eyes ledger on this point's own branch (81e1062a), so the code steps are
+  authorized. The FIRST STAGE IS BUILT, pushed and cross-read on `feat/834-durable-authoring-lane`
+  (287674b4, CI green, three Sol rounds without a finding): the three owed mechanisms written into
+  `docs/handover-architecture.md`, the schema-and-invariant core, the dark-lane flag with its
+  refusal interlock, the parent-death drill and the merger-check repair. WHAT REMAINS is the
+  durable state store, the daemon plus the Sol adapter, the fencing and lease work of step 4, and
+  the discovery/adoption/reconciliation of step 8 with step 9 where landing needs it — so the
+  point is NOT ticked and its branch stays open. Reason for the original rank: the user ordered it
+  forward on 22.08.2026 after a second lane died, and Sol's audit puts 716 first because 716
+  repairs the deployed plane while this point replaces it; 716 has since landed.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
@@ -11211,4 +11218,32 @@ to land than a mechanism that needs a review.
   refusing a `MEMORY.md` that exceeds its ceiling.
   Criticality: low — no product behaviour and no lost work; it costs a false red on unrelated
   points, which is a verification-trust problem rather than a defect.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 847. The brevity guard has four ways past it, all found by one cross-vendor reading (GPT-5.6
+  Sol, effort high, 23.08.2026, 02:30, pass 2/3 over `2d80896`, verdict do-not-merge; recorded in
+  `.claude/mechanism-reviews.jsonl`). `scripts/guide-brevity-core.mjs` enforces the measured
+  ceilings of `docs/analysis_de/vibe-coding-anleitung.md`, and the document sits at an EXACT fit
+  (432 lines / the word ceiling beside it) — so every path past the rule is a path that lets the
+  document grow while the guard stays green. The four, at their measured lines:
+  1. LINE 210 — any line beginning with `<!--` is dropped whole from both budgets, so
+     `<!-- x --> visible prose …` renders prose at zero lines and zero words.
+  2. LINES 224-228 — only the FIRST `##` heading containing "Fallstrick" is audited and the scan
+     stops at the next `##`, so moving entries into a second `## Weitere Fallstricke` evades the
+     entry-length, risk-length, prompt and stray-prose checks while the totals stay put.
+  3. LINES 291 and 358-367 — the action check accepts the `→ *Prompt:*` marker ANYWHERE in the
+     entry and never looks at what follows it, so an empty prompt, or one followed by further
+     narrative, passes the rule that every pitfall must END in an actionable prompt.
+  4. LINE 190 — the repository-path detector accepts neither `./` nor a leading `/` before
+     `scripts`, so the ordinary spelling `./scripts/chat-spool.mjs` is not recognised as the
+     project-specific path the rule means to keep out of a beginner's guide.
+  FINAL STATE: each of the four is closed at its own line, and a Vitest case per path pins the
+  evasion as REFUSED — a comment line with trailing prose counted, a second pitfall section
+  audited like the first, a prompt that does not end its entry refused, and the two path
+  spellings recognised. The measured ceilings themselves are NOT reopened: they are the user's
+  ruling and this point only makes them enforceable as written.
+  VERIFIABLE: the four new unit cases red against today's core and green after the fix, and the
+  guide itself still passing unchanged, because nothing in it uses any of the four paths.
+  Criticality: low — no product behaviour and no lost work; it is a guard that measures less
+  than its own sentence, and the cost is a document that could grow past a ruling unnoticed.
   Bundle: Session- & Repo-Hygiene.
