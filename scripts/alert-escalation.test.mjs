@@ -353,3 +353,47 @@ describe('INDEPENDENCE — the ladder acts while the other layers are missing', 
     expect(again.decision.rung).toBe(0)
   })
 })
+
+describe('escalate — an EXPLICIT key is used verbatim (point 859)', () => {
+  it('digit runs collapse only in DERIVED keys; two explicit episode keys stay two ladders', async () => {
+    const h = harness()
+    // Episode one: first alert of a fresh explicit key always goes out.
+    const first = await escalate({
+      title: 'Batch drive is STALLED',
+      message: 'dead for 30 min now',
+      key: 'launcher-stall:1787476800000',
+      priority: 'high',
+      env: {},
+      now: T0,
+      ...h,
+    })
+    expect(first.deliver).toBe(true)
+    first.commit()
+    // The SAME episode key a moment later sits inside the rung gap: suppressed —
+    // this is the throttling the stall watch leans on for its re-demands.
+    const again = await escalate({
+      title: 'Batch drive is STALLED',
+      message: 'dead for 45 min now',
+      key: 'launcher-stall:1787476800000',
+      priority: 'high',
+      env: {},
+      now: T0 + MIN_MS,
+      ...h,
+    })
+    expect(again.deliver).toBe(false)
+    // A LATER EPISODE differs only in its digits. If explicit keys were digit-
+    // collapsed (they are not — escalate uses `key ?? alertKey(...)`), this
+    // would inherit the first episode's rung and be suppressed. It is a fresh
+    // ladder and goes straight out.
+    const nextEpisode = await escalate({
+      title: 'Batch drive is STALLED',
+      message: 'dead for 30 min now',
+      key: 'launcher-stall:1787999900000',
+      priority: 'high',
+      env: {},
+      now: T0 + 2 * MIN_MS,
+      ...h,
+    })
+    expect(nextEpisode.deliver).toBe(true)
+  })
+})

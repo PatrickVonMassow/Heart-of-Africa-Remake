@@ -458,13 +458,15 @@ export async function runDaemon({
   return 'stopped'
 }
 
-/** Start the daemon detached, so it outlives the session that started it. */
-export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = LAUNCHER_TICK_MS } = {}) {
+/** Start the daemon detached, so it outlives the session that started it.
+ *  `spawner` is injected so the asynchronous spawn-error path is TESTED with a
+ *  child that really emits 'error', not with a pre-formed failure result. */
+export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = LAUNCHER_TICK_MS, spawner = spawn } = {}) {
   const before = launcherState({ recordPath, tickMs })
   if (before.state === 'ready' || before.state === 'running') {
     return { started: false, ...before, reason: 'already running' }
   }
-  const child = spawn(process.execPath, [SELF_PATH, '--daemon'], {
+  const child = spawner(process.execPath, [SELF_PATH, '--daemon'], {
     cwd: REPO_ROOT,
     detached: true,
     stdio: 'ignore',

@@ -14,12 +14,13 @@
 // the race is over the record, and the batch is never touched.
 import { describe, it, expect } from 'vitest'
 import { spawn } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { writeJsonAtomic } from './atomic-write.mjs'
-import { armLauncherAtSessionStart, readLauncherRecord, runDaemon, stopDaemon } from './batch-launcher.mjs'
+import { armLauncherAtSessionStart, readLauncherRecord, runDaemon, startDaemon, stopDaemon } from './batch-launcher.mjs'
 import { probePid } from './batch-singleton.mjs'
 
 const LAUNCHER = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'batch-launcher.mjs')).href
@@ -520,6 +521,32 @@ describe('runDaemon — dead ticks alert through the daemon itself', () => {
 // batch-resume-hook.mjs calls exactly this function; what a hook owes its
 // session is to NEVER throw and to name what happened. Driven with fakes,
 // including the asynchronous spawn failure that would otherwise crash the hook.
+// --- THE ASYNC SPAWN FAILURE, FOR REAL (point 859, Sol pass 2) -----------------
+// The listener in startDaemon exists for a child that EMITS 'error' after the
+// call returned (EAGAIN under pressure — the incident's weather). A pre-formed
+// failure result proves nothing about it, so this child really emits.
+describe('startDaemon — a child that errors asynchronously is a reason, not a crash', () => {
+  it('reports {started:false} with the emitted error instead of an unhandled event', async () => {
+    const place = arena()
+    try {
+      const child = new EventEmitter()
+      child.unref = () => {}
+      const r = await startDaemon({
+        recordPath: place.recordPath,
+        tickMs: TICK_MS,
+        spawner: () => {
+          setTimeout(() => child.emit('error', new Error('spawn EAGAIN')), 20)
+          return child
+        },
+      })
+      expect(r.started).toBe(false)
+      expect(r.reason).toMatch(/could not be spawned: spawn EAGAIN/)
+    } finally {
+      place.cleanup()
+    }
+  })
+})
+
 describe('armLauncherAtSessionStart — the hook cannot be crashed by the launcher', () => {
   const dead = () => ({ state: 'unknown', record: null })
   const live = () => ({ state: 'ready', record: { pid: 7 } })
