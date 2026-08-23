@@ -77,40 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 846. The router can send a point to the Fable lane, but nothing can commission it there
-  (measured 23.08.2026, 01:55, on `feat/834-durable-authoring-lane`). `node
-  scripts/author-sol.mjs --point 834 --dry-run`, run in the `point-834` worktree, answers "point
-  834 routes to the fable lane (Fable 5), not to GPT-5.6 Sol: because 18 unsuccessful review
-  rounds reached the §6 escalation threshold of 5" and refuses. There is no `author-fable.mjs`,
-  and the one recorder that would log such a run — `recordAuthoringCommission` in
-  `scripts/author-sol.mjs` — writes `model: SOL_MODEL_NAME` unconditionally, so even a Fable run
-  driven by hand cannot leave a truthful commission row. `criticality-review-guard` uses exactly
-  those rows as the base for a point's reviewed file set, so an unrecorded commission is not a
-  cosmetic gap: it is a point whose later review coverage cannot be computed.
-  WHAT THAT COSTS TODAY: point 834 stands directly behind this one in the work order, its first stage is
-  built and reviewed on its branch, and its next authoring stage has nowhere to go. The three
-  answers available to a session that meets this are all wrong — override the escalation with
-  `--anyway` and keep the lane that already failed 18 rounds, author it as Claude and re-run the
-  same failure a nineteenth time, or hand-append to the append-only ledger without its durability
-  transaction.
-  A SECOND, SMALLER CONTRADICTION IS SETTLED IN THE SAME PASS: `docs/batch-owner-runbook.md` says
-  "Fable 5 is out of the automatic cut and authors only a point that tags its lane", while
-  `scripts/author-routing-core.mjs` routes to Fable automatically at the escalation threshold.
-  Both texts cannot be the rule. Whichever survives, CLAUDE.md §6, the runbook and the router say
-  the same thing afterwards.
-  FINAL STATE: a point the router assigns to the Fable lane can be commissioned by one command,
-  the way `author-sol.mjs` commissions the Sol lane — same branch-and-worktree contract, same
-  three cheap gates, same "merges nothing", and a commission row that names the model that
-  actually ran. `recordAuthoringCommission` takes the lane's model rather than assuming Sol, and
-  the existing Sol callers keep their behaviour unchanged.
-  VERIFIABLE: Vitest showing a Fable commission row recorded with `model: "Fable 5"` and the Sol
-  path unchanged; the routing dry-run for a Fable-lane point naming the command that serves it
-  instead of refusing; and `criticality-review-guard` computing a file set from a Fable
-  commission base.
-  Criticality: high — it blocks the first open point of the work order, and every wrong way
-  around it either repeats a failed lane or corrupts the four-eyes ledger.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
   dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
   Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
