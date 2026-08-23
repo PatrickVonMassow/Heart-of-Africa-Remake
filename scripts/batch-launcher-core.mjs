@@ -234,3 +234,36 @@ export function classifyDaemonRecord({
   // word for it. Both readings are armed.
   return record.tickInFlight === true ? 'running' : 'ready'
 }
+
+/**
+ * SHOULD A SESSION START RE-ARM THE LAUNCHER? PURE, TOTAL (point 859).
+ *
+ * WHY. A container rebuild kills the daemon with everything else, and nothing
+ * inside the container survives to restart it — on 23.08.2026 a MEMORY NOTE,
+ * not machinery, made the successor session run `--start`, and only after a
+ * human returned. The one event that reliably happens after a rebuild is a
+ * session starting (the user opens a window; the SessionStart hook runs), so
+ * that is where the launcher comes back.
+ *
+ * WHAT IT NEVER DOES. It never overrides a deliberate `--stop`: 'disabled' is
+ * a recorded human decision, and a hook that quietly reverted it would break
+ * the one promise `--stop` makes. It never arms on Windows (the Scheduled
+ * Task is the launcher there) and never from a worktree (the daemon itself
+ * refuses that checkout). Racing sessions may both decide 'arm'; the daemon's
+ * own publish race resolves them to one survivor, so the decision stays cheap.
+ */
+export function resumeArmDecision({ state, platform, worktree } = {}) {
+  if (platform === 'win32') {
+    return { arm: false, reason: `the Windows launcher is the Scheduled Task "${LAUNCHER_TASK_NAME}" — a session cannot arm it` }
+  }
+  // FAIL CLOSED on the checkout (Sol review, finding 5): only a VERIFIED main
+  // checkout (worktree === false) may arm. `null` means `.git` could not even
+  // be read — and a launcher must never be armed from a tree nobody could read.
+  if (worktree === true) return { arm: false, reason: 'a worktree checkout must not arm the launcher' }
+  if (worktree !== false) return { arm: false, reason: 'the checkout could not be verified (.git unreadable) — not arming' }
+  if (state === 'ready' || state === 'running') return { arm: false, reason: `already armed (${state})` }
+  if (state === 'disabled') {
+    return { arm: false, reason: 'deliberately stopped — only an explicit `node scripts/batch-launcher.mjs --start` re-arms it' }
+  }
+  return { arm: true, reason: `the launcher record reads "${state ?? 'unknown'}" — dead or absent, re-armed at session start` }
+}
