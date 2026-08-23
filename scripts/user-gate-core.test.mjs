@@ -133,9 +133,36 @@ describe('parseGateLine — one work-order line', () => {
     expect(p).toMatchObject({ gated: true, since: '2026-07-30T11:22:33.000Z' })
   })
 
-  it('classifies a qualifying legacy marker as confirmation before migration', () => {
-    const p = parseGateLine(`- [ ] 7. X AWAITING-USER(2026-07-30; ${confirmation})`)
-    expect(p).toMatchObject({ legacy: true, gated: true, classification: { verdict: 'confirmation' } })
+  // A LEGACY MARKER OWES MIGRATION AND DOES NOT GATE (fourth cross-vendor
+  // round, GPT-5.6 Sol, 23.08.2026). Gating on the prose heuristic's verdict put
+  // that heuristic, and every false positive three rounds found in it, back on
+  // the live path of every queue and pool reader.
+  it('never gates on an untyped marker, whatever its reason says', () => {
+    for (const reason of [legacyProse, confirmation, 'choose a colour', '']) {
+      const p = parseGateLine(`- [ ] 7. X AWAITING-USER(2026-07-30; ${reason})`)
+      expect(p).toMatchObject({ legacy: true, gated: false, needsMigration: true })
+    }
+    expect(gatedPoints(`- [ ] 7. X AWAITING-USER(2026-07-30; ${legacyProse})`).size).toBe(0)
+    // …and the heuristic verdict is still recorded, because migration needs it.
+    expect(parseGateLine(`- [ ] 7. X AWAITING-USER(2026-07-30; ${legacyProse})`)).toMatchObject({
+      classification: { verdict: 'confirmation' },
+    })
+  })
+
+  it('turns a qualifying legacy marker into a gate that HOLDS, via migration', () => {
+    const before = `- [ ] 7. X AWAITING-USER(2026-07-30; ${legacyProse})`
+    expect(gatedPoints(before).size).toBe(0)
+    const after = migrateLegacyGates(before, { at: '2026-08-23' })
+    expect(after.entries).toEqual([{ point: 7, verdict: 'confirmation', reason: legacyProse.replace(';', ',') }])
+    expect([...gatedPoints(after.text)]).toEqual([7])
+  })
+
+  it('leaves a qualifying legacy marker alone when the typed form will not fit', () => {
+    const tooLong = `push the version tag for the public demonstration build of the modern remake; safe prepared state: ${'x'.repeat(40)} verified locally and no tag pushed`
+    const line = `- [ ] 7. X AWAITING-USER(2026-07-30; ${tooLong})`
+    const after = migrateLegacyGates(line, { at: '2026-08-23' })
+    expect(after.entries.map((e) => e.verdict)).toEqual(['confirmation-needs-rewrite'])
+    expect(after.text).toBe(line)
   })
 
   it('keeps advisory, ambiguous and reasonless legacy markers workable', () => {

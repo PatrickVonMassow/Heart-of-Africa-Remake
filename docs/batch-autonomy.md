@@ -2992,16 +2992,21 @@ impossible, not skipping the inspection.
   rounds showed that reading free prose for "is this outward-facing" parks
   ordinary product decisions — "copy for the withdrawal dialog in production"
   named an authorized act — and no widening of the patterns closed it. Prose is
-  still read for UNTYPED legacy markers alone, where a wrong guess preserves an
-  existing gate instead of creating one. Every reader that picks work goes through that core: the
+  read for UNTYPED legacy markers alone, and only to decide what `--migrate`
+  writes: an untyped marker never gates by itself, so no queue or pool ever
+  consults the heuristic. Every reader that picks work goes through that core: the
   queue generator, the queue-order guard, the pool's workable set and the
   session-start headline, so none of them can offer a gated point — and none of
   them treats an advisory marker as a gate.
-  LEGACY MARKERS: `node scripts/defer-for-user.mjs --migrate` rewrites every
-  untyped `AWAITING-USER` line and reports each one with its verdict and the
-  reason it judged. A reason that itself names a U3 act becomes
-  `AWAITING-CONFIRMATION`; everything ambiguous or reasonless becomes
-  `SELF-DECIDED` with a decision card. An all-advisory queue therefore yields a
+  LEGACY MARKERS: an untyped `AWAITING-USER` line does not park its point — it
+  owes migration and the point continues meanwhile. `node
+  scripts/defer-for-user.mjs --migrate` rewrites every such line and reports each
+  one with its verdict and the reason it judged. A reason that itself names a U3
+  act becomes `AWAITING-CONFIRMATION` in the typed form, which is what makes it
+  gate; everything ambiguous or reasonless becomes `SELF-DECIDED` with a decision
+  card; one that qualifies but will not fit a single work-order line is reported
+  as `confirmation-needs-rewrite` and left untouched, to be re-recorded with
+  `--act` rather than silently clipped. An all-advisory queue therefore yields a
   workable point; `setPaused` is not the remedy for it.
 - **Tool permission prompts** don't fire for the batch: `defaultMode: dontAsk` +
   a trusted workspace (`hasTrustDialogAccepted`) + an allow-list covering every

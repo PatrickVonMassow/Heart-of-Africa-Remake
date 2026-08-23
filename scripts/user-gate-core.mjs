@@ -46,11 +46,12 @@
 // * `SELF-DECIDED(<at>; <summary>)` records that an advisory choice took the
 //   reversible-default lane. Its `Entscheidungsprotokoll:` board card is the
 //   detailed record (decision, evidence, consequence and exact veto action).
-// * Legacy `AWAITING-USER` is the ONE place the prose heuristic still runs
-//   (`classifyLegacyReason`), because those lines were written before the typed
-//   form existed. There it only decides whether an ALREADY PARKED marker keeps
-//   its gate, so a wrong guess preserves a gate rather than creating one.
-//   It gates only if that reason meets today's confirmation rule. Missing or ambiguous reasons
+// * Legacy `AWAITING-USER` NEVER GATES. It owes migration and the point runs
+//   meanwhile — ambiguity continues, as the 23.08.2026 order says. It is also
+//   the ONE place the prose heuristic still runs (`classifyLegacyReason`),
+//   because those lines predate the typed form; there it decides only what
+//   `--migrate` WRITES, never what a reader honours, so no queue or pool
+//   consults it. Missing or ambiguous reasons
 //   fall toward `SELF-DECIDED`/continuation. `--migrate` makes that verdict
 //   explicit and reports EVERY legacy marker on the line — including one that
 //   stands before a later answer — with the reason it judged.
@@ -271,7 +272,17 @@ const STRUCTURED_RE = new RegExp(
   'i',
 )
 
-/** Compose the one reason a typed confirmation may carry. */
+/**
+ * Compose the one reason a typed confirmation may carry.
+ *
+ * THE COMPOSED REASON IS RE-READ BEFORE IT IS BLESSED (fourth cross-vendor
+ * round, GPT-5.6 Sol, 23.08.2026). Validating the FIELDS and then storing
+ * `sanitiseReason(...)` was a lost-gate defect: the 160-character cap cut the
+ * `safe prepared state` clause off the end, the writer reported success, the
+ * marker went into the work order — and the strict reader then classified it
+ * advisory, so the point it was meant to park ran on. Whatever this returns as
+ * `ok` must survive the round trip, so the round trip is what decides.
+ */
 export function formatConfirmationReason({ act = '', detail = '', prepared = '' } = {}) {
   const key = String(act ?? '').trim().toLowerCase()
   const clean = (t) => String(t ?? '').replace(/[();\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
@@ -281,7 +292,25 @@ export function formatConfirmationReason({ act = '', detail = '', prepared = '' 
   const [what, safe] = [clean(detail), clean(prepared)]
   if (wordsIn(what) < 3) return { ok: false, error: 'detail must name the concrete act in at least three words', reason: '' }
   if (wordsIn(safe) < 3) return { ok: false, error: 'prepared must name the safe prepared state in at least three words', reason: '' }
-  return { ok: true, error: '', reason: sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`) }
+  // A FIELD THAT ASKS IS NOT A FIELD THAT ACTS: selecting an act key does not
+  // turn "choose blue or green" into one.
+  for (const [name, value] of [['detail', what], ['prepared', safe]]) {
+    if (ASKS_RATHER_THAN_STATES(value.toLowerCase())) {
+      return { ok: false, error: `${name} asks a question — decide it and record SELF-DECIDED instead`, reason: '' }
+    }
+  }
+  const reason = sanitiseReason(`${key}: ${what}, safe prepared state: ${safe}`)
+  const back = reason.match(STRUCTURED_RE)
+  // A CLIPPED RECORD IS ALSO A REFUSAL: `sanitiseReason` marks a cut with an
+  // ellipsis, and half a prepared state is not the state.
+  if (reason.endsWith('…') || !back || wordsIn(back[2]) < 3 || wordsIn(back[3]) < 3) {
+    return {
+      ok: false,
+      error: `the composed reason does not survive one work-order line (${REASON_MAX} characters) — shorten detail or prepared`,
+      reason: '',
+    }
+  }
+  return { ok: true, error: '', reason }
 }
 
 /**
@@ -402,10 +431,16 @@ export function parseGateLine(line) {
     marker,
     legacy: marker === LEGACY_GATE_MARKER,
     selfDecided: live && selfDecided,
-    // An untyped marker is read through today's rule immediately: a legacy
-    // advisory must not park the point merely because migration has not run.
-    // The same fail-continuing direction applies to an invalid explicit marker.
-    gated: live && !answered && !selfDecided && classification?.verdict === 'confirmation',
+    // ONLY A TYPED MARKER GATES (fourth cross-vendor round, GPT-5.6 Sol,
+    // 23.08.2026). An untyped line used to gate on the prose heuristic's
+    // verdict, which put that heuristic — and every false positive three review
+    // rounds found in it — back on the live path of every queue and pool
+    // reader. A legacy marker now OWES MIGRATION and continues meanwhile, which
+    // is the direction the 23.08.2026 order prescribes for ambiguity; `--migrate`
+    // is what turns a qualifying one into a gate that holds. An invalid TYPED
+    // marker continues for the same reason.
+    gated: live && marker === CONFIRMATION_MARKER && classification?.verdict === 'confirmation',
+    needsMigration: live && marker === LEGACY_GATE_MARKER,
     answered: live && answered,
     since: answered ? '' : stamp,
     at: answered ? stamp : '',
@@ -612,6 +647,22 @@ export function prepareAdvisoryDecision(tasksText, point, {
   return { ...marked, card, question: classified.reason }
 }
 
+/**
+ * Split an untyped reason into the two typed fields. The canonical "…, safe
+ * prepared state: X" form splits exactly; anything else carries the WHOLE
+ * reason as the detail and says the state must be re-read from it — never that
+ * none was recorded, which was wrong whenever the prose named one in passing
+ * (fourth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+ */
+const legacySplit = (reason) => {
+  const text = String(reason ?? '')
+  const split = /^(.*?),?\s*safe prepared state:\s*(.+)$/i.exec(text)
+  if (split && wordsIn(split[1]) >= 3 && wordsIn(split[2]) >= 3) {
+    return { detail: split[1], prepared: split[2] }
+  }
+  return { detail: text, prepared: 'as recorded in the detail, re-record it before acting' }
+}
+
 const legacyDecision = (point, reason) => advisoryDecisionCard(point, {
   decision: `Die offene Beratungsfrage wird mit dem sichersten reversiblen Standard entschieden: ${reason || 'keine belastbare Frage aufgezeichnet'}`,
   evidence: 'Der alte Marker nennt weder einen autorisierten Außenakt noch den davor sicher vorbereiteten Zustand',
@@ -669,20 +720,17 @@ export function migrateLegacyGates(tasksText, { at = '' } = {}) {
         // meant to preserve would evaporate the moment it is written. The old
         // prose becomes the detail, and the prepared state says truthfully that
         // the untyped marker never recorded one.
-        // An old reason that already said "safe prepared state: …" keeps it;
-        // one that never named a state says so instead of inventing one.
-        const split = /^(.*?),?\s*safe prepared state:\s*(.+)$/i.exec(reason)
-        const composed = formatConfirmationReason({
-          act: legacyVerdict.act,
-          detail: split ? split[1] : reason,
-          prepared: split && wordsIn(split[2]) >= 3
-            ? split[2]
-            : 'not recorded by the untyped marker, re-record it before acting',
-        })
+        const composed = formatConfirmationReason({ act: legacyVerdict.act, ...legacySplit(reason) })
         if (composed.ok) {
           entries.push({ point, verdict: 'confirmation', reason })
           return `${CONFIRMATION_MARKER}(${since ? `${since}; ` : ''}${composed.reason})`
         }
+        // The old prose qualifies but will not fit the typed form. Rewriting it
+        // to SELF-DECIDED would drop a real gate and composing a truncated
+        // marker would drop it just as silently, so the line is LEFT ALONE and
+        // named: the operator re-records it with --act.
+        entries.push({ point, verdict: 'confirmation-needs-rewrite', reason })
+        return t.token
       }
       entries.push({ point, verdict: 'self-decided', reason })
       const card = legacyDecision(point, reason)
