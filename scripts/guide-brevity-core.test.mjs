@@ -442,3 +442,20 @@ describe('auditGuide — the cost note is a note, not a paragraph', () => {
     expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
   })
 })
+
+// Round five: the ceiling is the measured 77, so 78 is the first refusal.
+describe('auditGuide — the note ceiling sits on its measurement', () => {
+  const O = '„'
+  const withNote = (note) => doc(`- **Notiz an der Grenze** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(${note})*`)
+  const pad = (n) => '≈ 2x ' + 'a'.repeat(n - 5)
+
+  it('accepts a note of exactly the measured length', () => {
+    expect(pad(77)).toHaveLength(77)
+    expect(auditGuide(withNote(pad(77))).ok).toBe(true)
+  })
+
+  it('refuses the very next character', () => {
+    expect(pad(78)).toHaveLength(78)
+    expect(auditGuide(withNote(pad(78))).violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+})
