@@ -302,6 +302,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
+- **Der Halt, den nur ein Mensch aufhebt.** Ein Stopp-Zustand ohne Uhr kostet nicht zwanzig
+  Minuten, sondern den Rest deiner Abwesenheit — und ein leerer oder beschädigter Marker sieht
+  dabei genauso aus wie dein bewusster Stopp.
+  → *Prompt:* „Gib **jedem** Halt eine Wiederanlauf-Uhr. Clocklos bleibt nur, was **nachweislich**
+  von mir kommt: typisiert und über einen eigenen Befehl geschrieben, nie von Hand. Alles
+  Untypisierte wird protokolliert, kurz wiederholt — und der Befehl steht überall dort, wo bisher
+  »leg die Marker-Datei an« stand."
+
 - **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.** Die
   nächste Sitzung kennt deinen Chat nicht, der alte Bestand bleibt liegen.
   → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander,
@@ -441,4 +449,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 9443c11d8085f9435ab9f05616de0e9bf900c3b7234d2f12e12ec9e3e6da0872 -->
+<!-- GUIDE-FINGERPRINT: 6640b433952e9365eda8c88882a402e625a9b380a3d76f1005a0d3044a89af0d -->
