@@ -80,9 +80,18 @@ function refuseInWorktree() {
 const read = () => readFileSync(TASKS, 'utf8')
 const write = (text) => writeTextAtomic(TASKS, text)
 
+/**
+ * A FLAG IS NEVER A VALUE (fifth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+ * `--detail --prepared "verified locally"` used to store the literal
+ * `"--prepared"` as the detail: a typed gate, or a decision card, with a field
+ * nobody wrote. A missing or flag-shaped value is no value, and the field check
+ * downstream then names exactly which one is missing.
+ */
 const option = (args, name) => {
   const i = args.indexOf(name)
-  return i >= 0 ? String(args[i + 1] ?? '').trim() : ''
+  if (i < 0) return ''
+  const value = String(args[i + 1] ?? '')
+  return value.startsWith('--') ? '' : value.trim()
 }
 
 /** Add an idempotent decision record before changing TASKS: a marker without

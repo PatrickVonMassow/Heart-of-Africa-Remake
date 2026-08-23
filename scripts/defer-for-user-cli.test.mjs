@@ -1,0 +1,99 @@
+// The CLI half of the typed user gate, exercised as a PROCESS. The pure rules
+// live in scripts/user-gate-core.test.mjs; what only a real argv can show is
+// how the flags are read — and one of those readings fabricated a field
+// (fifth cross-vendor round, GPT-5.6 Sol, 23.08.2026).
+//
+// HOA_REPO_ROOT points every run at a throwaway work order. A directory with no
+// `.git` is not a linked worktree, so the main-only refusal correctly stands
+// down, and with no `.claude/ntfy-topic` the alert is a silent no-op.
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+const CLI = resolve(process.cwd(), 'scripts', 'defer-for-user.mjs')
+let root = ''
+
+const run = (...args) => {
+  try {
+    const stdout = execFileSync(process.execPath, [CLI, ...args], {
+      encoding: 'utf8',
+      env: { ...process.env, HOA_REPO_ROOT: root, HOA_ALERT_ESCALATION: 'off' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    return { code: 0, stdout, stderr: '' }
+  } catch (error) {
+    return { code: error.status ?? 1, stdout: String(error.stdout ?? ''), stderr: String(error.stderr ?? '') }
+  }
+}
+const tasks = () => readFileSync(join(root, 'TASKS.md'), 'utf8')
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), 'hoa-gate-'))
+  mkdirSync(join(root, '.claude'), { recursive: true })
+  writeFileSync(join(root, 'TASKS.md'), '- [ ] 42. A POINT.\n- [ ] 43. ANOTHER POINT.\n')
+})
+
+describe('defer-for-user — reading the flags', () => {
+  it('writes the typed marker for a selected act and two named fields', () => {
+    const r = run('42', '--act', 'release-tag', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
+    expect(r.code, r.stderr).toBe(0)
+    expect(tasks().split('\n')[0]).toBe(
+      '- [ ] 42. A POINT. AWAITING-CONFIRMATION(' +
+        new Date().toISOString().slice(0, 10) +
+        '; release-tag: push the v1.2.0 tag, safe prepared state: built locally and nothing pushed)',
+    )
+  })
+
+  // THE DEFECT: the value after `--detail` was the next FLAG, and it was stored.
+  it('never takes the next flag as a value, and writes nothing when it tries', () => {
+    const before = tasks()
+    const r = run('42', '--act', 'release-tag', '--detail', '--prepared', 'built locally and nothing pushed')
+    expect(r.code).toBe(1)
+    expect(r.stderr).toMatch(/detail must name the concrete act/)
+    expect(tasks()).toBe(before)
+    expect(tasks()).not.toContain('--prepared')
+  })
+
+  it('refuses a missing trailing value and an unselected act, unchanged', () => {
+    const before = tasks()
+    for (const args of [
+      ['42', '--act', 'release-tag', '--detail', 'push the v1.2.0 tag', '--prepared'],
+      ['42', '--act', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed'],
+      ['42', '--act', 'ship-it', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed'],
+      ['42'],
+    ]) {
+      expect(run(...args).code, args.join(' ')).toBe(1)
+      expect(tasks()).toBe(before)
+    }
+  })
+
+  // THE DISCRIMINATING CASE. A decision card has no word-count floor, so an
+  // omitted `--decision` whose next token is the following FLAG used to be
+  // recorded verbatim: a veto card, and a SELF-DECIDED marker, saying
+  // "--evidence". The field must be reported missing before anything is written.
+  it('refuses a self-decision whose field is the next flag, naming that field', () => {
+    const before = tasks()
+    const r = run(
+      '--self-decide', '42',
+      '--question', 'which colour should the card use',
+      '--decision', '--evidence', 'the token is blue',
+      '--consequence', 'the card stays consistent',
+      '--veto-action', 'reply Veto and restore the green token',
+    )
+    expect(r.code).toBe(1)
+    expect(r.stderr).toMatch(/decision record needs: decision/)
+    expect(r.stderr).not.toMatch(/could not be recorded/)
+    expect(tasks()).toBe(before)
+  })
+
+  it('reports a gate it wrote, and clears it back to the head of the queue', () => {
+    run('42', '--act', 'release-tag', '--detail', 'push the v1.2.0 tag', '--prepared', 'built locally and nothing pushed')
+    expect(run('--list').stdout).toMatch(/42 awaits confirmation/)
+    expect(run('--clear', '42').code).toBe(0)
+    expect(tasks()).toContain('USER-ANSWERED(')
+    expect(tasks()).not.toContain('AWAITING-CONFIRMATION')
+  })
+})
