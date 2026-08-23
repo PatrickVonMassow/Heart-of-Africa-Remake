@@ -120,6 +120,13 @@ describe('defer-for-user — reading the flags', () => {
     expect(mixed.code).toBe(1)
     expect(mixed.stderr).toMatch(/-h \(the same flag as --help\) is given more than once/)
     expect(mixed.stdout).toBe('')
+
+    // THE REVERSE ROUTE IS ITS OWN CASE: a reading that canonicalised only the
+    // SECOND spelling would pass the pair above and still let this one through.
+    const reversed = run('-h', '--help')
+    expect(reversed.code).toBe(1)
+    expect(reversed.stderr).toMatch(/--help is given more than once/)
+    expect(reversed.stdout).toBe('')
   })
 
   it('still answers a single -h with the usage on stdout', () => {
