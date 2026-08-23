@@ -80,6 +80,7 @@ strategy and suite map: `scripts/verify/README.md`.
   participates in authoring, serving, commit trailers, or blind merging.
   Serving models outside its reported chain pause the batch. Every commit names
   its author model in a `Co-Authored-By` trailer.
+  A commit may also name its cross-vendor reviewer in a second model trailer.
 - **Four eyes has two modes.** A divergent stage runs blind-parallel from the
   same inputs, each model producing a complete result before either sees the
   other. A third model merges by meaning and counts every id through

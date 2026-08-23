@@ -89,8 +89,12 @@ export const DOC_BUDGETS = [
     // branch of forty commits that stood 658 behind `main`. The rule has no other
     // authority and no guard, so it returns and the ceiling follows it by exactly
     // its own size.
+    // RAISED by the 13 measured words of the §6 reviewer-trailer rule: a commit
+    // may record its cross-vendor reviewer as a second model trailer. The commit
+    // gate already permits two separately allowed lines; this closes the policy
+    // ambiguity without changing that mechanism. The one-word margin remains.
     maxLines: 193,
-    maxWords: 1319,
+    maxWords: 1332,
     // THE RATCHET SLACK, tightest in the project: this file is the per-turn cost of
     // every session and every subagent, so twenty words is the whole licence between
     // one cut and the next. A larger edit than that lowers the ceiling with it.

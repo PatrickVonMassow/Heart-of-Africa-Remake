@@ -29,6 +29,11 @@ import { currentFableState } from './fable-switch.mjs'
 const BASELINE = repoPath('.claude/model-guard-baseline.json')
 const PAUSE = repoPath('.claude/batch-paused')
 
+// Git parses a literal comma as the next pretty-format option delimiter, so
+// `separator=,` means an EMPTY separator. Encode it to keep distinct trailer
+// values distinct for `splitTrailerField` in the decision core.
+export const RECENT_LOG_FORMAT = '%H|%cI|%(trailers:key=Co-Authored-By,valueonly,separator=%x2C)'
+
 /** Baseline timestamp; self-arms to NOW on first run so historic degraded
  *  commits (the acknowledged 24.07 incident) never re-trigger. `arm: false` reads
  *  the same value without WRITING it: the read-only preflight may report, but it
@@ -55,7 +60,7 @@ function baselineMs({ arm = true } = {}) {
 function recentLog() {
   try {
     return execSync(
-      'git log --all --since="48 hours ago" --format="%H|%cI|%(trailers:key=Co-Authored-By,valueonly,separator=,)"',
+      `git log --all --since="48 hours ago" --format="${RECENT_LOG_FORMAT}"`,
       { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' },
     )
   } catch {
