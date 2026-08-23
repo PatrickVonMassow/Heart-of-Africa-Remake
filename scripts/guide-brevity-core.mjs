@@ -69,7 +69,7 @@
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
 export const LIMITS = {
-  maxLines: 438,
+  maxLines: 444,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -184,7 +184,19 @@ export const LIMITS = {
   // and the ceilings move by exactly that to 438 / 3930, with zero slack. Not
   // escalated to the user, under his general withdrawal of ask-before-raising of
   // 10.08.2026.
-  maxWords: 3930,
+  // RAISED again on 23.08.2026 by ONE genuinely new lesson: the model that
+  // answers is not the model that was ordered — under shortage the environment
+  // silently serves a weaker one, the output looks normal, and only the results
+  // say it later. It is not the substituted-fallback tip (that one is about a
+  // component swapped inside the product): here the WORKER itself is exchanged,
+  // and the decision a reader copies is to verify the answering model at session
+  // start against an allowed chain, halt and report outside it, and stamp every
+  // result with the model that wrote it. Written first at eight lines, cut to
+  // six before the raise, as the shortening step this rule demands. What remains
+  // is +6 lines / +57 words against the measured 438 / 3930, and the ceilings
+  // move by exactly that to 444 / 3987, with zero slack. Not escalated to the
+  // user, under his general withdrawal of ask-before-raising of 10.08.2026.
+  maxWords: 3987,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

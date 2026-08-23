@@ -185,13 +185,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   je Aufgabe einen **frischen Kontext** an. Vor einem Deckel miss den **Startboden**, sonst
   deckelst du das Aufräumen mit."
 
-- **Es antwortet nicht das Modell, das du bestellt hast.** Bei Engpass oder Störung serviert die
-  Umgebung stillschweigend ein schwächeres weiter. Die Arbeit läuft, nur schlechter — an der
-  Ausgabe siehst du es nicht, an den Ergebnissen erst Stunden später.
-  → *Prompt:* „Stell zu Beginn jeder Sitzung fest, **welches Modell tatsächlich antwortet**, und
-  halte es gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**, statt
-  weiterzuarbeiten. Jedes Arbeitsergebnis trägt, **welches** Modell es geschrieben hat — sonst
-  weißt du hinterher nicht, was du neu prüfen musst."
+- **Es antwortet nicht das Modell, das du bestellt hast.** Bei Engpass serviert die Umgebung still
+  ein schwächeres weiter; an der Ausgabe siehst du es nicht.
+  → *Prompt:* „Stell zu Sitzungsbeginn fest, **welches Modell tatsächlich antwortet**, und halte es
+  gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**. Jedes Ergebnis trägt,
+  **welches** Modell es schrieb."
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
