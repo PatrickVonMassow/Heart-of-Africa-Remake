@@ -588,15 +588,15 @@
       "origin": "machine",
       "place": "last"
     },
-    "862": {
-      "at": "2026-08-23T14:11:47.047Z",
-      "why": "machine-filed guard-hardening finding on landed code; stands behind the release like its 856 family",
+    "860": {
+      "at": "2026-08-23T14:49:59.219Z",
+      "why": "ranked by the USER'S OWN ORDER of 23.08.2026 (no-standstill: recovery mechanisms outrank the current ticket), not by the machine",
       "origin": "machine",
       "place": "last"
     },
-    "863": {
-      "at": "2026-08-23T14:11:47.140Z",
-      "why": "machine-filed test-only gap; stands behind the release",
+    "861": {
+      "at": "2026-08-23T14:49:59.292Z",
+      "why": "ranked by the USER'S OWN ORDER of 23.08.2026 (no-standstill: recovery mechanisms outrank the current ticket), not by the machine",
       "origin": "machine",
       "place": "last"
     }
