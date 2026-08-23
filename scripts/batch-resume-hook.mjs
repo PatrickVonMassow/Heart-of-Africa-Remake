@@ -189,18 +189,12 @@ noteTopLevelSession(sessionId)
 // owner). The decision is pure and never reverts a deliberate --stop; failures
 // stay silent because a hook that cannot arm must still orient the session.
 try {
-  const { inWorktree, launcherState, startDaemon } = await import('./batch-launcher.mjs')
-  const { resumeArmDecision } = await import('./batch-launcher-core.mjs')
-  const decision = resumeArmDecision({
-    state: launcherState().state,
-    platform: process.platform,
-    worktree: inWorktree(),
-  })
-  if (decision.arm) {
-    const armed = await startDaemon()
+  const { armLauncherAtSessionStart } = await import('./batch-launcher.mjs')
+  const armed = await armLauncherAtSessionStart()
+  if (armed.attempted) {
     console.log(
-      armed.started
-        ? `[batch-resume] LAUNCHER RE-ARMED at session start (pid ${armed.record?.pid}): ${decision.reason}.`
+      armed.armed
+        ? `[batch-resume] LAUNCHER RE-ARMED at session start (pid ${armed.pid}): ${armed.reason}.`
         : `[batch-resume] LAUNCHER STILL NOT ARMED: ${armed.reason} — start it by hand: node scripts/batch-launcher.mjs --start`,
     )
   }

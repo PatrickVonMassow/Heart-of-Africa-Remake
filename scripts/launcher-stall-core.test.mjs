@@ -8,6 +8,7 @@ import {
   initialStallState,
   judgeSleep,
   judgeTick,
+  markAlertDelivered,
 } from './launcher-stall-core.mjs'
 
 const MIN = 60 * 1000
@@ -43,6 +44,19 @@ describe('judgeTick — the incident itself: consecutive dead ticks', () => {
     expect(third.alert).not.toBeNull()
     expect(third.alert.key).toBe(second.alert.key)
     expect(third.alert.title).toBe(second.alert.title)
+  })
+
+  it('the NEXT stall is a new episode: fresh ladder key, no inherited history', () => {
+    const firstEpisode = deadTicks(2)
+    const recovered = judgeTick({
+      state: markAlertDelivered(firstEpisode[1].state),
+      alive: true,
+      now: T0 + 60 * MIN,
+    })
+    const secondEpisode = deadTicks(2, { state: recovered.state, startAt: T0 + 120 * MIN })
+    expect(secondEpisode[1].alert).not.toBeNull()
+    expect(secondEpisode[1].alert.key).not.toBe(firstEpisode[1].alert.key)
+    for (const v of [firstEpisode[1], secondEpisode[1]]) expect(v.alert.key).toMatch(/^launcher-stall:\d+$/)
   })
 
   it('counts the stall duration from the FIRST dead tick', () => {
@@ -107,10 +121,10 @@ describe('judgeSleep — the host suspend', () => {
 })
 
 describe('judgeTick — recovery', () => {
-  it('the first working tick after an alerted run sends the one-time recovery notice and resets', () => {
+  it('the first working tick after a DELIVERED alert sends the one-time recovery notice and resets', () => {
     const dead = deadTicks(3)
-    const last = dead[dead.length - 1]
-    const back = judgeTick({ state: last.state, alive: true, now: T0 + 60 * MIN })
+    const delivered = markAlertDelivered(dead[dead.length - 1].state)
+    const back = judgeTick({ state: delivered, alive: true, now: T0 + 60 * MIN })
     expect(back.recovery).not.toBeNull()
     expect(back.recovery.priority).toBe('default')
     expect(back.recovery.message).toMatch(/3 dead attempt/)
@@ -119,6 +133,16 @@ describe('judgeTick — recovery', () => {
     const after = judgeTick({ state: back.state, alive: true, now: T0 + 75 * MIN })
     expect(after.recovery).toBeNull()
     expect(after.log).toBeNull()
+  })
+
+  it('"alerted" means DELIVERED: a stall whose every send failed ends without a recovery notice', () => {
+    // Three demands went out and none was confirmed — the daemon never called
+    // markAlertDelivered, so there is no received alert to stand down.
+    const dead = deadTicks(3)
+    const back = judgeTick({ state: dead[dead.length - 1].state, alive: true, now: T0 + 60 * MIN })
+    expect(back.recovery).toBeNull()
+    expect(back.log).toMatch(/no alert had been delivered/)
+    expect(back.state).toEqual(initialStallState())
   })
 
   it('a working tick after UN-alerted dead ticks resets silently — no alert, no notice', () => {

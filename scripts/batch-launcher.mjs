@@ -46,7 +46,8 @@ import {
   ownershipSignal,
   releaseSpawnDecision,
 } from './batch-launcher-core.mjs'
-import { initialStallState, judgeSleep, judgeTick } from './launcher-stall-core.mjs'
+import { initialStallState, judgeSleep, judgeTick, markAlertDelivered } from './launcher-stall-core.mjs'
+import { resumeArmDecision } from './batch-launcher-core.mjs'
 import { notify } from './notify.mjs'
 import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
@@ -63,15 +64,28 @@ export const TICK_TIMEOUT_MS = LAUNCHER_TICK_MS
  *  what it sees. Node's own startup, not the tick's. */
 const START_SETTLE_MS = 8000
 
+/** How long one stall alert send may take before the daemon moves on. The
+ *  loop is what this alarm protects; it must never hang on its own voice. A
+ *  send that settles later is harmless — the outcome is only logged. */
+export const ALERT_SEND_TIMEOUT_MS = 30_000
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** `.git` is a DIRECTORY in the real checkout and a FILE inside a worktree. */
-export function inWorktree(root = REPO_ROOT) {
+/** `.git` is a DIRECTORY in the real checkout and a FILE inside a worktree.
+ *  Three answers, because an UNREADABLE `.git` is neither (Sol review,
+ *  finding 5): true, false, or null for "could not be verified". */
+export function worktreeVerdict(root = REPO_ROOT) {
   try {
     return !statSync(join(root, '.git')).isDirectory()
   } catch {
-    return false
+    return null
   }
+}
+
+/** The CLI's coarse form: an unverifiable checkout refuses like a worktree —
+ *  a launcher must never be armed from a tree nobody could even read. */
+export function inWorktree(root = REPO_ROOT) {
+  return worktreeVerdict(root) !== false
 }
 
 export function readLauncherRecord(path = LAUNCHER_RECORD_PATH) {
@@ -232,6 +246,10 @@ export async function runDaemon({
   // sent from THIS process: notify() is an HTTPS POST, judged by the pure core
   // and throttled by the escalation ladder. Injected so a test alerts a fake.
   sendAlert = notify,
+  // The send gets a BUDGET, not trust (Sol review, finding 1): notify bounds
+  // its own fetch, but the ladder import and any injected channel do not, and
+  // an unbounded await here would stall the very loop this alarm watches over.
+  alertTimeoutMs = ALERT_SEND_TIMEOUT_MS,
 } = {}) {
   const existing = launcherState({ recordPath, tickMs })
   if ((existing.state === 'ready' || existing.state === 'running') && Number(existing.record?.pid) !== process.pid) {
@@ -314,11 +332,23 @@ export async function runDaemon({
   const speak = async (kind, { title, message, priority, key }) => {
     let ok = false
     try {
-      ok = await sendAlert(title, message, priority, key ? { key } : { escalate: false })
+      // Race, not trust: a hung send loses to the budget and the loop moves on.
+      // The losing promise may settle later; its result is only a log line.
+      ok = await Promise.race([
+        Promise.resolve(sendAlert(title, message, priority, key ? { key } : { escalate: false })).then(
+          (r) => r === true,
+          () => false,
+        ),
+        sleep(alertTimeoutMs).then(() => false),
+      ])
     } catch {
       /* a broken alert channel must never take the launcher down */
     }
-    appendLog(logPath, `stall-watch: ${kind} ${ok ? 'sent' : 'not sent (no topic, held back by the ladder, or send failed)'}`)
+    appendLog(
+      logPath,
+      `stall-watch: ${kind} ${ok ? 'sent' : 'not sent (no topic, held back by the ladder, send failed, or timed out)'}`,
+    )
+    return ok
   }
 
   while (!stopping) {
@@ -356,7 +386,9 @@ export async function runDaemon({
       const verdict = judgeTick({ state: stall, alive: tickCode !== null, now: Date.now() })
       stall = verdict.state
       if (verdict.log) appendLog(logPath, `stall-watch: ${verdict.log}`)
-      if (verdict.alert) await speak('alert', verdict.alert)
+      // Only a CONFIRMED delivery arms the recovery notice — "alerted" means
+      // the user actually got one, not that one was demanded.
+      if (verdict.alert && (await speak('alert', verdict.alert))) stall = markAlertDelivered(stall)
       if (verdict.recovery) await speak('recovery notice', verdict.recovery)
     }
     lastTickAt = Date.now()
@@ -438,13 +470,56 @@ export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = 
     stdio: 'ignore',
     windowsHide: true,
   })
+  // An ASYNCHRONOUS spawn failure (EAGAIN under pressure — the incident's exact
+  // weather) emits 'error' later; without a listener that is an uncaught event
+  // that crashes the CALLER, which since point 859 includes the SessionStart
+  // hook. Recorded here, reported below (Sol review, finding 2).
+  let spawnError = null
+  child.on('error', (e) => {
+    spawnError = e
+  })
   child.unref()
   const deadline = Date.now() + START_SETTLE_MS
   for (;;) {
     const now = launcherState({ recordPath, tickMs })
+    if (spawnError) {
+      return { started: false, ...now, reason: `the daemon could not be spawned: ${spawnError.message || spawnError}` }
+    }
     if (now.state === 'ready' || now.state === 'running') return { started: true, ...now }
     if (Date.now() >= deadline) return { started: false, ...now, reason: 'the daemon published no record' }
     await sleep(200)
+  }
+}
+
+/**
+ * THE SESSION-START ARMING, as one injectable seam (point 859, Sol review
+ * finding 6). The hook calls exactly this; a test drives it with fakes —
+ * including a spawn that fails asynchronously — and proves it NEVER throws:
+ * a hook that cannot arm must still orient its session.
+ *
+ * Returns { armed, attempted, reason, pid }:
+ *   attempted=false — the decision refused (already armed, stopped, win32,
+ *                     worktree/unverifiable checkout); nothing was spawned.
+ *   attempted=true  — a start ran; `armed` says whether it took.
+ */
+export async function armLauncherAtSessionStart({
+  platform = process.platform,
+  worktree = worktreeVerdict(),
+  readState = launcherState,
+  start = startDaemon,
+} = {}) {
+  try {
+    const decision = resumeArmDecision({ state: readState().state, platform, worktree })
+    if (!decision.arm) return { armed: false, attempted: false, reason: decision.reason, pid: null }
+    const r = await start()
+    return {
+      armed: r.started === true,
+      attempted: true,
+      reason: r.started === true ? decision.reason : r.reason || 'the daemon published no record',
+      pid: r.record?.pid ?? null,
+    }
+  } catch (e) {
+    return { armed: false, attempted: true, reason: `arming failed: ${(e && e.message) || e}`, pid: null }
   }
 }
 

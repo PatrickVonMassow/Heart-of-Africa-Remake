@@ -273,4 +273,12 @@ describe('resumeArmDecision — a session start heals a dead launcher, never a s
     expect(resumeArmDecision({ state: 'unknown', platform: 'win32', worktree: false }).arm).toBe(false)
     expect(resumeArmDecision({ state: 'unknown', platform: 'linux', worktree: true }).arm).toBe(false)
   })
+
+  it('FAILS CLOSED on a checkout nobody could verify (.git unreadable → null)', () => {
+    for (const worktree of [null, undefined]) {
+      const d = resumeArmDecision({ state: 'unknown', platform: 'linux', worktree })
+      expect(d.arm).toBe(false)
+      expect(d.reason).toMatch(/could not be verified/)
+    }
+  })
 })

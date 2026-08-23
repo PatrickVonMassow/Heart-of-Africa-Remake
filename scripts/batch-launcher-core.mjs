@@ -256,7 +256,11 @@ export function resumeArmDecision({ state, platform, worktree } = {}) {
   if (platform === 'win32') {
     return { arm: false, reason: `the Windows launcher is the Scheduled Task "${LAUNCHER_TASK_NAME}" — a session cannot arm it` }
   }
+  // FAIL CLOSED on the checkout (Sol review, finding 5): only a VERIFIED main
+  // checkout (worktree === false) may arm. `null` means `.git` could not even
+  // be read — and a launcher must never be armed from a tree nobody could read.
   if (worktree === true) return { arm: false, reason: 'a worktree checkout must not arm the launcher' }
+  if (worktree !== false) return { arm: false, reason: 'the checkout could not be verified (.git unreadable) — not arming' }
   if (state === 'ready' || state === 'running') return { arm: false, reason: `already armed (${state})` }
   if (state === 'disabled') {
     return { arm: false, reason: 'deliberately stopped — only an explicit `node scripts/batch-launcher.mjs --start` re-arms it' }

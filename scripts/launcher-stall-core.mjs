@@ -27,8 +27,15 @@
 // escalation rung only on a CONFIRMED delivery. So this core keeps demanding
 // the alert on every dead tick at or past the threshold, and the escalation
 // ladder (scripts/alert-escalation-core.mjs) decides which of those demands
-// actually goes out. Collapsed digits in the ladder key make "dead for 31 min"
-// and "dead for 46 min" ONE climbing alert, not a fresh one each tick.
+// actually goes out. The ladder key carries the EPISODE (its first dead tick's
+// timestamp): within one stall every demand climbs one ladder, while the next
+// stall — days later, after a recovery — starts a fresh key instead of
+// inheriting the old episode's rungs and intervals (Sol review, finding 3).
+//
+// "ALERTED" MEANS DELIVERED, NOT DEMANDED (Sol review, finding 4). The daemon
+// reports a confirmed send back through `markAlertDelivered`; only that arms
+// the recovery notice. A stall whose every send failed ends silently — the
+// notice exists to stand a RECEIVED alert down, and nothing was received.
 
 /** Consecutive dead ticks before the first alert. One dead tick is a slow
  *  machine or an unlucky kill; two whole intervals without one working child
@@ -43,10 +50,17 @@ export const STALL_ALERT_AFTER = 2
 export const SUSPEND_OVERSHOOT_MS_MIN = 5 * 60 * 1000
 
 /** The state the daemon threads through `judgeTick`. `deadSinceAt` is the time
- *  of the first dead tick of the current run (epoch ms), for the human-readable
- *  duration in the alert. */
+ *  of the first dead tick of the current run (epoch ms) — the human-readable
+ *  duration in the alert AND the episode mark in the ladder key. `alerted`
+ *  means an alert was DELIVERED, and only `markAlertDelivered` sets it. */
 export function initialStallState() {
   return { deadRun: 0, deadSinceAt: null, alerted: false, suspended: false }
+}
+
+/** The daemon confirmed a stall alert went out. PURE. */
+export function markAlertDelivered(state) {
+  const s = state && typeof state === 'object' ? state : initialStallState()
+  return { ...s, alerted: true }
 }
 
 /**
@@ -87,6 +101,7 @@ export function judgeTick({ state, alive, now } = {}) {
   const s = state && typeof state === 'object' ? state : initialStallState()
   if (alive === true) {
     const recovered = s.alerted === true
+    const endedStall = (Number(s.deadRun) || 0) > 0
     const minutes = s.deadSinceAt ? Math.max(1, Math.round((Number(now) - s.deadSinceAt) / 60000)) : 0
     return {
       state: initialStallState(),
@@ -100,7 +115,11 @@ export function judgeTick({ state, alive, now } = {}) {
             priority: 'default',
           }
         : null,
-      log: recovered ? `stall over — first working tick after ${s.deadRun} dead one(s)` : null,
+      log: recovered
+        ? `stall over — first working tick after ${s.deadRun} dead one(s)`
+        : endedStall
+          ? `stall over after ${s.deadRun} dead tick(s) — no alert had been delivered, so no recovery notice goes out`
+          : null,
     }
   }
   const deadRun = (Number.isInteger(s.deadRun) && s.deadRun >= 0 ? s.deadRun : 0) + 1
@@ -119,15 +138,15 @@ export function judgeTick({ state, alive, now } = {}) {
             '. Nothing advances the batch and no other alert path can run. ' +
             'Most likely the container is sick: restart VS Code (rebuilds the container) when you can.',
           priority: 'high',
-          // One climbing alert per stall episode: the ladder collapses digit
-          // runs itself, but the counters here would still make new keys —
-          // so the key is fixed, and fixed per EPISODE by construction
-          // (recovery resets the run, and the ladder key with it).
-          key: 'launcher-stall',
+          // One climbing alert per stall EPISODE: the key carries the episode's
+          // first dead-tick timestamp, so every demand of this stall climbs one
+          // ladder while the NEXT stall starts fresh instead of inheriting this
+          // episode's rungs (Sol review, finding 3).
+          key: `launcher-stall:${deadSinceAt}`,
         }
       : null
   return {
-    state: { ...s, deadRun, deadSinceAt, alerted: s.alerted || alert !== null },
+    state: { ...s, deadRun, deadSinceAt },
     alert,
     recovery: null,
     log: alert === null ? `dead tick ${deadRun}/${threshold} — alerting at ${threshold}` : null,
