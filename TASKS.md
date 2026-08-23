@@ -635,31 +635,6 @@ put it is the mistake this line exists to stop.
   the reader but changes no gate, and deriving it from the tag is what keeps it honest.
   Bundle: Chat & Tafel.
 
-- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
-  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
-  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
-  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
-  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
-  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
-  is not enough. This is not a calibration miss: there is no knob left to turn, so the
-  per-kind look itself carries too little contrast against the ground it sits on.
-  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
-  pace and eye height the player actually has, in every settlement kind and on the ground
-  colours they stand on — the Bambara village's pale sand is the case that failed, so it
-  is the case that must be shown to work. The contrast comes from the band's own design
-  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
-  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
-  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
-  the ceiling moves with the design rather than being raised past it.
-  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
-  frame from inside the settlement at the boundary in at least the Bambara village and
-  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
-  pinning the contrast the design settles on (the band's value against the sampled ground
-  value stays above the chosen minimum for every settlement kind), so a later ground or
-  palette change cannot quietly erase it again.
-  Criticality: medium — the boundary is what tells the player where the settlement ends
-  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
-
 - [ ] 713. The board's now-section answers to nothing, so it stood empty while three strands were
   in flight (user 17.08.2026, reading the live board: »Die Sektion Woran ich gerade arbeite ist
   leer. Soll das so sein?«; and at 20:07: »Lege einen neuen Punkt an, um das Problem mit dem
@@ -808,6 +783,31 @@ put it is the mistake this line exists to stop.
   breaks no player-visible behaviour itself, but a gate whose only exit is a hand waiver decays
   into a formality.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
+  (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
+  Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
+  state: `placeEdgeBand` stands at the shipped defaults, `widthM: 3`, `wanderM: 0.9`,
+  `strength: 1` — and `strength` is documented as "0 (invisible) .. 1 (the full per-kind
+  look)". He is therefore already looking at the STRONGEST edge the game can draw, and it
+  is not enough. This is not a calibration miss: there is no knob left to turn, so the
+  per-kind look itself carries too little contrast against the ground it sits on.
+  FINAL STATE: the boundary READS at a glance from inside the settlement, at the walking
+  pace and eye height the player actually has, in every settlement kind and on the ground
+  colours they stand on — the Bambara village's pale sand is the case that failed, so it
+  is the case that must be shown to work. The contrast comes from the band's own design
+  (value against the surrounding ground, not hue alone — the report is from a sand-on-sand
+  village), and it stays a give-way rather than becoming a painted stripe: the §2.6 look
+  is a threshold the player reads, not a fence. `strength: 1` remains the full look, so
+  the ceiling moves with the design rather than being raised past it.
+  VERIFIABLE: the PICTURE decides, since the complaint is legibility — a first-person
+  frame from inside the settlement at the boundary in at least the Bambara village and
+  one contrasting settlement kind, on BOTH backends, judged by looking. Plus a pure test
+  pinning the contrast the design settles on (the band's value against the sampled ground
+  value stays above the chosen minimum for every settlement kind), so a later ground or
+  palette change cannot quietly erase it again.
+  Criticality: medium — the boundary is what tells the player where the settlement ends
+  and the bird's-eye view resumes; §2.6 and criterion 15 both rest on it being legible.
 
 - [ ] 686. The taught language is five concepts, and the chief's message is four of them (user
   13.08.2026, playing the deployed communication slice).
@@ -11359,4 +11359,22 @@ to land than a mechanism that needs a review.
   VERIFIABLE: the new cases fail against the mutated classifier and the loosened validator, and pass
   against the delivered code.
   Criticality: low — test coverage only; the delivered behaviour itself was reviewed as correct.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 856. The review planner reads a reviewer credit as authorship and calls the commit unreviewable.
+  MEASURED 23.08.2026, 10:20: `scripts/review-sol.mjs --sha c54e4615 --since c54e4615~1` refuses with
+  "every configured reviewer vendor authored part of this contribution" and keeps
+  `scripts/timestamp-guard.test.mjs` as a mixed-vendor end-state file in EVERY range containing that
+  commit — `c54e4615` was authored by Claude Opus 5 alone and its second `Co-Authored-By` trailer is
+  the cross-vendor reviewer credit that CLAUDE.md §6 permits since point 854. Reading that credit as
+  authorship leaves NO eligible reviewer, so the four-eyes debt on such a commit can never be cleared
+  through the review path, only hand-recorded around it (done once for `c54e4615` via ask-sol).
+  FINAL STATE: the planner's authorship read distinguishes the authoring trailer from a reviewer
+  credit on commits that carry both (the ledger's own review record for the commit, or the §6 rule
+  that the second model trailer names the reviewer, decides which is which); a genuinely mixed-vendor
+  contribution stays unreviewable as today.
+  VERIFIABLE: unit cases over the planner's vendor cut — a commit with one Anthropic author trailer
+  plus one OpenAI reviewer trailer plans an OpenAI review pass; a commit whose CHANGES came from both
+  vendors still refuses; and the c54e4615 shape no longer reports "no eligible reviewer vendor".
+  Criticality: medium — it silently turns the reviewer credit the rule now invites into permanent
+  review debt on every commit that uses it.
   Bundle: Session- & Repo-Hygiene.
