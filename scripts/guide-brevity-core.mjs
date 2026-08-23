@@ -315,12 +315,16 @@ const PROMPT_RE = /→\s*\*Prompt\s*:\*/
 const OPEN_QUOTE = '\u201E'
 const CLOSING_QUOTES = ['"', '\u201C']
 
-// What may FOLLOW a closed prompt: the cost multiplier and the review question
-// the guide uses, and nothing else. Exempting every italic parenthetical let
-// narrative ride in as `*(Und danach folgt weitere Erzählung.)*`
-// (cross-vendor review, 23.08.2026).
+// WHAT MAY FOLLOW A CLOSED PROMPT, measured over the whole guide on 23.08.2026:
+// seven italic parentheticals, six of them cost notes carrying `≈` and one the
+// review question below. So the allowlist is those two forms and nothing else —
+// a prefix rule let `*(Kosten entstehen, und danach folgt weitere Erzählung.)*`
+// through, and a trailing `?` let `*(Und danach geschah noch etwas?)*` through
+// (cross-vendor review, 23.08.2026, round 3). A NEW kind of note is added HERE,
+// deliberately, so that adding one is a decision rather than a side effect.
 const NOTE_RE = /^\*\(([^)]*)\)\*/
-const isAllowedNote = (note) => /^(?:≈|Kosten\b|ca\.)/.test(note) || /\?$/.test(note)
+const REVIEW_QUESTION = 'Sieht das richtig aus?'
+const isAllowedNote = (note) => note.includes('≈') || note === REVIEW_QUESTION
 
 /**
  * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
@@ -409,17 +413,24 @@ export function auditGuide(text, limits = LIMITS) {
       if (!/\p{L}/u.test(tail)) {
         push('empty-prompt', where, `„${entry.title}" führt „→ *Prompt:*" ohne Anweisung`)
       } else if (PROMPT_RE.test(marker)) {
-        // A PROMPT IS QUOTED — all 49 in the guide are. That is what separates
-        // the instruction from the prose around it, so an unquoted prompt is
-        // refused rather than guessed at.
-        const open = tail.indexOf(OPEN_QUOTE)
-        const close = Math.max(...CLOSING_QUOTES.map((mark) => tail.lastIndexOf(mark)))
-        if (open < 0) {
+        // A PROMPT IS QUOTED, and the quotes are its BOUNDARIES, not merely
+        // characters that occur somewhere in it. Accepting the first opening and
+        // the last closing anywhere let prose stand BEFORE the prompt and a
+        // second quoted stretch stand AFTER it (cross-vendor review, round 3).
+        // Measured: all 49 prompts in the guide carry exactly one pair.
+        const body = tail.trimStart()
+        const opens = (body.match(/\u201E/g) ?? []).length
+        const closes = CLOSING_QUOTES.reduce((n, mark) => n + (body.split(mark).length - 1), 0)
+        if (opens === 0) {
           push('unquoted-prompt', where, `„${entry.title}" schreibt den Prompt ohne „…" — Anweisung und Prosa sind nicht getrennt`)
-        } else if (close < open) {
+        } else if (!body.startsWith(OPEN_QUOTE)) {
+          push('prose-before-prompt', where, `„${entry.title}" erzählt vor dem Prompt weiter`)
+        } else if (closes === 0) {
           push('unclosed-prompt', where, `„${entry.title}" schließt den Prompt nicht`)
+        } else if (opens > 1 || closes > 1) {
+          push('prose-after-prompt', where, `„${entry.title}" führt einen zweiten Anführungsblock — der Prompt ist nicht der Schluss`)
         } else {
-          let rest = tail.slice(close + 1).trim()
+          let rest = body.slice(body.search(new RegExp(`[${CLOSING_QUOTES.join('')}]`)) + 1).trim()
           for (let note = rest.match(NOTE_RE); note && isAllowedNote(note[1].trim()); note = rest.match(NOTE_RE)) {
             rest = rest.slice(note[0].length).trim()
           }

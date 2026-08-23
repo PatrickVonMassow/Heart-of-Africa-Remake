@@ -379,3 +379,43 @@ describe('auditGuide — the action check after its second reading', () => {
     expect(auditGuide(d).ok).toBe(true)
   })
 })
+
+// Round three: the quotes must be BOUNDARIES, and the note allowlist must be a
+// list rather than a prefix rule. Each counter-example below is Sol's own.
+describe('auditGuide — the prompt boundary and the note list', () => {
+  it('refuses prose standing before the quoted prompt', () => {
+    const { ok, violations } = auditGuide(
+      doc('- **Prosa davor** Ein Risiko.\n  → *Prompt:* Und dann Prosa. „Tu es."'),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('prose-before-prompt')
+  })
+
+  it('refuses a second quoted block after the prompt', () => {
+    const { violations } = auditGuide(
+      doc('- **Zweiter Block** Ein Risiko.\n  → *Prompt:* „Tu es." Danach „weitere Prosa."'),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('refuses a note that only BEGINS like a cost note', () => {
+    const { violations } = auditGuide(
+      doc('- **Kosten-Tarnung** Ein Risiko.\n  → *Prompt:* „Tu es." *(Kosten entstehen, und danach folgt weitere Erzählung.)*'),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('refuses a note that merely ends in a question mark', () => {
+    const { violations } = auditGuide(
+      doc('- **Frage-Tarnung** Ein Risiko.\n  → *Prompt:* „Tu es." *(Und danach geschah noch etwas?)*'),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('accepts the two note forms the guide actually uses', () => {
+    for (const note of ['*(≈ 1,5x.)*', '*(Kosten ≈ 2x)*', '*(Sieht das richtig aus?)*']) {
+      const d = doc(`- **Erlaubte Notiz** Ein Risiko.\n  → *Prompt:* „Tu es." ${note}`)
+      expect(auditGuide(d).ok, note).toBe(true)
+    }
+  })
+})
