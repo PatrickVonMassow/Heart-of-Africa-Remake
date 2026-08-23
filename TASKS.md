@@ -382,17 +382,27 @@ put it is the mistake this line exists to stop.
   The cost is not the alert but the escalation: a self-pause that only a human can
   lift, on evidence that was never there.
   FINAL STATE:
-  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
-     never as a foreign owner. The detector may then report "owner unknown"; it may
-     not report parallel sessions.
-  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
-     the ids say — the pid is the stronger evidence and settles it first.
+  1. A lock whose `sessionId` fails `validTransitionSessionId()` counts as owner
+     UNKNOWN, never as a foreign owner — and `acquire()` refuses to write such an
+     id in the first place. Re-measured 23.08.2026: `classifyParallel()` treats
+     only a PROBE owner as unknown (`preflight-` prefix, point 434(8)) and
+     `acquire()` checks only `isProbeSessionId`, so a bare placeholder like `x`
+     still passes both. The detector may report "owner unknown"; it may not report
+     parallel sessions.
+  2. A session whose pid equals the lock's pid is not a second session — but pid
+     equality counts ONLY together with the same process incarnation (the pid's
+     start time) and the current ownership generation, never "whatever the ids
+     say". Without both, pid reuse and a completed ownership transfer are
+     misclassified as self. Re-measured 23.08.2026: `classifyParallel()` consults
+     no pids at all, so this is still open.
   3. Both cases are covered by Vitest in the pure decision core.
   4. The escalation chain itself stays untouched: five unanswered alerts still
      pause the batch. The point removes the false alert, never the response to a
      real one.
   5. A self-pause no longer writes a card into "Von dir zu klären" (user
      05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
+     Still open, re-measured 23.08.2026: `boardCard()` in `alert-escalation.mjs`
+     writes the last-rung pause card through `board.mjs vdzk-add`.
      That section holds GENUINE user decisions only; diagnosing a pause and
      lifting it is the session's own work. The pause is instead reported where the
      session's own state is reported — the now-card — so the reader sees it
@@ -415,16 +425,20 @@ put it is the mistake this line exists to stop.
   moment IS that fenced session, so the handover deadlocks. Ownership was restored
   by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
   does not offer.
-  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
-     an id of the shape a real session carries; a placeholder, a probe id or an
-     empty string leaves the recorded owner untouched and answers the ownership
-     question without writing. Renaming a lock is a side effect of asking a
-     question, so the question must be safe to ask.
+  6. DELIVERED MEANWHILE (re-measured 23.08.2026), and the causal narrative above
+     therefore describes a mechanism that has been rebuilt: `ownsLock()` no longer
+     restamps at all. The only door that changes a live owner's session id is
+     `transitionOwnerSession()`, gated by `validTransitionSessionId()`, which
+     rejects an empty id, a control-character id and a probe id. Nothing is owed
+     here; the item stays as the record of what the incident was about.
   7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
      `pid` is this very process (argv and session match) but the id no longer does,
      one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
      as a torn state and names it in its verdict, rather than reporting "consistent"
-     as it did today. Hand-editing the lock is then never the only path.
+     as it did today. THE REPAIR GOES THROUGH `transitionOwnerSession()`, never a
+     direct lock write, so it keeps that door's validation, its generation checks
+     and its lifecycle journaling. Hand-editing the lock is then never the only
+     path. Re-measured 23.08.2026: batch-doctor still has no torn-id repair.
   8. A SESSION THE SINGLETON ITSELF STOOD DOWN IS NOT A PARALLEL BATCH SESSION
      (measured 18.08.2026 from `.claude/autostart.log`). At 09:18Z and 12:18Z the
      detector reported "PARALLEL SESSIONS DETECTED: owner=d559dcb0 plus 7fe2e051"
@@ -434,8 +448,12 @@ put it is the mistake this line exists to stop.
      wrong: the detector cannot see that it silenced one of the two itself. Five
      unanswered alerts then paused the batch at 14:18; the restart clock lifted it
      at 14:48. So a session carrying the stand-down note and no mutating action
-     since counts as attended-observing — no alert, no escalation. The alarm for a
-     genuinely second WORKING session is untouched. This branch is separate from
+     since counts as attended-observing — no alert, no escalation. THE NOTE IS
+     BOUND TO THE CURRENT CLAIM/WRITER GENERATION: any later claim, reservation,
+     transfer or mutating lifecycle transition invalidates it, so a stale note can
+     never silence a real alarm. Re-measured 23.08.2026: the exclusion still covers
+     only the claimed window (point 395). The alarm for a genuinely second WORKING
+     session is untouched. This branch is separate from
      items 1/2 above: those answer the placeholder owner, this one answers a real
      second process.
   9. A PAUSED BATCH STILL DELIVERS THE USER'S WORDS (measured 18.08.2026 15:0x,
@@ -468,6 +486,18 @@ put it is the mistake this line exists to stop.
      lock as proof of ownership, so nothing would have refused it a merge, a
      TASKS.md tick or a landing — the hard singleton was not outvoted, it was
      bypassed, and the split was held by agreement between two sessions instead.
+     FINAL STATE: ONE CANONICAL LOCK PER REPOSITORY, resolved through the git
+     common directory / the main checkout, so every process in every worktree
+     reads and writes the same lock and a worktree-private
+     `.claude/batch-lock.json` is never authority. Re-measured 23.08.2026:
+     `repo-paths.mjs` resolves through `git rev-parse --show-toplevel`, which is
+     the worktree, not the common directory.
+  HOW IT MUST FIT THE MACHINERY THAT EXISTS NOW. The spec above was written
+  against the 05.08.2026 world; the ownership layer has been rebuilt since, and a
+  build that ignores that will re-open what it repairs. It has to sit on top of
+  claims with release and reservation (e0154839), the transfer of running agents
+  (33ca802b), writer generations (ac38f368, 5b8c72c9) and journaled lifecycle
+  transitions (0038056c).
      FINAL STATE: the batch lock, the pause marker and every file the singleton
      treats as batch-global resolve to the MAIN checkout (git's common dir), never
      to the worktree, whatever the process's cwd; and a worktree-local copy found
@@ -577,13 +607,22 @@ put it is the mistake this line exists to stop.
   worktree away before the branch has been judged is what point 629 exists to prevent.
   Criticality: medium — it reorders the proof but must not dilute it; the both-backend
   picture proof stays exactly as binding as it is today.
-  BRANCH STATE 17.08.2026: `feat/595-598-verification-ladder-brief` DELIVERS this point and is
-  synced with main, gates green, pushed (five conflicts resolved, the real one in
-  `scripts/verify/world.mjs` where main's point-585 check was kept verbatim). What it still owes
-  before it can land: the both-backend picture proof — nine render-relevant suites were
-  re-sectioned and `world.mjs` gained conflict-resolved code, and only ONE cheap browser suite
-  (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
-  NAME only; see their entries.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point and is now ~1615
+  commits behind main — but that number overstates the conflict badly. NONE of the nine
+  re-sectioned suites (events, gamepad, handwriting, health, invariants, report, touch, voice,
+  world) and not `scripts/point-brief.mjs` carry a single main commit since the branch tip. Only
+  two files moved: `scripts/point-brief-core.mjs` (e5737113, sentence-case titles) and
+  `scripts/verify/README.md` (2bac561f, 79b6e4f1, f6c92b65, 35b9f00a). SO: merge main, resolve
+  those two surgically, then read the real diff — do NOT rebuild the suites.
+  THE OWED BOTH-BACKEND PICTURE PROOF NOW RUNS IN A DIFFERENT ENVIRONMENT than the one the
+  17.08. paragraph assumed, and it must be produced under this one: headless EGL routing
+  (fed2fe84), GPU backend probing at bring-up (35b9f00a), a hard failure before app startup when
+  a backend is absent (f6c92b65), bounded verify-run digests (64691b29) and the re-exec-ed
+  default verify launch (764f477b). Those four post-branch README changes must survive the
+  README merge.
+  THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
+  redo it — and open point 596 must not be pulled into this landing.
 
 - [ ] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
   The delegation brief carries a GENERATED orientation: the paths the specification itself
@@ -591,11 +630,19 @@ put it is the mistake this line exists to stop.
   headers. It is marked as a HINT, never as an instruction ("the specification names these
   paths", not "change these files"), and it is generated on every run so it cannot go
   stale.
-  AND IT NAMES THE PLANNED CHECK: which suite, and which `--section` of it, will verify this
-  point — derived from the diff→suite mapping and the ladder rung, generated like the rest so
-  it cannot go stale, and marked as a hint like the path list. This is the cheapest possible
-  answer to what the ladder point found: a rung that is built and routed to nobody gets used
-  when it stands in the artefact the agent reads FIRST, not in a rule it must remember.
+  AND IT NAMES THE PLANNED CHECK — as an ITERATION CHECK SET, not as one suite. Two corrections
+  to the original wording, both from the 23.08.2026 staleness audit.
+  TIMING: a brief is generated BEFORE the implementation diff exists, so the hint cannot
+  initially derive from the real diff→suite mapping. It derives from the PROSPECTIVE paths the
+  specification itself names; once a diff exists, a regenerated brief derives it from that diff.
+  SHAPE: the hint names one or more suite/`--section` pairs — a diff touching several suites
+  cannot be represented by a single pair — and it is stated SEPARATELY from the whole-suite
+  final proof, so the cheap rung can never be read as the acceptance. The singular wording
+  contradicted point 595 itself, where sections are the iteration rung and the proof is the
+  whole suite. Generated like the rest so it cannot go stale, and marked as a hint like the path
+  list. This is the cheapest possible answer to what the ladder point found: a rung that is built
+  and routed to nobody gets used when it stands in the artefact the agent reads FIRST, not in a
+  rule it must remember.
   MEASURED TARGET: search/read is 25.2 % of the weighted spend and the first responses of
   a delegated agent are almost always search; five saved responses per point is ~2 % of a
   median point.
@@ -605,13 +652,11 @@ put it is the mistake this line exists to stop.
   after. The brief is 1.9 % of the spend and exists to avoid the ~108k wholesale read.
   Criticality: low — a wrong list would misdirect, which generation-from-the-tree and the
   hint framing address.
-  BRANCH STATE 17.08.2026: `feat/595-598-verification-ladder-brief` DELIVERS this point and is
-  synced with main, gates green, pushed (five conflicts resolved, the real one in
-  `scripts/verify/world.mjs` where main's point-585 check was kept verbatim). What it still owes
-  before it can land: the both-backend picture proof — nine render-relevant suites were
-  re-sectioned and `world.mjs` gained conflict-resolved code, and only ONE cheap browser suite
-  (`health`, WebGPU) has been run on the merged state. The branch carries 596 and 597 in its
-  NAME only; see their entries.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point too. Main has not
+  touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
+  neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
+  merge surface and the owed both-backend picture proof are described once, under point 595.
 
 - [ ] 844. The board never shows how risky a point is (user request 22.08.2026, 21:19: "Reihe ein
   neues Ticket nach 598 ein: Im Header jeder Dashboard-Karte soll auch die Kritikalität angezeigt
