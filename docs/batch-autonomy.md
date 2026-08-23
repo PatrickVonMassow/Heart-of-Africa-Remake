@@ -72,18 +72,19 @@ not permission to fold their implementation into this policy-only point.
 
 ### Follow-up point boundaries
 
-The five code points above stay separate because they own different state and
-failure directions:
+The five code points above are filed in the work order as points 864-868, in the
+same bundle as this inventory. They stay separate because they own different
+state and failure directions:
 
-- **Typed pause recovery** owns the pause-record schema, legacy migration, and
+- **Typed pause recovery** (point 865) owns the pause-record schema, legacy migration, and
   the invariant that only a proved `user-stop` is clockless.
-- **Advisory decision defaults** owns question classification, `SELF-DECIDED` /
+- **Advisory decision defaults** (point 864) owns question classification, `SELF-DECIDED` /
   `AWAITING-CONFIRMATION`, queue eligibility, and the veto-card transition.
-- **Failure-lane retry** owns runaway, child outage, corruption-alert, and
+- **Failure-lane retry** (point 866) owns runaway, child outage, corruption-alert, and
   forbidden-model recovery; it must preserve quarantine and trusted-model safety.
-- **Cross-vendor quota retry** owns a per-point provider probe, without weakening
+- **Cross-vendor quota retry** (point 867) owns a per-point provider probe, without weakening
   mandatory cross-vendor evidence.
-- **Unattended launcher arming** owns the Windows privilege boundary and must be
+- **Unattended launcher arming** (point 868) owns the Windows privilege boundary and must be
   installed ahead of absence; it must not grant a running session general
   elevation.
 
