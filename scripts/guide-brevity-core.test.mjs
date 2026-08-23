@@ -489,3 +489,31 @@ describe('auditGuide — notes together, sentences without a space, paths that c
     expect(violations.map((v) => v.kind)).toContain('project-specific')
   })
 })
+
+// Round seven: the letters must be in the prompt, emphasis hides no sentence,
+// and a Markdown delimiter is no shelter for a repository path.
+describe('auditGuide — the last three shelters', () => {
+  const O = '„'
+
+  it('refuses empty quotes whose letters come from the note', () => {
+    const { ok, violations } = auditGuide(
+      doc(`- **Leere Anführung** Ein Risiko.\n  → *Prompt:* ${O}" *(Sieht das richtig aus?)*`),
+    )
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('empty-prompt')
+  })
+
+  it('refuses a second sentence wearing emphasis', () => {
+    const { violations } = auditGuide(
+      doc(`- **Fette Fortsetzung** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(≈ 1,5x. **Und danach noch etwas.**)*`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('recognises a path inside a Markdown link', () => {
+    const { violations } = auditGuide(
+      doc(`- **Pfad im Link** Siehe [../../src/main.ts] dort.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('project-specific')
+  })
+})

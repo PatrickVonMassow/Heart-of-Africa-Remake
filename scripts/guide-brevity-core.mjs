@@ -189,7 +189,7 @@ export const PROJECT_MARKERS = [
     // conventions a tool-neutral guide may name; `scripts/verify/x.mjs` is not.
     // A LEADING `./`, `../` or `/` is the ordinary way to write such a path and
     // must not be an escape hatch (cross-vendor review, 23.08.2026).
-    re: /(?:^|[\s("'`])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
+    re: /(?:^|[\s("'`[<|])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -331,8 +331,14 @@ const REVIEW_QUESTION = 'Sieht das richtig aus?'
 // was consumed whole while `includes('≈')` was the whole rule (cross-vendor
 // review, 23.08.2026, round 4).
 const NOTE_MAX_CHARS = 77
+// Emphasis is formatting, so it is stripped before the sentence test: it hid a
+// second sentence as `≈ 1,5x. **Und danach geschah noch etwas.**` (cross-vendor
+// review, 23.08.2026, round 7).
+const withoutEmphasis = (note) => note.replace(/[*_`~]/g, '')
 const isCostNote = (note) =>
-  note.includes('≈') && note.length <= NOTE_MAX_CHARS && !/[.!?]\s*\p{L}/u.test(note)
+  note.includes('≈') &&
+  note.length <= NOTE_MAX_CHARS &&
+  !/[.!?][\s\p{P}]*\p{L}/u.test(withoutEmphasis(note))
 const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**
@@ -438,6 +444,12 @@ export function auditGuide(text, limits = LIMITS) {
           push('unclosed-prompt', where, `„${entry.title}" schließt den Prompt nicht`)
         } else if (opens > 1 || closes > 1) {
           push('prose-after-prompt', where, `„${entry.title}" führt einen zweiten Anführungsblock — der Prompt ist nicht der Schluss`)
+        } else if (!/\p{L}/u.test(body.slice(1, body.search(new RegExp(`[${CLOSING_QUOTES.join('')}]`))))) {
+          // THE LETTERS MUST BE IN THE PROMPT. Looking for them anywhere in the
+          // tail let an allowed note supply them while the quotes stayed empty:
+          // `→ *Prompt:* „" *(Sieht das richtig aus?)*` (cross-vendor review,
+          // 23.08.2026, round 7).
+          push('empty-prompt', where, `„${entry.title}" führt „→ *Prompt:*" mit leeren Anführungszeichen`)
         } else {
           let rest = body.slice(body.search(new RegExp(`[${CLOSING_QUOTES.join('')}]`)) + 1).trim()
           // THE CEILING IS ON THE NOTES TOGETHER, not on each one: an unlimited
