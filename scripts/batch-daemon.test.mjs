@@ -21,7 +21,7 @@ const BATCH = 'drill-batch'
 const SID = 'test-session'
 const FENCE = 7
 
-let sandbox, repo, worktree, originDir, record
+let sandbox, repo, worktree, worktree2, originDir, record
 
 const git = (args, cwd) =>
   execFileSync('git', args, {
@@ -51,6 +51,8 @@ beforeAll(async () => {
   execFileSync('git', ['clone', '-q', originDir, worktree])
   git(['checkout', '-q', '-b', 'feat/stub'], worktree)
   git(['push', '-q', 'origin', 'feat/stub'], worktree)
+  worktree2 = join(sandbox, 'wt2')
+  execFileSync('git', ['clone', '-q', originDir, worktree2])
   mkdirSync(join(repo, '.claude'), { recursive: true })
   writeFileSync(
     join(repo, '.claude', 'batch-lock.json'),
@@ -165,6 +167,32 @@ describe('the daemon lifecycle in the sandbox', () => {
     const repeat = await request('request-checkpoint', { requestId: 'cp-1', waitMs: 15_000 })
     expect(repeat).toMatchObject({ ok: true, alreadyApplied: true })
   }, 20_000)
+
+  it('fences a resumed worker whose lease moved on: it stops, branch intact (M40)', async () => {
+    // A second stub on its own branch, so fencing one lane cannot disturb the
+    // checkpoint lane above.
+    git(['checkout', '-q', '-b', 'feat/fenced'], worktree2)
+    git(['push', '-q', 'origin', 'feat/fenced'], worktree2)
+    const started = await request('start-attempt', { pointId: 'p3', attemptId: 'f1', branch: 'feat/fenced', worktree: worktree2, adapter: 'stub' })
+    expect(started.ok, started.reason).toBe(true)
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    const attemptDir = join(store.dir, 'attempts', 'f1')
+    const leasePath = join(attemptDir, 'lease.json')
+    const lease = readJsonIfAny(leasePath).lease
+    // The daemon re-granted this attempt elsewhere: same shape, other lease id.
+    writeFileSync(leasePath, `${JSON.stringify({ lease: { ...lease, leaseId: 'someone-elses-grant' } })}\n`)
+    let status = null
+    const deadline = Date.now() + 15_000
+    while (status?.phase !== 'fenced' && Date.now() < deadline) {
+      await sleep(250)
+      status = readJsonIfAny(join(attemptDir, 'status.json'))
+    }
+    expect(status?.phase, JSON.stringify(status)).toBe('fenced')
+    expect(status.reason).toMatch(/not the lease that stands/)
+    // The branch is left intact for inspection: still on the remote, unmoved
+    // since the worker was fenced.
+    expect(git(['rev-parse', 'feat/fenced'], originDir)).toBeTruthy()
+  }, 25_000)
 
   it('cancels the attempt, preserves the branch, and journals the last pushed SHA', async () => {
     const tip = git(['rev-parse', 'feat/stub'], originDir)
