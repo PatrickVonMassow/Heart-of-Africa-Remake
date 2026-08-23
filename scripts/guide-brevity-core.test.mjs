@@ -582,3 +582,28 @@ describe('auditGuide — what renders, what ends a sentence, what is a word', ()
     expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
   })
 })
+
+// Round ten: a bracket inside a URL, an ellipsis, and a combining mark.
+describe('auditGuide — the three reachable variants of round ten', () => {
+  const O = '„'
+
+  it('renders away a destination that carries its own brackets', () => {
+    const { violations } = auditGuide(
+      doc(`- **Klammer im Ziel** Ein Risiko.\n  → *Prompt:* ${O}[](https://example.invalid/a(b)c)"`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('empty-prompt')
+  })
+
+  it('treats an ellipsis as the end of a sentence', () => {
+    const { violations } = auditGuide(
+      doc(`- **Auslassung** Ein Risiko.\n  → *Prompt:* ${O}Tu es." *(≈ 1,5x … 2 Minuten später geht es weiter)*`),
+    )
+    expect(violations.map((v) => v.kind)).toContain('prose-after-prompt')
+  })
+
+  it('counts a combining mark as part of the word before the slash', () => {
+    const decomposed = 'Menu\u0308docs/a.md'
+    const d = doc(`- **Kein Pfad** Das ${decomposed} ist kein Pfad.\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+    expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
+  })
+})

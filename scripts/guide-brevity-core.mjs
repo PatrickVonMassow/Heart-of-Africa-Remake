@@ -194,7 +194,9 @@ export const PROJECT_MARKERS = [
     // 23.08.2026, rounds 7 and 8).
     // …and "word character" means the UNICODE one: ASCII \w read `docs/a.md` out
     // of the ordinary German token `Menüdocs/a.md` (round 9).
-    re: /(?<![\p{L}\p{N}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/u,
+    // A COMBINING MARK is part of the word before it: the decomposed spelling of
+    // `Menüdocs/a.md` handed the detector a directory name (round 10).
+    re: /(?<![\p{L}\p{N}\p{M}_])(?:\.{0,2}\/)*(?:src|scripts|docs|verification|public|local|\.claude)\/\w/u,
     hint: 'Pfad aus diesem Repository',
   },
   {
@@ -348,7 +350,9 @@ export const renderedText = (text) =>
     .replace(/<[^>]*>/g, '')
     // A LINK renders its text, never its destination — an empty label with a URL
     // behind it supplied the letters of an otherwise empty prompt (round 9).
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // …and a destination may itself carry a balanced pair of brackets, so the
+    // first `)` is not the end of it (round 10).
+    .replace(/\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, '$1')
     .replace(/[*_`~]/g, '')
 const isCostNote = (note) =>
   note.includes('≈') &&
@@ -357,7 +361,9 @@ const isCostNote = (note) =>
   // a digit open the second sentence — `≈ 1,5x. 2 Minuten später …` (round 9).
   // A note written with an English decimal point is refused by this, and that is
   // the safe direction: the guide's own six cost notes use the German comma.
-  !/[.!?]\s*\S/u.test(renderedText(note).trim())
+  // An ELLIPSIS ends a sentence the way a period does, and it is ordinary German
+  // typography rather than a contrived case (round 10).
+  !/(?:\.{3}|[.!?\u2026])\s*\S/u.test(renderedText(note).trim())
 const isAllowedNote = (note) => isCostNote(note) || note === REVIEW_QUESTION
 
 /**
