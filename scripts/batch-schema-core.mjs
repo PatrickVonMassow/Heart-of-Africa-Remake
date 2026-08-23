@@ -425,13 +425,17 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
     return { ok: false, reason: 'a published credential cannot be leased as absent' }
   }
   // "Carries work" means at least one REAL work ref: an array (a bare string would
-  // spread into characters), every element a non-empty ref name, and none of them
-  // the credential ref — that one is appended by the push itself and is not work.
-  if (!Array.isArray(refs) || refs.some((r) => typeof r !== 'string' || !r)) {
-    return { ok: false, reason: 'refs must be an array of ref names' }
+  // spread into characters), every element a plain ref NAME — no leading dash that
+  // git would read as an option, no colon that makes it a refspec, no whitespace.
+  if (!Array.isArray(refs) || refs.some((r) => typeof r !== 'string' || !r || r.startsWith('-') || /[:\s]/.test(r))) {
+    return { ok: false, reason: 'refs must be an array of plain ref names' }
   }
-  const workRefs = refs.filter((r) => r !== CREDENTIAL_REF)
-  if (!workRefs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
+  // The credential ref is appended by the push itself; naming it in `refs` too
+  // would duplicate the argument, so it is refused rather than filtered out.
+  if (refs.includes(CREDENTIAL_REF)) {
+    return { ok: false, reason: 'the credential ref is appended by the push itself and is not work' }
+  }
+  if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
   return {
     ok: true,
     // The VALUE the caller must write into the credential ref, returned beside the
@@ -630,15 +634,15 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
   // The validator stays TOTAL: a payload that is not an object is a refusal, not a
   // TypeError out of Object.hasOwn.
   if (!payload || typeof payload !== 'object') return { ok: false, reason: `cannot key ${name}: the payload is not an object` }
-  // Own properties only — an inherited field is not an answer — and non-finite
-  // numbers are refused AT EVERY DEPTH: canonical JSON serialises NaN and Infinity
-  // as null wherever they sit, so {x:NaN} and {x:null} would collide one key.
+  // Own properties only — an inherited field is not an answer — and everything the
+  // serialisation would lose is refused AT EVERY DEPTH, because a lossy value makes
+  // the key non-injective (see containsUnkeyable).
   const fieldValue = (f) => (Object.hasOwn(payload, f) ? payload[f] : undefined)
   const missing = spec.keyFields.filter((f) => fieldValue(f) === undefined || fieldValue(f) === null)
   if (missing.length) return { ok: false, reason: `cannot key ${name}: missing ${missing.join(', ')}` }
-  const unkeyable = spec.keyFields.filter((f) => containsNonFinite(fieldValue(f)))
+  const unkeyable = spec.keyFields.filter((f) => containsUnkeyable(fieldValue(f)))
   if (unkeyable.length) {
-    return { ok: false, reason: `cannot key ${name}: non-finite ${unkeyable.join(', ')}` }
+    return { ok: false, reason: `cannot key ${name}: unkeyable ${unkeyable.join(', ')}` }
   }
   // Canonical JSON rather than joined strings: a delimiter-joined material lets a
   // VALUE that contains the delimiter and a field name collide two different
@@ -650,14 +654,24 @@ export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } =
   return { ok: true, key: `${name}:${createHash('sha256').update(material).digest('hex').slice(0, 16)}` }
 }
 
-/** A non-finite number at any depth of a key value. Hoisted out of idempotencyKey
- *  so the rule reads as one predicate: what canonical JSON would flatten to null
- *  cannot take part in a key. */
-function containsNonFinite(value) {
-  if (typeof value === 'number') return !Number.isFinite(value)
-  if (Array.isArray(value)) return value.some(containsNonFinite)
-  if (value && typeof value === 'object') return Object.values(value).some(containsNonFinite)
-  return false
+/** Anything, at any depth, that canonical JSON would flatten or drop — a non-finite
+ *  number, a function, a symbol, an undefined value, an array hole. The KEY must be
+ *  injective over what it admits: two payloads that differ only in a value the
+ *  serialisation loses would share one key, and the second mutation would be
+ *  silently dropped as already applied. */
+function containsUnkeyable(value) {
+  if (value === null) return false
+  const t = typeof value
+  if (t === 'string' || t === 'boolean') return false
+  if (t === 'number') return !Number.isFinite(value)
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      if (!(i in value) || value[i] === undefined || containsUnkeyable(value[i])) return true
+    }
+    return false
+  }
+  if (t === 'object') return Object.values(value).some((v) => v === undefined || containsUnkeyable(v))
+  return true
 }
 
 /** Applying a key that has already been applied changes nothing and says so. This
@@ -688,10 +702,14 @@ export function canonicalJson(value) {
     // Array.from, not map: map skips holes, and a skipped hole joins as ''.
     return `[${Array.from(value, (v) => canonicalJson(v) ?? 'null').join(',')}]`
   }
-  const keys = Object.keys(value)
-    .filter((k) => canonicalJson(value[k]) !== undefined)
+  // Each value is READ AND SERIALISED EXACTLY ONCE: filtering on one read and
+  // rendering from another would let an unstable accessor pass the filter and then
+  // render as the invalid text `undefined`.
+  const entries = Object.keys(value)
     .sort()
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(',')}}`
+    .map((k) => [k, canonicalJson(value[k])])
+    .filter(([, serialised]) => serialised !== undefined)
+  return `{${entries.map(([k, serialised]) => `${JSON.stringify(k)}:${serialised}`).join(',')}}`
 }
 
 export function checksumOf(entry) {

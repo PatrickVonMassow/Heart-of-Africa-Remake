@@ -371,12 +371,18 @@ describe('the coordinator credential', () => {
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [] }).ok).toBe(false)
   })
 
-  it('work refs are an array of ref names, and the credential ref alone is not work', () => {
+  it('work refs are an array of plain ref names, and the credential ref is never among them', () => {
     const next = advancedCredential(current).credential
     // A bare string would spread into one-character push arguments.
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: 'main' }).ok).toBe(false)
     expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', ''] }).ok).toBe(false)
-    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [CREDENTIAL_REF] }).reason).toMatch(/carry work/)
+    // Options and refspecs are not ref names.
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['--force', 'main'] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main:other'] }).ok).toBe(false)
+    // Naming the credential ref beside real work would duplicate the argument the
+    // push appends itself — refused, not filtered.
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: [CREDENTIAL_REF] }).ok).toBe(false)
+    expect(publicationPush({ current, next, expectedOid: 'oid1', refs: ['main', CREDENTIAL_REF] }).reason).toMatch(/appended by the push/)
   })
 
   it('a publication never changes the generation; recovery mints one', () => {
@@ -605,18 +611,24 @@ describe('the daemon command table', () => {
     // Canonical JSON serialises NaN and Infinity both as null — two distinct
     // payloads, one key, second mutation silently dropped.
     const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1'] })
-    expect(idempotencyKey('probe-cmd', { f1: NaN }, { table }).reason).toMatch(/non-finite/)
-    expect(idempotencyKey('probe-cmd', { f1: Infinity }, { table }).reason).toMatch(/non-finite/)
+    expect(idempotencyKey('probe-cmd', { f1: NaN }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: Infinity }, { table }).reason).toMatch(/unkeyable/)
     const inherited = Object.create({ f1: 'from-the-prototype' })
     expect(idempotencyKey('probe-cmd', inherited, { table }).reason).toMatch(/missing/)
   })
 
-  it('non-finite values are refused at every depth, and a non-object payload refuses instead of throwing', () => {
-    // {x:NaN} and {x:null} canonicalise identically — the collision one level down.
+  it('lossy values are refused at every depth, and a non-object payload refuses instead of throwing', () => {
+    // Everything canonical JSON flattens or drops would collide two payloads into
+    // one key: {x:NaN} with {x:null}, [() => {}] with [null], {x:undefined} with {}.
     const { table } = registerDaemonCommand({}, 'probe-cmd', { compensation: 'x', keyFields: ['f1'] })
-    expect(idempotencyKey('probe-cmd', { f1: { x: NaN } }, { table }).reason).toMatch(/non-finite/)
-    expect(idempotencyKey('probe-cmd', { f1: [1, [Infinity]] }, { table }).reason).toMatch(/non-finite/)
+    expect(idempotencyKey('probe-cmd', { f1: { x: NaN } }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: [1, [Infinity]] }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: [() => {}] }, { table }).reason).toMatch(/unkeyable/)
+    expect(idempotencyKey('probe-cmd', { f1: { x: undefined } }, { table }).reason).toMatch(/unkeyable/)
+    // eslint-disable-next-line no-sparse-arrays
+    expect(idempotencyKey('probe-cmd', { f1: [, 1] }, { table }).reason).toMatch(/unkeyable/)
     expect(idempotencyKey('probe-cmd', { f1: { x: null } }, { table }).ok).toBe(true)
+    expect(idempotencyKey('probe-cmd', { f1: [null] }, { table }).ok).toBe(true)
     expect(idempotencyKey('probe-cmd', null, { table }).reason).toMatch(/not an object/)
     expect(idempotencyKey('probe-cmd', 'payload', { table }).reason).toMatch(/not an object/)
   })
@@ -697,6 +709,18 @@ describe('journal framing', () => {
     expect(canonicalJson([, 1])).toBe('[null,1]')
     expect(canonicalJson({ a: 1, b: () => {} })).toBe('{"a":1}')
     expect(() => JSON.parse(canonicalJson({ list: [undefined, { x: 1 }] }))).not.toThrow()
+  })
+
+  it('reads every object value exactly once, so an unstable accessor cannot split filter and render', () => {
+    let reads = 0
+    const unstable = {
+      get x() {
+        reads += 1
+        return reads === 1 ? 1 : undefined
+      },
+    }
+    expect(canonicalJson(unstable)).toBe('{"x":1}')
+    expect(reads).toBe(1)
   })
 
   it('a checksummed line that is not a frame is still refused', () => {
