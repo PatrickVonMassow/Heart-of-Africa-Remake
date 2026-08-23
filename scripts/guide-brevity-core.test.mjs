@@ -643,3 +643,20 @@ describe('auditGuide — a path segment is anything up to what ends it', () => {
     expect(auditGuide(d).violations.map((v) => v.kind)).not.toContain('project-specific')
   })
 })
+
+// Round thirteen: a bare directory followed by punctuation is a sentence, not a
+// path — but a dot that OPENS a real file name still is one.
+describe('auditGuide — a segment has to name something', () => {
+  const O = '„'
+  const withText = (text) => doc(`- **Satz** ${text}\n  → *Prompt:* ${O}Etabliere einen Mechanismus."`)
+
+  it('leaves a bare directory ended by punctuation alone', () => {
+    for (const text of ['Lege Code unter src/.', 'Lege Code unter src/:', 'Lege Code unter **src/**.']) {
+      expect(auditGuide(withText(text)).violations.map((v) => v.kind), text).not.toContain('project-specific')
+    }
+  })
+
+  it('still recognises a dot-prefixed file name', () => {
+    expect(auditGuide(withText('Siehe docs/.nojekyll dort.')).violations.map((v) => v.kind)).toContain('project-specific')
+  })
+})
