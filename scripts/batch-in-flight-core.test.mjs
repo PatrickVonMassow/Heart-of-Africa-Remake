@@ -82,6 +82,7 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  agentCheckDeclaration,
   adoptTransferred,
   checkAgentOutput,
   checkDeclaredAgentOutput,
@@ -1006,6 +1007,45 @@ describe('the stand-down boundary — declared children cross ownership', () => 
       judgedOn: 'git',
       output: { verdict: 'alive' },
     })
+  })
+
+  it('--agent-check with no output arguments probes the recorded declaration', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'recorded author' },
+      ],
+    })
+    const fromNoArguments = agentCheckDeclaration(recorded)
+    expect(fromNoArguments.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(fromNoArguments, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      output: { verdict: 'dead', refutations: [{ evidence: `pid ${RUN_PID} (recorded author)` }] },
+    })
+  })
+
+  it('explicit output arguments augment and de-duplicate recorded evidence', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      agentCheckDeclaration(recorded, {
+        branches: ['feat/874-author', 'feat/875-other'],
+        worktrees: ['/repo/point-875'],
+        logs: ['/tmp/author.log'],
+      }).evidence,
+    ).toEqual([
+      { kind: 'branch', ref: 'feat/874-author' },
+      { kind: 'worktree', path: '/repo/point-875' },
+      { kind: 'branch', ref: 'feat/875-other' },
+      { kind: 'log', path: '/tmp/author.log' },
+    ])
   })
 
   it('turns a live declared agent into a transfer, never a silent stand-down', () => {
