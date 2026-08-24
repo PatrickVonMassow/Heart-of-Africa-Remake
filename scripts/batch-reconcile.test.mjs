@@ -185,6 +185,19 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     expect(JSON.parse(out).refill.ok).toBe(false)
   })
 
+  it('the resume-batch CLI exits RED while reconciliation remains unresolved', () => {
+    let status = 0
+    let out = ''
+    try {
+      out = execFileSync('node', ['scripts/resume-batch.mjs', '--repo', repo, '--batch', BATCH, '--session', SID], { windowsHide: true, encoding: 'utf8' })
+    } catch (error) {
+      status = error.status
+      out = `${error.stdout ?? ''}`
+    }
+    expect(status).toBe(1)
+    expect(JSON.parse(out).refill.ok).toBe(false)
+  })
+
   it('counts a publication id only as a parsed TRAILER, never as a message occurrence', () => {
     const id = 'pub-trailer-test-1'
     writeFileSync(join(worktree, 'pub.txt'), 'one\n')

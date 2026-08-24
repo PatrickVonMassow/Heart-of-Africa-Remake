@@ -69,7 +69,18 @@ if (isMainModule(import.meta.url)) {
   }
   resumeBatch({ repoDir: arg('--repo') ?? REPO_ROOT, batchId, sessionId: arg('--session') ?? null }).then((result) => {
     console.log(JSON.stringify(result, null, 2))
-    const red = !result.registry.ok || result.lanes.some((l) => l.quarantine) || result.adoptions.some((a) => !a.ok)
+    // GREEN MEANS RESOLVED: an UNKNOWN publication, a cold daemon record whose
+    // workers still await reconciliation, quarantined evidence and a refused
+    // refill are all unresolved startup — automation must see red for each.
+    const red =
+      !result.registry.ok ||
+      result.quarantined.length > 0 ||
+      result.lanes.some((l) => l.quarantine) ||
+      result.publications.some((p) => p.quarantine) ||
+      result.adoptions.some((a) => !a.ok) ||
+      result.pair.action === 'refuse-and-alert' ||
+      result.pair.action.startsWith('reconcile-workers') ||
+      !result.refill.ok
     process.exit(red ? 1 : 0)
   })
 }
