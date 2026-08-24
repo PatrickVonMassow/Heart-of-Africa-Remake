@@ -179,6 +179,22 @@ describe('the command', () => {
     expect(r.out).toMatch(/stated fallback contradicts/)
   })
 
+  it('a single TRACKED half still excludes its known author from the merge — and never claims "wrote neither half"', () => {
+    // The tracked repository artefact IS the fixture here: its author (Claude
+    // Opus 5) is known evidence even though the other half is a temp file with
+    // no provable author. Requiring BOTH halves to be tracked used to discard
+    // that knowledge — the known author could be selected as merger under a
+    // printed "it wrote neither half".
+    const trackedA = join(dirname(CLI), '..', 'docs', 'four-eyes', '676-blind-a-opus5.json')
+    const r = run('--a', trackedA, '--b', p('B.txt'), '--model-b', 'GPT-5.6 Sol')
+    expect(r.status).toBe(0)
+    expect(r.out).toMatch(/MERGING MODEL — /)
+    // The known author of the tracked half is excluded from the selection.
+    expect(r.out).not.toMatch(/MERGING MODEL — [^(\n]*Opus/)
+    // And with one half untracked, "wrote neither half" is unprovable and unsaid.
+    expect(r.out).not.toContain('it wrote neither half')
+  })
+
   it('lists the pairs to decide when no union is given, and says the ranking is not the merge', () => {
     const r = run('--a', p('A.json'), '--b', p('B.txt'))
     expect(r.status).toBe(0)

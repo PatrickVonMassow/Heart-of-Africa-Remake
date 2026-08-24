@@ -179,10 +179,13 @@ export function verdict(outcomes) {
   const by = Object.fromEntries(outcomes.map((o) => [o.shape, o]))
   const pipes = by.pipes
   const files = by.files
-  // Boolean, never undefined: a run missing a shape must READ as a refusal, and
-  // `pipes && …` would hand a caller `undefined` for the one case where the
-  // drill has the least to say.
-  const ok = Boolean(pipes && files && !pipes.escaped && files.escaped)
+  // AFFIRMATIVE ON BOTH SIDES, boolean, never undefined. The claim is "the
+  // pipe is the binding", and that needs the pipes worker PROVEN DEAD — not
+  // merely "not escaped": UNKNOWN, INCONCLUSIVE and a stalled-but-alive
+  // survivor all fail `escaped` while proving nothing about the cause, and
+  // reading any of them as the dead half would turn an unreadable probe
+  // beside an escaped files worker into a passed drill.
+  const ok = Boolean(pipes && files && pipes.dead === true && files.escaped === true)
   return {
     ok,
     // A drill in which both shapes survive proves NOTHING about the cause, and

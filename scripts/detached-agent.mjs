@@ -108,7 +108,14 @@ function git(args, cwd) {
 /** Installs the worktree's pre-push lease gate: a hook that re-runs
  *  leaseAllowsWrite for the WRAPPER's identity on every `git push` from this
  *  worktree, whoever performs it — the runner included. JSON.stringify is the
- *  quoting: these are absolute paths from controlled directories. */
+ *  quoting: these are absolute paths from controlled directories.
+ *
+ *  THE CONFIG IS PER-WORKTREE, NOT SHARED: plain `git config` in a linked
+ *  worktree writes the repository-wide file, so every new attempt would
+ *  replace every OTHER attempt's hook — a stale worker pushing through the
+ *  newest attempt's lease while legitimate older attempts get spuriously
+ *  fenced. `extensions.worktreeConfig` plus `--worktree` pins each gate to
+ *  the one checkout it fences. */
 export function installPrePushHook({ worktree, attemptDir, leaseId, holder }) {
   const hooksDir = join(attemptDir, 'hooks')
   mkdirSync(hooksDir, { recursive: true })
@@ -127,7 +134,8 @@ export function installPrePushHook({ worktree, attemptDir, leaseId, holder }) {
     String(holder.pidStartedAt),
   ].join(' ')
   writeFileSync(join(hooksDir, 'pre-push'), `#!/bin/sh\nexec ${line}\n`, { mode: 0o700 })
-  return git(['config', 'core.hooksPath', hooksDir], worktree).ok
+  if (!git(['config', 'extensions.worktreeConfig', 'true'], worktree).ok) return false
+  return git(['config', '--worktree', 'core.hooksPath', hooksDir], worktree).ok
 }
 
 /** The hook's other end: exit 0 only on an affirmative write verdict. Runs
@@ -193,14 +201,28 @@ async function runWorker(argv) {
     return leaseAllowsWrite({ lease, holder: self, leaseId: args['lease-id'], now: Date.now() })
   }
 
+  const tip = () => git(['rev-parse', 'HEAD'], args.worktree).out || null
+
+  /** The push is a COMPARE-AND-SWAP on the remote ref, not a bare fast-forward:
+   *  the lease verdict, the observed remote tip and the exact local sha are
+   *  taken together, and the refspec pushes THAT sha under a lease on THAT tip.
+   *  The local lease check alone leaves a window — expiry or revocation after
+   *  the hook returns but before the remote ref moves — and the CAS is what
+   *  bounds it: a successor that has moved the branch rejects this push, and a
+   *  stale push that does land moves the ref only from the tip a lease-valid
+   *  observation saw, where the successor's own CAS then detects it. The sha
+   *  the CAS pushed is returned so the acknowledgment claims exactly it. */
   const push = () => {
     const gate = mayPush()
     if (gate.verdict !== 'write') return { ok: false, fenced: true, why: gate.reason }
-    const res = git(['push', 'origin', args.branch], args.worktree)
-    return { ok: res.ok, fenced: false, why: res.err }
+    const head = tip()
+    if (!head) return { ok: false, fenced: false, why: 'no local HEAD to push' }
+    const remote = git(['ls-remote', 'origin', `refs/heads/${args.branch}`], args.worktree)
+    if (!remote.ok) return { ok: false, fenced: false, why: `the remote tip could not be observed: ${remote.err}` }
+    const expected = remote.out ? remote.out.split(/\s+/)[0] : ''
+    const res = git(['push', `--force-with-lease=refs/heads/${args.branch}:${expected}`, 'origin', `${head}:refs/heads/${args.branch}`], args.worktree)
+    return { ok: res.ok, fenced: false, why: res.err, sha: head }
   }
-
-  const tip = () => git(['rev-parse', 'HEAD'], args.worktree).out || null
 
   /** A checkpoint acknowledgment is honest about what it proves: the pushed SHA,
    *  and whether uncommitted work remains — a wrapper cannot commit on the
@@ -212,16 +234,25 @@ async function runWorker(argv) {
     if (!request?.requestId || request.requestId === lastAckedRequest) return
     const pushed = push()
     if (pushed.fenced) return fencedExit(pushed.why)
+    // THE ACK CLAIMS THE SHA THE PUSH CARRIED, never a tip taken afterwards:
+    // the wrapper cannot pause its runner, so a commit can land between the
+    // push and any later read — and an ack pairing pushedOk with a NEWER,
+    // unpushed sha would let reconciliation treat that commit as transferred
+    // and lose it. A head that moved past the pushed sha, like a dirty tree,
+    // marks the checkpoint incomplete.
     const dirty = git(['status', '--porcelain'], args.worktree).out !== ''
+    const headAtAck = tip()
+    const aheadOfPush = pushed.ok === true && headAtAck !== pushed.sha
     writeJsonAtomic(paths.checkpointAckPath, {
       requestId: request.requestId,
       at: Date.now(),
-      sha: tip(),
+      sha: pushed.sha ?? null,
       pushedOk: pushed.ok,
       dirty,
+      aheadOfPush,
     })
     lastAckedRequest = request.requestId
-    log(`checkpoint ${request.requestId}: pushedOk=${pushed.ok} dirty=${dirty}`)
+    log(`checkpoint ${request.requestId}: pushedOk=${pushed.ok} dirty=${dirty} aheadOfPush=${aheadOfPush}`)
   }
 
   const fencedExit = (why) => {
@@ -341,9 +372,14 @@ async function runWorker(argv) {
     if (args.runner === 'author-sol' && runnerExit !== null) {
       const pushed = push()
       if (pushed.fenced) return fencedExit(pushed.why)
-      status('done', { sha: tip(), runnerExit, pushedOk: pushed.ok })
-      log(`runner exited ${runnerExit}`)
-      process.exit(runnerExit === 0 ? WORKER_EXIT.done : WORKER_EXIT.runnerFailed)
+      // 'done' is a claim about DURABLE work, not about the runner's mood: a
+      // zero exit with a failed final push or a dirty tree is unlanded work,
+      // and recording it as a successful terminal attempt would erase it.
+      const dirty = git(['status', '--porcelain'], args.worktree).out !== ''
+      const complete = runnerExit === 0 && pushed.ok === true && !dirty
+      status(complete ? 'done' : 'incomplete', { sha: pushed.sha ?? tip(), runnerExit, pushedOk: pushed.ok, dirty })
+      log(`runner exited ${runnerExit}; pushedOk=${pushed.ok} dirty=${dirty}`)
+      process.exit(complete ? WORKER_EXIT.done : WORKER_EXIT.runnerFailed)
     }
     await new Promise((resolve) => setTimeout(resolve, tickMs))
   }

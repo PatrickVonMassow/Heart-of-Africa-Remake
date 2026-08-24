@@ -518,4 +518,20 @@ describe('verdict', () => {
     expect(verdict([outcome('files', true)]).ok).toBe(false)
     expect(SHAPES).toEqual(['pipes', 'files'])
   })
+
+  it('a pipes worker NOT PROVEN DEAD proves nothing, however escaped the files worker is', () => {
+    const escapedFiles = outcome('files', true)
+    // An unreadable liveness probe: not escaped, but not a corpse either.
+    const unknown = readOutcome({ shape: 'pipes', alive: false, unknownLiveness: true, beatsBefore: 9, killedAt: KILL, observedUntil: WINDOW, startedObserving: -1600, beatTimes: BASELINE })
+    expect(unknown.escaped).toBe(false)
+    expect(unknown.dead).toBe(false)
+    expect(verdict([unknown, escapedFiles]).ok).toBe(false)
+    // A live pipes worker that merely stalled: alive, so not the dead half.
+    const stalled = readOutcome({ shape: 'pipes', alive: true, beatsBefore: 9, killedAt: KILL, observedUntil: WINDOW, startedObserving: -1600, beatTimes: BASELINE })
+    expect(stalled.escaped).toBe(false)
+    expect(stalled.dead).toBe(false)
+    expect(verdict([stalled, escapedFiles]).ok).toBe(false)
+    // The affirmative pair still proves the cause.
+    expect(verdict([outcome('pipes', false), escapedFiles]).ok).toBe(true)
+  })
 })

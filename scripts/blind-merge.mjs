@@ -164,28 +164,31 @@ if (isMainModule(import.meta.url)) {
       process.exit(1)
     }
     // AFTER the authors are known, never before: the merger is the model that wrote
-    // NEITHER half, so naming it needs both halves' authors in hand.
-    // ONLY TRACKED HALVES DECIDE THE MERGER. An untracked path is caller-written, so
-    // its author field settles nothing and the switch's own answer stands — the same
-    // boundary the recorder applies, so the two commands cannot give opposite answers.
-    const deciding = trackedA && trackedB ? [a.model, b.model] : []
+    // NEITHER half. ONLY TRACKED HALVES DECIDE — an untracked path is
+    // caller-written, so its author field settles nothing — but each tracked
+    // half decides ON ITS OWN: a known author EXCLUDES that model from the
+    // merge even when the sibling half is untracked. Requiring BOTH to be
+    // tracked discarded the one authorship that WAS known, and with one
+    // tracked half written by the switch-selected model the merge went to
+    // that very author under a printed "it wrote neither half".
+    const deciding = [trackedA ? String(a.model ?? '').trim() : '', trackedB ? String(b.model ?? '').trim() : ''].filter(Boolean)
+    const bothKnown = deciding.length === 2
     const expectedMerger = mergerModel(fableState, deciding)
     // WHETHER THE SELECTION IS A THIRD MODEL OR THE FALLBACK, because the two owe
     // opposite sentences. Where every roster model wrote a half, selection keeps the
     // switch's answer and that model DID write one — saying "it wrote neither half"
     // there states a false condition instead of naming the recorded fallback
-    // (four-eyes finding 3 on this change).
-    // Where the halves decide, ask them. Where they do not — untracked, so their
-    // author fields settle nothing — fall back to the switch-only reading, which
-    // assumes the off-switch merger wrote a half and therefore owes the recorded
-    // two-model fallback. Unknown authorship must not read as "wrote neither".
-    const mergerWroteAHalf =
-      deciding.length === 2
-        ? deciding.some((author) => sameModel(expectedMerger, author))
-        : Boolean(mergeFallbackReason(fableState))
+    // (four-eyes finding 3 on this change). With PARTIAL knowledge the merger
+    // provably wrote no KNOWN half, and "wrote neither half" is exactly what
+    // an untracked half cannot prove — the sentence says so instead.
+    const mergerWroteAHalf = bothKnown
+      ? deciding.some((author) => sameModel(expectedMerger, author))
+      : deciding.some((author) => sameModel(expectedMerger, author)) || Boolean(mergeFallbackReason(fableState))
     const mergerBecause = mergerWroteAHalf
       ? 'it wrote a half itself — the recorded two-model fallback'
-      : 'it wrote neither half'
+      : bothKnown
+        ? 'it wrote neither half'
+        : 'it wrote no KNOWN half — an untracked half has no provable author, so this is the switch reading, not proof'
 
     const authorship = {
       A: checkAuthorshipFile({
