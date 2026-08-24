@@ -406,6 +406,15 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     expect(runHook().decision?.decision).toBe('block')
   })
 
+  const fableTranscript = () => {
+    const path = resolve(repo, 'fable-session.jsonl')
+    writeFileSync(
+      path,
+      `${JSON.stringify({ timestamp: '2026-08-24T16:20:00.000Z', type: 'assistant', isSidechain: false, message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' } })}\n`,
+    )
+    return path
+  }
+
   it('CLEARS once a different model records a merge naming the point', () => {
     const reviewed = git('rev-parse', 'HEAD').stdout.trim()
     const r = spawnSync(
@@ -418,6 +427,9 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         '--verdict', 'merge',
         '--evidence', 'read the core, ran the gate against a synthetic tick, no side effects found',
         '--mode', 'review',
+        // Anthropic reviewer identity must be verified since point 889.
+        '--model-at', '2026-08-24T16:20:00.000Z',
+        '--model-transcript', fableTranscript(),
       ],
       { windowsHide: true, cwd: repo, encoding: 'utf8' },
     )

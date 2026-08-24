@@ -11,6 +11,7 @@ import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
   AUTHORSHIP_CHECK_SINCE,
+  VERIFIED_REVIEWER_SINCE,
   evaluateMechanismReview,
   formatArgErrors,
   formatMechanismReviewVerdict,
@@ -21,6 +22,7 @@ import {
   MERGE_ACCOUNTING_SINCE,
   MODE_REQUIRED_SINCE,
   mechanismPathsIn,
+  mergeProblem,
   modelFromTrailers,
   modelsFromTrailers,
   MODES,
@@ -416,6 +418,149 @@ describe('evaluateMechanismReview', () => {
     ).toBe(true)
   })
 
+  it('refuses an UNVERIFIED claim from a reviewer the harness could have verified', () => {
+    // Cross-vendor review of point 889 (pass 3): "unverified" used to clear for
+    // every vendor, so an unknown actual reviewer could claim an independent
+    // model and clear the commit without anyone having proved who read the code.
+    // An Anthropic reviewer's session transcript exists at recording time, so
+    // agreement is achievable and anything less no longer composes.
+    const claim = (model, authorship) => ({
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model }),
+      reviewerAuthorship: { claimedModel: model, ...authorship },
+    })
+    // The commit under review is authored by the OTHER vendor each time, so the
+    // only thing deciding these cases is the authorship claim itself.
+    const judge = (rec, authorModel) =>
+      evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel })],
+        records: [rec],
+      }).block
+    expect(judge(claim('Claude Opus 5', { status: 'unverified', reason: 'transcript expired' }), 'GPT-5.6 Sol')).toBe(true)
+    expect(
+      judge(claim('Claude Opus 5', { status: 'agreement', actualModel: 'Claude Opus 5' }), 'GPT-5.6 Sol'),
+    ).toBe(false)
+    // An OpenAI reviewer runs outside the harness — no Claude transcript can
+    // hold its messages — so a REASONED unverified claim still composes…
+    expect(
+      judge(claim('GPT-5.6 Sol', { status: 'unverified', reason: 'external CLI reviewer, no harness transcript' }), 'Claude Opus 5'),
+    ).toBe(false)
+    // …a reasonless one does not, and an unknown vendor never does.
+    expect(judge(claim('GPT-5.6 Sol', { status: 'unverified' }), 'Claude Opus 5')).toBe(true)
+    expect(judge(claim('Mystery 9', { status: 'unverified', reason: 'who knows' }), 'Claude Opus 5')).toBe(true)
+    // Contradictory vendor markers are nobody: a label naming both families
+    // reached the OpenAI branch by first-match and cleared with only a reason.
+    expect(
+      judge(claim('Claude Opus 5 GPT-5', { status: 'unverified', reason: 'mixed markers' }), 'GPT-5.6 Sol'),
+    ).toBe(true)
+    // An OpenAI "agreement" is fabricated evidence — no harness transcript can
+    // hold that vendor's messages — and is refused even with matching names.
+    expect(
+      judge(claim('GPT-5.6 Sol', { status: 'agreement', actualModel: 'GPT-5.6 Sol' }), 'Claude Opus 5'),
+    ).toBe(true)
+    // The rows recorded under the older reading keep their standing.
+    const older = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
+    }
+    expect(judge(older, 'GPT-5.6 Sol')).toBe(false)
+  })
+
+  it('keys the reviewer-verification era on the COMMIT, so a backdated row buys nothing', () => {
+    // record.at is written by the recording hand; the commit timestamp is part
+    // of its sha. A hand-edited row claiming a pre-boundary `at` against a
+    // post-boundary commit answers to the new rule regardless.
+    const backdated = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
+    }
+    const judgeAt = (commitAt) =>
+      evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: 'GPT-5.6 Sol', at: commitAt })],
+        records: [backdated],
+      }).block
+    expect(judgeAt(VERIFIED_REVIEWER_SINCE + 1)).toBe(true)
+    expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(false)
+  })
+
+  it('keys the AUTHORSHIP requirement itself on the commit, not only the narrowing', () => {
+    // A row backdated past AUTHORSHIP_CHECK_SINCE used to omit reviewerAuthorship
+    // entirely and clear a commit made today (re-review round 4).
+    const bare = record({ at: AUTHORSHIP_CHECK_SINCE - 1, model: 'Fable 5' })
+    const judgeAt = (commitAt) =>
+      evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: 'GPT-5.6 Sol', at: commitAt })],
+        records: [bare],
+      }).block
+    expect(judgeAt(AUTHORSHIP_CHECK_SINCE + 1)).toBe(true)
+    expect(judgeAt(AUTHORSHIP_CHECK_SINCE - 2)).toBe(false)
+  })
+
+  it('poisons a modern blind-parallel row that carries NO halves instead of reading the trailers', () => {
+    // Dropping halfAuthors from a hand-edited row used to fall back to the
+    // trailer proxy, which says nothing when the union commit does not name the
+    // merger (re-review round 4). The merger here appears in no trailer, so the
+    // proxy would have cleared it.
+    const row = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: 'GPT-5.6 Sol', mode: 'blind-parallel' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
+      mergedBy: 'Fable 5',
+      accounting: RECEIPT,
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [row],
+    })
+    expect(v.block).toBe(true)
+    expect(formatMechanismReviewVerdict(v)).toMatch(/half authors the repository does not confirm/)
+  })
+
+  it('judges a mode wearing stray whitespace by its trimmed value on BOTH gates', () => {
+    // " blind-parallel " passed well-formedness (which trims) and fell out of
+    // mergeProblem (which compared raw), so one space bypassed every fold check.
+    const row = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: 'GPT-5.6 Sol', mode: ' blind-parallel ' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [row],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('names the unconfirmed-halves problem instead of calling it a self-merge', () => {
+    // mergeLine used to answer every problem beyond no-merger/no-count with
+    // "which wrote one of the two lists" — a false self-merge diagnosis for a
+    // row whose halves the repository simply did not confirm.
+    const row = {
+      ...record({ at: MERGE_ACCOUNTING_SINCE + 1, model: 'GPT-5.6 Sol', mode: 'blind-parallel' }),
+      mergedBy: 'Fable 5',
+      accounting: RECEIPT,
+      halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
+      halfAuthorsVerified: false,
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [row],
+    })
+    expect(v.block).toBe(true)
+    const text = formatMechanismReviewVerdict(v)
+    expect(text).toMatch(/half authors the repository does not confirm/)
+    expect(text).not.toMatch(/wrote one of the two lists/)
+  })
+
   it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {
     const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [commit()], records: [] })
     const text = formatMechanismReviewVerdict(v, {
@@ -553,14 +698,25 @@ describe('evaluateMechanismReview', () => {
       })
       expect(v.block, JSON.stringify(over)).toBe(true)
     }
-    // A row genuinely older than the recorder's mode flag owes none.
+    // A row genuinely older than the recorder's mode flag owes none — judged
+    // against a commit of its own era, since every cutoff reads the later of
+    // row and commit time.
     const legacy = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], at: MODE_REQUIRED_SINCE - 9000 })],
+      records: [record({ mode: '', at: MODE_REQUIRED_SINCE - 5000 })],
+    })
+    expect(legacy.block).toBe(false)
+    // …and the SAME old row does not clear a commit made after the rule: a
+    // record predating the commit it clears reviewed something else.
+    const modernCommit = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [covered],
       records: [record({ mode: '', at: MODE_REQUIRED_SINCE - 5000 })],
     })
-    expect(legacy.block).toBe(false)
+    expect(modernCommit.block).toBe(true)
   })
 
   it('REFUSES a hand-edited row whose UNION was merged by an author of it', () => {
@@ -605,11 +761,13 @@ describe('evaluateMechanismReview', () => {
 
   it('leaves the rows written BEFORE the rule landed alone, and no younger one', () => {
     const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
-    // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands.
+    // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands —
+    // for a commit of its own era; the cutoffs read the later of row and commit
+    // time, so the legacy fixture's commit predates the rule too.
     const legacy = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
-      pendingCommits: pending,
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], at: MERGE_ACCOUNTING_SINCE - 2 })],
       records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE - 1 })],
     })
     expect(legacy.block).toBe(false)
@@ -660,6 +818,40 @@ describe('evaluateMechanismReview', () => {
       records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT, mergeFallback: 'x' })],
     })
     expect(v.block).toBe(true)
+  })
+
+  it('reads both wordings of the merged count, and checks the unit the new one names', () => {
+    // The parenthesis has always counted INPUT ENTRIES folded, never union rows,
+    // but the old line said only "N merged" beside a union count it does not add
+    // up to — cross-vendor review of point 834 read 61 union entries "(18 merged,
+    // 5 only A, 47 only B)" as 70 and called it a mixed unit, twice. The printer
+    // names the unit now. Rows recorded before that keep clearing the gate: a
+    // receipt is evidence of what the accounting printed and is not rewritten.
+    const old = '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for'
+    const named = '14 A + 56 B entries → 61 union entries (18 of the 70 input entries merged, 5 only A, 47 only B): every input entry accounted for'
+    expect(receiptBalances(old)).toBe(true)
+    expect(receiptBalances(named)).toBe(true)
+    // The named total is CHECKED, not merely parsed — otherwise naming the unit
+    // would add a number nothing stands behind.
+    const wrong = '14 A + 56 B entries → 61 union entries (18 of the 99 input entries merged, 5 only A, 47 only B): every input entry accounted for'
+    expect(receiptBalances(wrong)).toBe(false)
+  })
+
+  it('counts in BigInt, so IEEE-754 rounding cannot balance forged arithmetic', () => {
+    // Individually safe operands still produce unsafe SUMS near 2^53: both
+    // unequal totals of the first line round to the same double, and each later
+    // slot has its own way to hide one entry the same way (re-review round 8).
+    const MAX = '9007199254740991' // 2^53 - 1
+    const forged = [
+      `${MAX} A + 2 B entries → ${MAX} union entries (2 merged, 9007199254740989 only A, 1 only B): every input entry accounted for`,
+      `2 A + ${MAX} B entries → ${MAX} union entries (2 merged, 1 only A, 9007199254740989 only B): every input entry accounted for`,
+      `${MAX} A + 2 B entries → ${MAX} union entries (2 of the 9007199254740992 input entries merged, 9007199254740990 only A, 1 only B): every input entry accounted for`,
+    ]
+    for (const line of forged) expect(receiptBalances(line), line).toBe(false)
+    // A HONEST line in the same range still balances — the defence is exact
+    // arithmetic, not a size cap.
+    const honest = `${MAX} A + 2 B entries → 9007199254740992 union entries (2 merged, 9007199254740990 only A, 1 only B): every input entry accounted for`
+    expect(receiptBalances(honest)).toBe(true)
   })
 
   it('refuses a receipt whose numbers do not add up', () => {
@@ -2045,5 +2237,52 @@ describe('the ledger path of a checkout', () => {
     // Trimming would rename a legitimate POSIX directory into a different one.
     expect(ledgerPathFrom('/repo/odd name ')).toBe(resolve('/repo/odd name ', LEDGER_RELATIVE_PATH))
     expect(ledgerPathFrom('   ')).toBe(resolve('   ', LEDGER_RELATIVE_PATH))
+  })
+})
+
+describe('a recorded merge is re-judged by the halves it names', () => {
+  const base = {
+    mode: BLIND_PARALLEL,
+    at: MERGE_ACCOUNTING_SINCE + 1,
+    model: 'GPT-5.6 Sol',
+    accounting: '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for',
+  }
+  // The union commit is Claude's, because Claude performed the merge and committed
+  // it. The trailer proxy therefore reads Claude as an author of the material.
+  const commit = { authorModels: ['Claude Opus 5 (1M context)'] }
+
+  it('accepts the merger only when VERIFIED halves leave it untainted, whoever committed the union', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
+    expect(mergeProblem(record, commit)).toBe('')
+  })
+
+  it('POISONS a half-author claim the repository did not confirm — hand-edited names buy nothing', () => {
+    // The ledger is hand-editable: two fabricated names excluding the merger
+    // would otherwise bypass the self-merge fence. An unverified claim is a
+    // problem in itself — not trusted, and not silently degraded to the proxy,
+    // which would let a forger probe wordings until one passes.
+    const forged = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+    expect(mergeProblem(forged, commit)).toBe('unverified-halves')
+    const stampedFalse = { ...forged, halfAuthorsVerified: false }
+    expect(mergeProblem(stampedFalse, commit)).toBe('unverified-halves')
+    // And the stamp is an affirmative true, not any truthy value.
+    expect(mergeProblem({ ...forged, halfAuthorsVerified: 'yes' }, commit)).toBe('unverified-halves')
+  })
+
+  it('would have condemned that same merge on the commit trailers alone', () => {
+    // Without the halves the gate falls back to the proxy and calls the accepted
+    // merge a self-merge — the recorder and the gate disagreeing by construction.
+    const record = { ...base, mergedBy: 'Claude Opus 5' }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
+  })
+
+  it('still refuses a merger the verified halves name as an author', () => {
+    const record = { ...base, mergedBy: 'GPT-5.6 Sol', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
+  })
+
+  it('a verified half list that does not name both authors still falls back to the proxy', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5'], halfAuthorsVerified: true }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 })

@@ -424,8 +424,15 @@ export function accountUnion({ a, b, union } = {}) {
 /** The one-line result, short enough for a `--evidence` line. */
 export function summaryLine(result) {
   const c = result?.counts ?? {}
+  // THE PARENTHESIS COUNTS INPUT ENTRIES, NOT UNION ROWS, and used to say only
+  // "N merged" — which reads as a breakdown of the union count it follows and
+  // does not add up to it: 61 union entries "(18 merged, 5 only A, 47 only B)"
+  // totals 70, because 18 counts the inputs that were folded into 9 rows.
+  // Cross-vendor review of point 834 read it that way twice, in the ledger and
+  // in the architecture document. The unit is now named in the line itself.
   const head = `${c.a ?? 0} A + ${c.b ?? 0} B entries → ${c.union ?? 0} union entries ` +
-    `(${c.merged ?? 0} merged, ${c.onlyA ?? 0} only A, ${c.onlyB ?? 0} only B)`
+    `(${c.merged ?? 0} of the ${(c.a ?? 0) + (c.b ?? 0)} input entries merged, ` +
+    `${c.onlyA ?? 0} only A, ${c.onlyB ?? 0} only B)`
   return result?.ok
     ? `${head}: every input entry accounted for`
     : `${head}: ${result?.findings?.length ?? 0} accounting error(s) — the union does not account for both lists`

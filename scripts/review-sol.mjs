@@ -980,7 +980,7 @@ if (isMainModule(import.meta.url)) {
       sha: full,
       base,
       records,
-      recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
+      recordUsable: (record, commit) => reviewRecordWellFormed(record, { commitAt: commit?.at }) && !mergeProblem(record, commit),
     })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
     const unavailableRoute = formatUnavailableReceiptRoute(plan, { sha: full, point })

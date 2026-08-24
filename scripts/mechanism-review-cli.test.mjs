@@ -11,6 +11,7 @@
 import { afterEach, describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
@@ -21,14 +22,18 @@ import {
   readRecords,
   recordsPathFor,
   resolveCommit,
+  junkSpelling,
+  reverifyReviewerAgreement,
+  reviewerVendorProblems,
   reviewFileSetKey,
   usage,
+  verifyHalfAuthors,
 } from './mechanism-review.mjs'
 import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
-const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs']
+const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
 const installFableSwitch = (repo, state = 'on') => {
   for (const file of FABLE_FILES) copyFileSync(resolve(process.cwd(), 'scripts', file), join(repo, 'scripts', file))
   mkdirSync(join(repo, '.claude'), { recursive: true })
@@ -44,6 +49,33 @@ const run = (...args) =>
     cwd: process.cwd(),
     input: '',
   })
+
+// THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
+// HEAD and refuses an absolute path outright, so a temp fixture can never satisfy
+// it. These cases are about the MERGER CHECK, not about git, so they hand the
+// production seam a stub that answers for the fixture's own model — exactly what
+// a committed half would say. The untracked case below passes no stub, so the
+// trailer proxy still stands where the halves are caller-written.
+const committedFixture = (path) => {
+  const bytes = readFileSync(path)
+  const model = JSON.parse(bytes.toString('utf8'))?.model
+  if (typeof model !== 'string' || !model.trim()) return null
+  return { oid: createHash('sha1').update(bytes).digest('hex'), model: model.trim() }
+}
+
+/** Fixture stand-ins for the committed-artefact readers: the "committed" oid is
+ *  the file's own hash and the blob text is the file's own bytes, so the
+ *  recorder's blob recount folds exactly what the fixtures wrote. */
+const committedOidFixture = (path) => createHash('sha1').update(readFileSync(path)).digest('hex')
+const hashFileFixture = committedOidFixture
+const blobTextFixture = (...paths) => {
+  const byOid = {}
+  for (const p of paths) {
+    const bytes = readFileSync(p)
+    byOid[createHash('sha1').update(bytes).digest('hex')] = bytes.toString('utf8')
+  }
+  return (oid) => byOid[oid] ?? null
+}
 
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
@@ -71,6 +103,191 @@ describe('the flag surface', () => {
   it('states the per-file convergence boundary', () => {
     expect(usage()).toContain('later commit to')
     expect(usage()).toContain('commit touching only other')
+  })
+})
+
+describe('a junk spelling is judged by the PLATFORM separators', () => {
+  it('flags dot segments and duplicate separators, and leaves POSIX backslash names alone', () => {
+    expect(junkSpelling('docs//half.json')).toBe(true)
+    expect(junkSpelling('docs/./half.json')).toBe(true)
+    expect(junkSpelling('docs/../half.json')).toBe(true)
+    expect(junkSpelling('docs/half.json')).toBe(false)
+    expect(junkSpelling('/abs/inside/half.json')).toBe(false)
+    if (process.platform !== 'win32') {
+      // A backslash is a legal filename byte on POSIX, not a separator.
+      expect(junkSpelling('docs/back\\slash.json')).toBe(false)
+    }
+  })
+})
+
+describe('the reviewer-vendor matrix binds evidence to the credited model', () => {
+  it('refuses a claim naming NO model, whatever the credit says', () => {
+    // A hand-edited source row of bare {status} used to pass the vendor test on
+    // the credit alone and be copied forward by a carry (re-review round 10).
+    expect(reviewerVendorProblems('Claude Opus 5', { status: 'agreement' }).join(' ')).toMatch(/names no claimedModel/)
+    expect(reviewerVendorProblems('GPT-5.6 Sol', { status: 'unverified', reason: 'external' }).join(' ')).toMatch(/names no claimedModel/)
+  })
+
+  it('refuses evidence about a DIFFERENT model than the credited one', () => {
+    expect(
+      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Fable 5', actualModel: 'Claude Fable 5' }).join(' '),
+    ).toMatch(/evidence for one model proves nothing about another/)
+    expect(junkSpelling('docs/half.json')).toBe(false)
+  })
+
+  it('accepts exactly what each vendor can prove', () => {
+    expect(
+      reviewerVendorProblems('Claude Opus 5', {
+        status: 'agreement',
+        claimedModel: 'Claude Opus 5',
+        actualModel: 'Claude Opus 5',
+        transcript: '/home/node/.claude/projects/x/session.jsonl',
+        artefactAt: 1_787_600_000_000,
+        messageId: 'msg_01',
+      }),
+    ).toEqual([])
+    // …and an agreement with nothing to audit — no transcript, time or message
+    // id — is a hand-forged pair, not evidence (confirming pass, round 13).
+    expect(
+      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Opus 5', actualModel: 'Claude Opus 5' }).join(' '),
+    ).toMatch(/nothing to audit/)
+    // …and the artefact time must BE a time — a truthy non-number anchors nothing.
+    for (const artefactAt of ['', false, {}, 'yesterday', 0, [1], '1787600000000']) {
+      expect(
+        reviewerVendorProblems('Claude Opus 5', {
+          status: 'agreement',
+          claimedModel: 'Claude Opus 5',
+          actualModel: 'Claude Opus 5',
+          transcript: '/x/session.jsonl',
+          artefactAt,
+          messageId: 'msg_01',
+        }).join(' '),
+        JSON.stringify(artefactAt),
+      ).toMatch(/nothing to audit/)
+    }
+    expect(
+      reviewerVendorProblems('GPT-5.6 Sol', { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' }),
+    ).toEqual([])
+  })
+})
+
+describe('a recorded reviewer AGREEMENT is re-checked against its transcript', () => {
+  // The two model strings in a ledger row are hand-editable; the transcript is
+  // the evidence they quote (cross-vendor re-review of point 889). While it
+  // still exists it is re-read; a contradiction downgrades the row to the
+  // refusal it earns. An expired transcript keeps the recorded reading — the
+  // ledger outlives the transcripts, and rotting old reviews into refusals
+  // would punish age, not forgery.
+  const row = (over = {}) => ({
+    reviewerAuthorship: {
+      status: 'agreement',
+      claimedModel: 'Claude Opus 5',
+      actualModel: 'Claude Opus 5',
+      artefactAt: 1_787_588_200_000,
+      transcript: '/tmp/somewhere/session.jsonl',
+      ...over,
+    },
+  })
+
+  it('downgrades an agreement the transcript now contradicts', () => {
+    const check = () => ({ status: 'disagreement', actualModel: 'claude-haiku-4-5', reason: 'the claimed author disagrees with message.model' })
+    const out = reverifyReviewerAgreement(row(), { check })
+    expect(out.status).toBe('disagreement')
+    expect(out.actualModel).toBe('claude-haiku-4-5')
+  })
+
+  it('keeps a recorded agreement whose transcript has expired', () => {
+    const check = () => ({ status: 'unverified', reason: 'the session transcript is missing or unreadable' })
+    expect(reverifyReviewerAgreement(row(), { check }).status).toBe('agreement')
+  })
+
+  it('touches nothing without a transcript path or below agreement', () => {
+    const check = () => {
+      throw new Error('must not be called')
+    }
+    expect(reverifyReviewerAgreement(row({ transcript: undefined }), { check }).status).toBe('agreement')
+    expect(reverifyReviewerAgreement(row({ status: 'unverified' }), { check }).status).toBe('unverified')
+  })
+})
+
+describe('a ledger row\'s half-authorship claim is re-derived, never believed', () => {
+  // Cross-vendor review of point 889: verification read the model field of
+  // whatever JSON stands at the recorded path today. That answers "some committed
+  // file here names this model" — not "these are the halves that were folded". A
+  // hand-written row could name unrelated files whose model fields happen to
+  // match, and a row that was once true stayed "verified" after the halves at
+  // those paths were replaced. The recorded blob oids are what bind it.
+  const row = {
+    sha: 'f'.repeat(40),
+    halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
+    halfSources: ['docs/a.json', 'docs/b.json'],
+    halfBlobs: ['aaaa1', 'bbbb2'],
+    unionSource: 'docs/u.json',
+    unionBlob: 'uuuu3',
+    mergedBy: 'Fable 5',
+    accounting: '1 A + 1 B entries → 1 union entries (2 of the 2 input entries merged, 0 only A, 0 only B): every input entry accounted for',
+  }
+  const blobs = {
+    'docs/a.json': { oid: 'aaaa1', model: 'Claude Opus 5' },
+    'docs/b.json': { oid: 'bbbb2', model: 'GPT-5.6 Sol' },
+  }
+  // The committed bytes behind those oids — what the fold is recomputed from.
+  const texts = {
+    aaaa1: JSON.stringify({ model: 'Claude Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the defect' }] }),
+    bbbb2: JSON.stringify({ model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the defect restated' }] }),
+    uuuu3: JSON.stringify({ mergedBy: 'Fable 5', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }),
+  }
+  const deps = (over = {}) => ({
+    isTracked: () => true,
+    committedHalf: (src) => blobs[src] ?? null,
+    blobText: (oid) => texts[oid] ?? null,
+    committedOidOf: (src) => (src === 'docs/u.json' ? 'uuuu3' : ''),
+    ...over,
+  })
+
+  it('confirms a row whose paths still carry the exact blobs it counted', () => {
+    expect(verifyHalfAuthors(row, deps())).toBe(true)
+  })
+
+  it('refuses a row whose path now carries a DIFFERENT blob, model field notwithstanding', () => {
+    const replaced = { ...blobs, 'docs/b.json': { oid: 'cccc3', model: 'GPT-5.6 Sol' } }
+    expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => replaced[src] ?? null }))).toBe(false)
+  })
+
+  it('refuses a row that names no blobs at all — two strings are not evidence', () => {
+    const { halfBlobs: _halfBlobs, ...withoutBlobs } = row
+    expect(verifyHalfAuthors(withoutBlobs, deps())).toBe(false)
+    expect(verifyHalfAuthors({ ...row, halfBlobs: ['aaaa1'] }, deps())).toBe(false)
+  })
+
+  it('re-performs the fold from the committed bytes, so the receipt is bound to them', () => {
+    // A row whose recorded accounting the recomputation does not reproduce is a
+    // claim about a fold that did not happen over these blobs.
+    expect(verifyHalfAuthors({ ...row, accounting: '2 A + 1 B entries → 2 union entries (2 of the 3 input entries merged, 1 only A, 0 only B): every input entry accounted for' }, deps())).toBe(false)
+    // A union blob whose mergedBy contradicts the row's is someone else's fold.
+    const forged = { ...texts, uuuu3: JSON.stringify({ mergedBy: 'GPT-5.6 Sol', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }) }
+    expect(verifyHalfAuthors(row, deps({ blobText: (oid) => forged[oid] ?? null }))).toBe(false)
+    // No union binding at all — nothing to recompute from — is not verified.
+    const { unionBlob: _unionBlob, ...withoutUnion } = row
+    expect(verifyHalfAuthors(withoutUnion, deps())).toBe(false)
+    // An absent blob (repository without the object) cannot confirm anything.
+    expect(verifyHalfAuthors(row, deps({ blobText: () => null }))).toBe(false)
+    // An oid that exists in the object store but is NOT the blob HEAD carries
+    // at the recorded union path is not repository provenance.
+    expect(verifyHalfAuthors(row, deps({ committedOidOf: () => 'other0' }))).toBe(false)
+    const { unionSource: _unionSource, ...withoutUnionPath } = row
+    expect(verifyHalfAuthors(withoutUnionPath, deps())).toBe(false)
+    // A union whose committed bytes name no merger corroborates no fold owner.
+    const unowned = { ...texts, uuuu3: JSON.stringify({ entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }) }
+    expect(verifyHalfAuthors(row, deps({ blobText: (oid) => unowned[oid] ?? null }))).toBe(false)
+  })
+
+  it('still refuses a source absent from the row-sha tree or a contradicted model', () => {
+    // The anchor is the row's own commit: a source its tree does not carry is
+    // nothing — a working-tree condition would instead rot true historical rows.
+    expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => (src === 'docs/b.json' ? null : blobs[src]) }))).toBe(false)
+    const renamed = { ...blobs, 'docs/a.json': { oid: 'aaaa1', model: 'Fable 5' } }
+    expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => renamed[src] ?? null }))).toBe(false)
   })
 })
 
@@ -318,6 +535,56 @@ describe('the mode round-trips into the ledger', () => {
     expect(own.errors.join('\n')).toMatch(/may not merge them/i)
   })
 
+  it('says the halves were not read when a merge refusal rests on the trailer proxy', () => {
+    // MEASURED 22.08.2026: a fold by the model that wrote neither half was refused,
+    // and the message argued about the merger's identity without ever saying where
+    // that identity came from — the recording commit, because a valid fold IS a
+    // commit by the third model. The refusal now names what it read and the one
+    // flag triple that replaces the proxy with the halves themselves.
+    const refused = build({ mode: 'blind-parallel', ...merged, mergedBy: 'Opus 5' })
+    expect(refused.ok).toBe(false)
+    const text = refused.errors.join('\n')
+    expect(text).toMatch(/the two halves were NOT read/)
+    expect(text).toMatch(/--union <U\.json> --list-a <A> --list-b <B>/)
+  })
+
+  it('does not blame the proxy where the halves themselves were read', () => {
+    // The counterpart: with tracked halves handed over, a refusal is about the
+    // halves, so the proxy hint would be a false explanation. It stays absent.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-proxy-'))
+    try {
+      const w = (name, value) => {
+        const path = join(dir, name)
+        writeFileSync(path, JSON.stringify(value))
+        return path
+      }
+      const listA = w('A.json', { model: 'Fable 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
+      const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first' }] })
+      const union = w('U.json', {
+        mergedBy: 'Fable 5',
+        entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect, both said it' }],
+      })
+      const selfMerged = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Fable 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        isTracked: () => true,
+        committedHalf: committedFixture,
+        committedUnion: committedOidFixture,
+        blobText: blobTextFixture(listA, listB, union),
+        hashFile: hashFileFixture,
+      })
+      expect(selfMerged.ok).toBe(false)
+      const text = (selfMerged.errors ?? []).join('\n')
+      expect(text).toMatch(/authored one of the two lists \(Fable 5\)/)
+      expect(text).not.toMatch(/the two halves were NOT read/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('COUNTS the union itself when handed the files, instead of believing a line', () => {
     // A typed receipt is a claim; given the three files the recorder measures it
     // (four-eyes review, third round).
@@ -328,8 +595,13 @@ describe('the mode round-trips into the ledger', () => {
         writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
         return path
       }
+      // The halves name their authors, so the merger is checked against THEM: Fable
+      // wrote A and Sol wrote B, which leaves Claude as the one model that wrote
+      // neither. This fixture used to say A was Opus 5's and let Sol merge its own
+      // half B — the recorder could not see that, because it read the commit
+      // trailers instead of the halves.
       const listA = w('A.json', {
-        model: 'Opus 5',
+        model: 'Fable 5',
         entries: [
           { id: 'A1', file: 'x.ts', defect: 'the first defect' },
           { id: 'A2', file: 'y.ts', defect: 'the second defect' },
@@ -337,18 +609,98 @@ describe('the mode round-trips into the ledger', () => {
       })
       const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'y.ts', defect: 'the second' }] })
       const union = w('U.json', {
+        mergedBy: 'Claude Opus 5',
         entries: [
           { id: 'U1', from: ['A1'] },
           { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
         ],
       })
+      // The halves decide the merger only where they are TRACKED artefacts, so the
+      // temp fixtures say so explicitly; the untracked case is asserted below.
+      const tracked = {
+        isTracked: () => true,
+        committedHalf: committedFixture,
+        committedUnion: committedOidFixture,
+        blobText: blobTextFixture(listA, listB, union),
+        hashFile: hashFileFixture,
+      }
       const built = build({
         mode: 'blind-parallel',
-        mergedBy: 'GPT-5.6 Sol',
+        mergedBy: 'Claude Opus 5',
         unionPath: union,
         listAPath: listA,
         listBPath: listB,
+        ...tracked,
       })
+      expect(built.record.mergedBy).toBe('Claude Opus 5')
+      // The record CARRIES the halves, because the gate re-judges it later and
+      // would otherwise fall back to the trailer proxy and call this a self-merge.
+      expect(built.record.halfAuthors).toEqual(['Fable 5', 'GPT-5.6 Sol'])
+      // Sources are stored repo-relative where they resolve inside the checkout;
+      // these temp fixtures live outside it and stay as given.
+      expect(built.record.halfSources).toEqual([listA, listB])
+      // …and the union the count read is content-addressed in the row, so the
+      // receipt is re-derivable later (cross-vendor re-review of point 889).
+      expect(built.record.unionBlob).toBe(committedOidFixture(union))
+
+      // UNTRACKED HALVES ARE CALLER-WRITTEN and decide nothing: the trailer proxy
+      // stands, and with it the older refusal. Without this the change would be
+      // WEAKER than the proxy it replaced — anyone could write two files naming
+      // authors that leave themselves untainted.
+      const untracked = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Claude Opus 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        isTracked: () => false,
+      })
+      expect(untracked.ok).toBe(false)
+      expect(untracked.record?.halfAuthors).toBeUndefined()
+
+      // AND THE HOLE THAT FIXTURE STOOD IN: an author of a half is refused as the
+      // merger now that the halves say who wrote them — the union itself names
+      // the half-author, so the committed artefact carries the self-merge.
+      const selfUnion = w('U-self.json', {
+        mergedBy: 'GPT-5.6 Sol',
+        entries: [
+          { id: 'U1', from: ['A1'] },
+          { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
+        ],
+      })
+      const selfMerged = build({
+        mode: 'blind-parallel',
+        mergedBy: 'GPT-5.6 Sol',
+        unionPath: selfUnion,
+        listAPath: listA,
+        listBPath: listB,
+        ...tracked,
+        blobText: blobTextFixture(listA, listB, selfUnion),
+      })
+      expect(selfMerged.ok).toBe(false)
+      expect((selfMerged.errors ?? []).join('\n')).toMatch(/authored one of the two lists \(GPT-5\.6 Sol\)/)
+
+      // A committed union that names NO merger refuses at the recorder, not
+      // first at the gate (re-review round 5).
+      const unownedUnion = w('U-unowned.json', {
+        entries: [
+          { id: 'U1', from: ['A1'] },
+          { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
+        ],
+      })
+      const unowned = build({
+        mode: 'blind-parallel',
+        ...tracked,
+        // The committed-blob fixtures carry THIS union too, so the refusal is
+        // the ownership rule and never a missing fixture blob (re-review
+        // round 8).
+        blobText: blobTextFixture(listA, listB, unownedUnion),
+        unionPath: unownedUnion,
+        listAPath: listA,
+        listBPath: listB,
+      })
+      expect(unowned.ok).toBe(false)
+      expect((unowned.errors ?? []).join('\n')).toMatch(/names no "mergedBy"/)
       expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
       expect(built.record.accounting).toMatch(/^2 A \+ 1 B entries → 2 union entries .*every input entry accounted for$/)
       expect(built.record.accountingSource).toBe('computed')
@@ -448,22 +800,39 @@ describe('the mode round-trips into the ledger', () => {
       writeFileSync(join(repo, 'world.txt'), 'a fixture world\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'Lay down the world\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
-      const sha = git('rev-parse', 'HEAD').stdout.trim()
+      const _sha = git('rev-parse', 'HEAD').stdout.trim()
 
       const w = (name, value) => {
         const path = join(dir, name)
         writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
         return path
       }
-      const listA = w('A.json', { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
-      const listB = w('B.txt', '- B1 | x.ts | the first defect said differently')
-      const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] })
+      // THE HALVES ARE COMMITTED ARTEFACTS, because that is the only form whose
+      // authorship the recorder can prove (cross-vendor review of point 889).
+      const halfA = { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] }
+      const halfB = { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect said differently' }] }
+      mkdirSync(join(repo, 'docs'), { recursive: true })
+      writeFileSync(join(repo, 'docs', 'A.json'), JSON.stringify(halfA))
+      writeFileSync(join(repo, 'docs', 'B.json'), JSON.stringify(halfB))
+      writeFileSync(
+        join(repo, 'docs', 'U.json'),
+        JSON.stringify({ mergedBy: 'GPT-5.6 Sol', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] }),
+      )
+      git('add', '-A')
+      git('commit', '-q', '-m', 'File the two blind halves and their union\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      // The fold is recorded against the commit that CARRIES the artefacts —
+      // the record's sha is where the halves and union are anchored, so a sha
+      // whose tree lacks them refuses (re-review round 4).
+      const sha2 = git('rev-parse', 'HEAD').stdout.trim()
+      const listA = join(repo, 'docs', 'A.json')
+      const listB = join(repo, 'docs', 'B.json')
+      const union = join(repo, 'docs', 'U.json')
       const record = (unionPath) =>
         spawnSync(
           process.execPath,
           [
             join(repo, 'scripts', 'mechanism-review.mjs'),
-            '--record', sha,
+            '--record', sha2,
             '--model', 'GPT-5.6 Sol',
             '--verdict', 'merge',
             '--evidence', 'read both lists and the union that folded them',
@@ -478,9 +847,114 @@ describe('the mode round-trips into the ledger', () => {
       const ok = record(union)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
-      expect(row).toMatchObject({ sha, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
-      expect(row.mergeFallback).toContain('node scripts/fable-switch.mjs --status')
+      expect(row).toMatchObject({ sha: sha2, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
+      // The whole switch-generated sentence, not merely the status command: the
+      // false "two models existed" wording would still have contained it
+      // (re-review round 3).
+      expect(row.mergeFallback).toMatch(/^Fable 5 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
+      // The row says which blobs it read, so a later reader re-derives the proof.
+      expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-5.6 Sol'])
+      // Stored repo-relative, so the ledger row is valid from every checkout.
+      expect(row.halfSources).toEqual(['docs/A.json', 'docs/B.json'])
+      expect(row.halfBlobs).toEqual([
+        git('rev-parse', 'HEAD:docs/A.json').stdout.trim(),
+        git('rev-parse', 'HEAD:docs/B.json').stdout.trim(),
+      ])
+      expect(row.unionSource).toBe('docs/U.json')
+      expect(row.unionBlob).toBe(git('rev-parse', 'HEAD:docs/U.json').stdout.trim())
+
+      // The reviewer-identity boundary at the spawned surface: an unknown-vendor
+      // reviewer is refused outright — no status, reason, or wording admits it —
+      // while the OpenAI record above was accepted as unverified-with-reason.
+      const mystery = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha2, '--model', 'Mystery 9', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', listB,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(mystery.status).not.toBe(0)
+      expect(`${mystery.stdout}${mystery.stderr}`).toMatch(/no vendor the review roster can place|must be VERIFIED/)
+
+      // A REWORDED DEFECT WITH IDENTICAL MODELS, OWNER AND SUMMARY still
+      // refuses, AND BY THE HASH COMPARISON, not by an untracked-path shortcut
+      // (re-review rounds 8 and 9): the reworded half is COMMITTED — the
+      // working tree is clean at HEAD — while the record targets the older
+      // sha whose blob carries the original wording. Only the byte identity
+      // between the working file and the blob the row binds can see that.
+      writeFileSync(
+        join(repo, 'docs', 'B.json'),
+        JSON.stringify({
+          model: 'GPT-5.6 Sol',
+          entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect, but reworded after the fold' }],
+        }),
+      )
+      // Only the half is staged: -A would sweep the freshly written ledger into
+      // this commit, and the revert below would then delete it out from under
+      // the later assertions (re-review round 10).
+      git('add', 'docs/B.json')
+      git('commit', '-q', '-m', 'Reword the defect after the fold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const editedContent = record(union)
+      expect(editedContent.status).not.toBe(0)
+      expect(`${editedContent.stdout}${editedContent.stderr}`).toMatch(/differs from the blob .* the row would bind/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+      // Restore the fold-era wording for the cases below.
+      git('revert', '-q', '--no-edit', 'HEAD')
+
+      // A JUNK SPELLING refuses instead of being silently repaired — the
+      // canonicalization accepts absolute-inside and platform separators,
+      // nothing else (re-review round 11).
+      const doubled = `${repo}/docs//B.json`
+      const junk = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha2, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', doubled,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(junk.status).not.toBe(0)
+      expect(`${junk.stdout}${junk.stderr}`).toMatch(/not a canonical spelling/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+
+      // THE UNTRACKED-UNION REFUSAL, ISOLATED: committed halves, a complete
+      // caller-written union — only the union's provenance can refuse here
+      // (re-review round 4: the earlier cases confounded it with a dropped
+      // entry or untracked halves).
+      const looseUnion = w('U-loose.json', {
+        mergedBy: 'GPT-5.6 Sol',
+        entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }],
+      })
+      const unionLoose = record(looseUnion)
+      expect(unionLoose.status).not.toBe(0)
+      expect(`${unionLoose.stdout}${unionLoose.stderr}`).toMatch(/the union.*not a tracked, clean committed artefact/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+
+      // AN UNPROVABLE HALF REFUSES; IT DOES NOT FALL BACK TO THE TRAILERS. The
+      // caller hands the three files over precisely so the halves decide instead
+      // of the recording commit, and a fold whose halves cannot be read is the
+      // unknown-authorship case the rule exists to refuse. It used to write the
+      // record anyway, silently, off the commit's own co-authors.
+      const loose = w('loose-A.json', halfA)
+      const untracked = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha2, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', loose, '--list-b', listB,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(untracked.status).not.toBe(0)
+      expect(`${untracked.stdout}${untracked.stderr}`).toMatch(/not a tracked, clean repository artefact/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
 
       // …and a union that drops an entry exits non-zero and writes nothing more.
       const bad = record(w('U-bad.json', { entries: [{ id: 'U1', from: ['A1'] }] }))
@@ -844,7 +1318,21 @@ describe('the mode round-trips into the ledger', () => {
       const subject = 'Route the __F__ marker past the splitter'
       git('commit', '-q', '-m', `${subject}\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>`)
       const sha = git('rev-parse', 'HEAD').stdout.trim()
-      const record = (model) =>
+      // The Anthropic reviewer's identity is VERIFIED (post-VERIFIED_REVIEWER_SINCE
+      // rows from that vendor no longer clear unverified), so the fixture carries
+      // the transcript its claim quotes.
+      const reviewAt = '2026-08-24T16:20:00.000Z'
+      const transcript = join(dir, 'session.jsonl')
+      writeFileSync(
+        transcript,
+        `${JSON.stringify({
+          timestamp: reviewAt,
+          type: 'assistant',
+          isSidechain: false,
+          message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' },
+        })}\n`,
+      )
+      const record = (model, ...extra) =>
         spawnSync(
           process.execPath,
           [
@@ -854,6 +1342,7 @@ describe('the mode round-trips into the ledger', () => {
             '--verdict', 'merge',
             '--evidence', 'read the fixture change against its stated intent',
             '--mode', 'review',
+            ...extra,
           ],
           { cwd: repo, encoding: 'utf8', windowsHide: true },
         )
@@ -866,9 +1355,14 @@ describe('the mode round-trips into the ledger', () => {
       expect(self.stderr, `${self.stdout}${self.stderr}`).toContain('SELF-REVIEW is refused')
       expect(self.stderr).toContain('GPT-5.6 Sol')
 
+      // An Anthropic reviewer with no identity evidence is refused outright.
+      const unproven = record('Claude Fable 5')
+      expect(unproven.status).not.toBe(0)
+      expect(`${unproven.stdout}${unproven.stderr}`).toContain('must be VERIFIED')
+
       // A cross-model record works, and the ledger row carries the subject
       // whole and the authorship exactly as the trailer spells it.
-      const ok = record('Claude Fable 5')
+      const ok = record('Claude Fable 5', '--model-at', reviewAt, '--model-transcript', transcript)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
       expect(row.subject).toBe(subject)

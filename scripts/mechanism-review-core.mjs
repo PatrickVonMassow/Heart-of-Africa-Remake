@@ -311,9 +311,16 @@ export function namesOtherModel(text, who) {
  * The shape is asserted against a real summaryLine() in blind-merge-core.test.mjs,
  * so the two halves cannot drift apart — the regex lives HERE because this core
  * must not import the accounting one (that one already imports this).
+ *
+ * TWO WORDINGS ARE ACCEPTED for one meaning. The count in the parenthesis has
+ * always been INPUT ENTRIES folded, never union rows, but the line used to say
+ * only "N merged" next to a union count it does not add up to. The printer names
+ * the unit since 24.08.2026; the rows recorded before that say the same thing in
+ * the ambiguous words and are read, not rewritten — a receipt is evidence of what
+ * the accounting printed, and correcting its text after the fact would forge it.
  */
 export const ACCOUNTING_RECEIPT =
-  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
+  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+)(?: of the (\d+) input entries)? merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
 
 /**
  * Is this receipt a line the accounting could actually have printed?
@@ -328,9 +335,19 @@ export const ACCOUNTING_RECEIPT =
 export function receiptBalances(line) {
   const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
   if (!m) return false
-  const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+  // IN BIGINT, or the arithmetic is IEEE-754 rounding instead of counting:
+  // individually safe operands still produce unsafe SUMS near 2^53, where two
+  // unequal totals compare equal as doubles and a fabricated line balances
+  // without adding up (re-review rounds 7 and 8). No real stage counts
+  // anywhere near this; a forged one may claim whatever it likes.
+  const [a, b, union, merged, statedInputs, onlyA, onlyB] = m
+    .slice(1)
+    .map((v) => (v === undefined ? undefined : BigInt(v)))
   if (merged + onlyA + onlyB !== a + b) return false
-  if (merged === 1) return false
+  // The named unit is checked, not just parsed: a line stating a total the two
+  // list sizes do not make would otherwise pass on the strength of its shape.
+  if (m[5] !== undefined && statedInputs !== a + b) return false
+  if (merged === 1n) return false
   if (onlyA > a || onlyB > b) return false
   // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth
   // round). Every entry standing alone is one union entry, and the merged ones
@@ -339,7 +356,7 @@ export function receiptBalances(line) {
   // could have produced.
   const singles = onlyA + onlyB
   if (!merged) return union === singles
-  return union > singles && union <= singles + Math.floor(merged / 2)
+  return union > singles && union <= singles + merged / 2n
 }
 
 /**
@@ -365,6 +382,20 @@ export const MODE_REQUIRED_SINCE = Date.UTC(2026, 7, 8)
 /** New ledger rows after point 840's recorded commission owe an explicit
  * transcript verdict. The exact boundary preserves every earlier 22.08 row. */
 export const AUTHORSHIP_CHECK_SINCE = 1_787_415_913_284
+
+/** From here on, "unverified" is no longer a clearance for a reviewer the
+ * harness could have verified. Cross-vendor review of point 889 (pass 3): an
+ * unknown actual reviewer could claim an independent model, record the claim
+ * with `status: 'unverified'`, and clear the commit — which is the
+ * unknown-authorship case the gate exists to refuse. Where the claimed
+ * reviewer is an Anthropic model, its session transcript exists in the harness
+ * at recording time, so AGREEMENT is achievable and anything less is refused.
+ * An OpenAI reviewer runs outside the harness — no Claude transcript can hold
+ * its messages, so demanding one would end every cross-vendor review — and
+ * stays recordable as unverified, but only with the reason stated; an unknown
+ * vendor is refused outright. The boundary preserves the rows recorded under
+ * the older reading (both vendors' 24.08 reviews among them). */
+export const VERIFIED_REVIEWER_SINCE = 1_787_588_100_000
 
 /**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
@@ -459,12 +490,12 @@ export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', au
   if (m !== BLIND_PARALLEL || fableState === undefined) {
     return { mergedBy: String(mergedBy ?? '').trim(), mergeFallback: String(mergeFallback ?? '').trim(), errors: [] }
   }
-  const expected = mergerModel(fableState)
+  const expected = mergerModel(fableState, authors)
   const declared = String(mergedBy ?? '').trim()
   const errors = []
   if (declared && !sameModel(declared, expected)) {
     errors.push(
-      `--merged-by "${declared}" contradicts the Fable switch: ${expected} owns this merge ` +
+      `--merged-by "${declared}" is not the one this stage owes: ${expected} owns this merge ` +
         '(node scripts/fable-switch.mjs --status)',
     )
   }
@@ -500,15 +531,23 @@ export function validateMergedBy({
   model,
   authoredBy,
   authors,
+  halfAuthors,
   fableState,
 } = {}) {
   const m = String(mode ?? '').trim()
   const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  // THE HALVES THEMSELVES WHERE THEY WERE READ, the trailer proxy only failing that.
+  // The proxy treats the union commit's models as the list authors, which is right
+  // while the merger is a delegate somebody else commits for, and wrong the moment
+  // the merging model commits its own union: it then names the merger as an author
+  // of the material and refuses the one model the rule allows.
+  const halves = (Array.isArray(halfAuthors) ? halfAuthors : []).map((a) => String(a ?? '').trim()).filter(Boolean)
+  const listAuthors = halves.length === 2 ? halves : [model, ...wrote]
   const policy = resolveMergePolicy({
     mode: m,
     mergedBy,
     mergeFallback,
-    authors: [model, ...wrote],
+    authors: listAuthors,
     fableState,
   })
   const who = policy.mergedBy
@@ -526,7 +565,7 @@ export function validateMergedBy({
     return { ok: errors.length === 0, errors }
   }
   if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
-  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason }).errors]
+  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: listAuthors, fallback: reason }).errors]
   if (!receipt) {
     errors.push(
       '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
@@ -1013,6 +1052,7 @@ export function validateRecord({
   mergeFallback,
   accounting,
   authors,
+  halfAuthors,
   pass,
   passFiles,
   fableState,
@@ -1043,7 +1083,10 @@ export function validateRecord({
     errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
   }
   errors.push(...validatePass({ pass, passFiles }).errors)
-  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, fableState }).errors)
+  errors.push(
+    ...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, halfAuthors, fableState })
+      .errors,
+  )
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -1099,30 +1142,62 @@ export function validateRecord({
  * so a second one named in the trailers cannot merge its own list either.
  */
 export function mergeProblem(record = {}, commit = {}) {
-  if (String(record.mode ?? '') !== BLIND_PARALLEL) return ''
+  // TRIMMED, like the well-formedness check reads it: " blind-parallel " passed
+  // there and fell out HERE, so a hand-edited row bypassed every fold check by
+  // one space (re-review round 6).
+  if (String(record.mode ?? '').trim() !== BLIND_PARALLEL) return ''
   // A row is grandfathered only by a REAL timestamp older than the rule. A row
   // with NO `at` is not old, it is unstamped — reading a missing field as legacy
   // was itself a bypass (four-eyes review, third round): omit `at`, `mergedBy`
   // and `accounting` together and nothing was ever checked.
   const at = Number(record.at)
-  if (Number.isFinite(at) && at > 0 && at < MERGE_ACCOUNTING_SINCE) return ''
+  // The grandfather clause reads the later of row and commit time, like every
+  // era cutoff (re-review round 4): a modern hand-edited row backdated before
+  // the accounting rule otherwise skips fold validation entirely.
+  const foldEra = Math.max(Number.isFinite(at) && at > 0 ? at : 0, Number(commit?.at) || 0)
+  if (Number.isFinite(at) && at > 0 && foldEra < MERGE_ACCOUNTING_SINCE) return ''
   const who = String(record.mergedBy ?? '').trim()
   if (!who) return 'no-merger'
   if (!receiptBalances(record.accounting)) return 'no-count'
   // The FALLBACK is judged, not merely present: any word in that field used to
   // buy an author the merge, while the recorder demanded it name the model that
   // was missing. One function answers for both halves.
+  // THE HALVES THE RECORD ITSELF NAMES, where it names them from tracked files,
+  // and only failing that the commit-trailer proxy. Re-judging a recorded merge
+  // by the proxy alone condemns every merge whose merging model committed its own
+  // union — which is precisely the case the recorder was taught to accept, so the
+  // gate has to read the same fact or the two disagree by construction.
+  //
+  // BUT THE FIELD IS A CLAIM, NOT EVIDENCE: ledger rows are hand-editable, and
+  // two fabricated names excluding the merger would bypass the self-merge
+  // fence entirely. The halves therefore decide ONLY when the ledger reader
+  // stamped them VERIFIED against the repository's committed bytes
+  // (readRecords → verifyHalfAuthors); a claim the repository cannot confirm
+  // POISONS the record instead of being trusted or silently ignored — silently
+  // falling back to the proxy would let a forger probe until a wording passes.
+  const halves = (Array.isArray(record.halfAuthors) ? record.halfAuthors : [])
+    .map((a) => String(a ?? '').trim())
+    .filter(Boolean)
+  if (halves.length && record.halfAuthorsVerified !== true) return 'unverified-halves'
+  // A MODERN ROW DOES NOT GET THE PROXY BACK BY DROPPING ITS CLAIM (re-review
+  // round 3): with `halfAuthors` deleted from a hand-edited row, the judgment
+  // fell through to the commit trailers, which say nothing when the union
+  // commit does not name the merger. Since the recorder began refusing folds
+  // with unproven halves, every legitimate new blind-parallel row carries its
+  // verified halves — one that does not is hand-made and clears nothing. The
+  // era reads the later of row and commit time, as everywhere else.
+  if (!halves.length && foldEra >= VERIFIED_REVIEWER_SINCE) return 'unverified-halves'
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,
-    authors: [...authors, record.model].filter(Boolean),
+    authors: halves.length === 2 ? halves : [...authors, record.model].filter(Boolean),
     fallback: record.mergeFallback,
   })
   return check.ok ? '' : 'self-merge'
 }
 
 /** Ledger-era validity shared by the gate and the per-file debt planner. */
-export function reviewRecordWellFormed(record = {}) {
+export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   if (!VERDICTS.includes(String(record.verdict))) return false
   if (typeof record.model !== 'string' || !record.model.trim()) return false
   if (!ledgerAtUsable(record.at)) return false
@@ -1131,13 +1206,43 @@ export function reviewRecordWellFormed(record = {}) {
   if (evidence.length < 10 || /^<.*>$/.test(evidence) || blindReviewerAdmission(evidence)) return false
   const mode = String(record.mode ?? '').trim()
   const at = Number(record.at)
-  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE)) return false
-  if (at >= AUTHORSHIP_CHECK_SINCE) {
+  // EVERY era cutoff reads the later of row and commit time (re-review round 4:
+  // the commit-aware reading sat on one cutoff, so a row backdated past the
+  // OTHERS — mode, authorship — kept the older, laxer rules against a commit
+  // made today).
+  const effectiveAt = Math.max(Number.isFinite(at) && at > 0 ? at : 0, Number(commitAt) || 0)
+  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && effectiveAt < MODE_REQUIRED_SINCE)) return false
+  // THE ERA IS THE COMMIT'S, NOT THE ROW'S ALONE (cross-vendor re-review of
+  // point 889): `record.at` is written by the recording hand, so a hand-edited
+  // row could backdate itself past a boundary — including all the way past the
+  // authorship requirement itself, which nesting the new rule inside the old
+  // gate silently allowed. A commit's timestamp is part of its sha and cannot
+  // move without changing the commit. Its residual is stated rather than
+  // hidden: an author who backdates the COMMIT ITSELF at creation time moves
+  // both readings, and no marker the same hand writes can close that; the
+  // systemic answer is work-order point 880's.
+  if (effectiveAt >= AUTHORSHIP_CHECK_SINCE) {
     const authorship = record.reviewerAuthorship
     if (!authorship || typeof authorship !== 'object') return false
     if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
     if (!sameModel(authorship.claimedModel, record.model)) return false
     if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
+    // See VERIFIED_REVIEWER_SINCE: what each vendor CAN prove is what it must.
+    if (effectiveAt >= VERIFIED_REVIEWER_SINCE) {
+      const vendor = modelVendor(record.model)
+      // A vendor the roster cannot place is a reviewer nobody can rule out —
+      // no status clears it (re-review round 3: the vendor rule sat only on
+      // the unverified branch, so an unknown vendor with a written-in
+      // "agreement" passed the two string comparisons above).
+      if (vendor === 'unknown') return false
+      if (vendor === 'anthropic' && authorship.status !== 'agreement') return false
+      if (vendor === 'openai') {
+        // No harness transcript can hold an OpenAI reviewer's messages, so an
+        // "agreement" claiming one is fabricated evidence, not strong evidence.
+        if (authorship.status !== 'unverified') return false
+        if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
+      }
+    }
   }
   return record.carried === undefined || record.carriedVerified === true
 }
@@ -1171,10 +1276,17 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
   return artefacts
 }
 
-const modelVendor = (model) => {
+export const modelVendor = (model) => {
   const value = String(model ?? '').toLowerCase()
-  if (/\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)) return 'openai'
-  if (/\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)) return 'anthropic'
+  const openai = /\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)
+  const anthropic = /\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)
+  // CONTRADICTORY MARKERS ARE NOBODY, not first-match-wins (re-review round 5):
+  // "Claude Opus 5 GPT-5" reached the OpenAI branch and cleared as
+  // unverified-with-reason, bypassing both the unknown-vendor refusal and the
+  // Anthropic agreement requirement.
+  if (openai && anthropic) return 'unknown'
+  if (openai) return 'openai'
+  if (anthropic) return 'anthropic'
   return 'unknown'
 }
 
@@ -1231,7 +1343,7 @@ export function evaluateMechanismReview({
     // standard from the day the recorder began demanding it (see
     // MODE_REQUIRED_SINCE): a row of that era naming no usable mode can only
     // have arrived by hand.
-    const rowWellFormed = reviewRecordWellFormed
+    const rowWellFormed = (r) => reviewRecordWellFormed(r, { commitAt: commit.at })
     const wellFormed = covering.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
     // applied to both gates): a covering do-not-merge whose timestamp fails
@@ -1580,6 +1692,12 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       }
       if (problem === 'no-count') {
         return `      ${who} merged the union, but the record carries no count of it — a merge nobody counted`
+      }
+      if (problem === 'unverified-halves') {
+        return (
+          '      the record names half authors the repository does not confirm — ' +
+          'a claim the committed halves cannot back clears nothing'
+        )
       }
       return (
         `      the union was merged by ${who}, which wrote one of the two lists — ` +
