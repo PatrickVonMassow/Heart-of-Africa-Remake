@@ -3557,6 +3557,11 @@ put it is the mistake this line exists to stop.
   unknown rather than as somebody else's lock.
   VERIFIABLE: Vitest — status with the owning id reports the coverage; status with no id reports
   unknown and never a stand-down; the hook path keeps its current behaviour.
+  STILL STANDING 24.08.2026, 16:18: the owning session (`c16d8f1a-…`, its own live pid and
+  `fence: 698` in `.claude/batch-lock.json`) asked `mechanism-review-guard --status` and was told
+  »stands down: another live session owns the batch lock«. Cost that turn: before landing point 897
+  the outstanding DO-NOT-MERGE that `guard-preflight` names could not be checked for merge-blocking
+  through `--status`, and had to be settled by reading the lock file by hand.
   Criticality: medium — no product defect, but it silently withholds a reading two governing
   documents ask for.
   Bundle: Session- & Repo-Hygiene.
