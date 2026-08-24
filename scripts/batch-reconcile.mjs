@@ -224,8 +224,12 @@ export function applyPairResolution({ repoDir = REPO_ROOT, batchId, report, sess
   // still reads running or stalled (a stalled lane IS a live process).
   const pre = revalidateLock()
   if (!pre.ok) return pre
-  const live = report.lanes.filter((lane) => lane.reading === 'running')
-  if (live.length) return { ok: false, did: `refused: ${live.length} lane(s) still read running under a cold record; that is a contradiction to investigate, not to delete` }
+  // 'stalled' IS a live process — silent, but alive — so it blocks a release
+  // exactly like 'running' does: only proven death or a terminal state frees.
+  const live = report.lanes.filter((lane) => ['running', 'stalled'].includes(lane.reading))
+  if (live.length) {
+    return { ok: false, did: `refused: ${live.length} lane(s) still read running or stalled under a cold record; a live process is a contradiction to investigate, not to delete` }
+  }
   const recordNow = readJsonIfAny(store.daemonRecordPath)
   if (recordNow) {
     const judged = report.pair.record

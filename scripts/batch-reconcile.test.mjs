@@ -124,11 +124,19 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     } catch {
       /* already gone */
     }
-    await sleep(800)
-
-    const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
-    const lane = report.lanes.find((l) => l.attemptId === 'r1')
-    expect(['missing', 'stalled']).toContain(lane?.reading)
+    // Poll until the worker is PROVEN gone: 'stalled' still means a live
+    // process, and a live process keeps blocking the release below — so the
+    // precondition here is 'missing', nothing weaker.
+    let report = null
+    let lane = null
+    const deadline = Date.now() + 10_000
+    for (;;) {
+      report = gatherEvidence({ repoDir: repo, batchId: BATCH })
+      lane = report.lanes.find((l) => l.attemptId === 'r1')
+      if (lane?.reading === 'missing' || Date.now() > deadline) break
+      await sleep(300)
+    }
+    expect(lane?.reading, lane?.reason).toBe('missing')
     const applied = applyPairResolution({ repoDir: repo, batchId: BATCH, report, sessionId: SID })
     expect(applied.ok, applied.did).toBe(true)
     const again = gatherEvidence({ repoDir: repo, batchId: BATCH })
