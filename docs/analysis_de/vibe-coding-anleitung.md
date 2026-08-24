@@ -397,6 +397,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Jeder Auftrag, der eine Sitzung überdauern soll, gehört in eine Datei, die dein
   Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
+- **Der letzte Atemzug sieht aus wie ein Herzschlag.** Wer prüft, ob ein Agent noch arbeitet,
+  nimmt gern ein Nebenzeichen — die frische Datei, den frischen Commit, das noch offene
+  Protokoll. Genau das hinterlässt aber ein soeben gestorbener Lauf, und zwar in seiner
+  frischesten Form. Schlimmer wird es, wenn dieses Nebenzeichen die echte Prozessprüfung
+  **überstimmt** statt sie zu ergänzen.
+  → *Prompt:* „Ein Lebendzeichen darf einen Nachweis **bestätigen**, nie **ersetzen**. Miss den
+  Prozess, der die Arbeit tut. Unterscheide **fehlender** Nachweis von **widerlegtem**: Stille
+  ist keine Messung, ein toter Prozess ist eine."
+
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
   baut aber weder Zustand noch Befehl dafür — dann besteht nur eine irreführende Formulierung
   die Prüfung.
@@ -441,4 +450,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: c1ebcd6904efd3365c5cca6a1c2d713241b8c4df377c92b693399dffb477ac94 -->
+<!-- GUIDE-FINGERPRINT: d4b069b0acf784b25112e993a914e954108cf96fb4c90f6495a1b6978d6e93cf -->

@@ -57,6 +57,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
 | 24.08. nachts | Die Vier-Augen-Regel sperrte sich selbst ein: Punkt 834 war fertig und grün, aber seine Prüfrunde liess sich auf keiner Basis beauftragen — ein Merge ohne Autor-Trailer nahm sieben Dateien den beweisbaren Gegenleser, und der Planer verweigerte darauf die ganze Runde statt dieser Dateien, obwohl die Ledger die Ausnahme-Satzart dafür längst führt (§3.169); derselbe Blick fand einen Auftragspunkt, der ohne Zeilenumbruch an den vorigen geklebt war und deshalb für jeden Leser der Datei nicht existierte |
 | 24.08. früh | Die Vorschau widersprach dem Tor: `guard-preflight` meldete den Mechanismus-Wächter als blockierend, während der Wächter selbst die Spanne gegen das Rundenbudget maß, eine Lesbarkeitslücke urteilte und den Zug durchließ — eine geplante 64-Pässe-Runde über 13,8 M Zeichen, die niemand verlangt (Punkt 873) |
+| 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1326,7 +1327,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 05:08 · Quellen-Fingerprint: `c1ebcd6904ef…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 05:31 · Quellen-Fingerprint: `d4b069b0acf7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1422,10 +1423,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 92 Prozess-/Meta-TASKS-Punkte (davon 36 offen).
+Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 93 Prozess-/Meta-TASKS-Punkte (davon 37 offen).
 
-<!-- RETRO-FINGERPRINT: c1ebcd6904efd3365c5cca6a1c2d713241b8c4df377c92b693399dffb477ac94 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T03:08:30.235Z -->
+<!-- RETRO-FINGERPRINT: d4b069b0acf784b25112e993a914e954108cf96fb4c90f6495a1b6978d6e93cf -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T03:31:38.955Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3121,3 +3122,47 @@ ist trotzdem wirkungslos, weil niemand sie schreibt und niemand sie liest. Prüf
 Bauen eines Wächters: *Was passiert, wenn meine Vorbedingung unerfüllbar ist — habe ich
 dafür einen Weg, und ist er an beiden Enden angeschlossen?* Und: eine Verweigerung sollte
 so schmal sein wie ihr Grund. Alles-oder-nichts ist die teuerste Form, recht zu haben.
+
+### 3.170 Der letzte Atemzug wird als Herzschlag gelesen
+
+Am 24.08.2026 gegen 05:20 nahm eine frische Sitzung den Stapel auf. Die Übergabe war
+tadellos: Die In-Flight-Deklaration zum laufenden Autorenlauf an Punkt 834 lag transferiert
+bereit, der Nachfolger übernahm sie als erste Handlung, und der Startvorgang nannte den
+Probe-Befehl gleich mit. Die Probe antwortete `alive`, `respawn: false`, und darunter stand
+in Großbuchstaben, was zu tun sei: **DO NOT REPLACE THIS AGENT: it is working.** Sie berief
+sich dabei auf den Vorfall vom 30.07.2026, bei dem ein Nachfolger einen lebenden Agenten für
+tot erklärt und zwei fertige Punkte neu gebaut hatte.
+
+Der Prozess war zu diesem Zeitpunkt seit zwei Minuten tot. Er war — wieder, wie in §3.155 —
+mit seiner Elternsitzung gefallen. Gemessen wurde das erst, als die Sitzung neben der Probe
+von Hand `ps -p` auf die pid legte, die in der Deklaration als Nachweis steht: Prozess weg,
+Elternsitzung weg. Genau diese pid schaut `--agent-check` nie an; das Unterkommando nimmt
+`--worktree`, `--branch` und `--log` und kein `--pid`, obwohl die Deklaration, die es prüft,
+die pid samt Startzeit als Nachweis führt.
+
+Die zweite Hälfte ist die eigentliche Lehre. `batch-in-flight-core.mjs` entscheidet die
+Rangfolge der Nachweise mit einer Zeile: Ist der Zweigstand frisch, gilt `judgedOn: 'git'` —
+und zwar *statt* der Prozessprüfung, nicht zusätzlich zu ihr. Das ist für den Fall gebaut,
+den der 30.07. lehrte, und für den ist es richtig: Ein stiller Autor, der gerade committet
+hat, arbeitet. Nur ist der frischeste denkbare Zweigstand zugleich das, was ein soeben
+gestorbener Lauf hinterlässt — der letzte Checkpoint fiel um 05:17:44, der Tod um 05:18. Die
+Regel liest den letzten Atemzug als Herzschlag, und sie tut es mit maximaler Zuversicht
+genau in dem halbstündigen Fenster, in dem ein Neustart noch billig ist.
+
+Das ist die dritte Stufe derselben Klasse: In §3.154 beantwortete eine Frischemessung die
+Frage nach dem Leben einer Sitzung, in §3.155 antwortete der Mantelprozess statt des
+Arbeiters, und hier antwortet ein Artefakt statt des Prozesses. Jedes Mal war der Nachweis
+formal vorhanden und zeigte auf etwas, das dem Leben nur ähnlich sieht. Gebucht als Punkt
+874; der Lauf wurde neu gestartet, diesmal von der Sitzung abgekoppelt, damit er das nächste
+Sitzungsende überlebt, und seine halbfertige Arbeit vorher als Patch gesichert statt im Baum
+liegengelassen — die Lehre aus §3.155, die diesmal gegriffen hat.
+
+**Lehre:** Ein Lebendnachweis darf durch ein Artefakt bestätigt, aber nie durch ein Artefakt
+ERSETZT werden. Stille ist keine Messung — ein toter Prozess ist eine. Wo eine Probe mehrere
+Nachweisarten kennt, gehört die Rangfolge so gebaut, dass eine positive Todesmessung nicht
+von einem frischen Nebenzeichen überstimmt wird; das Fehlen eines Nachweises und ein
+widerlegter Nachweis sind zwei verschiedene Dinge. Prüffrage: *Kann mein Lebendzeichen auch
+das Letzte sein, was ein Sterbender hinterlässt?* Und für Verweigerungstexte: Wer einem
+Nachfolger in Großbuchstaben verbietet zu handeln, sollte die Messung, auf die er sich
+stützt, im selben Atemzug nennen — hier stand `judgedOn: "git"` als Feld in der Ausgabe und
+rettete die Diagnose, während der Fließtext daneben nur Gewissheit behauptete.
