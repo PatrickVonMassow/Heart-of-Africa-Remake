@@ -176,6 +176,13 @@ describe('the daemon lifecycle in the sandbox', () => {
       request: { cmd: 'record-state', sessionId: 'someone-else', fence: FENCE, payload: { batchId: BATCH, pointId: 'p1', attemptId: 'x', state: 'queued', at: Date.now() } },
     })
     expect(foreign.ok).toBe(false)
+    // Prototype names are not commands: a bare handler index would answer
+    // 'constructor' with an inherited function instead of this refusal.
+    for (const inherited of ['constructor', 'toString']) {
+      const res = await controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd: inherited, sessionId: SID, fence: FENCE, payload: { batchId: BATCH } } })
+      expect(res.ok, inherited).toBe(false)
+      expect(res.reason, inherited).toMatch(/unknown command/)
+    }
   })
 
   it('fences shutdown like every other mutation: no credentials, wrong batch or a stranger cannot drain', async () => {

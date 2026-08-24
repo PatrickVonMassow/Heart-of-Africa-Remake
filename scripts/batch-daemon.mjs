@@ -632,7 +632,9 @@ async function serve(args) {
         let reply
         try {
           const request = JSON.parse(line)
-          const handler = handlers[request?.cmd]
+          // Own properties only: a bare index would answer 'constructor' or
+          // 'toString' with inherited functions instead of a refusal.
+          const handler = typeof request?.cmd === 'string' && Object.hasOwn(handlers, request.cmd) ? handlers[request.cmd] : null
           reply = handler ? await handler(request) : { ok: false, reason: `unknown command: ${String(request?.cmd)}` }
         } catch (error) {
           reply = { ok: false, reason: `unreadable request: ${error.message}` }

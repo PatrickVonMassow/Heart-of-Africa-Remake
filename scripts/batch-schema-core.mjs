@@ -681,7 +681,10 @@ export function registerDaemonCommand(table, name, spec) {
  *  same request produces the same key on a different machine, at a different time,
  *  under a different fence — except where the fence is itself part of the key. */
 export function idempotencyKey(name, payload = {}, { table = DAEMON_COMMANDS } = {}) {
-  const spec = table[name]
+  // Own properties only: a bare index would answer 'constructor' with an
+  // inherited function whose missing keyFields then THROWS below, and a thrown
+  // validator is not a refusal.
+  const spec = typeof name === 'string' && table && Object.hasOwn(table, name) ? table[name] : null
   if (!spec) return { ok: false, reason: `unknown command: ${name}` }
   // The validator stays TOTAL: a payload that is not an object is a refusal, not a
   // TypeError out of Object.hasOwn.

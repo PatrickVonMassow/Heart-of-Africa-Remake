@@ -604,6 +604,14 @@ describe('the daemon command table', () => {
     expect(idempotencyKey('no-such-command', {}).ok).toBe(false)
   })
 
+  it('refuses prototype names as commands instead of throwing over inherited entries', () => {
+    for (const inherited of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+      const res = idempotencyKey(inherited, { batchId: 'b1' })
+      expect(res.ok, inherited).toBe(false)
+      expect(res.reason, inherited).toMatch(/unknown command/)
+    }
+  })
+
   it('registration refuses a command without a compensation or without a key', () => {
     expect(registerDaemonCommand(DAEMON_COMMANDS, 'prune-logs', { keyFields: ['batchId'] }).reason).toMatch(
       /no compensation/,
