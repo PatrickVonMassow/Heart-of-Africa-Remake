@@ -77,25 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 892. The durable state store and its journal. CUT OUT OF POINT 834 (see 890 for the cut and
-  its reason). Step 2 of the "Ordered work": the store that lets a run be resumed instead of lost,
-  with atomic writes, a journal written before the state it describes, and full post-write
-  validation.
-  HOW THE BRANCH IS CUT: `feat/892-<slug>` off main, carrying `scripts/batch-state-core.mjs` and
-  its test, `scripts/batch-state.mjs` and its test and `scripts/batch-state-durability.test.mjs`
-  from `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
-  LANDS AFTER 891 — it imports `batch-schema-core.mjs`.
-  WHAT THE EARLIER REVIEW ROUNDS ALREADY FORCED, and what must not regress: reconciliation writes
-  are fenced compare-and-set and their evidence fails closed; a fence transition is journalled
-  BEFORE anything is written under that fence; the identity record stays cold when the journal
-  failed durably; cut tails are repaired and short writes finished, so a receipt never claims more
-  than the bytes on disk.
-  FINAL STATE: the store lands dark, imported by nothing on main yet, with today's path untouched.
-  VERIFIABLE: the union's unit cases for step 2; the durability cases; `npm run test:unit`, lint,
-  build; the cross-vendor review of this file set recorded green before the merge.
-  Criticality: high — this is where a crash either keeps or loses the run's work.
-  Bundle: unbundled (batch autonomy).
-
 - [ ] 893. Attempt leases and epoch fencing. CUT OUT OF POINT 834 (see 890 for the cut and its
   reason). The step-4 core, and the reason the cut of 834 was at step 4 rather than step 3:
   ACTIVATING a daemon without fencing is worse than today's path, because two coordinators can
