@@ -116,6 +116,14 @@ async function parentDeathScenario({ keep }) {
   })
   closeSync(out)
   parent.unref()
+  // The start time recorded NOW is what makes every later signal to this pid
+  // identity-checked: after the group dies, the bare number can be recycled by
+  // an unrelated process, and a signal to a bare number is not cleanup.
+  const parentStartedAt = processStartTime(parent.pid)
+  const sameRecordedProcess = (pid, startedAt) => {
+    const probe = probePid(pid)
+    return probe?.exists === true && Number.isFinite(startedAt) && Math.abs((probe.startedAt ?? 0) - startedAt) <= PROCESS_START_TOLERANCE_MS
+  }
 
   try {
     let ready = null
@@ -171,6 +179,24 @@ async function parentDeathScenario({ keep }) {
     const successorRequest = (cmd, payload) =>
       controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd, sessionId: successorSid, fence: newFence, payload: { batchId: BATCH, ...payload } } })
 
+    // THE NEGATIVE HALF OF THE FENCE, without which this drill would pass on a
+    // daemon that ignores epochs entirely: the DEAD session's credentials, and
+    // the superseded fence even under the live session id, must be REFUSED.
+    // The lock and fence writes above simulate what acquisition installs; these
+    // two probes are what prove the daemon actually reads them.
+    const staleSession = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: FENCE_BEFORE, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
+    })
+    check("the dead session's (sessionId, fence) is REFUSED after the takeover", staleSession.ok !== true, staleSession.ok ? 'accepted' : '')
+    const staleFence = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: FENCE_BEFORE, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
+    })
+    check('the superseded fence is REFUSED even under the live session id', staleFence.ok !== true, staleFence.ok ? 'accepted' : '')
+
     // ADOPTION AFTER RECONCILIATION, in that order: the successor gathers the
     // durable evidence first (step 8), and only a lane that reconciliation
     // reads as running is adopted — through the fenced daemon mutation.
@@ -206,18 +232,25 @@ async function parentDeathScenario({ keep }) {
 
     return { ok: checks.every((c) => c.ok), scenario: 'parent-death', checks, sandbox: keep ? sandbox : undefined }
   } finally {
-    try {
-      process.kill(-parent.pid, 'SIGKILL')
-    } catch {
-      /* long dead, which is the point */
+    // Cleanup signals only processes whose recorded identity still stands: a
+    // confirmed-dead group is never re-killed, because after death the bare
+    // pid — and with it the process-group id — can belong to a stranger.
+    if (sameRecordedProcess(parent.pid, parentStartedAt)) {
+      try {
+        process.kill(-parent.pid, 'SIGKILL')
+      } catch {
+        /* died between probe and signal */
+      }
     }
     const leftover = readJsonIfAny(openStateStore({ repoDir: repo, batchId: BATCH }).daemonRecordPath)
     if (leftover?.pid) {
       await sleep(1000)
-      try {
-        process.kill(leftover.pid, 'SIGKILL')
-      } catch {
-        /* already drained */
+      if (sameRecordedProcess(leftover.pid, leftover.pidStartedAt)) {
+        try {
+          process.kill(leftover.pid, 'SIGKILL')
+        } catch {
+          /* drained between probe and signal */
+        }
       }
     }
     if (!keep) rmSync(sandbox, { recursive: true, force: true })
