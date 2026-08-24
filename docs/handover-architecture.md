@@ -751,12 +751,18 @@ from the record. Every one of these leaves, at worst, a record with no copy — 
 at every handover, never an incident.
 
 **THE INVARIANT, in one sentence: the record is the sole authority on the daemon's existence, and
-the copy may only ever be ABSENT or OLDER, never NEWER.** Formally `copy.generation <=
-record.generation` at every observable instant, and a copy is trusted only when it matches the
-record exactly and the record's pid and pid start time probe live. Liveness is never read from
-the copy. Both write orders can produce absence and staleness and neither can produce novelty, so
-a copy naming a generation the record does not carry is not a race this design lost — it is
-corruption, and it fails closed.
+the copy may only ever be ABSENT, MATCHING or SUPERSEDED — never NOVEL.** "Older" is not an order
+on the generations themselves — they are random strings, and the ambiguous-generations row below
+says so — so the first draft's formal `copy.generation <= record.generation` compared values that
+carry no order and is withdrawn. The order EXISTS, but it lives in the JOURNAL, which records
+every mint: a copy's generation is SUPERSEDED exactly when the journal records it as minted and
+records the record's generation as minted after it. Formally: the copy is absent, or its
+generation equals the record's, or the journal's mint history orders it strictly before the
+record's. A copy is trusted only when it matches the record exactly and the record's pid and pid
+start time probe live; liveness is never read from the copy. Both write orders can produce
+absence and supersession and neither can produce novelty, so a copy whose generation the journal
+CANNOT PLACE — never minted there, or the journal unreadable — is not a race this design lost:
+it is corruption or missing evidence, and it fails closed.
 
 **The observations, and what each one resolves to.** Reconciliation is idempotent: running it
 twice changes nothing, because every resolution is a write toward the record's own truth.
@@ -777,11 +783,11 @@ without an answer, and un-negated is not the same as confirmed.
 | present | absent | live | unadopted — a handover, or a crash between the two writes | the lock owner probes the record and writes the copy |
 | present | absent | dead or unprobed | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
 | present | matching | dead or unprobed | stale copy | as cold record, and clear the copy |
-| present | older generation | live | superseded copy | the record wins; rewrite the copy from it |
-| present | older generation | dead or unprobed | cold record | the record is what must be reconciled, and the copy goes with it |
-| present | DIFFERING random-string generation | — | ambiguous generations — random strings carry no order, so "older" is unprovable: the same evidence fits an earlier copy beside a live record and a newer copy beside a rolled-back record | refuse every mutation and alert; an operator supplies the ordering evidence — never an automatic rewrite or release |
+| present | journal-superseded generation | live | superseded copy | the record wins; rewrite the copy from it |
+| present | journal-superseded generation | dead or unprobed | cold record | the record is what must be reconciled, and the copy goes with it |
+| present | differing generation the JOURNAL cannot place — never minted there, or the journal unreadable | — | ambiguous generations — the strings themselves carry no order, and without the journal's mint history "superseded" is unprovable: the same evidence fits an earlier copy beside a live record and a newer copy beside a rolled-back record | refuse every mutation and alert; an operator supplies the ordering evidence — never an automatic rewrite or release |
 | absent | present | — | orphaned copy | clear the copy; a daemon is never concluded from the copy alone |
-| present | newer generation, or no generation, or this generation under another process identity | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
+| present | a generation the journal orders AFTER the record's, or no generation, or this generation under another process identity | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
 | no generation | any | — | impossible by construction | a record nothing can be compared to fails closed like the row above |
 
 Its acceptance cases are step 1's own: every row of this table decided from the pair alone, and
