@@ -11,6 +11,7 @@
 import { afterEach, describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
@@ -28,7 +29,7 @@ import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.m
 import { writeState as writeFableState } from './fable-switch-core.mjs'
 
 const SCRIPT = resolve(process.cwd(), 'scripts', 'mechanism-review.mjs')
-const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs']
+const FABLE_FILES = ['fable-switch.mjs', 'fable-switch-core.mjs', 'atomic-write.mjs', 'git-tracked.mjs']
 const installFableSwitch = (repo, state = 'on') => {
   for (const file of FABLE_FILES) copyFileSync(resolve(process.cwd(), 'scripts', file), join(repo, 'scripts', file))
   mkdirSync(join(repo, '.claude'), { recursive: true })
@@ -44,6 +45,19 @@ const run = (...args) =>
     cwd: process.cwd(),
     input: '',
   })
+
+// THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
+// HEAD and refuses an absolute path outright, so a temp fixture can never satisfy
+// it. These cases are about the MERGER CHECK, not about git, so they hand the
+// production seam a stub that answers for the fixture's own model — exactly what
+// a committed half would say. The untracked case below passes no stub, so the
+// trailer proxy still stands where the halves are caller-written.
+const committedFixture = (path) => {
+  const bytes = readFileSync(path)
+  const model = JSON.parse(bytes.toString('utf8'))?.model
+  if (typeof model !== 'string' || !model.trim()) return null
+  return { oid: createHash('sha1').update(bytes).digest('hex'), model: model.trim() }
+}
 
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
@@ -318,6 +332,50 @@ describe('the mode round-trips into the ledger', () => {
     expect(own.errors.join('\n')).toMatch(/may not merge them/i)
   })
 
+  it('says the halves were not read when a merge refusal rests on the trailer proxy', () => {
+    // MEASURED 22.08.2026: a fold by the model that wrote neither half was refused,
+    // and the message argued about the merger's identity without ever saying where
+    // that identity came from — the recording commit, because a valid fold IS a
+    // commit by the third model. The refusal now names what it read and the one
+    // flag triple that replaces the proxy with the halves themselves.
+    const refused = build({ mode: 'blind-parallel', ...merged, mergedBy: 'Opus 5' })
+    expect(refused.ok).toBe(false)
+    const text = refused.errors.join('\n')
+    expect(text).toMatch(/the two halves were NOT read/)
+    expect(text).toMatch(/--union <U\.json> --list-a <A> --list-b <B>/)
+  })
+
+  it('does not blame the proxy where the halves themselves were read', () => {
+    // The counterpart: with tracked halves handed over, a refusal is about the
+    // halves, so the proxy hint would be a false explanation. It stays absent.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-proxy-'))
+    try {
+      const w = (name, value) => {
+        const path = join(dir, name)
+        writeFileSync(path, JSON.stringify(value))
+        return path
+      }
+      const listA = w('A.json', { model: 'Fable 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
+      const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first' }] })
+      const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect, both said it' }] })
+      const selfMerged = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Fable 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        isTracked: () => true,
+        committedHalf: committedFixture,
+      })
+      expect(selfMerged.ok).toBe(false)
+      const text = (selfMerged.errors ?? []).join('\n')
+      expect(text).toMatch(/authored one of the two lists \(Fable 5\)/)
+      expect(text).not.toMatch(/the two halves were NOT read/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('COUNTS the union itself when handed the files, instead of believing a line', () => {
     // A typed receipt is a claim; given the three files the recorder measures it
     // (four-eyes review, third round).
@@ -328,8 +386,13 @@ describe('the mode round-trips into the ledger', () => {
         writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
         return path
       }
+      // The halves name their authors, so the merger is checked against THEM: Fable
+      // wrote A and Sol wrote B, which leaves Claude as the one model that wrote
+      // neither. This fixture used to say A was Opus 5's and let Sol merge its own
+      // half B — the recorder could not see that, because it read the commit
+      // trailers instead of the halves.
       const listA = w('A.json', {
-        model: 'Opus 5',
+        model: 'Fable 5',
         entries: [
           { id: 'A1', file: 'x.ts', defect: 'the first defect' },
           { id: 'A2', file: 'y.ts', defect: 'the second defect' },
@@ -342,13 +405,50 @@ describe('the mode round-trips into the ledger', () => {
           { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
         ],
       })
+      // The halves decide the merger only where they are TRACKED artefacts, so the
+      // temp fixtures say so explicitly; the untracked case is asserted below.
+      const tracked = { isTracked: () => true, committedHalf: committedFixture }
       const built = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Claude Opus 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        ...tracked,
+      })
+      expect(built.record.mergedBy).toBe('Claude Opus 5')
+      // The record CARRIES the halves, because the gate re-judges it later and
+      // would otherwise fall back to the trailer proxy and call this a self-merge.
+      expect(built.record.halfAuthors).toEqual(['Fable 5', 'GPT-5.6 Sol'])
+      expect(built.record.halfSources).toEqual([listA, listB])
+
+      // UNTRACKED HALVES ARE CALLER-WRITTEN and decide nothing: the trailer proxy
+      // stands, and with it the older refusal. Without this the change would be
+      // WEAKER than the proxy it replaced — anyone could write two files naming
+      // authors that leave themselves untainted.
+      const untracked = build({
+        mode: 'blind-parallel',
+        mergedBy: 'Claude Opus 5',
+        unionPath: union,
+        listAPath: listA,
+        listBPath: listB,
+        isTracked: () => false,
+      })
+      expect(untracked.ok).toBe(false)
+      expect(untracked.record?.halfAuthors).toBeUndefined()
+
+      // AND THE HOLE THAT FIXTURE STOOD IN: an author of a half is refused as the
+      // merger now that the halves say who wrote them.
+      const selfMerged = build({
         mode: 'blind-parallel',
         mergedBy: 'GPT-5.6 Sol',
         unionPath: union,
         listAPath: listA,
         listBPath: listB,
+        ...tracked,
       })
+      expect(selfMerged.ok).toBe(false)
+      expect((selfMerged.errors ?? []).join('\n')).toMatch(/authored one of the two lists \(GPT-5\.6 Sol\)/)
       expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
       expect(built.record.accounting).toMatch(/^2 A \+ 1 B entries → 2 union entries .*every input entry accounted for$/)
       expect(built.record.accountingSource).toBe('computed')

@@ -311,9 +311,16 @@ export function namesOtherModel(text, who) {
  * The shape is asserted against a real summaryLine() in blind-merge-core.test.mjs,
  * so the two halves cannot drift apart — the regex lives HERE because this core
  * must not import the accounting one (that one already imports this).
+ *
+ * TWO WORDINGS ARE ACCEPTED for one meaning. The count in the parenthesis has
+ * always been INPUT ENTRIES folded, never union rows, but the line used to say
+ * only "N merged" next to a union count it does not add up to. The printer names
+ * the unit since 24.08.2026; the rows recorded before that say the same thing in
+ * the ambiguous words and are read, not rewritten — a receipt is evidence of what
+ * the accounting printed, and correcting its text after the fact would forge it.
  */
 export const ACCOUNTING_RECEIPT =
-  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
+  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+)(?: of the (\d+) input entries)? merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
 
 /**
  * Is this receipt a line the accounting could actually have printed?
@@ -328,8 +335,11 @@ export const ACCOUNTING_RECEIPT =
 export function receiptBalances(line) {
   const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
   if (!m) return false
-  const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+  const [a, b, union, merged, statedInputs, onlyA, onlyB] = m.slice(1).map(Number)
   if (merged + onlyA + onlyB !== a + b) return false
+  // The named unit is checked, not just parsed: a line stating a total the two
+  // list sizes do not make would otherwise pass on the strength of its shape.
+  if (m[5] !== undefined && statedInputs !== a + b) return false
   if (merged === 1) return false
   if (onlyA > a || onlyB > b) return false
   // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth
@@ -459,12 +469,12 @@ export function resolveMergePolicy({ mode, mergedBy = '', mergeFallback = '', au
   if (m !== BLIND_PARALLEL || fableState === undefined) {
     return { mergedBy: String(mergedBy ?? '').trim(), mergeFallback: String(mergeFallback ?? '').trim(), errors: [] }
   }
-  const expected = mergerModel(fableState)
+  const expected = mergerModel(fableState, authors)
   const declared = String(mergedBy ?? '').trim()
   const errors = []
   if (declared && !sameModel(declared, expected)) {
     errors.push(
-      `--merged-by "${declared}" contradicts the Fable switch: ${expected} owns this merge ` +
+      `--merged-by "${declared}" is not the one this stage owes: ${expected} owns this merge ` +
         '(node scripts/fable-switch.mjs --status)',
     )
   }
@@ -500,15 +510,23 @@ export function validateMergedBy({
   model,
   authoredBy,
   authors,
+  halfAuthors,
   fableState,
 } = {}) {
   const m = String(mode ?? '').trim()
   const wrote = (Array.isArray(authors) && authors.length ? authors : [authoredBy]).filter(Boolean)
+  // THE HALVES THEMSELVES WHERE THEY WERE READ, the trailer proxy only failing that.
+  // The proxy treats the union commit's models as the list authors, which is right
+  // while the merger is a delegate somebody else commits for, and wrong the moment
+  // the merging model commits its own union: it then names the merger as an author
+  // of the material and refuses the one model the rule allows.
+  const halves = (Array.isArray(halfAuthors) ? halfAuthors : []).map((a) => String(a ?? '').trim()).filter(Boolean)
+  const listAuthors = halves.length === 2 ? halves : [model, ...wrote]
   const policy = resolveMergePolicy({
     mode: m,
     mergedBy,
     mergeFallback,
-    authors: [model, ...wrote],
+    authors: listAuthors,
     fableState,
   })
   const who = policy.mergedBy
@@ -526,7 +544,7 @@ export function validateMergedBy({
     return { ok: errors.length === 0, errors }
   }
   if (m !== BLIND_PARALLEL) return { ok: true, errors: [] }
-  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: [model, ...wrote], fallback: reason }).errors]
+  const errors = [...policy.errors, ...validateMerger({ mergedBy: who, authors: listAuthors, fallback: reason }).errors]
   if (!receipt) {
     errors.push(
       '--accounting "<the summary line>": the union of a blind-parallel stage is COUNTED, not trusted. ' +
@@ -1013,6 +1031,7 @@ export function validateRecord({
   mergeFallback,
   accounting,
   authors,
+  halfAuthors,
   pass,
   passFiles,
   fableState,
@@ -1043,7 +1062,10 @@ export function validateRecord({
     errors.push('--spec-examination is not an authoring round and cannot also carry --author-framing')
   }
   errors.push(...validatePass({ pass, passFiles }).errors)
-  errors.push(...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, fableState }).errors)
+  errors.push(
+    ...validateMergedBy({ mode, mergedBy, mergeFallback, accounting, model, authoredBy, authors, halfAuthors, fableState })
+      .errors,
+  )
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -1112,10 +1134,27 @@ export function mergeProblem(record = {}, commit = {}) {
   // The FALLBACK is judged, not merely present: any word in that field used to
   // buy an author the merge, while the recorder demanded it name the model that
   // was missing. One function answers for both halves.
+  // THE HALVES THE RECORD ITSELF NAMES, where it names them from tracked files,
+  // and only failing that the commit-trailer proxy. Re-judging a recorded merge
+  // by the proxy alone condemns every merge whose merging model committed its own
+  // union — which is precisely the case the recorder was taught to accept, so the
+  // gate has to read the same fact or the two disagree by construction.
+  //
+  // BUT THE FIELD IS A CLAIM, NOT EVIDENCE: ledger rows are hand-editable, and
+  // two fabricated names excluding the merger would bypass the self-merge
+  // fence entirely. The halves therefore decide ONLY when the ledger reader
+  // stamped them VERIFIED against the repository's committed bytes
+  // (readRecords → verifyHalfAuthors); a claim the repository cannot confirm
+  // POISONS the record instead of being trusted or silently ignored — silently
+  // falling back to the proxy would let a forger probe until a wording passes.
+  const halves = (Array.isArray(record.halfAuthors) ? record.halfAuthors : [])
+    .map((a) => String(a ?? '').trim())
+    .filter(Boolean)
+  if (halves.length && record.halfAuthorsVerified !== true) return 'unverified-halves'
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,
-    authors: [...authors, record.model].filter(Boolean),
+    authors: halves.length === 2 ? halves : [...authors, record.model].filter(Boolean),
     fallback: record.mergeFallback,
   })
   return check.ok ? '' : 'self-merge'

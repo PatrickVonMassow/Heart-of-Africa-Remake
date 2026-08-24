@@ -39,9 +39,11 @@ import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { isTrackedInGit } from './git-tracked.mjs'
 import { isMainModule } from './is-main.mjs'
 import { accountUnion, formatAccounting, parseListText, summaryLine, validateInputs } from './blind-merge-core.mjs'
 import {
+  BLIND_PARALLEL,
   formatArgErrors,
   KNOWN_FLAGS,
   ledgerPathFrom,
@@ -49,6 +51,7 @@ import {
   modelsFromTrailers,
   MODES,
   parseArgs,
+  sameModel,
   validatePass,
   validateRecord,
   resolveMergePolicy,
@@ -102,9 +105,44 @@ export const RECORDS_PATH = recordsPathFor()
 // arguments directly — there is no shell to inject into.
 const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
+
+/** The committed model field and blob oid of a repository half — read from
+ *  HEAD, never from the working tree, so what it answers is what a commit
+ *  somebody can read actually says. Null when the path is not committed JSON
+ *  with a model field. */
+export function committedHalfModel(path) {
+  try {
+    const rel = String(path ?? '').trim()
+    if (!rel || rel.startsWith('/') || rel.includes('..')) return null
+    const oid = git(['rev-parse', `HEAD:${rel}`])
+    const model = JSON.parse(git(['show', `HEAD:${rel}`]))?.model
+    return typeof model === 'string' && model.trim() ? { oid, model: model.trim() } : null
+  } catch {
+    return null
+  }
+}
+
+/** Is a ledger row's halfAuthors claim BACKED BY THE REPOSITORY? The ledger is
+ *  hand-editable, so the two names alone are not evidence: each named source
+ *  must be a tracked, clean artefact whose COMMITTED model field says exactly
+ *  what the row claims. The gate poisons a claim this cannot confirm. */
+export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel } = {}) {
+  const authors = Array.isArray(record?.halfAuthors) ? record.halfAuthors : []
+  const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
+  if (authors.length !== 2 || sources.length !== 2) return false
+  return sources.every((src, i) => {
+    if (!isTracked(src)) return false
+    const committed = committedHalf(src)
+    return committed !== null && sameModel(committed.model, authors[i])
+  })
+}
+
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
- *  outlives the code that writes it, and one bad line must not blind the gate. */
-export function readRecords(path = RECORDS_PATH) {
+ *  outlives the code that writes it, and one bad line must not blind the gate.
+ *  A row claiming half authors is STAMPED with whether the repository confirms
+ *  the claim (`halfAuthorsVerified`), because the merge gate must never trust
+ *  two hand-editable strings to bypass the self-merge fence. */
+export function readRecords(path = RECORDS_PATH, { verifyHalves = verifyHalfAuthors } = {}) {
   // No checkout, no ledger — an empty history, not another tree's file.
   if (!path) return []
   let text = ''
@@ -130,7 +168,12 @@ export function readRecords(path = RECORDS_PATH) {
       // The sha shape is checked HERE, not only where it is used: the guard
       // interpolates it into a `git merge-base` command line, and a ledger is a
       // file anyone can hand-edit (four-eyes review, 27.07.2026).
-      if (rec && typeof rec.sha === 'string' && /^[0-9a-f]{7,40}$/i.test(rec.sha)) out.push(rec)
+      if (rec && typeof rec.sha === 'string' && /^[0-9a-f]{7,40}$/i.test(rec.sha)) {
+        if (Array.isArray(rec.halfAuthors) && rec.halfAuthors.length) {
+          rec.halfAuthorsVerified = verifyHalves(rec) === true
+        }
+        out.push(rec)
+      }
     } catch {
       /* a corrupted line is not a review; the gate then simply lacks it */
     }
@@ -187,7 +230,11 @@ export function countUnionFiles({ unionPath, listAPath, listBPath }) {
   if (!inputs.ok) return { ok: false, errors: inputs.errors }
   const result = accountUnion({ a, b, union })
   if (!result.ok) return { ok: false, errors: [formatAccounting(result)] }
-  return { ok: true, summary: summaryLine(result), errors: [] }
+  // THE HALVES NAME THEIR OWN AUTHORS, and that beats the commit-trailer proxy the
+  // merger check falls back to — see buildRecord below for why the proxy is wrong
+  // whenever the merging model is also the one that commits the union.
+  const halfAuthors = [a.model, b.model].map((m) => String(m ?? '').trim()).filter(Boolean)
+  return { ok: true, summary: summaryLine(result), halfAuthors, errors: [] }
 }
 
 /**
@@ -218,6 +265,8 @@ export function buildRecord({
   now = Date.now(),
   resolve = resolveCommit,
   countUnion = countUnionFiles,
+  isTracked = isTrackedInGit,
+  committedHalf = committedHalfModel,
   fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
@@ -307,6 +356,13 @@ export function buildRecord({
   const missing = paths.filter(([, v]) => !String(v ?? '').trim()).map(([flag]) => flag)
   let source = 'stated'
   let receipt = accounting
+  /** The two blind halves' own authors, when the files were handed over TRACKED. */
+  let halfAuthors = []
+  /** …and the paths they were read from, so the record says what it trusted. */
+  let halfSources = []
+  /** …and the COMMITTED blob oids the authors were read from, so a later
+   *  reader can re-derive the exact evidence instead of trusting two strings. */
+  let halfBlobs = []
   if (missing.length < paths.length) {
     if (missing.length) {
       return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
@@ -315,8 +371,34 @@ export function buildRecord({
     if (!counted.ok) return { ok: false, errors: counted.errors }
     receipt = counted.summary
     source = 'computed'
+    // ONLY FROM TRACKED HALVES, AND ONLY FROM THEIR COMMITTED BYTES: an
+    // untracked path is caller-written, and even a tracked one may have been
+    // read from a working tree that changed between the count and this check.
+    // The authors stored here are re-read from HEAD's blobs and must agree
+    // with what the count saw — anything less binds the record to bytes no
+    // commit carries. Where that fails the trailer proxy stands.
+    if (counted.halfAuthors?.length === 2 && [listAPath, listBPath].every((path) => isTracked(path))) {
+      const committed = [listAPath, listBPath].map((path) => committedHalf(path))
+      if (committed.every(Boolean) && committed.every((c, i) => sameModel(c.model, counted.halfAuthors[i]))) {
+        halfAuthors = committed.map((c) => c.model)
+        halfSources = [listAPath, listBPath]
+        halfBlobs = committed.map((c) => c.oid)
+      }
+    }
   }
   const commit = resolve(sha)
+  // WHO WROTE THE TWO HALVES, and only failing that, who touched the commit. The
+  // trailer proxy reads the union commit's models as the list authors, which holds
+  // only while the merging model is a DELEGATE whose output somebody else commits.
+  // Where the merger commits its own union — a merge performed by the session
+  // itself — the proxy names the merger as an author of the material and refuses
+  // the one model the rule actually allows. Measured on the 13.08.2026 stage: the
+  // halves are Fable's and Sol's, Claude wrote neither and merged, and no record
+  // of that fact could be written. Supplying --union/--list-a/--list-b replaces the
+  // proxy with the halves themselves, which are versioned files a reviewer can read.
+  const mergeAuthors = halfAuthors.length === 2
+    ? halfAuthors
+    : [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])]
   // This identity grants the second-model permission, so it is evidence-backed
   // wherever the transcript still exists. Expired evidence stays explicit.
   const reviewerAuthorship = checkAuthorshipFile({
@@ -328,7 +410,7 @@ export function buildRecord({
     mode,
     mergedBy,
     mergeFallback,
-    authors: [model, ...(commit.authors?.length ? commit.authors : [commit.authoredBy])],
+    authors: mergeAuthors,
     fableState,
   })
   const check = validateRecord({
@@ -340,6 +422,8 @@ export function buildRecord({
     // EVERY model named in the trailers, not only the first: two co-authors mean
     // two list authors, and the merger has to be neither (four-eyes, point 634).
     authors: commit.authors,
+    // Read off the halves when they were handed over; see mergeAuthors above.
+    halfAuthors,
     mode,
     framing,
     authorFraming,
@@ -351,6 +435,21 @@ export function buildRecord({
     passFiles,
   })
   const errors = [...merge.errors, ...check.errors]
+  // A REFUSAL HAS TO SAY WHAT IT READ. Where the halves were not handed over, every
+  // identity above was decided from the RECORDING COMMIT's trailers, and that proxy
+  // condemns the one case the rule exists for: a fold committed by the third model
+  // names that model as an author of the material. Measured 22.08.2026 on this very
+  // stage — a valid Fable fold was refused, and the message blamed the merger's
+  // identity without ever saying the halves had not been read. The remedy is one
+  // flag triple, so the refusal names it rather than leaving it to be rediscovered.
+  if (errors.length && mode === BLIND_PARALLEL && halfAuthors.length !== 2) {
+    errors.push(
+      'the two halves were NOT read for this check: the identities above come from the recording ' +
+        "commit's trailers, which name the merger as an author whenever it committed its own union. " +
+        'Hand the tracked files over — --union <U.json> --list-a <A> --list-b <B> — and the merger is ' +
+        'judged against the halves themselves.',
+    )
+  }
   if (authorshipRefusesPermission(reviewerAuthorship)) {
     errors.push(
       `the claimed review model "${reviewerAuthorship.claimedModel}" disagrees with transcript message.model ` +
@@ -410,6 +509,13 @@ export function buildRecord({
       // written before this flag carry none, and read as unrecorded.
       ...(merge.mergedBy ? { mergedBy: merge.mergedBy } : {}),
       ...(merge.mergeFallback ? { mergeFallback: merge.mergeFallback } : {}),
+      // WHO WROTE THE TWO HALVES, where tracked files said so. Stored because the
+      // GATE re-judges this record later and would otherwise fall back to the
+      // commit-trailer proxy, which reads the merging model as an author whenever
+      // the merger committed its own union — so a merge accepted here would be
+      // condemned as a self-merge on the next read (four-eyes finding on this
+      // change). The sources travel with it so the claim stays checkable.
+      ...(halfAuthors.length === 2 ? { halfAuthors, halfSources, halfBlobs } : {}),
       // The count itself, so the ledger holds the receipt and not only the claim
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.

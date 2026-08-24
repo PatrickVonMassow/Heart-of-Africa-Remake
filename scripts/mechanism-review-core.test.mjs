@@ -21,6 +21,7 @@ import {
   MERGE_ACCOUNTING_SINCE,
   MODE_REQUIRED_SINCE,
   mechanismPathsIn,
+  mergeProblem,
   modelFromTrailers,
   modelsFromTrailers,
   MODES,
@@ -660,6 +661,23 @@ describe('evaluateMechanismReview', () => {
       records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT, mergeFallback: 'x' })],
     })
     expect(v.block).toBe(true)
+  })
+
+  it('reads both wordings of the merged count, and checks the unit the new one names', () => {
+    // The parenthesis has always counted INPUT ENTRIES folded, never union rows,
+    // but the old line said only "N merged" beside a union count it does not add
+    // up to — cross-vendor review of point 834 read 61 union entries "(18 merged,
+    // 5 only A, 47 only B)" as 70 and called it a mixed unit, twice. The printer
+    // names the unit now. Rows recorded before that keep clearing the gate: a
+    // receipt is evidence of what the accounting printed and is not rewritten.
+    const old = '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for'
+    const named = '14 A + 56 B entries → 61 union entries (18 of the 70 input entries merged, 5 only A, 47 only B): every input entry accounted for'
+    expect(receiptBalances(old)).toBe(true)
+    expect(receiptBalances(named)).toBe(true)
+    // The named total is CHECKED, not merely parsed — otherwise naming the unit
+    // would add a number nothing stands behind.
+    const wrong = '14 A + 56 B entries → 61 union entries (18 of the 99 input entries merged, 5 only A, 47 only B): every input entry accounted for'
+    expect(receiptBalances(wrong)).toBe(false)
   })
 
   it('refuses a receipt whose numbers do not add up', () => {
@@ -2045,5 +2063,52 @@ describe('the ledger path of a checkout', () => {
     // Trimming would rename a legitimate POSIX directory into a different one.
     expect(ledgerPathFrom('/repo/odd name ')).toBe(resolve('/repo/odd name ', LEDGER_RELATIVE_PATH))
     expect(ledgerPathFrom('   ')).toBe(resolve('   ', LEDGER_RELATIVE_PATH))
+  })
+})
+
+describe('a recorded merge is re-judged by the halves it names', () => {
+  const base = {
+    mode: BLIND_PARALLEL,
+    at: MERGE_ACCOUNTING_SINCE + 1,
+    model: 'GPT-5.6 Sol',
+    accounting: '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for',
+  }
+  // The union commit is Claude's, because Claude performed the merge and committed
+  // it. The trailer proxy therefore reads Claude as an author of the material.
+  const commit = { authorModels: ['Claude Opus 5 (1M context)'] }
+
+  it('accepts the merger only when VERIFIED halves leave it untainted, whoever committed the union', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
+    expect(mergeProblem(record, commit)).toBe('')
+  })
+
+  it('POISONS a half-author claim the repository did not confirm — hand-edited names buy nothing', () => {
+    // The ledger is hand-editable: two fabricated names excluding the merger
+    // would otherwise bypass the self-merge fence. An unverified claim is a
+    // problem in itself — not trusted, and not silently degraded to the proxy,
+    // which would let a forger probe wordings until one passes.
+    const forged = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+    expect(mergeProblem(forged, commit)).toBe('unverified-halves')
+    const stampedFalse = { ...forged, halfAuthorsVerified: false }
+    expect(mergeProblem(stampedFalse, commit)).toBe('unverified-halves')
+    // And the stamp is an affirmative true, not any truthy value.
+    expect(mergeProblem({ ...forged, halfAuthorsVerified: 'yes' }, commit)).toBe('unverified-halves')
+  })
+
+  it('would have condemned that same merge on the commit trailers alone', () => {
+    // Without the halves the gate falls back to the proxy and calls the accepted
+    // merge a self-merge — the recorder and the gate disagreeing by construction.
+    const record = { ...base, mergedBy: 'Claude Opus 5' }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
+  })
+
+  it('still refuses a merger the verified halves name as an author', () => {
+    const record = { ...base, mergedBy: 'GPT-5.6 Sol', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
+  })
+
+  it('a verified half list that does not name both authors still falls back to the proxy', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5'], halfAuthorsVerified: true }
+    expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 })

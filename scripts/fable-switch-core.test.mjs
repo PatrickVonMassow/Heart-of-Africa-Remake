@@ -8,6 +8,7 @@ import {
   mergeFallbackReason,
   mergePromptFraming,
   mergerModel,
+  CLAUDE_MODEL,
   readState,
   requireState,
   servingChain,
@@ -86,6 +87,63 @@ describe('decisions derived from the state', () => {
   it('selects Fable as merger while on and Sol while off', () => {
     expect(mergerModel(on())).toBe(FABLE_MODEL)
     expect(mergerModel(off())).toBe(SOL_MODEL)
+  })
+
+  it('names the model that wrote neither half once the authors are known', () => {
+    // The 13.08.2026 stage recovered under docs/four-eyes/: Fable wrote half A and Sol
+    // half B. Answering "Sol" there hands the merge to an author of the material, which
+    // is the one thing the merge step exists to prevent.
+    expect(mergerModel(off(), [FABLE_MODEL, SOL_MODEL])).toBe(CLAUDE_MODEL)
+    expect(mergerModel(on(), [FABLE_MODEL, SOL_MODEL])).toBe(CLAUDE_MODEL)
+    // Version and vendor spellings still have to resolve to the same model.
+    expect(mergerModel(off(), ['Fable 5', 'GPT-5.6 Sol'])).toBe(CLAUDE_MODEL)
+    expect(mergerModel(off(), [FABLE_MODEL, 'Claude Opus 5 (1M context)'])).toBe(SOL_MODEL)
+  })
+
+  it('keeps the two-model fallback when every roster model wrote a half', () => {
+    // Nothing untainted is left, so the older answer stands and the caller owes the
+    // recorded fallback rather than the selection quietly inventing a third model.
+    expect(mergerModel(off(), [CLAUDE_MODEL, SOL_MODEL])).toBe(SOL_MODEL)
+    expect(mergerModel(on(), [CLAUDE_MODEL, SOL_MODEL])).toBe(FABLE_MODEL)
+  })
+
+  it('leaves the author-blind answer untouched so existing callers do not shift', () => {
+    expect(mergerModel(on(), [])).toBe(FABLE_MODEL)
+    expect(mergerModel(off(), [])).toBe(SOL_MODEL)
+    expect(mergerModel(off(), ['', '   '])).toBe(SOL_MODEL)
+  })
+
+  it('owes the decorrelated framing to whoever actually merges its own half', () => {
+    // Fable off used to be enough to demand it; what matters is whether the SELECTED
+    // merger wrote one of the halves.
+    expect(mergePromptFraming(off(), [FABLE_MODEL, SOL_MODEL])).toBe('')
+    expect(mergePromptFraming(off(), [CLAUDE_MODEL, SOL_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(off(), [CLAUDE_MODEL, SOL_MODEL])).toMatch(/GPT-5\.6 Sol's own half/)
+  })
+
+  it('still demands the framing while either half leaves its author unnamed', () => {
+    // A half nobody has named could be the merger's own. Reading that silence as "not
+    // the merger" would retire the framing exactly where it is least safe to — and the
+    // switch state does not change that, which is what the last line here used to get
+    // wrong: it asserted the framing was dropped with Fable ON and a half unnamed.
+    expect(mergePromptFraming(off(), [FABLE_MODEL, ''])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(off(), ['   ', SOL_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(off(), [FABLE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(on(), [FABLE_MODEL, ''])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(on(), ['', SOL_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+    // Nothing supplied at all is a caller not using this, and stays as it was.
+    expect(mergePromptFraming(on(), [])).toBe('')
+    expect(mergePromptFraming(on())).toBe('')
+  })
+
+  it('tells two Sol versions apart instead of treating every Sol as one model', () => {
+    // "GPT-5.6 Sol" carries its version on the VENDOR word, so a search keyed on "sol"
+    // found no digits and made every Sol compare equal. A half written by a different
+    // Sol version would then have wrongly disqualified the current one.
+    expect(mergerModel(off(), [FABLE_MODEL, 'GPT-6 Sol'])).toBe(SOL_MODEL)
+    expect(mergerModel(off(), [FABLE_MODEL, 'GPT-5.6 Sol'])).toBe(CLAUDE_MODEL)
+    // A name with no version at all still matches its family, as before.
+    expect(mergerModel(off(), [FABLE_MODEL, 'Sol'])).toBe(CLAUDE_MODEL)
   })
 
   it('adds an independent merge framing only for the same-model fallback', () => {

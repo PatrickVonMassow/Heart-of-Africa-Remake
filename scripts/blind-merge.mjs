@@ -25,6 +25,7 @@ import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { mergeFallbackReason, mergePromptFraming, mergerModel } from './fable-switch-core.mjs'
+import { isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 import { authorshipRefusesPermission, formatAuthorship } from './authorship-check-core.mjs'
@@ -136,12 +137,58 @@ if (isMainModule(import.meta.url)) {
     } = parsed.values
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
-    const expectedMerger = mergerModel(fableState)
     const a = parseListText('A', readText(pathA))
     const b = parseListText('B', readText(pathB))
-    // The flag wins over the file, and the line form has only the flag.
-    if (modelA) a.model = modelA
-    if (modelB) b.model = modelB
+    // A TRACKED HALF NAMES ITS OWN AUTHOR AND THE FLAG MAY NOT OVERRULE IT. The flag
+    // exists for the line form, which carries no model field; letting it rewrite a
+    // tracked file's author would hand back exactly the hole the tracked check closes
+    // — point at the real half, then rename its author (four-eyes review, point 834).
+    const trackedA = isTrackedInGit(pathA)
+    const trackedB = isTrackedInGit(pathB)
+    const overruled = []
+    for (const [name, list, flag, tracked] of [
+      ['a', a, modelA, trackedA],
+      ['b', b, modelB, trackedB],
+    ]) {
+      const stated = String(list.model ?? '').trim()
+      if (flag && tracked && stated && !sameModel(flag, stated)) {
+        overruled.push(
+          `--model-${name} "${flag}" contradicts the tracked half, which says "${stated}" — ` +
+            'a tracked half names its own author and the flag cannot rename it',
+        )
+      } else if (flag) list.model = flag
+    }
+    if (overruled.length) {
+      console.error('blind-merge: refusing to rename a tracked half\'s author.\n')
+      for (const e of overruled) console.error(`  · ${e}`)
+      process.exit(1)
+    }
+    // AFTER the authors are known, never before: the merger is the model that wrote
+    // NEITHER half. ONLY TRACKED HALVES DECIDE — an untracked path is
+    // caller-written, so its author field settles nothing — but each tracked
+    // half decides ON ITS OWN: a known author EXCLUDES that model from the
+    // merge even when the sibling half is untracked. Requiring BOTH to be
+    // tracked discarded the one authorship that WAS known, and with one
+    // tracked half written by the switch-selected model the merge went to
+    // that very author under a printed "it wrote neither half".
+    const deciding = [trackedA ? String(a.model ?? '').trim() : '', trackedB ? String(b.model ?? '').trim() : ''].filter(Boolean)
+    const bothKnown = deciding.length === 2
+    const expectedMerger = mergerModel(fableState, deciding)
+    // WHETHER THE SELECTION IS A THIRD MODEL OR THE FALLBACK, because the two owe
+    // opposite sentences. Where every roster model wrote a half, selection keeps the
+    // switch's answer and that model DID write one — saying "it wrote neither half"
+    // there states a false condition instead of naming the recorded fallback
+    // (four-eyes finding 3 on this change). With PARTIAL knowledge the merger
+    // provably wrote no KNOWN half, and "wrote neither half" is exactly what
+    // an untracked half cannot prove — the sentence says so instead.
+    const mergerWroteAHalf = bothKnown
+      ? deciding.some((author) => sameModel(expectedMerger, author))
+      : deciding.some((author) => sameModel(expectedMerger, author)) || Boolean(mergeFallbackReason(fableState))
+    const mergerBecause = mergerWroteAHalf
+      ? 'it wrote a half itself — the recorded two-model fallback'
+      : bothKnown
+        ? 'it wrote neither half'
+        : 'it wrote no KNOWN half — an untracked half has no provable author, so this is the switch reading, not proof'
 
     const authorship = {
       A: checkAuthorshipFile({
@@ -192,8 +239,8 @@ if (isMainModule(import.meta.url)) {
             `      ${p.b}: ${y?.file ?? ''} — ${y?.defect ?? ''}`,
         )
       }
-      console.log(`\nMERGING MODEL — ${expectedMerger} (from node scripts/fable-switch.mjs --status)`)
-      const framing = mergePromptFraming(fableState)
+      console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/fable-switch.mjs --status)`)
+      const framing = mergePromptFraming(fableState, deciding)
       if (framing) console.log(`\n${framing}`)
       console.log(
         '\nThese pairs are a RANKING, not the merge: read BOTH lists in full and pair anything\n' +
@@ -211,16 +258,14 @@ if (isMainModule(import.meta.url)) {
     // the one validated AND the one printed below (four-eyes review: the printed
     // record command used to echo an empty --merged-by for the union-only form).
     const declared = mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? ''))
-    const switchFallback = [a.model, b.model].some((author) => sameModel(expectedMerger, author))
-      ? mergeFallbackReason(fableState)
-      : ''
+    const switchFallback = mergerWroteAHalf ? mergeFallbackReason(fableState) : ''
     const mergerReason = fallback || switchFallback
     const merger = validateMerger({ mergedBy: expectedMerger, authors: [a.model, b.model], fallback: mergerReason })
     if (declared && !sameModel(declared, expectedMerger)) {
       merger.ok = false
       merger.errors.push(
-        `merger "${declared}" contradicts the Fable switch: ${expectedMerger} owns this merge ` +
-          '(node scripts/fable-switch.mjs --status)',
+        `merger "${declared}" is not the one this stage owes: ${expectedMerger} owns this merge, ` +
+          `${mergerBecause} (node scripts/fable-switch.mjs --status)`,
       )
     }
     if (fallback && fallback !== switchFallback) {
