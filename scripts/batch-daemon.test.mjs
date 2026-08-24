@@ -8,7 +8,7 @@
 // acknowledgment, cancellation that preserves the branch, drain and restart.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
@@ -90,6 +90,19 @@ describe('the dark pin', () => {
     const refused = await startDaemon({ repoDir: REPO_ROOT, batchId: BATCH, drill: true })
     expect(refused.ok).toBe(false)
     expect(refused.reason).toMatch(/sandbox/)
+  })
+
+  it('refuses a drill daemon through a SYMLINK to this checkout — the interlock compares real paths', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'link-interlock-'))
+    try {
+      const link = join(dir, 'looks-outside')
+      execFileSync('ln', ['-s', REPO_ROOT, link], { windowsHide: true })
+      const refused = await startDaemon({ repoDir: link, batchId: BATCH, drill: true })
+      expect(refused.ok).toBe(false)
+      expect(refused.reason).toMatch(/sandbox/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('enforces both gates in the serving process itself: a direct serve dispatch cannot bypass them', () => {
@@ -287,9 +300,12 @@ describe('the daemon lifecycle in the sandbox', () => {
     }
     expect(status?.phase, JSON.stringify(status)).toBe('fenced')
     expect(status.reason).toMatch(/not the lease that stands/)
-    // The branch is left intact for inspection: still on the remote, unmoved
-    // since the worker was fenced.
-    expect(git(['rev-parse', 'feat/fenced'], originDir)).toBeTruthy()
+    // The branch is left intact for inspection: UNMOVED since the worker was
+    // fenced — a mere existence check would pass even if the fenced worker
+    // kept pushing, which is exactly the failure this case exists to catch.
+    const tipAtFencing = git(['rev-parse', 'feat/fenced'], originDir)
+    await sleep(2500) // two stub work intervals: time enough for an unfenced worker to push again
+    expect(git(['rev-parse', 'feat/fenced'], originDir)).toBe(tipAtFencing)
   }, 25_000)
 
   it('cancels the attempt, preserves the branch, and journals the last pushed SHA', async () => {
@@ -383,14 +399,19 @@ describe('a durably failing journal fails closed', () => {
     expect(started.ok, started.reason).toBe(true)
     const store = openStateStore({ repoDir: repo, batchId: JF_BATCH })
     try {
-      // Take the journal's write bit away: the next append is refused by the
-      // filesystem, which stands in for disk-full and every other durable no.
-      chmodSync(store.journalPath, 0o400)
+      // Make the append fail by REPLACING the journal with a directory of the
+      // same name: opening it for append fails with EISDIR for every uid. A
+      // chmod to 0400 would not do — CAP_DAC_OVERRIDE (a root test runner)
+      // writes straight through a missing write bit, and the test would then
+      // assert nothing.
+      renameSync(store.journalPath, `${store.journalPath}.aside`)
+      mkdirSync(store.journalPath)
       const failing = await jfRequest('record-state', { pointId: 'p1', attemptId: 'jf1', state: 'queued', at: Date.now() })
       expect(failing.ok).toBe(false)
       expect(failing.reason).toMatch(/journal/)
       // The failure is STICKY: later mutations are refused up front...
-      chmodSync(store.journalPath, 0o600)
+      rmSync(store.journalPath, { recursive: true })
+      renameSync(`${store.journalPath}.aside`, store.journalPath)
       const after = await jfRequest('record-state', { pointId: 'p1', attemptId: 'jf2', state: 'queued', at: Date.now() })
       expect(after.ok).toBe(false)
       expect(after.reason).toMatch(/refuses every mutation/)
@@ -400,7 +421,15 @@ describe('a durably failing journal fails closed', () => {
       const journal = readJournal(store)
       expect(journal.entries.some((e) => e.kind === 'attempt-state')).toBe(false)
     } finally {
-      chmodSync(store.journalPath, 0o600)
+      // Restore the journal if the failing branch left the directory in place.
+      try {
+        if (existsSync(`${store.journalPath}.aside`)) {
+          rmSync(store.journalPath, { recursive: true, force: true })
+          renameSync(`${store.journalPath}.aside`, store.journalPath)
+        }
+      } catch {
+        /* the sandbox is removed afterwards either way */
+      }
       const record = readJsonIfAny(store.daemonRecordPath)
       if (record?.pid) {
         try {
