@@ -46,8 +46,9 @@ versioned now, and `docs/four-eyes/README.md` makes filing both halves a rule.
 
 A RE-MERGE was then run by Claude and audited by Sol. Because Claude wrote list A, that is a
 same-vendor merge and is recorded as the fallback, not as a third-model result. Its accounting
-holds exactly: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), every
-input entry claimed once, no dangling reference and no duplicate — a count Sol reproduced
+holds exactly: 14 A + 56 B identifiers → 70 source identifiers → 61 union entries, of which 9
+are merged rows consuming 18 identifiers and 52 carry a single identifier each (5 only A, 47 only
+B), every input entry claimed once, no dangling reference and no duplicate — a count Sol reproduced
 independently. FOUR ROWS had lost a clause and were restored by that re-merge — three of them
 list-A clauses dropped by list B's author — and the third-model fold below keeps every
 restoration. One is demonstrably consequential: A5b had already pointed at the existing batch lock and its fence as the thing a
@@ -137,7 +138,7 @@ ruled out, and an implementer who does not see them re-proposes them.
 | M60 | only B55 | Roll out first with the already-proven author-sol.mjs adapter behind a handover-capable flag, then enable other adapters only after crash, stall, push-failure, marker-deletion, daemon-restart, and split-brain drills pass. |
 | M61 | only B56 | Retain the existing drain-before-boundary rule as the explicit safe fallback whenever any active lane lacks the durable contract; degradation is visible and slower, but never loses work. |
 
-All 14 A identifiers and all 56 B identifiers appear exactly once: 14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B), counted by `blind-merge.mjs`.
+All 14 A identifiers and all 56 B identifiers appear exactly once. The two units are counted separately, because they do not add up to each other: 70 SOURCE IDENTIFIERS (14 A + 56 B) map onto 61 UNION ENTRIES — 9 merged rows consuming 18 identifiers, and 52 rows carrying one identifier each (5 only A, 47 only B). Counted by `blind-merge.mjs`.
 
 The apparent A6b/B9 disagreement is resolved narrowly: continuous session-local refilling is rejected, but daemon refill from a bounded, pre-authorized queue is allowed while backlog headroom exists. A3c/B33 does not require authors to finish before handover; it requires the serial landing operation itself to be either not started or durably complete.
 
@@ -534,8 +535,12 @@ The landing's safety therefore comes from serialization plus a fenced remote upd
 fence is what stops a dispossessed coordinator from acquiring the landing lock in the first place.
 Claiming compensation for either of these would have been a lie.
 
-The honest claim is therefore narrower than the first draft's: the fence makes a dispossessed
-coordinator's work DETECTABLE AND REVERSIBLE within one mutation, not impossible.
+The honest claim is therefore narrower than the first draft's, and narrower again than the
+previous wording of this sentence: the fence makes a dispossessed coordinator's work DETECTABLE
+within one mutation, and REVERSIBLE only where the mutation is daemon-local and compensable.
+A mutation that was already PUBLISHED is not reversible at all — that is what "uncompensable"
+above means, and residual 2 deliberately leaves one such push standing. Detection is the whole
+of the guarantee there; reversal is not offered.
 
 **ONE WRITER OF THE FENCE, AND IT IS ACQUISITION.** The union's step 7 has `--commit` "advance the
 coordinator epoch", which would make the boundary a second, unsynchronised writer of the same

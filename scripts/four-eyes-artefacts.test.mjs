@@ -118,6 +118,40 @@ describe('the 676 stage is auditable from its raw halves', () => {
     }
   })
 
+  it('states the fold arithmetic in the units it actually has, recomputed from the union', () => {
+    // Cross-vendor review of point 834 found the document's own count sentence
+    // mixing two units: "61 union entries (18 merged, 5 only A, 47 only B)" adds
+    // up to 70, because 18 counts SOURCE IDENTIFIERS while the other three count
+    // ENTRIES. The receipt still balanced — nothing recomputed the prose.
+    const entries = JSON.parse(read(UNION)).entries
+    const from = entries.map((e) => e.from)
+    const counts = {
+      unionEntries: entries.length,
+      mergedRows: from.filter((f) => f.length > 1).length,
+      identifiersInMergedRows: from.filter((f) => f.length > 1).reduce((n, f) => n + f.length, 0),
+      singleRows: from.filter((f) => f.length === 1).length,
+      onlyA: from.filter((f) => f.length === 1 && f[0].startsWith('A')).length,
+      onlyB: from.filter((f) => f.length === 1 && f[0].startsWith('B')).length,
+      sourceIdentifiers: from.reduce((n, f) => n + f.length, 0),
+    }
+    // The units are only separable if they genuinely differ; if a future fold made
+    // them coincide, this case would pass while proving nothing.
+    expect(counts.mergedRows).not.toBe(counts.identifiersInMergedRows)
+    expect(counts.singleRows + counts.mergedRows).toBe(counts.unionEntries)
+    expect(counts.onlyA + counts.onlyB).toBe(counts.singleRows)
+    expect(counts.identifiersInMergedRows + counts.singleRows).toBe(counts.sourceIdentifiers)
+
+    const doc = read(DOC).replace(/\s+/g, ' ')
+    const stated = [
+      `${counts.sourceIdentifiers} SOURCE IDENTIFIERS`,
+      `${counts.unionEntries} UNION ENTRIES`,
+      `${counts.mergedRows} merged rows consuming ${counts.identifiersInMergedRows} identifiers`,
+      `${counts.singleRows} rows carrying one identifier each`,
+      `${counts.onlyA} only A, ${counts.onlyB} only B`,
+    ]
+    for (const phrase of stated) expect(doc, phrase).toContain(phrase)
+  })
+
   it('carries every acceptance condition half A states in prose into the entry parsed from it', () => {
     // The section binding above compares STRUCTURE. Cross-vendor review of point
     // 834 found what that lets through: A8's prose states an acceptance condition
