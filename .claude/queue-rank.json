@@ -587,18 +587,6 @@
       "why": "Machine-filed from a review, criticality medium and not blocking: the six vacuous checks can be classified against a baseline, so it stands behind the release like every other non-urgent machine finding",
       "origin": "machine",
       "place": "last"
-    },
-    "865": {
-      "at": "2026-08-23T17:28:38.451Z",
-      "why": "same 23.08.2026 order: an ambiguous pause marker is today indistinguishable from a user stop and would hold the whole absence",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "866": {
-      "at": "2026-08-23T17:28:38.522Z",
-      "why": "same 23.08.2026 order: these four failure lanes end on a person today, and they are exactly the ones that fire while nobody is watching",
-      "origin": "user",
-      "place": "ahead"
     }
   },
   "boundary": {
@@ -646,7 +634,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-23T20:08:44.659Z",
+    "at": "2026-08-24T00:09:56.782Z",
     "points": [
       174,
       184,
@@ -905,8 +893,6 @@
       855,
       856,
       857,
-      865,
-      866,
       867,
       868
     ]
