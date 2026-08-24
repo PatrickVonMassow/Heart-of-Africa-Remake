@@ -77,25 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 892. The durable state store and its journal. CUT OUT OF POINT 834 (see 890 for the cut and
-  its reason). Step 2 of the "Ordered work": the store that lets a run be resumed instead of lost,
-  with atomic writes, a journal written before the state it describes, and full post-write
-  validation.
-  HOW THE BRANCH IS CUT: `feat/892-<slug>` off main, carrying `scripts/batch-state-core.mjs` and
-  its test, `scripts/batch-state.mjs` and its test and `scripts/batch-state-durability.test.mjs`
-  from `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
-  LANDS AFTER 891 — it imports `batch-schema-core.mjs`.
-  WHAT THE EARLIER REVIEW ROUNDS ALREADY FORCED, and what must not regress: reconciliation writes
-  are fenced compare-and-set and their evidence fails closed; a fence transition is journalled
-  BEFORE anything is written under that fence; the identity record stays cold when the journal
-  failed durably; cut tails are repaired and short writes finished, so a receipt never claims more
-  than the bytes on disk.
-  FINAL STATE: the store lands dark, imported by nothing on main yet, with today's path untouched.
-  VERIFIABLE: the union's unit cases for step 2; the durability cases; `npm run test:unit`, lint,
-  build; the cross-vendor review of this file set recorded green before the merge.
-  Criticality: high — this is where a crash either keeps or loses the run's work.
-  Bundle: unbundled (batch autonomy).
-
 - [ ] 893. Attempt leases and epoch fencing. CUT OUT OF POINT 834 (see 890 for the cut and its
   reason). The step-4 core, and the reason the cut of 834 was at step 4 rather than step 3:
   ACTIVATING a daemon without fencing is worse than today's path, because two coordinators can
@@ -1920,6 +1901,83 @@ put it is the mistake this line exists to stop.
   that /v0.3/ and /poc/ serve the new state, and FREEZE the tag: it is never
   re-pointed.
 
+
+- [ ] 899. `board-first-guard` locks a delegated author out of its own worktree. MEASURED
+  24.08.2026 by the delegated author of point 893. The guard means to exempt a delegated worktree —
+  `scripts/board-first-guard.mjs:383` returns early on `isWorktreeCheckout(REPO_ROOT)` — but
+  `REPO_ROOT` is derived from the HOOK PROCESS's cwd, and for an attached agent that is the main
+  checkout `/workspace/hoa`, not the agent's worktree. So the exemption never fires for the very
+  sessions it exists for, and the author is refused until it produces a board card it cannot
+  produce: `scripts/board.mjs` does not run in a worktree (no `.batch-dashboard.html` there),
+  `EnterWorktree` refuses, and the board belongs to the owner anyway. The block cleared by itself
+  that time and no work was lost; the next one costs a whole run. Note that the payload already
+  carries the answer — `:321` reads `payload.cwd || REPO_ROOT` for the write target — so the
+  information the exemption needs is present and simply not used at `:246`, `:316`, `:353` and
+  `:383`.
+  FINAL STATE: the worktree exemption is decided by the checkout the GUARDED CALL runs in, taken
+  from the payload, and only falls back to the hook process's own root when the payload names no
+  cwd; the same reading governs claim renewal, so an agent in a worktree neither renews nor is
+  measured against the owner's claim. A delegated author writing inside its own worktree is never
+  refused for a board card it has no way to write.
+  VERIFIABLE: unit cases over the guard's decision with a payload cwd inside a linked worktree while
+  the hook root is the main checkout (exempt), a payload cwd in the main checkout (guarded as
+  today), and a payload with no cwd at all (falls back to the hook root, behaviour unchanged).
+  Criticality: medium — it refuses a delegated author's writes without a remedy the author can
+  reach, and the current pass is luck, not design.
+  Bundle: Chat & Tafel.
+
+- [ ] 900. The review recorder answers a failed identity check with the advice to do what was
+  already done. MEASURED 24.08.2026 while recording the round-three verdict on point 892.
+  `scripts/mechanism-review.mjs:191-196` refuses an Anthropic-claimed reviewer whose authorship
+  status is not `agreement` with the text "pass --model-at <ISO> and --model-transcript
+  <session.jsonl>" — and prints exactly that even when BOTH flags were supplied and the check ran.
+  The real reason is computed one layer down and then dropped: `checkAuthorshipFile` returned
+  `unverified` with `reason: "the transcript has no model-bearing message covering the artefact
+  timestamp"`, because the natural reading of "artefact timestamp" is `new Date().toISOString()`
+  and the harness writes the session transcript with a lag, so NOW is always past its last
+  model-bearing message. Cost here: three refusals and a hand-probe of `authorship-check-io.mjs`
+  before the reason was visible; the working input turned out to be the timestamp of the last
+  model-bearing message in the transcript.
+  FINAL STATE: the refusal states the measured reason it already holds — no message covering that
+  timestamp, transcript unreadable, model disagreement — and names them apart, so the fix follows
+  from the text; where the reason is the timestamp, the refusal says which range the transcript
+  does cover. The generic "pass the two flags" advice is reserved for the case where they are
+  genuinely absent.
+  VERIFIABLE: unit cases over the refusal text — both flags absent yields the flag advice; both
+  flags present with an uncovered timestamp yields the coverage reason and the covered range; an
+  unreadable transcript yields the read error; a real model disagreement yields the disagreement.
+  Criticality: low — it costs a reviewer minutes and a source read, never correctness.
+  Bundle: Modell & Wächter.
+
+- [ ] 901. A superseded CI run is reported as a failure and buys a whole session as its repair
+  path. MEASURED 24./25.08.2026 on this session's own start. `scripts/ci-status-guard-core.mjs:11`
+  puts `cancelled` into `FAILED_CONCLUSIONS`, so `classifyRuns` returns `state: 'failed'`,
+  `observeCiWait` turns that into `verdict: 'red'`, and `ciTerminalPrompt`
+  (`scripts/batch-autostart-core.mjs:774`) hands the successor "concluded RED. This successor is
+  the repair path: … inspect the named failure, repair it, … before selecting another work-order
+  point." What was actually measured: run 32781782698 on `04d8dfe2` was cancelled by the workflow's
+  OWN `concurrency: cancel-in-progress: true` (`.github/workflows/ci.yml:43-45`) because `508c3c40`
+  was pushed to the same ref three minutes later — and `508c3c40`'s own run 32782044122 concluded
+  `success`. There was no failure and nothing to repair; the handoff nevertheless opened this
+  session with a repair order over a green tree. `scripts/ci-gate-verdict-core.mjs:38-40` already
+  states the rule the wait path is missing: "`cancelled` is deliberately NOT a gate no — a
+  cancelled step is a superseded run, not a broken tree."
+  KEEP THE GATE STRICT, FIX THE STORY: a cancelled run still carries no verdict on its code, so it
+  must not read as green. The defect is the CLASSIFICATION of that no-verdict as a red to be
+  repaired, and the handoff text it produces.
+  FINAL STATE: `cancelled` is its own state — no verdict — separate from `failure`/`timed_out`/
+  `startup_failure`. Where a NEWER sha on the same ref has its own concluded run, the cancellation
+  is explained by that supersession and the older sha is moot: the successor is told the batch
+  moved on, not that it must repair. Where nothing supersedes it, the successor is told the run
+  never reached a verdict and which sha to re-run — still not that a defect exists. The gate keeps
+  refusing to call either case green.
+  VERIFIABLE: unit cases over the classifier and the handoff text — a cancelled run with a newer
+  concluded green sha on the same ref yields the supersession wording and no repair order; a
+  cancelled run with nothing newer yields the no-verdict wording naming the sha to re-run; a real
+  `failure` still yields the repair handoff; and neither cancelled case is ever reported green.
+  Criticality: medium — it costs a whole session per occurrence and points it at work that does not
+  exist, but never loses code.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 898. The pause file and the in-flight declaration stayed per checkout after the lock and the
   fence were shared. MEASURED 24.08.2026 while reviewing point 897. That point moves
@@ -12006,4 +12064,3 @@ to land than a mechanism that needs a review.
   that fails when only one budget excludes the comment.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
   Bundle: Chat & Tafel.
-

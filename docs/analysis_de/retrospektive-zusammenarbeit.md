@@ -516,7 +516,9 @@ Ein neuer Riegel im Board-Werkzeug verweigert eine Veröffentlichung, wenn ein o
 
 Am 21.08.2026 dieselbe Bauform in einem anderen Werkzeug: `fold-point` schließt einen Punkt, der als Mitläufer auf einem fremden Zweig geliefert wurde, meldet ausdrücklich „NOT DONE: the push — run: `git push origin main`" — und genau dieser Befehl wird sofort vom `board-first-guard` verweigert, weil dasselbe `fold-point` einen Zug vorher die Übergabe-Karte gesetzt hat und die Tafel damit „hier läuft nichts mehr" behauptet. Der genannte Ausweg ist nicht falsch, er ist nur im **erzeugten** Zustand nicht mehr gangbar; der tragfähige Weg (eine `closing`-Karte, dann der Push, dann die Übergabe-Karte erneut) steht in der Verweigerung des anderen Riegels, nicht in der Anweisung, die ihn ausgelöst hat.
 
-**Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden.
+Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen dieselbe Wurzel aus einer neuen Richtung: Der Ausweg ist nicht nur unbegehbar, er wird dem Falschen genannt. Der `board-first-guard` will delegierte Arbeitsbäume ausdrücklich ausnehmen — die Ausnahme fragt aber das Verzeichnis des HOOK-Prozesses und nicht das des geprüften Aufrufs, und das ist bei einem angehefteten Agenten die Haupt-Auscheckung. Der delegierte Autor wird also auf eine Tafelkarte verwiesen, die er in seinem Arbeitsbaum gar nicht schreiben kann; die Auskunft, die ihn befreien würde, liegt im Prozess-Nutzlastfeld, das der Riegel eine Zeile weiter unten für etwas anderes bereits liest. Und der Review-Rekorder weist eine Identitätsprüfung mit dem Rat ab, genau die zwei Flags zu setzen, die schon gesetzt waren: Der gemessene Grund — das Sitzungstranskript deckt den angegebenen Zeitpunkt nicht ab, weil die Harness es mit Verzögerung schreibt und „jetzt“ deshalb immer hinter der letzten modelltragenden Nachricht liegt — wird eine Schicht tiefer berechnet und dann verworfen. Beide Male ist die Information, die den Ausweg gangbar macht, im Werkzeug bereits vorhanden.
+
+**Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
 ### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
 
@@ -1330,7 +1332,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 22:13 · Quellen-Fingerprint: `18cc48ad6c54…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 23:46 · Quellen-Fingerprint: `5088348fe2b9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1428,10 +1430,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 97 Prozess-/Meta-TASKS-Punkte (davon 38 offen).
+Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 98 Prozess-/Meta-TASKS-Punkte (davon 39 offen).
 
-<!-- RETRO-FINGERPRINT: 18cc48ad6c54d5abbafbab095631ef8853c25f4f89cf938093deba263664cde5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T20:13:09.085Z -->
+<!-- RETRO-FINGERPRINT: 5088348fe2b9d8c212e66f8d6b86665b7d5479d647c838bd31afa1a38f108155 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T21:46:08.115Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
