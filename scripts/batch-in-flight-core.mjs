@@ -308,13 +308,29 @@ export function porcelainPaths(out, { limit = 400 } = {}) {
 export function evidenceVerdict(items = []) {
   const list = Array.isArray(items) ? items : []
   const ok = list.filter((i) => i?.ok === true)
+  // A dead process and a reused pid are positive measurements of identity, not
+  // silence. The last commit of that process may be newer than its death, so it
+  // cannot outvote either refutation. Other failed pid checks remain unknown:
+  // an absent start time or an unavailable probe proves no death.
+  const refutations = list.filter(
+    (i) => i?.kind === 'pid' && i?.ok !== true && (i?.detail === 'process-gone' || i?.detail === 'pid-reused'),
+  )
   const outputFresh = ok.some((i) => OUTPUT_KINDS.has(i.kind))
-  const judgedOn = outputFresh ? 'git' : ok.some((i) => i.kind === 'pid') ? 'process' : ok.length > 0 ? 'log' : 'none'
+  const judgedOn = refutations.length > 0
+    ? 'process'
+    : outputFresh
+      ? 'git'
+      : ok.some((i) => i.kind === 'pid')
+        ? 'process'
+        : ok.length > 0
+          ? 'log'
+          : 'none'
   return {
     judgedOn,
     outputFresh,
     fresh: ok.map((i) => `${i.describe} — ${i.detail}`),
     silent: list.filter((i) => i?.ok !== true).map((i) => `${i.describe} — ${i.detail}`),
+    refutations: refutations.map((i) => ({ evidence: i.describe, measurement: i.detail })),
   }
 }
 
@@ -866,6 +882,7 @@ export function agentOutputVerdict({
   worktreeAt = null,
   branchTipAt = null,
   logAt = null,
+  processEvidence = [],
   now,
   graceMs = RESPAWN_GRACE_MS,
   logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
@@ -880,29 +897,42 @@ export function agentOutputVerdict({
   // Say which source the newest stamp came from where the WORKTREE is the newest
   // one and it named itself; a branch tip is already named by `commit`.
   const named = wt && wt.source && wt.at === newestGit ? wt.source : null
+  let output
   if (newestGit !== null && now - newestGit <= graceMs) {
-    return {
+    output = {
       verdict: 'alive',
       judgedOn: 'git',
       ageMs: now - newestGit,
       detail: `work output ${minutes(now - newestGit)} min old${named ? ` (${named})` : ''}`,
     }
+  } else {
+    // A FRESH log is genuine evidence that something is happening — it is only
+    // SILENCE that proves nothing — but it may not outrank measured, quiet output
+    // indefinitely (see `LOG_OVERRIDES_QUIET_GIT_MS`).
+    const gitLongQuiet = newestGit !== null && now - newestGit > logOverrideMs
+    if (log !== null && now - log <= graceMs && !gitLongQuiet) {
+      output = { verdict: 'alive', judgedOn: 'log', ageMs: now - log, detail: `log written ${minutes(now - log)} min ago` }
+    } else if (newestGit === null) {
+      output = { verdict: 'unmeasurable', judgedOn: 'none', ageMs: null, detail: 'no worktree and no branch could be read' }
+    } else {
+      output = {
+        verdict: 'quiet',
+        judgedOn: 'git',
+        ageMs: now - newestGit,
+        detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
+      }
+    }
   }
-  // A FRESH log is genuine evidence that something is happening — it is only
-  // SILENCE that proves nothing — but it may not outrank measured, quiet output
-  // indefinitely (see `LOG_OVERRIDES_QUIET_GIT_MS`).
-  const gitLongQuiet = newestGit !== null && now - newestGit > logOverrideMs
-  if (log !== null && now - log <= graceMs && !gitLongQuiet) {
-    return { verdict: 'alive', judgedOn: 'log', ageMs: now - log, detail: `log written ${minutes(now - log)} min ago` }
-  }
-  if (newestGit === null) {
-    return { verdict: 'unmeasurable', judgedOn: 'none', ageMs: null, detail: 'no worktree and no branch could be read' }
-  }
+
+  const measured = evidenceVerdict(processEvidence)
+  if (measured.refutations.length === 0) return output
+  const refuted = `${output.detail} (judged on ${output.judgedOn})`
   return {
-    verdict: 'quiet',
-    judgedOn: 'git',
-    ageMs: now - newestGit,
-    detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
+    verdict: 'dead',
+    judgedOn: 'process',
+    ageMs: null,
+    detail: `${measured.refutations.map((item) => `${item.evidence} — ${item.measurement}`).join('; ')} refutes ${refuted}`,
+    refutations: measured.refutations.map((item) => ({ ...item, refuted })),
   }
 }
 
@@ -917,6 +947,7 @@ export function agentOutputVerdict({
 export function respawnDecision({ output } = {}) {
   const o = output ?? { verdict: 'unmeasurable', judgedOn: 'none', detail: 'nothing probed' }
   if (o.verdict === 'alive') return { respawn: false, reason: 'agent-alive', judgedOn: o.judgedOn, detail: o.detail }
+  if (o.verdict === 'dead') return { respawn: true, reason: 'process-refuted', judgedOn: o.judgedOn, detail: o.detail }
   if (o.verdict === 'quiet') return { respawn: true, reason: 'output-quiet', judgedOn: o.judgedOn, detail: o.detail }
   return { respawn: false, reason: 'output-unmeasurable', judgedOn: o.judgedOn ?? 'none', detail: o.detail ?? '' }
 }
@@ -927,12 +958,12 @@ export function respawnDecision({ output } = {}) {
  * A declaration may name several agents, and `--agent-check` must ask all of
  * their durable output in one verdict: checking a quiet branch separately from
  * its moving worktree would print a replacement permission while the same child
- * was still editing files. Pids are deliberately absent. They identify a
- * process, not the branch/worktree output whose movement decides whether an
- * author may be described as gone.
+ * was still editing files. Pids travel with those output addresses as
+ * corroborating identities. A live pid never replaces output freshness, but a
+ * measured dead/reused pid refutes the last output the process left behind.
  */
 export function declaredAgentProbe(declaration) {
-  const out = { agent: false, worktrees: [], branches: [], logs: [] }
+  const out = { agent: false, worktrees: [], branches: [], logs: [], pids: [] }
   for (const item of Array.isArray(declaration?.evidence) ? declaration.evidence : []) {
     if (item?.kind === 'worktree' && typeof item.path === 'string' && item.path.trim()) {
       out.agent = true
@@ -942,6 +973,8 @@ export function declaredAgentProbe(declaration) {
       out.branches.push(item.ref.trim())
     } else if (item?.kind === 'log' && typeof item.path === 'string' && item.path.trim()) {
       out.logs.push(item.path.trim())
+    } else if (item?.kind === 'pid') {
+      out.pids.push(item)
     }
   }
   return out

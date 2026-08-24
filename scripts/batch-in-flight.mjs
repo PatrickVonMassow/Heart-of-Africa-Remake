@@ -664,11 +664,13 @@ export function checkAgentOutput(
     worktree = null,
     branch = null,
     log = null,
+    pids = [],
     now = Date.now(),
     graceMs,
     worktreeProbe = worktreeActiveAt,
     branchProbe = refTipAt,
     logProbe = mtimeOf,
+    pidProbe = probePid,
   } = {},
 ) {
   const many = (value) => (Array.isArray(value) ? value : value ? [value] : [])
@@ -678,10 +680,12 @@ export function checkAgentOutput(
   }
   const worktreeStamps = many(worktree).map((path) => worktreeStamp(worktreeProbe(path))).filter(Boolean)
   const newestWorktree = worktreeStamps.reduce((newest, stamp) => (!newest || stamp.at > newest.at ? stamp : newest), null)
+  const processEvidence = many(pids).map((item) => checkEvidence(item, { now, probePid: pidProbe }))
   const output = agentOutputVerdict({
     worktreeAt: newestWorktree,
     branchTipAt: newestNumber(many(branch).map((ref) => branchProbe(ref))),
     logAt: newestNumber(many(log).map((path) => logProbe(path))),
+    processEvidence,
     now,
     ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
   })
@@ -713,6 +717,7 @@ export function checkDeclaredAgentOutput(declaration, opts = {}) {
       worktree: probe.worktrees,
       branch: probe.branches,
       log: probe.logs,
+      pids: probe.pids,
       ...opts,
     }),
   }
