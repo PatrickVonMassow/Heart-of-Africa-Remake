@@ -281,13 +281,15 @@ export function worktreeClaimKey(worktree) {
  *  the CANONICAL worktree key to the attempt that holds it; a claim by a second
  *  attempt is refused while the first is not RELEASED — expiry does not release,
  *  death alone does not release, only the daemon's explicit release after
- *  reconciliation does. */
+ *  reconciliation does. The claim RECORD is frozen with the map: a frozen map
+ *  around a writable record let a holder relabel ownership, after which another
+ *  attempt read as the holder (cross-vendor review of point 893). */
 export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
   const keyed = worktreeClaimKey(worktree)
   if (!keyed.ok) return { ok: false, reason: keyed.reason }
   if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) return { ok: false, reason: 'a claim names its attempt' }
   if (!Object.hasOwn(claims, keyed.key)) {
-    return { ok: true, claims: Object.freeze({ ...claims, [keyed.key]: { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId } }) }
+    return { ok: true, claims: Object.freeze({ ...claims, [keyed.key]: Object.freeze({ batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }) }) }
   }
   const holder = claims[keyed.key]
   if (sameAttempt(holder, attempt)) return { ok: true, claims, alreadyHeld: true }

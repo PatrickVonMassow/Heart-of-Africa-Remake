@@ -307,6 +307,22 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(releaseWorktree({ claims: { '/wt/a': attempt }, worktree: 'wt/a', attempt })).toMatchObject({ ok: true, released: false })
   })
 
+  it('freezes the claim record it hands out, not only the map around it', () => {
+    // The map was frozen and the record inside it was not, so whoever held the
+    // returned claims could relabel ownership of a worktree — after which a
+    // DIFFERENT attempt read as the holder and could release it. The tests never
+    // mutated the record (cross-vendor review of point 893).
+    const first = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
+    expect(Object.isFrozen(first.claims['/wt/a'])).toBe(true)
+    try {
+      first.claims['/wt/a'].attemptId = 'a2'
+    } catch {
+      // A frozen record throws on assignment under module strict mode — that IS the fix.
+    }
+    expect(first.claims['/wt/a'].attemptId).toBe('a1')
+    expect(releaseWorktree({ claims: first.claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
+  })
+
   it('fails closed on an unreadable claim record', () => {
     const res = claimWorktree({ claims: { '/wt/a': {} }, worktree: '/wt/a', attempt })
     expect(res.ok).toBe(false)
