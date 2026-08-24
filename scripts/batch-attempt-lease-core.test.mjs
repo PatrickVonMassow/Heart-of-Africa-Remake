@@ -413,6 +413,30 @@ describe('a record is read once — the accessor class of the cross-vendor revie
     expect(claimWorktree({ claims: {}, worktree: '/wt/a', attempt: { get batchId() { throw new Error('unreadable') }, pointId: 'p', attemptId: 'a' } }).ok).toBe(false)
   })
 
+  it('refuses a claims CONTAINER whose entries it cannot see', () => {
+    // `typeof` says `object` for a Map, a Date and a class instance, and none of
+    // them carries own enumerable entries: `Object.entries` saw an EMPTY map, so a
+    // container full of ownership was reported as no ownership at all and the next
+    // attempt was handed a worktree that is held — the invariant broken by the one
+    // path that looks like success.
+    class Claims {
+      constructor() {
+        this['/wt/a'] = { ...attempt }
+      }
+    }
+    const other = { ...attempt, attemptId: 'a2' }
+    for (const container of [new Map([['/wt/a', { ...attempt }]]), new Date(), new Claims()]) {
+      const claimed = claimWorktree({ claims: container, worktree: '/wt/a', attempt: other })
+      expect(claimed.ok, String(container)).toBe(false)
+      expect(claimed.reason, String(container)).toMatch(/uncertain fails closed/)
+      expect(releaseWorktree({ claims: container, worktree: '/wt/a', attempt }).ok, String(container)).toBe(false)
+    }
+    // A map with no prototype at all is a plain collection and stays readable.
+    const bare = Object.assign(Object.create(null), { '/wt/a': { ...attempt } })
+    expect(claimWorktree({ claims: bare, worktree: '/wt/a', attempt: other }).reason).toMatch(/never share/)
+    expect(claimWorktree({ claims: bare, worktree: '/wt/a', attempt })).toMatchObject({ ok: true, alreadyHeld: true })
+  })
+
   it('refuses a claims map it cannot read at all rather than throwing out of the claim', () => {
     const boom = { batchId: 'b', pointId: 'p834', get attemptId() { throw new Error('unreadable') } }
     const res = claimWorktree({ claims: { '/wt/a': boom }, worktree: '/wt/b', attempt })

@@ -418,10 +418,16 @@ export function worktreeClaimKey(worktree) {
  *  point 893, the class the review closed for the existing lease). */
 function readClaims(claims) {
   if (claims === null || claims === undefined) return { ok: true, claims: {} }
-  // The MAP itself is a plain collection of records — an array or a callable is not
-  // one, and is refused rather than read. A RECORD inside it is a reference like any
-  // other and is read through `carriesFields` below.
-  if (typeof claims !== 'object' || Array.isArray(claims)) {
+  // THE MAP ITSELF IS A PLAIN COLLECTION OF RECORDS, and that is checked by its
+  // PROTOTYPE, not by `typeof`. A Map, a Date or a class instance answered `object`
+  // and carried no own enumerable entries at all, so `Object.entries` saw an EMPTY
+  // map: a claims container this module cannot read was reported as no ownership,
+  // and the worktree it held was handed to the next attempt — the fail-closed
+  // invariant broken by the one path that looks like success (cross-vendor review of
+  // point 893). A record INSIDE the map is a reference like any other and is read
+  // through `carriesFields` below; only the container is held to this.
+  const shape = readOnce(() => Object.getPrototypeOf(claims))
+  if (typeof claims !== 'object' || Array.isArray(claims) || (shape !== Object.prototype && shape !== null)) {
     return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
   }
   // A STORED KEY IS ITSELF A CANONICAL WORKTREE KEY. Canonicalising only the
