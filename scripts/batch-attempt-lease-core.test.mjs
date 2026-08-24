@@ -193,6 +193,30 @@ describe('grantAttemptLease', () => {
     expect(grantAttemptLease({ attempt, holder, now: NaN, leaseId: 'L1' }).ok).toBe(false)
     expect(grantAttemptLease({ attempt, holder, now: 1 }).ok).toBe(false)
   })
+
+  it('refuses an attempt identity that is not three names, and quarantines a lease carrying one', () => {
+    // Presence alone accepted an OBJECT as an id, and freezing is shallow: the
+    // identity the returned lease carried was then the CALLER's own object, still
+    // writable through the reference it kept, so the sealing this module promises
+    // stopped at the envelope. Equality was accidental too — `===` compares such
+    // ids by reference, so two attempts naming the same batch read as different
+    // ones (cross-vendor review of point 893).
+    for (const id of [{ value: 'b' }, ['b'], 1, true, '']) {
+      const res = grant({ attempt: { ...attempt, batchId: id } })
+      expect(res.ok, JSON.stringify(id)).toBe(false)
+      expect(res.reason, JSON.stringify(id)).toMatch(/non-empty string/)
+    }
+    // The identity a granted lease hands out is a fresh record, not the caller's.
+    const mutable = { batchId: 'b', pointId: 'p834', attemptId: 'a1' }
+    const lease = grant({ attempt: mutable }).lease
+    mutable.attemptId = 'a2'
+    expect(lease.attemptId).toBe('a1')
+    // And a PERSISTED lease whose identity is not three names is ownership this
+    // module cannot read: it fences the writer and the sweep quarantines it.
+    const aliased = { ...lease, batchId: { value: 'b' } }
+    expect(leaseAllowsWrite({ lease: aliased, holder, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
+    expect(expiredLeaseAlerts({ leases: [aliased], now: 20_000 })[0].alert).toMatch(/malformed/)
+  })
 })
 
 describe('leaseAllowsWrite — the check before every checkpoint and push (M40)', () => {
@@ -338,6 +362,34 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(releaseWorktree({ claims: first.claims, worktree: '/wt/a/', attempt })).toMatchObject({ ok: true, released: true })
   })
 
+  it('collides an alias that is the STORED key rather than the requested one', () => {
+    // The canonicalisation ran on the requested path alone, so a map keyed with any
+    // other spelling of the same worktree answered `hasOwn` with false: the second
+    // attempt was GRANTED the worktree the first one holds, and the map came back
+    // carrying both spellings — one worktree, two attempts, the single invariant
+    // this function exists for (cross-vendor review of point 893).
+    const other = { ...attempt, attemptId: 'a2' }
+    for (const stored of ['/wt/a/', '/wt//a', '/wt/a/.', '/wt/b/../a', 'wt/a']) {
+      const claims = { [stored]: attempt }
+      const claimed = claimWorktree({ claims, worktree: '/wt/a', attempt: other })
+      expect(claimed.ok, stored).toBe(false)
+      expect(claimed.reason, stored).toMatch(/uncertain fails closed/)
+      // The release path reads the same map and must refuse it just as closed —
+      // freeing on unknown ownership is the same act from the other side.
+      expect(releaseWorktree({ claims, worktree: '/wt/a', attempt }).ok, stored).toBe(false)
+    }
+  })
+
+  it('refuses a claim whose attempt identity is not three names', () => {
+    const res = claimWorktree({ claims: {}, worktree: '/wt/a', attempt: { ...attempt, attemptId: { value: 'a1' } } })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/non-empty string/)
+    // A stored record carrying one is unreadable ownership, not a rival claim.
+    const aliased = claimWorktree({ claims: { '/wt/a': { ...attempt, attemptId: { value: 'a1' } } }, worktree: '/wt/a', attempt })
+    expect(aliased.ok).toBe(false)
+    expect(aliased.reason).toMatch(/uncertain fails closed/)
+  })
+
   it('refuses relative paths outright', () => {
     expect(claimWorktree({ claims: {}, worktree: 'wt/a', attempt }).ok).toBe(false)
     expect(releaseWorktree({ claims: { '/wt/a': attempt }, worktree: 'wt/a', attempt })).toMatchObject({ ok: true, released: false })
@@ -431,20 +483,26 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(releaseWorktree({ claims: null, worktree: '/wt/a', attempt })).toMatchObject({ ok: true, released: false })
   })
 
-  it('keeps every key it was given an own entry, including one named __proto__', () => {
+  it('refuses a map carrying a key no claim can have, __proto__ among them', () => {
     // JSON.parse makes `__proto__` an OWN property, and writing it back with a
-    // plain assignment sets the prototype instead of storing it — so the map this
+    // plain assignment sets the PROTOTYPE instead of storing it — so the map this
     // module handed out silently lost the entry and carried a claim record as its
-    // prototype. No claim key can be `__proto__` (a key is an absolute path), but a
-    // map this module hands out must contain what it was given and nothing else.
+    // prototype. Since the stored keys are checked for canonicality, such a map
+    // never reaches the sealing at all: no claim key can be `__proto__`, a key is
+    // an absolute path, and a map keyed by anything else is ownership this module
+    // cannot read. It refuses on both paths rather than deciding around the key.
     const poisoned = JSON.parse('{"__proto__": {"batchId": "b", "pointId": "p834", "attemptId": "aX"}, "/wt/a": {"batchId": "b", "pointId": "p834", "attemptId": "a1"}}')
     const claimed = claimWorktree({ claims: poisoned, worktree: '/wt/b', attempt: { ...attempt, attemptId: 'a2' } })
-    expect(claimed.ok).toBe(true)
-    expect(Object.getPrototypeOf(claimed.claims)).toBe(Object.prototype)
-    expect(Object.hasOwn(claimed.claims, '__proto__')).toBe(true)
-    const released = releaseWorktree({ claims: JSON.parse(JSON.stringify(claimed.claims)), worktree: '/wt/a', attempt })
-    expect(released).toMatchObject({ ok: true, released: true })
-    expect(Object.getPrototypeOf(released.claims)).toBe(Object.prototype)
+    expect(claimed.ok).toBe(false)
+    expect(claimed.reason).toMatch(/__proto__/)
+    expect(claimed.claims).toBeUndefined()
+    expect(releaseWorktree({ claims: poisoned, worktree: '/wt/a', attempt }).ok).toBe(false)
+    // A map this module DID hand out is a plain object with the key as its own
+    // entry, so nothing it produces can poison a prototype downstream either.
+    const clean = claimWorktree({ claims: { '/wt/a': attempt }, worktree: '/wt/b', attempt: { ...attempt, attemptId: 'a2' } })
+    expect(clean.ok).toBe(true)
+    expect(Object.getPrototypeOf(clean.claims)).toBe(Object.prototype)
+    expect(Object.keys(clean.claims)).toEqual(['/wt/a', '/wt/b'])
   })
 
   it('releases only for the claiming attempt', () => {

@@ -24,6 +24,22 @@ import { sameAttempt, sameProcess } from './batch-schema-core.mjs'
  *  (M38); it alerts, and restart happens only after death is proven. */
 export const ATTEMPT_LEASE_TTL_MS = 5 * 60 * 1000
 
+/** THE THREE-PART ATTEMPT IDENTITY, AS NAMES. Presence alone accepted an OBJECT as
+ *  an id: the identity a lease or a claim record carries was then an ALIAS into the
+ *  caller's own object, and freezing — shallow by construction — sealed the record
+ *  around a value its caller could still rewrite, so ownership evidence stayed
+ *  mutable through a reference this module never saw (cross-vendor review of point
+ *  893). It also made equality accidental, because `===` compares two such ids by
+ *  reference rather than by name. An id is a name, and a name is a non-empty string;
+ *  the record built from it is a FRESH one, so nothing this module hands out shares
+ *  an object with what it was given. */
+function attemptIdentity(attempt) {
+  if (!attempt || typeof attempt !== 'object') return null
+  const named = (v) => typeof v === 'string' && v !== ''
+  if (!named(attempt.batchId) || !named(attempt.pointId) || !named(attempt.attemptId)) return null
+  return { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }
+}
+
 function usableLease(lease) {
   return Boolean(
     lease &&
@@ -44,7 +60,9 @@ function usableLease(lease) {
       // and no earlier than the grant, or the rollback fence below rests on a
       // number this module cannot trust.
       (lease.renewedAt === undefined || (Number.isFinite(lease.renewedAt) && lease.renewedAt >= lease.grantedAt)) &&
-      sameAttempt(lease, lease),
+      // A persisted lease whose identity is not three names is ownership this
+      // module cannot read, exactly like one it cannot date.
+      Boolean(attemptIdentity(lease)),
   )
 }
 
@@ -88,8 +106,9 @@ function clockFloor(lease) {
 // in 1970 (cross-vendor review of point 834). A missing clock is missing evidence
 // here exactly as it is everywhere else in this file.
 export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, now, ttlMs = ATTEMPT_LEASE_TTL_MS, leaseId = null, holderProvenDead = false } = {}) {
-  if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) {
-    return { ok: false, reason: 'a lease names its batch, point and attempt' }
+  const identity = attemptIdentity(attempt)
+  if (!identity) {
+    return { ok: false, reason: 'a lease names its batch, point and attempt, each of them a non-empty string' }
   }
   if (!Number.isInteger(holder.pid) || holder.pid < 1 || !Number.isFinite(holder.pidStartedAt)) {
     return { ok: false, reason: 'a lease holder is a process identity: pid and pid start time' }
@@ -151,9 +170,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
         lapsed: true,
         alert: `attempt lease ${existing.leaseId} lapsed ${now - existing.expiresAt}ms before its holder pid ${holder.pid} returned; re-granted as a new lease`,
         lease: sealedLease({
-          batchId: attempt.batchId,
-          pointId: attempt.pointId,
-          attemptId: attempt.attemptId,
+          ...identity,
           leaseId,
           holder,
           grantedAt: now,
@@ -197,9 +214,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     ok: true,
     renewed: false,
     lease: sealedLease({
-      batchId: attempt.batchId,
-      pointId: attempt.pointId,
-      attemptId: attempt.attemptId,
+      ...identity,
       leaseId,
       holder,
       grantedAt: now,
@@ -305,6 +320,24 @@ function readClaims(claims) {
   if (typeof claims !== 'object' || Array.isArray(claims)) {
     return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
   }
+  // A STORED KEY IS ITSELF A CANONICAL WORKTREE KEY. Canonicalising only the
+  // REQUESTED path left the alias open from the other side: a map keyed `/wt/a/`
+  // answered `hasOwn('/wt/a')` with false, so a second attempt was granted the
+  // worktree the first one holds and the map came back carrying both spellings —
+  // one worktree, two attempts, which is the single invariant this function exists
+  // for (cross-vendor review of point 893). Only this module writes these keys, and
+  // it writes them canonical, so any other spelling is corrupted or hand-edited
+  // ownership: unreadable, and unreadable fails closed rather than being tidied
+  // into a key nobody persisted.
+  for (const key of Object.keys(claims)) {
+    const keyed = worktreeClaimKey(key)
+    if (!keyed.ok || keyed.key !== key) {
+      return {
+        ok: false,
+        reason: `the worktree claims on record carry the non-canonical key ${JSON.stringify(key)}; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
+      }
+    }
+  }
   return { ok: true, claims }
 }
 
@@ -341,15 +374,16 @@ export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {
   claims = read.claims
   const keyed = worktreeClaimKey(worktree)
   if (!keyed.ok) return { ok: false, reason: keyed.reason }
-  if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) return { ok: false, reason: 'a claim names its attempt' }
+  const identity = attemptIdentity(attempt)
+  if (!identity) return { ok: false, reason: 'a claim names its attempt, each part of it a non-empty string' }
   if (!Object.hasOwn(claims, keyed.key)) {
-    return { ok: true, claims: sealedClaims({ ...claims, [keyed.key]: { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId } }) }
+    return { ok: true, claims: sealedClaims({ ...claims, [keyed.key]: identity }) }
   }
   const holder = claims[keyed.key]
-  if (sameAttempt(holder, attempt)) return { ok: true, claims: sealedClaims(claims), alreadyHeld: true }
-  if (!holder || !holder.batchId || !holder.pointId || !holder.attemptId) {
+  if (!attemptIdentity(holder)) {
     return { ok: false, reason: 'the worktree claim on record is unreadable; ownership is uncertain and uncertain fails closed' }
   }
+  if (sameAttempt(holder, attempt)) return { ok: true, claims: sealedClaims(claims), alreadyHeld: true }
   return { ok: false, reason: `the worktree is claimed by attempt ${holder.attemptId}; two attempts never share one worktree` }
 }
 
