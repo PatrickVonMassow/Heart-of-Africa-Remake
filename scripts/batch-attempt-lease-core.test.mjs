@@ -27,6 +27,24 @@ describe('grantAttemptLease', () => {
     expect(renewed.lease.expiresAt).toBe(20_000 + ATTEMPT_LEASE_TTL_MS)
   })
 
+  it('never extends a LAPSED lease silently: the same holder is alerted and re-granted under a new id', () => {
+    const first = grant().lease
+    const after = 10_000 + ATTEMPT_LEASE_TTL_MS + 1
+    // The renewal a holder attempts long after expiry: refused WITH the alert —
+    // a persisted extension would blind expiredLeaseAlerts to the lapse.
+    const stale = grant({ existing: first, now: after })
+    expect(stale).toMatchObject({ ok: false, verdict: 'lapsed' })
+    expect(stale.alert).toMatch(/expired .*ms ago/)
+    // The same lease id is a resurrection, not a re-grant.
+    const resurrection = grant({ existing: first, now: after, leaseId: 'L1' })
+    expect(resurrection.ok).toBe(false)
+    // Under a NEW id the living holder continues — loudly, marked as lapsed.
+    const regrant = grant({ existing: first, now: after, leaseId: 'L2' })
+    expect(regrant).toMatchObject({ ok: true, renewed: false, lapsed: true })
+    expect(regrant.lease.leaseId).toBe('L2')
+    expect(regrant.alert).toMatch(/lapsed/)
+  })
+
   it('refuses a second process while the lease is live — the duplicate writer of M39', () => {
     const first = grant().lease
     const second = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: 20_000, leaseId: 'L2' })

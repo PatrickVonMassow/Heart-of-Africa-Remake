@@ -40,7 +40,10 @@ function usableLease(lease) {
 /** Grants or renews the lease for one attempt. The decision is against the ONE
  *  existing lease for that attempt (the daemon indexes by attempt):
  *    - no existing lease → grant;
- *    - the same process renewing → extend, same leaseId;
+ *    - the same process renewing BEFORE expiry → extend, same leaseId;
+ *    - the same process after expiry → the lease LAPSED: the renewal is refused
+ *      with an alert, and the holder continues only via a re-grant under a new
+ *      lease id — persisting a silent extension would blind expiredLeaseAlerts;
  *    - a DIFFERENT process while the lease is unexpired → refuse: duplicate writer;
  *    - a different process after expiry → STILL refuse, with `stale-holder`: expiry
  *      alone never proves death (M38/M39), so the caller must present
@@ -68,7 +71,37 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
       return { ok: false, reason: 'the existing lease belongs to another attempt; the daemon indexed it wrong' }
     }
     if (sameProcess(existing.holder, holder)) {
-      return { ok: true, renewed: true, lease: Object.freeze({ ...existing, expiresAt: now + ttlMs }) }
+      if (now <= existing.expiresAt) {
+        return { ok: true, renewed: true, lease: Object.freeze({ ...existing, expiresAt: now + ttlMs }) }
+      }
+      // A LAPSED lease never extends silently (M38): once the renewal persisted,
+      // expiredLeaseAlerts could no longer observe the lapse. The lapse is
+      // alerted HERE, the stale renewal is refused, and the same process — alive
+      // by construction, it is asking — continues only under a NEW lease id the
+      // daemon records as a re-grant, never as a resurrection.
+      if (typeof leaseId !== 'string' || !leaseId || leaseId === existing.leaseId) {
+        return {
+          ok: false,
+          verdict: 'lapsed',
+          reason: 'the lease lapsed before this renewal; a lapse alerts and re-grants under a new lease id, it never extends silently (M38)',
+          alert: `attempt lease ${existing.leaseId} expired ${now - existing.expiresAt}ms ago while its holder pid ${existing.holder.pid} still lives`,
+        }
+      }
+      return {
+        ok: true,
+        renewed: false,
+        lapsed: true,
+        alert: `attempt lease ${existing.leaseId} lapsed ${now - existing.expiresAt}ms before its holder pid ${holder.pid} returned; re-granted as a new lease`,
+        lease: Object.freeze({
+          batchId: attempt.batchId,
+          pointId: attempt.pointId,
+          attemptId: attempt.attemptId,
+          leaseId,
+          holder: Object.freeze({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }),
+          grantedAt: now,
+          expiresAt: now + ttlMs,
+        }),
+      }
     }
     if (now <= existing.expiresAt) {
       return { ok: false, reason: `duplicate writer: the lease is held by pid ${existing.holder.pid} until ${existing.expiresAt}` }
