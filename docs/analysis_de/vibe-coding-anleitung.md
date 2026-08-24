@@ -145,6 +145,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 > ein Rot nur mit **benannter Ursache** — wiederholte Grüns sind keine. Und einen, der feste
 > Wartezeiten aufspürt."
 
+Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen: Miss die Teile des roten
+Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
+
 ---
 
 ## Die häufigsten Fallstricke → und was hilft
@@ -168,6 +171,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   alles grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
+- **Runde um Runde, ohne näher zu kommen.** Das Gegenlesen findet jedes Mal etwas, nur schließt
+  sich der Abstand nie.
+  → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Steht das Urteil,
+  während der Umfang bleibt, ist der Gegenstand zu groß — **verkleinere ihn**."
+
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
   das Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
@@ -186,15 +194,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Es antwortet nicht das Modell, das du bestellt hast.** Bei Engpass serviert die Umgebung still
   ein schwächeres weiter.
   → *Prompt:* „Stell zu Sitzungsbeginn fest, **welches Modell tatsächlich antwortet**, und halte es
-  gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**. Jedes Ergebnis trägt seinen
-  Verfasser."
+  gegen die erlaubte Reihe. Steht es außerhalb, **halte an und melde**."
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
-  → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
-  Aufgabe, und bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen."
+  → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
-  → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
+  → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Er misst dein Repository statt deinen
@@ -206,17 +212,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
   miss auf einer ruhigen Maschine."
 
-- **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert; ein Tor, das zu Recht verweigert, lässt nur einen Stapel wachsen.
-  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim
-  Start, was **lokal fertig, aber nirgends angekommen** ist."
+- **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist nicht passiert.
+  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim Start,
+  was **lokal fertig, aber nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
-  → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz**."
+  Satz, oder weiter, und sperrt Unbeteiligte.
+  → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
 
-- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlicher.
+- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet, nie
   eine Uhr — und schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
@@ -263,15 +267,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
 
-- **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt, dass jemand
-  gearbeitet *hat* — der tote Lauf belegt weiter seinen Platz.
-  → *Prompt:* „Miss Lebendigkeit am **Vorgang** (Kennung samt Startzeit), nie an seinen Spuren.
-  Ein fehlender Vorgang **widerlegt** jede frische Ausgabe; unlesbar heißt **unbekannt**, nicht tot."
+- **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt nur, dass jemand
+  gearbeitet *hat*.
+  → *Prompt:* „Miss Lebendigkeit am **Vorgang** (Kennung samt Startzeit), nie an seinen Spuren;
+  unlesbar heißt **unbekannt**, nicht tot."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
-  getrennt — eines schreibt, eines prüft — und blockieren so alle Arbeit.
-  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert. Alle
-  Aufrufstellen beantworten dieselbe Frage einmal; der Eingang ist **Pflicht**, kein Vorgabewert."
+  getrennt — eines schreibt, eines prüft.
+  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den Wert; der Eingang
+  ist **Pflicht**, kein Vorgabewert."
 
 - **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im Chat.
   → *Prompt:* „Sichere Befunde mit einem billigen Kommando, das immer schreibt, und einer Prüfung,
@@ -332,11 +336,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **„Nichts geliefert" wurde nie nachgemessen.** Ein Lauf meldet, er habe nichts geschrieben,
   während fertige, ungesicherte Arbeit danebenliegt.
-  → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint.
-  ‚Nichts da' gilt nur für den leeren Fall; sonst nenn die **Größe** des Vorhandenen und den
-  Befehl, der es **sichert**."
+  → *Prompt:* „Eine **verneinende** Meldung nennt den **gemessenen** Zustand, den sie verneint."
 
-- **Einigkeit und Erfolg sind keine Evidenz.** Modelle können gemeinsam danebenliegen, und
+- **Einigkeit und Erfolg sind keine Evidenz.** Modelle liegen gemeinsam daneben, und
   „es lief durch" beweist den Weg nicht.
   → *Prompt:* „Welcher **eine Test** macht die Ursache **sichtbar**? Sag **vor** der Messung,
   welches Ergebnis welche Erklärung ausschließt."
@@ -365,8 +367,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur."
 
 - **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
-  Zweige liegen; die Sortierprüfungen bleiben grün, denn sie prüfen die Liste, nie den Punkt in
-  Arbeit.
+  Zweige liegen; die Sortierprüfungen prüfen die Liste, nie den Punkt in Arbeit.
   → *Prompt:* „Vor jedem **neuen** Punkt: nenn ihn, den vordersten offenen und jeden älteren
   angefangenen Zweig. Weichst du ab, **begründe es**; leere Angefangenes zuerst."
 
@@ -398,8 +399,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
-  baut aber weder Zustand noch Befehl dafür — dann besteht nur eine irreführende Formulierung
-  die Prüfung.
+  baut aber weder Zustand noch Befehl dafür.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
@@ -441,4 +441,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 27bcbac0f4c4dc04343f7b5275dadb9bc4c4afa4127889c5d3a52b2dc7627cde -->
+<!-- GUIDE-FINGERPRINT: bc6e11eec1d314c1cbab52baec0d86dca181e2931b303a46a6e22066e27e7c2e -->

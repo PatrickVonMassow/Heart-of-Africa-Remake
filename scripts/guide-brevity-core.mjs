@@ -211,7 +211,13 @@ export const LIMITS = {
   // losing the clauses whose detail already stands in the retrospective. The
   // guide measures 444 / 3926 afterwards, so the word ceiling RATCHETS DOWN by
   // three more. The line ceiling stays 444 because the file does.
-  maxWords: 3926,
+  // 24.08.2026, later: the retry-healed red and the non-converging review round
+  // went in — one as a sentence on the existing retry prompt, one as its own
+  // pitfall — and nine neighbouring entries paid for both by dropping clauses the
+  // retrospective already carries in full (§3.171, §3.172). The guide measures
+  // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
+  // ceiling stays 444 because the file does.
+  maxWords: 3893,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
