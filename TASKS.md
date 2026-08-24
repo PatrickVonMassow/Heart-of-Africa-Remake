@@ -11562,3 +11562,45 @@ to land than a mechanism that needs a review.
   either way.
   Criticality: medium — it does not lose work, but it sends sessions on demands nobody makes.
   Bundle: Modell & Wächter.
+
+- [ ] 874. The batch's death oracle reports a dead authoring run as alive, because a fresh branch
+  tip outvotes measured process death. MEASURED 24.08.2026, 05:22 on main at `212b5334`: the
+  delegated Fable authoring run for point 834 (pid 1631993) and the session that spawned it (pid
+  1581781) were both gone — `ps -p 1631993` and `ps -p 1581781` return nothing. Run exactly as the
+  SessionStart hook prints it, `node scripts/batch-in-flight.mjs --agent-check --branch
+  refs/heads/feat/834-durable-authoring-lane --log local/author-834-round27.log` answered
+  `"verdict": "alive"`, `"judgedOn": "git"`, `"respawn": false`, `"reason": "agent-alive"`, and
+  printed the remedy "DO NOT REPLACE THIS AGENT: work output 3 min old (judged on git). It is
+  working." Two mechanisms produce that answer together. First, `--agent-check` accepts only
+  `--worktree`, `--branch` and `--log`, so it never probes the pid — although the declaration it is
+  checking records that pid, with its start time, as evidence (`.claude/batch-in-flight.json`,
+  `evidence[0].kind === "pid"`). Second, `scripts/batch-in-flight-core.mjs:312` computes `judgedOn =
+  outputFresh ? 'git' : ok.some((i) => i.kind === 'pid') ? 'process' : …`, so branch freshness
+  OUTRANKS pid evidence rather than being corroborated by it. The two compose into the worst case:
+  the freshest possible branch tip is exactly what a just-died run leaves behind — here the last
+  checkpoint c8d4ac87 landed 05:17:44 and the run was dead by 05:18.
+  WHAT IT COSTS: this is the probe the runbook makes the ONLY admissible way to judge a delegated
+  agent ("Never infer a dead child from the owner lock: run `batch-in-flight.mjs --agent-check`"),
+  and its remedy text does not hedge — it forbids replacement and cites the 30.07.2026 incident in
+  support. A session that obeys it burns the whole 30-minute grace before the tip ages out of
+  freshness, and burns it precisely in the window where restarting is still cheap. This session
+  caught it only because it measured the pid by hand against the declaration, which is the step the
+  hook's own command omits.
+  WHAT MUST NOT REGRESS: the 30.07.2026 lesson stands unchanged — a SILENT LOG beside a fresh commit
+  still reads alive, and absence of pid evidence still lets git freshness decide alone. What changes
+  is only the case where pid evidence is present and REFUTED: `process-gone` and `pid-reused` are
+  measurements, not silence, and a measurement may not be outvoted by the corpse's last commit.
+  FINAL STATE: `--agent-check` reads the recorded declaration and probes every evidence kind it
+  names, the pid included, without the caller having to restate it; and a positively refuted pid
+  yields `dead` regardless of branch-tip freshness, with the verdict naming which evidence refuted
+  which.
+  VERIFIABLE: unit cases — (a) declaration with a pid whose process is gone plus a branch tip one
+  minute old reports dead and `respawn: true`, naming the pid as the refuting evidence; (b) the same
+  with a pid whose start time disagrees (reused) reports dead the same way; (c) declaration with NO
+  pid evidence and a fresh tip still reports alive on git, unchanged; (d) declaration with a LIVE pid
+  and a silent log beside a fresh commit still reports alive, pinning the 30.07.2026 case; and (e)
+  `--agent-check` with no `--branch`/`--log`/`--worktree` arguments still checks the recorded
+  declaration's evidence rather than reporting `none`.
+  Criticality: high — it is the batch's own liveness measurement, it fails in the direction that
+  keeps a dead lane declared alive, and every delegated point depends on it.
+  Bundle: unbundled (batch autonomy).
