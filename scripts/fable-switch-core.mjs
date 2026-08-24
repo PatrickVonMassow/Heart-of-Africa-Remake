@@ -150,11 +150,14 @@ function sameModelName(a, b) {
     // A name carrying MODEL WORDS OF BOTH VENDORS — "Fable / GPT-5.6 Sol" — is not
     // resolved to either: first-match made it Sol, and mergerModel then offered
     // Fable as untainted although the marker names Fable (re-review round 6). Such
-    // a name matches EVERY model it mentions, which is the conservative reading —
-    // it disqualifies rather than qualifies.
+    // a name matches EVERY model it actually MENTIONS — and only those (round 7:
+    // a wildcard also disqualified models the name never named).
     const anthropicModel = family.some((w) => ['fable', 'opus', 'sonnet', 'haiku'].includes(w))
     const openaiModel = family.includes('sol') || family.includes('gpt')
-    if (anthropicModel && openaiModel) return { key: '*', version: '' }
+    if (anthropicModel && openaiModel) {
+      const keys = family.filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
+      return { keys: [...new Set(keys)], version: '' }
+    }
     const key = family.includes('sol') ? 'sol' : family.includes('fable') ? 'fable' : family[family.length - 1]
     // THE VERSION IS NOT ALWAYS ATTACHED TO THE KEY WORD (four-eyes finding 1 on this
     // change): "GPT-5.6 Sol" carries its version on the VENDOR word, so keying the
@@ -169,7 +172,8 @@ function sameModelName(a, b) {
   const x = parse(a)
   const y = parse(b)
   if (!x || !y) return false
-  if (x.key !== '*' && y.key !== '*' && x.key !== y.key) return false
+  const keysOf = (p) => (p.keys ? p.keys : [p.key])
+  if (!keysOf(x).some((k) => keysOf(y).includes(k))) return false
   if (!x.version || !y.version) return true
   return x.version === y.version
 }

@@ -130,8 +130,10 @@ performed the fold is read off the messages that performed it, not off a label.
 
 Nothing checked it. The halves were never versioned, so no reviewer read them
 beside the union; the union restated the label; and the label was the only
-authorship claim anyone had. The rule in `README.md` — both halves filed with
-the union, in the same commit — exists so the next stage cannot repeat this.
+authorship claim anyone had. The rule in `README.md` — both halves filed
+here, committed, beside their union — exists so the next stage cannot repeat
+this; the tooling enforces the committedness, and a recovered stage like this
+one files its artefacts across commits.
 It is worth stating what that rule does NOT buy: a half's own heading is still
 only a claim. Where authorship matters, it is settled by the metadata of the
 messages that produced the text.

@@ -203,6 +203,10 @@ describe('the 676 stage is auditable from its raw halves', () => {
       .filter((r) => r.halfSources.join('|') === `${HALF_A}.json|${HALF_B}.json`)
     expect(rows, 'the 676 fold is recorded exactly once').toHaveLength(1)
     const row = rows[0]
+    // The row's self-declared union source must BE the published union — a row
+    // referencing some other committed JSON with matching owner and accounting
+    // would otherwise disconnect the provenance chain (re-review round 7).
+    expect(row.unionSource).toBe(UNION)
     // The union is read at the ROW'S sha, like everything else this case
     // recomputes — the audit is of the historical fold, not of the working tree.
     const entries = JSON.parse(

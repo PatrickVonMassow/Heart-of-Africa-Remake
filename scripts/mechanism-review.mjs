@@ -198,7 +198,10 @@ export function repoRelative(path) {
   if (!raw.trim()) return ''
   const rel = relative(REPO_ROOT, resolvePath(REPO_ROOT, raw))
   const outside = !rel || rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')
-  return outside ? raw : rel.split('\\').join('/')
+  // Only the PLATFORM separator is normalised: replacing every backslash
+  // corrupted a POSIX filename that legitimately contains one (re-review
+  // round 7).
+  return outside ? raw : (sep === '\\' ? rel.split(sep).join('/') : rel)
 }
 
 /** The committed blob oid at a path, or '' when the commit carries none. */
@@ -663,6 +666,27 @@ export function buildRecord({
           ],
         }
       }
+      // THE OWNER TOO, NOT ONLY THE ARITHMETIC (re-review round 7): an edited
+      // working-tree mergedBy leaves the summary identical, and the row would
+      // then carry an owner the committed union contradicts — exactly the row
+      // verification refuses.
+      let committedOwner = ''
+      try {
+        const committedUnionDoc = JSON.parse(blobText(unionBlob) ?? 'null')
+        committedOwner = Array.isArray(committedUnionDoc) ? '' : String(committedUnionDoc?.mergedBy ?? '').trim()
+      } catch {
+        committedOwner = ''
+      }
+      if (committedOwner !== unionOwner) {
+        return {
+          ok: false,
+          errors: [
+            `the working-tree union says "${unionOwner}" merged it while the committed union at ` +
+              `${commit.sha.slice(0, 7)} says "${committedOwner}" — commit what you counted, then record`,
+          ],
+        }
+      }
+      mergedBy = committedOwner
       receipt = committedReceipt.summary
     } else if (mode === BLIND_PARALLEL) {
       // A FAILED PROOF IS A REFUSAL, NOT A SHRUG (cross-vendor review of point

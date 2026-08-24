@@ -336,6 +336,12 @@ export function receiptBalances(line) {
   const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
   if (!m) return false
   const [a, b, union, merged, statedInputs, onlyA, onlyB] = m.slice(1).map(Number)
+  // WITHIN THE SAFE-INTEGER DOMAIN, or the arithmetic below is IEEE-754
+  // rounding instead of counting: 2^53 A beside 2^53+1 "only A" compare equal
+  // as doubles, so a fabricated line could balance without adding up
+  // (re-review round 7). No real stage counts anywhere near this.
+  if (![a, b, union, merged, onlyA, onlyB].every(Number.isSafeInteger)) return false
+  if (m[5] !== undefined && !Number.isSafeInteger(statedInputs)) return false
   if (merged + onlyA + onlyB !== a + b) return false
   // The named unit is checked, not just parsed: a line stating a total the two
   // list sizes do not make would otherwise pass on the strength of its shape.
