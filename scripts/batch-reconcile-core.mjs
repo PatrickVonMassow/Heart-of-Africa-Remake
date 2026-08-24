@@ -27,11 +27,15 @@ export const LANE_STALL_MS = 10 * 60 * 1000
  *    heartbeatAt   last heartbeat (ms) or null
  *    worktreeExists  the recorded worktree is on disk
  *    localSha / remoteSha   branch tips, null when unreadable
+ *    remoteInLocal  ancestry verdict for a DIFFERING remote tip: true when the
+ *                   remote tip is contained in the local history (a push
+ *                   interval away — normal), false when the remote carries
+ *                   history this lane never produced, null when unprobed
  *    recordedSha   the last pushed SHA the record claims, or null
  *
  *  `completed` requires M37's whole condition — a terminal-commit claim VISIBLE
  *  on the remote — and is never concluded from the record alone. */
-export function classifyLane({ record = null, workerProbe = null, lease = null, heartbeatAt = null, worktreeExists = false, localSha = null, remoteSha = null, recordedSha = null, now = 0 } = {}) {
+export function classifyLane({ record = null, workerProbe = null, lease = null, heartbeatAt = null, worktreeExists = false, localSha = null, remoteSha = null, remoteInLocal = null, recordedSha = null, now = 0 } = {}) {
   if (!record?.state?.state) {
     return { reading: 'orphaned', reason: 'evidence with no readable record: work nothing accounts for', quarantine: true }
   }
@@ -65,10 +69,18 @@ export function classifyLane({ record = null, workerProbe = null, lease = null, 
   }
   if (workerLive) {
     if (Number.isFinite(heartbeatAt) && now - heartbeatAt <= LANE_STALL_MS) {
-      // A live worker whose local tip ran ahead of what was ever pushed is
-      // normal (a push interval away); a REMOTE ahead of the local one is not.
-      if (localSha && remoteSha && localSha !== remoteSha && !worktreeExists) {
-        return { reading: 'divergent', reason: 'the branch moved while the worktree is gone', quarantine: true }
+      // A live worker whose LOCAL tip ran ahead of the remote is normal — a
+      // push interval away, the remote tip still in its history. A remote that
+      // carries history this lane never produced is not: someone else moved
+      // the branch under a live writer. The verdict is the gatherer's ANCESTRY
+      // probe, and a differing tip it could not place stays an alert.
+      if (localSha && remoteSha && localSha !== remoteSha) {
+        if (remoteInLocal === false) {
+          return { reading: 'divergent', reason: 'the remote moved past history this lane ever produced, under a live worker', quarantine: true }
+        }
+        if (remoteInLocal !== true) {
+          return { reading: 'running', reason: 'live worker, fresh heartbeat; the differing remote tip could not be placed in the local history', alert: true }
+        }
       }
       return { reading: 'running', reason: 'live worker, fresh heartbeat' }
     }

@@ -38,6 +38,15 @@ describe('classifyLane (M28)', () => {
     expect(res).toMatchObject({ reading: 'stalled', alert: true })
   })
 
+  it('quarantines a live lane whose remote moved past history it never produced — and only on that verdict', () => {
+    const args = { record: runningRecord(), workerProbe: liveWorker, lease, heartbeatAt: 99_000, now: 100_000, worktreeExists: true, localSha: OID_A, remoteSha: OID_B }
+    expect(classifyLane({ ...args, remoteInLocal: false })).toMatchObject({ reading: 'divergent', quarantine: true })
+    // Local ahead by a push interval reads running and clean.
+    expect(classifyLane({ ...args, remoteInLocal: true })).toEqual({ reading: 'running', reason: 'live worker, fresh heartbeat' })
+    // A differing tip the probe could not place is an ALERT, never a pass.
+    expect(classifyLane({ ...args, remoteInLocal: null })).toMatchObject({ reading: 'running', alert: true })
+  })
+
   it('a recycled pid is not a live worker: the lease holder decides', () => {
     const stranger = { live: true, pid: 100, startedAt: 99_999 }
     const res = classifyLane({ record: runningRecord(), workerProbe: stranger, lease, heartbeatAt: 90_000, now: 100_000 })

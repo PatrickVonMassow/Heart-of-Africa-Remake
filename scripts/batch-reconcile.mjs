@@ -107,6 +107,19 @@ export function gatherEvidence({ repoDir = REPO_ROOT, batchId } = {}) {
     const localSha = context.worktree && worktreeExists ? git(['rev-parse', 'HEAD'], context.worktree).out || null : null
     const remoteListed = context.branch ? git(['ls-remote', 'origin', `refs/heads/${context.branch}`], resolved) : { ok: false }
     const remoteSha = remoteListed.ok && remoteListed.out ? remoteListed.out.split(/\s+/)[0] : null
+    // ANCESTRY for a differing remote tip: contained in the local history means
+    // "local ahead, a push interval away"; a commit the worktree does not even
+    // hold is history this lane never produced — an affirmative divergence. An
+    // errored probe stays null, which the core reads as unplaced, never as ok.
+    let remoteInLocal = null
+    if (worktreeExists && localSha && remoteSha && localSha !== remoteSha) {
+      const known = git(['cat-file', '-e', `${remoteSha}^{commit}`], context.worktree)
+      if (!known.ok) remoteInLocal = false
+      else {
+        const ancestry = git(['merge-base', '--is-ancestor', remoteSha, localSha], context.worktree)
+        remoteInLocal = ancestry.status === 0 ? true : ancestry.status === 1 ? false : null
+      }
+    }
     const reading = classifyLane({
       record: attempt,
       workerProbe,
@@ -115,6 +128,7 @@ export function gatherEvidence({ repoDir = REPO_ROOT, batchId } = {}) {
       worktreeExists,
       localSha,
       remoteSha,
+      remoteInLocal,
       recordedSha: attempt.state?.lastPushedSha ?? null,
       now,
     })
