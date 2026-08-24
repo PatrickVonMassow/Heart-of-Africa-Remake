@@ -671,6 +671,12 @@
       "why": "One fuse dated at point 1000 and one half-covered assertion — nothing bites at 884.",
       "origin": "machine",
       "place": "last"
+    },
+    "885": {
+      "at": "2026-08-24T07:11:06.028Z",
+      "why": "It loses the user's own words with no trace on either layer, and it fires whenever the owner delegates — which is the standing instruction, so every remaining point before the release widens the window.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -718,7 +724,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T06:26:51.799Z",
+    "at": "2026-08-24T07:11:06.036Z",
     "points": [
       174,
       184,
@@ -992,7 +998,8 @@
       881,
       882,
       883,
-      884
+      884,
+      885
     ]
   }
 }
