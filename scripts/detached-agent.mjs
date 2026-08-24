@@ -83,6 +83,44 @@ function git(args, cwd) {
   return { ok: res.status === 0, out: (res.stdout || '').trim(), err: (res.stderr || '').trim() }
 }
 
+/** Installs the worktree's pre-push lease gate: a hook that re-runs
+ *  leaseAllowsWrite for the WRAPPER's identity on every `git push` from this
+ *  worktree, whoever performs it — the runner included. JSON.stringify is the
+ *  quoting: these are absolute paths from controlled directories. */
+export function installPrePushHook({ worktree, attemptDir, leaseId, holder }) {
+  const hooksDir = join(attemptDir, 'hooks')
+  mkdirSync(hooksDir, { recursive: true })
+  const scriptPath = join(process.cwd(), 'scripts', 'detached-agent.mjs')
+  const line = [
+    JSON.stringify(process.execPath),
+    JSON.stringify(scriptPath),
+    'lease-gate',
+    '--attempt-dir',
+    JSON.stringify(attemptDir),
+    '--lease-id',
+    JSON.stringify(leaseId),
+    '--holder-pid',
+    String(holder.pid),
+    '--holder-started',
+    String(holder.pidStartedAt),
+  ].join(' ')
+  writeFileSync(join(hooksDir, 'pre-push'), `#!/bin/sh\nexec ${line}\n`, { mode: 0o700 })
+  return git(['config', 'core.hooksPath', hooksDir], worktree).ok
+}
+
+/** The hook's other end: exit 0 only on an affirmative write verdict. Runs
+ *  with the worktree as cwd, so everything it reads is an absolute path. */
+export function leaseGateVerdict(args) {
+  if (!args?.['attempt-dir'] || !args['lease-id']) return { verdict: 'fenced', reason: 'the lease gate was invoked without its attempt directory or lease id' }
+  const lease = readJsonIfAny(attemptPaths(args['attempt-dir']).leasePath)?.lease ?? null
+  return leaseAllowsWrite({
+    lease,
+    holder: { pid: Number(args['holder-pid']), pidStartedAt: Number(args['holder-started']) },
+    leaseId: args['lease-id'],
+    now: Date.now(),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // THE WORKER PROCESS
 // ---------------------------------------------------------------------------
@@ -179,6 +217,19 @@ async function runWorker(argv) {
   const leaseDeadline = Date.now() + 10_000
   while (!readJsonIfAny(paths.leasePath)?.lease && Date.now() < leaseDeadline) {
     await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+  // The wait above is PATIENCE, not permission. What licenses the runner is an
+  // AFFIRMATIVE lease verdict for this process and this lease id, inside its
+  // term: a missed deadline, a foreign holder or a stale lease fences HERE,
+  // before any runner exists to do unlicensed work.
+  const startGate = mayPush()
+  if (startGate.verdict !== 'write') return fencedExit(`refusing to start the runner: ${startGate.reason}`)
+  // The lease check before EVERY push (M40), enforced at GIT level: the
+  // wrapper cannot intercept pushes its runner performs itself, so a pre-push
+  // hook in the worktree runs the same gate for every `git push` from any
+  // process, presenting the wrapper's identity baked in at install time.
+  if (!installPrePushHook({ worktree: args.worktree, attemptDir: paths.dir, leaseId: args['lease-id'], holder: self })) {
+    return fencedExit('the pre-push lease gate could not be installed; an unfenceable worktree runs nothing')
   }
 
   let runnerChild = null
@@ -292,11 +343,22 @@ function ownStartTime() {
 }
 
 if (isMainModule(import.meta.url)) {
+  const argv = process.argv.slice(2)
+  if (argv[0] === 'lease-gate') {
+    // The pre-push hook's entry point: it runs with the WORKTREE as cwd, so it
+    // sits before the repository-root check and reads only absolute paths.
+    const gate = leaseGateVerdict(parseArgs(argv.slice(1)) ?? {})
+    if (gate.verdict !== 'write') {
+      console.error(`pre-push refused: ${gate.reason}`)
+      process.exit(1)
+    }
+    process.exit(0)
+  }
   if (!existsSync('scripts/detached-agent.mjs')) {
     // The spawn plan passes a repo-relative script path; a worker started from
     // elsewhere would silently resolve author-sol against the wrong tree.
     console.error('detached-agent: must be started from the repository root')
     process.exit(WORKER_EXIT.badInvocation)
   }
-  runWorker(process.argv.slice(2))
+  runWorker(argv)
 }
