@@ -107,6 +107,19 @@ describe('the lane\'s own fence store', () => {
     expect(back.fenceStore.fence).toBe(9)
   })
 
+  it('serializes the fence read and replacement so a racing writer cannot commit stale state', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    ensureFenceStore(store, { fence: 8 })
+    // This is the state while another ensureFenceStore call is between its read
+    // and replacement. The old implementation ignored it and could replace 10
+    // with a stale 9; a serialized implementation must not enter that window.
+    writeFileSync(`${store.fenceStorePath}.lock`, 'writer in progress')
+    const raced = ensureFenceStore(store, { fence: 9 })
+    expect(raced.ok).toBe(false)
+    expect(raced.reason).toMatch(/serialized/)
+    expect(JSON.parse(readFileSync(store.fenceStorePath, 'utf8')).fence).toBe(8)
+  })
+
   it('refuses a store it cannot read instead of minting a new generation over it', () => {
     // An ERASED store has nothing to invalidate and is re-minted; a CORRUPT one
     // may still belong to a live publisher, so it fails closed and waits for an

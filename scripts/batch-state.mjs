@@ -197,26 +197,42 @@ function repairCutTail(store) {
 export function ensureFenceStore(store, { fence } = {}) {
   if (!Number.isSafeInteger(fence) || fence < 1) return { ok: false, reason: 'a fence store is seeded with a usable fence' }
   const path = store.fenceStorePath
-  let existing = null
+  const lockPath = `${path}.lock`
+  let lockFd
   try {
-    existing = JSON.parse(readFileSync(path, 'utf8'))
+    // O_EXCL is the compare-and-set for the whole read/decide/replace cycle.
+    // Without it, two processes can both read 8 and commit 10 followed by 9.
+    // A crash-left lock is evidence whose safe answer is refusal; removing one
+    // automatically would need an ownership proof this layer does not have.
+    lockFd = openSync(lockPath, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW, 0o600)
   } catch (error) {
-    if (error.code !== 'ENOENT') {
-      return { ok: false, reason: `the fence store exists but cannot be read; minting over it would invalidate a live generation: ${error.message}` }
-    }
+    return { ok: false, reason: `the fence store mutation is already in progress or cannot be serialized: ${error.message}` }
   }
-  if (existing) {
-    if (typeof existing.generation !== 'string' || !existing.generation || !Number.isSafeInteger(existing.fence)) {
-      return { ok: false, reason: 'the fence store has lost its generation or fence and refuses to invent one' }
+  try {
+    let existing = null
+    try {
+      existing = JSON.parse(readFileSync(path, 'utf8'))
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        return { ok: false, reason: `the fence store exists but cannot be read; minting over it would invalidate a live generation: ${error.message}` }
+      }
     }
-    if (fence <= existing.fence) return { ok: true, fenceStore: existing, minted: false }
-    const raised = { ...existing, fence }
-    writeFileAtomic(path, `${JSON.stringify(raised)}\n`)
-    return { ok: true, fenceStore: raised, minted: false }
+    if (existing) {
+      if (typeof existing.generation !== 'string' || !existing.generation || !Number.isSafeInteger(existing.fence)) {
+        return { ok: false, reason: 'the fence store has lost its generation or fence and refuses to invent one' }
+      }
+      if (fence <= existing.fence) return { ok: true, fenceStore: existing, minted: false }
+      const raised = { ...existing, fence }
+      writeFileAtomic(path, `${JSON.stringify(raised)}\n`)
+      return { ok: true, fenceStore: raised, minted: false }
+    }
+    const fresh = { v: SCHEMA_VERSION, generation: randomBytes(16).toString('hex'), fence }
+    writeFileAtomic(path, `${JSON.stringify(fresh)}\n`)
+    return { ok: true, fenceStore: fresh, minted: true }
+  } finally {
+    closeSync(lockFd)
+    unlinkSync(lockPath)
   }
-  const fresh = { v: SCHEMA_VERSION, generation: randomBytes(16).toString('hex'), fence }
-  writeFileAtomic(path, `${JSON.stringify(fresh)}\n`)
-  return { ok: true, fenceStore: fresh, minted: true }
 }
 
 export function appendJournalEntry(store, entry) {
