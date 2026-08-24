@@ -66,6 +66,14 @@ export const STALE_AFTER_MS = 10 * 60_000
  *     hours ago and rewritten 23 hours ago is not fresh. An upper bound errs
  *     only toward refreshing, which is the safe direction — and where the last
  *     look was recent, the bound is small and no storm follows.
+ *     THE BOUND IS KEPT, NOT RESET (fourth cross-vendor round): remembering the
+ *     new content against `now` would throw the bound away and let the next
+ *     observation measure from here, so a card changed just after the last look
+ *     and seen twice would report minutes when it is nearly an hour old. The
+ *     earliest moment the content could have been written is the previous
+ *     observation, and that is what stays on the record. Only a party that
+ *     KNOWS when the card was written — the writer below, having just written
+ *     it — may stamp `now`.
  *   · no record at all — nothing here has ever looked, so nothing bounds the
  *     age. It is UNKNOWN, and the caller must treat that as stale rather than
  *     guess.
@@ -76,7 +84,7 @@ export function cardAge({ record = null, digest = '', now = 0 } = {}) {
     return { ageMs: null, remember: { digest, seenAt: now } }
   }
   const ageMs = now - seenAt
-  if (record.digest !== digest) return { ageMs, remember: { digest, seenAt: now } }
+  if (record.digest !== digest) return { ageMs, remember: { digest, seenAt } }
   return { ageMs, remember: null }
 }
 

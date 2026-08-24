@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { boardRoot, heartbeat, readCard, runBoardStatus, TRIGGERS } from './board-heartbeat.mjs'
 import { REASONS, STALE_AFTER_MS } from './board-heartbeat-core.mjs'
+import { BOARD_WRITE_TIMEOUT_MS } from './board-heartbeat.mjs'
 
 const FOCUS = { point: 847, note: 'Sol-Prüfrunden zu Punkt 847' }
 const NOW = 1_700_000_000_000
@@ -142,12 +143,15 @@ describe('the production card reader, against real board markup', () => {
           writeStatus: (point, status) => calls.push({ point, status }),
         })
 
-      // Never looked: unprovable, so it refreshes AND records what it saw.
+      // Never looked: unprovable, so it refreshes AND records what it saw. It
+      // records TWICE — the observation, then the card as it stands after the
+      // write, whose time it knows exactly because it just wrote it.
       const first = run(NOW, null)
       expect(first.refreshed).toBe(true)
       expect(first.reason).toBe(REASONS.NEVER_STAMPED)
-      expect(kept).toHaveLength(1)
-      const seen = kept[0]
+      expect(kept).toHaveLength(2)
+      expect(kept[1].seenAt).toBe(NOW)
+      const seen = kept.at(-1)
 
       // The same card a minute later: current, nothing written.
       expect(run(NOW + 60_000, seen).reason).toBe(REASONS.CURRENT)
@@ -268,6 +272,19 @@ describe('what it refuses, and what it survives', () => {
     expect(calls).toEqual([])
   })
 
+  it('SAYS SO when the board cannot be read — a silent refusal is not reporting', () => {
+    const said = []
+    heartbeat({
+      trigger: TRIGGERS.IN_FLIGHT,
+      detail: 'Wartestellung',
+      state: { dashboardPath: 'does/not/exist.html' },
+      focus: FOCUS,
+      writeStatus: () => {},
+      stderr: (line) => said.push(line),
+    })
+    expect(said.join('\n')).toMatch(/could not be read/)
+  })
+
   it('refuses a state that names no board at all', () => {
     const { calls, write } = recorder()
     const result = heartbeat({
@@ -315,6 +332,21 @@ describe('the board adapter itself', () => {
   it('names the exit status where the command said nothing', () => {
     const { spawn } = capture({ status: 7, stderr: '   ' })
     expect(() => runBoardStatus(848, 'x', { spawn })).toThrow(/exited 7/)
+  })
+
+  it('caps the wait, so a wedged publish cannot hold the recording step', () => {
+    // The caller awaits this. Without a cap a hung git push or child would keep
+    // a recorded review from reaching its exit (fourth cross-vendor round).
+    const { seen, spawn } = capture({ status: 0, stdout: '' })
+    runBoardStatus(848, 'x', { spawn })
+    expect(seen[0].opts.timeout).toBe(BOARD_WRITE_TIMEOUT_MS)
+  })
+
+  it('treats a child killed on the timeout as a failure, not as success', () => {
+    // spawnSync reports a timeout kill as a signal with no error object, so a
+    // bare status check would read SIGTERM-with-status-null as "fine".
+    const { spawn } = capture({ status: null, signal: 'SIGTERM' })
+    expect(() => runBoardStatus(848, 'x', { spawn, timeout: 5 })).toThrow(/killed after 5 ms/)
   })
 })
 

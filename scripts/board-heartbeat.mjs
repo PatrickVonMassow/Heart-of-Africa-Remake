@@ -82,6 +82,15 @@ export function readCard(state, root) {
   }
 }
 
+/**
+ * How long the board write may take before it is abandoned.
+ *
+ * CALIBRATABLE. A publish is a git push and an HTTPS read-back, so seconds are
+ * normal and a minute is already pathological — and the whole point of the cap
+ * is that the recording step it hangs off never waits longer than that.
+ */
+export const BOARD_WRITE_TIMEOUT_MS = 60_000
+
 /** Where this module remembers the card it last saw. Its OWN file: the shared
  *  dashboard state is written by many commands, and a read-modify-write from
  *  here would race them for no reason. */
@@ -96,15 +105,24 @@ const memoryPath = (root) => resolve(root, '.claude', 'board-heartbeat.json')
  * the argv it builds, the text it hands over on stdin and its refusal to treat
  * a non-zero exit as success are the behaviour, not incidental detail.
  */
-export function runBoardStatus(point, status, { spawn = spawnSync, root = boardRoot() } = {}) {
+export function runBoardStatus(
+  point,
+  status,
+  { spawn = spawnSync, root = boardRoot(), timeout = BOARD_WRITE_TIMEOUT_MS } = {},
+) {
   const result = spawn(
     process.execPath,
     [resolve(root, 'scripts', 'board.mjs'), 'status', String(point), '--text-stdin'],
     // windowsHide: the Stop chain and every recording step run unattended;
     // a console window here would steal the focus on each round (point 401).
-    { cwd: root, input: status, encoding: 'utf8', windowsHide: true },
+    // timeout: this call is optional bookkeeping awaited by the command that
+    // just recorded real work. A wedged publish, git call or child must not be
+    // able to hold that command short of its exit (fourth cross-vendor round).
+    { cwd: root, input: status, encoding: 'utf8', windowsHide: true, timeout },
   )
   if (result.error) throw result.error
+  // A killed-on-timeout child reports its signal, not an error object.
+  if (result.signal) throw new Error(`board.mjs status was killed after ${timeout} ms (${result.signal})`)
   if (result.status !== 0) {
     throw new Error(String(result.stderr ?? '').trim() || `board.mjs status exited ${result.status}`)
   }
@@ -141,22 +159,28 @@ export function heartbeat({
     const owned = (path) => resolve(owner, relative(REPO_ROOT, path))
     const seenState = state ?? readJson(owned(STATE_PATH))
     const seenFocus = focus ?? readJson(owned(FOCUS_PATH))
-    const seen = card === undefined ? readCard(seenState, owner) : { ok: true, ...card }
-    // Nothing may be written against a board this could not read: the mismatch
-    // refusal below rests on knowing which point the now-card actually names.
-    if (!seen.ok) return { refreshed: false, reason: 'board-unreadable' }
-    const record = memory === undefined ? readJson(memoryPath(owner)) : memory
-    const aged = cardAge({ record, digest: seen.digest, now })
-    // Remembered BEFORE the decision, so a refusal further down still leaves the
-    // reader able to age this card next time instead of answering UNKNOWN forever.
-    if (aged.remember) {
-      const write = remember ?? ((value) => writeJsonAtomic(memoryPath(owner), value))
+    const keep = (value) => {
+      const write = remember ?? ((v) => writeJsonAtomic(memoryPath(owner), v))
       try {
-        write(aged.remember)
+        write(value)
       } catch {
         // Bookkeeping about bookkeeping: never worth failing a recorded review.
       }
     }
+    const seen = card === undefined ? readCard(seenState, owner) : { ok: true, ...card }
+    // Nothing may be written against a board this could not read: the mismatch
+    // refusal below rests on knowing which point the now-card actually names.
+    if (!seen.ok) {
+      // REPORTED, not merely returned: callers discard the reason, and the
+      // module promises that a board which stopped following is said out loud.
+      stderr('board heartbeat: the now-card could not be read — the board is not being carried')
+      return { refreshed: false, reason: 'board-unreadable' }
+    }
+    const record = memory === undefined ? readJson(memoryPath(owner)) : memory
+    const aged = cardAge({ record, digest: seen.digest, now })
+    // Remembered BEFORE the decision, so a refusal further down still leaves the
+    // reader able to age this card next time instead of answering UNKNOWN forever.
+    if (aged.remember) keep(aged.remember)
     const decision = decideHeartbeat({
       focus: seenFocus,
       cardPoint: seen.point,
@@ -172,6 +196,10 @@ export function heartbeat({
     if (target == null) return { refreshed: false, reason: 'no-target' }
 
     writeStatus(target, decision.status, { root: owner })
+    // NOW the card's age is known exactly rather than bounded: this wrote it.
+    // Re-read so the digest recorded is the one the board actually carries.
+    const written = card === undefined ? readCard(seenState, owner) : null
+    keep({ digest: written?.digest ?? '', seenAt: now })
     return { refreshed: true, reason: decision.reason, status: decision.status }
   } catch (error) {
     // NEVER fatal: see the header. The caller recorded real work; the board
