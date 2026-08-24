@@ -358,6 +358,50 @@ put it is the mistake this line exists to stop.
   undelivered message returns to pending.
   Criticality: high — it loses the user's own words, silently, on the path built to reach them.
   Bundle: Chat & Tafel.
+- [ ] 886. A unit case fails on the first run after every push, because a network probe inside it
+  outlasts its own timeout. MEASURED 24.08.2026 in the point-848 worktree:
+  `scripts/guard-preflight-core.test.mjs` > "holds each gather step to the applicable/inputs
+  contract on the REAL repo" ran into its 30000 ms timeout. The cause was measured, not guessed, by
+  timing every gather step: `ci-status-guard` took 38150 ms and every other step stayed under
+  500 ms. GitHub Actions is unreachable from this container ("GitHub Actions could not be read"), so
+  the COLD probe burns its network timeout for each pushed ref before answering. Warm, the same file
+  passes in 3,4 s; on a branch whose refs were already probed, in 5,4 s.
+  WHY IT MATTERS MORE THAN A SLOW TEST: the red appears on the first full run after any push and is
+  green on the next, so it presents exactly like a flake and invites the retry that CLAUDE.md §7.2
+  calls SUSPECT and covering nothing. It cost this session two full suite runs to tell apart from a
+  real defect, and it will cost that to every session that pushes before it verifies.
+  FINAL STATE: the case no longer depends on reaching the network. Choose between a short probe
+  timeout under test, warming the probe before the suite, and budgeting the case for the cold
+  offline path — and write the REASON where the next reader of a red run will look.
+  VERIFIABLE: with the network unreachable and the probe cache emptied, the file passes on its first
+  run; a case pins whichever bound was chosen, so the fix cannot rot back into a timeout.
+  Criticality: low — no product behaviour, but it manufactures false reds in the one place the house
+  rules forbid treating a red as noise.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 887. Part of the durable-lane branch can be cleared by no reviewer, so the point cannot land
+  however green it is. MEASURED 24.08.2026 by `mechanism-review-guard` over
+  `feat/834-durable-authoring-lane`: five contributions carry no recorded review — `f439197`
+  (`scripts/blind-merge.mjs`, `scripts/blind-merge-cli.test.mjs`) and the checkpoint `64b5c99`
+  (`scripts/mechanism-review.mjs`, `scripts/mechanism-review-core.mjs`,
+  `scripts/mechanism-review-core.test.mjs`), all authored by Claude Fable 5 — and two end-state
+  files are UNREVIEWABLE outright because their authorship vendor is unknown:
+  `.claude/mechanism-reviews.jsonl` and `scripts/review-sol-cli.test.mjs`. For those two no
+  reviewer can prove cross-vendor independence, so no record by the configured chain clears them.
+  WHY IT IS ITS OWN POINT: it blocks point 834 independently of that point's remaining work and of
+  its test state, and the cure is a property of the LEDGER and the authorship record rather than of
+  the durable lane — 834 could be finished and green and still not land.
+  FINAL STATE: every runnable pass of the range is reviewed and recorded, and the exact measured
+  remainder is recorded with the criticality-review-unavailable command `review-sol` prints, which
+  never claims a review occurred. Where a file's authorship vendor is genuinely unrecoverable, that
+  is stated as the reason rather than left as an absence.
+  VERIFIABLE: `node scripts/mechanism-review-guard.mjs --status` reports GATE CLEAR for the
+  branch, and the receipt for the unavailable remainder names the files it covers.
+  Criticality: medium — it gates a high-criticality point, and an unrecorded remainder is the kind
+  of gap that later reads as a review that happened.
+  Bundle: unbundled (batch autonomy).
+
+
 - [ ] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
   (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
   HANDOVER markers, `.claude/autostart.log` spawns, commit timestamps, deduplicated by session
