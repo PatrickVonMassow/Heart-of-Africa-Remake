@@ -5,7 +5,7 @@
 // it once the contradiction is gone.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
@@ -143,5 +143,39 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     const foreign = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: 'stranger' })
     expect(foreign.ok).toBe(false)
     expect(foreign.did).toMatch(/lock owner/)
+  })
+
+  it('refuses a STALE report: a lock or record that moved after gathering is never overwritten', async () => {
+    const lockPath = join(repo, '.claude', 'batch-lock.json')
+    const lockBefore = readFileSync(lockPath, 'utf8')
+    const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
+    try {
+      // A handover advanced the fence AFTER the report was taken: the write
+      // must refuse instead of clobbering the successor's lock.
+      writeFileSync(lockPath, JSON.stringify({ ...JSON.parse(lockBefore), fence: FENCE + 1 }))
+      const moved = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SID })
+      expect(moved.ok).toBe(false)
+      expect(moved.did).toMatch(/regather/)
+    } finally {
+      writeFileSync(lockPath, lockBefore)
+    }
+    // A DIFFERENT daemon record stands than the one the report judged cold:
+    // releasing it would delete a newer daemon's identity.
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    try {
+      writeFileSync(
+        store.daemonRecordPath,
+        JSON.stringify({ v: 1, pid: process.pid, pidStartedAt: processStartTime(process.pid), generation: 'gen-successor', fence: FENCE, launchNonce: 'n', startedAt: Date.now() }),
+      )
+      const stale = {
+        ...report,
+        pair: { action: 'reconcile-workers-then-release-record', record: { pid: 424242, pidStartedAt: 1, generation: 'gen-reconcile-1' } },
+      }
+      const res = applyPairResolution({ repoDir: repo, batchId: BATCH, report: stale, sessionId: SID })
+      expect(res.ok).toBe(false)
+      expect(res.did).toMatch(/different daemon record/)
+    } finally {
+      rmSync(store.daemonRecordPath, { force: true })
+    }
   })
 })

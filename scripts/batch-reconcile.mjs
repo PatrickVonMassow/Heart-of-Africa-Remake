@@ -123,7 +123,12 @@ export function gatherEvidence({ repoDir = REPO_ROOT, batchId } = {}) {
 
   const record = readJsonIfAny(store.daemonRecordPath)
   const lock = readJsonIfAny(join(resolved, '.claude', 'batch-lock.json'))
-  const pair = daemonPairResolution({ record, copy: lock?.daemon ?? null, probe: record ? probeOf(record.pid) : null })
+  // The report carries the IDENTITY of the record it judged, so an apply can
+  // refuse when a different record stands by then (a restart, a handover).
+  const pair = {
+    ...daemonPairResolution({ record, copy: lock?.daemon ?? null, probe: record ? probeOf(record.pid) : null }),
+    record: record ? { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } : null,
+  }
 
   const publications = unconfirmedIntents(journal.entries).map((entry) =>
     resolvePublicationIntent({ intent: { publicationId: entry.publicationId, moves: entry.moves ?? [] }, refProbes: probeIntentRefs(entry, resolved) }),
@@ -148,40 +153,80 @@ export function applyPairResolution({ repoDir = REPO_ROOT, batchId, report, sess
   const resolved = resolve(repoDir)
   const store = openStateStore({ repoDir: resolved, batchId })
   const lockPath = join(resolved, '.claude', 'batch-lock.json')
-  const lock = readJsonIfAny(lockPath)
   const writeLock = (next) => {
     const tmp = `${lockPath}.tmp-${process.pid}`
     writeFileSync(tmp, `${JSON.stringify(next)}\n`)
     renameSync(tmp, lockPath)
   }
+  // REVALIDATE IMMEDIATELY BEFORE EVERY WRITE, and verify after it: the report
+  // may be minutes old, and a handover or a daemon restart in between must
+  // refuse the apply instead of letting a stale reading overwrite the
+  // successor's lock or delete a newer daemon's record.
+  const revalidateLock = () => {
+    const lock = readJsonIfAny(lockPath)
+    if (!lock || lock.sessionId !== sessionId) return { ok: false, did: 'only the current lock owner applies pair resolutions' }
+    if (report.lock && lock.fence !== report.lock.fence) {
+      return { ok: false, did: `refused: the lock moved (fence ${lock.fence}, the report saw ${report.lock.fence}); regather before applying` }
+    }
+    return { ok: true, lock }
+  }
+  const lockStands = (expectDaemonGeneration = undefined) => {
+    const lock = readJsonIfAny(lockPath)
+    if (!lock || lock.sessionId !== sessionId) return false
+    if (expectDaemonGeneration === undefined) return lock.daemon === undefined
+    return lock.daemon?.generation === expectDaemonGeneration
+  }
   const { action } = report.pair
   if (action === 'none') return { ok: true, did: 'nothing to do' }
   if (action === 'refuse-and-alert') return { ok: false, did: 'refused: the pair is impossible by construction; an operator resolves this' }
-  if (!lock || lock.sessionId !== sessionId) return { ok: false, did: 'only the lock owner applies pair resolutions' }
   if (action === 'clear-copy') {
-    const next = { ...lock }
+    const pre = revalidateLock()
+    if (!pre.ok) return pre
+    const next = { ...pre.lock }
     delete next.daemon
     writeLock(next)
+    if (!lockStands()) return { ok: false, did: 'the lock moved while the copy was being cleared; regather and reconcile again' }
     return { ok: true, did: 'cleared the orphaned copy' }
   }
   if (action === 'write-copy-from-record') {
+    const pre = revalidateLock()
+    if (!pre.ok) return pre
     const record = readJsonIfAny(store.daemonRecordPath)
     if (!record) return { ok: false, did: 'the record vanished under the resolution; rerun reconciliation' }
-    writeLock({ ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } })
+    if (report.pair.record && !(record.pid === report.pair.record.pid && record.generation === report.pair.record.generation)) {
+      return { ok: false, did: 'a different daemon record stands now than the one the report judged; regather before applying' }
+    }
+    writeLock({ ...pre.lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } })
+    if (!lockStands(record.generation)) return { ok: false, did: 'the lock moved while the copy was being written; regather and reconcile again' }
     return { ok: true, did: 'wrote the copy from the record' }
   }
-  // The cold-record family: workers first, record last — and never while any
-  // lane still reads running.
-  const running = report.lanes.filter((lane) => lane.reading === 'running')
-  if (running.length) return { ok: false, did: `refused: ${running.length} lane(s) still read running under a cold record; that is a contradiction to investigate, not to delete` }
-  try {
-    unlinkSync(store.daemonRecordPath)
-  } catch {
-    /* already released — idempotence is the point */
+  // The cold-record family: workers first, record last — never while any lane
+  // still reads running or stalled (a stalled lane IS a live process).
+  const pre = revalidateLock()
+  if (!pre.ok) return pre
+  const live = report.lanes.filter((lane) => lane.reading === 'running')
+  if (live.length) return { ok: false, did: `refused: ${live.length} lane(s) still read running under a cold record; that is a contradiction to investigate, not to delete` }
+  const recordNow = readJsonIfAny(store.daemonRecordPath)
+  if (recordNow) {
+    const judged = report.pair.record
+    const same = judged && recordNow.pid === judged.pid && recordNow.generation === judged.generation && recordNow.pidStartedAt === judged.pidStartedAt
+    if (!same) return { ok: false, did: 'a different daemon record stands now than the one the report judged cold; regather before releasing' }
+    try {
+      unlinkSync(store.daemonRecordPath)
+    } catch {
+      /* already released — idempotence is the point */
+    }
   }
-  const next = { ...lock }
+  const after = readJsonIfAny(store.daemonRecordPath)
+  if (after && report.pair.record && after.generation === report.pair.record.generation) {
+    return { ok: false, did: 'the cold record survived its release; investigate before retrying' }
+  }
+  const again = revalidateLock()
+  if (!again.ok) return again
+  const next = { ...again.lock }
   delete next.daemon
   writeLock(next)
+  if (!lockStands()) return { ok: false, did: 'the lock moved while its copy was being cleared; regather and reconcile again' }
   return { ok: true, did: 'released the cold record and cleared its copy; a new daemon mints a new generation' }
 }
 
