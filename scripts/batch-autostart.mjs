@@ -31,7 +31,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import { notify } from './notify.mjs'
-import { boardCard, boardNowCard } from './alert-escalation.mjs'
+import { boardNowCard } from './alert-escalation.mjs'
 import {
   acquire,
   updateOwnLock,
