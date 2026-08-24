@@ -36,7 +36,7 @@ describe('parent-directory fsync on creation', () => {
       // The first append created the journal's NAME: its directory is flushed.
       expect(flushed).toContain(store.dir)
       flushed.length = 0
-      const again = appendJournalEntry(store, { v: 1, seq: 2, fence: 1, kind: 'fence-transition' })
+      const again = appendJournalEntry(store, { v: 1, seq: 2, fence: 1, kind: 'command', key: 'later-append' })
       expect(again.ok).toBe(true)
       // Later appends flush only the file: the name already survives.
       expect(flushed).not.toContain(store.dir)
