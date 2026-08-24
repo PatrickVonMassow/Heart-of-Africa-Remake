@@ -277,6 +277,22 @@ export function worktreeClaimKey(worktree) {
   return { ok: true, key }
 }
 
+/** Every claims map this module hands out is sealed DOWN TO ITS RECORDS, and the
+ *  records are fresh copies. A frozen map around writable records, or a map handed
+ *  straight back to its caller, is ownership evidence its holder can rewrite: the
+ *  idempotent claim and the no-op release returned the caller's own map, and the
+ *  successful release froze a new map around the records it had been given
+ *  (cross-vendor review of point 893, the class behind its findings 1 and 2). A
+ *  record this module cannot read passes through untouched, so the collision path
+ *  still fails closed on it rather than seeing a tidied copy. */
+function sealedClaims(claims) {
+  const sealed = {}
+  for (const [key, record] of Object.entries(claims)) {
+    sealed[key] = record && typeof record === 'object' ? Object.freeze({ ...record }) : record
+  }
+  return Object.freeze(sealed)
+}
+
 /** One worktree, one attempt — the fail-closed worktree lock of M39. `claims` maps
  *  the CANONICAL worktree key to the attempt that holds it; a claim by a second
  *  attempt is refused while the first is not RELEASED — expiry does not release,
@@ -289,10 +305,10 @@ export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {
   if (!keyed.ok) return { ok: false, reason: keyed.reason }
   if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) return { ok: false, reason: 'a claim names its attempt' }
   if (!Object.hasOwn(claims, keyed.key)) {
-    return { ok: true, claims: Object.freeze({ ...claims, [keyed.key]: Object.freeze({ batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }) }) }
+    return { ok: true, claims: sealedClaims({ ...claims, [keyed.key]: { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId } }) }
   }
   const holder = claims[keyed.key]
-  if (sameAttempt(holder, attempt)) return { ok: true, claims, alreadyHeld: true }
+  if (sameAttempt(holder, attempt)) return { ok: true, claims: sealedClaims(claims), alreadyHeld: true }
   if (!holder || !holder.batchId || !holder.pointId || !holder.attemptId) {
     return { ok: false, reason: 'the worktree claim on record is unreadable; ownership is uncertain and uncertain fails closed' }
   }
@@ -302,11 +318,11 @@ export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {
 export function releaseWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
   const keyed = worktreeClaimKey(worktree)
   // An unkeyable path can never be a stored key, so there is nothing to release.
-  if (!keyed.ok || !Object.hasOwn(claims, keyed.key)) return { ok: true, claims, released: false }
+  if (!keyed.ok || !Object.hasOwn(claims, keyed.key)) return { ok: true, claims: sealedClaims(claims), released: false }
   if (!sameAttempt(claims[keyed.key], attempt)) {
     return { ok: false, reason: 'only the claiming attempt releases its worktree; reconciliation releases for the dead' }
   }
   const next = { ...claims }
   delete next[keyed.key]
-  return { ok: true, claims: Object.freeze(next), released: true }
+  return { ok: true, claims: sealedClaims(next), released: true }
 }

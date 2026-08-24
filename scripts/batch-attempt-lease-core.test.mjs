@@ -323,6 +323,50 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(releaseWorktree({ claims: first.claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
   })
 
+  it('hands out a frozen map of frozen records on EVERY path, pass-throughs included', () => {
+    // The same defect as the record above, in the three return sites the review
+    // did not name: the idempotent claim and the no-op release returned the
+    // CALLER's map untouched — not frozen at all, so a key could simply be added
+    // to it — and the successful release froze the new map while leaving the
+    // SURVIVING records the mutable ones it was handed. A persisted map is the
+    // normal input, and nothing about it is frozen.
+    const held = claimWorktree({ claims: {}, worktree: '/wt/a', attempt }).claims
+    const persisted = () => JSON.parse(JSON.stringify(held))
+
+    const idempotent = claimWorktree({ claims: persisted(), worktree: '/wt/a', attempt })
+    expect(idempotent).toMatchObject({ ok: true, alreadyHeld: true })
+    expect(Object.isFrozen(idempotent.claims)).toBe(true)
+    expect(Object.isFrozen(idempotent.claims['/wt/a'])).toBe(true)
+    try {
+      idempotent.claims['/wt/b'] = { ...attempt, attemptId: 'a2' }
+    } catch {
+      // A frozen map throws on assignment under module strict mode — that IS the fix.
+    }
+    expect(Object.hasOwn(idempotent.claims, '/wt/b')).toBe(false)
+
+    // The release that frees nothing hands back a map just as sealed.
+    const noop = releaseWorktree({ claims: persisted(), worktree: 'wt/a', attempt })
+    expect(noop).toMatchObject({ ok: true, released: false })
+    expect(Object.isFrozen(noop.claims)).toBe(true)
+    expect(Object.isFrozen(noop.claims['/wt/a'])).toBe(true)
+
+    // A claim for a second worktree must not carry the first record over by reference.
+    const carried = claimWorktree({ claims: persisted(), worktree: '/wt/b', attempt: { ...attempt, attemptId: 'a2' } })
+    expect(Object.isFrozen(carried.claims['/wt/a'])).toBe(true)
+
+    // And a release seals the claims that survive it.
+    const both = JSON.parse(JSON.stringify(carried.claims))
+    const released = releaseWorktree({ claims: both, worktree: '/wt/b', attempt: { ...attempt, attemptId: 'a2' } })
+    expect(released).toMatchObject({ ok: true, released: true })
+    expect(Object.isFrozen(released.claims['/wt/a'])).toBe(true)
+    try {
+      released.claims['/wt/a'].attemptId = 'a2'
+    } catch {
+      // As above: the throw is the fix, not the failure.
+    }
+    expect(releaseWorktree({ claims: released.claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
+  })
+
   it('fails closed on an unreadable claim record', () => {
     const res = claimWorktree({ claims: { '/wt/a': {} }, worktree: '/wt/a', attempt })
     expect(res.ok).toBe(false)
