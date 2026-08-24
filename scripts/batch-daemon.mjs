@@ -157,27 +157,59 @@ async function serve(args) {
     process.exit(1)
   }
 
+  // A DURABLE-WRITE FAILURE FAILS CLOSED: an external effect with no journal
+  // evidence is exactly what the store exists to prevent, so a refused append
+  // is STICKY — the daemon refuses every further mutation like it does for a
+  // corrupt journal, and the caller of the failing mutation gets a refusal,
+  // never a sequence number over missing bytes.
+  let journalFailed = null
   const journalEntry = (entry, underFence = fence) => {
-    seq += 1
-    const res = appendJournalEntry(store, { seq, fence: underFence, ...entry })
-    if (!res.ok) console.error(`daemon: journal refused: ${res.reason}`)
-    return seq
+    if (journalFailed) return { ok: false, reason: journalFailed }
+    const next = seq + 1
+    let res
+    try {
+      res = appendJournalEntry(store, { seq: next, fence: underFence, ...entry })
+    } catch (error) {
+      res = { ok: false, reason: error.message }
+    }
+    if (!res.ok) {
+      journalFailed = `the journal refused an append: ${res.reason}`
+      console.error(`daemon: ${journalFailed}; every further mutation is refused`)
+      return { ok: false, reason: journalFailed }
+    }
+    seq = next
+    return { ok: true, seq: next }
   }
 
   // The daemon is the journal's ONE writer, transitions included (mechanism 2):
   // a fence it has not journalled yet gets its transition appended BEFORE the
   // first entry written under it — at serve start for the fence it was started
   // under, and inside `mutate` when a handover moves the lock to a new one.
+  // A fence is marked journalled only AFTER its append succeeded.
   const journalledFences = new Set(journal.entries.filter((e) => e.kind === 'fence-transition').map((e) => e.fence))
   const ensureFenceJournalled = (underFence) => {
-    if (journalCorrupt || journalledFences.has(underFence)) return
-    journalledFences.add(underFence)
-    journalEntry({ kind: 'fence-transition' }, underFence)
+    if (journalCorrupt) return { ok: false, reason: 'the journal is corrupt' }
+    if (journalledFences.has(underFence)) return { ok: true }
+    const res = journalEntry({ kind: 'fence-transition' }, underFence)
+    if (res.ok) journalledFences.add(underFence)
+    return res
   }
-  ensureFenceJournalled(fence)
 
   writeRecordExclusive(store.daemonRecordPath, built.record)
-  if (!journalCorrupt) journalEntry({ kind: 'daemon-lifecycle', event: 'start', record: built.record })
+  if (!journalCorrupt) {
+    const booted = ensureFenceJournalled(fence).ok && journalEntry({ kind: 'daemon-lifecycle', event: 'start', record: built.record }).ok
+    if (!booted) {
+      // A daemon that cannot journal its own start has no business existing:
+      // release the record it just claimed and stop.
+      try {
+        unlinkSync(store.daemonRecordPath)
+      } catch {
+        /* the record may not have survived either; either way it is not ours to keep */
+      }
+      console.error('daemon: could not journal the start; refusing to serve')
+      process.exit(1)
+    }
+  }
 
   const workers = new Map() // attemptId -> { attempt, pid, worktree, leaseId, dir }
   let leases = new Map() // attemptId -> lease
@@ -190,8 +222,11 @@ async function serve(args) {
   }, DAEMON_HEARTBEAT_MS)
 
   const recordAttemptState = (attemptId, pointId, record, underFence = fence) => {
-    journalEntry({ kind: 'attempt-state', batchId: args.batch, pointId, attemptId, record }, underFence)
-    attemptsState.set(attemptId, { batchId: args.batch, pointId, attemptId, state: record })
+    // Journal FIRST: an in-memory state the journal never accepted would let
+    // the daemon act on evidence no successor can ever see.
+    const logged = journalEntry({ kind: 'attempt-state', batchId: args.batch, pointId, attemptId, record }, underFence)
+    if (logged.ok) attemptsState.set(attemptId, { batchId: args.batch, pointId, attemptId, state: record })
+    return logged
   }
 
   /** One mutation, the whole mechanism-2 sequence: validate against the freshly
@@ -200,6 +235,7 @@ async function serve(args) {
   const mutate = async (request, applyFn, compensateFn) => {
     if (draining) return { ok: false, reason: 'the daemon is draining and refuses new mutations' }
     if (journalCorrupt) return { ok: false, reason: 'the journal is corrupt; the daemon refuses every mutation and awaits the operator' }
+    if (journalFailed) return { ok: false, reason: `the journal failed durably (${journalFailed}); the daemon refuses every mutation and awaits the operator` }
     const lock = readLock(repoDir)
     const presented = { sessionId: request.sessionId, fence: request.fence }
     const validated = validateMutation({ presented, lock, probe: lock ? probeOf(lock.pid) : null, now: nowMs() })
@@ -218,9 +254,19 @@ async function serve(args) {
     const result = await application.result
     if (result && result.ok === false) return result
     // The entry carries the fence it was VALIDATED under, which after a handover
-    // is the successor's, not the fence this daemon was started under.
-    ensureFenceJournalled(validated.fence)
-    journalEntry({ kind: 'command', name: request.cmd, key: keyed.key, payload: request.payload ?? {} }, validated.fence)
+    // is the successor's, not the fence this daemon was started under. A refused
+    // append REVERSES the local effect and refuses the mutation: acknowledging
+    // an effect the journal never recorded would leave the world ahead of every
+    // durable trace of it.
+    const fenceLogged = ensureFenceJournalled(validated.fence)
+    const logged = fenceLogged.ok
+      ? journalEntry({ kind: 'command', name: request.cmd, key: keyed.key, payload: request.payload ?? {} }, validated.fence)
+      : fenceLogged
+    if (!logged.ok) {
+      const compensated = compensateFn ? await compensateFn(result) : { note: 'no local effect to reverse' }
+      console.error(`daemon: ${request.cmd} reversed after a journal refusal: ${JSON.stringify(compensated)}`)
+      return { ok: false, reason: `refused: the journal could not record ${request.cmd} (${logged.reason}); the local effect was reversed` }
+    }
     const after = revalidateAfterWrite({ validated: presented, lock: readLock(repoDir) })
     if (after.verdict === 'compensate') {
       const compensated = compensateFn ? await compensateFn(result) : { note: 'no local effect to reverse' }

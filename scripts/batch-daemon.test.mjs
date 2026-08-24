@@ -8,7 +8,7 @@
 // acknowledgment, cancellation that preserves the branch, drain and restart.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
@@ -305,4 +305,45 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(down.ok).toBe(true)
     await sleep(500)
   }, 20_000)
+})
+
+describe('a durably failing journal fails closed', () => {
+  const JF_BATCH = 'journal-fail-batch'
+  const jfRequest = (cmd, payload = {}) =>
+    controlRequest({ repoDir: repo, batchId: JF_BATCH, request: { cmd, sessionId: SID, fence: FENCE, payload: { batchId: JF_BATCH, ...payload } } })
+
+  it('refuses the failing mutation and every one after it, instead of acknowledging over missing bytes', async () => {
+    const started = await startDaemon({ repoDir: repo, batchId: JF_BATCH, drill: true })
+    expect(started.ok, started.reason).toBe(true)
+    const store = openStateStore({ repoDir: repo, batchId: JF_BATCH })
+    try {
+      // Take the journal's write bit away: the next append is refused by the
+      // filesystem, which stands in for disk-full and every other durable no.
+      chmodSync(store.journalPath, 0o400)
+      const failing = await jfRequest('record-state', { pointId: 'p1', attemptId: 'jf1', state: 'queued', at: Date.now() })
+      expect(failing.ok).toBe(false)
+      expect(failing.reason).toMatch(/journal/)
+      // The failure is STICKY: later mutations are refused up front...
+      chmodSync(store.journalPath, 0o600)
+      const after = await jfRequest('record-state', { pointId: 'p1', attemptId: 'jf2', state: 'queued', at: Date.now() })
+      expect(after.ok).toBe(false)
+      expect(after.reason).toMatch(/refuses every mutation/)
+      // ...while status stays readable, and the journal carries NO trace of the
+      // refused mutations.
+      expect((await jfRequest('status')).ok).toBe(true)
+      const journal = readJournal(store)
+      expect(journal.entries.some((e) => e.kind === 'attempt-state')).toBe(false)
+    } finally {
+      chmodSync(store.journalPath, 0o600)
+      const record = readJsonIfAny(store.daemonRecordPath)
+      if (record?.pid) {
+        try {
+          process.kill(record.pid, 'SIGTERM')
+        } catch {
+          /* already gone */
+        }
+      }
+      await sleep(500)
+    }
+  }, 30_000)
 })
