@@ -34,7 +34,7 @@ export const ATTEMPT_LEASE_TTL_MS = 5 * 60 * 1000
  *  the record built from it is a FRESH one, so nothing this module hands out shares
  *  an object with what it was given. */
 function attemptIdentity(attempt) {
-  if (!attempt || typeof attempt !== 'object') return null
+  if (!carriesFields(attempt)) return null
   // READ ONCE, THEN JUDGE THE COPY. Validating the caller's object and building the
   // result from a SECOND read is a check on one value and a decision on another.
   const identity = readOnce(() => ({ batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }))
@@ -59,6 +59,19 @@ function attemptIdentity(attempt) {
  *  exception out instead turned a documented refusal into a crash in the grant and
  *  the write check, which are exactly the two paths a worker runs before it writes
  *  (cross-vendor review of point 893). */
+function carriesFields(value) {
+  // A REFERENCE THAT CAN CARRY FIELDS IS AN OBJECT **OR A CALLABLE**. `typeof x ===
+  // 'object'` alone let a function slip past every isolated reading in this file
+  // while the checks that follow still read its fields: a callable holder with
+  // throwing accessors crashed the sweep and the write check, and one with numeric
+  // fields read as usable through a reference this module had never copied
+  // (cross-vendor review of point 893). WHAT a record is decides nothing here; what
+  // it says its pid, its start time and its names are decides everything, and all of
+  // them are read into a plain record before anything is judged. Nothing callable
+  // survives that copy, and nothing in this module ever calls what it was handed.
+  return value !== null && (typeof value === 'object' || typeof value === 'function')
+}
+
 function readOnce(take) {
   try {
     return take()
@@ -68,12 +81,12 @@ function readOnce(take) {
 }
 
 function snapshotHolder(holder) {
-  if (!holder || typeof holder !== 'object') return null
+  if (!carriesFields(holder)) return null
   return readOnce(() => ({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }))
 }
 
 function snapshotLease(lease) {
-  if (!lease || typeof lease !== 'object') return null
+  if (!carriesFields(lease)) return null
   // THE READING IS TAKEN WHETHER OR NOT IT IS USABLE, and `usableLease` judges the
   // COPY. Returning null for a malformed lease left its caller with nothing to name
   // it by, so the sweep read the caller's record a second time and a flipping getter
@@ -95,7 +108,7 @@ function snapshotLease(lease) {
   // at all, and the two must stay distinguishable (cross-vendor review of point
   // 893). A holder that is not an object at all is content, and stays as it is for
   // the usability check to refuse.
-  if (snapshot.holder && typeof snapshot.holder === 'object') {
+  if (carriesFields(snapshot.holder)) {
     const holder = snapshotHolder(snapshot.holder)
     if (!holder) return null
     snapshot.holder = holder
@@ -260,7 +273,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     // (cross-vendor review of point 893). The caller now presents the pid AND
     // pid start time it probed, and sameProcess decides — so a recycled pid,
     // proven dead under the holder's number, still frees nothing.
-    const deathVerdict = holderProvenDead && typeof holderProvenDead === 'object' ? snapshotHolder(holderProvenDead) : null
+    const deathVerdict = carriesFields(holderProvenDead) ? snapshotHolder(holderProvenDead) : null
     if (!deathVerdict) {
       return {
         ok: false,
@@ -405,6 +418,9 @@ export function worktreeClaimKey(worktree) {
  *  point 893, the class the review closed for the existing lease). */
 function readClaims(claims) {
   if (claims === null || claims === undefined) return { ok: true, claims: {} }
+  // The MAP itself is a plain collection of records — an array or a callable is not
+  // one, and is refused rather than read. A RECORD inside it is a reference like any
+  // other and is read through `carriesFields` below.
   if (typeof claims !== 'object' || Array.isArray(claims)) {
     return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
   }
@@ -435,7 +451,7 @@ function readClaims(claims) {
           reason: `the worktree claims on record carry the non-canonical key ${JSON.stringify(key)}; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
         }
       }
-      read[key] = record && typeof record === 'object' ? { ...record } : record
+      read[key] = carriesFields(record) ? { ...record } : record
     }
   } catch {
     return { ok: false, reason: 'the worktree claims on record could not be read at all; ownership is uncertain and uncertain fails closed' }
@@ -458,7 +474,7 @@ function sealedClaims(claims) {
   // carried a claim record as its prototype.
   return Object.freeze(
     Object.fromEntries(
-      Object.entries(claims).map(([key, record]) => [key, record && typeof record === 'object' ? Object.freeze({ ...record }) : record]),
+      Object.entries(claims).map(([key, record]) => [key, carriesFields(record) ? Object.freeze({ ...record }) : record]),
     ),
   )
 }

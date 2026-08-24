@@ -370,6 +370,31 @@ describe('a record is read once — the accessor class of the cross-vendor revie
     expect(grantAttemptLease({ existing: unreadableHolder, attempt, holder, now: 15_000, leaseId: 'L2' }).ok).toBe(false)
   })
 
+  it('reads a CALLABLE record like any other reference instead of stepping around it', () => {
+    // The isolated readings all tested `typeof x === 'object'`, which a function is
+    // not — so a callable holder walked past every one of them while the checks
+    // that followed still read its fields: a throwing accessor crashed the sweep
+    // and the write check, and numeric fields read as usable through a reference
+    // this module had never copied.
+    const callable = (fields) => Object.assign(function holderFn() {}, fields)
+    const throwing = callable({ pidStartedAt: 5000 })
+    Object.defineProperty(throwing, 'pid', { get() { throw new Error('unreadable') } })
+    const hostile = { ...grant().lease, holder: throwing }
+    expect(expiredLeaseAlerts({ leases: [hostile], now: 30_000 })[0].alert).toMatch(/could not be read at all/)
+    expect(leaseAllowsWrite({ lease: hostile, holder, leaseId: 'L1', now: 15_000 }).verdict).toBe('fenced')
+    expect(grantAttemptLease({ existing: hostile, attempt, holder, now: 15_000, leaseId: 'L2' }).ok).toBe(false)
+    // What a record IS decides nothing; what it says decides everything, and the
+    // copy that decides it is plain — the callable never reaches a verdict.
+    const readable = { ...grant().lease, holder: callable({ pid: 100, pidStartedAt: 5000 }) }
+    const allowed = leaseAllowsWrite({ lease: readable, holder, leaseId: 'L1', now: 15_000 })
+    expect(allowed.verdict).toBe('write')
+    expect(typeof allowed.lease.holder).toBe('object')
+    // And a claim record that is callable is copied, not carried by reference.
+    const claimed = claimWorktree({ claims: { '/wt/a': callable({ ...attempt }) }, worktree: '/wt/a', attempt })
+    expect(claimed).toMatchObject({ ok: true, alreadyHeld: true })
+    expect(typeof claimed.claims['/wt/a']).toBe('object')
+  })
+
   it('refuses rather than THROWS on every path that reads a record', () => {
     // Taking the reading is itself fallible, and a reader that lets the exception
     // out turns a documented refusal into a crash — in the grant and the write
