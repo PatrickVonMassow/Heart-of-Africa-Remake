@@ -152,13 +152,14 @@ function sameModelName(a, b) {
     // Fable as untainted although the marker names Fable (re-review round 6). Such
     // a name matches EVERY model it actually MENTIONS — and only those (round 7:
     // a wildcard also disqualified models the name never named).
-    const anthropicModel = family.some((w) => ['fable', 'opus', 'sonnet', 'haiku'].includes(w))
-    const openaiModel = family.includes('sol') || family.includes('gpt')
-    if (anthropicModel && openaiModel) {
-      // Each mentioned model keeps ITS OWN version: erasing them turned
-      // "Fable 5 / GPT-6 Sol" into a disqualifier of every Fable and every Sol,
-      // although it names a different Sol (re-review round 8).
-      const keys = [...new Set(family.filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w)))]
+    // A name mentioning MORE THAN ONE model word — cross-vendor OR same-vendor
+    // ("Fable 5 / Claude Opus 5") — matches every model it actually mentions,
+    // each with its own version. Reducing a compound to one key let a forged
+    // author marker leave a NAMED co-model looking untainted, and erasing the
+    // versions disqualified models the name never named (re-review rounds 6-9).
+    const modelWords = family.map((w) => (w === 'gpt' ? 'sol' : w)).filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
+    const keys = [...new Set(modelWords)]
+    if (keys.length > 1) {
       const versionOf = (key) => {
         const words = key === 'sol' ? ['sol', 'gpt'] : [key]
         for (const w of words) {

@@ -814,24 +814,26 @@ describe('the mode round-trips into the ledger', () => {
       expect(`${mystery.stdout}${mystery.stderr}`).toMatch(/no vendor the review roster can place|must be VERIFIED/)
 
       // A REWORDED DEFECT WITH IDENTICAL MODELS, OWNER AND SUMMARY still
-      // refuses: the hash comparison sees the content change the receipt
-      // cannot (re-review round 8).
-      const reworded = w('B-reworded.json', {
-        model: 'GPT-5.6 Sol',
-        entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect, but reworded after the fold' }],
-      })
-      const editedContent = spawnSync(
-        process.execPath,
-        [
-          join(repo, 'scripts', 'mechanism-review.mjs'),
-          '--record', sha2, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
-          '--evidence', 'read both lists and the union that folded them',
-          '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', reworded,
-        ],
-        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      // refuses, AND BY THE HASH COMPARISON, not by an untracked-path shortcut
+      // (re-review rounds 8 and 9): the reworded half is COMMITTED — the
+      // working tree is clean at HEAD — while the record targets the older
+      // sha whose blob carries the original wording. Only the byte identity
+      // between the working file and the blob the row binds can see that.
+      writeFileSync(
+        join(repo, 'docs', 'B.json'),
+        JSON.stringify({
+          model: 'GPT-5.6 Sol',
+          entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect, but reworded after the fold' }],
+        }),
       )
+      git('add', '-A')
+      git('commit', '-q', '-m', 'Reword the defect after the fold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const editedContent = record(union)
       expect(editedContent.status).not.toBe(0)
+      expect(`${editedContent.stdout}${editedContent.stderr}`).toMatch(/differs from the blob .* the row would bind/)
       expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+      // Restore the fold-era wording for the cases below.
+      git('revert', '-q', '--no-edit', 'HEAD')
 
       // THE UNTRACKED-UNION REFUSAL, ISOLATED: committed halves, a complete
       // caller-written union — only the union's provenance can refuse here

@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { isTrackedInGit } from './git-tracked.mjs'
+import { canonicalTreePath, isTrackedInGit } from './git-tracked.mjs'
 
 let sandbox, repo, outside
 
@@ -101,6 +101,19 @@ describe('isTrackedInGit — committed bytes only', () => {
   it('refuses paths outside the checkout, lexical or absolute', () => {
     expect(isTrackedInGit('../outside/evil.json', { root: repo })).toBe(false)
     expect(isTrackedInGit(join(outside, 'evil.json'), { root: repo })).toBe(false)
+  })
+
+  it('refuses NON-CANONICAL spellings of an in-checkout path, which callers convert deliberately', () => {
+    // Silent normalisation answered about a path the caller never spelled, and
+    // the non-portable spelling could travel into the ledger (re-review round 9).
+    expect(isTrackedInGit(join(repo, 'docs', 'half.json'), { root: repo })).toBe(false)
+    expect(isTrackedInGit('docs/../docs/half.json', { root: repo })).toBe(false)
+    expect(isTrackedInGit('./docs/half.json', { root: repo })).toBe(false)
+    // canonicalTreePath is the deliberate conversion, and its output is accepted.
+    expect(canonicalTreePath(join(repo, 'docs', 'half.json'), { root: repo })).toBe('docs/half.json')
+    expect(canonicalTreePath('docs/../docs/half.json', { root: repo })).toBe('docs/half.json')
+    expect(canonicalTreePath(join(outside, 'evil.json'), { root: repo })).toBe('')
+    expect(isTrackedInGit(canonicalTreePath(join(repo, 'docs', 'half.json'), { root: repo }), { root: repo })).toBe(true)
   })
 
   // Cross-vendor review of point 889: the check used to ask `git status

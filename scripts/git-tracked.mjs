@@ -33,8 +33,21 @@
 // in one command and not the other, so it lives here once and both import it.
 import { spawnSync } from 'node:child_process'
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
-import { relative, resolve as resolvePath, sep } from 'node:path'
+import { isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
+
+/** A caller path as a CANONICAL repository tree path, or '' when it is not one
+ *  inside this checkout. This is where a consumer deliberately converts its own
+ *  spelling — an absolute path, a dot-segment — into the portable form the
+ *  ledger stores and git is asked about; isTrackedInGit itself refuses
+ *  non-canonical input rather than normalising it silently. */
+export function canonicalTreePath(path, { root = REPO_ROOT } = {}) {
+  const raw = String(path ?? '')
+  if (!raw.trim()) return ''
+  const rel = relative(root, resolvePath(root, raw))
+  if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')) return ''
+  return sep === '\\' ? rel.split(sep).join('/') : rel
+}
 
 export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, content } = {}) {
   // THE CALLER'S SPELLING, UNTOUCHED: trimming rewrote a legal filename that
@@ -42,6 +55,13 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, conten
   // 5). Only an argument that is nothing but whitespace is refused.
   const raw = String(path ?? '')
   if (!raw.trim()) return false
+  // AND ONLY CANONICAL SPELLING IS ANSWERED (re-review round 9): an absolute
+  // path or a dot-segment spelling like docs/../docs/half.json used to be
+  // normalised on the way in, so the answer was about a path the caller never
+  // spelled and a non-portable spelling could travel into the ledger. A caller
+  // holding such a path converts it deliberately with canonicalTreePath.
+  if (isAbsolute(raw)) return false
+  if (raw.split(/[\\/]+/).some((segment) => segment === '.' || segment === '..')) return false
   const real = run('git', ['rev-parse', '--path-format=absolute', '--show-toplevel'], {
     windowsHide: true,
     cwd: root,

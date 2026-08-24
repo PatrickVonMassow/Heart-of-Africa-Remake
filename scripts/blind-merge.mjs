@@ -25,7 +25,7 @@ import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { mergeFallbackReason, mergePromptFraming, mergerModel } from './fable-switch-core.mjs'
-import { isTrackedInGit } from './git-tracked.mjs'
+import { canonicalTreePath, isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 import { authorshipRefusesPermission, formatAuthorship } from './authorship-check-core.mjs'
@@ -147,9 +147,14 @@ if (isMainModule(import.meta.url)) {
     // — point at the real half, then rename its author (four-eyes review, point 834).
     // THE BYTES PARSED ABOVE ARE THE ONES THAT MUST BE COMMITTED, so they are
     // what the check is asked about — not a second read that could differ from
-    // it (cross-vendor review of point 889).
-    const trackedA = isTrackedInGit(pathA, { content: rawA })
-    const trackedB = isTrackedInGit(pathB, { content: rawB })
+    // it (cross-vendor review of point 889). The caller's spelling is converted
+    // to the canonical tree path DELIBERATELY, because the tracked check
+    // refuses non-canonical input by contract, and the canonical form is what
+    // the printed record command carries into the ledger (round 9).
+    const canonA = canonicalTreePath(pathA)
+    const canonB = canonicalTreePath(pathB)
+    const trackedA = Boolean(canonA) && isTrackedInGit(canonA, { content: rawA })
+    const trackedB = Boolean(canonB) && isTrackedInGit(canonB, { content: rawB })
     const overruled = []
     /** Which halves carry their author IN THE COMMITTED FILE — the only form the
      *  count below may believe; a flag is a claim wearing whatever name the
@@ -306,7 +311,8 @@ if (isMainModule(import.meta.url)) {
     // prove. README.md's filing rule makes this the normal order anyway: the
     // halves are committed before the union is counted.
     const rawUText = readText(pathU)
-    const trackedU = isTrackedInGit(pathU, { content: rawUText })
+    const canonU = canonicalTreePath(pathU)
+    const trackedU = Boolean(canonU) && isTrackedInGit(canonU, { content: rawUText })
     const unproven = [
       ['A', pathA, trackedA],
       ['B', pathB, trackedB],
@@ -421,7 +427,7 @@ if (isMainModule(import.meta.url)) {
         // THE THREE FILES TRAVEL INTO THE RECORD: without them the recorder
         // falls back to the trailer proxy and the ledger row binds to nothing
         // (cross-vendor re-review of point 889).
-        `    --union "${pathU}" --list-a "${pathA}" --list-b "${pathB}" \\\n` +
+        `    --union "${canonU}" --list-a "${canonA}" --list-b "${canonB}" \\\n` +
         `    --accounting "${summaryLine(result)}" --evidence "<what the stage found>"`,
     )
     process.exit(0)

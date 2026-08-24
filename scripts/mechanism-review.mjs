@@ -36,7 +36,6 @@
 // The decision logic is pure (mechanism-review-core.mjs); this file does I/O and
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
-import { createHash } from 'node:crypto'
 import { dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -217,15 +216,21 @@ export function committedOid(path, { at = 'HEAD' } = {}) {
   }
 }
 
-/** A file's git blob oid, computed from its working-tree bytes — what the
- *  committed oid will be if these bytes are what the commit carries. */
+/** A file's git blob oid, computed from its working-tree bytes AS GIT WOULD
+ *  COMMIT THEM — `git hash-object --path` applies the same clean filters and
+ *  EOL normalisation a commit applies, so a clean, fully committed artefact
+ *  hashes to its committed oid instead of being falsely refused on raw bytes
+ *  (re-review round 9). */
 export function workingBlobOid(path) {
   try {
     const bytes = readFileSync(path)
-    return createHash('sha1')
-      .update(`blob ${bytes.length}\0`)
-      .update(bytes)
-      .digest('hex')
+    const rel = repoRelative(path)
+    return execFileSync('git', ['hash-object', '--path', rel, '--stdin'], {
+      windowsHide: true,
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      input: bytes,
+    }).trim()
   } catch {
     return ''
   }
@@ -632,7 +637,16 @@ export function buildRecord({
     // The authors stored here are re-read from HEAD's blobs and must agree
     // with what the count saw — anything less binds the record to bytes no
     // commit carries. Where that fails the trailer proxy stands.
-    const untracked = [listAPath, listBPath].filter((path) => !isTracked(path))
+    // The caller's spellings are canonicalized DELIBERATELY here — the tracked
+    // check refuses non-canonical input by contract (re-review round 9).
+    const canonA = repoRelative(listAPath)
+    const canonB = repoRelative(listBPath)
+    const untracked = [
+      [listAPath, canonA],
+      [listBPath, canonB],
+    ]
+      .filter(([, canon]) => !canon || !isTracked(canon))
+      .map(([path]) => path)
     const committed = untracked.length ? [] : [listAPath, listBPath].map((path) => committedHalf(path, { at: commit.sha }))
     const uncommitted = untracked.length ? [] : [listAPath, listBPath].filter((_, i) => !committed[i])
     const contradicted = untracked.length || uncommitted.length
@@ -640,7 +654,8 @@ export function buildRecord({
       : [listAPath, listBPath].filter((_, i) => !sameModel(committed[i].model, counted.halfAuthors[i]))
     // The union answers to the same standard as the halves: committed, or the
     // receipt cannot be re-derived by anyone later.
-    const unionCommitted = isTracked(unionPath) ? committedUnion(unionPath, { at: commit.sha }) : ''
+    const canonU = repoRelative(unionPath)
+    const unionCommitted = canonU && isTracked(canonU) ? committedUnion(unionPath, { at: commit.sha }) : ''
     if (
       counted.halfAuthors?.length === 2 &&
       !untracked.length &&
