@@ -173,7 +173,7 @@ export function committedBlobText(oid) {
  *  claims, the union's committed mergedBy says what the row claims, the
  *  recomputed accounting balances and reproduces the recorded receipt, and the
  *  named paths still carry those exact blobs. The gate poisons anything less. */
-export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel, blobText = committedBlobText } = {}) {
+export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel, blobText = committedBlobText, committedOidOf = committedOid } = {}) {
   const authors = Array.isArray(record?.halfAuthors) ? record.halfAuthors : []
   const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
   const blobs = Array.isArray(record?.halfBlobs) ? record.halfBlobs : []
@@ -186,9 +186,16 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
     return sameModel(committed.model, authors[i])
   })
   if (!anchored) return false
-  // The fold itself, recomputed from the committed bytes the row names.
+  // The fold itself, recomputed from the committed bytes the row names. The
+  // union is anchored exactly like the halves: the row names its PATH and its
+  // BLOB, and the blob must be the one HEAD carries at that path — an oid that
+  // merely exists somewhere in the object store is not repository provenance
+  // (re-review round 3).
   const unionBlob = String(record?.unionBlob ?? '').trim()
-  if (!unionBlob) return false
+  const unionSource = String(record?.unionSource ?? '').trim()
+  if (!unionBlob || !unionSource) return false
+  if (!isTracked(unionSource)) return false
+  if (committedOidOf(unionSource) !== unionBlob) return false
   const texts = [blobs[0], blobs[1], unionBlob].map((oid) => blobText(oid))
   if (texts.some((t) => t === null)) return false
   let a, b, union
@@ -200,9 +207,12 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
     return false
   }
   if (!sameModel(a.model, authors[0]) || !sameModel(b.model, authors[1])) return false
+  // BOTH merger namings are required and must agree: a union that names no
+  // mergedBy beside a row that claims one is a fold whose owner the committed
+  // artefact does not corroborate (re-review round 3).
   const declaredMerger = String(record?.mergedBy ?? '').trim()
   const unionMerger = Array.isArray(union) ? '' : String(union?.mergedBy ?? '').trim()
-  if (declaredMerger && unionMerger && !sameModel(declaredMerger, unionMerger)) return false
+  if (!declaredMerger || !unionMerger || !sameModel(declaredMerger, unionMerger)) return false
   if (!validateInputs(a, b).ok) return false
   const result = accountUnion({ a, b, union })
   if (!result.ok) return false
@@ -610,17 +620,20 @@ export function buildRecord({
   // claim only clears for a reviewer no harness transcript can cover. Writing
   // the row anyway would report "recorded" for a review the gate then ignores —
   // silent debt the recording session believes settled.
-  if (
-    now >= VERIFIED_REVIEWER_SINCE &&
-    reviewerAuthorship.status !== 'agreement' &&
-    !authorshipRefusesPermission(reviewerAuthorship) &&
-    modelVendor(model) !== 'openai'
-  ) {
-    errors.push(
-      `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
-        'must be VERIFIED: pass --model-at <ISO> and --model-transcript <session.jsonl> so the claim can be ' +
-        'checked against message.model — an unverified claim from this vendor no longer clears the gate',
-    )
+  if (now >= VERIFIED_REVIEWER_SINCE && !authorshipRefusesPermission(reviewerAuthorship)) {
+    const reviewerVendor = modelVendor(model)
+    if (reviewerVendor === 'unknown') {
+      errors.push(
+        `the claimed reviewer "${model}" names no vendor the review roster can place — a reviewer nobody ` +
+          'can rule out clears nothing, whatever its claimed status',
+      )
+    } else if (reviewerVendor === 'anthropic' && reviewerAuthorship.status !== 'agreement') {
+      errors.push(
+        `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
+          'must be VERIFIED: pass --model-at <ISO> and --model-transcript <session.jsonl> so the claim can be ' +
+          'checked against message.model — an unverified claim from this vendor no longer clears the gate',
+      )
+    }
   }
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block

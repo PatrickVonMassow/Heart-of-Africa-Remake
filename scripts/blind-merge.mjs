@@ -166,7 +166,14 @@ if (isMainModule(import.meta.url)) {
           `--model-${name} "${flag}" contradicts the tracked half, which says "${stated}" — ` +
             'a tracked half names its own author and the flag cannot rename it',
         )
-      } else if (flag) list.model = flag
+      } else if (flag && !(tracked && stated)) {
+        // A family-equivalent flag may not overwrite the committed spelling
+        // either: sameModel treats a versionless "Sol" as every Sol, so writing
+        // "GPT-6 Sol" over a committed "Sol" would shift which exact model the
+        // merger is checked against (cross-vendor re-review of point 889). The
+        // committed bytes stand; the flag only fills silence.
+        list.model = flag
+      }
     }
     if (overruled.length) {
       console.error('blind-merge: refusing to rename a tracked half\'s author.\n')
@@ -292,6 +299,8 @@ if (isMainModule(import.meta.url)) {
     // mechanism-review.mjs refuses to record a fold whose halves it cannot
     // prove. README.md's filing rule makes this the normal order anyway: the
     // halves are committed before the union is counted.
+    const rawUText = readText(pathU)
+    const trackedU = isTrackedInGit(pathU, { content: rawUText })
     const unproven = [
       ['A', pathA, trackedA],
       ['B', pathB, trackedB],
@@ -313,7 +322,19 @@ if (isMainModule(import.meta.url)) {
       )
       process.exit(1)
     }
-    const rawU = readJson(pathU)
+    if (!trackedU) {
+      // The union is the record's third artefact: uncommitted, the exact folded
+      // result can change or vanish after a green count, and the ledger row the
+      // printed command writes could never be re-derived (cross-vendor
+      // re-review of point 889 — the same-commit filing rule, enforced where
+      // the record is produced).
+      console.error(
+        `blind-merge: the union (${pathU}) is not a tracked, clean repository artefact — ` +
+          'file it in the same commit as the halves (docs/four-eyes/README.md), then count.',
+      )
+      process.exit(1)
+    }
+    const rawU = JSON.parse(rawUText)
     // The union may name its own merger; the flag wins, and whichever is used is
     // the one validated AND the one printed below (four-eyes review: the printed
     // record command used to echo an empty --merged-by for the union-only form).
@@ -366,6 +387,10 @@ if (isMainModule(import.meta.url)) {
         `${reviewerAt || reviewerTranscript ? ' \\\n' : ''}` +
         `    --verdict merge --mode blind-parallel --merged-by "${expectedMerger}"` +
         `${merger.fallback ? ` --merge-fallback "${mergerReason}"` : ''} \\\n` +
+        // THE THREE FILES TRAVEL INTO THE RECORD: without them the recorder
+        // falls back to the trailer proxy and the ledger row binds to nothing
+        // (cross-vendor re-review of point 889).
+        `    --union "${pathU}" --list-a "${pathA}" --list-b "${pathB}" \\\n` +
         `    --accounting "${summaryLine(result)}" --evidence "<what the stage found>"`,
     )
     process.exit(0)

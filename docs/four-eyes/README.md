@@ -41,8 +41,16 @@ that quotes the applicable evidence verbatim, the way `676-provenance.md` does f
 676 halves. Once quoted into a tracked record, the reading survives transcript deletion.
 The same-commit filing rule corroborates only what a trailer can say: the commit's
 author-model trailer backs the half THAT SESSION'S MODEL wrote — it cannot vouch for the
-other model's half, which always needs its own evidence of one of the two kinds above. A
-`model` field that no route backs does not decide the merger question.
+other model's half, which always needs its own evidence of one of the two kinds above.
+
+What the TOOLING checks against this rule, and what it cannot: `blind-merge.mjs` counts
+only halves whose `model` field is committed, which makes every author claim a readable,
+attributable commit — the auditability floor — and refuses everything below it. Whether
+that committed claim is also TRUE is what the provenance record above answers, and a
+reader who doubts a fold checks the record, not the field. The tooling cannot read
+provenance prose; the floor it enforces is deliberately the strongest machine-checkable
+one, and a `model` field that no route backs does not decide a CONTESTED merger
+question — contesting it is exactly what filing a provenance record is for.
 
 ## Counting a union against its halves
 

@@ -1165,6 +1165,15 @@ export function mergeProblem(record = {}, commit = {}) {
     .map((a) => String(a ?? '').trim())
     .filter(Boolean)
   if (halves.length && record.halfAuthorsVerified !== true) return 'unverified-halves'
+  // A MODERN ROW DOES NOT GET THE PROXY BACK BY DROPPING ITS CLAIM (re-review
+  // round 3): with `halfAuthors` deleted from a hand-edited row, the judgment
+  // fell through to the commit trailers, which say nothing when the union
+  // commit does not name the merger. Since the recorder began refusing folds
+  // with unproven halves, every legitimate new blind-parallel row carries its
+  // verified halves — one that does not is hand-made and clears nothing. The
+  // era reads the later of row and commit time, as everywhere else.
+  const modernAt = Math.max(Number.isFinite(at) ? at : 0, Number(commit?.at) || 0)
+  if (!halves.length && modernAt >= VERIFIED_REVIEWER_SINCE) return 'unverified-halves'
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,
@@ -1185,24 +1194,37 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   const mode = String(record.mode ?? '').trim()
   const at = Number(record.at)
   if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE)) return false
-  if (at >= AUTHORSHIP_CHECK_SINCE) {
+  // THE ERA IS THE COMMIT'S, NOT THE ROW'S ALONE (cross-vendor re-review of
+  // point 889): `record.at` is written by the recording hand, so a hand-edited
+  // row could backdate itself past a boundary — including all the way past the
+  // authorship requirement itself, which nesting the new rule inside the old
+  // gate silently allowed. A commit's timestamp is part of its sha and cannot
+  // move without changing the commit, so BOTH cutoffs read the later of the
+  // two. Its residual is stated rather than hidden: an author who backdates
+  // the COMMIT ITSELF at creation time moves both, and no marker the same hand
+  // writes can close that; the systemic answer is work-order point 880's.
+  const effectiveAt = Math.max(at, Number(commitAt) || 0)
+  if (effectiveAt >= AUTHORSHIP_CHECK_SINCE) {
     const authorship = record.reviewerAuthorship
     if (!authorship || typeof authorship !== 'object') return false
     if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
     if (!sameModel(authorship.claimedModel, record.model)) return false
     if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
-    // See VERIFIED_REVIEWER_SINCE: an unverified claim clears only where
-    // verification was impossible by construction, and says why it was.
-    // THE ERA IS THE COMMIT'S, NOT THE ROW'S ALONE (cross-vendor re-review of
-    // point 889): `record.at` is written by the recording hand, so a
-    // hand-edited row could backdate itself past the boundary. A commit's
-    // timestamp is part of its sha — it cannot be moved without changing the
-    // commit — so a row clearing a post-boundary commit answers to the new
-    // rule whatever its own `at` claims.
-    const effectiveAt = Math.max(at, Number(commitAt) || 0)
-    if (effectiveAt >= VERIFIED_REVIEWER_SINCE && authorship.status === 'unverified') {
-      if (modelVendor(record.model) !== 'openai') return false
-      if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
+    // See VERIFIED_REVIEWER_SINCE: what each vendor CAN prove is what it must.
+    if (effectiveAt >= VERIFIED_REVIEWER_SINCE) {
+      const vendor = modelVendor(record.model)
+      // A vendor the roster cannot place is a reviewer nobody can rule out —
+      // no status clears it (re-review round 3: the vendor rule sat only on
+      // the unverified branch, so an unknown vendor with a written-in
+      // "agreement" passed the two string comparisons above).
+      if (vendor === 'unknown') return false
+      if (vendor === 'anthropic' && authorship.status !== 'agreement') return false
+      if (vendor === 'openai') {
+        // No harness transcript can hold an OpenAI reviewer's messages, so an
+        // "agreement" claiming one is fabricated evidence, not strong evidence.
+        if (authorship.status !== 'unverified') return false
+        if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
+      }
     }
   }
   return record.carried === undefined || record.carriedVerified === true

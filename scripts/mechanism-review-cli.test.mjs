@@ -140,6 +140,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
     halfSources: ['docs/a.json', 'docs/b.json'],
     halfBlobs: ['aaaa1', 'bbbb2'],
+    unionSource: 'docs/u.json',
     unionBlob: 'uuuu3',
     mergedBy: 'Fable 5',
     accounting: '1 A + 1 B entries → 1 union entries (2 of the 2 input entries merged, 0 only A, 0 only B): every input entry accounted for',
@@ -158,6 +159,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     isTracked: () => true,
     committedHalf: (src) => blobs[src] ?? null,
     blobText: (oid) => texts[oid] ?? null,
+    committedOidOf: (src) => (src === 'docs/u.json' ? 'uuuu3' : ''),
     ...over,
   })
 
@@ -188,6 +190,14 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     expect(verifyHalfAuthors(withoutUnion, deps())).toBe(false)
     // An absent blob (repository without the object) cannot confirm anything.
     expect(verifyHalfAuthors(row, deps({ blobText: () => null }))).toBe(false)
+    // An oid that exists in the object store but is NOT the blob HEAD carries
+    // at the recorded union path is not repository provenance.
+    expect(verifyHalfAuthors(row, deps({ committedOidOf: () => 'other0' }))).toBe(false)
+    const { unionSource: _unionSource, ...withoutUnionPath } = row
+    expect(verifyHalfAuthors(withoutUnionPath, deps())).toBe(false)
+    // A union whose committed bytes name no merger corroborates no fold owner.
+    const unowned = { ...texts, uuuu3: JSON.stringify({ entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }) }
+    expect(verifyHalfAuthors(row, deps({ blobText: (oid) => unowned[oid] ?? null }))).toBe(false)
   })
 
   it('still refuses an untracked source or a contradicted model', () => {
@@ -707,7 +717,10 @@ describe('the mode round-trips into the ledger', () => {
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
       expect(row).toMatchObject({ sha, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
-      expect(row.mergeFallback).toContain('node scripts/fable-switch.mjs --status')
+      // The whole switch-generated sentence, not merely the status command: the
+      // false "two models existed" wording would still have contained it
+      // (re-review round 3).
+      expect(row.mergeFallback).toMatch(/^Fable 5 is switched off by the recorded Fable switch \(node scripts\/fable-switch\.mjs --status\): /)
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
       // The row says which blobs it read, so a later reader re-derives the proof.
       expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-5.6 Sol'])
@@ -719,6 +732,22 @@ describe('the mode round-trips into the ledger', () => {
       ])
       expect(row.unionSource).toBe('docs/U.json')
       expect(row.unionBlob).toBe(git('rev-parse', 'HEAD:docs/U.json').stdout.trim())
+
+      // The reviewer-identity boundary at the spawned surface: an unknown-vendor
+      // reviewer is refused outright — no status, reason, or wording admits it —
+      // while the OpenAI record above was accepted as unverified-with-reason.
+      const mystery = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha, '--model', 'Mystery 9', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', listB,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(mystery.status).not.toBe(0)
+      expect(`${mystery.stdout}${mystery.stderr}`).toMatch(/no vendor the review roster can place|must be VERIFIED/)
 
       // AN UNPROVABLE HALF REFUSES; IT DOES NOT FALL BACK TO THE TRAILERS. The
       // caller hands the three files over precisely so the halves decide instead

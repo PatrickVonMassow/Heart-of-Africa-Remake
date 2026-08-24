@@ -80,9 +80,6 @@ beforeAll(() => {
   })
   // A committed line-form half: tracked, but its author still only claimable.
   write('tracked-b.txt', ['- B1 | src/ui/hud.tsx | the affliction badge sits on the date', 'VERDICT: merge'].join('\n'))
-  git('add', 'A.json', 'B.json', 'claude-a.json', 'tracked-b.txt')
-  git('commit', '-q', '-m', 'File the blind halves')
-  write('B.txt', ['- B1 | src/ui/hud.tsx | the affliction badge sits on the date', 'VERDICT: merge'].join('\n'))
   write('U.json', {
     mergedBy: 'Fable 5',
     entries: [
@@ -98,6 +95,9 @@ beforeAll(() => {
       { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
     ],
   })
+  git('add', 'A.json', 'B.json', 'claude-a.json', 'tracked-b.txt', 'U.json', 'U-dropped.json', 'U-sol.json')
+  git('commit', '-q', '-m', 'File the blind halves and the unions')
+  write('B.txt', ['- B1 | src/ui/hud.tsx | the affliction badge sits on the date', 'VERDICT: merge'].join('\n'))
 })
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -269,6 +269,35 @@ describe('the command', () => {
     expect(r.out).toContain('it wrote no KNOWN half')
     // And the framing is still owed, because the unnamed half could be Sol's own.
     expect(r.out).toContain('DECORRELATED MERGE FRAMING')
+  })
+
+  it('refuses an UNTRACKED union in the count form — the folded result must not be able to vanish', () => {
+    const loose = write('U-loose.json', {
+      mergedBy: 'Fable 5',
+      entries: [
+        { id: 'U1', from: ['A1'] },
+        { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
+      ],
+    })
+    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', loose, '--merged-by', 'Fable 5')
+    expect(r.status).toBe(1)
+    expect(r.out).toMatch(/the union .*not a tracked, clean repository artefact/)
+  })
+
+  it('keeps the committed spelling of a tracked half against a family-equivalent flag', () => {
+    // sameModel treats a versionless name as its whole family, so a flag like
+    // "GPT-6 Sol" over a committed "Sol" would shift which exact model the
+    // merger is checked against. The committed bytes stand.
+    const r = run('--a', p('claude-a.json'), '--b', p('B.json'), '--model-a', 'Opus')
+    expect(r.status).toBe(0)
+    // The prompt echoes the file's own spelling, not the flag's.
+    expect(r.out).toMatch(/A: 1 entries \(Claude Opus 5\)/)
+  })
+
+  it('prints the record command WITH the three files, so the ledger row binds to them', () => {
+    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U.json'), '--merged-by', 'Fable 5')
+    expect(r.status).toBe(0)
+    expect(r.out).toMatch(/--union "[^"]*U\.json" --list-a "[^"]*A\.json" --list-b "[^"]*B\.json"/)
   })
 
   it('refuses an unknown flag and a missing list rather than guessing', () => {

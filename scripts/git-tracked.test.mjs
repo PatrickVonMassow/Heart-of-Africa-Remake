@@ -5,7 +5,7 @@
 // read as NOT tracked, or the merger-selection boundary it guards is a bypass.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isTrackedInGit } from './git-tracked.mjs'
@@ -113,6 +113,30 @@ describe('isTrackedInGit — committed bytes only', () => {
     expect(isTrackedInGit('docs/half.json', { root: repo })).toBe(false)
     git(['update-index', '--no-skip-worktree', 'docs/half.json'], repo)
     git(['checkout', '-q', '--', 'docs/half.json'], repo)
+  })
+
+  it('refuses a working tree that a clean/smudge filter makes report clean while its bytes differ', () => {
+    // The third status-bypass mechanism beside assume-unchanged and
+    // skip-worktree: a smudge filter rewrites bytes on checkout, and the
+    // matching clean filter maps them back, so `git status` compares clean
+    // while the bytes any consumer READS are the smudged ones.
+    writeFileSync(join(repo, '.gitattributes'), 'docs/half.json filter=forge\n')
+    git(['config', 'filter.forge.clean', "sed s/SMUDGED-MODEL/GPT-5.6\\ Sol/"], repo)
+    git(['config', 'filter.forge.smudge', "sed s/GPT-5.6\\ Sol/SMUDGED-MODEL/"], repo)
+    try {
+      // Re-checkout through the smudge filter: the working bytes now differ.
+      unlinkSync(join(repo, 'docs', 'half.json'))
+      git(['checkout', '-q', '--', 'docs/half.json'], repo)
+      expect(readFileSync(join(repo, 'docs', 'half.json'), 'utf8')).toContain('SMUDGED-MODEL')
+      expect(git(['status', '--porcelain', '--', 'docs/half.json'], repo)).toBe('')
+      expect(isTrackedInGit('docs/half.json', { root: repo })).toBe(false)
+    } finally {
+      unlinkSync(join(repo, '.gitattributes'))
+      git(['config', '--unset', 'filter.forge.clean'], repo)
+      git(['config', '--unset', 'filter.forge.smudge'], repo)
+      unlinkSync(join(repo, 'docs', 'half.json'))
+      git(['checkout', '-q', '--', 'docs/half.json'], repo)
+    }
   })
 
   // THE CONSUMER'S OWN BYTES ARE THE ONES THAT MUST MATCH. A caller that has

@@ -478,6 +478,14 @@ beforeAll(() => {
       mode: 'review',
       pass: { index: 1, total: 1, files: ['shared.txt'], commits: [historicalReviewSha] },
       at: 1_787_000_000_000,
+      // The fixture commits are created at test time, which is inside the
+      // commit-era reviewer rule, so the row carries what that rule demands of
+      // an OpenAI reviewer: an explicit unverified claim with its reason.
+      reviewerAuthorship: {
+        status: 'unverified',
+        claimedModel: 'GPT-5.6 Sol',
+        reason: 'external CLI reviewer, no harness transcript',
+      },
     })}\n`,
   )
 })
