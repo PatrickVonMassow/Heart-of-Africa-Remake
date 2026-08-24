@@ -309,18 +309,35 @@ describe('a record is read once — the accessor class of the cross-vendor revie
     expect(releaseWorktree({ claims: held.claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
   })
 
+  it('names a malformed lease by the reading it took, not by a later one', () => {
+    // A malformed lease returned no snapshot at all, so the sweep read the caller's
+    // record again to name it: a getter answering one attempt to the snapshot and
+    // ANOTHER to the alert attributed the quarantine to an attempt that never held
+    // the lease — and an alert that names the wrong owner is worse than a silent one.
+    const batchId = flipping('b', 'someone-else')
+    const malformed = {
+      get batchId() { return batchId() },
+      pointId: 'p834',
+      attemptId: 'aX',
+      leaseId: 'LX',
+      holder: null,
+      grantedAt: 10_000,
+      expiresAt: 20_000,
+    }
+    const alerts = expiredLeaseAlerts({ leases: [malformed], now: 30_000 })
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].alert).toMatch(/malformed/)
+    expect(alerts[0].batchId).toBe('b')
+  })
+
   it('quarantines a lease whose reading THROWS instead of losing the whole sweep', () => {
-    // The malformed path reached back through the failed snapshot to name the
-    // attempt. A getter that answered once and threw on the second call took the
-    // entire sweep down with it — and a sweep that throws raises no alert for any
-    // lease, which is the silence this function exists to prevent.
-    const batchId = flipping('b', null)
+    // The sweep read every lease directly, so a record whose own reading throws
+    // took the entire sweep down with it — and a sweep that throws raises no alert
+    // for ANY lease, which is the silence this function exists to prevent. Such a
+    // lease is quarantined without a name, and the leases beside it are still
+    // reported.
     const hostile = {
-      get batchId() {
-        const v = batchId()
-        if (v === null) throw new Error('unreadable')
-        return v
-      },
+      get batchId() { throw new Error('unreadable') },
       pointId: 'p834',
       attemptId: 'aX',
       leaseId: 'LX',

@@ -59,10 +59,20 @@ function snapshotHolder(holder) {
 
 function snapshotLease(lease) {
   if (!lease || typeof lease !== 'object') return null
-  const identity = attemptIdentity(lease)
-  const holder = snapshotHolder(lease.holder)
-  if (!identity || !holder) return null
-  const snapshot = { ...identity, leaseId: lease.leaseId, holder, grantedAt: lease.grantedAt, expiresAt: lease.expiresAt }
+  // THE READING IS TAKEN WHETHER OR NOT IT IS USABLE, and `usableLease` judges the
+  // COPY. Returning null for a malformed lease left its caller with nothing to name
+  // it by, so the sweep read the caller's record a second time and a flipping getter
+  // attributed the alert to another attempt (cross-vendor review of point 893). What
+  // comes back is plain data, so every later read of it is the same value.
+  const snapshot = {
+    batchId: lease.batchId,
+    pointId: lease.pointId,
+    attemptId: lease.attemptId,
+    leaseId: lease.leaseId,
+    holder: snapshotHolder(lease.holder),
+    grantedAt: lease.grantedAt,
+    expiresAt: lease.expiresAt,
+  }
   // An OMITTED renewal stays omitted: `renewedAt: undefined` is a renewal the
   // usability check would have to treat as present-but-unreadable. It is READ ONCE
   // like every other field — testing `lease.renewedAt` and then assigning it again
@@ -320,9 +330,7 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
     let name = UNNAMED
     try {
       lease = snapshotLease(raw)
-      name = lease
-        ? { batchId: lease.batchId, pointId: lease.pointId, attemptId: lease.attemptId }
-        : { batchId: named(raw?.batchId), pointId: named(raw?.pointId), attemptId: named(raw?.attemptId) }
+      name = { batchId: named(lease?.batchId), pointId: named(lease?.pointId), attemptId: named(lease?.attemptId) }
     } catch {
       return [{ ...UNNAMED, alert: 'a persisted attempt lease could not be read at all; its ownership is uncertain and it is quarantined, not skipped' }]
     }
