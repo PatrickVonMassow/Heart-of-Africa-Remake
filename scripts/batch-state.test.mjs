@@ -150,6 +150,13 @@ describe('atomic snapshot replacement', () => {
     expect(abandonedTemporaries(store)).toHaveLength(1)
   })
 
+  it('refuses an atomic write whose committed target is a symlink', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'batch-symtarget' })
+    symlinkSync(join(repo, 'outside.json'), store.snapshotPath)
+    expect(() => writeSnapshot(store, { planted: true })).toThrow(/symlink/)
+    expect(existsSync(join(repo, 'outside.json'))).toBe(false)
+  })
+
   it('judges a missing snapshot as missing and a truncated one as corrupt', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
     expect(readSnapshot(store).verdict).toBe('missing')

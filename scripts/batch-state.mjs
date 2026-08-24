@@ -20,6 +20,7 @@
 import { closeSync, constants as fsConstants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, writeSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { execFileSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { frameEntry } from './batch-schema-core.mjs'
 import { readSnapshotText, replayJournal, sealSnapshotText } from './batch-state-core.mjs'
 
@@ -124,11 +125,16 @@ export function readJournal(store) {
  *  the bytes are complete and flushed under a temporary name before the real name
  *  ever points at them, the rename is atomic, and the DIRECTORY is fsynced after
  *  it so the name change itself is durable. A crash at any step leaves either the
- *  old committed file or a `.tmp-` leftover the reader ignores. */
+ *  old committed file or a `.tmp-` leftover the reader ignores.
+ *
+ *  The temporary name is RANDOM and the create EXCLUSIVE: a predictable
+ *  pid-derived name is plantable as a symlink (O_EXCL fails on one, however
+ *  dangling) and re-usable after pid recycling, where a truncating open would
+ *  silently overwrite the crash evidence a leftover IS. */
 function writeFileAtomic(path, text) {
   refuseSymlink(path, 'an atomic write target')
-  const tmp = `${path}.tmp-${process.pid}`
-  const fd = openSync(tmp, 'w', 0o600)
+  const tmp = `${path}.tmp-${randomBytes(8).toString('hex')}`
+  const fd = openSync(tmp, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)
   try {
     writeSync(fd, text)
     fsyncSync(fd)
