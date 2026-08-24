@@ -111,6 +111,7 @@ import { ACTIVITY_EVENTS, parseActivityJournal } from './batch-activity-journal-
 import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 import { modelHandoffSpawn } from './model-handoff-core.mjs'
+import { REPO_ROOT } from './repo-paths.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -127,7 +128,9 @@ if (!(process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].r
 }
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO = R('..')
+// Script paths follow this checkout's source; batch-global state and every git
+// read follow the main checkout selected through Git's common worktree register.
+const REPO = REPO_ROOT
 const SELF = fileURLToPath(import.meta.url)
 const C = (n) => join(REPO, '.claude', n)
 const LOG = C('autostart.log')

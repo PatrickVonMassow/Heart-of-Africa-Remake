@@ -660,6 +660,18 @@ describe('the launcher acts on the pause record', () => {
   })
 })
 
+describe('the launcher uses the canonical repository for batch-global state', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('takes REPO from repo-paths while retaining source-relative script lookup', () => {
+    expect(source).toMatch(/import \{ REPO_ROOT \} from '\.\/repo-paths\.mjs'/)
+    expect(source).toMatch(/const R = \(p\) => fileURLToPath/)
+    expect(source).toMatch(/const REPO = REPO_ROOT/)
+    expect(source).not.toMatch(/const REPO = R\('\.\.'\)/)
+    expect(source).toMatch(/const C = \(n\) => join\(REPO, '\.claude', n\)/)
+  })
+})
+
 // Recurring healthy-flow and remediation notices are EVENTS: another identical
 // occurrence is new information, not evidence that a request went unanswered.
 // The launcher itself cannot be imported, so this source contract pins the
