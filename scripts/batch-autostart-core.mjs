@@ -403,6 +403,7 @@ export function launcherStartDecision({
   batchWriters = {},
   previousBatchWriters = {},
   fenceState = null,
+  includeOwnerWriter = false,
   probePid = () => null,
   now = Date.now(),
 } = {}) {
@@ -473,8 +474,8 @@ export function launcherStartDecision({
   // built to decide, and handover deliberately leaves its process alive. What
   // this independent registry adds is the process the lock DOES NOT name — a
   // lockless writer, or a second writer beside a stale lock.
-  const vetoes = writers.filter(
-    (writer) => writer.authoritative && (!lock || writer.sessionId !== evidence.lock.sessionId),
+  const vetoes = writers.filter((writer) =>
+    writer.authoritative && (includeOwnerWriter === true || !lock || writer.sessionId !== evidence.lock.sessionId),
   )
   if (vetoes.length > 0) {
     const identities = vetoes.map((writer) => `${writer.sessionId} (pid ${writer.pid})`).join(', ')
@@ -552,6 +553,10 @@ export function successorStartDecision({
     ? trigger.predecessorToken
     : null
   const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
+  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
+  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
+  const observedFence = Math.max(durableFence, lockFence)
+  const requestedFence = observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null
   const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
   const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
     ? new Date(ciWaitDeadline).toISOString()
@@ -654,6 +659,13 @@ export function successorStartDecision({
     batchWriters,
     previousBatchWriters,
     fenceState,
+    // A clean boundary is itself a successor transport and deliberately overlaps
+    // the predecessor while that process finishes. A terminal CI notification is
+    // not: several refs may conclude together, and none may turn the still-live
+    // current session into one new session per ref merely because its lock still
+    // carries a handover mark. Its current fenced writer identity therefore
+    // vetoes CI-terminal starts just like a writer outside the lock.
+    includeOwnerWriter: kind === SUCCESSOR_TRIGGERS.CI_TERMINAL,
     probePid,
     now,
   })
@@ -664,6 +676,9 @@ export function successorStartDecision({
       veto: ownership.veto ?? null,
       vetoes: ownership.vetoes ?? [],
     })
+  }
+  if (requestedFence === null) {
+    return refuse('fence-exhausted', 'the ownership fence has no safe successor generation')
   }
 
   return {
@@ -677,6 +692,10 @@ export function successorStartDecision({
       sourceSpawnToken,
       wakeToken,
       trigger: kind,
+      // This is a PROPOSAL, captured with the start decision rather than
+      // recomputed after the exclusive lock create. The serialized fence door
+      // refuses it if another grant advances the durable mark in between.
+      requestedFence,
       requestedAt: now,
     },
   }

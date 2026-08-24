@@ -159,6 +159,51 @@ export function classifyTool(call) {
 }
 
 /**
+ * RE-CHECK BATCH OWNERSHIP BEFORE EVERY MUTATION. PURE.
+ *
+ * The ordinary guard stand-down remains exactly that for reads, paused batches,
+ * and isolated delegated worktrees: they receive no board duty and no denial.
+ * A top-level session which has lost the live owner lock, however, may not turn
+ * "this guard stood down" into permission for the mutation itself. The wrapper
+ * runs this decision on every PreToolUse call after measuring ownership again.
+ */
+export function ownershipStandDownDecision({
+  heldByOtherLiveOwner = false,
+  paused = false,
+  worktree = false,
+  ownerSession = '',
+  toolName,
+  command,
+  filePath,
+} = {}) {
+  try {
+    if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
+      return { block: false, reason: '', standDown: heldByOtherLiveOwner === true }
+    }
+    const call = classifyCall({ toolName, command, filePath })
+    if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
+    const attempted = call.segment
+      ? `the state-changing segment \`${call.segment}\``
+      : filePath
+        ? `${String(toolName ?? 'write')} of \`${filePath}\``
+        : `the ${String(toolName ?? 'state-changing')} tool call`
+    const owner = typeof ownerSession === 'string' && ownerSession ? ` (${ownerSession})` : ''
+    return {
+      block: true,
+      standDown: true,
+      reason:
+        `BATCH OWNERSHIP STAND-DOWN — another live session${owner} owns the batch lock. ` +
+        `${attempted} was refused before it ran.\n` +
+        'STAND-DOWN PATH: stop all mutations in this top-level session; reads remain available so you can ' +
+        'inspect and report the state. The current owner continues the batch. To request ownership through ' +
+        'the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
+    }
+  } catch {
+    return { block: false, reason: '', standDown: false }
+  }
+}
+
+/**
  * Is the board's published copy identical to the repo file? Mirrors invariant 9
  * of dashboard-guard-core, including the logged `--defer` valve. An unknown repo
  * hash means "cannot tell" → treated as published (fail-open).

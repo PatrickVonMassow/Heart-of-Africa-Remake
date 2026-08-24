@@ -9,6 +9,7 @@ import {
   ESCAPE_SCRIPTS,
   classifyTool,
   classifyCall,
+  ownershipStandDownDecision,
   isEscapeSegment,
   isMutatingSegment,
   isBoardFile,
@@ -269,6 +270,35 @@ describe('classifyTool', () => {
     expect(
       classifyTool({ toolName: 'Bash', command: 'node scripts/focus.mjs confirm && git push origin main' }),
     ).toBe('mutating')
+  })
+})
+
+describe('ownership mutation stand-down', () => {
+  const moved = (over = {}) => ownershipStandDownDecision({
+    heldByOtherLiveOwner: true,
+    ownerSession: 'successor-session',
+    toolName: 'Bash',
+    command: 'npm run build',
+    ...over,
+  })
+
+  it('refuses the next mutation after ownership moves and names the stand-down path', () => {
+    const decision = moved()
+    expect(decision).toMatchObject({ block: true, standDown: true })
+    expect(decision.reason).toContain('BATCH OWNERSHIP STAND-DOWN')
+    expect(decision.reason).toContain('state-changing segment `npm run build`')
+    expect(decision.reason).toContain('STAND-DOWN PATH')
+    expect(decision.reason).toContain('successor-session')
+  })
+
+  it('allows reads while standing down, and exempts paused batches and isolated worktrees', () => {
+    expect(moved({ command: 'git status --short' })).toEqual({ block: false, reason: '', standDown: true })
+    expect(moved({ paused: true })).toEqual({ block: false, reason: '', standDown: true })
+    expect(moved({ worktree: true })).toEqual({ block: false, reason: '', standDown: true })
+  })
+
+  it('does not constrain a session while no other live owner holds the lock', () => {
+    expect(moved({ heldByOtherLiveOwner: false })).toEqual({ block: false, reason: '', standDown: false })
   })
 })
 
