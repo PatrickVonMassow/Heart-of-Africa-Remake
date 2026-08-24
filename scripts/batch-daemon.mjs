@@ -18,7 +18,7 @@
 // path is the path that runs. --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
-import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { createServer, createConnection } from 'node:net'
 import { join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -51,6 +51,9 @@ import { attemptPaths, readJsonIfAny, spawnDetached } from './detached-agent.mjs
 export const DAEMON_HEARTBEAT_MS = 1000
 export const START_WAIT_MS = 10_000
 export const CHECKPOINT_WAIT_MS = 60_000
+/** How long adoption watches the worker's heartbeat for MOVEMENT (the worker
+ *  ticks every few hundred ms; ten times that is observation, not luck). */
+export const ADOPTION_PULSE_WAIT_MS = 5000
 export const FLAG_PATH_SUFFIX = join('.claude', 'durable-lane-flag.json')
 
 const nowMs = () => Date.now()
@@ -88,6 +91,30 @@ function probeOf(pid) {
   return { live: probe?.exists === true, pid, startedAt: probe?.startedAt ?? null }
 }
 
+/** realpath, or null: the interlock and canonical checks treat an
+ *  unresolvable path as a refusal, never as a pass. */
+function realOrNull(path) {
+  try {
+    return realpathSync(path)
+  } catch {
+    return null
+  }
+}
+
+/** Durable atomic replacement: tmp, fsync, rename — the pattern every file
+ *  whose loss would un-fence a writer must use. */
+function writeDurableSync(path, content) {
+  const tmp = `${path}.tmp-${process.pid}`
+  const fd = openSync(tmp, 'w', 0o600)
+  try {
+    writeSync(fd, content)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  renameSync(tmp, path)
+}
+
 function mtimeOf(path) {
   try {
     return statSync(path).mtimeMs
@@ -120,8 +147,12 @@ async function serve(args) {
   // dispatch walks around. startDaemon's copy of these checks is the early,
   // friendlier refusal; this one is the authoritative one.
   if (args.drill === true) {
-    const root = resolve(REPO_ROOT)
-    if (repoDir === root || repoDir.startsWith(root + sep)) {
+    // REAL paths on both sides: a lexical prefix test passes an outside path
+    // that is a symlink INTO this checkout, while every later write lands in
+    // the real repository. A path that cannot be canonicalised fails closed.
+    const root = realOrNull(resolve(REPO_ROOT))
+    const repoReal = realOrNull(repoDir)
+    if (!root || !repoReal || repoReal === root || repoReal.startsWith(root + sep)) {
       console.error('daemon: a drill daemon serves only a sandbox repository, never this checkout')
       process.exit(1)
     }
@@ -284,7 +315,12 @@ async function serve(args) {
     try {
       result = await application.result
     } catch (error) {
-      return { ok: false, reason: `the operation failed before completing: ${error.message}` }
+      // An exception AFTER partial application is exactly what compensation
+      // exists for: the operation may have installed claims or spawned a
+      // worker before it threw, and returning without reversing them would
+      // leave effects no journal entry accounts for.
+      const compensated = compensateFn ? await compensateFn(null) : { note: 'no local effect to reverse' }
+      return { ok: false, reason: `the operation failed before completing: ${error.message}; partial effects were compensated: ${JSON.stringify(compensated)}` }
     }
     if (result && result.ok === false) return result
     // The entry carries the fence it was VALIDATED under, which after a handover
@@ -324,7 +360,7 @@ async function serve(args) {
     'start-attempt': (request) =>
       mutate(
         request,
-        () => {
+        async () => {
           const { pointId, attemptId, branch, adapter } = request.payload ?? {}
           const cap = mayStartAttempt({ attempts: [...attemptsState.values()] })
           if (!cap.ok) return { ok: false, reason: cap.reason }
@@ -337,41 +373,73 @@ async function serve(args) {
           if (leases.get(attemptId)) return { ok: false, reason: `attempt ${attemptId} already holds a lease; a retry is a new attempt id` }
           const claimed = claimWorktree({ claims: worktreeClaims, worktree, attempt: { batchId: args.batch, pointId, attemptId } })
           if (!claimed.ok) return { ok: false, reason: claimed.reason }
-          const dir = join(store.dir, 'attempts', attemptId)
-          mkdirSync(dir, { recursive: true, mode: 0o700 })
-          const plan = workerSpawnPlan({ adapter, pointId, branch, worktree, attemptDir: dir, leaseId })
-          if (!plan.ok) return { ok: false, reason: plan.reason }
           worktreeClaims = claimed.claims
-          const spawned = spawnDetached({ cmd: plan.cmd, args: plan.args, cwd: process.cwd(), logPath: plan.logPath })
-          // The lease belongs to the WRITER (M39), which exists only now: grant it
-          // to the worker's own pid and start time and hand it over through the
-          // attempt directory. The worker waits for this file before its first
-          // write, so absence-at-start is patience, not dispossession.
-          const workerProbe = probeOf(spawned.pid)
-          if (workerProbe.live !== true || !Number.isFinite(workerProbe.startedAt)) {
+          // Everything from the claim onward reverses ITSELF on any failure or
+          // exception: a thrown mkdir or lease write must not strand the claim,
+          // the lease entry or a spawned worker with no journal evidence.
+          let spawnedWorker = null
+          const reverse = async (why) => {
+            if (spawnedWorker) await stopWorker(spawnedWorker, why)
+            leases.delete(attemptId)
+            workers.delete(attemptId)
             const released = releaseWorktree({ claims: worktreeClaims, worktree, attempt: { batchId: args.batch, pointId, attemptId } })
             if (released.ok) worktreeClaims = released.claims
-            return { ok: false, reason: `the worker died at spawn (pid ${spawned.pid})` }
           }
-          const granted = grantAttemptLease({
-            existing: null,
-            attempt: { batchId: args.batch, pointId, attemptId },
-            holder: { pid: spawned.pid, pidStartedAt: workerProbe.startedAt },
-            now: nowMs(),
-            leaseId,
-          })
-          if (!granted.ok) return { ok: false, reason: granted.reason }
-          leases.set(attemptId, granted.lease)
-          writeFileSync(attemptPaths(dir).leasePath, `${JSON.stringify({ lease: granted.lease })}\n`)
-          workers.set(attemptId, { pointId, pid: spawned.pid, worktree, leaseId, dir })
-          const record = attemptStateRecord({ state: 'running', actor: 'daemon', fence: request.fence, at: nowMs(), lastCommit: null, lastPushedSha: null })
-          if (record.ok) recordAttemptState(attemptId, pointId, record.record, request.fence)
-          return { ok: true, attemptId, pid: spawned.pid, leaseId }
+          try {
+            const dir = join(store.dir, 'attempts', attemptId)
+            mkdirSync(dir, { recursive: true, mode: 0o700 })
+            const plan = workerSpawnPlan({ adapter, pointId, branch, worktree, attemptDir: dir, leaseId })
+            if (!plan.ok) {
+              await reverse('start-attempt refused after the claim')
+              return { ok: false, reason: plan.reason }
+            }
+            const spawned = spawnDetached({ cmd: plan.cmd, args: plan.args, cwd: process.cwd(), logPath: plan.logPath })
+            // The lease belongs to the WRITER (M39), which exists only now: grant it
+            // to the worker's own pid and start time and hand it over through the
+            // attempt directory. The worker waits for this file before its first
+            // write, so absence-at-start is patience, not dispossession.
+            const workerProbe = probeOf(spawned.pid)
+            if (workerProbe.live !== true || !Number.isFinite(workerProbe.startedAt)) {
+              await reverse('start-attempt failed at spawn')
+              return { ok: false, reason: `the worker died at spawn (pid ${spawned.pid})` }
+            }
+            spawnedWorker = { pointId, pid: spawned.pid, pidStartedAt: workerProbe.startedAt, worktree, leaseId, dir }
+            const granted = grantAttemptLease({
+              existing: null,
+              attempt: { batchId: args.batch, pointId, attemptId },
+              holder: { pid: spawned.pid, pidStartedAt: workerProbe.startedAt },
+              now: nowMs(),
+              leaseId,
+            })
+            if (!granted.ok) {
+              await reverse('start-attempt failed at the lease grant')
+              return { ok: false, reason: granted.reason }
+            }
+            leases.set(attemptId, granted.lease)
+            writeFileSync(attemptPaths(dir).leasePath, `${JSON.stringify({ lease: granted.lease })}\n`)
+            workers.set(attemptId, spawnedWorker)
+            const record = attemptStateRecord({ state: 'running', actor: 'daemon', fence: request.fence, at: nowMs(), lastCommit: null, lastPushedSha: null })
+            if (record.ok) recordAttemptState(attemptId, pointId, record.record, request.fence)
+            return { ok: true, attemptId, pid: spawned.pid, leaseId }
+          } catch (error) {
+            await reverse(`start-attempt threw: ${error.message}`)
+            return { ok: false, reason: `start-attempt failed and its partial effects were reversed: ${error.message}` }
+          }
         },
         async (result) => {
-          const worker = workers.get(result?.attemptId)
-          if (worker) await stopWorker(worker, 'compensation: the lock moved under start-attempt')
-          return { compensation: 'stop-worker-preserve-branch' }
+          // Compensation reverses EVERYTHING start-attempt installs — worker,
+          // lease entry, worktree claim — and finds its attempt from the
+          // payload when the operation threw before producing a result.
+          const attemptId = result?.attemptId ?? request.payload?.attemptId
+          const worker = workers.get(attemptId)
+          if (worker) {
+            await stopWorker(worker, 'compensation: the lock moved under start-attempt')
+            const released = releaseWorktree({ claims: worktreeClaims, worktree: worker.worktree, attempt: { batchId: args.batch, pointId: worker.pointId, attemptId } })
+            if (released.ok) worktreeClaims = released.claims
+          }
+          leases.delete(attemptId)
+          workers.delete(attemptId)
+          return { compensation: 'stop-worker-preserve-branch-release-claim' }
         },
       ),
 
@@ -439,16 +507,19 @@ async function serve(args) {
       }),
 
     'adopt-attempt': (request) =>
-      mutate(request, () => {
+      mutate(request, async () => {
         const { attemptId } = request.payload ?? {}
         const known = attemptsState.get(attemptId)
         if (!known) return { ok: false, reason: `no such attempt: ${attemptId}` }
         // Adoption is an OPERATION against verified evidence, never a reading
         // of the in-memory map (M17/M18): the successor takes over supervision
-        // only of a worker whose lease stands on disk AND in memory, whose
-        // recorded process identity probes live, and whose heartbeat moves.
-        // Everything else — dead holder, revoked lease, silent heartbeat — is
-        // reconciliation's case (step 8), not adoption's.
+        // only of a worker whose lease stands on disk AND in memory and is
+        // UNEXPIRED, whose recorded process identity probes live, and whose
+        // heartbeat is observed to ADVANCE — one fresh timestamp is a
+        // snapshot, not a pulse, and a worker frozen just before it would
+        // pass. Everything else — dead holder, revoked or expired lease,
+        // silent or frozen heartbeat — is reconciliation's case (step 8),
+        // not adoption's.
         const worker = workers.get(attemptId)
         if (!worker) {
           return { ok: false, reason: `attempt ${attemptId} has no live worker under this daemon; reconcile it (step 8) instead of adopting` }
@@ -458,13 +529,30 @@ async function serve(args) {
         if (!lease || !onDisk || onDisk.leaseId !== lease.leaseId) {
           return { ok: false, reason: `attempt ${attemptId} carries no standing lease; a revoked or missing lease is reconciled, not adopted` }
         }
+        if (!Number.isFinite(lease.expiresAt) || nowMs() > lease.expiresAt) {
+          return { ok: false, reason: `the lease of ${attemptId} is expired or carries no expiry; an expired lease alerts and is reconciled, never adopted (M38)` }
+        }
         const probe = probeOf(lease.holder?.pid)
         if (probe.live !== true || !sameProcess(lease.holder, { pid: probe.pid, pidStartedAt: probe.startedAt })) {
           return { ok: false, reason: `the lease holder of ${attemptId} does not probe live under its recorded identity; nothing that cannot answer is adopted` }
         }
-        const heartbeatAt = mtimeOf(attemptPaths(worker.dir).heartbeatPath)
-        if (!Number.isFinite(heartbeatAt) || nowMs() - heartbeatAt > AGREEMENT_SILENCE_MS) {
+        const heartbeatPath = attemptPaths(worker.dir).heartbeatPath
+        const first = mtimeOf(heartbeatPath)
+        if (!Number.isFinite(first) || nowMs() - first > AGREEMENT_SILENCE_MS) {
           return { ok: false, reason: `the worker of ${attemptId} has a missing or silent heartbeat; a stalled lane is reconciled, not adopted` }
+        }
+        let advanced = false
+        const pulseDeadline = nowMs() + ADOPTION_PULSE_WAIT_MS
+        while (nowMs() < pulseDeadline) {
+          await sleep(200)
+          const again = mtimeOf(heartbeatPath)
+          if (Number.isFinite(again) && again > first) {
+            advanced = true
+            break
+          }
+        }
+        if (!advanced) {
+          return { ok: false, reason: `the heartbeat of ${attemptId} did not advance within ${ADOPTION_PULSE_WAIT_MS}ms; a frozen worker is reconciled, not adopted` }
         }
         return {
           ok: true,
@@ -514,37 +602,50 @@ async function serve(args) {
       })
       if (!validated.ok) return { ok: false, reason: validated.reason }
       const drain = request.payload?.drain === true
-      setTimeout(() => performShutdown(drain), 20)
+      // The credentials ride along: performShutdown validates them AGAIN when
+      // the timer fires, because this validation is stale by then.
+      setTimeout(() => performShutdown(drain, { presented: { sessionId: request.sessionId, fence: request.fence } }), 20)
       return { ok: true, draining: drain, steps: DRAIN_STEPS }
     },
   }
 
-  /** Gone for WRITING purposes: dead, or a zombie — a zombie holds its pid but
-   *  no thread that could touch the worktree again. */
-  function workerGone(pid) {
-    if (probeOf(pid).live !== true) return true
+  /** Gone for WRITING purposes: dead, a RECYCLED pid — the number lives but its
+   *  start time is not the worker's, so the worker itself is gone and the
+   *  stranger must not be signalled — or a zombie, which holds its pid but no
+   *  thread that could touch the worktree again. */
+  function workerGone(worker) {
+    const probe = probeOf(worker.pid)
+    if (probe.live !== true) return true
+    if (!sameProcess({ pid: worker.pid, pidStartedAt: worker.pidStartedAt }, { pid: probe.pid, pidStartedAt: probe.startedAt })) return true
     try {
-      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+      const stat = readFileSync(`/proc/${worker.pid}/stat`, 'utf8')
       return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) === 'Z'
     } catch {
       return true
     }
   }
 
-  /** Stops a worker FAIL-CLOSED. The on-disk lease is revoked FIRST, so every
-   *  later push is fenced even if the process resists its signals; then the
-   *  process group gets SIGTERM, a bounded grace, SIGKILL — and the verdict is
-   *  the PID PROBE, never the status file alone: a worker that still probes
-   *  live was NOT stopped, and the caller must not release what it may still
-   *  be writing. */
+  /** Stops a worker FAIL-CLOSED. The on-disk lease is revoked FIRST — durably,
+   *  by tmp-fsync-rename, because a revocation that can be lost in a crash is
+   *  no fence — so every later push is fenced even if the process resists its
+   *  signals; then the process group gets SIGTERM, a bounded grace, SIGKILL.
+   *  Every signal is IDENTITY-CHECKED at send time: once the worker's recorded
+   *  pid start time no longer matches, the number belongs to a stranger and is
+   *  never signalled (group ids included — the group id is the leader's pid).
+   *  The verdict is the identity probe, never the status file alone; and a
+   *  revocation that could not be persisted is reported, because a caller that
+   *  releases state over it would leave a live worker holding a valid lease. */
   async function stopWorker(worker, why) {
     const paths = attemptPaths(worker.dir)
+    let revoked = true
     try {
-      writeFileSync(paths.leasePath, `${JSON.stringify({ lease: null, revokedAt: nowMs(), reason: String(why || 'stopped') })}\n`)
+      writeDurableSync(paths.leasePath, `${JSON.stringify({ lease: null, revokedAt: nowMs(), reason: String(why || 'stopped') })}\n`)
     } catch (error) {
+      revoked = false
       console.error(`daemon: could not revoke the on-disk lease for pid ${worker.pid}: ${error.message}`)
     }
     const signalGroup = (signal) => {
+      if (workerGone(worker)) return
       try {
         process.kill(-worker.pid, signal)
       } catch {
@@ -558,30 +659,56 @@ async function serve(args) {
     const goneWithin = async (ms) => {
       const deadline = nowMs() + ms
       while (nowMs() < deadline) {
-        if (workerGone(worker.pid)) return true
+        if (workerGone(worker)) return true
         await sleep(100)
       }
-      return workerGone(worker.pid)
+      return workerGone(worker)
     }
     signalGroup('SIGTERM')
-    if (await goneWithin(5000)) return { stopped: true }
+    if (await goneWithin(5000)) return { stopped: true, revoked }
     signalGroup('SIGKILL')
-    if (await goneWithin(2000)) return { stopped: true, escalated: true }
+    if (await goneWithin(2000)) return { stopped: true, escalated: true, revoked }
     console.error(`daemon: worker pid ${worker.pid} survived SIGTERM and SIGKILL (${why}); its lease is revoked but nothing is released`)
-    return { stopped: false }
+    return { stopped: false, revoked }
   }
 
-  async function performShutdown(drain) {
+  async function performShutdown(drain, { presented = null } = {}) {
+    if (draining) return
+    // The socket handler's validation is STALE BY NOW — it aged across the
+    // reply timer, and a successor can have acquired the lock since. A
+    // credential-carrying shutdown re-validates at the moment it ACTS; a
+    // request whose authority lapsed in between does nothing. The SIGTERM
+    // path carries no credentials: the signal itself is the record owner's
+    // authority.
+    if (presented) {
+      const lock = readLock(repoDir)
+      const validated = validateMutation({ presented, lock, probe: lock ? probeOf(lock.pid) : null, now: nowMs() })
+      if (!validated.ok) {
+        console.error(`daemon: shutdown aborted at execution time: ${validated.reason}`)
+        return
+      }
+      currentFence = validated.fence
+    }
     draining = true
     if (!journalCorrupt) ensureFenceJournalled(currentFence)
+    // Any worker this shutdown leaves behind — an undrained live worker, one
+    // that survived its signals, or one whose lease revocation could not be
+    // persisted — keeps a claim only the daemon's maps knew. Releasing the
+    // identity record over that claim would let a fresh daemon re-issue the
+    // same worktree beside a live writer, so the record is released ONLY when
+    // nothing survives it; otherwise it stays as the cold record that forces
+    // reconciliation (step 8) before any successor daemon.
+    let unreleased = 0
     if (drain) {
       for (const [attemptId, worker] of workers) {
         const stop = await stopWorker(worker, 'daemon drain')
-        if (!stop.stopped) {
-          // The survivor is fenced by its revoked lease; its state stays
-          // exactly as recorded, for reconciliation to read — a drain must not
-          // journal 'cancelled' over a process that is still alive.
-          console.error(`daemon: drain leaves worker pid ${worker.pid} unreleased; reconcile it (step 8)`)
+        if (!stop.stopped || stop.revoked === false) {
+          // The survivor is fenced by its revoked lease (when that write
+          // stood); its state stays exactly as recorded, for reconciliation
+          // to read — a drain must not journal 'cancelled' over a process
+          // that may still be alive.
+          unreleased += 1
+          console.error(`daemon: drain leaves worker pid ${worker.pid} unreleased (stopped: ${stop.stopped}, lease revoked: ${stop.revoked}); reconcile it (step 8)`)
           continue
         }
         const status = readJsonIfAny(attemptPaths(worker.dir).statusPath)
@@ -599,18 +726,28 @@ async function serve(args) {
       if (!journalCorrupt) {
         writeSnapshot(store, { ...deriveSnapshot(readJournal(store).entries, { batchId: args.batch }), sealed: true, sealedAt: nowMs() })
       }
+    } else {
+      // A non-draining shutdown deliberately leaves its workers running —
+      // they are durable — but their claims must survive the daemon: every
+      // live worker counts as unreleased so the record stays for adoption or
+      // reconciliation.
+      unreleased = workers.size
     }
-    if (!journalCorrupt) journalEntry({ kind: 'daemon-lifecycle', event: 'stop', drained: drain })
+    if (!journalCorrupt) journalEntry({ kind: 'daemon-lifecycle', event: 'stop', drained: drain, unreleased })
     clearInterval(heartbeat)
     try {
       server.close()
     } catch {
       /* closing is the goal */
     }
-    try {
-      unlinkSync(store.daemonRecordPath)
-    } catch {
-      /* releasing a record that is already gone is release all the same */
+    if (unreleased === 0) {
+      try {
+        unlinkSync(store.daemonRecordPath)
+      } catch {
+        /* releasing a record that is already gone is release all the same */
+      }
+    } else {
+      console.error(`daemon: ${unreleased} worker(s) survive this shutdown; the identity record stays as a cold record until reconciliation (step 8) releases it`)
     }
     process.exit(0)
   }
@@ -691,9 +828,13 @@ export function controlRequest({ repoDir, batchId, request, timeoutMs = 15_000 }
 export async function startDaemon({ repoDir, batchId, drill = false, waitMs = START_WAIT_MS }) {
   const resolved = resolve(repoDir)
   if (drill) {
-    const root = resolve(REPO_ROOT)
-    if (resolved === root || resolved.startsWith(root + sep)) {
-      return { ok: false, reason: 'a drill daemon runs only against a sandbox repository, never this checkout' }
+    // Same rule as the serving process: REAL paths on both sides, so a symlink
+    // into this checkout cannot pass the prefix test, and an unresolvable path
+    // fails closed.
+    const root = realOrNull(resolve(REPO_ROOT))
+    const repoReal = realOrNull(resolved)
+    if (!root || !repoReal || repoReal === root || repoReal.startsWith(root + sep)) {
+      return { ok: false, reason: 'a drill daemon runs only a sandbox repository, never this checkout (real paths compared; unresolvable refuses)' }
     }
   } else {
     const flag = readJsonIfAny(join(resolved, FLAG_PATH_SUFFIX))
@@ -729,16 +870,55 @@ export async function startDaemon({ repoDir, batchId, drill = false, waitMs = ST
 
 /** Writes the daemon COPY into the batch lock, from the record, for the current
  *  owner (mechanism 2: START writes the record first; the lock owner then reads
- *  it and writes the copy). */
-export function writeLockCopy({ repoDir, record, sessionId }) {
+ *  it and writes the copy).
+ *
+ *  This is a COMPARE-AND-SWAP, not a replacement: a bare read-check-rename
+ *  would let a writer that validated ownership, stalled, and woke after a
+ *  handover rename its stale snapshot over the successor's lock — the old
+ *  owner and fence restored by the very file that dispossessed them. So the
+ *  update runs under a short-lived exclusive-create mutex beside the lock,
+ *  and the ownership check is REPEATED inside it: only what the lock says at
+ *  the instant of the swap decides, and a stale writer installs nothing. */
+export function writeLockCopy({ repoDir, record, sessionId, fence = null, mutexWaitMs = 2000 }) {
   const path = lockPathFor(repoDir)
-  const lock = readJsonIfAny(path)
-  if (!lock || lock.sessionId !== sessionId) return { ok: false, reason: 'only the lock owner writes the daemon copy' }
-  const next = { ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } }
-  const tmp = `${path}.tmp-${process.pid}`
-  writeFileSync(tmp, `${JSON.stringify(next)}\n`)
-  renameSync(tmp, path)
-  return { ok: true }
+  const mutexDir = `${path}.copy-mutex`
+  const staleMutexMs = 10_000
+  const deadline = nowMs() + mutexWaitMs
+  for (;;) {
+    try {
+      mkdirSync(mutexDir)
+      break
+    } catch {
+      // A mutex left by a crashed holder must not refuse forever: the critical
+      // section is a read and a rename, so a directory older than seconds is a
+      // corpse and is reaped — the same shape as the lock's own reap mutex.
+      try {
+        if (nowMs() - statSync(mutexDir).mtimeMs > staleMutexMs) rmdirSync(mutexDir)
+      } catch {
+        /* raced another reaper or reader; the retry below decides */
+      }
+      if (nowMs() > deadline) return { ok: false, reason: 'the lock-copy mutex is held; another writer is mid-swap — retry or reconcile' }
+      // A synchronous, bounded spin: contention is measured in milliseconds.
+    }
+  }
+  try {
+    const lock = readJsonIfAny(path)
+    if (!lock || lock.sessionId !== sessionId) return { ok: false, reason: 'only the lock owner writes the daemon copy' }
+    if (fence !== null && lock.fence !== fence) {
+      return { ok: false, reason: `the lock carries fence ${lock.fence}, not the writer's ${fence}; a superseded owner writes nothing` }
+    }
+    const next = { ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } }
+    const tmp = `${path}.tmp-${process.pid}`
+    writeFileSync(tmp, `${JSON.stringify(next)}\n`)
+    renameSync(tmp, path)
+    return { ok: true }
+  } finally {
+    try {
+      rmdirSync(mutexDir)
+    } catch {
+      /* the mutex directory is best-effort cleanup; a leftover one times out above */
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
