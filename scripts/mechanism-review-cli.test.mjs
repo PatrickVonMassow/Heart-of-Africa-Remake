@@ -121,7 +121,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
   })
 
   it('refuses a row that names no blobs at all — two strings are not evidence', () => {
-    const { halfBlobs, ...withoutBlobs } = row
+    const { halfBlobs: _halfBlobs, ...withoutBlobs } = row
     expect(verifyHalfAuthors(withoutBlobs, deps())).toBe(false)
     expect(verifyHalfAuthors({ ...row, halfBlobs: ['aaaa1'] }, deps())).toBe(false)
   })

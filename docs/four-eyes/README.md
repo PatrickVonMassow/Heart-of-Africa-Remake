@@ -6,9 +6,12 @@ can no longer tell what either model actually wrote, and a dropped or re-worded 
 leaves no trace. This directory is where the raw halves live so that stays possible.
 
 **Rule: a blind stage files its two halves here in the same commit as its union.** Both
-the machine-readable `.json` (the exact `blind-merge.mjs` input: `id`, `file`, `defect`)
-and the model's output verbatim as `.md`. Neither `local/` nor a session scratchpad is a
-record — both are untracked and one of them is wiped by a reboot.
+the machine-readable `.json` — the exact `blind-merge.mjs` input, a top-level `model`
+naming who wrote the half beside an `entries` array of `id`, `file`, `defect` — and the
+model's output verbatim as `.md`. The `model` field is REQUIRED and not decoration: it
+is the field the merger question is decided from, and a half without it names no author
+the merger can be checked against. Neither `local/` nor a session scratchpad is a record
+— both are untracked and one of them is wiped by a reboot.
 
 **The halves must be TRACKED here for the tooling to trust them.** `blind-merge.mjs`
 and `mechanism-review.mjs` decide the merger question — who wrote neither half — from
@@ -25,7 +28,7 @@ is therefore two-part: an UNCONTESTED half is filed in the same commit by the se
 that produced it, so the commit's own trailer corroborates the field; a CONTESTED or
 after-the-fact label is settled only by a provenance record filed HERE that quotes the
 producing-message metadata verbatim (model id, line, timestamp, tool-call id), the way
-`676-provenance.md` does for half A. Once quoted into a tracked record, the reading
+`676-provenance.md` does for both 676 halves. Once quoted into a tracked record, the reading
 survives transcript deletion; a `model` field that neither route backs does not decide
 the merger question.
 
@@ -51,6 +54,8 @@ the union disagrees, `676-union.json` governs.
 
 RECOVERED on 22.08.2026 from the origin session's scratchpad and `local/`, both of them
 untracked; the halves had never been versioned, which is why the rule above now exists.
+Both labels are therefore after-the-fact, so `676-provenance.md` carries the
+producing-message metadata for BOTH halves, as the rule above requires.
 
 **Half A's own heading says Fable 5 wrote it, and that is false** — the transcript
 metadata says Claude Opus 5, and Fable had stopped serving nearly three hours before the

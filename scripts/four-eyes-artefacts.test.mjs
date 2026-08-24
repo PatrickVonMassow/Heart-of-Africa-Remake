@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import crypto from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
@@ -186,17 +187,38 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // nothing recomputed it against the artefacts it claims to have counted. Its
     // wording is the one the accounting printed on 22.08.2026 and stays as
     // printed; what it ASSERTS is checked here instead.
+    //
+    // AND IT IS THE 676 ROW, IDENTIFIED (cross-vendor review of point 889): this
+    // used to take the LAST ledger line carrying any accounting string, so the
+    // next unrelated fold recorded anywhere in the repository would have become
+    // the thing under test, and a row naming a HALF-AUTHOR as merger would have
+    // satisfied it. The row is picked by the sources it says it read, there must
+    // be exactly one, and it has to name Fable 5 — the model that wrote neither
+    // half — as the merger.
     const entries = JSON.parse(read(UNION)).entries
     const from = entries.map((e) => e.from)
     const rows = read(LEDGER)
       .split('\n')
       .filter(Boolean)
       .map((l) => JSON.parse(l))
-      .filter((r) => typeof r.accounting === 'string' && r.accounting)
-    const row = rows.at(-1)
-    const m = /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+)(?: of the \d+ input entries)? merged, (\d+) only A, (\d+) only B\)/.exec(row.accounting)
+      .filter((r) => r.mode === 'blind-parallel' && Array.isArray(r.halfSources))
+      .filter((r) => r.halfSources.join('|') === `${HALF_A}.json|${HALF_B}.json`)
+    expect(rows, 'the 676 fold is recorded exactly once').toHaveLength(1)
+    const row = rows[0]
+
+    const halfModel = (half) => JSON.parse(read(`${half}.json`)).model
+    expect(row.halfAuthors).toEqual([halfModel(HALF_A), halfModel(HALF_B)])
+    // THE MERGER WROTE NEITHER HALF — the one rule the fold step exists to keep.
+    expect(row.mergedBy).toBe('Fable 5')
+    expect(row.halfAuthors).not.toContain(row.mergedBy)
+    // …and the row names the exact blobs it counted, so the claim above is
+    // re-derivable from the repository rather than read off two strings.
+    const oid = (rel) => execFileSync('git', ['rev-parse', `HEAD:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+    expect(row.halfBlobs).toEqual([oid(`${HALF_A}.json`), oid(`${HALF_B}.json`)])
+
+    const m = /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) of the (\d+) input entries merged, (\d+) only A, (\d+) only B\)/.exec(row.accounting)
     expect(m, `not a receipt line: ${row.accounting}`).not.toBe(null)
-    const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+    const [a, b, union, merged, inputs, onlyA, onlyB] = m.slice(1).map(Number)
     const single = (side) => from.filter((f) => f.length === 1 && f[0].startsWith(side)).length
     expect(union).toBe(entries.length)
     expect(merged).toBe(from.filter((f) => f.length > 1).reduce((n, f) => n + f.length, 0))
@@ -204,6 +226,10 @@ describe('the 676 stage is auditable from its raw halves', () => {
     expect(onlyB).toBe(single('B'))
     expect(a).toBe(JSON.parse(read(`${HALF_A}.json`)).entries.length)
     expect(b).toBe(JSON.parse(read(`${HALF_B}.json`)).entries.length)
+    // The denominator the merged count is OF — read past, and so unchecked, by
+    // the receipt pattern this case used to carry.
+    expect(inputs).toBe(a + b)
+    expect(merged + onlyA + onlyB).toBe(inputs)
   })
 
   it('leaves no reference in the union that the halves cannot answer', () => {
