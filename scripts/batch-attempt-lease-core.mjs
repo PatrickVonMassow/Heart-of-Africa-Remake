@@ -40,8 +40,21 @@ function usableLease(lease) {
       Number.isFinite(lease.grantedAt) &&
       Number.isFinite(lease.expiresAt) &&
       lease.expiresAt >= lease.grantedAt &&
+      // A renewal stamps its own moment; if one is recorded it must be readable
+      // and no earlier than the grant, or the rollback fence below rests on a
+      // number this module cannot trust.
+      (lease.renewedAt === undefined || (Number.isFinite(lease.renewedAt) && lease.renewedAt >= lease.grantedAt)) &&
       sameAttempt(lease, lease),
   )
+}
+
+/** The moment before which a clock is ROLLED BACK for this lease. A renewal keeps
+ *  the original grantedAt — that is the lease's identity — so a jump back to a
+ *  moment after the grant but before the last renewal used to read as a merely
+ *  early clock. The fence is dated at the last evidence the lease has of the
+ *  clock's position (cross-vendor review of point 893). */
+function clockFloor(lease) {
+  return Number.isFinite(lease.renewedAt) ? lease.renewedAt : lease.grantedAt
 }
 
 /** Grants or renews the lease for one attempt. The decision is against the ONE
@@ -82,9 +95,16 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     if (!sameAttempt(existing, attempt)) {
       return { ok: false, reason: 'the existing lease belongs to another attempt; the daemon indexed it wrong' }
     }
+    // A CLOCK BEFORE THE LEASE'S OWN LAST EVIDENCE IS NOT EARLINESS, IT IS
+    // ROLLBACK, and no decision below — renewal, lapse, duplicate writer, adoption
+    // — can be made on a clock that cannot judge expiry. It fences here, before
+    // the branches, so a rollback can never buy a silent extension.
+    if (now < clockFloor(existing)) {
+      return { ok: false, reason: `the clock is ${clockFloor(existing) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }
+    }
     if (sameProcess(existing.holder, holder)) {
       if (now <= existing.expiresAt) {
-        return { ok: true, renewed: true, lease: Object.freeze({ ...existing, expiresAt: now + ttlMs }) }
+        return { ok: true, renewed: true, lease: Object.freeze({ ...existing, renewedAt: now, expiresAt: now + ttlMs }) }
       }
       // A LAPSED lease never extends silently (M38): once the renewal persisted,
       // expiredLeaseAlerts could no longer observe the lapse. The lapse is
@@ -178,12 +198,12 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
   if (!sameProcess(lease.holder, holder)) {
     return { verdict: 'fenced', reason: 'the lease is held by another process identity; a recycled pid does not inherit it' }
   }
-  // A CLOCK BEFORE THE GRANT IS NOT EARLINESS, IT IS ROLLBACK, and a rolled-back
-  // clock makes every expiry comparison below meaningless — the lease would read
-  // valid for as long as the rollback lasts, which is precisely the window a
-  // fenced worker must not write in.
-  if (now < lease.grantedAt) {
-    return { verdict: 'fenced', reason: `the clock is ${lease.grantedAt - now}ms before this lease was granted — a rolled-back clock cannot judge expiry` }
+  // A CLOCK BEFORE THE LEASE'S LAST EVIDENCE IS NOT EARLINESS, IT IS ROLLBACK, and
+  // a rolled-back clock makes every expiry comparison below meaningless — the lease
+  // would read valid for as long as the rollback lasts, which is precisely the
+  // window a fenced worker must not write in.
+  if (now < clockFloor(lease)) {
+    return { verdict: 'fenced', reason: `the clock is ${clockFloor(lease) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }
   }
   if (now > lease.expiresAt) {
     return { verdict: 'fenced', reason: 'the lease has expired; renew through the daemon before writing, or stop' }

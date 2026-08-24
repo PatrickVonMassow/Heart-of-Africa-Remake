@@ -93,6 +93,24 @@ describe('grantAttemptLease', () => {
     expect(bound.lease.leaseId).toBe('L2')
   })
 
+  it('fences a rolled-back clock at renewal, and dates the fence at the last renewal', () => {
+    // The renewal branch asked only `now <= expiresAt`, which a clock BEFORE the
+    // grant satisfies as comfortably as one inside the term, so a rollback bought
+    // a silent extension (cross-vendor review of point 893).
+    const first = grant().lease
+    const rolled = grant({ existing: first, now: first.grantedAt - 60_000 })
+    expect(rolled.ok).toBe(false)
+    expect(rolled.reason).toMatch(/rolled-back clock/)
+    // And because a renewal keeps the original grantedAt, a jump back to a moment
+    // AFTER the grant but BEFORE the last renewal slipped past the write-side
+    // rollback check too. The fence is dated at the last renewal, not the grant.
+    const renewed = grant({ existing: first, now: 200_000 })
+    expect(renewed).toMatchObject({ ok: true, renewed: true })
+    expect(grant({ existing: renewed.lease, now: 20_000 }).reason).toMatch(/rolled-back clock/)
+    expect(leaseAllowsWrite({ lease: renewed.lease, holder, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
+    expect(leaseAllowsWrite({ lease: renewed.lease, holder, leaseId: 'L1', now: 200_000 }).verdict).toBe('write')
+  })
+
   it('fails closed on an unreadable existing lease instead of treating broken as free', () => {
     const broken = grant({ existing: { leaseId: 'L0' }, leaseId: 'L2' })
     expect(broken.ok).toBe(false)
