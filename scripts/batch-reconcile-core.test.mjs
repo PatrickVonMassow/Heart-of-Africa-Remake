@@ -68,9 +68,22 @@ describe('classifyLane (M28)', () => {
     expect(classifyLane({ record: { state: {} } })).toMatchObject({ reading: 'orphaned' })
   })
 
-  it('terminal states are complete for adoption purposes and adopt nothing', () => {
-    for (const state of ['landed', 'failed', 'cancelled']) {
+  it('failed and cancelled complete without remote claims; landed completes only with its remote proof (M37)', () => {
+    for (const state of ['failed', 'cancelled']) {
       expect(classifyLane({ record: runningRecord(state) }).reading).toBe('completed')
+    }
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: OID_A }).reading).toBe('completed')
+    // A landed claim the remote does not show — moved tip, missing branch or a
+    // record with nothing recorded — quarantines instead of completing.
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: OID_B })).toMatchObject({ reading: 'divergent', quarantine: true })
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: null })).toMatchObject({ reading: 'divergent', quarantine: true })
+    expect(classifyLane({ record: runningRecord('landed') })).toMatchObject({ reading: 'divergent', quarantine: true })
+  })
+
+  it('a LIVE worker contradicting a terminal or reviewable record quarantines, never completes', () => {
+    for (const state of ['ready-for-review', 'landed', 'failed', 'cancelled']) {
+      const res = classifyLane({ record: runningRecord(state), workerProbe: liveWorker, lease, recordedSha: OID_A, remoteSha: OID_A })
+      expect(res, state).toMatchObject({ reading: 'divergent', quarantine: true })
     }
   })
 })

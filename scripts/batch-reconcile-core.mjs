@@ -38,13 +38,29 @@ export function classifyLane({ record = null, workerProbe = null, lease = null, 
   const state = record.state.state
   const workerLive = workerProbe?.live === true && (!lease || sameProcess(lease.holder, { pid: workerProbe.pid, pidStartedAt: workerProbe.startedAt }))
 
+  // A LIVE worker under a terminal or reviewable record is a contradiction:
+  // whatever wrote that state believed the process gone, so nothing here may
+  // read the lane as free while the process still runs.
+  if (['ready-for-review', 'landed', 'failed', 'cancelled'].includes(state) && workerLive) {
+    return { reading: 'divergent', reason: `a live worker contradicts the recorded state ${state}`, quarantine: true }
+  }
   if (state === 'ready-for-review') {
     if (recordedSha && remoteSha && remoteSha === recordedSha) {
       return { reading: 'completed', reason: 'the terminal commit is visible on the remote (M37)' }
     }
     return { reading: 'divergent', reason: 'the record claims reviewable work the remote does not show', quarantine: true }
   }
-  if (['landed', 'failed', 'cancelled'].includes(state)) {
+  if (state === 'landed') {
+    // M37 in full: LANDED is a claim about the remote and completes only when
+    // the remote shows it — never from the record alone.
+    if (recordedSha && remoteSha && remoteSha === recordedSha) {
+      return { reading: 'completed', reason: 'the landed claim is visible on the remote (M37)' }
+    }
+    return { reading: 'divergent', reason: 'the record claims landed work the remote does not show (M37)', quarantine: true }
+  }
+  if (['failed', 'cancelled'].includes(state)) {
+    // These claim no remote success, so with the worker proven not-live there
+    // is nothing left to verify.
     return { reading: 'completed', reason: `terminal state ${state}; nothing to adopt` }
   }
   if (workerLive) {
