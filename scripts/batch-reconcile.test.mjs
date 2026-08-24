@@ -145,6 +145,23 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     expect(foreign.did).toMatch(/lock owner/)
   })
 
+  it('mutates nothing while the registry is corrupt or entries are quarantined', () => {
+    const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
+    for (const bad of [
+      { registry: { ok: false, source: 'reconstruction' }, quarantined: [] },
+      { registry: { ok: true, source: 'journal-only' }, quarantined: [{ seq: 3, reason: 'unknown kind' }] },
+    ]) {
+      const res = applyPairResolution({
+        repoDir: repo,
+        batchId: BATCH,
+        report: { ...report, ...bad, pair: { ...report.pair, action: 'clear-copy' } },
+        sessionId: SID,
+      })
+      expect(res.ok).toBe(false)
+      expect(res.did).toMatch(/corrupt or carries quarantined/)
+    }
+  })
+
   it('refuses a STALE report: a lock or record that moved after gathering is never overwritten', async () => {
     const lockPath = join(repo, '.claude', 'batch-lock.json')
     const lockBefore = readFileSync(lockPath, 'utf8')

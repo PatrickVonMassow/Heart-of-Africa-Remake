@@ -179,6 +179,12 @@ export function applyPairResolution({ repoDir = REPO_ROOT, batchId, report, sess
   const { action } = report.pair
   if (action === 'none') return { ok: true, did: 'nothing to do' }
   if (action === 'refuse-and-alert') return { ok: false, did: 'refused: the pair is impossible by construction; an operator resolves this' }
+  // FAIL CLOSED ON THE REGISTRY: a corrupt or truncated journal can OMIT a
+  // live lane, so its lane list must not authorise any mutation — least of all
+  // the release of a daemon record whose workers it may not show (M41).
+  if (!report.registry?.ok || (report.quarantined?.length ?? 0) > 0) {
+    return { ok: false, did: 'refused: the registry is corrupt or carries quarantined entries; evidence that may omit a live lane authorises nothing' }
+  }
   if (action === 'clear-copy') {
     const pre = revalidateLock()
     if (!pre.ok) return pre
