@@ -49,6 +49,14 @@ describe('openStateStore', () => {
     expect(again.looseModes.map((l) => l.path)).toContain(first.dir)
   })
 
+  it('reports a widened store root that could replace an otherwise restricted batch directory', () => {
+    openStateStore({ repoDir: repo, batchId: 'batch-1' })
+    const root = stateRootFor(repo)
+    chmodSync(root, 0o777)
+    const again = openStateStore({ repoDir: repo, batchId: 'batch-1' })
+    expect(again.looseModes).toContainEqual({ path: root, mode: '777' })
+  })
+
   it('refuses a batch id that could leave the root', () => {
     for (const bad of ['../x', 'a/b', '', '.hidden', 'a'.repeat(200), null]) {
       expect(validBatchId(bad), String(bad)).toBe(false)

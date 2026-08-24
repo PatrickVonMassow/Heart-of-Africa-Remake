@@ -119,7 +119,10 @@ export function openStateStore({ repoDir = process.cwd(), batchId } = {}) {
     receiptsDir,
   }
   const loose = []
-  for (const p of [dir, receiptsDir]) {
+  // The root is part of the same restricted family: if it is writable by
+  // another user, that user can rename or replace the whole batch directory and
+  // bypass clean modes on both descendants. Report all three trust boundaries.
+  for (const p of [root, dir, receiptsDir]) {
     const mode = statSync(p).mode & 0o777
     if (mode & 0o077) loose.push({ path: p, mode: mode.toString(8) })
   }
