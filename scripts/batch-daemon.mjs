@@ -328,7 +328,17 @@ async function serve(args) {
         const { attemptId, reason } = request.payload ?? {}
         const worker = workers.get(attemptId)
         if (!worker) return { ok: false, reason: `no such worker: ${attemptId}` }
-        await stopWorker(worker, reason)
+        const stop = await stopWorker(worker, reason)
+        if (!stop.stopped) {
+          // FAIL CLOSED: the revoked on-disk lease fences the survivor from
+          // pushing, but claim, lease record and worker entry stay held —
+          // releasing a worktree a live process may still write would license
+          // a second writer beside it.
+          return {
+            ok: false,
+            reason: `worker pid ${worker.pid} did not die on cancellation; its lease is revoked and nothing is released — investigate before retrying`,
+          }
+        }
         const status = readJsonIfAny(attemptPaths(worker.dir).statusPath)
         const record = attemptStateRecord({
           state: 'cancelled',
@@ -399,32 +409,70 @@ async function serve(args) {
     },
   }
 
-  async function stopWorker(worker, why) {
+  /** Gone for WRITING purposes: dead, or a zombie — a zombie holds its pid but
+   *  no thread that could touch the worktree again. */
+  function workerGone(pid) {
+    if (probeOf(pid).live !== true) return true
     try {
-      process.kill(-worker.pid, 'SIGTERM')
+      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+      return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) === 'Z'
     } catch {
+      return true
+    }
+  }
+
+  /** Stops a worker FAIL-CLOSED. The on-disk lease is revoked FIRST, so every
+   *  later push is fenced even if the process resists its signals; then the
+   *  process group gets SIGTERM, a bounded grace, SIGKILL — and the verdict is
+   *  the PID PROBE, never the status file alone: a worker that still probes
+   *  live was NOT stopped, and the caller must not release what it may still
+   *  be writing. */
+  async function stopWorker(worker, why) {
+    const paths = attemptPaths(worker.dir)
+    try {
+      writeFileSync(paths.leasePath, `${JSON.stringify({ lease: null, revokedAt: nowMs(), reason: String(why || 'stopped') })}\n`)
+    } catch (error) {
+      console.error(`daemon: could not revoke the on-disk lease for pid ${worker.pid}: ${error.message}`)
+    }
+    const signalGroup = (signal) => {
       try {
-        process.kill(worker.pid, 'SIGTERM')
+        process.kill(-worker.pid, signal)
       } catch {
-        /* already gone; the branch is preserved either way */
+        try {
+          process.kill(worker.pid, signal)
+        } catch {
+          /* already gone; the branch is preserved either way */
+        }
       }
     }
-    // Bounded wait for the worker's own terminal status, so the cancelled state
-    // can carry its last pushed SHA rather than a guess.
-    const deadline = nowMs() + 5000
-    while (nowMs() < deadline) {
-      const status = readJsonIfAny(attemptPaths(worker.dir).statusPath)
-      if (status && status.phase !== 'running') return
-      await sleep(100)
+    const goneWithin = async (ms) => {
+      const deadline = nowMs() + ms
+      while (nowMs() < deadline) {
+        if (workerGone(worker.pid)) return true
+        await sleep(100)
+      }
+      return workerGone(worker.pid)
     }
-    console.error(`daemon: worker pid ${worker.pid} did not report terminal status after SIGTERM (${why})`)
+    signalGroup('SIGTERM')
+    if (await goneWithin(5000)) return { stopped: true }
+    signalGroup('SIGKILL')
+    if (await goneWithin(2000)) return { stopped: true, escalated: true }
+    console.error(`daemon: worker pid ${worker.pid} survived SIGTERM and SIGKILL (${why}); its lease is revoked but nothing is released`)
+    return { stopped: false }
   }
 
   async function performShutdown(drain) {
     draining = true
     if (drain) {
       for (const [attemptId, worker] of workers) {
-        await stopWorker(worker, 'daemon drain')
+        const stop = await stopWorker(worker, 'daemon drain')
+        if (!stop.stopped) {
+          // The survivor is fenced by its revoked lease; its state stays
+          // exactly as recorded, for reconciliation to read — a drain must not
+          // journal 'cancelled' over a process that is still alive.
+          console.error(`daemon: drain leaves worker pid ${worker.pid} unreleased; reconcile it (step 8)`)
+          continue
+        }
         const status = readJsonIfAny(attemptPaths(worker.dir).statusPath)
         const record = attemptStateRecord({
           state: 'cancelled',

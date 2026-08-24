@@ -273,6 +273,13 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(cancelled.result.branchPreserved).toBe(true)
     await sleep(300)
     expect(git(['rev-parse', 'feat/stub'], originDir)).toBe(tip)
+    // The on-disk lease was REVOKED before any signal: even a worker that had
+    // resisted its signals would find every further push fenced, and the dead
+    // worker probes gone before anything was released.
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    const leaseFile = readJsonIfAny(join(store.dir, 'attempts', 'a1', 'lease.json'))
+    expect(leaseFile.lease).toBe(null)
+    expect(leaseFile.revokedAt).toBeGreaterThan(0)
   }, 20_000)
 
   it('drains: seals the snapshot, releases the record, and the journal replays clean', async () => {
