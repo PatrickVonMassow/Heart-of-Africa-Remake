@@ -19,6 +19,7 @@ import {
   mintLaunchNonce,
   readinessSatisfied,
   retentionDecision,
+  unknownStateAttempts,
   workerSpawnPlan,
 } from './batch-daemon-core.mjs'
 
@@ -35,6 +36,19 @@ describe('the global cap (M9)', () => {
     expect(activeAttemptCount(attempts)).toBe(3)
     expect(mayStartAttempt({ attempts }).ok).toBe(false)
     expect(mayStartAttempt({ attempts: attempts.slice(1) }).ok).toBe(true)
+  })
+
+  it('an unknown or corrupt state OCCUPIES its slot — fail closed, and surfaced by name', () => {
+    // A record whose state this module cannot read may still be a live
+    // authoring process; excluding it from the count would permit a fourth.
+    const attempts = [at('running'), at('checkpointing'), { state: { state: 'wedged?' } }]
+    expect(activeAttemptCount(attempts)).toBe(3)
+    const refused = mayStartAttempt({ attempts })
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/unreadable states/)
+    expect(unknownStateAttempts(attempts)).toHaveLength(1)
+    // Missing state entirely is the same uncertainty.
+    expect(activeAttemptCount([{}, at('queued')])).toBe(1)
   })
 })
 
@@ -93,6 +107,19 @@ describe('retention — audit forever, bulk for a term', () => {
 
   it('keeps everything when the state carries no usable timestamp', () => {
     expect(retentionDecision({ attempt: { state: { state: 'landed' } }, now: RETAIN_BULK_MS * 10 }).pruneLog).toBe(false)
+  })
+
+  it('keeps everything on an unusable clock or interval — pruning is destructive', () => {
+    const aged = { state: { state: 'landed', at: 0 } }
+    for (const args of [
+      { attempt: aged, now: NaN },
+      { attempt: aged, now: Infinity },
+      { attempt: aged },
+      { attempt: aged, now: RETAIN_BULK_MS + 1, retainMs: NaN },
+      { attempt: aged, now: RETAIN_BULK_MS + 1, retainMs: 0 },
+    ]) {
+      expect(retentionDecision(args), JSON.stringify(args)).toEqual({ keepRecord: true, pruneLog: false, pruneWorktree: false })
+    }
   })
 })
 

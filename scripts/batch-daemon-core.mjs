@@ -19,19 +19,38 @@ import { DAEMON_RECORD_FIELDS, SCHEMA_VERSION, sameProcess } from './batch-schem
  *  POOL_CAP in scripts/batch-in-flight-core.mjs; a test asserts the two agree. */
 export const DAEMON_POOL_CAP = 3
 
-/** The states that occupy a slot: a checkpointing worker is still a live process,
- *  a stalled one may come back (M38 frees no ambiguous lease), so both count.
- *  Only terminal states and queued free the slot. */
+/** The slot question is decided by a FREEING whitelist, not an occupying one:
+ *  a state frees its slot only when it affirmatively proves no authoring
+ *  process runs — queued (nothing spawned yet), ready-for-review and landing
+ *  (M37: the worker exited with a clean worktree and a pushed terminal commit
+ *  before either is reachable), and the terminal states. Running,
+ *  checkpointing and stalled occupy (M38 frees no ambiguous lease) — and so
+ *  does ANY state this module does not recognise: a corrupt or unknown state
+ *  is uncertain evidence, and uncertain evidence occupying a slot is what
+ *  keeps a fourth authoring process out. */
+export const SLOT_FREEING_STATES = Object.freeze(['queued', 'ready-for-review', 'landing', 'landed', 'failed', 'cancelled'])
 export const SLOT_OCCUPYING_STATES = Object.freeze(['running', 'checkpointing', 'stalled'])
 
 export function activeAttemptCount(attempts = []) {
-  return attempts.filter((a) => SLOT_OCCUPYING_STATES.includes(a?.state?.state)).length
+  return attempts.filter((a) => !SLOT_FREEING_STATES.includes(a?.state?.state)).length
+}
+
+/** The unknowns are surfaced beside the count, never silently absorbed into
+ *  it: an operator must see WHICH records occupy slots as quarantined
+ *  evidence rather than as workers. */
+export function unknownStateAttempts(attempts = []) {
+  return attempts.filter((a) => {
+    const s = a?.state?.state
+    return !SLOT_FREEING_STATES.includes(s) && !SLOT_OCCUPYING_STATES.includes(s)
+  })
 }
 
 export function mayStartAttempt({ attempts = [], cap = DAEMON_POOL_CAP } = {}) {
   const active = activeAttemptCount(attempts)
   if (active >= cap) {
-    return { ok: false, reason: `the global cap holds: ${active} of ${cap} slots are occupied, stalled workers included` }
+    const unknown = unknownStateAttempts(attempts).length
+    const suffix = unknown ? `; ${unknown} of them carry unreadable states and occupy their slots as quarantined evidence` : ', stalled workers included'
+    return { ok: false, reason: `the global cap holds: ${active} of ${cap} slots are occupied${suffix}` }
   }
   return { ok: true, active }
 }
@@ -87,10 +106,14 @@ export function workerSpawnPlan({ adapter, pointId, branch, worktree, attemptDir
  *  Failed attempts keep everything: they are evidence someone has not read yet. */
 export const RETAIN_BULK_MS = 14 * 24 * 60 * 60 * 1000
 
-export function retentionDecision({ attempt = {}, now = 0, retainMs = RETAIN_BULK_MS } = {}) {
+export function retentionDecision({ attempt = {}, now, retainMs = RETAIN_BULK_MS } = {}) {
   const state = attempt?.state?.state
   const keepAll = { keepRecord: true, pruneLog: false, pruneWorktree: false }
   if (!['landed', 'cancelled'].includes(state)) return keepAll
+  // Pruning is destructive, so unusable timing evidence keeps everything: a
+  // NaN or infinite clock or interval would otherwise fall through the guard
+  // below and mark logs and worktrees for deletion.
+  if (!Number.isFinite(now) || !Number.isFinite(retainMs) || retainMs <= 0) return keepAll
   const at = attempt?.state?.at
   if (!Number.isFinite(at) || now - at < retainMs) return keepAll
   return { keepRecord: true, pruneLog: true, pruneWorktree: true }
