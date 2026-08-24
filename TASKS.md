@@ -241,6 +241,19 @@ put it is the mistake this line exists to stop.
   point is NOT ticked and its branch stays open. Reason for the original rank: the user ordered it
   forward on 22.08.2026 after a second lane died, and Sol's audit puts 716 first because 716
   repairs the deployed plane while this point replaces it; 716 has since landed.
+  SPLIT ORDERED (user, 24.08.2026, general procedure and not a one-off): a large point that stops
+  converging is cut into smaller standalone points and each is worked on its own — no further
+  confirmation is needed. This point is the named case, at authoring round 27 with four
+  `do-not-merge` passes behind it. THE NEXT SESSION CUTS IT BEFORE IT REVIEWS FURTHER, along the
+  branch's own subsystem seams, because what remains is not building but CROSS-VENDOR REVIEW of
+  ~12,000 lines that no single round can hold: the state store and journal, the daemon and its
+  control plane, the fencing and attempt leases, the adoption and reconciliation slice, the drill
+  and the dark-lane flag, and the four-eyes ledger repair. `node scripts/review-sol.mjs --sha
+  <HEAD> --point 834 --plan` prints the current pass cut and is the honest starting map.
+  WHAT IS ALREADY DONE STAYS DONE and is not re-cut: the branch is built and machine-green (13,419
+  unit tests, lint, build), and the parent-death drill passes end to end through the REAL
+  acquisition path — four review passes have run, every finding they raised is fixed, and the
+  worst of them was that the drill had been simulating the takeover it claimed to prove.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
