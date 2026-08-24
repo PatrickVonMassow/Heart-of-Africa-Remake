@@ -13,14 +13,14 @@
 // Every failure is reported on stderr and swallowed, and the caller's own exit
 // status is untouched.
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.mjs'
+import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import { parseNowCardPoint } from './dashboard-guard-core.mjs'
 import { nowCard } from './board-core.mjs'
 import { mainCheckoutFrom } from './main-checkout-core.mjs'
-import { berlinMinutes } from './dashboard-guard.mjs'
-import { decideHeartbeat, stampAgeMs, stampMinutes, TRIGGERS } from './board-heartbeat-core.mjs'
+import { cardAge, decideHeartbeat, TRIGGERS } from './board-heartbeat-core.mjs'
 
 export { TRIGGERS }
 
@@ -64,18 +64,24 @@ function gitCommonDir(root) {
  * (cross-vendor review, 24.08.2026). The card's own stamp answers the only
  * question that matters: when was THIS status written.
  */
-function readCard(state, nowMin, root) {
+export function readCard(state, root) {
   try {
-    if (!state?.dashboardPath) return { point: null, ageMs: null }
+    if (!state?.dashboardPath) return { point: null, digest: '' }
     const html = readFileSync(resolve(root, state.dashboardPath), 'utf8')
     const point = parseNowCardPoint(html)
     const card = point == null ? null : nowCard(html, point)
-    const stamp = card ? /<span class="stamp">Stand ([^<]*)<\/span>/.exec(card)?.[1] : null
-    return { point, ageMs: stampAgeMs(stampMinutes(stamp), nowMin) }
+    // The WHOLE card is the content: its status line, its stamp and its title.
+    // Anything that rewrites any of them is a card the reader has not seen.
+    return { point, digest: card ? createHash('sha256').update(card).digest('hex') : '' }
   } catch {
-    return { point: null, ageMs: null }
+    return { point: null, digest: '' }
   }
 }
+
+/** Where this module remembers the card it last saw. Its OWN file: the shared
+ *  dashboard state is written by many commands, and a read-modify-write from
+ *  here would race them for no reason. */
+const memoryPath = (root) => resolve(root, '.claude', 'board-heartbeat.json')
 
 /**
  * Restamp the now-card through the ordinary board command, which owns the edit,
@@ -115,8 +121,10 @@ export function heartbeat({
   root = undefined,
   state = undefined,
   focus = undefined,
-  nowMinutes = berlinMinutes(),
+  now = Date.now(),
   card = undefined,
+  memory = undefined,
+  remember = undefined,
   writeStatus = runBoardStatus,
   stderr = (line) => console.error(line),
 } = {}) {
@@ -129,11 +137,23 @@ export function heartbeat({
     const owned = (path) => resolve(owner, relative(REPO_ROOT, path))
     const seenState = state ?? readJson(owned(STATE_PATH))
     const seenFocus = focus ?? readJson(owned(FOCUS_PATH))
-    const seen = card === undefined ? readCard(seenState, nowMinutes, owner) : card
+    const seen = card === undefined ? readCard(seenState, owner) : card
+    const record = memory === undefined ? readJson(memoryPath(owner)) : memory
+    const aged = cardAge({ record, digest: seen.digest, now })
+    // Remembered BEFORE the decision, so a refusal further down still leaves the
+    // reader able to age this card next time instead of answering UNKNOWN forever.
+    if (aged.remember) {
+      const write = remember ?? ((value) => writeJsonAtomic(memoryPath(owner), value))
+      try {
+        write(aged.remember)
+      } catch {
+        // Bookkeeping about bookkeeping: never worth failing a recorded review.
+      }
+    }
     const decision = decideHeartbeat({
       focus: seenFocus,
       cardPoint: seen.point,
-      ageMs: seen.ageMs,
+      ageMs: aged.ageMs,
       trigger,
       detail,
     })

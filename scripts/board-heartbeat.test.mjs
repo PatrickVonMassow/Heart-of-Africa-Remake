@@ -2,12 +2,24 @@
 // promise that it never takes its caller down. Every dependency is injected, so
 // no case touches the real board, its branch or the network.
 import { describe, it, expect } from 'vitest'
-import { boardRoot, heartbeat, runBoardStatus, TRIGGERS } from './board-heartbeat.mjs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { boardRoot, heartbeat, readCard, runBoardStatus, TRIGGERS } from './board-heartbeat.mjs'
 import { REASONS, STALE_AFTER_MS } from './board-heartbeat-core.mjs'
 
 const FOCUS = { point: 847, note: 'Sol-Prüfrunden zu Punkt 847' }
-const STALE = { point: 847, ageMs: STALE_AFTER_MS + 1 }
-const FRESH = { point: 847, ageMs: 1_000 }
+const NOW = 1_700_000_000_000
+
+/** A now-card of `point` that has stood unchanged for `ms`. The age is a record
+ *  of when this exact content was first seen, never a stamp read off the card —
+ *  see the core's cardAge for why a time-only stamp cannot carry it. */
+const stood = (ms, point = 847) => ({
+  card: { point, digest: 'd' },
+  memory: Number.isFinite(ms) ? { digest: 'd', seenAt: NOW - ms } : null,
+  now: NOW,
+  remember: () => {},
+})
 
 /** A writeStatus that records what it was asked to publish. */
 const recorder = () => {
@@ -22,7 +34,7 @@ describe('a recording step carries the board', () => {
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 3 abgeschlossen (do-not-merge)',
       focus: FOCUS,
-      card: STALE,
+      ...stood(STALE_AFTER_MS + 1),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(true)
@@ -37,7 +49,7 @@ describe('a recording step carries the board', () => {
       trigger: TRIGGERS.MECHANISM_RECORD,
       detail: 'Prüfung aufgezeichnet',
       focus: FOCUS,
-      card: FRESH,
+      ...stood(1_000),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(false)
@@ -58,9 +70,9 @@ describe('staleness is read from the CARD, never from a publish', () => {
       trigger: TRIGGERS.IN_FLIGHT,
       detail: 'Suite läuft',
       // The board published seconds ago; THIS card's status is an hour old.
-      state: { pagesPublishedAt: Date.now(), dashboardPath: '.batch-dashboard.html' },
+      state: { pagesPublishedAt: NOW, dashboardPath: '.batch-dashboard.html' },
       focus: FOCUS,
-      card: { point: 847, ageMs: 60 * 60_000 },
+      ...stood(60 * 60_000),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(true)
@@ -68,18 +80,109 @@ describe('staleness is read from the CARD, never from a publish', () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('reads the card\'s own stamp out of the real board markup', async () => {
-    // The parser is exercised against the exact span the board writes, so a
-    // markup change breaks this rather than silently disabling the heartbeat.
-    const { berlinMinutes } = await import('./dashboard-guard.mjs')
-    const { stampAgeMs, stampMinutes } = await import('./board-heartbeat-core.mjs')
-    const card = '<span class="stamp">Stand 04:15</span> Sol-Prüfrunde läuft'
-    const stamp = /<span class="stamp">Stand ([^<]*)<\/span>/.exec(card)?.[1]
-    expect(stamp).toBe('04:15')
-    expect(stampMinutes(stamp)).toBe(4 * 60 + 15)
-    // Age against a known clock reading, so no wall clock enters the assertion.
-    expect(stampAgeMs(stampMinutes(stamp), 5 * 60 + 15)).toBe(60 * 60_000)
-    expect(typeof berlinMinutes()).toMatch(/number|object/)
+})
+
+describe('the production card reader, against real board markup', () => {
+  // THE GAP THE SECOND ROUND FOUND: every behavioural case above injects `card`,
+  // so breaking the real reader — or swapping it back for a publish timestamp —
+  // would have left this suite green. These cases drive readCard and heartbeat
+  // through an actual board file on disk.
+  const board = (point, status, stamp) =>
+    `<main>
+<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
+<details class="now">
+  <summary><span class="num">${point}</span><span class="t">Ein Titel</span><span class="right"><span class="meta">10:02 · ~12:02</span></span></summary>
+  <div class="body">
+    <p><span class="stamp">Stand ${stamp}</span> ${status}</p>
+  </div>
+</details>
+</details>
+</main>`
+
+  const withBoard = (html) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-heartbeat-'))
+    mkdirSync(join(dir, '.claude'), { recursive: true })
+    writeFileSync(join(dir, '.batch-dashboard.html'), html)
+    return dir
+  }
+
+  it('reads the now-card\'s point and a digest of its content', () => {
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    try {
+      const seen = readCard({ dashboardPath: '.batch-dashboard.html' }, dir)
+      expect(seen.point).toBe(848)
+      expect(seen.digest).toMatch(/^[0-9a-f]{64}$/)
+      // The digest follows the card's TEXT, not just its identity.
+      const other = readCard({ dashboardPath: '.batch-dashboard.html' }, withBoard(board(848, 'ein anderer Stand', '10:17')))
+      expect(other.digest).not.toBe(seen.digest)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('drives the whole read path: unseen card, then unchanged, then stale', () => {
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    try {
+      const NOW = 1_700_000_000_000
+      const state = { dashboardPath: '.batch-dashboard.html' }
+      const focus = { point: 848, note: 'Fokus' }
+      const kept = []
+      const calls = []
+      const run = (now, memory) =>
+        heartbeat({
+          trigger: TRIGGERS.REVIEW_ROUND,
+          detail: 'Runde',
+          root: dir,
+          state,
+          focus,
+          now,
+          memory,
+          remember: (value) => kept.push(value),
+          writeStatus: (point, status) => calls.push({ point, status }),
+        })
+
+      // Never looked: unprovable, so it refreshes AND records what it saw.
+      const first = run(NOW, null)
+      expect(first.refreshed).toBe(true)
+      expect(first.reason).toBe(REASONS.NEVER_STAMPED)
+      expect(kept).toHaveLength(1)
+      const seen = kept[0]
+
+      // The same card a minute later: current, nothing written.
+      expect(run(NOW + 60_000, seen).reason).toBe(REASONS.CURRENT)
+      expect(calls).toHaveLength(1)
+
+      // The same card long after: stale, and carried.
+      expect(run(NOW + STALE_AFTER_MS + 1, seen).reason).toBe(REASONS.STALE)
+      expect(calls).toHaveLength(2)
+      expect(calls[1]).toEqual({ point: 848, status: 'Fokus · Runde' })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a card rewritten by somebody else reads as current, not as stale', () => {
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    try {
+      const calls = []
+      const result = heartbeat({
+        trigger: TRIGGERS.MECHANISM_RECORD,
+        detail: 'Prüfung',
+        root: dir,
+        state: { dashboardPath: '.batch-dashboard.html' },
+        focus: { point: 848, note: 'Fokus' },
+        now: 1_700_000_000_000,
+        // A record of a DIFFERENT card: somebody wrote since the last look.
+        memory: { digest: 'ein anderer Kartenstand', seenAt: 1_700_000_000_000 - 99 * 60_000 },
+        remember: () => {},
+        writeStatus: (point, status) => calls.push({ point, status }),
+      })
+      expect(result.refreshed).toBe(false)
+      expect(result.reason).toBe(REASONS.CURRENT)
+      expect(calls).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -90,7 +193,7 @@ describe('what it refuses, and what it survives', () => {
       trigger: TRIGGERS.MECHANISM_RECORD,
       detail: 'Prüfung aufgezeichnet',
       focus: { point: null, note: 'Abschluss vorbereiten' },
-      card: { point: null, ageMs: STALE_AFTER_MS + 1 },
+      ...stood(STALE_AFTER_MS + 1, null),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(false)
@@ -104,7 +207,7 @@ describe('what it refuses, and what it survives', () => {
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 3',
       focus: FOCUS,
-      card: STALE,
+      ...stood(STALE_AFTER_MS + 1),
       writeStatus: () => {
         throw new Error('publish precondition refused')
       },
@@ -123,7 +226,7 @@ describe('what it refuses, and what it survives', () => {
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 1',
       focus: FOCUS,
-      card: { point: 847, ageMs: null },
+      ...stood(null),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(true)
@@ -137,7 +240,7 @@ describe('what it refuses, and what it survives', () => {
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 3',
       focus: FOCUS,
-      card: { point: 720, ageMs: STALE_AFTER_MS + 1 },
+      ...stood(STALE_AFTER_MS + 1, 720),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(false)
@@ -225,7 +328,7 @@ describe('the board belongs to the owning checkout', () => {
       root: '/repo',
       state: { dashboardPath: '.batch-dashboard.html' },
       focus: FOCUS,
-      card: STALE,
+      ...stood(STALE_AFTER_MS + 1),
       writeStatus: (point, status, opts) => seen.push({ point, root: opts?.root }),
     })
     expect(seen).toEqual([{ point: 847, root: '/repo' }])

@@ -5,9 +5,8 @@ import {
   decideHeartbeat,
   heartbeatStatus,
   REASONS,
+  cardAge,
   STALE_AFTER_MS,
-  stampAgeMs,
-  stampMinutes,
   TRIGGERS,
 } from './board-heartbeat-core.mjs'
 
@@ -136,16 +135,43 @@ describe('currency that cannot be proven is not currency', () => {
     expect(decision.reason).toBe(REASONS.NEVER_STAMPED)
   })
 
-  it('reads the card stamp, and wraps a stamp ahead of the clock to yesterday', () => {
-    expect(stampMinutes('04:15')).toBe(255)
-    expect(stampMinutes('Stand 23:59')).toBe(1439)
-    expect(stampMinutes('nonsense')).toBeNull()
-    expect(stampMinutes('99:99')).toBeNull()
-    // 05:15 now, stamped 04:15 → one hour.
-    expect(stampAgeMs(255, 315)).toBe(60 * 60_000)
-    // 00:10 now, stamped 23:50 → twenty minutes, not minus 23 hours.
-    expect(stampAgeMs(1430, 10)).toBe(20 * 60_000)
-    expect(stampAgeMs(null, 10)).toBeNull()
+  it('ages the card by CONTENT, and answers UNKNOWN where it has never looked', () => {
+    const NOW = 1_700_000_000_000
+    // Never looked: the age is unprovable, and the caller must read that as stale.
+    const first = cardAge({ record: null, digest: 'a', now: NOW })
+    expect(first.ageMs).toBeNull()
+    expect(first.remember).toEqual({ digest: 'a', seenAt: NOW })
+
+    // Unchanged since it was recorded: the age is exactly that span.
+    const stood = cardAge({ record: { digest: 'a', seenAt: NOW - 90_000 }, digest: 'a', now: NOW })
+    expect(stood.ageMs).toBe(90_000)
+    expect(stood.remember).toBeNull()
+
+    // Somebody rewrote the card: it is current, and now is when that was seen.
+    const rewritten = cardAge({ record: { digest: 'a', seenAt: NOW - 90_000 }, digest: 'b', now: NOW })
+    expect(rewritten.ageMs).toBe(0)
+    expect(rewritten.remember).toEqual({ digest: 'b', seenAt: NOW })
+
+    // A malformed record is ignorance, not evidence.
+    expect(cardAge({ record: { digest: 'a' }, digest: 'a', now: NOW }).ageMs).toBeNull()
+  })
+
+  it('a card untouched for a full day never reads as fresh again', () => {
+    // THE DEFECT A TIME-ONLY STAMP HAD (cross-vendor review, 24.08.2026, second
+    // round): aged modulo a day, a card stamped 04:15 and untouched for 24 h read
+    // as freshly stamped for ten minutes. An epoch record cannot wrap.
+    const NOW = 1_700_000_000_000
+    const day = cardAge({ record: { digest: 'a', seenAt: NOW - 24 * 3_600_000 }, digest: 'a', now: NOW })
+    expect(day.ageMs).toBe(24 * 3_600_000)
+    expect(
+      decideHeartbeat({
+        focus: FOCUS,
+        cardPoint: 847,
+        ageMs: day.ageMs,
+        trigger: TRIGGERS.REVIEW_ROUND,
+        detail: 'x',
+      }).reason,
+    ).toBe(REASONS.STALE)
   })
 })
 

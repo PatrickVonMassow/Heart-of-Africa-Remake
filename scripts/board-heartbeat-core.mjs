@@ -45,29 +45,30 @@ const KNOWN = new Set(Object.values(TRIGGERS))
  */
 export const STALE_AFTER_MS = 10 * 60_000
 
-/** Minutes-since-midnight of a `Stand HH:MM` stamp, or null when there is none
- *  to read. The board writes this stamp onto the now-card itself, so it answers
- *  the only question that matters here: when was THIS card's status written. */
-export function stampMinutes(stamp) {
-  const m = /(\d{1,2}):(\d{2})/.exec(String(stamp ?? ''))
-  if (!m) return null
-  const h = Number(m[1])
-  const min = Number(m[2])
-  if (!Number.isInteger(h) || !Number.isInteger(min) || h > 23 || min > 59) return null
-  return h * 60 + min
-}
-
 /**
- * How long the card's own stamp has stood, in ms.
+ * How long the now-card has stood UNCHANGED, from a record of when its content
+ * was last seen to differ.
  *
- * The stamp carries no date, so it is read as the most recent occurrence at or
- * before now — a stamp "ahead" of the clock belongs to yesterday. Anything that
- * old is far past every threshold anyway, so the wrap costs no precision where
- * the answer matters.
+ * WHY NOT THE CARD'S OWN `Stand HH:MM` STAMP: it carries no date, so its age can
+ * only be computed modulo a day, and a card untouched for exactly 24 hours reads
+ * as freshly stamped again for ten minutes (cross-vendor review, 24.08.2026,
+ * second round). A time-only stamp cannot distinguish today from yesterday, and
+ * "unprovable currency is stale" must not have a window in which it inverts.
+ *
+ * The three answers are distinct on purpose:
+ *   · no record at all — nothing here has ever looked, so the age is UNKNOWN and
+ *     the caller must treat it as stale rather than guess.
+ *   · the content differs from the recorded one — somebody rewrote the card since
+ *     the last look, so it is current, and now is when that was first seen.
+ *   · the content matches — the card has stood untouched since it was recorded.
  */
-export function stampAgeMs(stampMin, nowMin) {
-  if (!Number.isInteger(stampMin) || !Number.isInteger(nowMin)) return null
-  return (((nowMin - stampMin) % 1440) + 1440) % 1440 * 60_000
+export function cardAge({ record = null, digest = '', now = 0 } = {}) {
+  const seenAt = Number(record?.seenAt)
+  if (!record || !record.digest || !Number.isFinite(seenAt)) {
+    return { ageMs: null, remember: { digest, seenAt: now } }
+  }
+  if (record.digest !== digest) return { ageMs: 0, remember: { digest, seenAt: now } }
+  return { ageMs: now - seenAt, remember: null }
 }
 
 /** Why a decision came out the way it did. Recorded, so a caller can say what
