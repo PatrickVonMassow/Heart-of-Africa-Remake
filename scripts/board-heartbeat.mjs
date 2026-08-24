@@ -209,7 +209,12 @@ export function heartbeat({
     // The card is addressed by NUMBER, so a refresh needs one. A non-point focus
     // is legitimate work, but there is no card here to carry it.
     const target = seenFocus?.point ?? seen.point
-    if (target == null) return { refreshed: false, reason: 'no-target' }
+    if (target == null) {
+      // Another no-write path, so the observation is kept here too: nothing was
+      // written, and this is what bounds the card's age at the next look.
+      if (aged.remember) keep(aged.remember)
+      return { refreshed: false, reason: 'no-target' }
+    }
 
     writeStatus(target, decision.status, { root: owner })
     // NOW the card's age is known exactly rather than bounded: this wrote it.

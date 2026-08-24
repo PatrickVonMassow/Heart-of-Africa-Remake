@@ -301,16 +301,23 @@ describe('the production card reader, against real board markup', () => {
 describe('what it refuses, and what it survives', () => {
   it('has no card to carry when neither the focus nor the board names a point', () => {
     const { calls, write } = recorder()
+    const kept = []
     const result = heartbeat({
       trigger: TRIGGERS.MECHANISM_RECORD,
       detail: 'Prüfung aufgezeichnet',
       focus: { point: null, note: 'Abschluss vorbereiten' },
       ...stood(STALE_AFTER_MS + 1, null),
+      // No record yet, so this observation IS new information worth keeping.
+      memory: null,
+      remember: (value) => kept.push(value),
       writeStatus: write,
     })
     expect(result.refreshed).toBe(false)
     expect(result.reason).toBe('no-target')
     expect(calls).toEqual([])
+    // Nothing was written, so the observation is still the age bound for the
+    // next look — this path used to drop it (seventh cross-vendor round).
+    expect(kept).toHaveLength(1)
   })
 
   it('NEVER throws when the board write fails — the caller recorded real work', () => {
