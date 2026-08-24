@@ -51,6 +51,7 @@ import {
   modelsFromTrailers,
   MODES,
   parseArgs,
+  sameModel,
   validatePass,
   validateRecord,
   resolveMergePolicy,
@@ -105,9 +106,43 @@ export const RECORDS_PATH = recordsPathFor()
 const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 
+/** The committed model field and blob oid of a repository half — read from
+ *  HEAD, never from the working tree, so what it answers is what a commit
+ *  somebody can read actually says. Null when the path is not committed JSON
+ *  with a model field. */
+export function committedHalfModel(path) {
+  try {
+    const rel = String(path ?? '').trim()
+    if (!rel || rel.startsWith('/') || rel.includes('..')) return null
+    const oid = git(['rev-parse', `HEAD:${rel}`])
+    const model = JSON.parse(git(['show', `HEAD:${rel}`]))?.model
+    return typeof model === 'string' && model.trim() ? { oid, model: model.trim() } : null
+  } catch {
+    return null
+  }
+}
+
+/** Is a ledger row's halfAuthors claim BACKED BY THE REPOSITORY? The ledger is
+ *  hand-editable, so the two names alone are not evidence: each named source
+ *  must be a tracked, clean artefact whose COMMITTED model field says exactly
+ *  what the row claims. The gate poisons a claim this cannot confirm. */
+export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel } = {}) {
+  const authors = Array.isArray(record?.halfAuthors) ? record.halfAuthors : []
+  const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
+  if (authors.length !== 2 || sources.length !== 2) return false
+  return sources.every((src, i) => {
+    if (!isTracked(src)) return false
+    const committed = committedHalf(src)
+    return committed !== null && sameModel(committed.model, authors[i])
+  })
+}
+
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
- *  outlives the code that writes it, and one bad line must not blind the gate. */
-export function readRecords(path = RECORDS_PATH) {
+ *  outlives the code that writes it, and one bad line must not blind the gate.
+ *  A row claiming half authors is STAMPED with whether the repository confirms
+ *  the claim (`halfAuthorsVerified`), because the merge gate must never trust
+ *  two hand-editable strings to bypass the self-merge fence. */
+export function readRecords(path = RECORDS_PATH, { verifyHalves = verifyHalfAuthors } = {}) {
   // No checkout, no ledger — an empty history, not another tree's file.
   if (!path) return []
   let text = ''
@@ -133,7 +168,12 @@ export function readRecords(path = RECORDS_PATH) {
       // The sha shape is checked HERE, not only where it is used: the guard
       // interpolates it into a `git merge-base` command line, and a ledger is a
       // file anyone can hand-edit (four-eyes review, 27.07.2026).
-      if (rec && typeof rec.sha === 'string' && /^[0-9a-f]{7,40}$/i.test(rec.sha)) out.push(rec)
+      if (rec && typeof rec.sha === 'string' && /^[0-9a-f]{7,40}$/i.test(rec.sha)) {
+        if (Array.isArray(rec.halfAuthors) && rec.halfAuthors.length) {
+          rec.halfAuthorsVerified = verifyHalves(rec) === true
+        }
+        out.push(rec)
+      }
     } catch {
       /* a corrupted line is not a review; the gate then simply lacks it */
     }
@@ -226,6 +266,7 @@ export function buildRecord({
   resolve = resolveCommit,
   countUnion = countUnionFiles,
   isTracked = isTrackedInGit,
+  committedHalf = committedHalfModel,
   fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
@@ -319,6 +360,9 @@ export function buildRecord({
   let halfAuthors = []
   /** …and the paths they were read from, so the record says what it trusted. */
   let halfSources = []
+  /** …and the COMMITTED blob oids the authors were read from, so a later
+   *  reader can re-derive the exact evidence instead of trusting two strings. */
+  let halfBlobs = []
   if (missing.length < paths.length) {
     if (missing.length) {
       return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
@@ -327,12 +371,19 @@ export function buildRecord({
     if (!counted.ok) return { ok: false, errors: counted.errors }
     receipt = counted.summary
     source = 'computed'
-    // ONLY FROM TRACKED HALVES, see isTrackedInGit: an untracked path is caller-
-    // written, and the whole point of reading the halves is that a reviewer can
-    // read the same file. Where they are not tracked the trailer proxy stands.
+    // ONLY FROM TRACKED HALVES, AND ONLY FROM THEIR COMMITTED BYTES: an
+    // untracked path is caller-written, and even a tracked one may have been
+    // read from a working tree that changed between the count and this check.
+    // The authors stored here are re-read from HEAD's blobs and must agree
+    // with what the count saw — anything less binds the record to bytes no
+    // commit carries. Where that fails the trailer proxy stands.
     if (counted.halfAuthors?.length === 2 && [listAPath, listBPath].every((path) => isTracked(path))) {
-      halfAuthors = counted.halfAuthors
-      halfSources = [listAPath, listBPath]
+      const committed = [listAPath, listBPath].map((path) => committedHalf(path))
+      if (committed.every(Boolean) && committed.every((c, i) => sameModel(c.model, counted.halfAuthors[i]))) {
+        halfAuthors = committed.map((c) => c.model)
+        halfSources = [listAPath, listBPath]
+        halfBlobs = committed.map((c) => c.oid)
+      }
     }
   }
   const commit = resolve(sha)
@@ -464,7 +515,7 @@ export function buildRecord({
       // the merger committed its own union — so a merge accepted here would be
       // condemned as a self-merge on the next read (four-eyes finding on this
       // change). The sources travel with it so the claim stays checkable.
-      ...(halfAuthors.length === 2 ? { halfAuthors, halfSources } : {}),
+      ...(halfAuthors.length === 2 ? { halfAuthors, halfSources, halfBlobs } : {}),
       // The count itself, so the ledger holds the receipt and not only the claim
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.

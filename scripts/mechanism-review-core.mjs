@@ -1129,9 +1129,18 @@ export function mergeProblem(record = {}, commit = {}) {
   // by the proxy alone condemns every merge whose merging model committed its own
   // union — which is precisely the case the recorder was taught to accept, so the
   // gate has to read the same fact or the two disagree by construction.
+  //
+  // BUT THE FIELD IS A CLAIM, NOT EVIDENCE: ledger rows are hand-editable, and
+  // two fabricated names excluding the merger would bypass the self-merge
+  // fence entirely. The halves therefore decide ONLY when the ledger reader
+  // stamped them VERIFIED against the repository's committed bytes
+  // (readRecords → verifyHalfAuthors); a claim the repository cannot confirm
+  // POISONS the record instead of being trusted or silently ignored — silently
+  // falling back to the proxy would let a forger probe until a wording passes.
   const halves = (Array.isArray(record.halfAuthors) ? record.halfAuthors : [])
     .map((a) => String(a ?? '').trim())
     .filter(Boolean)
+  if (halves.length && record.halfAuthorsVerified !== true) return 'unverified-halves'
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,

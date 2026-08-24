@@ -2060,9 +2060,22 @@ describe('a recorded merge is re-judged by the halves it names', () => {
   // it. The trailer proxy therefore reads Claude as an author of the material.
   const commit = { authorModels: ['Claude Opus 5 (1M context)'] }
 
-  it('accepts the merger the halves leave untainted, whoever committed the union', () => {
-    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+  it('accepts the merger only when VERIFIED halves leave it untainted, whoever committed the union', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
     expect(mergeProblem(record, commit)).toBe('')
+  })
+
+  it('POISONS a half-author claim the repository did not confirm — hand-edited names buy nothing', () => {
+    // The ledger is hand-editable: two fabricated names excluding the merger
+    // would otherwise bypass the self-merge fence. An unverified claim is a
+    // problem in itself — not trusted, and not silently degraded to the proxy,
+    // which would let a forger probe wordings until one passes.
+    const forged = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+    expect(mergeProblem(forged, commit)).toBe('unverified-halves')
+    const stampedFalse = { ...forged, halfAuthorsVerified: false }
+    expect(mergeProblem(stampedFalse, commit)).toBe('unverified-halves')
+    // And the stamp is an affirmative true, not any truthy value.
+    expect(mergeProblem({ ...forged, halfAuthorsVerified: 'yes' }, commit)).toBe('unverified-halves')
   })
 
   it('would have condemned that same merge on the commit trailers alone', () => {
@@ -2072,13 +2085,13 @@ describe('a recorded merge is re-judged by the halves it names', () => {
     expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 
-  it('still refuses a merger the halves name as an author', () => {
-    const record = { ...base, mergedBy: 'GPT-5.6 Sol', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'] }
+  it('still refuses a merger the verified halves name as an author', () => {
+    const record = { ...base, mergedBy: 'GPT-5.6 Sol', halfAuthors: ['Fable 5', 'GPT-5.6 Sol'], halfAuthorsVerified: true }
     expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 
-  it('ignores a half list that does not name both authors', () => {
-    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5'] }
+  it('a verified half list that does not name both authors still falls back to the proxy', () => {
+    const record = { ...base, mergedBy: 'Claude Opus 5', halfAuthors: ['Fable 5'], halfAuthorsVerified: true }
     expect(mergeProblem(record, commit)).toBe('self-merge')
   })
 })
