@@ -440,6 +440,13 @@ describe('a record is read once — the accessor class of the cross-vendor revie
       getPrototypeOf() { throw new Error('unreadable') },
     })
     expect(claimWorktree({ claims: hostile, worktree: '/wt/a', attempt: other }).ok).toBe(false)
+    // And a proxy that LIES successfully is the same silent success: it reports the
+    // prototype of a plain map, denies being an array, and then shows no entries.
+    const spoofing = new Proxy(new Map([['/wt/a', { ...attempt }]]), {
+      getPrototypeOf() { return Object.prototype },
+    })
+    expect(claimWorktree({ claims: spoofing, worktree: '/wt/a', attempt: other }).ok).toBe(false)
+    expect(releaseWorktree({ claims: spoofing, worktree: '/wt/a', attempt }).ok).toBe(false)
     const revoked = Proxy.revocable({ '/wt/a': { ...attempt } }, {})
     revoked.revoke()
     expect(claimWorktree({ claims: revoked.proxy, worktree: '/wt/a', attempt: other }).ok).toBe(false)

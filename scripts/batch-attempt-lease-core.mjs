@@ -16,6 +16,7 @@
 // refs/hoa/coordinator (batch-schema-core.mjs, publicationPush), which is a check
 // that IS the push. Both halves fail closed.
 import { normalize } from 'node:path'
+import { types } from 'node:util'
 import { sameAttempt, sameProcess } from './batch-schema-core.mjs'
 
 /** How long a granted lease holds without renewal. Generous against load stalls —
@@ -432,8 +433,18 @@ function readClaims(claims) {
   // Map was ACCEPTED and read as empty; `Array.isArray` on a revoked proxy throws in
   // the same breath (cross-vendor review of point 893). Both readings are taken
   // together, inside the guard, and a shape that cannot be read at all is no shape.
+  // AND A CONTAINER THAT ANSWERS FOR ITSELF IS NOT ONE OF THESE. Every check above
+  // asks the container what it is, and a proxy answers whatever it likes: one over a
+  // populated Map can report Object.prototype, deny being an array and then show no
+  // entries at all, so the fail-closed guard passes it and the held worktree is
+  // handed on (cross-vendor review of point 893). A claims map is persisted data or
+  // a map this module minted; a proxy in that position is never legitimate, and it
+  // is the one exotic container no structural check can unmask — `types.isProxy`
+  // asks the runtime instead of the value. RECORDS inside the map need no such
+  // check: their fields are copied and only the VALUES decide, so a record that
+  // lies says no more than a plain one carrying the same values.
   const shape = readOnce(() => ({ proto: Object.getPrototypeOf(claims), isArray: Array.isArray(claims) }))
-  if (typeof claims !== 'object' || !shape || shape.isArray || (shape.proto !== Object.prototype && shape.proto !== null)) {
+  if (typeof claims !== 'object' || types.isProxy(claims) || !shape || shape.isArray || (shape.proto !== Object.prototype && shape.proto !== null)) {
     return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
   }
   // A STORED KEY IS ITSELF A CANONICAL WORKTREE KEY. Canonicalising only the
