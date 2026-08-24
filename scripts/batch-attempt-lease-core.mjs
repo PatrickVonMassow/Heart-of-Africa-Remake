@@ -35,9 +35,38 @@ export const ATTEMPT_LEASE_TTL_MS = 5 * 60 * 1000
  *  an object with what it was given. */
 function attemptIdentity(attempt) {
   if (!attempt || typeof attempt !== 'object') return null
+  // READ ONCE, THEN JUDGE THE COPY. Validating the caller's object and building the
+  // result from a SECOND read is a check on one value and a decision on another.
+  const identity = { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }
   const named = (v) => typeof v === 'string' && v !== ''
-  if (!named(attempt.batchId) || !named(attempt.pointId) || !named(attempt.attemptId)) return null
-  return { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }
+  if (!named(identity.batchId) || !named(identity.pointId) || !named(identity.attemptId)) return null
+  return identity
+}
+
+/** THE RECORDS THIS MODULE DECIDES ON ARE READ EXACTLY ONCE, into a snapshot of
+ *  plain values, and every guard and every comparison after that reads the SNAPSHOT.
+ *  Re-reading a caller's object after validating it decides on a value the guard
+ *  never saw: an accessor-backed field answers a valid name to the check and a
+ *  shared object to the comparison that follows, so both guards pass while the
+ *  comparison matches by reference and frees a claim this module cannot read
+ *  (cross-vendor review of point 893). A persisted record has no accessors, but not
+ *  every record this module is handed comes from JSON — and the rule costs one copy.
+ *  A snapshot that cannot be taken is `null`: unreadable ownership, as everywhere. */
+function snapshotHolder(holder) {
+  if (!holder || typeof holder !== 'object') return null
+  return { pid: holder.pid, pidStartedAt: holder.pidStartedAt }
+}
+
+function snapshotLease(lease) {
+  if (!lease || typeof lease !== 'object') return null
+  const identity = attemptIdentity(lease)
+  const holder = snapshotHolder(lease.holder)
+  if (!identity || !holder) return null
+  const snapshot = { ...identity, leaseId: lease.leaseId, holder, grantedAt: lease.grantedAt, expiresAt: lease.expiresAt }
+  // An OMITTED renewal stays omitted: `renewedAt: undefined` is a renewal the
+  // usability check would have to treat as present-but-unreadable.
+  if (lease.renewedAt !== undefined) snapshot.renewedAt = lease.renewedAt
+  return snapshot
 }
 
 function usableLease(lease) {
@@ -74,7 +103,7 @@ function usableLease(lease) {
  *  point 893). The identity is a FRESH frozen record, so no reference anyone already
  *  holds reaches into a lease this module has handed out. */
 function sealedLease(lease) {
-  return Object.freeze({ ...lease, holder: Object.freeze({ pid: lease.holder.pid, pidStartedAt: lease.holder.pidStartedAt }) })
+  return Object.freeze({ ...lease, holder: Object.freeze({ ...lease.holder }) })
 }
 
 /** The moment before which a clock is ROLLED BACK for this lease. A renewal keeps
@@ -110,7 +139,8 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
   if (!identity) {
     return { ok: false, reason: 'a lease names its batch, point and attempt, each of them a non-empty string' }
   }
-  if (!Number.isInteger(holder.pid) || holder.pid < 1 || !Number.isFinite(holder.pidStartedAt)) {
+  const holderSnapshot = snapshotHolder(holder)
+  if (!holderSnapshot || !Number.isInteger(holderSnapshot.pid) || holderSnapshot.pid < 1 || !Number.isFinite(holderSnapshot.pidStartedAt)) {
     return { ok: false, reason: 'a lease holder is a process identity: pid and pid start time' }
   }
   if (!Number.isFinite(now) || !Number.isFinite(ttlMs) || ttlMs <= 0) {
@@ -131,55 +161,56 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
   // through to the fresh grant, so unreadable ownership was interpreted as no
   // ownership (cross-vendor review of point 893). Every other value is a lease
   // this module must read, and failing to read it fails closed.
+  const existingLease = existing === null || existing === undefined ? null : snapshotLease(existing)
   if (existing !== null && existing !== undefined) {
-    if (!usableLease(existing)) {
+    if (!usableLease(existingLease)) {
       // An unreadable lease is UNCERTAIN ownership, and uncertain fails closed
       // (M39) — never "broken, therefore free".
       return { ok: false, reason: 'the existing lease is unreadable; ownership is uncertain and uncertain fails closed' }
     }
-    if (!sameAttempt(existing, attempt)) {
+    if (!sameAttempt(existingLease, identity)) {
       return { ok: false, reason: 'the existing lease belongs to another attempt; the daemon indexed it wrong' }
     }
     // A CLOCK BEFORE THE LEASE'S OWN LAST EVIDENCE IS NOT EARLINESS, IT IS
     // ROLLBACK, and no decision below — renewal, lapse, duplicate writer, adoption
     // — can be made on a clock that cannot judge expiry. It fences here, before
     // the branches, so a rollback can never buy a silent extension.
-    if (now < clockFloor(existing)) {
-      return { ok: false, reason: `the clock is ${clockFloor(existing) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }
+    if (now < clockFloor(existingLease)) {
+      return { ok: false, reason: `the clock is ${clockFloor(existingLease) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }
     }
-    if (sameProcess(existing.holder, holder)) {
-      if (now <= existing.expiresAt) {
-        return { ok: true, renewed: true, lease: sealedLease({ ...existing, renewedAt: now, expiresAt }) }
+    if (sameProcess(existingLease.holder, holderSnapshot)) {
+      if (now <= existingLease.expiresAt) {
+        return { ok: true, renewed: true, lease: sealedLease({ ...existingLease, renewedAt: now, expiresAt }) }
       }
       // A LAPSED lease never extends silently (M38): once the renewal persisted,
       // expiredLeaseAlerts could no longer observe the lapse. The lapse is
       // alerted HERE, the stale renewal is refused, and the same process — alive
       // by construction, it is asking — continues only under a NEW lease id the
       // daemon records as a re-grant, never as a resurrection.
-      if (typeof leaseId !== 'string' || !leaseId || leaseId === existing.leaseId) {
+      if (typeof leaseId !== 'string' || !leaseId || leaseId === existingLease.leaseId) {
         return {
           ok: false,
           verdict: 'lapsed',
           reason: 'the lease lapsed before this renewal; a lapse alerts and re-grants under a new lease id, it never extends silently (M38)',
-          alert: `attempt lease ${existing.leaseId} expired ${now - existing.expiresAt}ms ago while its holder pid ${existing.holder.pid} still lives`,
+          alert: `attempt lease ${existingLease.leaseId} expired ${now - existingLease.expiresAt}ms ago while its holder pid ${existingLease.holder.pid} still lives`,
         }
       }
       return {
         ok: true,
         renewed: false,
         lapsed: true,
-        alert: `attempt lease ${existing.leaseId} lapsed ${now - existing.expiresAt}ms before its holder pid ${holder.pid} returned; re-granted as a new lease`,
+        alert: `attempt lease ${existingLease.leaseId} lapsed ${now - existingLease.expiresAt}ms before its holder pid ${holderSnapshot.pid} returned; re-granted as a new lease`,
         lease: sealedLease({
           ...identity,
           leaseId,
-          holder,
+          holder: holderSnapshot,
           grantedAt: now,
           expiresAt,
         }),
       }
     }
-    if (now <= existing.expiresAt) {
-      return { ok: false, reason: `duplicate writer: the lease is held by pid ${existing.holder.pid} until ${existing.expiresAt}` }
+    if (now <= existingLease.expiresAt) {
+      return { ok: false, reason: `duplicate writer: the lease is held by pid ${existingLease.holder.pid} until ${existingLease.expiresAt}` }
     }
     // A DEATH VERDICT IS BOUND TO THE IDENTITY IT WAS REACHED ABOUT. A bare
     // `true` was a verdict about SOME process, and the gate applied it to this
@@ -187,7 +218,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     // (cross-vendor review of point 893). The caller now presents the pid AND
     // pid start time it probed, and sameProcess decides — so a recycled pid,
     // proven dead under the holder's number, still frees nothing.
-    const deathVerdict = holderProvenDead && typeof holderProvenDead === 'object' ? holderProvenDead : null
+    const deathVerdict = holderProvenDead && typeof holderProvenDead === 'object' ? snapshotHolder(holderProvenDead) : null
     if (!deathVerdict) {
       return {
         ok: false,
@@ -198,16 +229,16 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
             : 'the death verdict names no process identity; an unbound verdict proves nothing and frees nothing (M39)',
       }
     }
-    if (!sameProcess(existing.holder, deathVerdict)) {
+    if (!sameProcess(existingLease.holder, deathVerdict)) {
       return {
         ok: false,
         verdict: 'stale-holder',
-        reason: `the death verdict is about pid ${deathVerdict.pid}, not this lease's holder pid ${existing.holder.pid}; a verdict frees only the identity it was reached about`,
+        reason: `the death verdict is about pid ${deathVerdict.pid}, not this lease's holder pid ${existingLease.holder.pid}; a verdict frees only the identity it was reached about`,
       }
     }
   }
   if (typeof leaseId !== 'string' || !leaseId) return { ok: false, reason: 'a grant mints a fresh lease id; none was supplied' }
-  if (existing && leaseId === existing.leaseId) {
+  if (existingLease && leaseId === existingLease.leaseId) {
     return { ok: false, reason: 'a re-grant after death is a NEW lease id, never a resurrection of the old one' }
   }
   return {
@@ -216,7 +247,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     lease: sealedLease({
       ...identity,
       leaseId,
-      holder,
+      holder: holderSnapshot,
       grantedAt: now,
       expiresAt,
     }),
@@ -232,26 +263,27 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
   // comparison below is vacuously false and an expired lease would answer
   // `write`. Missing evidence fences, like every other uncertainty here.
   if (!Number.isFinite(now)) return { verdict: 'fenced', reason: 'no finite current time was supplied; expiry cannot be judged and uncertain fails closed' }
-  if (!usableLease(lease)) return { verdict: 'fenced', reason: 'no usable lease; ownership is uncertain and uncertain fails closed' }
-  if (typeof leaseId !== 'string' || !leaseId || leaseId !== lease.leaseId) {
+  const held = snapshotLease(lease)
+  if (!usableLease(held)) return { verdict: 'fenced', reason: 'no usable lease; ownership is uncertain and uncertain fails closed' }
+  if (typeof leaseId !== 'string' || !leaseId || leaseId !== held.leaseId) {
     return { verdict: 'fenced', reason: 'the lease id presented is not the lease that stands; this attempt was re-granted' }
   }
-  if (!sameProcess(lease.holder, holder)) {
+  if (!sameProcess(held.holder, snapshotHolder(holder))) {
     return { verdict: 'fenced', reason: 'the lease is held by another process identity; a recycled pid does not inherit it' }
   }
   // A CLOCK BEFORE THE LEASE'S LAST EVIDENCE IS NOT EARLINESS, IT IS ROLLBACK, and
   // a rolled-back clock makes every expiry comparison below meaningless — the lease
   // would read valid for as long as the rollback lasts, which is precisely the
   // window a fenced worker must not write in.
-  if (now < clockFloor(lease)) {
-    return { verdict: 'fenced', reason: `the clock is ${clockFloor(lease) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }
+  if (now < clockFloor(held)) {
+    return { verdict: 'fenced', reason: `the clock is ${clockFloor(held) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }
   }
-  if (now > lease.expiresAt) {
+  if (now > held.expiresAt) {
     return { verdict: 'fenced', reason: 'the lease has expired; renew through the daemon before writing, or stop' }
   }
   // The evidence a passed check hands back is sealed too: a `write` verdict must
   // not carry a record anything downstream can rewrite.
-  return { verdict: 'write', lease: sealedLease(lease) }
+  return { verdict: 'write', lease: sealedLease(held) }
 }
 
 /** Expiry is LOUD (M18/M38): every expired lease is an alert naming its attempt,
@@ -274,9 +306,10 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
   if (!Number.isFinite(now)) {
     return leases.map((l) => ({ ...identity(l), alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }))
   }
-  return leases.flatMap((l) => {
+  return leases.flatMap((raw) => {
+    const l = snapshotLease(raw)
     if (!usableLease(l)) {
-      return [{ ...identity(l), alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
+      return [{ ...identity(raw), alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
     }
     // A CLOCK BEHIND THE LEASE'S LAST EVIDENCE IS THE ONE STATE THIS FUNCTION MUST
     // NOT REPORT AS FRESH. `now <= expiresAt` holds for the whole length of a
@@ -379,11 +412,11 @@ export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {
   if (!Object.hasOwn(claims, keyed.key)) {
     return { ok: true, claims: sealedClaims({ ...claims, [keyed.key]: identity }) }
   }
-  const holder = claims[keyed.key]
-  if (!attemptIdentity(holder)) {
+  const holder = attemptIdentity(claims[keyed.key])
+  if (!holder) {
     return { ok: false, reason: 'the worktree claim on record is unreadable; ownership is uncertain and uncertain fails closed' }
   }
-  if (sameAttempt(holder, attempt)) return { ok: true, claims: sealedClaims(claims), alreadyHeld: true }
+  if (sameAttempt(holder, identity)) return { ok: true, claims: sealedClaims(claims), alreadyHeld: true }
   return { ok: false, reason: `the worktree is claimed by attempt ${holder.attemptId}; two attempts never share one worktree` }
 }
 
@@ -400,14 +433,16 @@ export function releaseWorktree({ claims = {}, worktree = null, attempt = {} } =
   // for the next attempt (cross-vendor review of point 893). Unreadable ownership
   // fails closed on the freeing side too — that is the side where it lets a second
   // attempt in.
-  if (!attemptIdentity(attempt)) return { ok: false, reason: 'a release names its attempt, each part of it a non-empty string' }
+  const identity = attemptIdentity(attempt)
+  if (!identity) return { ok: false, reason: 'a release names its attempt, each part of it a non-empty string' }
   const keyed = worktreeClaimKey(worktree)
   // An unkeyable path can never be a stored key, so there is nothing to release.
   if (!keyed.ok || !Object.hasOwn(claims, keyed.key)) return { ok: true, claims: sealedClaims(claims), released: false }
-  if (!attemptIdentity(claims[keyed.key])) {
+  const holder = attemptIdentity(claims[keyed.key])
+  if (!holder) {
     return { ok: false, reason: 'the worktree claim on record is unreadable; ownership is uncertain and uncertain fails closed' }
   }
-  if (!sameAttempt(claims[keyed.key], attempt)) {
+  if (!sameAttempt(holder, identity)) {
     return { ok: false, reason: 'only the claiming attempt releases its worktree; reconciliation releases for the dead' }
   }
   const next = { ...claims }

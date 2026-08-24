@@ -524,6 +524,34 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(stored.reason).toMatch(/uncertain fails closed/)
   })
 
+  it('decides on the identity it VALIDATED, not on a second reading of it', () => {
+    // Every guard here validated the caller's object and then compared the object
+    // again. An accessor-backed field answers a valid name to the guard and a
+    // SHARED OBJECT to the comparison that follows: both identities passed, and
+    // `sameAttempt` — which compares with === — matched the two shared references,
+    // so a release was performed between two attempts that do not name the same
+    // one, and the worktree stood open for the next claim (cross-vendor review of
+    // point 893). Reading each field once, into a snapshot every later decision
+    // uses, is what closes the class rather than this one instance.
+    const shared = { value: 'shared' }
+    const flips = (first) => {
+      let read = 0
+      return { batchId: 'b', pointId: 'p834', get attemptId() { return read++ === 0 ? first : shared } }
+    }
+    const stored = flips('a1')
+    const requester = flips('a2')
+    const released = releaseWorktree({ claims: { '/wt/a': stored }, worktree: '/wt/a', attempt: requester })
+    expect(released.ok).toBe(false)
+    expect(released.reason).toMatch(/only the claiming attempt/)
+    // The claim path decides on the snapshot too: a1 still holds the worktree.
+    const claimed = claimWorktree({ claims: { '/wt/a': flips('a1') }, worktree: '/wt/a', attempt: flips('a2') })
+    expect(claimed.ok).toBe(false)
+    expect(claimed.reason).toMatch(/never share/)
+    // And so does the lease: a renewal is judged against the name that was read.
+    const persisted = { ...grant().lease, get attemptId() { return shared } }
+    expect(grantAttemptLease({ existing: persisted, attempt, holder, now: 20_000, leaseId: 'L1' }).ok).toBe(false)
+  })
+
   it('releases only for the claiming attempt', () => {
     const { claims } = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
     expect(releaseWorktree({ claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
