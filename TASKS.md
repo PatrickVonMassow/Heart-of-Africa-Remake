@@ -11534,3 +11534,31 @@ to land than a mechanism that needs a review.
   attributed, because the merge itself now does.
   Criticality: high — it is a four-eyes gate that can plan a model as reviewer of its own work.
   Bundle: Modell & Wächter.
+
+- [ ] 873. `guard-preflight` predicts a block where `mechanism-review-guard` rules a review gap, and
+  a session that trusts the prediction does work the gate does not demand. MEASURED 24.08.2026,
+  05:05 on main at `afdb53ee`: `node scripts/guard-preflight.mjs --for turn-end --session <owner>`
+  reports `mechanism-review-guard` as would-block with "UNREVIEWABLE: this range contains
+  contributions with no eligible reviewer vendor" and prints a two-file unreviewable end-state list
+  (`.claude/mechanism-reviews.jsonl`, `scripts/criticality-review-guard-core.mjs`). The guard itself,
+  run exactly as the Stop hook runs it — `echo '{"session_id":"<owner>"}' | node
+  scripts/mechanism-review-guard.mjs` — rules the OPPOSITE and exits 0: "REVIEW GAP — the material
+  for 265712e40e6c..afdb53ee2a3a cannot be assembled for review: measured 13858237 characters
+  against the 200000-character round budget ... this turn may end". The gap ruling wins because
+  `.claude/mechanism-reviews.jsonl`, `TASKS.md` and `docs/tasks-archive.md` each exceed the budget
+  alone, so no split can cover the range; `scripts/mechanism-review-guard-gap-core.mjs` is the single
+  wording of that ruling and preflight does not consult it.
+  WHAT IT COSTS: preflight is the batch's advertised pre-action oracle — CLAUDE.md §7.2 sends every
+  governed action through it. Acting on its verdict, this session planned a 64-pass review round over
+  13.8 M characters that the real gate does not demand, and only caught it by running the guard by
+  hand. That is the unearned-work failure the gap ruling exists to prevent, arriving through the
+  oracle instead of through the gate.
+  FINAL STATE: preflight's `mechanism-review-guard` row and the guard cannot disagree — preflight
+  runs the same measurement, or delegates the verdict to the guard itself, so a range in the gap
+  state reports clean in both.
+  VERIFIABLE: unit cases — a range whose material exceeds every coverable split reports clean in
+  preflight and exits 0 in the guard; a range that DOES split into coverable passes still reports
+  would-block in both; and a preflight row that cannot measure the range says so rather than guessing
+  either way.
+  Criticality: medium — it does not lose work, but it sends sessions on demands nobody makes.
+  Bundle: Modell & Wächter.

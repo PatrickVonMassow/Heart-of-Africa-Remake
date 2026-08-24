@@ -605,6 +605,12 @@
       "why": "The gap is closed in practice as long as only Claude sessions merge, and point 870 already stops it from deadlocking a round — behind the release, like every machine-filed point",
       "origin": "machine",
       "place": "last"
+    },
+    "873": {
+      "at": "2026-08-24T03:03:54.753Z",
+      "why": "Steht direkt hinter seinem Bündelnachbarn 872 (Modell & Wächter); der Umweg kostet nur Arbeit, keine Arbeit geht verloren, und die Handumgehung ist ein einziger Aufruf",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -652,7 +658,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T01:53:40.769Z",
+    "at": "2026-08-24T03:03:54.761Z",
     "points": [
       174,
       184,
@@ -915,7 +921,8 @@
       868,
       869,
       871,
-      872
+      872,
+      873
     ]
   }
 }
