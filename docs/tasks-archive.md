@@ -22894,3 +22894,23 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   build; the cross-vendor review of this file set recorded green before the merge.
   Criticality: high — this is where a crash either keeps or loses the run's work.
   Bundle: unbundled (batch autonomy).
+
+- [x] 893. Attempt leases and epoch fencing. CUT OUT OF POINT 834 (see 890 for the cut and its
+  reason). The step-4 core, and the reason the cut of 834 was at step 4 rather than step 3:
+  ACTIVATING a daemon without fencing is worse than today's path, because two coordinators can
+  then drive one batch, two attempts can share one worktree, and a replaced orphan can keep
+  checkpointing and pushing.
+  HOW THE BRANCH IS CUT: `feat/893-<slug>` off main, carrying
+  `scripts/batch-attempt-lease-core.mjs` and its test from `feat/834-durable-authoring-lane`, plus
+  `docs/command-index.md` regenerated.
+  LANDS AFTER 891 — it imports `batch-schema-core.mjs`.
+  WHAT THE EARLIER ROUNDS FORCED: lease decisions fence closed on an unusable clock, malformed
+  leases are quarantined rather than interpreted, slot occupancy is decided by a freeing
+  whitelist, and adoption verdicts fail closed on malformed blocks, bad clocks and unbound
+  agreements. The last recorded `do-not-merge` on this file set (pass 4 of 14, 7f0f10d1) named
+  attempt-lease clocks and adoption identity binding; 091f66b5 answered it and was never read.
+  FINAL STATE: the lease core lands dark, with fail-closed defaults, imported by nothing on main.
+  VERIFIABLE: the union's unit cases for the lease and the fence; `npm run test:unit`, lint,
+  build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — this is what keeps two coordinators off one batch.
+  Bundle: unbundled (batch autonomy).
