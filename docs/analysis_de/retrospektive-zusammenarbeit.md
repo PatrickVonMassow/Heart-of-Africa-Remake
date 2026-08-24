@@ -1327,7 +1327,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 08:49 · Quellen-Fingerprint: `e56372dd0aea…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 09:21 · Quellen-Fingerprint: `27bcbac0f4c4…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1425,8 +1425,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 95 Prozess-/Meta-TASKS-Punkte (davon 38 offen).
 
-<!-- RETRO-FINGERPRINT: e56372dd0aea4cc179ddb7635f6a6aca0fad411398a1647e3e97c2a21c961575 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T06:49:29.317Z -->
+<!-- RETRO-FINGERPRINT: 27bcbac0f4c4dc04343f7b5275dadb9bc4c4afa4127889c5d3a52b2dc7627cde -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T07:21:13.897Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2384,6 +2384,33 @@ verdrahtet gelesen worden wäre. Die Auflösung war der Name: Das Modul ist kein
 sondern die Grenze des Prüflaufs selbst — und heißt jetzt so. **Zusatzlehre:** Wenn ein Register
 ein Ding falsch einordnet, ist die erste Frage, ob das Ding richtig benannt ist, und erst die
 zweite, ob das Register mehr lernen muss.
+
+### 3.172 Ein Haken lief für den Untertitel und nahm die Post des Elternfensters an sich
+
+Am 24.08.2026 um 05:54 schrieb der Nutzer eine Frage ins Board-Chat. Sie erreichte kein Modell.
+Gemessen: Die Nachricht wurde binnen 31 Sekunden aus dem Chat-Ablauf entnommen, und in keinem
+einzigen Sitzungsprotokoll steht ihr Text. Der Nutzer schickte sie eine Stunde später von Hand
+noch einmal.
+
+Die Ursache ist eine Identitätsfrage, keine Zustellfrage. Der Besitzer hatte gerade drei delegierte
+Gegenlesungen gestartet. Ein delegierter Agent führt DIESELBEN Haken aus wie das Elternfenster, und
+sein Haken-Aufruf trägt die Kennung des ELTERNFENSTERS — für den Herzschlag sieht er also aus wie
+der Besitzer und nimmt die wartende Nachricht entgegen. Nur wird die Ausgabe eines Untertitel-Hakens
+nirgends eingespielt: Sie fällt auf den Boden. Und das Auffangnetz, das genau diesen Fall abfangen
+soll, liest nur, was noch WARTET — das Annehmen hatte die Nachricht da schon aus der Warteschlange
+genommen. Beide Schichten schwiegen.
+
+**Lehre:** Wo ein Mechanismus »wer bin ich« aus einer geerbten Kennung beantwortet, beantwortet er
+sie für zwei verschiedene Läufer gleich — und der falsche gewinnt, sobald er zuerst zieht. Die
+Unterscheidung muss aus etwas kommen, das der Untertitel nicht erbt; hier ist es der Pfad seines
+eigenen Protokolls. **Zweite Lehre:** Ein Zustellweg, der ANNIMMT und dann zustellt, verliert jede
+Nachricht, deren Zustellung scheitert. Zustellen und danach abbuchen kostet einen Zwischenzustand
+und macht jeden verlorenen Versuch zu einem Wiederholungsversuch.
+
+**Und die unbequeme Hälfte:** Diese Sitzung hat den Verlust selbst verursacht — mit genau der
+Delegation, die die Betriebsanweisung fordert. Je mehr delegiert wird, desto breiter das Fenster.
+Das ist kein Argument gegen Delegation, sondern eines dafür, dass ein Verlust auf dem Weg zum
+Nutzer sich MELDEN muss, statt sich auf ein Netz zu verlassen, das ihn nicht sehen kann.
 
 ### 3.171 Dieselbe Klasse, zweimal an einem Tag — und der Punkt lag schon im Auftragsbuch
 
