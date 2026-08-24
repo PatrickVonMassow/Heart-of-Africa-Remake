@@ -92,6 +92,7 @@ let fableSha = ''
 let solSha = ''
 let solHeadSha = ''
 let unreviewableSha = ''
+let mergeResolutionSha = ''
 let orphanSha = ''
 let bulkSha = ''
 let oddSha = ''
@@ -355,6 +356,28 @@ beforeAll(() => {
   )
   unreviewableSha = git('rev-parse', 'HEAD')
 
+  // A feature branch resolves a conflict while merging a newer main. The
+  // merge itself has no trailer and its second parent is outside `main..head`,
+  // exactly the historical shape that used to turn the cc-only resolution into
+  // unknown authorship and refuse the whole review plan.
+  git('checkout', '-q', '-b', 'merge-resolution', mainSha)
+  commit('world.txt', 'the feature-side world\n', 'Revise the world on the feature', 'Opus 5')
+  git('checkout', '-q', 'main')
+  commit('world.txt', 'the main-side world\n', 'Revise the world on main', 'Opus 5')
+  git('checkout', '-q', 'merge-resolution')
+  const merged = spawnSync('git', ['-c', 'core.hooksPath=', 'merge', '--no-ff', '--no-commit', 'main'], {
+    windowsHide: true,
+    cwd: repo,
+    encoding: 'utf8',
+    env: hermeticEnv(),
+  })
+  expect(merged.status).toBe(1)
+  expect(`${merged.stdout}${merged.stderr}`).toContain('CONFLICT')
+  writeFileSync(join(repo, 'world.txt'), 'the resolved world\n')
+  git('add', '-A')
+  git('commit', '--no-verify', '-q', '-m', 'Resolve the main merge')
+  mergeResolutionSha = git('rev-parse', 'HEAD')
+
   // A branch whose material CANNOT fit one round (point 714): two files of 120k
   // characters, so the range needs more than the 200k budget however it is cut.
   git('checkout', '-q', '-b', 'bulk', 'main')
@@ -411,7 +434,7 @@ beforeAll(() => {
   }
 
   // A path changed and then restored has no net artefact to review.
-  git('checkout', '-q', '-b', 'reverted', 'main')
+  git('checkout', '-q', '-b', 'reverted', mainSha)
   commit('world.txt', 'temporary world\n', 'Temporarily revise the world', 'Opus 5')
   revertedSha = commit('world.txt', 'the fixture world\n', 'Restore the fixture world', 'Opus 5')
 
@@ -695,6 +718,14 @@ describe('a review that does not run', () => {
 })
 
 describe('the guards around the run', () => {
+  it('reviews a cc-only resolution whose trailer-bearing merged parent is outside the range', () => {
+    provenId()
+    const r = run(['--sha', mergeResolutionSha, '--brief', 'judge the resolved file'])
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stderr).not.toContain('UNREVIEWABLE')
+    expect(readFileSync(join(dir, 'stdin.txt'), 'utf8')).toContain('the resolved world')
+  })
+
   it('refuses a --since ref that does not exist instead of silently reviewing one commit', () => {
     provenId()
     const r = run(['--sha', headSha, '--since', 'no-such-branch-here', '--brief', 'judge it'])

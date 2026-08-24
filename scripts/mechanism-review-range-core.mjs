@@ -116,7 +116,13 @@ const authorshipResolver = (commits = []) => {
     const parents = uniq(commit?.parentShas)
     if (parents.length < 2) return own
     resolving.add(sha)
-    const merged = uniq(parents.slice(1).flatMap((parent) => resolve(bySha.get(parent))))
+    const merged = uniq(
+      parents.slice(1).flatMap((parent) => {
+        const inRange = bySha.get(parent)
+        if (inRange) return resolve(inRange)
+        return commit?.parentAuthorModels?.[parent] ?? []
+      }),
+    )
     resolving.delete(sha)
     cache.set(sha, merged)
     return merged

@@ -332,11 +332,30 @@ function gatherRange(sha, base, onlyPaths = null) {
 /** Commit/file authorship facts for a range, in the same path semantics as the guard. */
 export function gatherAuthorshipCommits(sha, base) {
   const raw = git(mechanismLogCommand(base, sha), { raw: true })
-  return parseRangeLog(raw, { decodePath: unquoteGitPath }).map((commit) => {
+  const commits = parseRangeLog(raw, { decodePath: unquoteGitPath })
+  const inRange = new Set(commits.map((commit) => commit.sha))
+  return commits.map((commit) => {
     const field = git([
       'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', commit.sha,
     ])
-    return { ...commit, authorModels: modelsInTrailerField(field), authorModel: modelsInTrailerField(field)[0] ?? '' }
+    const authorModels = modelsInTrailerField(field)
+    // A main-into-feature merge's second parent is already reachable from the
+    // range base, so `base..sha` deliberately omits that parent commit. The
+    // merge's cc-only resolution is still a real contribution. Preserve the
+    // merged tip's model evidence beside the merge so the pure resolver can
+    // attribute it without widening the reviewed range to unrelated main work.
+    const parentAuthorModels = Object.fromEntries(
+      (commit.parentShas ?? [])
+        .slice(1)
+        .filter((parent) => !inRange.has(parent))
+        .map((parent) => {
+          const trailers = git([
+            'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', parent,
+          ])
+          return [parent, modelsInTrailerField(trailers)]
+        }),
+    )
+    return { ...commit, authorModels, authorModel: authorModels[0] ?? '', parentAuthorModels }
   })
 }
 
