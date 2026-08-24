@@ -512,9 +512,23 @@ latency. **The clock rule is withdrawn.** What actually holds is a rule about wh
   afterwards. There is no third outcome, and no assumption about drift, scheduling or latency
   survives in this argument at all.
 
-What this costs is honest and small: for the length of one push, a dispossessed-in-the-lock-file
-coordinator can still publish. What it buys is that the property is decided by an atomic operation
-on the far side rather than by two clocks agreeing.
+What this costs is honest, and the first draft understated it as "the length of one push". The
+CAS carries no priority: every publication by A moves the ref, so each one makes B's pending
+advance fail its lease, and nothing on a plain git remote can make B's write win against a
+predecessor that keeps publishing. What actually bounds A is LOCAL: every publication in this
+design is preceded by lease validation against the lock (M40, and the per-mutation validation
+above), so a predecessor RUNNING THIS DESIGN'S CODE observes its dispossession at the next
+validation and can win at most the publications already past validation — publications are
+serialized, so that is at most one, which is where the one-push figure comes from and the only
+place it holds. A process that skips that validation — a bug, a rolled-back binary, a rogue —
+is not automatically boundable by any rule here, and the design says so instead of claiming
+otherwise: B's advance RETRIES on each lease failure against the freshly read credential and
+publishes nothing until it lands, so safety never lapses; every failed advance is an ALERT
+naming the credential that beat it, which identifies the still-publishing predecessor; and
+sustained failure escalates to the operator, whose kill is the bound. Starvation here is a
+liveness loss, detected and named — never a second publisher. What the CAS buys is unchanged:
+the property is decided by an atomic operation on the far side rather than by two clocks
+agreeing.
 
 The landing's safety therefore comes from serialization plus a fenced remote update, and the local
 fence is what stops a dispossessed coordinator from acquiring the landing lock in the first place.
