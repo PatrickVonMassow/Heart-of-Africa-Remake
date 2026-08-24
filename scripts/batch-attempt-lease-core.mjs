@@ -37,7 +37,8 @@ function attemptIdentity(attempt) {
   if (!attempt || typeof attempt !== 'object') return null
   // READ ONCE, THEN JUDGE THE COPY. Validating the caller's object and building the
   // result from a SECOND read is a check on one value and a decision on another.
-  const identity = { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }
+  const identity = readOnce(() => ({ batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId }))
+  if (!identity) return null
   const named = (v) => typeof v === 'string' && v !== ''
   if (!named(identity.batchId) || !named(identity.pointId) || !named(identity.attemptId)) return null
   return identity
@@ -52,9 +53,23 @@ function attemptIdentity(attempt) {
  *  (cross-vendor review of point 893). A persisted record has no accessors, but not
  *  every record this module is handed comes from JSON — and the rule costs one copy.
  *  A snapshot that cannot be taken is `null`: unreadable ownership, as everywhere. */
+/** TAKING A READING IS ITSELF FALLIBLE, so every reader here is TOTAL: a record
+ *  whose own reading throws answers `null` — no reading could be taken — and every
+ *  caller already treats that as unreadable ownership and fails closed. Letting the
+ *  exception out instead turned a documented refusal into a crash in the grant and
+ *  the write check, which are exactly the two paths a worker runs before it writes
+ *  (cross-vendor review of point 893). */
+function readOnce(take) {
+  try {
+    return take()
+  } catch {
+    return null
+  }
+}
+
 function snapshotHolder(holder) {
   if (!holder || typeof holder !== 'object') return null
-  return { pid: holder.pid, pidStartedAt: holder.pidStartedAt }
+  return readOnce(() => ({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }))
 }
 
 function snapshotLease(lease) {
@@ -64,7 +79,7 @@ function snapshotLease(lease) {
   // it by, so the sweep read the caller's record a second time and a flipping getter
   // attributed the alert to another attempt (cross-vendor review of point 893). What
   // comes back is plain data, so every later read of it is the same value.
-  const snapshot = {
+  const snapshot = readOnce(() => ({
     batchId: lease.batchId,
     pointId: lease.pointId,
     attemptId: lease.attemptId,
@@ -72,14 +87,16 @@ function snapshotLease(lease) {
     holder: snapshotHolder(lease.holder),
     grantedAt: lease.grantedAt,
     expiresAt: lease.expiresAt,
-  }
+  }))
+  if (!snapshot) return null
   // An OMITTED renewal stays omitted: `renewedAt: undefined` is a renewal the
   // usability check would have to treat as present-but-unreadable. It is READ ONCE
   // like every other field — testing `lease.renewedAt` and then assigning it again
   // let a getter show a late renewal to the test and an earlier one to the record
   // the clock fence is dated by (cross-vendor review of point 893).
-  const renewedAt = lease.renewedAt
-  if (renewedAt !== undefined) snapshot.renewedAt = renewedAt
+  const renewal = readOnce(() => ({ renewedAt: lease.renewedAt }))
+  if (!renewal) return null
+  if (renewal.renewedAt !== undefined) snapshot.renewedAt = renewal.renewedAt
   return snapshot
 }
 
@@ -326,14 +343,11 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
     // so a getter that succeeded once and threw on the second call took the WHOLE
     // sweep down — and a sweep that throws raises no alert for any lease, which is
     // the silence this function exists to prevent (cross-vendor review of point 893).
-    let lease = null
-    let name = UNNAMED
-    try {
-      lease = snapshotLease(raw)
-      name = { batchId: named(lease?.batchId), pointId: named(lease?.pointId), attemptId: named(lease?.attemptId) }
-    } catch {
+    const lease = snapshotLease(raw)
+    if (!lease) {
       return [{ ...UNNAMED, alert: 'a persisted attempt lease could not be read at all; its ownership is uncertain and it is quarantined, not skipped' }]
     }
+    const name = { batchId: named(lease.batchId), pointId: named(lease.pointId), attemptId: named(lease.attemptId) }
     if (!Number.isFinite(now)) {
       return [{ ...name, alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }]
     }

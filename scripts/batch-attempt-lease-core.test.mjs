@@ -354,6 +354,24 @@ describe('a record is read once — the accessor class of the cross-vendor revie
     expect(alerts[1].attemptId).toBe('a1')
   })
 
+  it('refuses rather than THROWS on every path that reads a record', () => {
+    // Taking the reading is itself fallible, and a reader that lets the exception
+    // out turns a documented refusal into a crash — in the grant and the write
+    // check above all, the two paths a worker runs before it writes. Every reader
+    // here answers "no reading could be taken", which every caller already treats
+    // as unreadable ownership (cross-vendor review of point 893).
+    const unreadable = { get batchId() { throw new Error('unreadable') }, pointId: 'p834', attemptId: 'a1', leaseId: 'L1', holder, grantedAt: 10_000, expiresAt: 20_000 }
+    const refusal = grantAttemptLease({ existing: unreadable, attempt, holder, now: 15_000, leaseId: 'L2' })
+    expect(refusal.ok).toBe(false)
+    expect(refusal.reason).toMatch(/uncertain fails closed/)
+    expect(leaseAllowsWrite({ lease: unreadable, holder, leaseId: 'L1', now: 15_000 }).verdict).toBe('fenced')
+    // The requesting side is read the same way: an attempt or a holder whose own
+    // reading throws is a refusal, not an exception out of the grant.
+    expect(grant({ attempt: { get batchId() { throw new Error('unreadable') }, pointId: 'p834', attemptId: 'a1' } }).ok).toBe(false)
+    expect(grant({ holder: { get pid() { throw new Error('unreadable') }, pidStartedAt: 5000 } }).ok).toBe(false)
+    expect(claimWorktree({ claims: {}, worktree: '/wt/a', attempt: { get batchId() { throw new Error('unreadable') }, pointId: 'p', attemptId: 'a' } }).ok).toBe(false)
+  })
+
   it('refuses a claims map it cannot read at all rather than throwing out of the claim', () => {
     const boom = { batchId: 'b', pointId: 'p834', get attemptId() { throw new Error('unreadable') } }
     const res = claimWorktree({ claims: { '/wt/a': boom }, worktree: '/wt/b', attempt })
