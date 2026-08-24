@@ -10,7 +10,7 @@
 //       cause: a stale heartbeat with a LIVE pid (mid-long-tool-call) is ALIVE;
 //   (5) a non-owner session at the batch-progress-guard → stands down.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmdirSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
@@ -715,6 +715,24 @@ describe('renewLease / grantFence (the I/O half)', () => {
     const fence = readFence({ fencePath })
     expect(fence).toMatchObject({ fence: 1, holder: 's1' })
     expect(lockOf().leaseUntil).toBeGreaterThan(Date.now())
+  })
+
+  it('a transiently busy grant mutex cannot leave the acquired lock without a fence number', () => {
+    const mutexPath = `${fencePath}.claiming`
+    mkdirSync(mutexPath)
+    let waited = false
+
+    expect(acquire('s1', opts({
+      fenceMutexWaitMs: 100,
+      fenceMutexSleep: () => {
+        waited = true
+        rmdirSync(mutexPath)
+      },
+    }))).toBe('acquired')
+
+    expect(waited).toBe(true)
+    expect(lockOf().fence).toBe(1)
+    expect(readFence({ fencePath })).toMatchObject({ fence: 1, holder: 's1' })
   })
 
   /** The lock of a session that fell silent: heartbeat AND lease both run out.

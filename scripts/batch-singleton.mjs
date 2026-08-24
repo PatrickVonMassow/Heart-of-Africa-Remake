@@ -55,7 +55,7 @@ import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { commonRepoPath } from './repo-paths.mjs'
-import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
+import { sleepSync, writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   LEASE_MS,
   renewedLock,
@@ -138,6 +138,10 @@ export const PARALLEL_FRESH_MS = 10 * 60 * 1000
 /** A reap-mutex directory older than this belongs to a crashed reaper and may
  *  be cleared. */
 export const REAP_MUTEX_STALE_MS = 60 * 1000
+/** A fence writer's atomic write can itself retry for ~0.8 s. A claimant waits
+ *  just beyond that bounded window before accepting a genuinely unavailable
+ *  grant door and falling back to an unfenced lock. */
+export const FENCE_MUTEX_WAIT_MS = 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
@@ -904,6 +908,26 @@ function enterReapMutex(mutexPath) {
   }
 }
 
+/**
+ * Fence grants are shorter than reap operations, and a claimant has already won
+ * the owner lock before it reaches this door. Give the current grant one bounded
+ * write window to finish, then retry the atomic mkdir. This prevents ordinary
+ * contention from erasing the new lock's fence number while preserving the
+ * established fail-open exit for a genuinely stuck mutex.
+ */
+function enterFenceMutex(mutexPath, opts = {}) {
+  if (enterReapMutex(mutexPath)) return true
+  const waitMs = opts.fenceMutexWaitMs ?? FENCE_MUTEX_WAIT_MS
+  if (!(Number.isFinite(waitMs) && waitMs > 0)) return false
+  const sleep = opts.fenceMutexSleep ?? sleepSync
+  const deadline = Date.now() + waitMs
+  while (Date.now() < deadline) {
+    sleep(Math.min(10, Math.max(1, deadline - Date.now())))
+    if (enterReapMutex(mutexPath)) return true
+  }
+  return false
+}
+
 function exitReapMutex(mutexPath) {
   try {
     rmdirSync(mutexPath)
@@ -1008,6 +1032,8 @@ export function acquire(sessionId, opts = {}) {
         fencePath,
         priorFence,
         requestedFence: opts.requestedFence,
+        fenceMutexWaitMs: opts.fenceMutexWaitMs,
+        fenceMutexSleep: opts.fenceMutexSleep,
         now,
         takeover: takenFrom,
       })
@@ -1206,7 +1232,7 @@ export function recordFenceNotice(sessionId, fence, opts = {}) {
 export function grantFence(sessionId, opts = {}) {
   const fencePath = opts.fencePath ?? FENCE_PATH
   const mutexPath = `${fencePath}.claiming`
-  if (!enterReapMutex(mutexPath)) return null
+  if (!enterFenceMutex(mutexPath, opts)) return null
   try {
     const now = opts.now ?? Date.now()
     const state = normaliseFence(readJson(fencePath))
@@ -1553,7 +1579,7 @@ export function revokeWriterFence(sessionId, generation, opts = {}) {
   if (!sessionId || !Number.isSafeInteger(generation) || generation < 0) return rejected('invalid-authority')
   const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
   const mutexPath = `${fencePath}.claiming`
-  if (!enterReapMutex(mutexPath)) return rejected('write-busy')
+  if (!enterFenceMutex(mutexPath, opts)) return rejected('write-busy')
   try {
     const current = readFence({ fencePath })
     if (current.fence !== generation) return rejected('generation-changed', current.fence)
