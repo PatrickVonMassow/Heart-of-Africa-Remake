@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { probePid } from './batch-singleton.mjs'
+import { PUBLICATION_TRAILER_KEY } from './batch-schema-core.mjs'
 import { deriveSnapshot, unconfirmedIntents } from './batch-state-core.mjs'
 import { openStateStore, readJournal, readSnapshot } from './batch-state.mjs'
 import { attemptPaths, readJsonIfAny } from './detached-agent.mjs'
@@ -58,7 +59,7 @@ function attemptContext(entries, attemptId) {
  *  ref's current oid by ls-remote, ancestry after fetching the ref, and the
  *  publication id as a commit trailer in the fetched history. Every failure is
  *  an unprobed value, which the resolution reads as UNKNOWN — never as absent. */
-function probeIntentRefs(intent, repoDir) {
+export function probeIntentRefs(intent, repoDir) {
   const probes = {}
   for (const move of intent.moves ?? []) {
     const name = move.ref.replace(/^refs\/heads\//, '')
@@ -74,8 +75,22 @@ function probeIntentRefs(intent, repoDir) {
         // after-oid object, a shallow history — and unprobed resolves UNKNOWN.
         const ancestry = git(['merge-base', '--is-ancestor', move.afterOid, 'FETCH_HEAD'], repoDir)
         afterIsAncestor = ancestry.status === 0 ? true : ancestry.status === 1 ? false : null
-        const trailer = git(['log', '--fixed-strings', `--grep=${intent.publicationId}`, '--format=%H', 'FETCH_HEAD'], repoDir)
-        trailerFound = trailer.ok ? trailer.out !== '' : null
+        // --grep only PREFILTERS candidates — it matches anywhere in the
+        // message. Each candidate is then verified by git's own trailer
+        // parser: only an exact PUBLICATION_TRAILER_KEY value counts.
+        const candidates = git(['log', '--fixed-strings', `--grep=${intent.publicationId}`, '--format=%H', 'FETCH_HEAD'], repoDir)
+        if (!candidates.ok) trailerFound = null
+        else if (candidates.out === '') trailerFound = false
+        else {
+          trailerFound = false
+          for (const sha of candidates.out.split('\n').filter(Boolean)) {
+            const trailers = git(['show', '-s', `--format=%(trailers:key=${PUBLICATION_TRAILER_KEY},valueonly)`, sha], repoDir)
+            if (trailers.ok && trailers.out.split('\n').some((value) => value.trim() === intent.publicationId)) {
+              trailerFound = true
+              break
+            }
+          }
+        }
       }
     } else {
       // An absent ref cannot carry an ancestor, and its empty history holds no

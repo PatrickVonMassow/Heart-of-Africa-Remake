@@ -609,6 +609,12 @@ export function revalidateAfterWrite({ validated = {}, lock = null } = {}) {
  *  remote, which is a check that IS the act rather than one that precedes it. */
 export const PUBLISHED_ACTS = Object.freeze(['landing-push', 'checkpoint-push'])
 
+/** The commit trailer a landing (step 9) writes to carry its publication id
+ *  into history that survives a rewrite. Reconciliation accepts the id ONLY as
+ *  this trailer, parsed by git's own trailer machinery — an occurrence in a
+ *  subject or body proves nothing and must not read as LANDED-REWRITTEN. */
+export const PUBLICATION_TRAILER_KEY = 'Publication-Id'
+
 /** Each row: the local mutation, the compensation that reverses it when the lock
  *  moved under it, and the payload fields its idempotency key is built from. */
 export const DAEMON_COMMANDS = Object.freeze({

@@ -12,7 +12,7 @@ import { processStartTime } from './batch-singleton.mjs'
 import { openStateStore } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
-import { applyPairResolution, gatherEvidence } from './batch-reconcile.mjs'
+import { applyPairResolution, gatherEvidence, probeIntentRefs } from './batch-reconcile.mjs'
 import { resumeBatch } from './resume-batch.mjs'
 
 const BATCH = 'reconcile-batch'
@@ -168,6 +168,22 @@ describe('reconciliation over a live batch, then over its corpse', () => {
       expect(res.ok).toBe(false)
       expect(res.did).toMatch(/corrupt or carries quarantined/)
     }
+  })
+
+  it('counts a publication id only as a parsed TRAILER, never as a message occurrence', () => {
+    const id = 'pub-trailer-test-1'
+    writeFileSync(join(worktree, 'pub.txt'), 'one\n')
+    git(['add', '.'], worktree)
+    git(['commit', '-q', '-m', `a subject mentioning ${id} in the message body`], worktree)
+    git(['push', '-q', 'origin', 'feat/rec'], worktree)
+    const tip = git(['rev-parse', 'HEAD'], worktree)
+    const intent = { publicationId: id, moves: [{ ref: 'refs/heads/feat/rec', beforeOid: tip, afterOid: tip }] }
+    expect(probeIntentRefs(intent, repo)['refs/heads/feat/rec'].trailerFound).toBe(false)
+    writeFileSync(join(worktree, 'pub.txt'), 'two\n')
+    git(['add', '.'], worktree)
+    git(['commit', '-q', '-m', `a rewritten landing\n\nPublication-Id: ${id}`], worktree)
+    git(['push', '-q', 'origin', 'feat/rec'], worktree)
+    expect(probeIntentRefs(intent, repo)['refs/heads/feat/rec'].trailerFound).toBe(true)
   })
 
   it('refuses a STALE report: a lock or record that moved after gathering is never overwritten', async () => {
