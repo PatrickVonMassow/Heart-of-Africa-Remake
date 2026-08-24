@@ -187,10 +187,16 @@ async function runWorker(argv) {
     // The proven authoring path, UNCHANGED (M2/M5): this wrapper is the daemon's
     // child, so it survives the session, and the runner's pipes end HERE — at a
     // parent that stays alive — never at the session that asked for the work.
+    // The runner leads its OWN process group, so cancellation can take its
+    // whole subtree with one group signal — a SIGTERM to the immediate child
+    // alone leaves grandchildren writing. (If the wrapper itself is SIGKILLed
+    // the runner group survives orphaned; the revoked lease and the pre-push
+    // hook fence its pushes, and reconciliation reads the orphan.)
     runnerChild = spawn(process.execPath, ['scripts/author-sol.mjs', '--point', args.point], {
       cwd: args.worktree,
       env: process.env,
       windowsHide: true,
+      detached: true,
       stdio: ['ignore', openSync(paths.logPath, 'a'), openSync(paths.logPath, 'a')],
     })
     runnerChild.on('close', (code) => {
@@ -215,16 +221,43 @@ async function runWorker(argv) {
     log(`stub step: pushed=${pushed.ok} sha=${tip()}`)
   }
 
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+  const runnerGone = () => runnerChild === null || runnerExit !== null
+  const killRunnerGroup = (signal) => {
+    try {
+      process.kill(-runnerChild.pid, signal)
+    } catch {
+      try {
+        runnerChild.kill(signal)
+      } catch {
+        /* already gone */
+      }
+    }
+  }
+  /** Cancellation is proven, never assumed: SIGTERM to the runner's group, a
+   *  bounded grace, SIGKILL, and only a REAPED runner lets the worker record a
+   *  terminal state — a durable 'cancelled' over a still-writing subtree is
+   *  the lie this function exists to prevent. */
+  const stopRunner = async () => {
+    if (runnerGone()) return true
+    killRunnerGroup('SIGTERM')
+    let deadline = Date.now() + 5000
+    while (!runnerGone() && Date.now() < deadline) await sleep(100)
+    if (runnerGone()) return true
+    killRunnerGroup('SIGKILL')
+    deadline = Date.now() + 2000
+    while (!runnerGone() && Date.now() < deadline) await sleep(100)
+    return runnerGone()
+  }
+
   // The loop IS the worker: heartbeat, checkpoint answers, work, cancellation.
   for (;;) {
     writeFileSync(paths.heartbeatPath, `${Date.now()}\n`)
     if (stopping) {
-      if (runnerChild) {
-        try {
-          runnerChild.kill('SIGTERM')
-        } catch {
-          /* already gone */
-        }
+      if (!(await stopRunner())) {
+        status('cancel-blocked', { sha: tip(), reason: 'the runner survived SIGTERM and SIGKILL; nothing here claims it stopped' })
+        log('worker leaving: cancel-blocked; the runner still lives, fenced by its lease')
+        process.exit(WORKER_EXIT.runnerFailed)
       }
       status(stopping, { sha: tip() })
       log(`worker leaving: ${stopping}; branch preserved`)
