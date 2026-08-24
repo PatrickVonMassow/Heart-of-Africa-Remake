@@ -12,16 +12,46 @@
 // a board that cannot be published must not take a recorded review down with it.
 // Every failure is reported on stderr and swallowed, and the caller's own exit
 // status is untouched.
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { parseNowCardPoint } from './dashboard-guard-core.mjs'
 import { nowCard } from './board-core.mjs'
+import { mainCheckoutFrom } from './main-checkout-core.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
 import { decideHeartbeat, stampAgeMs, stampMinutes, TRIGGERS } from './board-heartbeat-core.mjs'
 
 export { TRIGGERS }
+
+/**
+ * The checkout that OWNS the board.
+ *
+ * The board file and its state live in the main working tree, while review
+ * rounds are routinely run from a delegated worktree — and there the heartbeat
+ * would find no board, decide nothing and silently do nothing at all. This is
+ * the same resolution `review-sol` uses for the saved login: `--git-common-dir`
+ * points at the one real `.git` directory from every worktree alike, and with
+ * no git answer the current checkout is the honest fallback.
+ */
+export function boardRoot({ root = REPO_ROOT, run = gitCommonDir } = {}) {
+  return mainCheckoutFrom(run(root), root) ?? root
+}
+
+/** `git rev-parse --git-common-dir`, absolute, or '' when git cannot answer. */
+function gitCommonDir(root) {
+  try {
+    return String(
+      execFileSync('git', ['-C', root, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      }),
+    ).trim()
+  } catch {
+    return ''
+  }
+}
 
 /**
  * The now-card as the board actually shows it: its title point, and how long its
@@ -34,10 +64,10 @@ export { TRIGGERS }
  * (cross-vendor review, 24.08.2026). The card's own stamp answers the only
  * question that matters: when was THIS status written.
  */
-function readCard(state, nowMin) {
+function readCard(state, nowMin, root) {
   try {
     if (!state?.dashboardPath) return { point: null, ageMs: null }
-    const html = readFileSync(resolve(REPO_ROOT, state.dashboardPath), 'utf8')
+    const html = readFileSync(resolve(root, state.dashboardPath), 'utf8')
     const point = parseNowCardPoint(html)
     const card = point == null ? null : nowCard(html, point)
     const stamp = card ? /<span class="stamp">Stand ([^<]*)<\/span>/.exec(card)?.[1] : null
@@ -56,13 +86,13 @@ function readCard(state, nowMin) {
  * the argv it builds, the text it hands over on stdin and its refusal to treat
  * a non-zero exit as success are the behaviour, not incidental detail.
  */
-export function runBoardStatus(point, status, { spawn = spawnSync } = {}) {
+export function runBoardStatus(point, status, { spawn = spawnSync, root = boardRoot() } = {}) {
   const result = spawn(
     process.execPath,
-    [resolve(REPO_ROOT, 'scripts', 'board.mjs'), 'status', String(point), '--text-stdin'],
+    [resolve(root, 'scripts', 'board.mjs'), 'status', String(point), '--text-stdin'],
     // windowsHide: the Stop chain and every recording step run unattended;
     // a console window here would steal the focus on each round (point 401).
-    { cwd: REPO_ROOT, input: status, encoding: 'utf8', windowsHide: true },
+    { cwd: root, input: status, encoding: 'utf8', windowsHide: true },
   )
   if (result.error) throw result.error
   if (result.status !== 0) {
@@ -82,17 +112,26 @@ export function runBoardStatus(point, status, { spawn = spawnSync } = {}) {
 export function heartbeat({
   trigger,
   detail = '',
-  state = readJson(STATE_PATH),
-  focus = readJson(FOCUS_PATH),
+  root = undefined,
+  state = undefined,
+  focus = undefined,
   nowMinutes = berlinMinutes(),
   card = undefined,
   writeStatus = runBoardStatus,
   stderr = (line) => console.error(line),
 } = {}) {
   try {
-    const seen = card === undefined ? readCard(state, nowMinutes) : card
+    const owner = root ?? boardRoot()
+    // In a worktree the state and focus files of the OWNING checkout are the
+    // ones that matter; the worktree has none of its own. The names are derived
+    // from the canonical paths rather than repeated, so moving either file here
+    // cannot leave this reading behind.
+    const owned = (path) => resolve(owner, relative(REPO_ROOT, path))
+    const seenState = state ?? readJson(owned(STATE_PATH))
+    const seenFocus = focus ?? readJson(owned(FOCUS_PATH))
+    const seen = card === undefined ? readCard(seenState, nowMinutes, owner) : card
     const decision = decideHeartbeat({
-      focus,
+      focus: seenFocus,
       cardPoint: seen.point,
       ageMs: seen.ageMs,
       trigger,
@@ -102,10 +141,10 @@ export function heartbeat({
 
     // The card is addressed by NUMBER, so a refresh needs one. A non-point focus
     // is legitimate work, but there is no card here to carry it.
-    const target = focus?.point ?? seen.point
+    const target = seenFocus?.point ?? seen.point
     if (target == null) return { refreshed: false, reason: 'no-target' }
 
-    writeStatus(target, decision.status)
+    writeStatus(target, decision.status, { root: owner })
     return { refreshed: true, reason: decision.reason, status: decision.status }
   } catch (error) {
     // NEVER fatal: see the header. The caller recorded real work; the board

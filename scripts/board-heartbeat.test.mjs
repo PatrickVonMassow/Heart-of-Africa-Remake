@@ -2,7 +2,7 @@
 // promise that it never takes its caller down. Every dependency is injected, so
 // no case touches the real board, its branch or the network.
 import { describe, it, expect } from 'vitest'
-import { heartbeat, runBoardStatus, TRIGGERS } from './board-heartbeat.mjs'
+import { boardRoot, heartbeat, runBoardStatus, TRIGGERS } from './board-heartbeat.mjs'
 import { REASONS, STALE_AFTER_MS } from './board-heartbeat-core.mjs'
 
 const FOCUS = { point: 847, note: 'Sol-Prüfrunden zu Punkt 847' }
@@ -193,5 +193,41 @@ describe('the board adapter itself', () => {
   it('names the exit status where the command said nothing', () => {
     const { spawn } = capture({ status: 7, stderr: '   ' })
     expect(() => runBoardStatus(848, 'x', { spawn })).toThrow(/exited 7/)
+  })
+})
+
+describe('the board belongs to the owning checkout', () => {
+  // A review round is routinely run from a DELEGATED WORKTREE, which holds no
+  // board, no dashboard state and no focus of its own. Resolving to the main
+  // checkout is what keeps the heartbeat from silently doing nothing there —
+  // the same resolution review-sol uses for its saved login.
+  it('resolves a worktree to the main checkout that holds the board', () => {
+    const root = boardRoot({
+      root: '/repo/.worktrees/point-848',
+      run: () => '/repo/.git',
+    })
+    expect(root).toBe('/repo')
+  })
+
+  it('stays in the current checkout when it IS the main one', () => {
+    expect(boardRoot({ root: '/repo', run: () => '/repo/.git' })).toBe('/repo')
+  })
+
+  it('falls back to the current checkout when git cannot answer', () => {
+    expect(boardRoot({ root: '/repo/x', run: () => '' })).toBe('/repo/x')
+  })
+
+  it('hands the owning checkout to the writer, so the board is edited where it lives', () => {
+    const seen = []
+    heartbeat({
+      trigger: TRIGGERS.REVIEW_ROUND,
+      detail: 'Runde 3',
+      root: '/repo',
+      state: { dashboardPath: '.batch-dashboard.html' },
+      focus: FOCUS,
+      card: STALE,
+      writeStatus: (point, status, opts) => seen.push({ point, root: opts?.root }),
+    })
+    expect(seen).toEqual([{ point: 847, root: '/repo' }])
   })
 })
