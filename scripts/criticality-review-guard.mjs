@@ -30,6 +30,7 @@
 //       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/criticality-review-guard.mjs --status
+// usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { dirname } from 'node:path'
@@ -584,13 +585,13 @@ if (isMainModule(import.meta.url)) {
       const parsed = parseUnavailableReceiptArgs(argv)
       if (!parsed.ok) {
         console.error(`criticality-review-guard: refusing unavailable receipt.\n  · ${parsed.errors.join('\n  · ')}`)
-        console.error(`\nusage: ${unavailableReceiptUsage()}`)
+        console.error(`\nrun: ${unavailableReceiptUsage()}`)
         process.exit(1)
       }
       const built = buildUnavailableReceipt({ ...parsed.values, records: readRecords() })
       if (!built.ok) {
         console.error(`criticality-review-guard: refusing unavailable receipt.\n  · ${built.errors.join('\n  · ')}`)
-        console.error(`\nusage: ${unavailableReceiptUsage()}`)
+        console.error(`\nrun: ${unavailableReceiptUsage()}`)
         process.exit(1)
       }
       appendRecord(built.record)

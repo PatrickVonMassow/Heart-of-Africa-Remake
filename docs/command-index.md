@@ -116,7 +116,7 @@
 | `context-watermark-core.mjs` | THE CONTEXT WATERMARK (point 675, defeat 3) — the decision half, pure. | — |
 | `context-watermark.mjs` | THE CONTEXT WATERMARK (point 675, defeat 3) — the IO half. | — |
 | `criticality-review-guard-core.mjs` | Pure decision core of the CRITICALITY four-eyes gate (work-order point 298). | — |
-| `criticality-review-guard.mjs` | Stop hook (work-order point 298): a HIGH-criticality point does not get ticked without a second model's recorded, ANSWERED review. | — |
+| `criticality-review-guard.mjs` | Stop hook (work-order point 298): a HIGH-criticality point does not get ticked without a second model's recorded, ANSWERED review. | usage: node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> --files "<exact paths>" --reason "<why no vendor is eligible>" |
 | `cut-account-core.mjs` | Pure parser and judge for the CUT ACCOUNT of work-order point 757. | — |
 | `dashboard-card-topic-guard-core.mjs` | Pure decision logic of the dashboard-card-topic Stop-hook guard (dashboard-card-topic-guard.mjs is the thin fail-open I/O wrapper). | — |
 | `dashboard-card-topic-guard.mjs` | Stop hook (user mandate 23.07.2026): GUARANTEE each batch-dashboard card speaks STRICTLY about its OWN topic — the active "272" now-card once reported the status of points 246 and 266, and reminders do not hold. | — |
