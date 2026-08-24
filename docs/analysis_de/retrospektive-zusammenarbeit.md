@@ -2402,8 +2402,9 @@ allein in die Warteschlange. Solange 873 offen ist, muss `guard-preflight` in de
 selbst sagen, dass sie mit dem Tor uneins sein kann und wie man das Tor fragt.
 
 **Zweite Lehre, gegen die erste gehalten:** Die elf Pässe waren keine verlorene Zeit — sie fanden
-sieben belegte Defekte, darunter fünf Wege, eine Vier-Augen-Pflicht ohne zweite Augen zu erfüllen,
-und einen Zaun, den eine Sitzung ohne Sperre umgeht. Unverlangte Arbeit ist nicht automatisch
+zehn belegte Defekte, die als Punkte 875–884 im Auftragsbuch stehen. Einer davon, Punkt 880, zählt
+allein fünf Wege auf, eine Vier-Augen-Pflicht ohne zweite Augen zu erfüllen; ein anderer, Punkt 879,
+einen Zaun, den eine Sitzung ohne Sperre umgeht. Unverlangte Arbeit ist nicht automatisch
 wertlose Arbeit. Aber sie war unverlangt, und das entscheidet die nächste Sitzung nur dann richtig,
 wenn das Werkzeug es ihr sagt.
 

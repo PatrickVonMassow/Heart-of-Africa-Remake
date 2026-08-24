@@ -602,6 +602,19 @@ put it is the mistake this line exists to stop.
   options is accepted; and a case over each of the two call sites asserting they no longer
   reach `vdzk-add`. Plus a case that the board's rendered pause state disappears once
   `.claude/batch-paused` is gone.
+  A THIRD CALL SITE, measured 24.08.2026 after the user repeated the ruling: the card he hit
+  ("Entscheidungsprotokoll: Batch läuft weiter — PARALLEL batch sessions") comes from neither
+  site above. It is the CONTINUE-AND-RECORD path — `scripts/alert-escalation.mjs` ~234,
+  `continuationDecisionCard`/`continuationCardBody` — and `corruptionDecisionCard`
+  (repair-and-probe) is the same shape. Both nominally offer a "retroactive veto", but the user
+  cannot evaluate a machine-side incident — this one was a phantom parallel-session alert about
+  an already retired predecessor — so the offer is not a genuine user choice under this point's
+  own admissibility rule. His words, 24.08.2026 07:54: "Diese Dinge liegen nicht in meiner Hand.
+  … Löse das selbst."
+  So the final state above covers all four sites: the continuation and corruption protocols are
+  RECORDS and belong in the board's state/protocol section, never `vdzk-add`; the retroactive
+  veto stays reachable as a chat or ntfy answer without a standing decision card; and the card
+  class resolves itself once its alert condition is diagnosed or gone.
   Criticality: medium — it touches the alert path, which must keep reaching the user; the
   change removes a board card, never a notification.
   Bundle: Chat & Tafel.
@@ -11803,7 +11816,7 @@ to land than a mechanism that needs a review.
   empty-series case that admits rather than refuses; and a registration case that pins the matcher
   against the debit the code books.
   Criticality: high — it is the mechanism that decides whether a session may act at all.
-  Bundle: Modell & Wächter.
+  Bundle: Session- & Repo-Hygiene.
 
 - [ ] 882. Deleting a governed document disables its budget, and a misspelled ceiling disables half
   of it. MEASURED 24.08.2026 by the cross-vendor review of `a3a0432` (recorded `do-not-merge`):
