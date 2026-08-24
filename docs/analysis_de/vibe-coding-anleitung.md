@@ -164,10 +164,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
   nach. Zweimal festgebissen: wechsle das Modell."
 
-- **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende Prüfung
-  verschärfen, alles wird grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
-  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND
-  echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
+- **Fehlalarm behoben — echter Alarm gleich mit.** Die zu oft anschlagende Prüfung wird schärfer,
+  alles grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
+  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
   das Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
@@ -192,17 +191,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
-  Aufgabe, und bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen.
-  Jedes Warten bricht beim **Fehler** ab und steht in einer **Datei**."
+  Aufgabe, und bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last; oder er
-  misst dein Repository statt deinen Code und ist nur dort grün, wo er lief.
+- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Er misst dein Repository statt deinen
+  Code und ist nur dort grün, wo er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt** und baut sich seine Voraussetzung
-  **selbst** — wahr wegen des Codes, nie wegen des Checkouts; ein Überspringen ist blind."
+  **selbst** — wahr wegen des Codes, nie wegen des Checkouts."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -214,7 +212,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Start, was **lokal fertig, aber nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
-  Satz und deckt nur einen Teil — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
+  Satz — oder weiter, und sperrt Nachbarn, die sie nichts angehen.
   → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
   **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**, zieh **den Code auf den Satz**."
 
@@ -238,8 +236,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
   → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft. Ein
-  Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist — blockiere die Lücke aber
-  nicht: benannt ist mehr wert als erfundene Deckung."
+  Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist — blockiere sie aber nicht."
 
 - **Die aufgeschriebene Grenze deckt nicht, was sie behauptet.** Der Satz, was ein Mechanismus
   *nicht* leistet, wird zur Ablage für bloß nicht Getanes.
@@ -265,6 +262,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Einträge; nicht geliefert liest sich *grüner* als ein Fehlschlag.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: nach Zeit, nie nach
   Anzahl. Melde die **Abdeckung** mit; ein Urteil über halbem Material ist **Teilprüfung**."
+
+- **„Läuft der noch?" mit „ist die Ausgabe frisch?" beantwortet.** Frische belegt, dass jemand
+  gearbeitet *hat* — der tote Lauf belegt weiter seinen Platz.
+  → *Prompt:* „Miss Lebendigkeit am **Vorgang** (Kennung samt Startzeit), nie an seinen Spuren.
+  Ein fehlender Vorgang **widerlegt** jede frische Ausgabe; unlesbar heißt **unbekannt**, nicht tot."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
   getrennt — eines schreibt, eines prüft — und blockieren so alle Arbeit.
@@ -299,11 +301,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
-- **Der Halt, den nur ein Mensch aufhebt.** Er kostet nicht zwanzig Minuten, sondern den Rest
-  deiner Abwesenheit — und ein leerer Marker sieht aus wie dein bewusster Stopp.
+- **Der Halt, den nur ein Mensch aufhebt.** Er kostet den Rest deiner Abwesenheit — und ein
+  leerer Marker sieht aus wie dein bewusster Stopp.
   → *Prompt:* „Jeder Halt bekommt eine Wiederanlauf-Uhr. Ohne Uhr bleibt nur, was **nachweislich**
-  von mir kommt: typisiert, über einen eigenen Befehl. Alles andere wird protokolliert und kurz
-  wiederholt."
+  von mir kommt; alles andere wird protokolliert und kurz wiederholt."
 
 - **Priorität in Prosa wirkt nicht — und eine neue Sortierregel greift nur nach vorn.**
   → *Prompt:* „Trag Priorisiertes dort ein, wo gearbeitet wird; laufen beide auseinander, schlägt
@@ -361,8 +362,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Die Kur ist teurer als der Fehler.** Eine Regel, die ein seltenes Fehlverhalten sicher
   unterbindet, verbiegt alles andere mit.
   → *Prompt:* „Ein bestätigter Befund verpflichtet zur **Untersuchung**, nicht zur Änderung: Miss
-  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener
-  Kur — verschweigen gilt nicht, still beheben auch nicht."
+  die Kur gegen gesunde Fälle. Ist sie teurer, **buche** den Fehler mit Zahlen und verworfener Kur."
 
 - **Die Reihenfolge wird gerankt, nicht befolgt.** Die KI fängt Neues an, während halbfertige
   Zweige liegen; die Sortierprüfungen bleiben grün, denn sie prüfen die Liste, nie den Punkt in
@@ -441,4 +441,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: d4b069b0acf784b25112e993a914e954108cf96fb4c90f6495a1b6978d6e93cf -->
+<!-- GUIDE-FINGERPRINT: dfcc091093717c3679d5d8f0acdafde0f044343c4e7effe58c8b07054ce0cb38 -->
