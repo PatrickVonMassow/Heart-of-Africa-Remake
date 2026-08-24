@@ -124,6 +124,9 @@ change) and 449 last, because the drill is what makes the others more than a cla
 - **887** — the four-eyes remainder that no reviewer can clear. It is a property of the
   review ledger and the authorship record rather than of any lane, it gates a point in
   another bundle, and putting it in one would tie an unrelated bundle's order to it.
+- **888** — the reviewer trailer that reads as authorship. Like 887 it lives in the
+  review machinery rather than in any lane, and it changes a rule in CLAUDE.md §6, so
+  every bundle's work would have to wait on a decision that is not that bundle's.
 - **285**.
 - **393** — sequenced behind 264, so it moves with that point rather than with a
   bundle.

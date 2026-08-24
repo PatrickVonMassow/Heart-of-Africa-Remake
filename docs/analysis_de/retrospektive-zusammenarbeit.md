@@ -1328,7 +1328,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 11:47 · Quellen-Fingerprint: `bc6e11eec1d3…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 13:08 · Quellen-Fingerprint: `2406199d064b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1426,8 +1426,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 95 Prozess-/Meta-TASKS-Punkte (davon 37 offen).
 
-<!-- RETRO-FINGERPRINT: bc6e11eec1d314c1cbab52baec0d86dca181e2931b303a46a6e22066e27e7c2e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T09:47:30.654Z -->
+<!-- RETRO-FINGERPRINT: 2406199d064b81545c4a672185993a1a89490ccde3f00e051078807f5452ff49 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T11:08:57.350Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3276,3 +3276,30 @@ Karte in »Von dir zu klären« gestellt, weil sie festlegt, wann ich Arbeit des
 echten Defekt findet und dessen Urteil wandert, arbeitet; eines, dessen Urteil steht, während der
 Umfang bleibt, braucht einen kleineren Gegenstand statt einer weiteren Runde. Prüffrage vor jeder
 neuen Runde: *Hat sich seit der letzten etwas bewegt außer der Zählung?*
+
+### 3.120 Der Probelauf stellte die Stufe nach, die er beweisen sollte
+
+Der Punkt, der einen Autorenlauf den Tod seiner Sitzung überleben lässt, steht und fällt mit einem
+Probelauf: Elternsitzung starten, mitten in der Arbeit hart abschießen, und zeigen, dass Daemon und
+Arbeiter weiterlaufen und eine frische Sitzung sie wiederfindet. Der Probelauf lief grün, seit
+Tagen.
+
+Die Gegenlesung des anderen Hauses las ihn genauer (24.08.2026): Die Stufe „frische Sitzung
+übernimmt die Sperre" rief die Übernahme nie auf. Sie schrieb Zaundatei und Sperrdatei von Hand
+mit einer fest einprogrammierten Nummer — dem *Ergebnis* einer geglückten Übernahme. Ein Zaun, der
+keine Nummer prägt, eine verlorene Wettlaufsituation, eine wiederverwendete Nummer: Jeder dieser
+Fehler wäre durchgelaufen.
+
+Als die Stufe die echte Übernahme ausführte, hielt sie sofort an — und legte einen Fehler frei,
+den es ohne sie nicht zu finden gab: Der Daemon las seinen Zaunspeicher aus der Datei der
+Stapelsperre. Deren einziger Schreiber baut sie bei *jeder* Übernahme aus einem festen Feldsatz neu
+auf und löscht dabei die Generation, ohne die der Daemon sich weigert zu starten. Auf dem gebauten
+Weg hätte nach der ersten echten Übernahme nie wieder ein Daemon starten können. Die Nachstellung
+hat den Fehler nicht übersehen — sie hat ihn getragen.
+
+**Lehre:** Ein Test, der den Zustand *nach* einer Handlung herstellt, statt die Handlung
+auszuführen, prüft die Handlung nicht, sondern die eigene Annahme darüber. Er ist besonders
+gefährlich, weil er dauerhaft grün ist und dadurch als Beweis zählt. Prüffrage an jeden Probelauf:
+*Welche Zeile ruft die Sache auf, die hier bewiesen werden soll — und was bliebe grün, wenn diese
+Sache völlig kaputt wäre?* Was ein Probelauf legitim abkürzen darf, ist die vergehende Zeit; was er
+nie abkürzen darf, ist den Aufruf.
