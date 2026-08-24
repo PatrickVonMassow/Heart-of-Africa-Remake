@@ -228,6 +228,13 @@ describe('the daemon lifecycle in the sandbox', () => {
       const res = await request('record-state', { pointId: 'p9', attemptId, state: 'cancelled', reason: 'cap test over', at: Date.now() })
       expect(res.ok, res.reason).toBe(true)
     }
+    // The REFUSAL did not poison its idempotency key: the identical retry runs
+    // the operation again — here into the worktree claim held by a1, a live
+    // refusal — instead of answering `alreadyApplied` for work that never ran.
+    const retried = await request('start-attempt', { pointId: 'p2', attemptId: 'a2', branch: 'feat/stub', worktree, adapter: 'stub' })
+    expect(retried.alreadyApplied).toBeUndefined()
+    expect(retried.ok).toBe(false)
+    expect(retried.reason).toMatch(/share|claimed/)
   })
 
   it('gets a checkpoint acknowledged with the pushed SHA', async () => {

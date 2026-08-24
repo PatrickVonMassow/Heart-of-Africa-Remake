@@ -250,8 +250,17 @@ async function serve(args) {
     const application = applyOnce(applied, keyed.key, () => applyFn())
     if (!application.ok) return { ok: false, reason: application.reason }
     if (!application.applied) return { ok: true, alreadyApplied: true }
-    applied.add(keyed.key)
-    const result = await application.result
+    // The key counts as applied only after the operation SUCCEEDED and its
+    // journal entry stands (added below): a capacity refusal, a spawn failure
+    // or a thrown operation never happened, and its key must not answer the
+    // next legitimate retry with `alreadyApplied`. Restart agrees: appliedKeys
+    // rebuilds from journalled commands, which only successes produce.
+    let result
+    try {
+      result = await application.result
+    } catch (error) {
+      return { ok: false, reason: `the operation failed before completing: ${error.message}` }
+    }
     if (result && result.ok === false) return result
     // The entry carries the fence it was VALIDATED under, which after a handover
     // is the successor's, not the fence this daemon was started under. A refused
@@ -267,6 +276,7 @@ async function serve(args) {
       console.error(`daemon: ${request.cmd} reversed after a journal refusal: ${JSON.stringify(compensated)}`)
       return { ok: false, reason: `refused: the journal could not record ${request.cmd} (${logged.reason}); the local effect was reversed` }
     }
+    applied.add(keyed.key)
     const after = revalidateAfterWrite({ validated: presented, lock: readLock(repoDir) })
     if (after.verdict === 'compensate') {
       const compensated = compensateFn ? await compensateFn(result) : { note: 'no local effect to reverse' }
