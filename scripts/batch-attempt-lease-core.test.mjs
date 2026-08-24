@@ -132,6 +132,22 @@ describe('grantAttemptLease', () => {
     expect(grant({ existing: undefined }).ok).toBe(true)
   })
 
+  it('never mints a lease whose term does not end at a finite moment', () => {
+    // `now` and `ttlMs` were each checked for finiteness, but their SUM was not,
+    // so finite extremes overflowed to `expiresAt: Infinity` and the core
+    // answered ok with a lease usableLease itself rejects — a holder would be
+    // fenced on the very lease it had just been granted (cross-vendor review of
+    // point 893).
+    const fresh = grantAttemptLease({ attempt, holder, now: Number.MAX_VALUE, ttlMs: Number.MAX_VALUE, leaseId: 'L1' })
+    expect(fresh.ok).toBe(false)
+    expect(fresh.reason).toMatch(/finite moment/)
+    // The renewal mints the same window and must refuse it for the same reason.
+    const wide = { ...attempt, leaseId: 'L1', holder, grantedAt: 0, expiresAt: Number.MAX_VALUE }
+    const renewal = grantAttemptLease({ existing: wide, attempt, holder, now: Number.MAX_VALUE, ttlMs: Number.MAX_VALUE, leaseId: 'L1' })
+    expect(renewal.ok).toBe(false)
+    expect(renewal.reason).toMatch(/finite moment/)
+  })
+
   it('refuses an incomplete attempt, holder or clock', () => {
     expect(grantAttemptLease({ attempt: { batchId: 'b' }, holder, now: 1, leaseId: 'L1' }).ok).toBe(false)
     expect(grantAttemptLease({ attempt, holder: { pid: 100 }, now: 1, leaseId: 'L1' }).ok).toBe(false)

@@ -86,6 +86,16 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
   if (!Number.isFinite(now) || !Number.isFinite(ttlMs) || ttlMs <= 0) {
     return { ok: false, reason: 'a lease needs a usable clock and ttl' }
   }
+  // FINITE INPUTS DO NOT MAKE A FINITE WINDOW: two finite extremes overflow to
+  // `expiresAt: Infinity`, and the core answered ok with a lease usableLease
+  // itself rejects, fencing the holder on the lease it had just been granted
+  // (cross-vendor review of point 893). The end of the term is computed once,
+  // here, for every path that mints or extends one — a term that does not end is
+  // not a term this module hands out.
+  const expiresAt = now + ttlMs
+  if (!Number.isFinite(expiresAt)) {
+    return { ok: false, reason: 'the lease term does not end at a finite moment; a lease this module could not use is never minted' }
+  }
   // ABSENCE IS null OR AN OMITTED FIELD — NOTHING ELSE. `if (existing)` let a
   // persisted `false`, `0`, `''` or `NaN` skip validation entirely and fall
   // through to the fresh grant, so unreadable ownership was interpreted as no
@@ -109,7 +119,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     }
     if (sameProcess(existing.holder, holder)) {
       if (now <= existing.expiresAt) {
-        return { ok: true, renewed: true, lease: Object.freeze({ ...existing, renewedAt: now, expiresAt: now + ttlMs }) }
+        return { ok: true, renewed: true, lease: Object.freeze({ ...existing, renewedAt: now, expiresAt }) }
       }
       // A LAPSED lease never extends silently (M38): once the renewal persisted,
       // expiredLeaseAlerts could no longer observe the lapse. The lapse is
@@ -136,7 +146,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
           leaseId,
           holder: Object.freeze({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }),
           grantedAt: now,
-          expiresAt: now + ttlMs,
+          expiresAt,
         }),
       }
     }
@@ -182,7 +192,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
       leaseId,
       holder: Object.freeze({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }),
       grantedAt: now,
-      expiresAt: now + ttlMs,
+      expiresAt,
     }),
   }
 }
