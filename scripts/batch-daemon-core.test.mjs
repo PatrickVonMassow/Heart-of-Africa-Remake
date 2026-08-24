@@ -59,6 +59,13 @@ describe('workerSpawnPlan — commands from the table, data as data', () => {
 
   it('refuses an unknown adapter and every request-shaped injection', () => {
     expect(workerSpawnPlan({ ...good, adapter: 'rm -rf' }).ok).toBe(false)
+    // Prototype entries are not adapters: a bare table index would answer
+    // these with inherited functions and emit '--runner undefined'.
+    for (const inherited of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+      const res = workerSpawnPlan({ ...good, adapter: inherited })
+      expect(res.ok, inherited).toBe(false)
+      expect(res.reason, inherited).toMatch(/unknown adapter/)
+    }
     expect(workerSpawnPlan({ ...good, pointId: '834; rm' }).ok).toBe(false)
     expect(workerSpawnPlan({ ...good, branch: '--upload-pack=/x' }).ok).toBe(false)
     expect(workerSpawnPlan({ ...good, branch: 'a..b' }).ok).toBe(false)

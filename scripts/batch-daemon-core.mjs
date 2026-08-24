@@ -57,7 +57,10 @@ const plainBranch = (v) => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._/-]
 const absDir = (v) => typeof v === 'string' && v.startsWith('/') && !v.includes('\0')
 
 export function workerSpawnPlan({ adapter, pointId, branch, worktree, attemptDir, leaseId } = {}) {
-  const spec = WORKER_ADAPTERS[adapter]
+  // Own properties only: the table is a plain object, so a bare index would
+  // answer `constructor` or `toString` with an inherited function and produce a
+  // malformed spawn plan instead of a refusal.
+  const spec = typeof adapter === 'string' && Object.hasOwn(WORKER_ADAPTERS, adapter) ? WORKER_ADAPTERS[adapter] : null
   if (!spec) return { ok: false, reason: `unknown adapter: ${String(adapter)}; commands come from the adapter table, never from a request` }
   if (!plainId(pointId)) return { ok: false, reason: 'pointId must be a plain identifier' }
   if (!plainBranch(branch)) return { ok: false, reason: 'branch must be a plain ref name' }
