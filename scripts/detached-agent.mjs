@@ -20,7 +20,8 @@
 // STILL DARK: only the daemon spawns this, and no daemon starts while the
 // activation flag refuses (scripts/durable-lane-flag-core.mjs).
 import { spawn, spawnSync } from 'node:child_process'
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { appendFileSync, closeSync, constants as fsConstants, existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { leaseAllowsWrite } from './batch-attempt-lease-core.mjs'
@@ -63,11 +64,32 @@ export function spawnDetached({ cmd, args, cwd, logPath, env = process.env }) {
 
 /** Atomic small-file write for status and acks: a reader never sees half a
  *  record. (The durability fsync lives in the state store; these files are
- *  advisory runtime state a successor re-probes anyway.) */
+ *  advisory runtime state a successor re-probes anyway.) The tmp name is
+ *  RANDOM and the create EXCLUSIVE, the store's rule: a predictable pid-named
+ *  tmp is plantable as a symlink, and a truncating open writes through one. */
 function writeJsonAtomic(path, value) {
-  const tmp = `${path}.tmp-${process.pid}`
-  writeFileSync(tmp, `${JSON.stringify(value)}\n`)
+  const tmp = `${path}.tmp-${randomBytes(8).toString('hex')}`
+  const fd = openSync(tmp, 'wx', 0o600)
+  try {
+    writeSync(fd, `${JSON.stringify(value)}\n`)
+  } finally {
+    closeSync(fd)
+  }
   renameSync(tmp, path)
+}
+
+/** In-place write that REFUSES to follow a symlink at its target — for the
+ *  heartbeats, which are overwritten in place at tick rate (an atomic
+ *  tmp-rename per tick would buy nothing: their readers take the mtime, and a
+ *  torn read of a timestamp fails no invariant). O_NOFOLLOW makes a planted
+ *  link fail the write loudly instead of landing it where the planter chose. */
+export function writeFileNoFollow(path, text) {
+  const fd = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC | fsConstants.O_NOFOLLOW, 0o600)
+  try {
+    writeSync(fd, text)
+  } finally {
+    closeSync(fd)
+  }
 }
 
 export function readJsonIfAny(path) {
@@ -303,7 +325,7 @@ async function runWorker(argv) {
 
   // The loop IS the worker: heartbeat, checkpoint answers, work, cancellation.
   for (;;) {
-    writeFileSync(paths.heartbeatPath, `${Date.now()}\n`)
+    writeFileNoFollow(paths.heartbeatPath, `${Date.now()}\n`)
     if (stopping) {
       if (!(await stopRunner())) {
         status('cancel-blocked', { sha: tip(), reason: 'the runner survived SIGTERM and SIGKILL; nothing here claims it stopped' })

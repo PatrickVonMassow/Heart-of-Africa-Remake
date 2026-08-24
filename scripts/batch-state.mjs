@@ -159,8 +159,11 @@ export function readJournal(store) {
  *  The temporary name is RANDOM and the create EXCLUSIVE: a predictable
  *  pid-derived name is plantable as a symlink (O_EXCL fails on one, however
  *  dangling) and re-usable after pid recycling, where a truncating open would
- *  silently overwrite the crash evidence a leftover IS. */
-function writeFileAtomic(path, text) {
+ *  silently overwrite the crash evidence a leftover IS.
+ *
+ *  Exported: the daemon's own durable files — lease revocations, the lock copy,
+ *  checkpoint requests — carry the same discipline instead of a weaker copy. */
+export function writeFileAtomic(path, text) {
   refuseSymlink(path, 'an atomic write target')
   const tmp = `${path}.tmp-${randomBytes(8).toString('hex')}`
   const fd = openSync(tmp, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)

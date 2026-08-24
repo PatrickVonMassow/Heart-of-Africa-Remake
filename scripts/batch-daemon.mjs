@@ -18,7 +18,7 @@
 // path is the path that runs. --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
-import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, rmdirSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { createServer, createConnection } from 'node:net'
 import { join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -34,7 +34,7 @@ import {
 } from './batch-schema-core.mjs'
 import { AGREEMENT_SILENCE_MS } from './batch-adoption-core.mjs'
 import { appliedKeys, deriveSnapshot } from './batch-state-core.mjs'
-import { appendJournalEntry, openStateStore, readJournal, writeSnapshot } from './batch-state.mjs'
+import { appendJournalEntry, openStateStore, readJournal, writeFileAtomic, writeSnapshot } from './batch-state.mjs'
 import {
   DRAIN_STEPS,
   buildDaemonRecord,
@@ -46,7 +46,7 @@ import {
 } from './batch-daemon-core.mjs'
 import { grantAttemptLease, claimWorktree, releaseWorktree } from './batch-attempt-lease-core.mjs'
 import { DURABLE_LANE_STEPS, mayStartDaemon } from './durable-lane-flag-core.mjs'
-import { attemptPaths, readJsonIfAny, spawnDetached } from './detached-agent.mjs'
+import { attemptPaths, readJsonIfAny, spawnDetached, writeFileNoFollow } from './detached-agent.mjs'
 
 export const DAEMON_HEARTBEAT_MS = 1000
 export const START_WAIT_MS = 10_000
@@ -99,20 +99,6 @@ function realOrNull(path) {
   } catch {
     return null
   }
-}
-
-/** Durable atomic replacement: tmp, fsync, rename — the pattern every file
- *  whose loss would un-fence a writer must use. */
-function writeDurableSync(path, content) {
-  const tmp = `${path}.tmp-${process.pid}`
-  const fd = openSync(tmp, 'w', 0o600)
-  try {
-    writeSync(fd, content)
-    fsyncSync(fd)
-  } finally {
-    closeSync(fd)
-  }
-  renameSync(tmp, path)
 }
 
 function mtimeOf(path) {
@@ -251,6 +237,17 @@ async function serve(args) {
     console.error(`daemon: could not claim the identity record exclusively (${error.code ?? error.message}); another daemon won the race`)
     process.exit(1)
   }
+  // The record's NAME is durable only once its directory is flushed (the
+  // store's own rule): an fsynced record that vanishes with its filename after
+  // a crash would erase the cold-record forcing function reconciliation needs.
+  {
+    const dirFd = openSync(store.dir, 'r')
+    try {
+      fsyncSync(dirFd)
+    } finally {
+      closeSync(dirFd)
+    }
+  }
   if (!journalCorrupt) {
     const booted = ensureFenceJournalled(fence).ok && journalEntry({ kind: 'daemon-lifecycle', event: 'start', record: built.record }).ok
     if (!booted) {
@@ -273,7 +270,10 @@ async function serve(args) {
   let draining = false
 
   const heartbeat = setInterval(() => {
-    writeFileSync(join(store.dir, 'daemon-heartbeat'), `${nowMs()}\n`)
+    // O_NOFOLLOW, like every store write: a planted link must fail the write
+    // loudly (crashing here leaves the record cold, which forces reconciliation)
+    // rather than land the timestamp wherever the planter chose.
+    writeFileNoFollow(join(store.dir, 'daemon-heartbeat'), `${nowMs()}\n`)
   }, DAEMON_HEARTBEAT_MS)
 
   const recordAttemptState = (attemptId, pointId, record, underFence = currentFence) => {
@@ -416,7 +416,7 @@ async function serve(args) {
               return { ok: false, reason: granted.reason }
             }
             leases.set(attemptId, granted.lease)
-            writeFileSync(attemptPaths(dir).leasePath, `${JSON.stringify({ lease: granted.lease })}\n`)
+            writeFileAtomic(attemptPaths(dir).leasePath, `${JSON.stringify({ lease: granted.lease })}\n`)
             workers.set(attemptId, spawnedWorker)
             const record = attemptStateRecord({ state: 'running', actor: 'daemon', fence: request.fence, at: nowMs(), lastCommit: null, lastPushedSha: null })
             if (record.ok) recordAttemptState(attemptId, pointId, record.record, request.fence)
@@ -448,7 +448,7 @@ async function serve(args) {
         const requestId = request.payload?.requestId
         const waitMs = Number(request.payload?.waitMs) > 0 ? Number(request.payload.waitMs) : CHECKPOINT_WAIT_MS
         const asked = [...workers.entries()].map(([attemptId, worker]) => {
-          writeFileSync(attemptPaths(worker.dir).checkpointRequestPath, `${JSON.stringify({ requestId, at: nowMs() })}\n`)
+          writeFileAtomic(attemptPaths(worker.dir).checkpointRequestPath, `${JSON.stringify({ requestId, at: nowMs() })}\n`)
           return { attemptId, worker }
         })
         const deadline = nowMs() + waitMs
@@ -626,9 +626,11 @@ async function serve(args) {
   }
 
   /** Stops a worker FAIL-CLOSED. The on-disk lease is revoked FIRST — durably,
-   *  by tmp-fsync-rename, because a revocation that can be lost in a crash is
-   *  no fence — so every later push is fenced even if the process resists its
-   *  signals; then the process group gets SIGTERM, a bounded grace, SIGKILL.
+   *  by the store's own atomic write (random exclusive tmp, fsync, rename,
+   *  DIRECTORY fsync — without the last one the rename itself can be lost in a
+   *  crash, and a revocation that can be lost is no fence) — so every later
+   *  push is fenced even if the process resists its signals; then the process
+   *  group gets SIGTERM, a bounded grace, SIGKILL.
    *  Every signal is IDENTITY-CHECKED at send time: once the worker's recorded
    *  pid start time no longer matches, the number belongs to a stranger and is
    *  never signalled (group ids included — the group id is the leader's pid).
@@ -639,7 +641,7 @@ async function serve(args) {
     const paths = attemptPaths(worker.dir)
     let revoked = true
     try {
-      writeDurableSync(paths.leasePath, `${JSON.stringify({ lease: null, revokedAt: nowMs(), reason: String(why || 'stopped') })}\n`)
+      writeFileAtomic(paths.leasePath, `${JSON.stringify({ lease: null, revokedAt: nowMs(), reason: String(why || 'stopped') })}\n`)
     } catch (error) {
       revoked = false
       console.error(`daemon: could not revoke the on-disk lease for pid ${worker.pid}: ${error.message}`)
@@ -908,9 +910,13 @@ export function writeLockCopy({ repoDir, record, sessionId, fence = null, mutexW
       return { ok: false, reason: `the lock carries fence ${lock.fence}, not the writer's ${fence}; a superseded owner writes nothing` }
     }
     const next = { ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } }
-    const tmp = `${path}.tmp-${process.pid}`
-    writeFileSync(tmp, `${JSON.stringify(next)}\n`)
-    renameSync(tmp, path)
+    // The store's atomic write, not a pid-named tmp: a predictable name beside
+    // the lock is plantable as a symlink, and 'w' would write through it.
+    try {
+      writeFileAtomic(path, `${JSON.stringify(next)}\n`)
+    } catch (error) {
+      return { ok: false, reason: `the lock copy could not be written safely: ${error.message}` }
+    }
     return { ok: true }
   } finally {
     try {

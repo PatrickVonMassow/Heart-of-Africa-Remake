@@ -5,10 +5,10 @@
 // standing lease of the recorded holder lets a push through.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { attemptPaths, installPrePushHook, leaseGateVerdict } from './detached-agent.mjs'
+import { attemptPaths, installPrePushHook, leaseGateVerdict, writeFileNoFollow } from './detached-agent.mjs'
 
 let sandbox, originDir, worktree, attemptDir, paths
 
@@ -94,5 +94,25 @@ describe('the pre-push lease gate — pushes the wrapper never sees are still fe
   it('leaseGateVerdict fails closed on a gate invoked without its arguments', () => {
     expect(leaseGateVerdict({}).verdict).toBe('fenced')
     expect(leaseGateVerdict(null).verdict).toBe('fenced')
+  })
+})
+
+describe('writeFileNoFollow — the heartbeat write refuses planted links', () => {
+  it('overwrites a regular file in place but refuses a symlink target', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nofollow-'))
+    try {
+      const real = join(dir, 'heartbeat')
+      writeFileNoFollow(real, '1\n')
+      writeFileNoFollow(real, '2\n')
+      expect(readFileSync(real, 'utf8')).toBe('2\n')
+      const target = join(dir, 'elsewhere')
+      writeFileSync(target, 'untouched\n')
+      const link = join(dir, 'link-heartbeat')
+      execFileSync('ln', ['-s', target, link], { windowsHide: true })
+      expect(() => writeFileNoFollow(link, 'redirected\n')).toThrow()
+      expect(readFileSync(target, 'utf8')).toBe('untouched\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

@@ -389,6 +389,25 @@ describe('two SIMULTANEOUS daemon starts', () => {
   }, 30_000)
 })
 
+describe('writeLockCopy against a planted symlink', () => {
+  it('refuses to write the daemon copy through a symlinked lock file', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lock-copy-link-'))
+    try {
+      mkdirSync(join(dir, '.claude'), { recursive: true })
+      const target = join(dir, 'elsewhere.json')
+      writeFileSync(target, JSON.stringify({ sessionId: SID, fence: FENCE, pid: process.pid, pidStartedAt: processStartTime(process.pid), leaseUntil: Date.now() + 3_600_000 }))
+      execFileSync('ln', ['-s', target, join(dir, '.claude', 'batch-lock.json')], { windowsHide: true })
+      const res = writeLockCopy({ repoDir: dir, record: { pid: 1, pidStartedAt: 1, generation: 'gen-link-test' }, sessionId: SID })
+      expect(res.ok).toBe(false)
+      expect(res.reason).toMatch(/symlink/)
+      // The planted target survived the refused write untouched.
+      expect(JSON.parse(readFileSync(target, 'utf8')).daemon).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('a durably failing journal fails closed', () => {
   const JF_BATCH = 'journal-fail-batch'
   const jfRequest = (cmd, payload = {}) =>
