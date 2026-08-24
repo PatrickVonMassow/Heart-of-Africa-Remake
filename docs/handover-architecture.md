@@ -866,14 +866,16 @@ and change nothing until the probe answers or an operator supplies the evidence.
 | Record | Copy | Probe | Reading | Resolution |
 |---|---|---|---|---|
 | absent | absent | — | no daemon | today's path, legal and normal |
-| present | matching | live | healthy | nothing to do |
+| present, `running` | matching | live | healthy | nothing to do |
+| present, `starting` or `stopping` | matching | live | coming up, or going down | refuse every mutation and adoption; wait for `running`, or for the process to go — the copy is left as it is |
 | present, `running` | absent | live | unadopted — a handover, or a crash between the two writes | the lock owner probes the record and writes the copy |
 | present, `starting` or `stopping` | absent | live | coming up, or going down — never adoptable | wait for `running`, or for the process to go; a `stopping` record is never re-adopted |
 | present | absent | dead, PROVEN | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
 | present | absent | unprobed, or the probe failed | UNKNOWN | refuse every mutation and alert; no release, no new generation, retry the probe — an unanswered probe is not a death certificate |
 | present | matching | dead, PROVEN | stale copy | as cold record, and clear the copy |
 | present | matching | unprobed, or the probe failed | UNKNOWN | as the unknown row above; the copy is left exactly as it is |
-| present | journal-superseded generation | live | superseded copy | the record wins; rewrite the copy from it |
+| present, `running` | journal-superseded generation | live | superseded copy | the record wins; rewrite the copy from it |
+| present, `starting` or `stopping` | journal-superseded generation | live | superseded copy, and not adoptable | refuse every mutation; the copy is rewritten only once the record reads `running` |
 | present | journal-superseded generation | dead, PROVEN | cold record | the record is what must be reconciled, and the copy goes with it |
 | present | journal-superseded generation | unprobed, or the probe failed | UNKNOWN | as the unknown row above |
 | present | differing generation the JOURNAL cannot place — never minted there, or the journal unreadable | — | ambiguous generations — the strings themselves carry no order, and without the journal's mint history "superseded" is unprovable: the same evidence fits an earlier copy beside a live record and a newer copy beside a rolled-back record | refuse every mutation and alert; an operator supplies the ordering evidence — never an automatic rewrite or release |
@@ -883,7 +885,9 @@ and change nothing until the probe answers or an operator supplies the evidence.
 
 Its acceptance cases are step 1's own: every row of this table decided from the pair alone plus
 the record's lifecycle state, the forbidden row refused rather than resolved, and each UNKNOWN row
-asserted to change nothing — no release, no mint, no copy write. Two of them are ordering cases
+asserted to change nothing — no release, no mint, no copy write. NO ROW READS A LIVE RECORD
+WITHOUT ITS STATE: every live row names `running`, `starting` or `stopping` explicitly, and a case
+asserts that no resolution adopts, rewrites a copy or mutates anything under the latter two. Two of them are ordering cases
 rather than table lookups and must fail if the order is reversed: a crash between STOP's two
 writes leaves `stopping` and the lock owner does not adopt it, and a crash between START's two
 writes leaves `starting` and the lock owner does not adopt that either.
