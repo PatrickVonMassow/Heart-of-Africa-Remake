@@ -103,6 +103,32 @@ put it is the mistake this line exists to stop.
   it was caught here by luck, not by a check.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 898. The pause file and the in-flight declaration stayed per checkout after the lock and the
+  fence were shared. MEASURED 24.08.2026 while reviewing point 897. That point moves
+  `.claude/batch-lock.json` and its fence family onto `commonRepoPath`, so the main checkout and
+  every linked worktree read ONE file — correct for the incident 897 exists to fix. Two siblings of
+  the same class stayed on `repoPath` and therefore stay per checkout: `.claude/batch-paused`
+  (17 non-test call sites) and `.claude/batch-in-flight.json` (2).
+  WHAT THAT COSTS. The house facts every point brief carries state that EVERY guard stands down for
+  a paused batch. A process started inside `.claude/worktrees/<point>/` reads a DIFFERENT pause file,
+  so a pause the user sets in the main checkout never reaches it and its guards keep firing — the
+  same shape as the young fence counter standing beside the recorded mark of 690, moved from the
+  lock to the pause. For the in-flight file, a wait declared from a worktree lands beside the one the
+  main session reads, so the successor's `--adopt` cannot find it.
+  DELIBERATELY NOT FIXED IN 897: that point's FINAL STATE names the lock, the fence and the
+  ownership hand-over, not the pause; widening its diff would have been scope creep.
+  FINAL STATE: every host-local singleton file under `.claude/` resolves through the common checkout
+  rather than the process's own, and the ones that deliberately stay per checkout are named as such.
+  VERIFIABLE: unit cases — a pause written in the main checkout is seen by a resolver running with a
+  linked worktree as its cwd; an in-flight declaration written from a worktree is read back by the
+  main checkout. The test ENUMERATES the `.claude/` singleton candidates rather than listing known
+  names, the way point 774 enumerates the guards with a `--status` path.
+  OPEN QUESTION FOR THE AUTHOR: decide per file which ones legitimately stay per checkout — several
+  guard baseline and state files may well want that — and record the reason beside each.
+  Criticality: medium — no product defect, but a pause the user sets can silently fail to reach a
+  running agent, which is the control the batch relies on to stop.
+  Bundle: Session- & Repo-Hygiene.
+
 
 - [ ] 889. The four-eyes ledger repair lands on its own, and carries the fold that authorized the
   lane. CUT OUT OF POINT 834 (see 890 for the cut and its reason).
