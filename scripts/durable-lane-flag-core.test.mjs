@@ -1,9 +1,9 @@
 // THE INTERLOCK THAT KEEPS THE DURABLE LANE DARK (point 891, step 1).
 //
 // The point's rule is that steps 1 to 4 land behind an activation flag and that the
-// flag REFUSES to enable while steps 8 and 9 are not green — because controlling
-// what the board advertises does not control what somebody switches on. These cases
-// are that refusal, pinned.
+// flag REFUSES to enable while steps 8 and 9 and the step 12 drills are not green —
+// because controlling what the board advertises does not control what somebody
+// switches on. These cases are that refusal, pinned.
 import { describe, it, expect } from 'vitest'
 import {
   DURABLE_LANE_STEPS,
@@ -34,11 +34,21 @@ describe('the activation interlock', () => {
   it('still refuses when steps 1 to 4 are green but 8 and 9 are not — durable execution is not transferable supervision', () => {
     const verdict = activationDecision({ steps: green(1, 2, 3, 4) })
     expect(verdict.ok).toBe(false)
-    expect(verdict.missing).toEqual([8, 9])
+    expect(verdict.missing).toEqual([8, 9, 12])
+  })
+
+  it('still refuses when the mechanisms are green but the staged failure trials have not proved the real path', () => {
+    const verdict = activationDecision({
+      steps: green(1, 2, 3, 4, 8, 9),
+      boundaryMode: REQUIRED_BOUNDARY_MODE,
+    })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.missing).toEqual([12])
+    expect(verdict.reason).toMatch(/staged failure trials/)
   })
 
   it('does not count a step that claims green without evidence', () => {
-    const steps = { ...green(1, 2, 3, 4, 8, 9) }
+    const steps = { ...green(...STEPS_REQUIRED_FOR_ACTIVATION) }
     steps[8] = { ...steps[8], evidence: null }
     expect(activationDecision({ steps }).missing).toEqual([8])
   })

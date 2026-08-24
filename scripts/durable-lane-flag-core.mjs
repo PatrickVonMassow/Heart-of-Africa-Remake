@@ -40,12 +40,17 @@ export const DURABLE_LANE_STEPS = Object.freeze({
   4: Object.freeze({ title: 'transferable declarations and fencing', green: false, evidence: null }),
   8: Object.freeze({ title: 'successor startup and reconciliation', green: false, evidence: null }),
   9: Object.freeze({ title: 'crash-recoverable serial landing', green: false, evidence: null }),
+  12: Object.freeze({ title: 'staged failure trials', green: false, evidence: null }),
 })
 
 /** The steps without which survivability may not be CLAIMED, and therefore may not
  *  be switched on. Steps 1 to 4 are necessary too, but they are not sufficient, and
- *  this list is the sufficiency condition. */
-export const STEPS_REQUIRED_FOR_ACTIVATION = Object.freeze([1, 2, 3, 4, 8, 9])
+ *  this list is the sufficiency condition. Steps 8 and 9 make survivability
+ *  CLAIMABLE; step 12 makes it PROVEN on the real path by killing the spawning
+ *  parent session and showing a fresh session discover, adopt and reconcile. Green
+ *  mechanisms that have never faced a real session death are still an untested
+ *  claim, and this file records which claims the project will make. */
+export const STEPS_REQUIRED_FOR_ACTIVATION = Object.freeze([1, 2, 3, 4, 8, 9, 12])
 
 /** Until ordered-work steps 6 and 7 exist, this is the only boundary mode an
  *  enabled durable lane may declare. Relaxing it is itself a reviewed code change
