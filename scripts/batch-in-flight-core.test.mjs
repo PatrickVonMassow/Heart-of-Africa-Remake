@@ -82,6 +82,7 @@ import {
 import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
+  agentCheckDeclaration,
   adoptTransferred,
   checkAgentOutput,
   checkDeclaredAgentOutput,
@@ -887,8 +888,12 @@ describe('the stand-down boundary — declared children cross ownership', () => 
       worktrees: ['/repo/.claude/worktrees/point-716'],
       branches: ['feat/716-standdown-boundary'],
       logs: ['/tmp/agent.log'],
+      pids: [],
     })
-    expect(declaredAgentProbe(declaration({ evidence: [{ kind: 'pid', pid: 7 }] })).agent).toBe(false)
+    expect(declaredAgentProbe(declaration({ evidence: [{ kind: 'pid', pid: 7 }] }))).toMatchObject({
+      agent: false,
+      pids: [{ kind: 'pid', pid: 7 }],
+    })
   })
 
   it('asks every declared path in one --agent-check verdict', () => {
@@ -914,6 +919,184 @@ describe('the stand-down boundary — declared children cross ownership', () => 
         branchProbe: () => NOW - 90 * 60_000,
       }),
     ).toMatchObject({ respawn: false, reason: 'agent-alive' })
+  })
+
+  it('a gone declared pid refutes a branch tip left one minute ago', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author', label: 'author output' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'author process' },
+      ],
+    })
+    const checked = checkDeclaredAgentOutput(recorded, {
+      now: NOW,
+      branchProbe: () => NOW - 60_000,
+      pidProbe: () => dead(),
+    })
+    expect(checked).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: {
+        verdict: 'dead',
+        refutations: [
+          {
+            evidence: `pid ${RUN_PID} (author process)`,
+            measurement: 'process-gone',
+            refuted: expect.stringContaining('work output 1 min old'),
+          },
+        ],
+      },
+    })
+  })
+
+  it('a reused declared pid refutes the same fresh branch tip', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const checked = checkDeclaredAgentOutput(recorded, {
+      now: NOW,
+      branchProbe: () => NOW - 60_000,
+      pidProbe: () => ({ exists: true, startedAt: RUN_STARTED + PID_START_TOLERANCE_MS + 1 }),
+    })
+    expect(checked).toMatchObject({
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead', refutations: [{ measurement: 'pid-reused' }] },
+    })
+    expect(checked.detail).toContain(`pid ${RUN_PID}`)
+    expect(checked.detail).toContain('pid-reused')
+  })
+
+  it('without pid evidence a fresh tip still decides alone, unchanged', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      checkDeclaredAgentOutput(recorded, { now: NOW, branchProbe: () => NOW - 60_000 }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('a live pid and silent log beside a fresh commit retain the 30.07 verdict', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+        { kind: 'log', path: '/tmp/author-874.log' },
+      ],
+    })
+    expect(
+      checkDeclaredAgentOutput(recorded, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => alive(),
+        logProbe: () => NOW - 59 * 60_000,
+      }),
+    ).toMatchObject({
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('--agent-check with no output arguments probes the recorded declaration', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/874-author' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'recorded author' },
+      ],
+    })
+    const fromNoArguments = agentCheckDeclaration(recorded)
+    expect(fromNoArguments.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(fromNoArguments, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      output: { verdict: 'dead', refutations: [{ evidence: `pid ${RUN_PID} (recorded author)` }] },
+    })
+  })
+
+  it('explicit output arguments augment and de-duplicate recorded evidence', () => {
+    const recorded = declaration({ evidence: [{ kind: 'branch', ref: 'feat/874-author' }] })
+    expect(
+      agentCheckDeclaration(recorded, {
+        branches: ['feat/874-author', 'feat/875-other'],
+        worktrees: ['/repo/point-875'],
+        logs: ['/tmp/author.log'],
+      }).evidence,
+    ).toEqual([
+      { kind: 'branch', ref: 'feat/874-author' },
+      { kind: 'worktree', path: '/repo/point-875' },
+      { kind: 'branch', ref: 'feat/875-other' },
+      { kind: 'log', path: '/tmp/author.log' },
+    ])
+  })
+
+  it('does not let a gone recorded pid refute a foreign explicit branch', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/B'] })
+    expect(probe.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/A' },
+      { kind: 'branch', ref: 'feat/B' },
+    ])
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: (ref) => (ref === 'feat/B' ? NOW - 60_000 : NOW - 60 * 60_000),
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('keeps a gone recorded pid when explicit arguments re-state its own address', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/A'] })
+    expect(probe.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead' },
+    })
   })
 
   it('turns a live declared agent into a transfer, never a silent stand-down', () => {
@@ -965,6 +1148,22 @@ describe('the stand-down boundary — declared children cross ownership', () => 
     expect(text).toContain('--agent-check')
     expect(text).not.toContain('provably dead')
     expect(successorAgentOrientation({ declaration: agent, sid: SID, agentCheck: working })).toBe('')
+  })
+
+  it('carries a process refutation into the stand-down and successor verdicts', () => {
+    const refuted = {
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      detail: 'pid 9001 (author) — process-gone refutes work output 1 min old',
+    }
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: refuted, transfer: { available: false } }),
+    ).toEqual({ action: 'stand-down', reason: 'agent-process-refuted' })
+    const text = successorAgentOrientation({ declaration: agent, sid: 'successor', agentCheck: refuted })
+    expect(text).toContain('PROCESS MEASURED DEAD')
+    expect(text).toContain('pid 9001 (author)')
+    expect(text).not.toContain('STATE UNKNOWN')
   })
 
   it('writes the transfer at stand-down, and the successor sees and adopts it', () => {
@@ -1071,6 +1270,20 @@ describe('evidenceVerdict — the verdict names the source it rests on', () => {
     expect(v.outputFresh).toBe(true)
     expect(v.fresh).toHaveLength(1)
     expect(v.silent).toEqual(['log x — quiet'])
+  })
+
+  it('lets a positive process refutation outrank the process\'s fresh last output', () => {
+    const v = evidenceVerdict([
+      item('branch', true),
+      { ...item('pid', false), describe: 'pid 42 (author)', detail: 'process-gone' },
+    ])
+    expect(v).toMatchObject({
+      judgedOn: 'process',
+      outputFresh: true,
+      refutations: [{ evidence: 'pid 42 (author)', measurement: 'process-gone' }],
+    })
+    // An unverifiable identity remains uncertainty, not a fabricated death.
+    expect(evidenceVerdict([{ ...item('pid', false), detail: 'start-time-unverifiable' }]).refutations).toEqual([])
   })
 })
 

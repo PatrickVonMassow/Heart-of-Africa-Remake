@@ -664,11 +664,13 @@ export function checkAgentOutput(
     worktree = null,
     branch = null,
     log = null,
+    pids = [],
     now = Date.now(),
     graceMs,
     worktreeProbe = worktreeActiveAt,
     branchProbe = refTipAt,
     logProbe = mtimeOf,
+    pidProbe = probePid,
   } = {},
 ) {
   const many = (value) => (Array.isArray(value) ? value : value ? [value] : [])
@@ -678,10 +680,12 @@ export function checkAgentOutput(
   }
   const worktreeStamps = many(worktree).map((path) => worktreeStamp(worktreeProbe(path))).filter(Boolean)
   const newestWorktree = worktreeStamps.reduce((newest, stamp) => (!newest || stamp.at > newest.at ? stamp : newest), null)
+  const processEvidence = many(pids).map((item) => checkEvidence(item, { now, probePid: pidProbe }))
   const output = agentOutputVerdict({
     worktreeAt: newestWorktree,
     branchTipAt: newestNumber(many(branch).map((ref) => branchProbe(ref))),
     logAt: newestNumber(many(log).map((path) => logProbe(path))),
+    processEvidence,
     now,
     ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
   })
@@ -701,6 +705,44 @@ export function declaredAgentCheckCommand(declaration) {
   return args.length ? `node scripts/batch-in-flight.mjs --agent-check ${args.join(' ')}` : ''
 }
 
+/**
+ * The declaration is the source of truth for `--agent-check`. Explicit output
+ * addresses remain useful for one-off checks, but they augment the recorded
+ * addresses instead of replacing them. A recorded pid comes along only when
+ * every explicit address is already in that declaration: one combined verdict
+ * cannot truthfully apply agent A's pid refutation to foreign agent B output.
+ * We drop pids for that mixed probe instead of splitting the printed verdict,
+ * because its purpose is to answer all named output with one replacement
+ * decision; separate verdicts could again call one quiet address dead while
+ * another address in the same requested probe is moving.
+ */
+export function agentCheckDeclaration(declaration, { worktrees = [], branches = [], logs = [] } = {}) {
+  const base = declaration && typeof declaration === 'object' ? declaration : {}
+  const recordedEvidence = Array.isArray(base.evidence) ? base.evidence : []
+  const key = (item) => {
+    if (item?.kind === 'worktree' || item?.kind === 'log') return `${item.kind}:${String(item.path ?? '').trim()}`
+    if (item?.kind === 'branch') return `branch:${String(item.ref ?? '').trim()}`
+    return null
+  }
+  const explicitEvidence = [
+    ...worktrees.map((path) => ({ kind: 'worktree', path })),
+    ...branches.map((ref) => ({ kind: 'branch', ref })),
+    ...logs.map((path) => ({ kind: 'log', path })),
+  ]
+  const recordedAddresses = new Set(recordedEvidence.map(key).filter(Boolean))
+  const hasForeignAddress = explicitEvidence.some((item) => !recordedAddresses.has(key(item)))
+  const evidence = recordedEvidence.filter((item) => !hasForeignAddress || item?.kind !== 'pid')
+  const seen = new Set(evidence.map(key).filter(Boolean))
+  const add = (item) => {
+    const identity = key(item)
+    if (!identity || seen.has(identity)) return
+    seen.add(identity)
+    evidence.push(item)
+  }
+  for (const item of explicitEvidence) add(item)
+  return { ...base, evidence }
+}
+
 /** Ask every declared child output through the same verdict as `--agent-check`. */
 export function checkDeclaredAgentOutput(declaration, opts = {}) {
   const probe = declaredAgentProbe(declaration)
@@ -713,6 +755,7 @@ export function checkDeclaredAgentOutput(declaration, opts = {}) {
       worktree: probe.worktrees,
       branch: probe.branches,
       log: probe.logs,
+      pids: probe.pids,
       ...opts,
     }),
   }
@@ -1358,14 +1401,30 @@ if (isMain) {
     const worktrees = opts('--worktree')
     const branches = opts('--branch')
     const logs = opts('--log')
-    if (!worktrees.length && !branches.length && !logs.length) {
+    const declaration = agentCheckDeclaration(readDeclaration(), { worktrees, branches, logs })
+    const recorded = declaredAgentProbe(declaration)
+    if (!recorded.agent) {
       fail(
-        'nothing to check. Name what the agent PRODUCES — its worktree (--worktree PATH) and/or its branch ' +
-          `(--branch REF); --log PATH may ride along but never decides.\n${usage}`,
+        'nothing to check. Record what the agent produces in the in-flight declaration, or name its worktree ' +
+          '(--worktree PATH) and/or branch (--branch REF); --log PATH may ride along but never decides.\n' +
+          usage,
       )
     }
-    const r = checkAgentOutput({ worktree: worktrees, branch: branches, log: logs })
-    console.log(JSON.stringify({ worktrees, branches, logs, graceMs: RESPAWN_GRACE_MS, ...r }, null, 2))
+    const r = checkDeclaredAgentOutput(declaration)
+    console.log(
+      JSON.stringify(
+        {
+          worktrees: recorded.worktrees,
+          branches: recorded.branches,
+          logs: recorded.logs,
+          pids: recorded.pids.map(({ pid, startedAt, label }) => ({ pid, startedAt, ...(label ? { label } : {}) })),
+          graceMs: RESPAWN_GRACE_MS,
+          ...r,
+        },
+        null,
+        2,
+      ),
+    )
     if (r.respawn) {
       console.log(
         `\nA REPLACEMENT IS PERMITTED: ${r.detail} (judged on ${r.judgedOn}). Re-run this exact command in the ` +
