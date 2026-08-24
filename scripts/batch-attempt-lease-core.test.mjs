@@ -291,6 +291,23 @@ describe('expiredLeaseAlerts', () => {
     expect(expiredLeaseAlerts({ leases: [renewed], now: 200_000 })).toEqual([])
   })
 
+  it('reports an unreadable lease collection instead of throwing the whole sweep away', () => {
+    // `leases.map` threw on any persisted value that is not an array, and a sweep
+    // that throws raises no alert for ANY lease — the silence this function must
+    // never answer. The unreadable collection is an alert like the unreadable
+    // lease and the unusable clock (hostile re-read of point 893).
+    for (const persisted of [false, 0, '', NaN, 'garbage', { '/wt/a': {} }]) {
+      const alerts = expiredLeaseAlerts({ leases: persisted, now: 20_000 })
+      expect(alerts, String(persisted)).toHaveLength(1)
+      expect(alerts[0].alert, String(persisted)).toMatch(/unreadable/)
+    }
+    // An unusable clock on top of it must not turn the sweep back into a throw.
+    expect(expiredLeaseAlerts({ leases: 'garbage', now: NaN })[0].alert).toMatch(/unreadable/)
+    // Absence is null or an omitted field, exactly as it is for a lease.
+    expect(expiredLeaseAlerts({ leases: null, now: 20_000 })).toEqual([])
+    expect(expiredLeaseAlerts({ now: 20_000 })).toEqual([])
+  })
+
   it('reports every lease as unjudgeable when the clock itself is unusable', () => {
     const lease = grant().lease
     const alerts = expiredLeaseAlerts({ leases: [lease], now: NaN })

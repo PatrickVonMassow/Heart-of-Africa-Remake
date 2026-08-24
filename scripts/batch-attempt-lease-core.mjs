@@ -248,6 +248,14 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
  *  unjudgeable rather than silently fresh. */
 export function expiredLeaseAlerts({ leases = [], now } = {}) {
   const identity = (l) => ({ batchId: l?.batchId ?? null, pointId: l?.pointId ?? null, attemptId: l?.attemptId ?? null })
+  // A COLLECTION THIS FUNCTION CANNOT READ IS AN ALERT, NOT A CRASH. `leases.map`
+  // threw on any persisted value that is not an array, and a sweep that throws
+  // raises no alert for ANY lease — precisely the silence this function must never
+  // answer. Absence is null or an omitted field, as it is everywhere else here.
+  if (leases === null || leases === undefined) return []
+  if (!Array.isArray(leases)) {
+    return [{ ...identity(null), alert: 'the persisted attempt leases are unreadable; ownership is uncertain and it is quarantined, not skipped' }]
+  }
   if (!Number.isFinite(now)) {
     return leases.map((l) => ({ ...identity(l), alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }))
   }
