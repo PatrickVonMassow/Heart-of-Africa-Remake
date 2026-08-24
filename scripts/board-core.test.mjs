@@ -55,6 +55,7 @@ import {
   refreshFooter,
   removeVdzk,
   setCardStatus,
+  setBatchPauseStatus,
   setCardTitle,
   toDone,
   doneCards,
@@ -97,6 +98,25 @@ describe('setCardStatus', () => {
   it('refuses a non-numeric point and an empty document', () => {
     expect(() => setCardStatus(board(), 'abc', 'X', '09:00')).toThrow(/not a point number/)
     expect(() => setCardStatus('', 361, 'X', '09:00')).toThrow(/empty document/)
+  })
+})
+
+describe('setBatchPauseStatus', () => {
+  it('reports the pause on every running now-card', () => {
+    const cards = [361, 362]
+      .map((point) => board(point).replace(/^<main>\n?/, '').replace(/<\/main>\s*$/, ''))
+      .join('\n')
+    const two = `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n${cards}\n</details>\n<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>\n</main>`
+    const out = setBatchPauseStatus(two, 'PAUSIERT: Diagnose läuft.', '14:49')
+    expect(out.match(/PAUSIERT: Diagnose läuft\./g)).toHaveLength(2)
+    expect(out.match(/Stand 14:49/g)).toHaveLength(2)
+  })
+
+  it('restates an existing unnumbered state card without creating a question', () => {
+    const idle = '<main><details class="now" data-state="idle"><summary><span class="t">Gerade keine laufende Arbeit</span></summary><div class="body"><p>alt</p></div></details></main>'
+    const out = setBatchPauseStatus(idle, 'Batch pausiert; die Sitzung diagnostiziert die Ursache.', '14:49')
+    expect(out).toContain('Batch pausiert; die Sitzung diagnostiziert die Ursache.')
+    expect(out).not.toContain('Von dir zu klären')
   })
 })
 

@@ -1375,6 +1375,26 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   return html.slice(0, from) + rewritten + html.slice(end)
 }
 
+/** Report a batch self-pause in the section that already reports session state.
+ * Every numbered current-work card is restated; with no running point, the
+ * existing state card is restated in place. No VDZK entry is created because a
+ * self-pause is diagnosis/recovery work, not a decision delegated to the user. */
+export function setBatchPauseStatus(html, text, stamp = berlinStamp()) {
+  if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  const status = String(text ?? '').trim()
+  if (!status) throw new Error('board: refusing to write an empty pause status')
+  const points = standingPointCards(html)
+  if (points.length > 0) {
+    return points.reduce((document, point) => setCardStatus(document, point, status, stamp), html)
+  }
+  const { from, end, text: section } = nowSectionSlice(html)
+  const re = /(<details class="now"[^>]*>[\s\S]*?<div class="body">)[\s\S]*?(<\/div>\s*<\/details>)/
+  if (!re.test(section)) throw new Error('board: no now-card exists to carry the pause status')
+  const body = renderCardBody(status, { stamp })
+  const rewritten = section.replace(re, (_match, head, tail) => `${head}\n${body}\n  ${tail}`)
+  return html.slice(0, from) + rewritten + html.slice(end)
+}
+
 /**
  * Retitle the card for `point` — the current-work card when there is one, the
  * queue card otherwise. Times, estimate and body are left exactly as they were.

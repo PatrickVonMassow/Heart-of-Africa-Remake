@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   boardCard,
+  boardNowCard,
   continuationCardBody,
   corruptionCardBody,
   escalate,
@@ -362,6 +363,17 @@ describe('the reason reaches the morning reader', () => {
     // leaving neither a card NOR a pause.
     expect(boardCard('t', 'q', { cwd: dir })).toBe(false)
     expect(existsSync(join(dir, '.batch-dashboard.html'))).toBe(false)
+  })
+
+  it('routes a self-pause to the now-card command, never to VDZK', () => {
+    const calls = []
+    expect(boardNowCard('Batch pausiert', 'Diagnose läuft', {
+      cwd: dir,
+      exec: (...args) => calls.push(args),
+    })).toBe(true)
+    expect(calls).toHaveLength(1)
+    expect(calls[0][1]).toEqual(['scripts/board.mjs', 'paused', 'Batch pausiert: Diagnose läuft'])
+    expect(calls[0][1]).not.toContain('vdzk-add')
   })
 })
 

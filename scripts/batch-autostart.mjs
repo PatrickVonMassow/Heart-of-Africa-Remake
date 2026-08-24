@@ -31,7 +31,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import { notify } from './notify.mjs'
-import { boardCard } from './alert-escalation.mjs'
+import { boardCard, boardNowCard } from './alert-escalation.mjs'
 import {
   acquire,
   updateOwnLock,
@@ -596,16 +596,16 @@ const pauseText = (() => { try { return readFileSync(C('batch-paused'), 'utf8') 
 let pause = classifyPause({ text: pauseText, now })
 if (pause.state === 'recover') {
   const recovery = pauseRecovery({ text: pauseText, now })
-  if (boardCard(recovery.title, recovery.body)) {
+  if (boardNowCard(recovery.title, recovery.body)) {
     try {
       writeTextAtomic(C('batch-paused'), recovery.record)
       pause = classifyPause({ text: recovery.record, now })
-      log(`${describePause(classifyPause({ text: pauseText, now }))}; decision card recorded; retry at ${new Date(recovery.retryAfter).toISOString()}`)
+      log(`${describePause(classifyPause({ text: pauseText, now }))}; now-card updated; retry at ${new Date(recovery.retryAfter).toISOString()}`)
     } catch (e) {
       log(`AMBIGUOUS PAUSE snapshot recorded but its recovery clock could not be written (${e?.message ?? e})`)
     }
   } else {
-    log('AMBIGUOUS PAUSE recovery deferred — its decision card could not be recorded')
+    log('AMBIGUOUS PAUSE recovery deferred — its now-card status could not be recorded')
   }
 }
 let batchParked = pause.state === 'hold' || pause.state === 'wait' || pause.state === 'recover'
@@ -1082,7 +1082,7 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   const when = `retry at ${new Date(plan.retryAfter).toISOString()}${plan.capped ? ' (capped probe)' : ''}`
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
   if (plan.decisionRecord) {
-    const recorded = boardCard(plan.decisionRecord.title, plan.decisionRecord.body)
+    const recorded = boardNowCard(plan.decisionRecord.title, plan.decisionRecord.body)
     log(`RUNAWAY capped scheduling decision ${recorded ? 'recorded' : 'FAILED to reach the board'} — next attempt ${new Date(plan.retryAfter).toISOString()}`)
   }
   // ATOMICALLY (four-eyes finding 4): a torn record is the one corruption that

@@ -113,6 +113,20 @@ export function boardCard(title, question, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/** A self-pause belongs on the current-state card, never under VDZK. */
+export function boardNowCard(title, status, { cwd = REPO_ROOT, exec = execFileSync } = {}) {
+  try {
+    exec(
+      process.execPath,
+      ['scripts/board.mjs', 'paused', `${title}: ${status}`],
+      { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** The durable record demanded by a generic alert's last rung. */
 export function continuationCardBody(title, message, decision, stamp) {
   return (

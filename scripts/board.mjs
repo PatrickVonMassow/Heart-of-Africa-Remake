@@ -7,6 +7,7 @@
 //
 //   node scripts/board.mjs now    <point> "<status>"  # queue → current work
 //   node scripts/board.mjs status <point> "<text>"    # restate a now-card's status
+//   node scripts/board.mjs paused "<status>"           # report a self-pause on the now-card(s)
 //   node scripts/board.mjs title  <point> "<text>"    # retitle a now- OR queue card
 //   node scripts/board.mjs queue  <point> ["<text>"]  # current work → back to queue
 //   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
@@ -59,6 +60,7 @@ import {
   removeVdzk,
   resolveCardText,
   setCardStatus,
+  setBatchPauseStatus,
   setCardTitle,
   toClosingWork,
   toNoCurrentWork,
@@ -167,6 +169,14 @@ try {
     if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"|--text-stdin')
     const at = berlinStamp()
     edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
+  } else if (cmd === 'paused') {
+    const status = textOf(rest)
+    if (!status) throw new Error('usage: board.mjs paused "<status>"|--text-stdin')
+    const at = berlinStamp()
+    edit(
+      (html) => setBatchPauseStatus(html, status, at),
+      `the batch self-pause is reported on the current state card (Stand ${at}); no user-decision card was created`,
+    )
   } else if (cmd === 'title') {
     // RETITLING HAD NO COMMAND AT ALL for a now-card (point 439), so the three
     // current-work cards of 30.07.2026 were fixed by hand-editing the HTML — the

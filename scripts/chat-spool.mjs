@@ -203,9 +203,9 @@ export function deliverPendingMessages({
   now = Date.now(),
 } = {}) {
   try {
-    // The two stand-downs first, so a non-owner and a paused batch cost one
-    // boolean rather than a directory read.
-    if (!ownsBatch || paused) return ''
+    // Ownership still binds; pause does not. A parked owner must hear the user
+    // instruction that may diagnose, redirect or lift the pause.
+    if (!ownsBatch) return ''
 
     const plan = deliveryDecision({ ownsBatch, paused, pending: existsSync(dir) ? readPending(dir) : [], max })
     const claimed = []

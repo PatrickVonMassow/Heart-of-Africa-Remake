@@ -629,9 +629,17 @@ describe('the launcher acts on the pause record', () => {
   it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
     const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
     const block = codeLines.slice(recovery, recovery + 18).join('\n')
-    expect(block).toMatch(/boardCard\(recovery\.title, recovery\.body\)/)
+    expect(block).toMatch(/boardNowCard\(recovery\.title, recovery\.body\)/)
+    expect(block).not.toMatch(/boardCard\(/)
     expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
     expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+  })
+
+  it('reports the runaway self-pause on the now-card and never creates a user question', () => {
+    const start = lineOf(/state\.failCount >= RUNAWAY_FAIL_LIMIT/, 'the runaway pause')
+    const block = codeLines.slice(start, start + 40).join('\n')
+    expect(block).toMatch(/boardNowCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
+    expect(block).not.toMatch(/boardCard\(/)
   })
 
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
@@ -639,7 +647,8 @@ describe('the launcher acts on the pause record', () => {
     const block = codeLines.slice(brake, brake + 32).join('\n')
     expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
-    expect(block).toMatch(/boardCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
+    expect(block).toMatch(/boardNowCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
+    expect(block).not.toMatch(/boardCard\(/)
     expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 

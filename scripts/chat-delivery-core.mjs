@@ -161,15 +161,15 @@ export function hookStdout(messages) {
 /**
  * WHICH WAITING MESSAGES THIS TOOL CALL MAY TAKE. PURE.
  *
- * The stand-downs are the house rule every guard here follows: a session that
- * does NOT own the batch lock must not consume the batch's messages (it would
- * take them out of the owner's spool and show them in a window nobody is
- * driving), and a paused batch is not addressed at all. Both produce the empty
- * delivery, which by the token rule is silence.
+ * A session that does NOT own the batch lock must not consume the batch's
+ * messages (it would take them out of the owner's spool and show them in a
+ * window nobody is driving). A pause is deliberately different: instructions
+ * are most valuable while work is parked, so the owning session keeps receiving
+ * them. The watcher supplies the ownerless paused case.
  */
 export function deliveryDecision({ ownsBatch = false, paused = false, pending = [], max = MAX_PER_CALL } = {}) {
-  if (!ownsBatch || paused) return { deliver: [], reason: paused ? 'paused' : 'not-owner' }
+  if (!ownsBatch) return { deliver: [], reason: 'not-owner' }
   const list = orderMessages(pending)
   if (list.length === 0) return { deliver: [], reason: 'empty' }
-  return { deliver: list.slice(0, Math.max(0, max)), reason: 'deliver' }
+  return { deliver: list.slice(0, Math.max(0, max)), reason: paused ? 'deliver-paused' : 'deliver' }
 }
