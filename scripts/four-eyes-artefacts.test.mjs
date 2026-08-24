@@ -11,6 +11,7 @@
 // fixtures, because the artefacts are the thing under test.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import crypto from 'node:crypto'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
@@ -62,15 +63,36 @@ describe('the 676 stage is auditable from its raw halves', () => {
     expect(read(DOC)).toMatch(/weaker two-model fallback/i)
   })
 
-  it('keeps half B\'s verbatim text and its parsed form the same list', () => {
+  it('keeps half B\'s verbatim text and its parsed form the same list — file column included', () => {
     const parsed = JSON.parse(read(`${HALF_B}.json`)).entries
     const verbatim = [...read(`${HALF_B}.md`).matchAll(/^(B\d+) \| ([^|]+) \| (.+)$/gm)]
     expect(verbatim.length).toBe(parsed.length)
     for (const [i, m] of verbatim.entries()) {
       expect(m[1]).toBe(parsed[i].id)
+      // The FILE a finding is attributed to is part of the finding: an id and
+      // defect that match while the file drifted would relocate the claim.
+      expect(m[2].trim().replaceAll('`', '')).toBe(String(parsed[i].file ?? '').replaceAll('`', ''))
       // Backticks were stripped when the raw output was parsed into JSON; nothing
       // else may differ.
       expect(m[3].replaceAll('`', '')).toBe(parsed[i].defect.replaceAll('`', ''))
+    }
+  })
+
+  it('the four raw halves are byte-pinned: they are FROZEN evidence, and any edit is a conscious event', () => {
+    // Section-id and count comparisons bind structure, not content: a claim
+    // rewritten INSIDE an existing section — in the prose or in the JSON —
+    // would pass them all. The halves are the immutable inputs of a finished
+    // blind stage, so their exact bytes are pinned; whoever must change one
+    // updates this pin in the same commit and thereby signs the change.
+    const createHash = crypto.createHash
+    const pins = {
+      [`${HALF_A}.md`]: 'e770546ef0715e40791dc30a4e678e53bcbf68b533c9420f1d772db8bc9f633a',
+      [`${HALF_A}.json`]: '85a61dc966b4cfcead323fd2e19fdaeb2bf3d204579edb011afb5967c47dcf64',
+      [`${HALF_B}.md`]: '09bcbe2aafc724197c96a54d6920d81052973215970af015533e8b7e211360bd',
+      [`${HALF_B}.json`]: 'c9a6cd98bcd5940ea31e179e783eab73bb5c6ea4fe69e3b1594024e768f6868f',
+    }
+    for (const [rel, sha] of Object.entries(pins)) {
+      expect(createHash('sha256').update(read(rel)).digest('hex'), rel).toBe(sha)
     }
   })
 
