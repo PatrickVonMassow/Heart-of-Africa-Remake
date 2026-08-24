@@ -91,6 +91,11 @@ scripts/.tile-cache
 .claude/worktrees/
 .claude/dashboard-state.json
 .claude/current-focus.json
+# The heartbeat's memory of the now-card it last saw, and the launcher's
+# mandate verdict: tooling state, written per machine, never authorship.
+.claude/board-heartbeat.json
+.claude/board-heartbeat.json.tmp-*
+.claude/repo-mandate.json
 .claude/focus-check-pending.json
 .claude/session-process.json
 .claude/session-process.json.tmp-*
