@@ -37,7 +37,12 @@ the merger question.
 
 ## Stage 676 — durable authoring workers and a short-lived coordinator (13.08.2026)
 
-The union is `docs/handover-architecture.md`; work-order points 676 and 834 build from it.
+The counted union of the halves is `676-union.json` — the 22.08.2026 third-model fold,
+which superseded the two fallback folds. `docs/handover-architecture.md` embeds that
+same union as its table (`scripts/four-eyes-artefacts.test.mjs` pins the two identical)
+and wraps it in provenance, rejected alternatives and the ordered work; work-order
+points 676 and 834 build from the architecture document, and where any older copy of
+the union disagrees, `676-union.json` governs.
 
 | Half | Model | Entries | File |
 |---|---|---|---|
