@@ -62,6 +62,40 @@ describe('repositoryRoot', () => {
     expect(repositoryCommonRoot({ explicitRoot: '', cwd: repository })).toBe(resolve(repository))
   })
 
+  it('defers and memoizes common-checkout discovery while reusing the resolved repository root', () => {
+    const moduleUrl = pathToFileURL(resolve('scripts/repo-paths.mjs')).href
+    const probe = `
+      import childProcess from 'node:child_process'
+      import { syncBuiltinESMExports } from 'node:module'
+
+      const calls = []
+      childProcess.execFileSync = (_file, args) => {
+        calls.push(args)
+        return args.includes('--git-common-dir') ? '/fixture/main/.git\\n' : '/fixture/linked\\n'
+      }
+      syncBuiltinESMExports()
+
+      const paths = await import(${JSON.stringify(moduleUrl)})
+      const afterImport = calls.slice()
+      paths.commonRepoPath('.claude', 'batch-lock.json')
+      paths.commonRepoPath('.claude', 'batch-fence.json')
+      process.stdout.write(JSON.stringify({ afterImport, calls }))
+    `
+
+    const result = JSON.parse(
+      execFileSync(process.execPath, ['--input-type=module', '--eval', probe], {
+        encoding: 'utf8',
+        windowsHide: true,
+      }),
+    )
+
+    expect(result.afterImport).toEqual([['-C', process.cwd(), 'rev-parse', '--show-toplevel']])
+    expect(result.calls).toEqual([
+      ['-C', process.cwd(), 'rev-parse', '--show-toplevel'],
+      ['-C', resolve('/fixture/linked'), 'rev-parse', '--git-common-dir'],
+    ])
+  })
+
   it('falls back to the module location when cwd is not in a repository', () => {
     const arbitraryDirectory = temporaryDirectory()
 

@@ -132,7 +132,7 @@ describe('statePathsFor — a redirected lock never reaches the repo .claude/', 
   })
 
   it('the default authority family lives in the common checkout', () => {
-    expect(LOCK_PATH).toBe(resolve(COMMON_REPO_ROOT, '.claude', 'batch-lock.json'))
+    expect(LOCK_PATH).toBe(resolve(COMMON_REPO_ROOT(), '.claude', 'batch-lock.json'))
   })
 })
 

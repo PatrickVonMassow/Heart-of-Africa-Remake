@@ -70,16 +70,24 @@ export function repositoryRoot({ explicitRoot = process.env.HOA_REPO_ROOT, cwd =
  * singleton state cannot. Otherwise a CLI started from a linked worktree gets a
  * second lock and a young fence counter beside the main checkout's live batch.
  */
-export function repositoryCommonRoot(options = {}) {
-  const checkout = repositoryRoot(options)
+export function repositoryCommonRoot({ checkoutRoot = '', ...rootOptions } = {}) {
+  const checkout = checkoutRoot || repositoryRoot(rootOptions)
   return checkout ? commonCheckoutRoot(checkout) : ''
 }
 
 export const REPO_ROOT = repositoryRoot()
-export const COMMON_REPO_ROOT = repositoryCommonRoot()
+
+/** Resolve the shared checkout only for callers that use singleton state. */
+export const COMMON_REPO_ROOT = (() => {
+  let root
+  return () => {
+    root ??= repositoryCommonRoot({ checkoutRoot: REPO_ROOT })
+    return root
+  }
+})()
 
 /** A path inside the repo: repoPath('.claude', 'batch-paused'). */
 export const repoPath = (...parts) => resolve(REPO_ROOT, ...parts)
 
 /** A host-local path shared by the main checkout and all its linked worktrees. */
-export const commonRepoPath = (...parts) => resolve(COMMON_REPO_ROOT, ...parts)
+export const commonRepoPath = (...parts) => resolve(COMMON_REPO_ROOT(), ...parts)
