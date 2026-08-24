@@ -141,6 +141,28 @@ describe('unconfirmedIntents', () => {
     ]
     expect(unconfirmedIntents(entries).map((e) => e.publicationId)).toEqual(['p2', 'p3'])
   })
+
+  it('a QUARANTINED confirmation suppresses nothing: the intent stays for recovery', () => {
+    const entries = [
+      { seq: 1, fence: 7, kind: 'publish-intent', publicationId: 'p1' },
+      { seq: 2, fence: 7, kind: 'publish-confirmed', publicationId: 'p1', quarantine: 'unknown kind revision' },
+    ]
+    expect(unconfirmedIntents(entries).map((e) => e.publicationId)).toEqual(['p1'])
+  })
+
+  it('a confirmation BEFORE its intent answers an earlier reused id, not this intent', () => {
+    const entries = [
+      { seq: 1, fence: 7, kind: 'publish-confirmed', publicationId: 'p1' },
+      { seq: 2, fence: 7, kind: 'publish-intent', publicationId: 'p1' },
+    ]
+    expect(unconfirmedIntents(entries).map((e) => e.publicationId)).toEqual(['p1'])
+    // …while the ordered pair still confirms.
+    const ordered = [
+      { seq: 1, fence: 7, kind: 'publish-intent', publicationId: 'p1' },
+      { seq: 2, fence: 7, kind: 'publish-confirmed', publicationId: 'p1' },
+    ]
+    expect(unconfirmedIntents(ordered)).toEqual([])
+  })
 })
 
 describe('deriveSnapshot', () => {

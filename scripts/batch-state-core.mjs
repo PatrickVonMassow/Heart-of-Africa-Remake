@@ -171,11 +171,25 @@ function oidLike(v) {
  *  published, which is exactly why mechanism 2 refuses to read quarantine as
  *  uniformly local. */
 export function unconfirmedIntents(entries = []) {
-  const confirmed = new Set()
+  // A confirmation suppresses an intent only when the journal could have MEANT
+  // it: not quarantined — nothing unauthorised erases a publication from
+  // recovery — and appended AFTER the intent it confirms, because a
+  // confirmation that precedes its intent confirms an earlier publication
+  // under a reused id, never this one. Fail closed either way: a doubtful
+  // confirmation leaves the intent listed for the remote to answer.
+  const confirmedSeqs = new Map()
   for (const e of entries) {
-    if (e.kind === 'publish-confirmed' && typeof e.publicationId === 'string') confirmed.add(e.publicationId)
+    if (e.kind === 'publish-confirmed' && !e.quarantine && typeof e.publicationId === 'string' && Number.isInteger(e.seq)) {
+      const seqs = confirmedSeqs.get(e.publicationId) ?? []
+      seqs.push(e.seq)
+      confirmedSeqs.set(e.publicationId, seqs)
+    }
   }
-  return entries.filter((e) => e.kind === 'publish-intent' && typeof e.publicationId === 'string' && !confirmed.has(e.publicationId))
+  return entries.filter((e) => {
+    if (e.kind !== 'publish-intent' || typeof e.publicationId !== 'string') return false
+    if (!Number.isInteger(e.seq)) return true
+    return !(confirmedSeqs.get(e.publicationId) ?? []).some((seq) => seq > e.seq)
+  })
 }
 
 // ---------------------------------------------------------------------------
