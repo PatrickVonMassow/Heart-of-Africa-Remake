@@ -63,12 +63,34 @@ describe('grantAttemptLease', () => {
     const after = 10_000 + ATTEMPT_LEASE_TTL_MS + 1
     const unproven = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L2' })
     expect(unproven).toMatchObject({ ok: false, verdict: 'stale-holder' })
-    const resurrection = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L1', holderProvenDead: true })
+    const resurrection = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L1', holderProvenDead: holder })
     expect(resurrection.ok).toBe(false)
     expect(resurrection.reason).toMatch(/NEW lease id/)
-    const regrant = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L2', holderProvenDead: true })
+    const regrant = grant({ existing: first, holder: { pid: 200, pidStartedAt: 6000 }, now: after, leaseId: 'L2', holderProvenDead: holder })
     expect(regrant.ok).toBe(true)
     expect(regrant.lease.leaseId).toBe('L2')
+  })
+
+  it('binds a death verdict to the identity that was probed, and refuses an unbound one', () => {
+    // A bare `holderProvenDead: true` is a verdict about SOME process; the gate
+    // read it as a verdict about THIS holder, so any death anywhere freed an
+    // expired lease (cross-vendor review of point 893). The verdict now names the
+    // identity it was reached about, and only that identity's lease is adopted.
+    const first = grant().lease
+    const after = 10_000 + ATTEMPT_LEASE_TTL_MS + 1
+    const other = { pid: 200, pidStartedAt: 6000 }
+    const unbound = grant({ existing: first, holder: other, now: after, leaseId: 'L2', holderProvenDead: true })
+    expect(unbound).toMatchObject({ ok: false, verdict: 'stale-holder' })
+    expect(unbound.reason).toMatch(/names no process identity/)
+    const wrongPid = grant({ existing: first, holder: other, now: after, leaseId: 'L2', holderProvenDead: { pid: 999, pidStartedAt: 5000 } })
+    expect(wrongPid).toMatchObject({ ok: false, verdict: 'stale-holder' })
+    // A recycled pid proven dead is a DIFFERENT process from the holder, so its
+    // death says nothing about the lease.
+    const recycled = grant({ existing: first, holder: other, now: after, leaseId: 'L2', holderProvenDead: { pid: 100, pidStartedAt: 99_000 } })
+    expect(recycled).toMatchObject({ ok: false, verdict: 'stale-holder' })
+    const bound = grant({ existing: first, holder: other, now: after, leaseId: 'L2', holderProvenDead: { pid: 100, pidStartedAt: 5000 } })
+    expect(bound.ok).toBe(true)
+    expect(bound.lease.leaseId).toBe('L2')
   })
 
   it('fails closed on an unreadable existing lease instead of treating broken as free', () => {

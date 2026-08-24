@@ -54,8 +54,9 @@ function usableLease(lease) {
  *    - a DIFFERENT process while the lease is unexpired → refuse: duplicate writer;
  *    - a different process after expiry → STILL refuse, with `stale-holder`: expiry
  *      alone never proves death (M38/M39), so the caller must present
- *      `holderProvenDead: true` — an affirmative verdict from the pid-and-start-time
- *      probe — before the attempt may be re-granted, and then only as a NEW lease id.
+ *      `holderProvenDead: { pid, pidStartedAt }` — the IDENTITY the pid-and-start-time
+ *      probe found dead, which must be the holder's own — before the attempt may be
+ *      re-granted, and then only as a NEW lease id.
  *  A recycled pid presenting the dead holder's number is caught by sameProcess:
  *  the start time does not match, so it is a different process like any other. */
 // NO DEFAULT CLOCK. `now = 0` made an OMITTED clock look like a usable one at the
@@ -117,11 +118,28 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     if (now <= existing.expiresAt) {
       return { ok: false, reason: `duplicate writer: the lease is held by pid ${existing.holder.pid} until ${existing.expiresAt}` }
     }
-    if (holderProvenDead !== true) {
+    // A DEATH VERDICT IS BOUND TO THE IDENTITY IT WAS REACHED ABOUT. A bare
+    // `true` was a verdict about SOME process, and the gate applied it to this
+    // lease's holder, so any death anywhere freed an expired lease anywhere
+    // (cross-vendor review of point 893). The caller now presents the pid AND
+    // pid start time it probed, and sameProcess decides — so a recycled pid,
+    // proven dead under the holder's number, still frees nothing.
+    const deathVerdict = holderProvenDead && typeof holderProvenDead === 'object' ? holderProvenDead : null
+    if (!deathVerdict) {
       return {
         ok: false,
         verdict: 'stale-holder',
-        reason: 'the lease has expired but its holder is not proven dead; expiry alerts, it does not free (M38)',
+        reason:
+          holderProvenDead === false || holderProvenDead === null || holderProvenDead === undefined
+            ? 'the lease has expired but its holder is not proven dead; expiry alerts, it does not free (M38)'
+            : 'the death verdict names no process identity; an unbound verdict proves nothing and frees nothing (M39)',
+      }
+    }
+    if (!sameProcess(existing.holder, deathVerdict)) {
+      return {
+        ok: false,
+        verdict: 'stale-holder',
+        reason: `the death verdict is about pid ${deathVerdict.pid}, not this lease's holder pid ${existing.holder.pid}; a verdict frees only the identity it was reached about`,
       }
     }
   }
