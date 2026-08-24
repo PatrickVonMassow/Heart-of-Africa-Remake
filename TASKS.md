@@ -77,31 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 891. The durable lane's schemas, invariants and the flag that keeps it dark. CUT OUT OF
-  POINT 834 (see 890 for the cut and its reason). This is step 1 of the "Ordered work" in
-  `docs/handover-architecture.md` plus the activation flag, and it is the base every later slice
-  imports.
-  HOW THE BRANCH IS CUT: `feat/891-<slug>` off main, carrying `scripts/batch-schema-core.mjs` and
-  its test and `scripts/durable-lane-flag-core.mjs` and its test from
-  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
-  LANDS AFTER 890, whose text it encodes: the schemas must not encode a claim the document has
-  withdrawn — in particular the crash-safe transition and reconciliation invariant for the
-  daemon's doubly-recorded existence (890 item (i)).
-  IT IS BUILT DARK, AND THE INTERLOCK IS THE POINT: the flag REFUSES to enable while the
-  discovery/adoption/reconciliation slice (895) and the drills (834) are not green, and a unit
-  case pins that refusal. THE CROSS-VENDOR READ OF 890 ADDED A SECOND CASE (24.08.2026, P0): the
-  interlock's precondition is steps 8 and 9, so an enabled lane survives the DEATH of its session
-  and NOT a planned handover — the checkpoint barrier and the two-phase boundary are unbuilt in
-  the remainder of 676. While they are, draining before the boundary is the only permitted mode,
-  and a case pins that an enabled flag demands it. Controlling what the board, the brief and the handover ADVERTISE does
-  not control what is SWITCHED ON, which is why the refusal is a mechanism and not a habit.
-  FINAL STATE: the schema and invariant core lands with nothing importing it yet, today's
-  authoring path untouched, and the flag off and unable to be turned on.
-  VERIFIABLE: the union's unit cases for step 1; the interlock refusal case; `npm run test:unit`,
-  lint, build; the cross-vendor review of this file set recorded green before the merge.
-  Criticality: high — every later slice encodes these states.
-  Bundle: unbundled (batch autonomy).
-
 - [ ] 892. The durable state store and its journal. CUT OUT OF POINT 834 (see 890 for the cut and
   its reason). Step 2 of the "Ordered work": the store that lets a run be resumed instead of lost,
   with atomic writes, a journal written before the state it describes, and full post-write
