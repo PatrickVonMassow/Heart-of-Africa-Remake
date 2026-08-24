@@ -663,6 +663,23 @@ describe('evaluateMechanismReview', () => {
     expect(v.block).toBe(true)
   })
 
+  it('reads both wordings of the merged count, and checks the unit the new one names', () => {
+    // The parenthesis has always counted INPUT ENTRIES folded, never union rows,
+    // but the old line said only "N merged" beside a union count it does not add
+    // up to — cross-vendor review of point 834 read 61 union entries "(18 merged,
+    // 5 only A, 47 only B)" as 70 and called it a mixed unit, twice. The printer
+    // names the unit now. Rows recorded before that keep clearing the gate: a
+    // receipt is evidence of what the accounting printed and is not rewritten.
+    const old = '14 A + 56 B entries → 61 union entries (18 merged, 5 only A, 47 only B): every input entry accounted for'
+    const named = '14 A + 56 B entries → 61 union entries (18 of the 70 input entries merged, 5 only A, 47 only B): every input entry accounted for'
+    expect(receiptBalances(old)).toBe(true)
+    expect(receiptBalances(named)).toBe(true)
+    // The named total is CHECKED, not merely parsed — otherwise naming the unit
+    // would add a number nothing stands behind.
+    const wrong = '14 A + 56 B entries → 61 union entries (18 of the 99 input entries merged, 5 only A, 47 only B): every input entry accounted for'
+    expect(receiptBalances(wrong)).toBe(false)
+  })
+
   it('refuses a receipt whose numbers do not add up', () => {
     const cooked = '3 A + 2 B entries → 4 union entries (1 merged, 1 only A, 1 only B): every input entry accounted for'
     expect(receiptBalances(cooked)).toBe(false)

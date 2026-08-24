@@ -311,9 +311,16 @@ export function namesOtherModel(text, who) {
  * The shape is asserted against a real summaryLine() in blind-merge-core.test.mjs,
  * so the two halves cannot drift apart — the regex lives HERE because this core
  * must not import the accounting one (that one already imports this).
+ *
+ * TWO WORDINGS ARE ACCEPTED for one meaning. The count in the parenthesis has
+ * always been INPUT ENTRIES folded, never union rows, but the line used to say
+ * only "N merged" next to a union count it does not add up to. The printer names
+ * the unit since 24.08.2026; the rows recorded before that say the same thing in
+ * the ambiguous words and are read, not rewritten — a receipt is evidence of what
+ * the accounting printed, and correcting its text after the fact would forge it.
  */
 export const ACCOUNTING_RECEIPT =
-  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
+  /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+)(?: of the (\d+) input entries)? merged, (\d+) only A, (\d+) only B\): every input entry accounted for$/
 
 /**
  * Is this receipt a line the accounting could actually have printed?
@@ -328,8 +335,11 @@ export const ACCOUNTING_RECEIPT =
 export function receiptBalances(line) {
   const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
   if (!m) return false
-  const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+  const [a, b, union, merged, statedInputs, onlyA, onlyB] = m.slice(1).map(Number)
   if (merged + onlyA + onlyB !== a + b) return false
+  // The named unit is checked, not just parsed: a line stating a total the two
+  // list sizes do not make would otherwise pass on the strength of its shape.
+  if (m[5] !== undefined && statedInputs !== a + b) return false
   if (merged === 1) return false
   if (onlyA > a || onlyB > b) return false
   // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth

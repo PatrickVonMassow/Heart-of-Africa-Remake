@@ -21,6 +21,7 @@ const HALF_A = 'docs/four-eyes/676-blind-a-opus5'
 const HALF_B = 'docs/four-eyes/676-blind-b-sol'
 const UNION = 'docs/four-eyes/676-union.json'
 const DOC = 'docs/handover-architecture.md'
+const LEDGER = '.claude/mechanism-reviews.jsonl'
 
 /** The union table of the architecture document, in the union's own shape. */
 function unionFromDocument(text) {
@@ -178,6 +179,31 @@ describe('the 676 stage is auditable from its raw halves', () => {
       const text = entries.filter((e) => e.id.replace(/[a-c]$/, '') === id).map((e) => norm(e.defect)).join(' ')
       expect(text, `${id}: ${sentence}`).toContain(sentence)
     }
+  })
+
+  it('agrees with the fold receipt recorded in the ledger, recomputed from the union', () => {
+    // The receipt is the row that authorized everything built on this fold, and
+    // nothing recomputed it against the artefacts it claims to have counted. Its
+    // wording is the one the accounting printed on 22.08.2026 and stays as
+    // printed; what it ASSERTS is checked here instead.
+    const entries = JSON.parse(read(UNION)).entries
+    const from = entries.map((e) => e.from)
+    const rows = read(LEDGER)
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l))
+      .filter((r) => typeof r.accounting === 'string' && r.accounting)
+    const row = rows.at(-1)
+    const m = /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+)(?: of the \d+ input entries)? merged, (\d+) only A, (\d+) only B\)/.exec(row.accounting)
+    expect(m, `not a receipt line: ${row.accounting}`).not.toBe(null)
+    const [a, b, union, merged, onlyA, onlyB] = m.slice(1).map(Number)
+    const single = (side) => from.filter((f) => f.length === 1 && f[0].startsWith(side)).length
+    expect(union).toBe(entries.length)
+    expect(merged).toBe(from.filter((f) => f.length > 1).reduce((n, f) => n + f.length, 0))
+    expect(onlyA).toBe(single('A'))
+    expect(onlyB).toBe(single('B'))
+    expect(a).toBe(JSON.parse(read(`${HALF_A}.json`)).entries.length)
+    expect(b).toBe(JSON.parse(read(`${HALF_B}.json`)).entries.length)
   })
 
   it('leaves no reference in the union that the halves cannot answer', () => {
