@@ -123,10 +123,10 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 **abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
-  Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern.
+  Funktionen. Sekunden, und kein Browser-Timing kann sie flackern lassen.
 - **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
-  Browser-/E2E-Tests (Rendering, Layout, Klick-Flows). Gibt es mehrere Unterbauten, prüf
-  auf dem der Nutzer, nicht auf dem bequemeren Ersatzweg.
+  Browser-Tests. Gibt es mehrere Unterbauten, prüf auf dem der Nutzer, nicht auf dem
+  bequemeren Ersatzweg.
 - **Groß (vor jedem Release):** die volle Regression über alle Suiten und **alle
   Ziel-Backends/Geräte**, mehrfach flakefrei.
 
@@ -135,27 +135,26 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 > passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus, der die große
 > Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert."
 
-*(Kosten ≈ 1,5x)*
-
-Zwei Mechanismen, die das Netz ehrlich halten:
+*(Kosten ≈ 1,5x)* Zwei Mechanismen, die das Netz ehrlich halten:
 
 > *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
 > flakender Test darf einmal wiederholt werden, gilt danach aber als **verdächtig** und trägt
-> keine Freigabe mehr; der Release-Lauf muss strikt ohne Wiederholung grün sein. Erledigt ist
-> ein Rot nur mit **benannter Ursache** — wiederholte Grüns sind keine. Und einen, der feste
-> Wartezeiten aufspürt."
+> keine Freigabe mehr. Erledigt ist ein Rot nur mit **benannter Ursache** — wiederholte Grüns
+> sind keine. Und einen, der feste Wartezeiten aufspürt."
 
-Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen: Miss die Teile des roten
-Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
+Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 ---
 
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
-  das Bild entstand vor der fertigen Szene.
+  das Bild entstand vor der fertigen Szene. Schlimmster Fall: Er *stellt her*, was die Handlung
+  bewirkt hätte, statt sie aufzurufen, und ist dadurch für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
-  unter einer erreichbaren Bedingung geprüft wurde." *(≈ 1,5x.)* *(Sieht das richtig aus?)*
+  unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
+  Sache auf — und was bliebe grün, wenn sie völlig kaputt wäre?** Vergehende Zeit darf ein Test
+  abkürzen, den **Aufruf** nie." *(≈ 1,5x.)* *(Sieht das richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft und
@@ -163,18 +162,19 @@ Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
   Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
 - **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
-  → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** behoben ist **und** der
+  → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** weg ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
   nach. Zweimal festgebissen: wechsle das Modell."
 
-- **Fehlalarm behoben — echter Alarm gleich mit.** Die zu oft anschlagende Prüfung wird schärfer,
-  alles grün — nur schlägt sie auch nicht mehr an, wenn sie sollte.
-  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(Kosten ≈ 1,3x.)*
+- **Fehlalarm behoben — echter Alarm gleich mit.** Die Prüfung wird schärfer, alles grün — nur
+  schlägt sie auch nicht mehr an, wenn sie sollte.
+  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(≈ 1,3x)*
 
 - **Runde um Runde, ohne näher zu kommen.** Das Gegenlesen findet jedes Mal etwas, nur schließt
   sich der Abstand nie.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Steht das Urteil,
-  während der Umfang bleibt, ist der Gegenstand zu groß — **verkleinere ihn**."
+  während der Umfang bleibt, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes
+  Stück für sich ab**."
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
   das Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
@@ -234,13 +234,13 @@ Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
-  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt.
+  Wer baut, prüft gegen die Vorstellung, aus der der Fehler stammt.
   → *Prompt:* „Zieh bei Kritischem **ein anderes Modell** hinzu. Beim **Finden** blind parallel,
   beim **Beurteilen** Gegenlesen — **erst das Ergebnis, dann die Begründung**." *(≈ 2x)*
 
 - **Die Lehre gilt als versorgt, sobald ihr Wächter benannt ist** — gebaut ist er damit nicht.
-  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft. Ein
-  Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist — blockiere sie aber nicht."
+  → *Prompt:* „Trenne **benannt** von **gebaut**: ‚gebaut' wird am Haken des Punktes geprüft, und
+  ein Bericht nennt jede Lehre, deren Wächter seit Wochen nur benannt ist."
 
 - **Die aufgeschriebene Grenze deckt nicht, was sie behauptet.** Der Satz, was ein Mechanismus
   *nicht* leistet, wird zur Ablage für bloß nicht Getanes.
@@ -301,7 +301,7 @@ Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
   jedem Start gegen eine **Beobachtung**. Dort ändert niemand etwas ohne Kopie."
 
 - **Der Alarm, der nie spricht.** Fällt die Quelle aus, meldet ein Alarm auf ein *Ereignis*
-  nichts — und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert.
+  nichts — und der Ersatzkanal hat oft nie gefeuert.
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses, und **löse jeden Ersatzkanal
   einmal echt aus**. Was anhalten darf, eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
@@ -381,11 +381,11 @@ Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
   es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
 
-- **Der Prüflauf verändert sein eigenes Projekt.** Eine Testsuite, die ihren Zielpfad aus dem
-  Quellort statt aus der Testumgebung ableitet, schreibt Zweige oder Metadaten um und bleibt grün.
+- **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
+  Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
-- **Grün über einem Programm, das gar nicht startet.** Der Testlader ist milder als der echte.
+- **Grün über einem Programm, das nicht startet.** Der Testlader ist milder als der echte.
   → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
   Zeugen — der seine Sicherheit nicht von dem borgt, was er prüft."
 
@@ -439,6 +439,6 @@ Schritts einzeln und vergleiche mit einer Umgebung, in der er grün ist.
 > sie erzwingt. Bei Kritischem hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das
 > Zielbild unklar ist — rate nicht."
 
-Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
+Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: bc6e11eec1d314c1cbab52baec0d86dca181e2931b303a46a6e22066e27e7c2e -->
+<!-- GUIDE-FINGERPRINT: 8e34376139f84f1061473a31ddefd9be88441cd024b24d15ecce6282c00123e3 -->
