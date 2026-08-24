@@ -573,6 +573,17 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
   const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
   const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
   const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
+  // An Anthropic reviewer's identity must be VERIFIED since point 889, so the
+  // fixture reviewer carries the transcript its claim quotes.
+  const FABLE_AT = '2026-08-24T16:20:00.000Z'
+  const fableTranscript = () => {
+    const path = resolve(repo, 'fable-session.jsonl')
+    writeFileSync(
+      path,
+      `${JSON.stringify({ timestamp: FABLE_AT, type: 'assistant', isSidechain: false, message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' } })}\n`,
+    )
+    return ['--model-at', FABLE_AT, '--model-transcript', path]
+  }
 
   let base = ''
   let guardSha = ''
@@ -598,6 +609,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--verdict', 'merge',
       '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
       '--mode', 'review',
+      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(base)
@@ -623,6 +635,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--verdict', 'do-not-merge',
       '--evidence', 'the fast path waves through the files the unit layer measures',
       '--mode', 'review',
+      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(base)
@@ -657,6 +670,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--verdict', 'merge-with-fixes',
       '--evidence', 'reviewed both commits of the branch at its head',
       '--mode', 'review',
+      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(from)
@@ -727,6 +741,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--verdict', 'merge',
       '--evidence', 'reviewed the fourth demo guard on its branch before the merge',
       '--mode', 'review',
+      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     const merge = git('merge', '--no-ff', '-m', `merge the clean side branch\n\n${AUTHOR}`, 'clean-side')
