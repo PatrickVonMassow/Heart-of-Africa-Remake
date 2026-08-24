@@ -59,20 +59,44 @@ export function durableBlock({ batchId, pointId, attemptId, pid, pidStartedAt, t
  *                     --is-ancestor <checkpoint> <tip>`, equality included)
  *
  *  The verdict is `live` only when nothing disagrees. Anything else is
- *  `expired` WITH the alerts that say what stopped agreeing. */
-export function agreementVerdict({ durable = null, probes = {}, now = 0, maxSilenceMs = AGREEMENT_SILENCE_MS } = {}) {
+ *  `expired` WITH the alerts that say what stopped agreeing — or `invalid`
+ *  when the block or the clock cannot even be judged, which no caller may
+ *  read as anything but a refusal.
+ *
+ *  A `live` verdict carries the LANE it was taken for (`lane: { batchId,
+ *  pointId, attemptId }`), because an agreement that names no lane could be
+ *  replayed against another declaration. */
+export function agreementVerdict({ durable = null, probes = {}, now, maxSilenceMs = AGREEMENT_SILENCE_MS } = {}) {
   const alerts = []
   if (!durable || durable.transferable !== true) {
     return { verdict: 'not-transferable', alerts: ['the declaration carries no transferable durable block'] }
+  }
+  // A block that claims transferability must survive the same all-or-nothing
+  // validation the recording path applies: a persisted fragment naming only a
+  // PID and a flag must never be judged on its probes at all.
+  const validated = durableBlock(durable)
+  if (!validated.ok) return { verdict: 'invalid', alerts: [`the durable block is unusable: ${validated.reason}`] }
+  // The clock is EVIDENCE, and missing evidence fails closed: with no finite
+  // `now` every staleness comparison is false and arbitrarily old probes would
+  // read permanently fresh. The same applies to a silence window that is not a
+  // positive number.
+  if (!Number.isFinite(now)) return { verdict: 'invalid', alerts: ['no finite current time was supplied, so freshness cannot be judged'] }
+  if (!Number.isFinite(maxSilenceMs) || maxSilenceMs <= 0) {
+    return { verdict: 'invalid', alerts: ['the silence window is not a positive finite number, so freshness cannot be judged'] }
   }
   const { heartbeatAt, logAdvancedAt, workerProbe, launcherOwned, checkpointSha, remoteSha, remoteHasCheckpoint } = probes
 
   if (!(workerProbe?.live === true) || !sameProcess({ pid: durable.pid, pidStartedAt: durable.pidStartedAt }, { pid: workerProbe.pid, pidStartedAt: workerProbe.startedAt })) {
     alerts.push(`the declared worker process (pid ${durable.pid}) is not the one running — dead, or a recycled pid`)
   }
+  // A probe timestamp AHEAD of the clock is not freshness — it is clock
+  // rollback or a corrupt mtime, and evidence that cannot be dated does not
+  // agree.
   if (!Number.isFinite(heartbeatAt)) alerts.push('the heartbeat is unreadable')
+  else if (heartbeatAt > now) alerts.push(`the heartbeat timestamp is ${heartbeatAt - now}ms in the future — a rolled-back clock or corrupt mtime`)
   else if (now - heartbeatAt > maxSilenceMs) alerts.push(`the heartbeat is ${now - heartbeatAt}ms old`)
   if (!Number.isFinite(logAdvancedAt)) alerts.push('the log is unreadable or has never advanced')
+  else if (logAdvancedAt > now) alerts.push(`the log timestamp is ${logAdvancedAt - now}ms in the future — a rolled-back clock or corrupt mtime`)
   else if (now - logAdvancedAt > maxSilenceMs) alerts.push(`the log stopped advancing ${now - logAdvancedAt}ms ago`)
   // AFFIRMATIVE like every probe in this design: only `true` is ownership, and
   // an unprobed launcher is a disagreement, not a pass.
@@ -92,18 +116,28 @@ export function agreementVerdict({ durable = null, probes = {}, now = 0, maxSile
       `the last acknowledged checkpoint (${checkpointSha.slice(0, 12)}) is not verified reachable from the remote tip (${remoteSha.slice(0, 12)})`,
     )
   }
-  if (alerts.length) return { verdict: 'expired', alerts }
-  return { verdict: 'live', alerts: [] }
+  const lane = Object.freeze({ batchId: durable.batchId, pointId: durable.pointId, attemptId: durable.attemptId })
+  if (alerts.length) return { verdict: 'expired', alerts, lane }
+  return { verdict: 'live', alerts: [], lane }
 }
 
 /** What a boundary asks per lane: a lane is handed on only while its declaration
- *  is transferable AND its agreement says live; everything else keeps today's
- *  drain-before-boundary rule (M48/M61 — durability is per active lane). */
+ *  is transferable AND its agreement says live FOR THIS LANE; everything else
+ *  keeps today's drain-before-boundary rule (M48/M61 — durability is per active
+ *  lane). The lane binding is not politeness: an agreement without one, or with
+ *  another lane's, could be a replay from a different declaration, and that is
+ *  a BLOCK, never a hand-over. */
 export function laneBoundaryVerdict({ durable = null, agreement = null } = {}) {
   if (!durable) return { verdict: 'drain', reason: 'no durable block: a session-bound lane blocks the boundary until it finishes or stops (M6)' }
   if (durable.transferable !== true) return { verdict: 'drain', reason: 'the lane is declared non-transferable' }
+  const validated = durableBlock(durable)
+  if (!validated.ok) return { verdict: 'block', reason: `the durable block is unusable and cannot be handed over: ${validated.reason}` }
   if (agreement?.verdict !== 'live') {
     return { verdict: 'block', reason: `the transferable lane does not agree with its probes: ${(agreement?.alerts ?? ['no agreement probe ran']).join('; ')}` }
+  }
+  const boundTo = agreement.lane
+  if (!boundTo || boundTo.batchId !== durable.batchId || boundTo.pointId !== durable.pointId || boundTo.attemptId !== durable.attemptId) {
+    return { verdict: 'block', reason: 'the agreement is not bound to this lane — it names no lane or another lane\'s identities, so it proves nothing here' }
   }
   return { verdict: 'hand-over' }
 }

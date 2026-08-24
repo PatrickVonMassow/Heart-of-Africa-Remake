@@ -39,8 +39,42 @@ describe('durableBlock', () => {
 })
 
 describe('agreementVerdict (M18)', () => {
-  it('is live only while everything agrees', () => {
-    expect(agreementVerdict({ durable: block(), probes: liveProbes(), now: 100_000 })).toEqual({ verdict: 'live', alerts: [] })
+  it('is live only while everything agrees, and names the lane it judged', () => {
+    expect(agreementVerdict({ durable: block(), probes: liveProbes(), now: 100_000 })).toEqual({
+      verdict: 'live',
+      alerts: [],
+      lane: { batchId: 'b', pointId: 'p834', attemptId: 'a1' },
+    })
+  })
+
+  it('refuses a malformed durable block instead of judging its probes', () => {
+    // The bypass the review demonstrated: a persisted fragment carrying only
+    // `transferable`, a PID and a start time must never reach the probe logic.
+    const fragment = { transferable: true, pid: 100, pidStartedAt: 5000 }
+    const res = agreementVerdict({ durable: fragment, probes: liveProbes(), now: 100_000 })
+    expect(res.verdict).toBe('invalid')
+    expect(res.alerts.join('; ')).toMatch(/batchId/)
+  })
+
+  it('fails closed without a finite clock: omitted, NaN and Infinity all refuse', () => {
+    for (const now of [undefined, NaN, Infinity, -Infinity]) {
+      const res = agreementVerdict({ durable: block(), probes: liveProbes(), now })
+      expect(res.verdict, String(now)).toBe('invalid')
+      expect(res.alerts.join('; ')).toMatch(/finite current time/)
+    }
+    const badWindow = agreementVerdict({ durable: block(), probes: liveProbes(), now: 100_000, maxSilenceMs: NaN })
+    expect(badWindow.verdict).toBe('invalid')
+  })
+
+  it('reads a future probe timestamp as disagreement, never as freshness', () => {
+    // A rolled-back clock or corrupt far-future mtime would otherwise look
+    // permanently fresh.
+    const future = agreementVerdict({ durable: block(), probes: liveProbes({ heartbeatAt: 200_000 }), now: 100_000 })
+    expect(future.verdict).toBe('expired')
+    expect(future.alerts.join('; ')).toMatch(/in the future/)
+    const futureLog = agreementVerdict({ durable: block(), probes: liveProbes({ logAdvancedAt: 10 ** 15 }), now: 100_000 })
+    expect(futureLog.verdict).toBe('expired')
+    expect(futureLog.alerts.join('; ')).toMatch(/in the future/)
   })
 
   it('never expires silently: every expiry names what stopped agreeing', () => {
@@ -84,8 +118,26 @@ describe('agreementVerdict (M18)', () => {
 })
 
 describe('laneBoundaryVerdict', () => {
-  it('hands over only a live transferable lane', () => {
-    expect(laneBoundaryVerdict({ durable: block(), agreement: { verdict: 'live', alerts: [] } })).toEqual({ verdict: 'hand-over' })
+  const laneOf = (d) => ({ batchId: d.batchId, pointId: d.pointId, attemptId: d.attemptId })
+
+  it('hands over only a live transferable lane whose agreement names it', () => {
+    const d = block()
+    expect(laneBoundaryVerdict({ durable: d, agreement: { verdict: 'live', alerts: [], lane: laneOf(d) } })).toEqual({ verdict: 'hand-over' })
+  })
+
+  it('BLOCKS an agreement bound to another lane, or to none', () => {
+    const d = block()
+    const foreign = { verdict: 'live', alerts: [], lane: { batchId: 'b', pointId: 'p777', attemptId: 'a9' } }
+    expect(laneBoundaryVerdict({ durable: d, agreement: foreign }).verdict).toBe('block')
+    const unbound = { verdict: 'live', alerts: [] }
+    expect(laneBoundaryVerdict({ durable: d, agreement: unbound }).verdict).toBe('block')
+  })
+
+  it('BLOCKS a malformed durable block that claims transferability', () => {
+    const fragment = { transferable: true, pid: 100, pidStartedAt: 5000 }
+    const res = laneBoundaryVerdict({ durable: fragment, agreement: { verdict: 'live', alerts: [], lane: { batchId: undefined, pointId: undefined, attemptId: undefined } } })
+    expect(res.verdict).toBe('block')
+    expect(res.reason).toMatch(/unusable/)
   })
 
   it('drains session-bound and non-transferable lanes — the M61 fallback', () => {
