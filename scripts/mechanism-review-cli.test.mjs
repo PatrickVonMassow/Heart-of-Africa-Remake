@@ -11,6 +11,7 @@
 import { afterEach, describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
@@ -44,6 +45,19 @@ const run = (...args) =>
     cwd: process.cwd(),
     input: '',
   })
+
+// THE HALVES ARE ADOPTED ONLY FROM COMMITTED BYTES: `committedHalfModel` reads
+// HEAD and refuses an absolute path outright, so a temp fixture can never satisfy
+// it. These cases are about the MERGER CHECK, not about git, so they hand the
+// production seam a stub that answers for the fixture's own model — exactly what
+// a committed half would say. The untracked case below passes no stub, so the
+// trailer proxy still stands where the halves are caller-written.
+const committedFixture = (path) => {
+  const bytes = readFileSync(path)
+  const model = JSON.parse(bytes.toString('utf8'))?.model
+  if (typeof model !== 'string' || !model.trim()) return null
+  return { oid: createHash('sha1').update(bytes).digest('hex'), model: model.trim() }
+}
 
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
@@ -351,6 +365,7 @@ describe('the mode round-trips into the ledger', () => {
         listAPath: listA,
         listBPath: listB,
         isTracked: () => true,
+        committedHalf: committedFixture,
       })
       expect(selfMerged.ok).toBe(false)
       const text = (selfMerged.errors ?? []).join('\n')
@@ -392,7 +407,7 @@ describe('the mode round-trips into the ledger', () => {
       })
       // The halves decide the merger only where they are TRACKED artefacts, so the
       // temp fixtures say so explicitly; the untracked case is asserted below.
-      const tracked = { isTracked: () => true }
+      const tracked = { isTracked: () => true, committedHalf: committedFixture }
       const built = build({
         mode: 'blind-parallel',
         mergedBy: 'Claude Opus 5',
