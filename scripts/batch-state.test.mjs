@@ -134,6 +134,17 @@ describe('the lane\'s own fence store', () => {
     expect(res.reason).toMatch(/cannot be read/)
   })
 
+  it('refuses a fence-store symlink even when its target contains valid generation data', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    const outside = join(repo, 'outside-fence.json')
+    writeFileSync(outside, `${JSON.stringify({ v: 1, generation: 'live-generation', fence: 8 })}\n`)
+    symlinkSync(outside, store.fenceStorePath)
+    const result = ensureFenceStore(store, { fence: 8 })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/cannot be read|symlink|ELOOP/)
+    expect(JSON.parse(readFileSync(outside, 'utf8')).fence).toBe(8)
+  })
+
   it('refuses a store that lost its generation rather than inventing one', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b1' })
     writeFileSync(store.fenceStorePath, JSON.stringify({ v: 1, fence: 8 }))

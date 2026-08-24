@@ -12,7 +12,8 @@
 // inside no worktree's checkout — is created owner-only (0o700), and a store
 // path that is a symlink is REFUSED rather than followed: a link planted at the
 // store's name would otherwise redirect fsynced writes anywhere the planter
-// chose. Symlink checks are lstat-based and happen on every open, not once.
+// chose. Restricted-file reads enforce O_NOFOLLOW on the open itself, so a path
+// swapped after an lstat check is refused rather than followed.
 //
 // STILL DARK: nothing on today's authoring path imports this file; its first
 // runtime caller is the daemon of step 3, and the activation flag refuses to
@@ -140,6 +141,18 @@ function writeAllSync(fd, text) {
   return buf.length
 }
 
+/** Read through the descriptor that performed O_NOFOLLOW. Passing the path to
+ *  readFileSync after an lstat check would reopen it and leave a substitution
+ *  window in which a planted symlink could redirect the restricted read. */
+function readFileNoFollow(path, encoding = 'utf8') {
+  const fd = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+  try {
+    return readFileSync(fd, encoding)
+  } finally {
+    closeSync(fd)
+  }
+}
+
 /** A crash can cut the journal's final frame before its delimiter. Replay reads
  *  that tail as an ordinary dropped crash — but an APPEND after it would
  *  concatenate the next frame onto the fragment, turning two harmless pieces
@@ -211,7 +224,7 @@ export function ensureFenceStore(store, { fence } = {}) {
   try {
     let existing = null
     try {
-      existing = JSON.parse(readFileSync(path, 'utf8'))
+      existing = JSON.parse(readFileNoFollow(path))
     } catch (error) {
       if (error.code !== 'ENOENT') {
         return { ok: false, reason: `the fence store exists but cannot be read; minting over it would invalidate a live generation: ${error.message}` }
@@ -253,7 +266,7 @@ export function appendJournalEntry(store, entry) {
   refuseSymlink(store.journalPath, 'the journal')
   const repaired = repairCutTail(store)
   const exists = existsSync(store.journalPath)
-  const before = exists ? readFileSync(store.journalPath, 'utf8') : ''
+  const before = exists ? readFileNoFollow(store.journalPath) : ''
   const candidate = replayJournal(before + framed.line)
   const appended = candidate.entries.at(-1)
   if (candidate.verdict !== 'ok') {
@@ -286,7 +299,7 @@ export function appendJournalEntry(store, entry) {
 export function readJournal(store) {
   refuseSymlink(store.journalPath, 'the journal')
   if (!existsSync(store.journalPath)) return { exists: false, ...replayJournal('') }
-  return { exists: true, ...replayJournal(readFileSync(store.journalPath, 'utf8')) }
+  return { exists: true, ...replayJournal(readFileNoFollow(store.journalPath)) }
 }
 
 /** WRITE–FLUSH–RENAME, the only way a committed snapshot or receipt is produced:
@@ -331,7 +344,7 @@ export function writeSnapshot(store, body) {
 export function readSnapshot(store) {
   refuseSymlink(store.snapshotPath, 'the snapshot')
   if (!existsSync(store.snapshotPath)) return readSnapshotText(null)
-  return readSnapshotText(readFileSync(store.snapshotPath, 'utf8'))
+  return readSnapshotText(readFileNoFollow(store.snapshotPath))
 }
 
 /** Receipts share the snapshot's sealing and owner-only discipline, but NOT its
@@ -349,7 +362,7 @@ export function writeReceipt(store, receiptId, body) {
   refuseSymlink(path, 'a receipt')
   const sameAsExisting = () => {
     try {
-      return readFileSync(path, 'utf8') === sealed.text
+      return readFileNoFollow(path) === sealed.text
     } catch {
       return false
     }
@@ -400,7 +413,7 @@ export function readReceipt(store, receiptId) {
   assertInside(store.receiptsDir, path)
   refuseSymlink(path, 'a receipt')
   if (!existsSync(path)) return readSnapshotText(null)
-  return readSnapshotText(readFileSync(path, 'utf8'))
+  return readSnapshotText(readFileNoFollow(path))
 }
 
 /** What the reader IGNORES tells the operator what a crash left behind: `.tmp-`
