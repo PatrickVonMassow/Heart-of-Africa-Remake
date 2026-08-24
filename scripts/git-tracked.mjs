@@ -61,7 +61,10 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, conten
   // spelled and a non-portable spelling could travel into the ledger. A caller
   // holding such a path converts it deliberately with canonicalTreePath.
   if (isAbsolute(raw)) return false
-  if (raw.split(/[\\/]+/).some((segment) => segment === '.' || segment === '..')) return false
+  // Split on SINGLE separators: a duplicate separator produces an empty
+  // segment, which is a non-canonical spelling resolvePath would silently
+  // normalise (re-review round 10).
+  if (raw.split(/[\\/]/).some((segment) => segment === '' || segment === '.' || segment === '..')) return false
   const real = run('git', ['rev-parse', '--path-format=absolute', '--show-toplevel'], {
     windowsHide: true,
     cwd: root,

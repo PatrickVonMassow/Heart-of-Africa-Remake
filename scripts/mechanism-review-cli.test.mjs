@@ -23,6 +23,7 @@ import {
   recordsPathFor,
   resolveCommit,
   reverifyReviewerAgreement,
+  reviewerVendorProblems,
   reviewFileSetKey,
   usage,
   verifyHalfAuthors,
@@ -101,6 +102,30 @@ describe('the flag surface', () => {
   it('states the per-file convergence boundary', () => {
     expect(usage()).toContain('later commit to')
     expect(usage()).toContain('commit touching only other')
+  })
+})
+
+describe('the reviewer-vendor matrix binds evidence to the credited model', () => {
+  it('refuses a claim naming NO model, whatever the credit says', () => {
+    // A hand-edited source row of bare {status} used to pass the vendor test on
+    // the credit alone and be copied forward by a carry (re-review round 10).
+    expect(reviewerVendorProblems('Claude Opus 5', { status: 'agreement' }).join(' ')).toMatch(/names no claimedModel/)
+    expect(reviewerVendorProblems('GPT-5.6 Sol', { status: 'unverified', reason: 'external' }).join(' ')).toMatch(/names no claimedModel/)
+  })
+
+  it('refuses evidence about a DIFFERENT model than the credited one', () => {
+    expect(
+      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Fable 5', actualModel: 'Claude Fable 5' }).join(' '),
+    ).toMatch(/evidence for one model proves nothing about another/)
+  })
+
+  it('accepts exactly what each vendor can prove', () => {
+    expect(
+      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Opus 5', actualModel: 'Claude Opus 5' }),
+    ).toEqual([])
+    expect(
+      reviewerVendorProblems('GPT-5.6 Sol', { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' }),
+    ).toEqual([])
   })
 })
 
@@ -826,7 +851,10 @@ describe('the mode round-trips into the ledger', () => {
           entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect, but reworded after the fold' }],
         }),
       )
-      git('add', '-A')
+      // Only the half is staged: -A would sweep the freshly written ledger into
+      // this commit, and the revert below would then delete it out from under
+      // the later assertions (re-review round 10).
+      git('add', 'docs/B.json')
       git('commit', '-q', '-m', 'Reword the defect after the fold\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
       const editedContent = record(union)
       expect(editedContent.status).not.toBe(0)

@@ -159,16 +159,25 @@ function sameModelName(a, b) {
     // versions disqualified models the name never named (re-review rounds 6-9).
     const modelWords = family.map((w) => (w === 'gpt' ? 'sol' : w)).filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
     const keys = [...new Set(modelWords)]
-    if (keys.length > 1) {
-      const versionOf = (key) => {
-        const words = key === 'sol' ? ['sol', 'gpt'] : [key]
-        for (const w of words) {
-          const m = text.match(new RegExp(`\\b${w}[\\s-]*(\\d+(?:\\.\\d+)?)`))
-          if (m) return m[1]
-        }
-        return ''
+    const versionsOf = (key) => {
+      const words = key === 'sol' ? ['sol', 'gpt'] : [key]
+      const found = []
+      for (const w of words) {
+        for (const m of text.matchAll(new RegExp(`\\b${w}[\\s-]*(\\d+(?:\\.\\d+)?)`, 'g'))) found.push(m[1])
       }
-      return { entries: keys.map((key) => ({ key, version: versionOf(key) })) }
+      return [...new Set(found)]
+    }
+    // A name repeating ONE family with SEVERAL versions — "GPT-6 Sol / GPT-5.6
+    // Sol" — mentions each of those models; collapsing to the first version let
+    // the other one pass as untainted (re-review round 10).
+    if (keys.length === 1) {
+      const versions = versionsOf(keys[0])
+      if (versions.length > 1) {
+        return { entries: versions.map((version) => ({ key: keys[0], version })) }
+      }
+    }
+    if (keys.length > 1) {
+      return { entries: keys.map((key) => ({ key, version: versionsOf(key)[0] ?? '' })) }
     }
     const key = family.includes('sol') ? 'sol' : family.includes('fable') ? 'fable' : family[family.length - 1]
     // THE VERSION IS NOT ALWAYS ATTACHED TO THE KEY WORD (four-eyes finding 1 on this

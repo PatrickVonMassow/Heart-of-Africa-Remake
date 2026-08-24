@@ -109,6 +109,7 @@ describe('isTrackedInGit — committed bytes only', () => {
     expect(isTrackedInGit(join(repo, 'docs', 'half.json'), { root: repo })).toBe(false)
     expect(isTrackedInGit('docs/../docs/half.json', { root: repo })).toBe(false)
     expect(isTrackedInGit('./docs/half.json', { root: repo })).toBe(false)
+    expect(isTrackedInGit('docs//half.json', { root: repo })).toBe(false)
     // canonicalTreePath is the deliberate conversion, and its output is accepted.
     expect(canonicalTreePath(join(repo, 'docs', 'half.json'), { root: repo })).toBe('docs/half.json')
     expect(canonicalTreePath('docs/../docs/half.json', { root: repo })).toBe('docs/half.json')

@@ -161,6 +161,10 @@ describe('decisions derived from the state', () => {
     expect(mergerModel(on(), ['Fable 5 / GPT-6 Sol', 'Claude Opus 5'])).toBe(SOL_MODEL)
     // While the mentioned version matching the roster still disqualifies.
     expect(mergerModel(on(), ['Fable 5 / GPT-5.6 Sol', ''])).toBe(CLAUDE_MODEL)
+    // One family, several versions: each mentioned version is tainted — the
+    // collapse to the first version let the other pass as untainted.
+    expect(mergerModel(off(), ['GPT-6 Sol / GPT-5.6 Sol', CLAUDE_MODEL])).toBe(SOL_MODEL)
+    expect(mergerModel(on(), ['GPT-6 Sol / GPT-5.6 Sol', 'Claude Opus 5'])).toBe(FABLE_MODEL)
     // SAME-VENDOR compounds too: "Fable 5 / Claude Opus 5" mentions Claude, so
     // Claude may not be offered as untainted (reduction to one key did that).
     expect(mergerModel(on(), ['Fable 5 / Claude Opus 5', 'GPT-5.6 Sol'])).toBe(FABLE_MODEL)

@@ -144,7 +144,15 @@ export function reviewerVendorProblems(model, authorship = {}) {
   // a carried source hand-credited to one model beside an agreement quoted for
   // another passed the vendor test on the credit alone.
   const claimed = String(authorship?.claimedModel ?? '').trim()
-  if (claimed && !sameModel(claimed, model)) {
+  if (!claimed) {
+    // A claim naming NO model binds its evidence to nobody: a hand-edited
+    // source row of bare {status} would otherwise pass the vendor test on the
+    // credit alone and be copied forward (re-review round 10).
+    return [
+      `the reviewer identity evidence names no claimedModel — evidence bound to nobody proves nothing about "${model}"`,
+    ]
+  }
+  if (!sameModel(claimed, model)) {
     return [
       `the reviewer identity evidence is about "${claimed}" while the credit names "${model}" — ` +
         'evidence for one model proves nothing about another',
