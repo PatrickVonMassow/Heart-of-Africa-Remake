@@ -32,7 +32,6 @@ import {
   validateMutation,
   revalidateAfterWrite,
 } from './batch-schema-core.mjs'
-import { AGREEMENT_SILENCE_MS } from './batch-adoption-core.mjs'
 import { appliedKeys, deriveSnapshot } from './batch-state-core.mjs'
 import { appendJournalEntry, ensureFenceStore, openStateStore, readJournal, writeFileAtomic, writeSnapshot } from './batch-state.mjs'
 import {
@@ -554,7 +553,7 @@ async function serve(args) {
         }
         const heartbeatPath = attemptPaths(worker.dir).heartbeatPath
         const first = mtimeOf(heartbeatPath)
-        if (!Number.isFinite(first) || nowMs() - first > AGREEMENT_SILENCE_MS) {
+        if (!Number.isFinite(first) || nowMs() - first > 10 * 60 * 1000) {
           return { ok: false, reason: `the worker of ${attemptId} has a missing or silent heartbeat; a stalled lane is reconciled, not adopted` }
         }
         let advanced = false
