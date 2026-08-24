@@ -909,11 +909,14 @@ function exitReapMutex(mutexPath) {
 }
 
 /**
- * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race'.
+ * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race' |
+ * 'stale-event' | 'stale-fence'.
  *   - 'acquired'  — this session now owns the batch.
  *   - 'mine'      — it already did (heartbeat refreshed).
  *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
  *   - 'lost-race' — a concurrent starter won. STAND DOWN.
+ *   - 'stale-event' — the lock no longer matches the triggering event.
+ *   - 'stale-fence' — the explicit generation proposal no longer advances the mark.
  * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
  *
  * THERE IS NO `takeWedged` ANY MORE (point 434). A wedged owner used to be a case
@@ -995,15 +998,35 @@ export function acquire(sessionId, opts = {}) {
    * nobody could record simply blocks nobody (fail-open, as everywhere here).
    */
   const claim = () => {
-    if (!tryExclusiveCreate(lockPath, identity(null))) return false
+    if (!tryExclusiveCreate(lockPath, identity(null))) return 'lost-race'
     try {
-      const fence = grantFence(sessionId, { fencePath, priorFence, now, takeover: takenFrom })
+      const fence = grantFence(sessionId, {
+        fencePath,
+        priorFence,
+        requestedFence: opts.requestedFence,
+        now,
+        takeover: takenFrom,
+      })
       const fresh = readOwnerLock(lockPath)
+      // An explicit proposal is part of the acquisition's authority. If the
+      // durable mark has already reached it, this claimant never owned that
+      // generation: remove only our just-created, still-unfenced lock and
+      // report the refusal. Callers without a proposal retain the historic
+      // fail-open behaviour for an unavailable fence file.
+      if (opts.requestedFence !== undefined && fence === null) {
+        if (fresh?.sessionId === sessionId && fresh.fence === null) rmSync(lockPath, { force: true })
+        return 'stale-fence'
+      }
       if (fence !== null && fresh && fresh.sessionId === sessionId) {
         writeJsonAtomic(lockPath, { ...fresh, fence }, opts)
       }
     } catch {
-      /* see above — an unrecordable fence never fails an acquisition */
+      if (opts.requestedFence !== undefined) {
+        const fresh = readOwnerLock(lockPath)
+        if (fresh?.sessionId === sessionId && fresh.fence === null) rmSync(lockPath, { force: true })
+        return 'stale-fence'
+      }
+      /* see above — an unrecordable implicit fence never fails an acquisition */
     }
     const acquired = readOwnerLock(lockPath)
     emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, acquired, {
@@ -1016,7 +1039,7 @@ export function acquire(sessionId, opts = {}) {
         takenFrom,
       },
     })
-    return true
+    return 'acquired'
   }
 
   // Sweep the litter of past failed writes (point 340 (b)) — only tmp files
@@ -1028,7 +1051,8 @@ export function acquire(sessionId, opts = {}) {
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
     if (opts.expected) return 'stale-event'
-    if (claim()) return 'acquired'
+    const result = claim()
+    if (result !== 'lost-race') return result
   }
 
   const lock = readOwnerLock(lockPath)
@@ -1058,8 +1082,7 @@ export function acquire(sessionId, opts = {}) {
       if (now - st.mtimeMs < REAP_MUTEX_STALE_MS) return 'held'
     } catch {
       // vanished between the existsSync and here — retry the fast path once
-      if (claim()) return 'acquired'
-      return 'lost-race'
+      return claim()
     }
   }
 
@@ -1095,8 +1118,7 @@ export function acquire(sessionId, opts = {}) {
     } catch {
       return 'lost-race'
     }
-    if (claim()) return 'acquired'
-    return 'lost-race'
+    return claim()
   } finally {
     exitReapMutex(mutexPath)
   }

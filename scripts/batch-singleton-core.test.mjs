@@ -17,7 +17,7 @@ import { execFile } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
-import { spawnProgressed } from './batch-autostart-core.mjs'
+import { spawnProgressed, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
   assessOwner,
   classifyParallel,
@@ -744,7 +744,19 @@ describe('renewLease / grantFence (the I/O half)', () => {
     expect(readFence({ fencePath }).fence).toBe(10)
   })
 
-  it('a lower fence claim is refused and leaves the persisted file byte-for-byte unchanged', () => {
+  it('the production successor acquisition refuses a proposed fence that fell behind the durable mark', () => {
+    const start = successorStartDecision({
+      trigger: { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+      spawnToken: 'stale-spawn',
+      openPoints: 1,
+      assessment: { alive: false, reason: 'no-lock' },
+      // This is the young worktree counter from the measured incident. The
+      // production decision carries its next generation into acquire().
+      fenceState: { fence: 2 },
+      now: NOW,
+    })
+    expect(start).toMatchObject({ start: true, reservation: { requestedFence: 3 } })
+
     const standing = {
       v: 1,
       fence: 690,
@@ -755,7 +767,13 @@ describe('renewLease / grantFence (the I/O half)', () => {
     writeFileSync(fencePath, JSON.stringify(standing, null, 2))
     const before = readFileSync(fencePath, 'utf8')
 
-    expect(grantFence('stale-session', { fencePath, requestedFence: 3, now: NOW + 1 })).toBe(null)
+    expect(acquire('stale-session', opts({
+      kind: 'pending-spawn',
+      requestedFence: start.reservation.requestedFence,
+      extra: start.reservation,
+      now: NOW + 1,
+    }))).toBe('stale-fence')
+    expect(existsSync(lockPath)).toBe(false)
     expect(readFileSync(fencePath, 'utf8')).toBe(before)
     expect(readFence({ fencePath })).toMatchObject({ fence: 690, holder: 'current-session' })
   })

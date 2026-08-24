@@ -553,6 +553,10 @@ export function successorStartDecision({
     ? trigger.predecessorToken
     : null
   const wakeToken = typeof trigger?.wakeToken === 'string' && trigger.wakeToken ? trigger.wakeToken : null
+  const durableFence = Number.isSafeInteger(fenceState?.fence) && fenceState.fence >= 0 ? fenceState.fence : 0
+  const lockFence = Number.isSafeInteger(lock?.fence) && lock.fence >= 0 ? lock.fence : 0
+  const observedFence = Math.max(durableFence, lockFence)
+  const requestedFence = observedFence < Number.MAX_SAFE_INTEGER ? observedFence + 1 : null
   const ciWaitDeadline = Number.isFinite(ciWait?.deadline) ? ciWait.deadline : null
   const ciWaitDeadlineLabel = ciWaitDeadline !== null && Math.abs(ciWaitDeadline) <= 8.64e15
     ? new Date(ciWaitDeadline).toISOString()
@@ -673,6 +677,9 @@ export function successorStartDecision({
       vetoes: ownership.vetoes ?? [],
     })
   }
+  if (requestedFence === null) {
+    return refuse('fence-exhausted', 'the ownership fence has no safe successor generation')
+  }
 
   return {
     start: true,
@@ -685,6 +692,10 @@ export function successorStartDecision({
       sourceSpawnToken,
       wakeToken,
       trigger: kind,
+      // This is a PROPOSAL, captured with the start decision rather than
+      // recomputed after the exclusive lock create. The serialized fence door
+      // refuses it if another grant advances the durable mark in between.
+      requestedFence,
       requestedAt: now,
     },
   }
