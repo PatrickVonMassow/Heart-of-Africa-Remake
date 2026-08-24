@@ -31,15 +31,35 @@ export const LANE_STALL_MS = 10 * 60 * 1000
  *                   remote tip is contained in the local history (a push
  *                   interval away — normal), false when the remote carries
  *                   history this lane never produced, null when unprobed
+ *    remoteProbeFailed  the remote listing itself failed (network, auth) —
+ *                   remoteSha null then hides possible divergence, so every
+ *                   non-quarantined reading carries an alert
  *    recordedSha   the last pushed SHA the record claims, or null
+ *    landedOnTarget  for a `landed` record: whether the LANDING TARGET's
+ *                   history contains the recorded sha (true/false), or null
+ *                   when unprobed. The worker branch proves nothing here —
+ *                   landing merges to the target and deletes the branch, so a
+ *                   merely pushed candidate must not satisfy a landed claim.
  *
  *  `completed` requires M37's whole condition — a terminal-commit claim VISIBLE
- *  on the remote — and is never concluded from the record alone. */
-export function classifyLane({ record = null, workerProbe = null, lease = null, heartbeatAt = null, worktreeExists = false, localSha = null, remoteSha = null, remoteInLocal = null, recordedSha = null, now = 0 } = {}) {
+ *  on the remote — and is never concluded from the record alone. The clock and
+ *  the lease FAIL CLOSED: liveness, heartbeat freshness and lease validity are
+ *  judgments about time, and without a usable `now` — or past the lease's
+ *  expiry — a live process is never read as a cleanly running lane. */
+export function classifyLane({ record = null, workerProbe = null, lease = null, heartbeatAt = null, worktreeExists = false, localSha = null, remoteSha = null, remoteInLocal = null, remoteProbeFailed = false, recordedSha = null, landedOnTarget = null, now = null } = {}) {
+  const verdict = classifyLaneInner({ record, workerProbe, lease, heartbeatAt, worktreeExists, localSha, remoteSha, remoteInLocal, recordedSha, landedOnTarget, now })
+  if (remoteProbeFailed && !verdict.quarantine) {
+    return { ...verdict, alert: true, reason: `${verdict.reason}; the remote probe failed, so divergence cannot be excluded` }
+  }
+  return verdict
+}
+
+function classifyLaneInner({ record, workerProbe, lease, heartbeatAt, worktreeExists, localSha, remoteSha, remoteInLocal, recordedSha, landedOnTarget, now }) {
   if (!record?.state?.state) {
     return { reading: 'orphaned', reason: 'evidence with no readable record: work nothing accounts for', quarantine: true }
   }
   const state = record.state.state
+  const clockOk = Number.isFinite(now) && now > 0
   const workerLive = workerProbe?.live === true && (!lease || sameProcess(lease.holder, { pid: workerProbe.pid, pidStartedAt: workerProbe.startedAt }))
 
   // A LIVE worker under a terminal or reviewable record is a contradiction:
@@ -55,19 +75,38 @@ export function classifyLane({ record = null, workerProbe = null, lease = null, 
     return { reading: 'divergent', reason: 'the record claims reviewable work the remote does not show', quarantine: true }
   }
   if (state === 'landed') {
-    // M37 in full: LANDED is a claim about the remote and completes only when
-    // the remote shows it — never from the record alone.
-    if (recordedSha && remoteSha && remoteSha === recordedSha) {
-      return { reading: 'completed', reason: 'the landed claim is visible on the remote (M37)' }
+    // M37 in full: LANDED is a claim about the LANDING TARGET and completes
+    // only when the target's history contains the recorded commit. The worker
+    // branch's tip is no proof either way — a merely pushed candidate matches
+    // it without ever landing, and a genuine merge deletes the branch.
+    if (recordedSha && landedOnTarget === true) {
+      return { reading: 'completed', reason: 'the landed claim is contained in the landing target (M37)' }
     }
-    return { reading: 'divergent', reason: 'the record claims landed work the remote does not show (M37)', quarantine: true }
+    if (landedOnTarget === false) {
+      return { reading: 'divergent', reason: 'the record claims landed work the landing target does not contain (M37)', quarantine: true }
+    }
+    return { reading: 'divergent', reason: 'the landed claim could not be verified against the landing target (M37)', quarantine: true }
   }
   if (['failed', 'cancelled'].includes(state)) {
     // These claim no remote success, so with the worker proven not-live there
     // is nothing left to verify.
     return { reading: 'completed', reason: `terminal state ${state}; nothing to adopt` }
   }
+  if (workerProbe?.live === true && !lease) {
+    // A live process with NO lease is authority without evidence: nothing
+    // binds the pid to this lane, and nothing bounds what it may write.
+    return { reading: 'divergent', reason: 'a live process holds no lease for this lane; authority without evidence', quarantine: true }
+  }
   if (workerLive) {
+    if (!Number.isFinite(lease.expiresAt)) {
+      return { reading: 'divergent', reason: 'the lease carries no readable expiry; a live worker under a malformed lease is unbounded authority', quarantine: true }
+    }
+    if (!clockOk) {
+      return { reading: 'stalled', reason: 'no usable clock to judge the lease or the heartbeat; a live worker is never cleanly running on unusable time', alert: true }
+    }
+    if (now > lease.expiresAt) {
+      return { reading: 'divergent', reason: 'the worker process lives past its lease expiry; it may be operating outside its fence', quarantine: true }
+    }
     if (Number.isFinite(heartbeatAt) && now - heartbeatAt <= LANE_STALL_MS) {
       // A live worker whose LOCAL tip ran ahead of the remote is normal — a
       // push interval away, the remote tip still in its history. A remote that
@@ -148,8 +187,18 @@ export function resolvePublicationIntent({ intent = null, refProbes = {} } = {})
       reason: 'the ref moved in a way this attempt cannot explain; a trailer-losing rewrite and an unrelated successor look identical',
     }
   })
-  const worst = ['UNKNOWN', 'LANDED-REWRITTEN', 'LANDED', 'ABANDONED'].find((o) => outcomes.some((m) => m.outcome === o))
-  return { outcome: worst, quarantine: worst === 'UNKNOWN', publicationId: intent.publicationId, moves: outcomes }
+  // COLLAPSING BY PRIORITY WOULD HIDE A PARTIAL PUBLICATION: one ref landed
+  // and another abandoned is not "landed", it is an intent that half-executed
+  // and needs an operator. Only uniform verdicts collapse cleanly; any UNKNOWN
+  // keeps the whole intent unknown, and a landed/abandoned mix quarantines as
+  // PARTIAL instead of letting the strongest ref speak for the weakest.
+  const kinds = new Set(outcomes.map((m) => m.outcome))
+  let worst
+  if (kinds.has('UNKNOWN')) worst = 'UNKNOWN'
+  else if ((kinds.has('LANDED') || kinds.has('LANDED-REWRITTEN')) && kinds.has('ABANDONED')) worst = 'PARTIAL'
+  else if (kinds.has('LANDED-REWRITTEN')) worst = 'LANDED-REWRITTEN'
+  else worst = kinds.has('LANDED') ? 'LANDED' : 'ABANDONED'
+  return { outcome: worst, quarantine: worst === 'UNKNOWN' || worst === 'PARTIAL', publicationId: intent.publicationId, moves: outcomes }
 }
 
 // ---------------------------------------------------------------------------
@@ -204,4 +253,23 @@ export function registryVerdict({ journalVerdict = null, snapshotVerdict = null 
  *  the successor has ONE reconciliation entry point. */
 export function landingRecovery({ stage = null } = {}) {
   return landingCrashDecision({ stage })
+}
+
+/** GREEN MEANS RESOLVED, nothing less: quarantined journal entries, alerting
+ *  lanes (a stalled worker IS an alert), quarantined publications, a refused
+ *  refill, a failed apply — and a PAIR ACTION THAT REMAINS TO BE DONE. A
+ *  required resolution (write-copy, clear-copy, release) that was not applied
+ *  successfully is unresolved reconciliation, so a run without `--apply` is
+ *  red whenever the pair needs anything: automation reading this exit code
+ *  must never activate over an explicitly unresolved daemon pair. */
+export function reconcileExitRed(report) {
+  return (
+    !report?.registry?.ok ||
+    (report.quarantined?.length ?? 0) > 0 ||
+    (report.lanes ?? []).some((l) => l.quarantine || l.alert) ||
+    (report.publications ?? []).some((p) => p.quarantine) ||
+    (report.pair?.action !== 'none' && report.applied?.ok !== true) ||
+    !report.refill?.ok ||
+    report.applied?.ok === false
+  )
 }

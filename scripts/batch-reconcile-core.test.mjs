@@ -12,6 +12,7 @@ import {
   daemonPairResolution,
   landingRecovery,
   mayRefill,
+  reconcileExitRed,
   registryVerdict,
   resolvePublicationIntent,
 } from './batch-reconcile-core.mjs'
@@ -77,16 +78,51 @@ describe('classifyLane (M28)', () => {
     expect(classifyLane({ record: { state: {} } })).toMatchObject({ reading: 'orphaned' })
   })
 
-  it('failed and cancelled complete without remote claims; landed completes only with its remote proof (M37)', () => {
+  it('failed and cancelled complete without remote claims; landed completes only when the LANDING TARGET contains it (M37)', () => {
     for (const state of ['failed', 'cancelled']) {
       expect(classifyLane({ record: runningRecord(state) }).reading).toBe('completed')
     }
-    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: OID_A }).reading).toBe('completed')
-    // A landed claim the remote does not show — moved tip, missing branch or a
-    // record with nothing recorded — quarantines instead of completing.
-    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: OID_B })).toMatchObject({ reading: 'divergent', quarantine: true })
-    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: null })).toMatchObject({ reading: 'divergent', quarantine: true })
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, landedOnTarget: true }).reading).toBe('completed')
+    // The WORKER BRANCH tip is no proof of a landing: a merely pushed candidate
+    // matches it without ever reaching the target, and a genuine merge deletes
+    // the branch. Matching worker-branch tips without a target verdict still
+    // quarantine; only the target's own history completes a landed claim.
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, remoteSha: OID_A })).toMatchObject({ reading: 'divergent', quarantine: true })
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, landedOnTarget: false })).toMatchObject({ reading: 'divergent', quarantine: true })
+    expect(classifyLane({ record: runningRecord('landed'), recordedSha: OID_A, landedOnTarget: null })).toMatchObject({ reading: 'divergent', quarantine: true })
     expect(classifyLane({ record: runningRecord('landed') })).toMatchObject({ reading: 'divergent', quarantine: true })
+    // landedOnTarget true without a recorded sha is a probe of NOTHING — it
+    // must not complete a claim the record cannot even name.
+    expect(classifyLane({ record: runningRecord('landed'), landedOnTarget: true })).toMatchObject({ reading: 'divergent', quarantine: true })
+  })
+
+  it('a live worker past its lease expiry quarantines — it may be operating outside its fence', () => {
+    const res = classifyLane({ record: runningRecord(), workerProbe: liveWorker, lease: { ...lease, expiresAt: 99_999 }, heartbeatAt: 99_000, now: 100_000, worktreeExists: true })
+    expect(res).toMatchObject({ reading: 'divergent', quarantine: true })
+    expect(res.reason).toMatch(/lease expiry/)
+  })
+
+  it('a malformed lease expiry and a leaseless live process both quarantine: unbounded authority', () => {
+    for (const expiresAt of [undefined, NaN, 'soon']) {
+      const res = classifyLane({ record: runningRecord(), workerProbe: liveWorker, lease: { ...lease, expiresAt }, heartbeatAt: 99_000, now: 100_000 })
+      expect(res, String(expiresAt)).toMatchObject({ reading: 'divergent', quarantine: true })
+    }
+    expect(classifyLane({ record: runningRecord(), workerProbe: liveWorker, lease: null, heartbeatAt: 99_000, now: 100_000 })).toMatchObject({ reading: 'divergent', quarantine: true })
+  })
+
+  it('an unusable clock never reads a live worker as cleanly running — fail closed, not fresh-forever', () => {
+    for (const now of [undefined, 0, NaN, -5]) {
+      const res = classifyLane({ record: runningRecord(), workerProbe: liveWorker, lease, heartbeatAt: 99_000, now, worktreeExists: true })
+      expect(res, String(now)).toMatchObject({ reading: 'stalled', alert: true })
+    }
+  })
+
+  it('a failed remote probe alerts on every non-quarantined reading: null is not "no divergence"', () => {
+    const res = classifyLane({ record: runningRecord(), workerProbe: liveWorker, lease, heartbeatAt: 99_000, now: 100_000, worktreeExists: true, remoteProbeFailed: true })
+    expect(res).toMatchObject({ reading: 'running', alert: true })
+    expect(res.reason).toMatch(/remote probe failed/)
+    const dead = classifyLane({ record: runningRecord(), workerProbe: { live: false }, worktreeExists: true, localSha: OID_A, remoteProbeFailed: true })
+    expect(dead).toMatchObject({ reading: 'missing', alert: true })
   })
 
   it('a LIVE worker contradicting a terminal or reviewable record quarantines, never completes', () => {
@@ -142,6 +178,64 @@ describe('resolvePublicationIntent — the one ordered procedure', () => {
     expect(resolvePublicationIntent({ intent: create, refProbes: absent }).outcome).toBe('ABANDONED')
     const appeared = { 'refs/hoa/coordinator': { refAt: OID_A, afterIsAncestor: false, trailerFound: false } }
     expect(resolvePublicationIntent({ intent: create, refProbes: appeared }).outcome).toBe('UNKNOWN')
+  })
+
+  it('a landed/abandoned MIX is PARTIAL and quarantined — no ref speaks for another', () => {
+    const two = {
+      publicationId: 'pub-3',
+      moves: [
+        { ref: 'refs/heads/a', beforeOid: OID_A, afterOid: OID_B },
+        { ref: 'refs/heads/b', beforeOid: OID_A, afterOid: OID_B },
+      ],
+    }
+    const probes = {
+      'refs/heads/a': { refAt: OID_B, afterIsAncestor: true, trailerFound: false },
+      'refs/heads/b': { refAt: OID_A, afterIsAncestor: false, trailerFound: false },
+    }
+    expect(resolvePublicationIntent({ intent: two, refProbes: probes })).toMatchObject({ outcome: 'PARTIAL', quarantine: true })
+    // A rewritten half beside an abandoned half is the same partial execution.
+    probes['refs/heads/a'] = { refAt: OID_B, afterIsAncestor: false, trailerFound: true }
+    expect(resolvePublicationIntent({ intent: two, refProbes: probes })).toMatchObject({ outcome: 'PARTIAL', quarantine: true })
+    // UNIFORM landings still collapse cleanly, and any UNKNOWN outranks all.
+    probes['refs/heads/b'] = { refAt: OID_B, afterIsAncestor: true, trailerFound: false }
+    probes['refs/heads/a'] = { refAt: OID_B, afterIsAncestor: true, trailerFound: false }
+    expect(resolvePublicationIntent({ intent: two, refProbes: probes }).outcome).toBe('LANDED')
+    probes['refs/heads/b'] = { refAt: OID_B, afterIsAncestor: null, trailerFound: false }
+    expect(resolvePublicationIntent({ intent: two, refProbes: probes })).toMatchObject({ outcome: 'UNKNOWN', quarantine: true })
+  })
+})
+
+describe('reconcileExitRed — green means resolved, nothing less', () => {
+  const clean = {
+    registry: { ok: true },
+    quarantined: [],
+    lanes: [{ reading: 'completed' }],
+    pair: { action: 'none' },
+    publications: [],
+    refill: { ok: true },
+  }
+
+  it('a clean report with nothing to do is green', () => {
+    expect(reconcileExitRed(clean)).toBe(false)
+  })
+
+  it('a pair action that remains to be done is RED even without --apply', () => {
+    for (const action of ['write-copy-from-record', 'clear-copy', 'reconcile-workers-then-release-record', 'refuse-and-alert']) {
+      expect(reconcileExitRed({ ...clean, pair: { action } }), action).toBe(true)
+    }
+  })
+
+  it('a successfully applied pair action is green; a failed one is red', () => {
+    expect(reconcileExitRed({ ...clean, pair: { action: 'clear-copy' }, applied: { ok: true } })).toBe(false)
+    expect(reconcileExitRed({ ...clean, pair: { action: 'clear-copy' }, applied: { ok: false } })).toBe(true)
+  })
+
+  it('quarantines, alerts and a refused refill are red regardless of the pair', () => {
+    expect(reconcileExitRed({ ...clean, registry: { ok: false } })).toBe(true)
+    expect(reconcileExitRed({ ...clean, quarantined: [{ seq: 1 }] })).toBe(true)
+    expect(reconcileExitRed({ ...clean, lanes: [{ reading: 'missing', alert: true }] })).toBe(true)
+    expect(reconcileExitRed({ ...clean, publications: [{ quarantine: true }] })).toBe(true)
+    expect(reconcileExitRed({ ...clean, refill: { ok: false } })).toBe(true)
   })
 })
 

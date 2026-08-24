@@ -18,12 +18,12 @@
 // path is the path that runs. --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
-import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, rmdirSync, statSync, unlinkSync, writeSync } from 'node:fs'
+import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { createServer, createConnection } from 'node:net'
 import { join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { probePid, processStartTime } from './batch-singleton.mjs'
+import { probePid, processStartTime, withLockWriteMutex } from './batch-singleton.mjs'
 import {
   attemptStateRecord,
   idempotencyKey,
@@ -899,54 +899,36 @@ export async function startDaemon({ repoDir, batchId, drill = false, waitMs = ST
  *  This is a COMPARE-AND-SWAP, not a replacement: a bare read-check-rename
  *  would let a writer that validated ownership, stalled, and woke after a
  *  handover rename its stale snapshot over the successor's lock — the old
- *  owner and fence restored by the very file that dispossessed them. So the
- *  update runs under a short-lived exclusive-create mutex beside the lock,
- *  and the ownership check is REPEATED inside it: only what the lock says at
- *  the instant of the swap decides, and a stale writer installs nothing. */
+ *  owner and fence restored by the very file that dispossessed them. And a
+ *  PRIVATE mutex would not close it either: takeover unlinks and recreates
+ *  the lock under the `.reaping` mutex, so only a writer holding THAT mutex
+ *  knows the lock it re-read is the lock its rename replaces. The update
+ *  therefore runs under the same reap mutex takeover uses, and the ownership
+ *  check is REPEATED inside it: only what the lock says at the instant of
+ *  the swap decides, and a stale writer installs nothing. */
 export function writeLockCopy({ repoDir, record, sessionId, fence = null, mutexWaitMs = 2000 }) {
   const path = lockPathFor(repoDir)
-  const mutexDir = `${path}.copy-mutex`
-  const staleMutexMs = 10_000
-  const deadline = nowMs() + mutexWaitMs
-  for (;;) {
-    try {
-      mkdirSync(mutexDir)
-      break
-    } catch {
-      // A mutex left by a crashed holder must not refuse forever: the critical
-      // section is a read and a rename, so a directory older than seconds is a
-      // corpse and is reaped — the same shape as the lock's own reap mutex.
-      try {
-        if (nowMs() - statSync(mutexDir).mtimeMs > staleMutexMs) rmdirSync(mutexDir)
-      } catch {
-        /* raced another reaper or reader; the retry below decides */
+  const held = withLockWriteMutex(
+    path,
+    () => {
+      const lock = readJsonIfAny(path)
+      if (!lock || lock.sessionId !== sessionId) return { ok: false, reason: 'only the lock owner writes the daemon copy' }
+      if (fence !== null && lock.fence !== fence) {
+        return { ok: false, reason: `the lock carries fence ${lock.fence}, not the writer's ${fence}; a superseded owner writes nothing` }
       }
-      if (nowMs() > deadline) return { ok: false, reason: 'the lock-copy mutex is held; another writer is mid-swap — retry or reconcile' }
-      // A synchronous, bounded spin: contention is measured in milliseconds.
-    }
-  }
-  try {
-    const lock = readJsonIfAny(path)
-    if (!lock || lock.sessionId !== sessionId) return { ok: false, reason: 'only the lock owner writes the daemon copy' }
-    if (fence !== null && lock.fence !== fence) {
-      return { ok: false, reason: `the lock carries fence ${lock.fence}, not the writer's ${fence}; a superseded owner writes nothing` }
-    }
-    const next = { ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } }
-    // The store's atomic write, not a pid-named tmp: a predictable name beside
-    // the lock is plantable as a symlink, and 'w' would write through it.
-    try {
-      writeFileAtomic(path, `${JSON.stringify(next)}\n`)
-    } catch (error) {
-      return { ok: false, reason: `the lock copy could not be written safely: ${error.message}` }
-    }
-    return { ok: true }
-  } finally {
-    try {
-      rmdirSync(mutexDir)
-    } catch {
-      /* the mutex directory is best-effort cleanup; a leftover one times out above */
-    }
-  }
+      const next = { ...lock, daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation } }
+      // The store's atomic write, not a pid-named tmp: a predictable name beside
+      // the lock is plantable as a symlink, and 'w' would write through it.
+      try {
+        writeFileAtomic(path, `${JSON.stringify(next)}\n`)
+      } catch (error) {
+        return { ok: false, reason: `the lock copy could not be written safely: ${error.message}` }
+      }
+      return { ok: true }
+    },
+    { waitMs: mutexWaitMs },
+  )
+  return held.ok ? held.result : { ok: false, reason: held.reason }
 }
 
 // ---------------------------------------------------------------------------

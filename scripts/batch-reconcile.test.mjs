@@ -12,7 +12,7 @@ import { processStartTime } from './batch-singleton.mjs'
 import { openStateStore } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
-import { applyPairResolution, gatherEvidence, probeIntentRefs } from './batch-reconcile.mjs'
+import { applyPairResolution, gatherEvidence, probeIntentRefs, reconcileProbe } from './batch-reconcile.mjs'
 import { resumeBatch } from './resume-batch.mjs'
 
 const BATCH = 'reconcile-batch'
@@ -152,6 +152,41 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     expect(foreign.ok).toBe(false)
     expect(foreign.did).toMatch(/lock owner/)
   })
+
+  it('a takeover that lands INSIDE the mutation window is refused — the revalidation runs under the mutex', () => {
+    const lockPath = join(repo, '.claude', 'batch-lock.json')
+    const before = readFileSync(lockPath, 'utf8')
+    const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
+    // The hook fires after the mutex is entered and before the revalidation —
+    // exactly where a bare read-before-write would already have validated and
+    // would rename its stale snapshot over the successor's lock.
+    reconcileProbe.onMutexEntered = (path) => {
+      writeFileSync(path, JSON.stringify({ ...JSON.parse(before), sessionId: 'successor-session', fence: FENCE + 1 }))
+    }
+    try {
+      const raced = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SID })
+      expect(raced.ok).toBe(false)
+      expect(raced.did).toMatch(/lock owner/)
+      // The successor's lock SURVIVES: nothing renamed a stale snapshot over it.
+      expect(JSON.parse(readFileSync(lockPath, 'utf8')).sessionId).toBe('successor-session')
+    } finally {
+      reconcileProbe.onMutexEntered = null
+      writeFileSync(lockPath, before)
+    }
+  })
+
+  it('refuses to mutate while the lock mutex is held — a takeover mid-swap serializes, never interleaves', () => {
+    const mutexDir = join(repo, '.claude', 'batch-lock.json.reaping')
+    mkdirSync(mutexDir)
+    try {
+      const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
+      const held = applyPairResolution({ repoDir: repo, batchId: BATCH, report: { ...report, pair: { ...report.pair, action: 'clear-copy' } }, sessionId: SID })
+      expect(held.ok).toBe(false)
+      expect(held.did).toMatch(/mutex is held/)
+    } finally {
+      rmSync(mutexDir, { recursive: true, force: true })
+    }
+  }, 10_000)
 
   it('mutates nothing while the registry is corrupt or entries are quarantined', () => {
     const report = gatherEvidence({ repoDir: repo, batchId: BATCH })
