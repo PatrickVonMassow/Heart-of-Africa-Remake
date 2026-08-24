@@ -22611,3 +22611,46 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   list and the quarantine safety of point 860 stay pinned by their existing tests.
   Criticality: HIGH — these are the lanes that fire exactly when nobody is watching.
   Bundle: Urlaubsfestigkeit.
+
+- [x] 870. A merge's unattributed conflict resolution makes its files permanently unreviewable, and
+  one such file refuses the whole review round. MEASURED 24.08.2026, 03:00, on
+  `feat/834-durable-authoring-lane` at `89adc809`: `node scripts/review-sol.mjs --sha 89adc809
+  --brief … --point 834 --pass 1` (base `main`, the landing scope) plans 13 passes at 87% coverage
+  and then refuses with "UNREVIEWABLE — at least one contribution has no eligible non-author vendor;
+  no round can clear it", so round 28 of point 834 cannot be commissioned AT ALL and the point cannot
+  land. CAUSE ONE: merge `2b783e81` resolved conflicts across 41 files with 2119 insertions and 423
+  deletions and carries NO `Co-Authored-By` trailer. `gatherAuthorshipCommits`
+  (`scripts/review-sol.mjs:333`) reads the range with `--diff-merges=cc`, so that resolution is a
+  real authored contribution whose vendor is unknown, and seven end-state files therefore have no
+  provable independent reviewer: `scripts/blind-merge.mjs`, `scripts/blind-merge-cli.test.mjs`,
+  `scripts/mechanism-review.mjs`, `scripts/mechanism-review-core.mjs`,
+  `scripts/mechanism-review-core.test.mjs`, `scripts/mechanism-review-cli.test.mjs`,
+  `scripts/review-sol-cli.test.mjs`. CAUSE TWO: the refusal is ALL-OR-NOTHING. The ledger already
+  carries a record kind built for exactly this exception — `criticality-review-unavailable`
+  (`scripts/criticality-review-guard-core.mjs:46`), verified against Git by
+  `attachUnavailableClearances` — but its own documentation says it "answers no refusal", no CLI
+  writes it, and `review-sol` never consults it. So 87% reviewable material stays unread because of
+  the other 13%, and there is no operator route out. The tool's own remedy, "narrow with --since <the
+  last reviewed sha>", does not work here: `--since 95f4c3a1` and `--since 821aa03c` reach back
+  across two main merges, cost 21 and 23 passes instead of 13, and hit the separate point 856 defect
+  on `scripts/timestamp-guard.test.mjs`.
+  WHAT IT COSTS: the front point of the queue is unlandable after 28 authoring rounds and roughly
+  $62 in its last run alone, and the escape is either a history rewrite that would invalidate every
+  recorded review sha on the branch or hand-recording around the mechanism.
+  THIS POINT IS DISTINCT FROM 856, which only teaches the planner to tell a reviewer credit from an
+  authoring trailer; neither of this point's two causes is that one, and fixing 856 alone leaves 834
+  blocked.
+  FINAL STATE: a merge commit's conflict resolution is attributable — either the merge carries its
+  author trailer by rule and a guard says so when it does not, or the planner attributes a cc-only
+  contribution to a named model rather than to "unknown"; AND a round proceeds over the material it
+  CAN review, naming every file it could not cover, with a verified
+  `criticality-review-unavailable` receipt as the recorded route for the remainder, instead of
+  refusing every pass.
+  VERIFIABLE: unit cases over the planner and the CLI — a range containing an unattributed merge
+  resolution reports those files as uncovered and still plans and runs the reviewable passes; the
+  recorded pass names exactly the files it read and leaves the rest owed; a receipt whose file list
+  does not equal the measured unavailable set is refused; and on this branch `review-sol --since
+  main` plans and runs pass 1 instead of refusing.
+  Criticality: high — it is a guard on the four-eyes rule that can deadlock the queue, and its only
+  workarounds are history rewriting or recording around the review.
+  Bundle: Session- & Repo-Hygiene.
