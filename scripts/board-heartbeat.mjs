@@ -49,7 +49,9 @@ function runBoardStatus(point, status) {
   const result = spawnSync(
     process.execPath,
     [resolve(REPO_ROOT, 'scripts', 'board.mjs'), 'status', String(point), '--text-stdin'],
-    { cwd: REPO_ROOT, input: status, encoding: 'utf8' },
+    // windowsHide: the Stop chain and every recording step run unattended;
+    // a console window here would steal the focus on each round (point 401).
+    { cwd: REPO_ROOT, input: status, encoding: 'utf8', windowsHide: true },
   )
   if (result.error) throw result.error
   if (result.status !== 0) {
