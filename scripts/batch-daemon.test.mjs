@@ -7,7 +7,7 @@
 // exclusive existence, fenced mutations, idempotent retries, checkpoint
 // acknowledgment, cancellation that preserves the branch, drain and restart.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -312,6 +312,46 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(down.ok).toBe(true)
     await sleep(500)
   }, 20_000)
+})
+
+describe('two SIMULTANEOUS daemon starts', () => {
+  it('lets exactly one claim the record before anything is journalled', async () => {
+    const CC_BATCH = 'concurrent-batch'
+    const store = openStateStore({ repoDir: repo, batchId: CC_BATCH })
+    const procs = ['nonce-one', 'nonce-two'].map((nonce) =>
+      spawn('node', ['scripts/batch-daemon.mjs', 'serve', '--repo', repo, '--batch', CC_BATCH, '--nonce', nonce, '--drill'], {
+        windowsHide: true,
+        cwd: REPO_ROOT,
+        stdio: 'ignore',
+      }),
+    )
+    const exits = []
+    procs.forEach((p) => p.on('exit', (code) => exits.push(code)))
+    try {
+      // Both race the exclusive create; the loser exits without having written
+      // a byte of journal. Wait for one loser and a booted winner.
+      const deadline = Date.now() + 20_000
+      while ((exits.length < 1 || readJournal(store).entries.length < 2) && Date.now() < deadline) await sleep(200)
+      expect(exits.length).toBeGreaterThanOrEqual(1)
+      const record = readJsonIfAny(store.daemonRecordPath)
+      expect(record).toBeTruthy()
+      expect(['nonce-one', 'nonce-two']).toContain(record.launchNonce)
+      const journal = readJournal(store)
+      expect(journal.verdict).toBe('ok')
+      // ONE start under ONE writer: no interleaved sequences, no second record.
+      expect(journal.entries.filter((e) => e.kind === 'daemon-lifecycle' && e.event === 'start')).toHaveLength(1)
+    } finally {
+      const record = readJsonIfAny(store.daemonRecordPath)
+      if (record?.pid) {
+        try {
+          process.kill(record.pid, 'SIGTERM')
+        } catch {
+          /* already gone */
+        }
+      }
+      await sleep(500)
+    }
+  }, 30_000)
 })
 
 describe('a durably failing journal fails closed', () => {

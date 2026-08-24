@@ -195,7 +195,16 @@ async function serve(args) {
     return res
   }
 
-  writeRecordExclusive(store.daemonRecordPath, built.record)
+  // EXCLUSIVITY BEFORE THE FIRST JOURNAL WRITE: the 'wx' create is what makes
+  // this process the journal's single writer, so nothing may be appended before
+  // it. Two simultaneous starters both pass the advisory pre-check above; the
+  // loser of this create exits here having written NOTHING.
+  try {
+    writeRecordExclusive(store.daemonRecordPath, built.record)
+  } catch (error) {
+    console.error(`daemon: could not claim the identity record exclusively (${error.code ?? error.message}); another daemon won the race`)
+    process.exit(1)
+  }
   if (!journalCorrupt) {
     const booted = ensureFenceJournalled(fence).ok && journalEntry({ kind: 'daemon-lifecycle', event: 'start', record: built.record }).ok
     if (!booted) {
