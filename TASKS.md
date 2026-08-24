@@ -1958,6 +1958,20 @@ put it is the mistake this line exists to stop.
   same shape as the young fence counter standing beside the recorded mark of 690, moved from the
   lock to the pause. For the in-flight file, a wait declared from a worktree lands beside the one the
   main session reads, so the successor's `--adopt` cannot find it.
+  A THIRD SIBLING, MEASURED 24.08.2026 while landing point 891, and the only one of the three that
+  fires a FALSE BLOCK today: `.claude/dashboard-state.json`. `scripts/dashboard-guard.mjs` resolves
+  it against the hook's own cwd, so run from the main checkout it exits 0, while the identical run
+  with `cwd=/workspace/hoa/.claude/worktrees/point-891` returns `decision:block` with "BATCH
+  DASHBOARD NOT REGISTERED" — the linked worktree carries its OWN copy of that path, written by
+  other guards (`openFingerprint`, `tasksSeenMtime`, `ownerLoopWatch`) and holding no
+  `dashboardPath` at all, so `evaluate`'s `!marker.dashboardPath` test reads a file that
+  structurally cannot answer. The batch works in linked worktrees constantly and the shell cwd
+  follows the last `cd`, so the block lands on a session that did nothing wrong — and its stated
+  remedy makes it worse: `--synced` run from the worktree would write a SECOND marker there instead
+  of repairing the real one, registering the dashboard in a checkout that does not hold it (the file
+  is gitignored and exists only in the main tree). This one is not an OPEN QUESTION for the author:
+  the registration marker is a fact about the repository, so it moves to the common checkout with
+  the rest.
   DELIBERATELY NOT FIXED IN 897: that point's FINAL STATE names the lock, the fence and the
   ownership hand-over, not the pause; widening its diff would have been scope creep.
   FINAL STATE: every host-local singleton file under `.claude/` resolves through the common checkout
