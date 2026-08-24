@@ -594,11 +594,17 @@
       "origin": "machine",
       "place": "last"
     },
-    "870": {
-      "at": "2026-08-24T01:05:08.893Z",
-      "why": "it deadlocks the queue itself: point 834 stands first and cannot be reviewed or landed at all until this is fixed, so no release work behind it can move either",
+    "871": {
+      "at": "2026-08-24T01:53:40.685Z",
+      "why": "The card only misleads while a run is transferred, and the session that meets it can append a truthful sentence — behind the release, like every machine-filed point",
       "origin": "machine",
-      "place": "ahead"
+      "place": "last"
+    },
+    "872": {
+      "at": "2026-08-24T01:53:40.762Z",
+      "why": "The gap is closed in practice as long as only Claude sessions merge, and point 870 already stops it from deadlocking a round — behind the release, like every machine-filed point",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -646,7 +652,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T01:05:08.900Z",
+    "at": "2026-08-24T01:53:40.769Z",
     "points": [
       174,
       184,
@@ -908,7 +914,8 @@
       867,
       868,
       869,
-      870
+      871,
+      872
     ]
   }
 }
