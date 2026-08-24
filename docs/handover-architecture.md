@@ -580,8 +580,19 @@ reserving; the same lock-owning session could begin a legacy operation immediate
 
 **So the daemon's existence is ALSO A FIELD OF THE BATCH LOCK — a copy of its record, not a
 second record.** `start` writes a `daemon` field — pid, pid start time, generation — into
-`.claude/batch-lock.json` through the same atomic test-and-set that already governs the lock, and
-`stop` clears it the same way. The consequences follow without any new primitive:
+`.claude/batch-lock.json`, and `stop` clears it the same way. **And that write is a
+COMPARE-AND-SWAP, not a replacement** — the distinction the first draft blurred by calling it
+"the same atomic test-and-set": exclusive create only governs a lock that does not exist, and a
+bare write–rename over an existing lock would let a writer that prepared its update under fence
+7, stalled, and woke after B acquired fence 8 overwrite B's lock with its stale record — the old
+coordinator valid again, installed by the very file that dispossessed it. So every update of an
+EXISTING lock — the heartbeat, the `daemon` field, its clearing — runs under the same reap mutex
+that already serializes takeover: take the mutex, RE-READ the lock, refuse unless it still names
+the writer's own `sessionId` and `fence` at that instant, only then rename the new content over,
+release the mutex. A stale writer fails the re-read and installs nothing; a takeover holds the
+mutex, so the two cannot interleave. Only under that rule is "only the lock owner writes the
+lock" true as a mechanism rather than an intention. The consequences follow without any new
+primitive:
 
 - **"Is there a daemon?" and "may I work?" are ONE READ for the current lock owner,** so that
   owner cannot act on a pair of answers taken at two different instants. That is an ATOMICITY
@@ -727,9 +738,10 @@ here, BEFORE they are encoded — otherwise the schemas encode a lie.
   the fence being served, the launch nonce. Its only writer is the daemon itself, by
   write–flush–rename, and `start` claims it by exclusive create.
 - **The copy** is the `daemon` field of `.claude/batch-lock.json`: pid, pid start time and
-  generation, nothing else. Its only writer is the lock's atomic test-and-set, so only the lock
-  owner can write it, and it is a CACHE — it exists so that "is there a daemon" and "may I work"
-  are one read for the current owner, and for nothing else.
+  generation, nothing else. Its only writer is the mutex-guarded compare-and-swap defined above
+  — re-read, match own `sessionId` and `fence`, only then rename — so only the CURRENT lock
+  owner can install it, and it is a CACHE — it exists so that "is there a daemon" and "may I
+  work" are one read for the current owner, and for nothing else.
 
 **Two write orders, and each is crash-safe in the same direction.** START writes the record
 durably first; the lock owner then reads it, matches the launch nonce, probes the identity and
