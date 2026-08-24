@@ -104,6 +104,24 @@ function writeRecordExclusive(path, record) {
 
 async function serve(args) {
   const repoDir = resolve(args.repo)
+  // THE INTERLOCK IS ENFORCED HERE, in the serving process itself — not only in
+  // startDaemon: `node scripts/batch-daemon.mjs serve ...` is reachable
+  // directly, and a gate that lives only in the launcher is a gate a direct
+  // dispatch walks around. startDaemon's copy of these checks is the early,
+  // friendlier refusal; this one is the authoritative one.
+  if (args.drill === true) {
+    const root = resolve(REPO_ROOT)
+    if (repoDir === root || repoDir.startsWith(root + sep)) {
+      console.error('daemon: a drill daemon serves only a sandbox repository, never this checkout')
+      process.exit(1)
+    }
+  } else {
+    const gate = mayStartDaemon({ flag: readJsonIfAny(join(repoDir, FLAG_PATH_SUFFIX)), steps: DURABLE_LANE_STEPS })
+    if (!gate.ok) {
+      console.error(`daemon: ${gate.reason}`)
+      process.exit(1)
+    }
+  }
   const store = openStateStore({ repoDir, batchId: args.batch })
   const fenceStore = readJsonIfAny(fenceStorePathFor(repoDir))
   if (!fenceStore || typeof fenceStore.generation !== 'string' || !fenceStore.generation || !Number.isInteger(fenceStore.fence)) {
@@ -505,7 +523,7 @@ export async function startDaemon({ repoDir, batchId, drill = false, waitMs = ST
   const nonce = mintLaunchNonce()
   spawnDetached({
     cmd: process.execPath,
-    args: ['scripts/batch-daemon.mjs', 'serve', '--repo', resolved, '--batch', batchId, '--nonce', nonce],
+    args: ['scripts/batch-daemon.mjs', 'serve', '--repo', resolved, '--batch', batchId, '--nonce', nonce, ...(drill ? ['--drill'] : [])],
     cwd: process.cwd(),
     logPath: join(store.dir, 'daemon.log'),
   })

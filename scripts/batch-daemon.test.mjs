@@ -91,6 +91,36 @@ describe('the dark pin', () => {
     expect(refused.ok).toBe(false)
     expect(refused.reason).toMatch(/sandbox/)
   })
+
+  it('enforces both gates in the serving process itself: a direct serve dispatch cannot bypass them', () => {
+    const run = (extraArgs) => {
+      const res = execFileSync('node', ['scripts/batch-daemon.mjs', 'serve', '--batch', BATCH, '--nonce', 'direct-nonce', ...extraArgs], {
+        windowsHide: true,
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      return { status: 0, out: res }
+    }
+    // Production serve while the steps are not green: refused by serve itself.
+    let production
+    try {
+      production = run(['--repo', repo])
+    } catch (error) {
+      production = { status: error.status, out: `${error.stdout}${error.stderr}` }
+    }
+    expect(production.status).not.toBe(0)
+    expect(production.out).toMatch(/not green/)
+    // Drill serve against this checkout: refused by serve itself.
+    let drill
+    try {
+      drill = run(['--repo', REPO_ROOT, '--drill'])
+    } catch (error) {
+      drill = { status: error.status, out: `${error.stdout}${error.stderr}` }
+    }
+    expect(drill.status).not.toBe(0)
+    expect(drill.out).toMatch(/sandbox/)
+  })
 })
 
 describe('canonicalWorktree — the symlink half of one-worktree/one-attempt', () => {
