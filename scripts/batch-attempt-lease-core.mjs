@@ -86,7 +86,12 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
   if (!Number.isFinite(now) || !Number.isFinite(ttlMs) || ttlMs <= 0) {
     return { ok: false, reason: 'a lease needs a usable clock and ttl' }
   }
-  if (existing) {
+  // ABSENCE IS null OR AN OMITTED FIELD — NOTHING ELSE. `if (existing)` let a
+  // persisted `false`, `0`, `''` or `NaN` skip validation entirely and fall
+  // through to the fresh grant, so unreadable ownership was interpreted as no
+  // ownership (cross-vendor review of point 893). Every other value is a lease
+  // this module must read, and failing to read it fails closed.
+  if (existing !== null && existing !== undefined) {
     if (!usableLease(existing)) {
       // An unreadable lease is UNCERTAIN ownership, and uncertain fails closed
       // (M39) — never "broken, therefore free".

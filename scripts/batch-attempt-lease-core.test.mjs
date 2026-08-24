@@ -117,6 +117,21 @@ describe('grantAttemptLease', () => {
     expect(broken.reason).toMatch(/uncertain fails closed/)
   })
 
+  it('quarantines a FALSEY persisted lease instead of reading it as no lease at all', () => {
+    // `if (existing)` sent `false`, `0`, `''` and `NaN` straight to the fresh-grant
+    // path, so a persisted value this module cannot read was interpreted as
+    // absence and the attempt was granted to a second process (cross-vendor
+    // review of point 893). Unreadable is uncertain, and uncertain fails closed.
+    for (const persisted of [false, 0, '', NaN]) {
+      const res = grant({ existing: persisted, leaseId: 'L2' })
+      expect(res.ok, String(persisted)).toBe(false)
+      expect(res.reason, String(persisted)).toMatch(/uncertain fails closed/)
+    }
+    // Absence is null or an omitted field, and only absence grants.
+    expect(grant({ existing: null }).ok).toBe(true)
+    expect(grant({ existing: undefined }).ok).toBe(true)
+  })
+
   it('refuses an incomplete attempt, holder or clock', () => {
     expect(grantAttemptLease({ attempt: { batchId: 'b' }, holder, now: 1, leaseId: 'L1' }).ok).toBe(false)
     expect(grantAttemptLease({ attempt, holder: { pid: 100 }, now: 1, leaseId: 'L1' }).ok).toBe(false)
