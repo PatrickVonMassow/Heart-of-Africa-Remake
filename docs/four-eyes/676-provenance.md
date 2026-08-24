@@ -72,3 +72,22 @@ the union, in the same commit — exists so the next stage cannot repeat this.
 It is worth stating what that rule does NOT buy: a half's own heading is still
 only a claim. Where authorship matters, it is settled by the metadata of the
 messages that produced the text.
+
+## The one signed edit to a frozen half (24.08.2026)
+
+Cross-vendor review of point 834 found half A's counted `.json` incomplete
+against its own prose. `676-blind-a-opus5.md` §A8 states an acceptance
+condition — "Success is that figure falling while the number of points landed
+per day does not" — and the JSON entry named only the measurements. The
+structural binding in `scripts/four-eyes-artefacts.test.mjs` compares section
+ids and counts, so it could not see a requirement dropped inside an entry, and
+the ledger row went on claiming that every input entry was accounted for.
+
+The transcription is repaired: A8's JSON entry now carries the condition, and
+the byte pin is updated in the same commit, which is how that test says a
+frozen half is changed. **The union is untouched, and that is the evidence the
+repair is a transcription fix rather than a content change**: `676-union.json`
+M54 already carried the full sentence, so Fable's fold read the prose half, and
+nothing folded, counted or landed changes with it. A new case binds the class
+rather than the instance — wherever half A's prose states a "Success is …"
+condition, the entries parsed from that section must state it too.

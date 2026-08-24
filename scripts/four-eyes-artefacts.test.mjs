@@ -87,7 +87,7 @@ describe('the 676 stage is auditable from its raw halves', () => {
     const createHash = crypto.createHash
     const pins = {
       [`${HALF_A}.md`]: 'e770546ef0715e40791dc30a4e678e53bcbf68b533c9420f1d772db8bc9f633a',
-      [`${HALF_A}.json`]: '85a61dc966b4cfcead323fd2e19fdaeb2bf3d204579edb011afb5967c47dcf64',
+      [`${HALF_A}.json`]: '6710c68848f2b36152e806dfaa47e759dbd73504520083897f40969acdf16822',
       [`${HALF_B}.md`]: '09bcbe2aafc724197c96a54d6920d81052973215970af015533e8b7e211360bd',
       [`${HALF_B}.json`]: 'c9a6cd98bcd5940ea31e179e783eab73bb5c6ea4fe69e3b1594024e768f6868f',
     }
@@ -115,6 +115,34 @@ describe('the 676 stage is auditable from its raw halves', () => {
       const lettered = entries.filter((id) => base(id) === section && id !== section)
       const letters = lettered.map((id) => id.slice(-1))
       expect(letters).toEqual(letters.length ? ['a', 'b', 'c'].slice(0, letters.length) : [])
+    }
+  })
+
+  it('carries every acceptance condition half A states in prose into the entry parsed from it', () => {
+    // The section binding above compares STRUCTURE. Cross-vendor review of point
+    // 834 found what that lets through: A8's prose states an acceptance condition
+    // ("Success is that figure falling while the number of points landed per day
+    // does not") and the counted JSON entry named only the measurements. The
+    // accounting then claims every input entry was folded, while the requirement
+    // the entry exists to impose never reached the counted half.
+    // A stated success condition is the one prose sentence that can be bound
+    // mechanically, so it is: wherever half A says "Success is …", the entries of
+    // that section must say it too.
+    const md = read(`${HALF_A}.md`)
+    const entries = JSON.parse(read(`${HALF_A}.json`)).entries
+    const norm = (t) => t.replace(/\s+/g, ' ').replaceAll('`', '').trim()
+    const stated = md
+      .split(/^## /m)
+      .slice(1)
+      .flatMap((section) => {
+        const id = section.match(/^(A\d+)\./)[1]
+        return [...section.matchAll(/Success is [^.]*\./g)].map((m) => [id, norm(m[0])])
+      })
+    // If the prose ever stops stating one, this case must not silently pass.
+    expect(stated.length).toBeGreaterThan(0)
+    for (const [id, sentence] of stated) {
+      const text = entries.filter((e) => e.id.replace(/[a-c]$/, '') === id).map((e) => norm(e.defect)).join(' ')
+      expect(text, `${id}: ${sentence}`).toContain(sentence)
     }
   })
 

@@ -69,7 +69,7 @@
   {
    "id": "A8",
    "file": "CLAUDE.md",
-   "defect": "Measured by scripts/measure-context-cost.mjs over a full day, in both scopes: median main-session context at handover and the share of spend above 150k context (the 87-94 % figure that motivated the boundary), against points landed per day."
+   "defect": "Measured by scripts/measure-context-cost.mjs over a full day, in both scopes: median main-session context at handover and the share of spend above 150k context (the 87-94 % figure that motivated the boundary). Success is that figure falling while the number of points landed per day does not."
   }
  ]
 }
