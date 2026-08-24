@@ -489,6 +489,27 @@ describe('a durably failing journal fails closed', () => {
       expect((await jfRequest('status')).ok).toBe(true)
       const journal = readJournal(store)
       expect(journal.entries.some((e) => e.kind === 'attempt-state')).toBe(false)
+      // Shutdown after the durable failure: the daemon leaves, but its
+      // identity record stays COLD — the stop is unwitnessed by the failed
+      // journal, and releasing over it would let a successor daemon start
+      // over a journal whose tail lies. The next start is therefore refused
+      // until reconciliation releases the record.
+      const jfRecord = readJsonIfAny(store.daemonRecordPath)
+      const down = await jfRequest('shutdown', {})
+      expect(down.ok).toBe(true)
+      const exitDeadline = Date.now() + 10_000
+      while (Date.now() < exitDeadline) {
+        try {
+          process.kill(jfRecord.pid, 0)
+          await sleep(200)
+        } catch {
+          break
+        }
+      }
+      expect(existsSync(store.daemonRecordPath)).toBe(true)
+      const refused = await startDaemon({ repoDir: repo, batchId: JF_BATCH, drill: true, waitMs: 3000 })
+      expect(refused.ok).toBe(false)
+      expect(refused.log ?? '').toMatch(/cold daemon record/)
     } finally {
       // Restore the journal if the failing branch left the directory in place.
       try {

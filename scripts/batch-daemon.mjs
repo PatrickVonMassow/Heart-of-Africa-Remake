@@ -754,14 +754,24 @@ async function serve(args) {
     } catch {
       /* closing is the goal */
     }
-    if (unreleased === 0) {
+    // Releasing the record is an EXTERNAL EFFECT like any other, so it obeys
+    // the same fail-closed rule: once the journal failed durably, the stop —
+    // and possibly drain evidence before it — is unwitnessed, and a release
+    // over an unwitnessed shutdown would let a successor daemon start over a
+    // journal whose tail lies. A journal corrupt from BOOT is different: that
+    // daemon never mutated anything, its shutdown changes no evidence, and its
+    // release is what lets the operator act.
+    if (unreleased === 0 && !journalFailed) {
       try {
         unlinkSync(store.daemonRecordPath)
       } catch {
         /* releasing a record that is already gone is release all the same */
       }
     } else {
-      console.error(`daemon: ${unreleased} worker(s) survive this shutdown; the identity record stays as a cold record until reconciliation (step 8) releases it`)
+      const why = journalFailed
+        ? 'the journal failed durably, so this shutdown is unwitnessed'
+        : `${unreleased} worker(s) survive this shutdown`
+      console.error(`daemon: ${why}; the identity record stays as a cold record until reconciliation (step 8) releases it`)
     }
     process.exit(0)
   }
