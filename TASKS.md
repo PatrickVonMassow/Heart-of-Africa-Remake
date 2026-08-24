@@ -358,28 +358,6 @@ put it is the mistake this line exists to stop.
   undelivered message returns to pending.
   Criticality: high — it loses the user's own words, silently, on the path built to reach them.
   Bundle: Chat & Tafel.
-- [ ] 848. The board can freeze for hours while a single-turn batch session works, because every
-  currency mechanism bites only at a turn end. MEASURED 23.08.2026 ~05:00: the board's last
-  publish was 02:30 (the point-720 boundary card "Übergabe an eine frische Sitzung"); the
-  watchdog session spawned 01:50 (lock claimed 02:40) then worked point 847 through fifteen
-  Sol review rounds until at least 04:58 in ONE continuous `-p` turn and never rewrote the
-  now-card or republished. `dashboard-guard` enforces card currency in the Stop chain, which a
-  long single-turn session never reaches, and a `batch-in-flight` declaration is visible to the
-  launcher but leaves no trace on the board. Result: the public board showed stale finished
-  work for ~2.5 h of live review ping-pong, and the user had to ask whether the batch was
-  still alive.
-  FINAL STATE: a long-running turn keeps the board current without polling — the recurring
-  in-turn recording steps (a `review-sol.mjs` round completing, `mechanism-review.mjs --record`,
-  a `batch-in-flight` declaration or refresh) stamp the now-card's status line and republish
-  when the card is stale against the declared focus, so review round N is visible on the page
-  while round N+1 runs.
-  VERIFIABLE: a unit case per trigger shows a stale now-card refreshed by the trigger and a
-  current card left untouched (no publish storm), and the board history after one review round
-  carries the round's status without any Stop hook having run.
-  Criticality: low — no product behaviour; the cost is operator blindness during the longest
-  sessions, exactly when visibility matters most.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
   (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
   HANDOVER markers, `.claude/autostart.log` spawns, commit timestamps, deduplicated by session
