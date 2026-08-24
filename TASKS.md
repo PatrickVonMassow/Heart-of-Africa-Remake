@@ -77,183 +77,241 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 834. The durable authoring lane is pulled forward, cut where it is safe to cut, and built
-  dark (user 22.08.2026, verbatim: "Mache es so, wie du es vorschlägst" and "Aber frage nochmal
-  Sol, ob dein Plan auch so funktioniert"; the audit that corrected the cut is GPT-5.6 Sol, effort
-  high, 22.08.2026, 23 findings, against `docs/handover-architecture.md` and the texts of 676 and
-  716). WHAT IT COSTS TODAY, measured: on 21.08.2026 an authoring run for point 597 died with its
-  parent session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost. The cause is
-  structural: `scripts/author-sol.mjs:337` spawns codex `detached` only so a kill takes the whole
-  group, while `author-sol.mjs` itself is awaited inside the parent session's tool call, and a Sol
-  run has no checkpoint to resume from. Point 676 has owned the cure since 13.08.2026 at
-  criticality high, blocked by nothing — its only cited prerequisite, 675, is closed — and has
-  waited at queue position 198 while the failure it describes kept happening.
-  THIS POINT IS THE FRONT STAGE OF 676, NOT A SECOND 676. The remainder of 676 keeps its number and its rank:
-  bounded dispatch, checkpoint barrier, two-phase boundary, successor reconciliation beyond the
-  slice claimed here, crash-recoverable landing, board projection, metrics, staged failure trials
-  and the measured baseline trial. ITS SPEC IS AMENDED IN THE SAME COMMIT that files this point, so
-  the steps carried here are struck from it and its text says it begins AFTER this point — an
-  unamended 676 duplicates steps 1-4 and 8 and lets its remainder be worked first (Sol A9).
-  A17 IS RESOLVED BEFORE 716 LANDS, not after: 716 and 676 must not codify contradictory answers
-  about transferring a live Agent-tool child, so whichever of the two lands first carries the
-  agreed answer and the other cites it (Sol A10).
-  THE CUT IS AT STEP 4, NOT STEP 3, and this is the correction Sol's audit forced. Steps 1-3 of the
-  document's "Ordered work" — schemas and invariants, the durable state store, the daemon plus the
-  Sol adapter — deliver DURABLE EXECUTION, not TRANSFERABLE SUPERVISION: a worker merely is not
-  killed, while no transferable declaration, fenced adoption, reconciliation or plan-native landing
-  exists, so a successor can neither prove nor land its work (Sol A2). Worse, ACTIVATING step 3
-  without step 4 is worse than today: without epoch fencing, attempt leases, fail-closed worktree
-  locks and push-time lease validation, two coordinators can drive one batch, two attempts can
-  share one worktree, and a replaced orphan can keep checkpointing and pushing (Sol A6). This point
-  therefore CARRIES steps 1-4 AND step 8 — fenced discovery, adoption, reconciliation — and step 9
-  where landing is needed, because that is the smallest set at which survivability may be CLAIMED
-  (Sol A3). A second cross-vendor pass on this very text refused the earlier wording: merely NAMING
-  8 and 9 delivers nothing, and the parent-death drill below cannot pass without them, since
-  fresh-session discovery and adoption live in step 8 (Sol, 22.08.2026, A1/A5/A11).
-  IT IS BUILT DARK. Steps 1-4 land behind an activation flag with today's path untouched (Sol A20),
-  because evidence-preserving cancellation and lease release arrive only later and there is no
-  rollback path before them. Nothing in the board, the brief or the handover advertises a surviving
-  lane until the step-8 slice is green — and that is an INTERLOCK, not a habit: the flag REFUSES to
-  enable while steps 8 and 9 are not green, and a test pins that refusal (Sol A8; controlling what
-  is advertised does not control what is switched on).
-  BEFORE ANY CODE, ONE HARD PREREQUISITE REMAINS (this replaces the two recovery items the point
-  carried until 22.08.2026, 18:20; both are done, and the spec examination below refused a text
-  that still ordered them as work — Sol A1):
-  (a) THE RECOVERY STAGE IS COMPLETE ON THIS BRANCH. The recovered raw halves, corrected
-      provenance, provisional re-merge record and repaired four-eyes tooling are inputs to this
-      point and are not repeated.
-  (b) THE RECORDED TWO-MODEL FALLBACK DOES NOT AUTHORIZE IMPLEMENTATION. Its union is a
-      specification with known gaps until a model that authored neither raw half folds it — the
-      demonstrated one is M27, which keeps B15's state vocabulary and drops the actor, epoch,
-      timestamps and commit identities B15 requires. That neutral fold runs through
-      `scripts/mechanism-review.mjs --merged-by`; it may add, drop or re-word union entries, and
-      what it settles is what gets built. Fable is the only currently identified qualifying
-      merger. It was off when this point was filed; `.claude/fable-switch.json` records it back
-      ON since 22.08.2026, 18:26 (`setBy: Test`, reason "User instruction 22.08.2026: Anthropic
-      released new weekly volume — Fable may be used again"), and CLAUDE.md §6 makes that record
-      the sole answer on whether Fable may blind-merge. THE FOLD IS THEREFORE THE FIRST ACTION
-      OF THIS POINT rather than a blocker of it — but it still precedes every line of code. Only
-      read-only repository and test mapping are safe before it lands. Steps 1-3 remain
-      revisable: a named later step reopens schemas, store and adapter, and re-tests and
-      re-reviews every reopened part.
-      WHAT THE RECORD DOES AND DOES NOT AUTHORIZE: on 22.08.2026 at 18:14 the owner reported new
-      weekly volume, asked for the Fable suspension to be lifted, and restated the rule he wants
-      back — Sol and Opus 5 blind, Fable folding — while asking expressly that it not be
-      implemented before he has seen the resulting model rules. The switch was flipped twelve
-      minutes later. That authorizes THE FOLD; it is not a ruling that the §6 model rules may be
-      rewritten, which still waits for him. A claim that he had ruled the opposite stood in the
-      branch documents for about twenty minutes on 22.08.2026 and is withdrawn; it was inferred
-      from the standing switch setting, and point 840 exists to make that class of claim
-      checkable. The branch documents of this point — `docs/four-eyes/README.md`, the union's
-      `mergedByNote` and `docs/handover-architecture.md` — were written before the flip and
-      still say the switch is off; the fold corrects them where it lands.
-  (c) THE FOLD IS DONE BUT UNRECORDED, AND THE LEDGER GATE IS WHAT REFUSES IT (measured
-      22.08.2026, 22:20, on `feat/834-durable-authoring-lane`). Fable 5 folded the two blind
-      halves — 14 A + 56 B into 61 union entries, every input entry accounted for, commits
-      81e1062a and eb10461d, pushed. Recording it is REFUSED: `node scripts/mechanism-review.mjs
-      --record 81e1062a --merged-by "Fable 5"` answers that Fable 5 authored one of the two lists
-      and may not merge them. It did not: the halves' tracked model fields are `Claude Opus 5` and
-      `GPT-5.6 Sol`, and Fable's two commits touch only `docs/four-eyes/676-union.json`,
-      `docs/four-eyes/README.md` and `docs/handover-architecture.md` — neither half file. The
-      identity the refusal quotes is an EMAIL form, so `validateMerger`
-      (`scripts/mechanism-review-core.mjs`) is fed the authors of the RECORDED COMMIT RANGE
-      instead of the authors of the two halves. That makes the rule self-defeating for the one
-      case it exists for: a valid fold IS a commit by the third model, so recording any valid
-      fold trips the check. A SECOND route to the same wrong answer must be closed in the same
-      pass: the raw half A `.md` still carries a false `Fable 5` heading, which
-      `docs/four-eyes/676-provenance.md` settles as Claude Opus 5's from the transcript metadata.
-      FINAL STATE: the merger check reads the authorship of the HALVES it is asked to fold, never
-      the authorship of the recording commit; the false heading is corrected at its source; a unit
-      case pins a third-model fold as recordable and a genuine half-author fold as refused; and
-      the fold of this point stands in the four-eyes ledger, so the two superseded fallback folds
-      are no longer its newest rows. This precedes the code steps, because an unrecorded fold is
-      an unproven authorization for everything built on it.
-  THE READ-ONLY TEST MAPPING IS DONE, since it is one of the two things safe before the fold. The
-  union's "Ordered work" names `scripts/__tests__/<name>.test.mjs` and `tests/<name>.spec.ts`;
-  NEITHER convention exists in this repository. Vitest lives beside its subject as
-  `scripts/*.test.mjs` and `src/**/*.test.ts[x]` (`npm run test:unit`), browser suites are
-  `scripts/verify/*.mjs` driven by `npm test -- <suite>`, and there is no `playwright.config`
-  and no `tests/` directory. Every test path the union names is therefore translated, not
-  created: `scripts/__tests__/batch-schema.test.mjs` becomes `scripts/batch-schema.test.mjs`,
-  and the board's browser check becomes a suite under `scripts/verify/`.
-  FOUR ITEMS THE DOCUMENT DOES NOT CARRY ARE FOLDED IN:
-  1. HOW THE DAEMON ITSELF ESCAPES the spawning session's tool-call lifetime, stated mechanically.
-     Step 3 does not say (Sol A4) — and that is precisely the defect that killed the run.
-  2. THE DRILL THAT REPRODUCES THE REAL REGRESSION (Sol A19): kill the spawning parent session
-     mid-authoring, then prove daemon and worker survive and a FRESH session recovers them. A
-     launcher-client exit, a daemon restart and a normal handover are not equivalent.
-  3. A MIGRATION RULE relating today's batch lock to the new renewable coordinator lease and its
-     epoch (Sol A18), or a window exists in which lock ownership and daemon mutation authority
-     disagree.
-  4. ORDERED OWNERSHIP AND TESTS for the prose-only requirements of the document's "Additional
-     omissions" section (Sol A21): daemon authorization, state permissions, retention, resource
-     headroom, experimental sampling.
-  THE FOUR FOLDED ITEMS ARE DELIVERED, NOT DEMANDED. A second cross-vendor pass found each of them
-  still standing as an instruction: item 1 repeats that the daemon's escape must be stated without
-  stating it, item 3 asks for a migration rule without giving precedence, atomic cutover,
-  split-brain prevention or rollback, and item 4 assigns no ordered step, owner or acceptance test
-  (Sol A3/A6/A7). The FIRST sub-step of this point therefore WRITES those three mechanisms down and
-  puts each through its own mechanism review before any of them is built. Likewise the revisability
-  of schemas, store and adapter is owned: a named later step reopens them, and what it reopens is
-  re-tested and re-reviewed rather than inherited (Sol A4 on A12-A14).
-  VERIFIABLE: the unit cases the union names per step; each folded item with its own test; the
-  parent-session-death drill; and the stage proven DARK — with the flag off, today's authoring path
-  is the path that runs now. Mechanism review per step, not once at the end; each step green on the
-  unit layer before the next.
-  THE DESIGN STAGE IS CLOSED, AND WHAT IT LEFT IS LISTED HERE rather than rediscovered while
-  building (twelve cross-vendor rounds over the three mechanisms, GPT-5.6 Sol at effort high,
-  22./23.08.2026, every round recorded in `.claude/mechanism-reviews.jsonl`; the final round was
-  asked to separate what is still false from what is an admitted uncovered case, and it did).
-  Several claims were WITHDRAWN rather than patched — a clock rule that could not be enforced
-  against scheduling delay, an exclusion that did not exist, and a reversibility the design never
-  established — and the text says so where it once claimed otherwise. FIVE ITEMS ARE OWED:
-  (i) BEFORE STEP 1: the daemon's existence is recorded twice — its own durable identity file and
-      a copy in the batch lock — and mechanism 2 claims the two can never disagree. They can: a
-      crash between the two writes, or a daemon exit, leaves them apart. Step 1 defines the
-      crash-safe transition and reconciliation invariant for that pair BEFORE the schemas encode
-      the states, or the schemas encode a lie.
-  (ii) AGAINST STEP 4: one sentence still reads "B advances the ref as the first act of
-      acquisition", which the later mandatory order contradicts — acquire, start the daemon if one
-      is to be started, advance the credential, then publish. The explanation after it re-reads
-      "first act" as "before any publication"; the earlier sentence is simply false and goes.
-  (iii) AGAINST STEP 8: the recovery procedure's third outcome consumes a case its fourth says
-      must be quarantined. A rewrite that lost its publication trailer and an unrelated successor
-      leave the same graph evidence, so ABANDONED must not be concluded from "the history contains
-      the expected-before oid and nothing derived from this attempt"; that case is UNKNOWN.
-  (iv) AGAINST STEP 7: the omissions table's idempotency case still requires a repeated `--commit`
-      to advance the fence once, while step 7 and mechanism 2 say `--commit` never advances it.
-      The case asserts the fence is UNCHANGED.
-  (v) THE ADMITTED RESIDUALS, which are not blockers and are recorded as limits in
-      `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the
-      very defect this point removes, so it is worst before the point lands); work begun on the old
-      path gains nothing from this design; one push of publishing authority survives local
-      dispossession, deliberately, so that exactly one publisher exists at all times; and the
-      drill's check-to-signal interval has one branch it cannot observe.
-  QUEUE RANK AND STATE (re-measured 23.08.2026, 02:30): at the front, now directly behind point
-  846, which blocks it. Clause (b) is DISCHARGED — Fable 5's fold of the two blind halves stands
-  in the four-eyes ledger on this point's own branch (81e1062a), so the code steps are
-  authorized. The FIRST STAGE IS BUILT, pushed and cross-read on `feat/834-durable-authoring-lane`
-  (287674b4, CI green, three Sol rounds without a finding): the three owed mechanisms written into
-  `docs/handover-architecture.md`, the schema-and-invariant core, the dark-lane flag with its
-  refusal interlock, the parent-death drill and the merger-check repair. WHAT REMAINS is the
-  durable state store, the daemon plus the Sol adapter, the fencing and lease work of step 4, and
-  the discovery/adoption/reconciliation of step 8 with step 9 where landing needs it — so the
-  point is NOT ticked and its branch stays open. Reason for the original rank: the user ordered it
-  forward on 22.08.2026 after a second lane died, and Sol's audit puts 716 first because 716
-  repairs the deployed plane while this point replaces it; 716 has since landed.
-  SPLIT ORDERED (user, 24.08.2026, general procedure and not a one-off): a large point that stops
-  converging is cut into smaller standalone points and each is worked on its own — no further
-  confirmation is needed. This point is the named case, at authoring round 27 with four
-  `do-not-merge` passes behind it. THE NEXT SESSION CUTS IT BEFORE IT REVIEWS FURTHER, along the
-  branch's own subsystem seams, because what remains is not building but CROSS-VENDOR REVIEW of
-  ~12,000 lines that no single round can hold: the state store and journal, the daemon and its
-  control plane, the fencing and attempt leases, the adoption and reconciliation slice, the drill
-  and the dark-lane flag, and the four-eyes ledger repair. `node scripts/review-sol.mjs --sha
-  <HEAD> --point 834 --plan` prints the current pass cut and is the honest starting map.
-  WHAT IS ALREADY DONE STAYS DONE and is not re-cut: the branch is built and machine-green (13,419
-  unit tests, lint, build), and the parent-death drill passes end to end through the REAL
-  acquisition path — four review passes have run, every finding they raised is fixed, and the
-  worst of them was that the drill had been simulating the takeover it claimed to prove.
+- [ ] 889. The four-eyes ledger repair lands on its own, and carries the fold that authorized the
+  lane. CUT OUT OF POINT 834 (user rule 24.08.2026, general procedure: a large point that stops
+  converging is cut into standalone points, each worked on its own, no confirmation needed).
+  834 stood at authoring round 27 with four recorded `do-not-merge` passes behind it; its branch
+  `feat/834-durable-authoring-lane` is BUILT and machine-green at 091f66b5 (13,419 unit cases,
+  lint, build), and what remained was never building but CROSS-VENDOR REVIEW of ~12,000 lines
+  that no single round can hold — `review-sol.mjs --plan` cuts that range into FOURTEEN passes.
+  This point is the first seam, and it is the only one that owes nothing to the others.
+  WHAT IT OWNS: the merger check that refuses a valid fold, and the four-eyes artefacts of the
+  blind-parallel stage of 676. MEASURED 22.08.2026, 22:20: Fable 5 folded the two blind halves —
+  14 A + 56 B into 61 union entries, every input entry accounted for — and
+  `mechanism-review.mjs --record … --merged-by "Fable 5"` REFUSED it, answering that Fable 5
+  authored one of the two lists. It did not: the halves' tracked model fields are `Claude Opus 5`
+  and `GPT-5.6 Sol`. `validateMerger` (`scripts/mechanism-review-core.mjs`) is fed the authors of
+  the RECORDED COMMIT RANGE instead of the authors of the two HALVES, so every valid fold trips
+  the rule — a valid fold IS a commit by the third model. A second route to the same wrong answer:
+  raw half A's `.md` carries a false `Fable 5` heading that `docs/four-eyes/676-provenance.md`
+  settles as Claude Opus 5's from the transcript metadata.
+  HOW THE BRANCH IS CUT: `feat/889-<slug>` off main; the paths below are taken from
+  `feat/834-durable-authoring-lane` (`git checkout feat/834-durable-authoring-lane -- <paths>`)
+  and nothing else travels with them.
+  FILES: `scripts/mechanism-review-core.mjs` + its test, `scripts/mechanism-review.mjs`,
+  `scripts/mechanism-review-cli.test.mjs`, `scripts/blind-merge.mjs`, `scripts/blind-merge-core.mjs`,
+  `scripts/blind-merge-cli.test.mjs`, `scripts/git-tracked.mjs` + its test,
+  `scripts/fable-switch-core.mjs` + its test, `scripts/four-eyes-artefacts.test.mjs`,
+  `scripts/review-sol-cli.test.mjs`, `docs/four-eyes/` (both raw halves, the provenance record,
+  the union and the README), and `docs/command-index.md` regenerated by `node scripts/help.mjs --write`.
+  THE LEDGER IS APPENDED TO, NEVER TAKEN WHOLESALE: `.claude/mechanism-reviews.jsonl` has gained
+  rows on main since that branch forked, so taking the branch's copy would delete them. Only the
+  FOLD record travels (Fable 5's `--merged-by` row, commits 81e1062a/eb10461d); the pass rows
+  recorded against 834-branch shas stay behind, because those shas never reach main.
+  FINAL STATE: the merger check reads the authorship of the HALVES it is asked to fold, never the
+  authorship of the recording commit; the false heading is corrected at its source; and Fable 5's
+  fold stands in the four-eyes ledger on main, so the two superseded fallback folds are no longer
+  its newest rows. The branch documents written before 22.08.2026, 18:26 still say the Fable
+  switch is off; they are corrected where this lands. What the switch record authorizes is THE
+  FOLD alone — it is not a ruling that the CLAUDE.md §6 model rules may be rewritten, which still
+  waits for the user.
+  VERIFIABLE: a unit case pinning a third-model fold as RECORDABLE and a genuine half-author fold
+  as REFUSED; the provenance case for the corrected heading; `npm run test:unit`, lint, build; and
+  the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — an unrecorded fold is an unproven authorization for everything built on it.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 890. The handover architecture document is read as the spec it is, before its code lands.
+  CUT OUT OF POINT 834 (see 889 for the cut and its reason). `docs/handover-architecture.md`
+  grew by ~900 lines on `feat/834-durable-authoring-lane`: the three mechanisms the union did not
+  carry (how the daemon escapes the spawning session's tool-call lifetime; the migration rule
+  relating today's batch lock to the renewable coordinator lease and its epoch, with precedence,
+  atomic cutover, split-brain prevention and rollback; and ordered ownership plus tests for the
+  prose-only requirements — daemon authorization, state permissions, retention, resource headroom,
+  experimental sampling). It is ONE file and one full review pass of the fourteen (~178,000
+  characters), and it is the text every code slice is judged against, so it is read FIRST.
+  HOW THE BRANCH IS CUT: `feat/890-<slug>` off main, carrying `docs/handover-architecture.md`
+  from `feat/834-durable-authoring-lane` and nothing else.
+  WHAT MUST HOLD IN THE TEXT: the five items 834's design stage left owed are settled here, not
+  rediscovered while building — (i) the daemon's existence is recorded twice, in its own durable
+  identity file and in a copy inside the batch lock, and the document must define the crash-safe
+  transition and the reconciliation invariant for that pair rather than claim the two can never
+  disagree; (ii) the sentence "B advances the ref as the first act of acquisition" contradicts the
+  mandatory order that follows it — acquire, start the daemon if one is to be started, advance the
+  credential, then publish — and goes; (iii) the recovery procedure's third outcome consumes a
+  case its fourth quarantines, so ABANDONED must not be concluded from "the history contains the
+  expected-before oid and nothing derived from this attempt": that case is UNKNOWN; (iv) the
+  omissions table's idempotency case still demands that a repeated `--commit` advance the fence
+  once, while step 7 and mechanism 2 say `--commit` never advances it — the case asserts the fence
+  is UNCHANGED; and (v) the admitted residuals stay recorded as LIMITS, not quietly dropped: an
+  undeclared old-path child evades every start check, work begun on the old path gains nothing
+  from this design, one push of publishing authority survives local dispossession by design so
+  that exactly one publisher exists at all times, and the drill's check-to-signal interval has one
+  branch it cannot observe.
+  FINAL STATE: the document says, per mechanism, what is BUILT on main and what is still owed, so
+  a reader cannot mistake the design for the deployed plane. It names the points that own each
+  remaining step (891-895, 834) and the remainder of 676 behind them.
+  VERIFIABLE: the doc-budget check for this file; the cross-vendor review of the file recorded
+  green before the merge; `npm run test:unit`, lint, build.
+  Criticality: high — every code slice is reviewed against this text, so a false sentence here
+  becomes a defect in five branches.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 891. The durable lane's schemas, invariants and the flag that keeps it dark. CUT OUT OF
+  POINT 834 (see 889 for the cut and its reason). This is step 1 of the "Ordered work" in
+  `docs/handover-architecture.md` plus the activation flag, and it is the base every later slice
+  imports.
+  HOW THE BRANCH IS CUT: `feat/891-<slug>` off main, carrying `scripts/batch-schema-core.mjs` and
+  its test and `scripts/durable-lane-flag-core.mjs` and its test from
+  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
+  LANDS AFTER 890, whose text it encodes: the schemas must not encode a claim the document has
+  withdrawn — in particular the crash-safe transition and reconciliation invariant for the
+  daemon's doubly-recorded existence (890 item (i)).
+  IT IS BUILT DARK, AND THE INTERLOCK IS THE POINT: the flag REFUSES to enable while the
+  discovery/adoption/reconciliation slice (895) and the drills (834) are not green, and a unit
+  case pins that refusal. Controlling what the board, the brief and the handover ADVERTISE does
+  not control what is SWITCHED ON, which is why the refusal is a mechanism and not a habit.
+  FINAL STATE: the schema and invariant core lands with nothing importing it yet, today's
+  authoring path untouched, and the flag off and unable to be turned on.
+  VERIFIABLE: the union's unit cases for step 1; the interlock refusal case; `npm run test:unit`,
+  lint, build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — every later slice encodes these states.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 892. The durable state store and its journal. CUT OUT OF POINT 834 (see 889 for the cut and
+  its reason). Step 2 of the "Ordered work": the store that lets a run be resumed instead of lost,
+  with atomic writes, a journal written before the state it describes, and full post-write
+  validation.
+  HOW THE BRANCH IS CUT: `feat/892-<slug>` off main, carrying `scripts/batch-state-core.mjs` and
+  its test, `scripts/batch-state.mjs` and its test and `scripts/batch-state-durability.test.mjs`
+  from `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
+  LANDS AFTER 891 — it imports `batch-schema-core.mjs`.
+  WHAT THE EARLIER REVIEW ROUNDS ALREADY FORCED, and what must not regress: reconciliation writes
+  are fenced compare-and-set and their evidence fails closed; a fence transition is journalled
+  BEFORE anything is written under that fence; the identity record stays cold when the journal
+  failed durably; cut tails are repaired and short writes finished, so a receipt never claims more
+  than the bytes on disk.
+  FINAL STATE: the store lands dark, imported by nothing on main yet, with today's path untouched.
+  VERIFIABLE: the union's unit cases for step 2; the durability cases; `npm run test:unit`, lint,
+  build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — this is where a crash either keeps or loses the run's work.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 893. Attempt leases and epoch fencing. CUT OUT OF POINT 834 (see 889 for the cut and its
+  reason). The step-4 core, and the reason the cut of 834 was at step 4 rather than step 3:
+  ACTIVATING a daemon without fencing is worse than today's path, because two coordinators can
+  then drive one batch, two attempts can share one worktree, and a replaced orphan can keep
+  checkpointing and pushing.
+  HOW THE BRANCH IS CUT: `feat/893-<slug>` off main, carrying
+  `scripts/batch-attempt-lease-core.mjs` and its test from `feat/834-durable-authoring-lane`, plus
+  `docs/command-index.md` regenerated.
+  LANDS AFTER 891 — it imports `batch-schema-core.mjs`.
+  WHAT THE EARLIER ROUNDS FORCED: lease decisions fence closed on an unusable clock, malformed
+  leases are quarantined rather than interpreted, slot occupancy is decided by a freeing
+  whitelist, and adoption verdicts fail closed on malformed blocks, bad clocks and unbound
+  agreements. The last recorded `do-not-merge` on this file set (pass 4 of 14, 7f0f10d1) named
+  attempt-lease clocks and adoption identity binding; 091f66b5 answered it and was never read.
+  FINAL STATE: the lease core lands dark, with fail-closed defaults, imported by nothing on main.
+  VERIFIABLE: the union's unit cases for the lease and the fence; `npm run test:unit`, lint,
+  build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — this is what keeps two coordinators off one batch.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 894. The daemon, its control plane, and how a worker escapes the session that spawned it.
+  CUT OUT OF POINT 834 (see 889 for the cut and its reason). Step 3, and the mechanism the
+  measured failure demands: on 21.08.2026 an authoring run for point 597 died with its parent
+  session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost — because
+  `scripts/author-sol.mjs:337` spawns codex `detached` only so that a kill takes the whole group,
+  while `author-sol.mjs` itself is awaited inside the parent session's tool call and a Sol run has
+  no checkpoint to resume from.
+  HOW THE BRANCH IS CUT: `feat/894-<slug>` off main, carrying `scripts/batch-daemon.mjs` and its
+  test, `scripts/batch-daemon-core.mjs` and its test, `scripts/detached-agent.mjs` and its test,
+  and the `withLockWriteMutex` addition to `scripts/batch-singleton.mjs` from
+  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
+  LANDS AFTER 891, 892 and 893 — it imports the schema core, the state store, the attempt lease
+  and the dark-lane flag.
+  WHAT THE EARLIER ROUNDS FORCED: the daemon's shutdown, fencing and identity races are closed;
+  every daemon-side state write takes the store's atomic discipline; stale credentials are
+  refused; and the lock's daemon copy is written under the SAME `.reaping` mutex that serializes
+  lock takeover, because a writer on any other mutex still races a takeover.
+  FINAL STATE: the daemon lands dark behind the flag of 891, which cannot be enabled until 895 and
+  834 are green; today's authoring path is the path that runs. The document of 890 states, in
+  mechanical terms, how the daemon outlives the tool call that started it.
+  VERIFIABLE: the union's unit cases for step 3; the control-plane cases; `npm run test:unit`,
+  lint, build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — it is the process that must survive, and an unfenced one is worse than none.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 895. Fenced discovery, adoption, reconciliation, and the slice of landing they need. CUT OUT
+  OF POINT 834 (see 889 for the cut and its reason). Step 8 with the part of step 9 that step 8
+  requires — and it is what makes SURVIVABILITY claimable at all: without it a worker merely is
+  not killed, while no transferable declaration, fenced adoption, reconciliation or plan-native
+  landing exists, so a successor can neither prove nor land its work.
+  HOW THE BRANCH IS CUT: `feat/895-<slug>` off main, carrying `scripts/batch-adoption-core.mjs`
+  and its test, `scripts/batch-landing-core.mjs`, `scripts/batch-reconcile-core.mjs` and its test,
+  `scripts/batch-reconcile.mjs` and its test, `scripts/resume-batch.mjs` and the durable-block
+  flags added to `scripts/batch-in-flight.mjs` from `feat/834-durable-authoring-lane`, plus
+  `docs/command-index.md` regenerated.
+  LANDS AFTER 894 — `batch-reconcile.mjs` and `resume-batch.mjs` import the daemon, the store and
+  the detached worker contract.
+  WHAT MUST HOLD: the adoption record is all-or-nothing and binds the attempt to a process
+  identity — pid AND start time — because naming an attempt without its process leaves exactly the
+  guess the record exists to remove; a successor's recovery verdict is UNKNOWN, never ABANDONED,
+  where a lost publication trailer and an unrelated successor leave the same graph evidence
+  (890 item (iii)); and `--commit` never advances the fence (890 item (iv)).
+  FINAL STATE: a fresh session can DISCOVER a running attempt, adopt it under a fence, reconcile
+  what it finds and land it — all still dark behind the flag of 891, with today's path untouched.
+  VERIFIABLE: the union's unit cases for steps 8 and 9; the reconciliation evidence cases;
+  `npm run test:unit`, lint, build; the cross-vendor review of this file set recorded green
+  before the merge.
+  Criticality: high — this is the half that lets a successor prove and land another session's work.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 834. The drills prove the takeover on the real path, and only then may the dark lane be
+  switched on. THIS POINT WAS CUT ON 24.08.2026 (user rule, general procedure: a large point that
+  stops converging is cut into standalone points and each is worked on its own, no confirmation
+  needed). It had reached authoring round 27 with four recorded `do-not-merge` passes behind it,
+  and what remained was not building but CROSS-VENDOR REVIEW of ~12,000 lines that no single round
+  can hold. The seams became points 889 (the four-eyes ledger repair), 890 (the architecture
+  document), 891 (schemas, invariants and the activation flag), 892 (the durable state store),
+  893 (attempt leases and epoch fencing), 894 (the daemon and the detached worker contract) and
+  895 (fenced discovery, adoption, reconciliation and the landing slice). THIS NUMBER KEEPS THE
+  CLAIM ITSELF: the authoring lane survives the session that spawned it — which may only be
+  claimed once a drill has demonstrated it.
+  WHAT IT COSTS TODAY, measured: on 21.08.2026 an authoring run for point 597 died with its parent
+  session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost. The lane the seven
+  points above build is the cure; this point is the proof and the switch.
+  HOW THE BRANCH IS CUT: `feat/834-<slug>` off main, carrying `scripts/batch-daemon-drill.mjs` and
+  its test and `scripts/detached-escape-drill.mjs` and its test from
+  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated. LANDS LAST, after
+  895 — the drill imports the daemon, the store, the singleton and the resume path.
+  THE DRILL MUST CALL THE THING IT CLAIMS TO PROVE. It kills the SPAWNING PARENT SESSION mid-
+  authoring and then shows that daemon and worker survive it and that a FRESH session discovers,
+  adopts and reconciles them. A launcher-client exit, a daemon restart and a normal handover are
+  NOT equivalent, and the worst finding of the four review rounds behind this point was that the
+  drill had been simulating the takeover it claimed to prove — 091f66b5 gave the lane its own
+  fence store so the drill runs through the REAL acquisition path, and that commit has never been
+  read by a reviewer.
+  THE SWITCH IS THE LAST ACT, AND IT IS RECORDED: the flag of 891 refuses to enable while 895 and
+  this point are not green. Enabling it is a separate, deliberate step taken after this drill
+  passes on main, and it is what first makes the surviving lane something the board, the brief and
+  the handover may advertise.
+  THE RESIDUALS ARE ADMITTED, NOT SOLVED, and stay recorded as limits in
+  `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the very
+  defect this lane removes, so it is worst before it lands); work begun on the old path gains
+  nothing from this design; one push of publishing authority survives local dispossession, by
+  design, so that exactly one publisher exists at all times; and the drill's check-to-signal
+  interval has one branch it cannot observe.
+  WHAT FOLLOWS: the remainder of 676 keeps its number and its rank and begins after this point —
+  bounded dispatch, the checkpoint barrier, the two-phase boundary, successor reconciliation
+  beyond the slice claimed here, crash-recoverable landing, board projection, metrics, staged
+  failure trials and the measured baseline trial. It must not codify an answer about transferring
+  a live Agent-tool child that contradicts the one the landed point 716 carries.
+  FINAL STATE: the parent-death drill and the escape drill run on main, the drill's takeover is
+  the real one, and the lane may be switched on.
+  VERIFIABLE: the parent-session-death drill end to end; the escape drill's measurement; the
+  interlock proven by turning the flag on only after 895 is green; `npm run test:unit`, lint,
+  build; the cross-vendor review of this file set recorded green before the merge.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
