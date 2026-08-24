@@ -375,6 +375,15 @@ put it is the mistake this line exists to stop.
   main; and the file-scoped branch gets tests at all — the suite currently contains no occurrence of
   `endState`.
   Criticality: high — it is the gate that makes every other model rule enforceable.
+  RESIDUALS FILED BY POINT 889 (24.08.2026), all of the same identity class, each named at its
+  code site: (a) a backdated COMMIT moves both era readings at once — the commit-era keying in
+  `reviewRecordWellFormed` closes row backdating, not commit backdating; a non-author-controlled
+  era marker is this point's to design. (b) A recorded reviewer `agreement` whose transcript has
+  expired keeps its standing (`reverifyReviewerAgreement`) — a forged claim naming a transcript
+  that never existed is indistinguishable from honest expiry; closing it needs an attestation
+  that outlives the transcript. (c) An OpenAI reviewer's `unverified` claim authenticates its
+  stated reason, not its claimant — closing it needs a receipt-backed attestation from the
+  review-sol run itself (its printed RECEIPT hash is the natural anchor).
   Bundle: Modell & Wächter.
 
 - [ ] 885. A delegated agent swallows the user's chat message, and the backstop cannot see that it
