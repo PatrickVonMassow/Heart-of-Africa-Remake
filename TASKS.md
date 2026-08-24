@@ -11642,3 +11642,231 @@ to land than a mechanism that needs a review.
   result whose optional parts are null.
   Criticality: medium — it misorders the queue in both directions, but loses no work.
   Bundle: Modell & Wächter.
+
+- [ ] 878. A proven red CI verdict is thrown away by a lock timeout, and the guard's own tests
+  never run it. MEASURED 24.08.2026 by the cross-vendor review of `401b939` (recorded
+  `merge-with-fixes`):
+  (1) By `scripts/ci-status-guard.mjs:620` the block reason is already decided; `:636` then
+  persists state through `mutateState`, which THROWS `timed out acquiring CI state lock` after 2 s
+  (`:93-116`). Nothing between there and the caller catches it, so the catch at `:884` prints
+  "ci-status-guard error (allowing stop)" and the turn ends green. A `.claude/ci-status-guard-state.lock`
+  left behind by a killed observer — this container dies with the editor — is younger than the 30 s
+  stale threshold at `:102`, so for half a minute EVERY Stop hook that measured `origin/main` RED
+  allows the stop.
+  (2) `:194-200` and `:459-468` swallow every failing local git call into `false`/`[]`, so one
+  timed-out `git for-each-ref` (5 s timeout, `:185`, on a host this project runs 40-minute suites
+  on) empties the target set and `:617` returns `{decision:null}` with NO `failedOpen` entry — the
+  silent swallow the file forbids at `:688`.
+  (3) `:790-793` continues polling for any classification other than success/failed, so an
+  `action_required`, a `stale`, or a deleted run leaves a node process polling GitHub every 90 s
+  forever and never arms a CI-terminal successor wake again.
+  (4) `scripts/ci-status-guard.test.mjs` reads its subject with `readFileSync` and regexes it; it
+  never spawns the guard, feeds stdin or asserts an outcome. The wrapper's fail-open promise
+  (`:18-20`), its "a fail-open SAYS why" rule (`:688`) and its one output contract — a red sha
+  writes a block payload to stdout (`:874`) — have no test anywhere.
+  WHAT IT COSTS: this is the guard the user mandated on 22.07.2026 so a red CI can never go
+  unnoticed again. Finding 1 loses exactly the verdict it exists to deliver, on an environment
+  transient in the PERSISTENCE step, after the judgement was already made.
+  FINAL STATE: the verdict is emitted before it is persisted, and a failure to persist never
+  changes it. A failing local git measurement reports itself as a fail-open with its reason. The
+  observer goes terminal on any answer it cannot use, and says so. The suite spawns the guard the
+  way `board-first-guard.test.mjs` does and asserts the payload.
+  VERIFIABLE: spawned cases — a red sha with an unwritable/locked state file still writes the block
+  payload; a failing `for-each-ref` yields a named `failedOpen` rather than a silent null; an
+  `action_required` run ends the observer; and the fail-open promise is exercised for a missing
+  token, an offline host and a non-200.
+  Criticality: high — it drops a decided red on an environment fault.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 879. `--help` and eight git subcommands walk straight through the main-write fence. MEASURED
+  24.08.2026 by the cross-vendor review of `fc64b34` (recorded `do-not-merge`), every case run
+  through the pure classifier:
+  (1) `scripts/command-classify-core.mjs:555` returns `read` for any segment carrying `--help`,
+  BEFORE the `MUTATING_SCRIPTS` check at `:572` — and `scripts/land-point.mjs:587-594` parses only
+  the numeric argument and its named flags, ignoring `--help` entirely. So
+  `node scripts/land-point.mjs 594 --model "…" --help` classifies as read-only while performing the
+  real merge, tick and push: `board-first-core.mjs:151` demands no board for it and
+  `batch-lease-core.mjs:783` reports `writes:false`, so a session holding NO batch lock passes the
+  fence. The module's own invariant at `:607` says the judgement is by NAME, not by flags; the test
+  at `command-classify-core.test.mjs:462` pins that for `--dry` alone.
+  (2) `:462-465` `GIT_WRITES` omits every ref-moving subcommand. Measured as NOT mutating:
+  `git pull --rebase origin main`, `git fetch --prune`, `git update-ref refs/heads/main <sha>`,
+  `git branch feat/x`, `git branch -f main <sha>` (the flag list at `:490` has no `-f/--force`),
+  `git gc --prune=now`, `git submodule update --init`, `git symbolic-ref HEAD refs/heads/x`. A
+  lockless session may therefore move `refs/heads/main` in the main checkout — the exact class the
+  rule exists for, which its own test proves only for `git commit`.
+  (3) Three lexer gaps: `:539-546` rejects any redirection operator ending in `&`, so
+  `node gen.mjs >& all.log` is a read while `&> all.log` is a write; process substitution is not
+  unwrapped, so `diff <(git push) x` hides a push; and a here-document BODY is lexed as commands,
+  so a board or chat text that quotes `git push origin main` inside a heredoc denies the call —
+  the over-block direction the header forbids at `:22`.
+  WHAT IT COSTS: this module answers "does this call write" for the fence, the board gate and the
+  context fence at once. (1) and (2) are holes in the lockless-main rule; (3) costs turns on quoted
+  text, which is what that rule was written to stop.
+  FINAL STATE: the mutating-script rule outranks `--help`, or `--help` is judged only for scripts
+  that actually implement it. `GIT_WRITES` covers every subcommand that can move a ref or rewrite
+  the object store. Redirection with `&`, process substitution and here-document bodies are lexed
+  correctly, with quoted text never deciding.
+  VERIFIABLE: unit cases for each measured string above, in both directions.
+  Criticality: high — a lockless session may move main.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 880. The four-eyes duty can be cleared without an independent review, five measured ways.
+  MEASURED 24.08.2026 by the cross-vendor review of `1862687` and `e0ebcff` (both recorded
+  `do-not-merge`), each route executed against `evaluateMechanismReview`/`validateRecord`:
+  (1) `scripts/mechanism-review-core.mjs:1270-1272` (and `validateRecord` at `:1081`) — the
+  ordinary, PASS-LESS path, which is the one the guard's own refusal text tells you to run, checks
+  only `sameModel(record.model, commit.authorModel)`: no vendor rule, only the FIRST co-author, no
+  unknown-authorship rule. So `--model "GPT-5.6"` clears a commit trailed `GPT-5.6 Sol` (different
+  `family`, same vendor); a commit with two model trailers is cleared by its SECOND author; and an
+  unrecognised author designation is cleared by anyone. The strict file-scoped path at `:1285`
+  applies the full test — the legacy path simply does not consult it.
+  (2) `:1285` — `(commit.authorModels ?? [commit.authorModel]).filter(Boolean)` yields `[]` for a
+  commit whose trailers name no model (an empty array is not nullish), so the vendor set is EMPTY
+  and both guards pass: any model, including the author, clears it. The concrete case is the evil
+  merge CLAUDE.md §6 warns about — merges carry no model trailer. `mechanism-review-range-core.mjs:221`
+  gets this right and maps an empty author list to `unknown`, so `--status` prints the file as
+  UNREVIEWABLE while the Stop hook clears it.
+  (3) `:1300-1305` — on the file-scoped path a recorded `do-not-merge` is answered by the newest
+  timestamp alone, with no descent requirement. A `merge` re-recorded at the SAME sha retires the
+  refusal, which contradicts the rule written forty lines below (`:1452-1461`, user decision
+  18.08.2026: a same-sha re-record fixes nothing).
+  (4) `:1279-1314` — every record this CLI writes carries `pass.endState`
+  (`mechanism-review.mjs:372`), and `fileClaim` rows are excluded from both `legacyCovering` and
+  `legacySound`. So the split-completeness demand and the pass-less-beside-a-split poison can no
+  longer fire for ANY new record: one `pass 1/3` row clears the commit while passes 2 and 3 are
+  never recorded. About twenty tests still pin a shape nothing writes.
+  (5) All three era cutoffs key on `record.at` (`:1108`, `:1134-1141`), a field the recording hand
+  controls, and nothing requires a record to postdate the commit it clears — a row dated before
+  `AUTHORSHIP_CHECK_SINCE` clears a commit made today.
+  Plus the baseline: `.claude/mechanism-review-baseline.json` is gitignored (`.gitignore:177`), so a
+  fresh clone, a fresh worktree or a `git clean -xfd` removes it; `bootstrapBase`
+  (`scripts/mechanism-review-guard.mjs:139-155`) then takes `merge-base(main, HEAD)`, which ON MAIN
+  is HEAD — the pending set is empty, the turn clears, and `:630` writes the new baseline at HEAD.
+  All outstanding mechanism debt is grandfathered in one turn, unreported.
+  WHAT IT COSTS: this is the gate the whole model policy rests on. Every route above turns a
+  four-eyes duty into a formality without anybody noticing, and route (4) applies to every record
+  written from now on.
+  FINAL STATE: one identity test, applied on every clearance path — vendor-based, over ALL co-author
+  trailers, treating a commit with no named author as `unknown` and therefore unreviewable. A
+  refusal is answered only by a record whose sha DESCENDS from the refused one. A split records its
+  own completeness. A record may not predate the commit it clears. The baseline is either tracked or
+  its absence is reported and refuses to clear rather than bootstrapping at HEAD.
+  VERIFIABLE: unit cases for each of the five measured routes and for the baseline bootstrap on
+  main; and the file-scoped branch gets tests at all — the suite currently contains no occurrence of
+  `endState`.
+  Criticality: high — it is the gate that makes every other model rule enforceable.
+  Bundle: Modell & Wächter.
+
+- [ ] 881. Armed, the context fence would refuse the very commands that end a session — and on a
+  fresh machine it refuses everything. MEASURED 24.08.2026 by the cross-vendor review of `a759962`
+  and `43a967c` (both recorded `do-not-merge`), probed against the live modules:
+  (1) `scripts/context-fence-core.mjs`'s `fenceRefusal` has NO production caller. The shipped brake
+  is `contextBudgetRefusal` (`scripts/context-budget-core.mjs:28-46`), whose
+  `BOUNDED_CONTROL_OPERATIONS` exempts only git commit/push, `board.mjs`, `board-queue.mjs`,
+  `board-publish.mjs`, `focus.mjs set|confirm` and `batch-boundary.mjs`. Everything else past the
+  mark is refused. Measured denies at the live p90s: `finding.mjs --record` (the sanctioned way to
+  keep a finding past the mark, `context-fence-core.mjs:126`), `batch-claim.mjs --withdraw` (whose
+  denial `:110-124` says "would trap the session in the state the withdrawal exists to leave"),
+  `land-point.mjs` (named at `:13` as untouched, and mandatory under CLAUDE.md §6), and
+  `guard-preflight.mjs --for answer` — which `batch-boundary.mjs:752` prescribes as part of taking
+  the boundary. The exit path is not fully inside the allowed set.
+  (2) `scripts/context-fence-core.test.mjs:19-37,487-530` pins the opposite through a `decide()`
+  helper the production path never calls: the landing, the fast unit gate, `git status` and
+  `npm run build && npm run lint` are all green in the suite and all refused by the shipped fence.
+  (3) `context-budget-core.mjs:280-285` — `.claude/context-incidents.jsonl` is gitignored
+  (`.gitignore:145`), so a fresh clone or a new machine has no series; `seriesKindCost` returns null
+  and the projected cost of every START becomes the WHOLE ceiling, making the remainder negative for
+  any reading at all. Probed: reading 5,000 tokens, `Agent`, empty series → `insufficient`. Armed on
+  such a machine, every agent spawn, suite start and authoring write is refused at 3 % context —
+  fail-LOUD on an environment condition. Non-starts correctly fail open, so the inversion is
+  specific to this brake.
+  (4) `scripts/context-fence-guard.mjs:11-12` — the registered matcher carries no read tool, so the
+  read debit `session-context-ceiling-core.mjs:44-51` exists for is never booked, although `read` is
+  the largest p90 of all kinds. `context-fence-guard.test.mjs:235-238` spawns the guard with a
+  `Read` call and asserts the debit, creating coverage that does not exist.
+  (5) `context-fence-core.mjs:86-94` — the read-only modes of the four delegating scripts
+  (`--routing`, `--dry-run`, `--help`) classify as STARTS, because `START_SCRIPT_ARG_GATES` is not
+  applied to them; `author-sol.mjs:557` labels its routing report read-only and state-free.
+  (6) `:237` — the memory rule matches any path containing a `memory/` segment while its docs
+  sibling at `:239` requires `.md`. Latent today (no such tracked path), but it contradicts the
+  invariant the suite pins for the docs side.
+  WHAT IT COSTS: the fence defaults to `observe` and refuses nothing, so none of this bites yet —
+  which is exactly why it must be settled BEFORE its arming point lands. Armed as it stands, (1) and
+  (3) would trap a session with no way out.
+  FINAL STATE: one refusal path, the shipped one, whose allowed set is the finishing set the design
+  declares — the landing, the boundary, the preflight it prescribes, the finding carrier, the claim
+  withdrawal, the reads and the fast gates. A missing incident series fails OPEN, like every other
+  unmeasured cost. Reads are booked where the design says they are, or the read debit goes. Read-only
+  flags of the delegating scripts are not starts.
+  VERIFIABLE: unit cases for each command named above against the SHIPPED refusal path; an
+  empty-series case that admits rather than refuses; and a registration case that pins the matcher
+  against the debit the code books.
+  Criticality: high — it is the mechanism that decides whether a session may act at all.
+  Bundle: Modell & Wächter.
+
+- [ ] 882. Deleting a governed document disables its budget, and a misspelled ceiling disables half
+  of it. MEASURED 24.08.2026 by the cross-vendor review of `a3a0432` (recorded `do-not-merge`):
+  (1) `scripts/doc-budget-core.mjs:401` skips every missing document silently, required repository
+  files included — `CLAUDE.md`, `TASKS.md`, `design.md`. Deleting a governed file therefore turns
+  its guard off and reports clean, and `scripts/doc-budget-core.test.mjs:65` pins that behaviour.
+  Genuinely optional documents need their own handling.
+  (2) `:439` ratchets only `maxWords`. A cut that creates LINE headroom — by dropping blank lines or
+  reflowing — can regrow up to the unchanged `maxLines`, although the refusal text instructs the
+  reader to lower both.
+  (3) `:362` treats any backtick- or tilde-looking line as a fence toggle, with no marker, length or
+  tail rules, so a short closer, a mismatched marker or a fence line carrying text makes genuine
+  fenced content raise a prose refusal and then hides the prose that follows. The neighbouring
+  work-order parser already implements the right rules.
+  (4) `:403` and `:413` never validate `maxLines`/`maxWords`: missing, `NaN` or a misspelled key
+  makes the comparison false and silently switches off that half of the guard, while `slackWords`
+  and `perPoint.maxWords` do get fail-closed validation.
+  (5) `scripts/guard-hooks.test.mjs:317` adds only a spawned ALLOW case built from the
+  implementation's own constants; it never makes the spawned hook BLOCK on either new behaviour, and
+  omits three governed sources by relying on the missing-file fail-open.
+  FINAL STATE: a required document that is missing is a refusal, not a pass. Both ceilings ratchet.
+  Fences are parsed by marker, length and tail. An unusable ceiling fails closed like its
+  neighbours. The spawned test blocks as well as allows.
+  VERIFIABLE: unit cases — a deleted `CLAUDE.md` refuses; a line-headroom cut ratchets `maxLines`; a
+  tilde fence, a short closer and an info-string fence each parse correctly; a `NaN` or misspelled
+  ceiling refuses; and a spawned hook case that blocks.
+  Criticality: medium — it disables guards quietly, but only for documents somebody deleted or
+  mis-keyed.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 883. The queue's urgency baseline proves membership and stops there. MEASURED 24.08.2026 by
+  the cross-vendor review of `f999250` (recorded `do-not-merge`), and adjacent to point 877:
+  (1) `scripts/queue-rank-core.mjs:449` skips every baseline-known point permanently. Once an urgent
+  point has passed and settled, removing its high criticality — or moving any known low-urgency
+  point from behind the release to ahead of it — produces no breach at all. A membership-only
+  baseline cannot prove a CONTINUING invariant.
+  (2) `:83` accepts any "holds a red" phrasing without checking the required "cannot otherwise
+  close" condition, so a point recorded as "holds a red, but another path closes it" is allowed
+  ahead of the release.
+  FINAL STATE: the baseline states the invariant that must keep holding, not the set that once held
+  it, so a later loosening is a breach; and the red allowance requires both halves of its condition.
+  VERIFIABLE: unit cases — a settled point whose criticality is lowered afterwards breaches; a known
+  low-urgency point moved ahead of the release breaches; and the "another path closes it" phrasing
+  is refused.
+  Criticality: medium — it misorders the release queue without losing work.
+  Bundle: Modell & Wächter.
+
+- [ ] 884. Two dated fuses in the board and guide guards. MEASURED 24.08.2026 by the cross-vendor
+  reviews of `52c8ad1` and `267ff5e`:
+  (1) `scripts/dashboard-card-topic-guard-core.mjs:82,100` — both reference forms cap the point
+  number at three digits, and the spelled form's trailing `\b` keeps `\d{1,3}` from matching inside
+  a four-digit number. Probed: a card body saying "Punkt 1000" yields no foreign reference, and a
+  card titled `1000 — Titel` parses as owning no point at all, so the guard goes blind the moment
+  the work order passes 999. The highest point today is 884. Its JSDoc at `:104` also promises the
+  references in order of first appearance while the code sorts them numerically.
+  (2) `scripts/guide-brevity-core.test.mjs:164-170` — the case titled "leaves the fingerprint
+  comment out of BOTH budgets" tightens only `maxLines` and leaves `maxWords` at the full ceiling
+  against a hundred-word fixture, so the word half of that invariant passes whether or not the
+  comment is excluded. Related, not a defect today: `measureGuide` drops a line only when it STARTS
+  with `<!--`, so a multi-line comment's continuation and closing lines would count.
+  FINAL STATE: point numbers are parsed without a digit ceiling; the JSDoc matches the code; the
+  fingerprint case tightens both budgets; and a multi-line comment is excluded whole.
+  VERIFIABLE: unit cases with a four-digit point in a title and in a body, and a fingerprint case
+  that fails when only one budget excludes the comment.
+  Criticality: low — one fuse dated at point 1000, one half-covered assertion.
+  Bundle: Chat & Tafel.

@@ -206,7 +206,12 @@ export const LIMITS = {
   // that only rephrased its own headline, three times over). The guide measures
   // 444 / 3929 afterwards, so the word ceiling RATCHETS DOWN by 58 to exactly
   // that. The line ceiling stays 444 because the file does.
-  maxWords: 3929,
+  // 24.08.2026, the freshness-is-not-liveness pitfall: the lesson out of the
+  // dead authoring run went in, and six neighbouring entries paid for it by
+  // losing the clauses whose detail already stands in the retrospective. The
+  // guide measures 444 / 3926 afterwards, so the word ceiling RATCHETS DOWN by
+  // three more. The line ceiling stays 444 because the file does.
+  maxWords: 3926,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
