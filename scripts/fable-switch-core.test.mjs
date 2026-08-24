@@ -156,6 +156,11 @@ describe('decisions derived from the state', () => {
     expect(mergePromptFraming(on(), ['Fable / GPT-5.6 Sol', 'Claude Opus 5'])).toMatch(/DECORRELATED MERGE FRAMING/)
     expect(mergerModel(off(), ['Fable / GPT-5.6 Sol', CLAUDE_MODEL])).toBe(SOL_MODEL)
     expect(mergePromptFraming(off(), ['Fable / GPT-5.6 Sol', CLAUDE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+    // …but each mentioned model keeps its own version: a name mentioning a
+    // DIFFERENT Sol does not disqualify the current one.
+    expect(mergerModel(on(), ['Fable 5 / GPT-6 Sol', 'Claude Opus 5'])).toBe(SOL_MODEL)
+    // While the mentioned version matching the roster still disqualifies.
+    expect(mergerModel(on(), ['Fable 5 / GPT-5.6 Sol', ''])).toBe(CLAUDE_MODEL)
   })
 
   it('tells two Sol versions apart instead of treating every Sol as one model', () => {

@@ -155,8 +155,19 @@ function sameModelName(a, b) {
     const anthropicModel = family.some((w) => ['fable', 'opus', 'sonnet', 'haiku'].includes(w))
     const openaiModel = family.includes('sol') || family.includes('gpt')
     if (anthropicModel && openaiModel) {
-      const keys = family.filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
-      return { keys: [...new Set(keys)], version: '' }
+      // Each mentioned model keeps ITS OWN version: erasing them turned
+      // "Fable 5 / GPT-6 Sol" into a disqualifier of every Fable and every Sol,
+      // although it names a different Sol (re-review round 8).
+      const keys = [...new Set(family.filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w)))]
+      const versionOf = (key) => {
+        const words = key === 'sol' ? ['sol', 'gpt'] : [key]
+        for (const w of words) {
+          const m = text.match(new RegExp(`\\b${w}[\\s-]*(\\d+(?:\\.\\d+)?)`))
+          if (m) return m[1]
+        }
+        return ''
+      }
+      return { entries: keys.map((key) => ({ key, version: versionOf(key) })) }
     }
     const key = family.includes('sol') ? 'sol' : family.includes('fable') ? 'fable' : family[family.length - 1]
     // THE VERSION IS NOT ALWAYS ATTACHED TO THE KEY WORD (four-eyes finding 1 on this
@@ -172,10 +183,12 @@ function sameModelName(a, b) {
   const x = parse(a)
   const y = parse(b)
   if (!x || !y) return false
-  const keysOf = (p) => (p.keys ? p.keys : [p.key])
-  if (!keysOf(x).some((k) => keysOf(y).includes(k))) return false
-  if (!x.version || !y.version) return true
-  return x.version === y.version
+  const entriesOf = (p) => (p.entries ? p.entries : [{ key: p.key, version: p.version }])
+  return entriesOf(x).some((ex) =>
+    entriesOf(y).some(
+      (ey) => ex.key === ey.key && (!ex.version || !ey.version || ex.version === ey.version),
+    ),
+  )
 }
 
 export function mergerModel(value, authors = []) {

@@ -36,6 +36,7 @@
 // The decision logic is pure (mechanism-review-core.mjs); this file does I/O and
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -211,6 +212,20 @@ export function committedOid(path, { at = 'HEAD' } = {}) {
     if (!rel || isAbsolute(rel)) return ''
     const ref = /^[0-9a-f]{7,40}$/i.test(String(at)) || at === 'HEAD' ? at : 'HEAD'
     return git(['rev-parse', `${ref}:${rel}`])
+  } catch {
+    return ''
+  }
+}
+
+/** A file's git blob oid, computed from its working-tree bytes — what the
+ *  committed oid will be if these bytes are what the commit carries. */
+export function workingBlobOid(path) {
+  try {
+    const bytes = readFileSync(path)
+    return createHash('sha1')
+      .update(`blob ${bytes.length}\0`)
+      .update(bytes)
+      .digest('hex')
   } catch {
     return ''
   }
@@ -473,6 +488,7 @@ export function buildRecord({
   committedHalf = committedHalfModel,
   committedUnion = committedOid,
   blobText = committedBlobText,
+  hashFile = workingBlobOid,
   fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
@@ -640,6 +656,25 @@ export function buildRecord({
       halfBlobs = committed.map((c) => c.oid)
       unionSource = repoRelative(unionPath)
       unionBlob = unionCommitted
+      // THE WORKING BYTES MUST BE THE BOUND BYTES, file by file (re-review
+      // round 8): models, owner and summary can all agree while the findings
+      // themselves were edited — the receipt comparison cannot see a reworded
+      // defect line. The hash can.
+      const divergent = [
+        [listAPath, halfBlobs[0]],
+        [listBPath, halfBlobs[1]],
+        [unionPath, unionBlob],
+      ].filter(([path, oid]) => hashFile(path) !== oid)
+      if (divergent.length) {
+        return {
+          ok: false,
+          errors: divergent.map(
+            ([path, oid]) =>
+              `${path} differs from the blob ${String(oid).slice(0, 12)} the row would bind at ` +
+              `${commit.sha.slice(0, 7)} — commit what you counted, then record`,
+          ),
+        }
+      }
       // THE RECEIPT COMES FROM THE BYTES THE ROW BINDS (re-review round 6): the
       // count above read the WORKING TREE, and the row names blobs from the
       // reviewed commit — two sets of bytes that can differ while every model

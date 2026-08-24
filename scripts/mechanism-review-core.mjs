@@ -335,18 +335,19 @@ export const ACCOUNTING_RECEIPT =
 export function receiptBalances(line) {
   const m = ACCOUNTING_RECEIPT.exec(String(line ?? '').trim())
   if (!m) return false
-  const [a, b, union, merged, statedInputs, onlyA, onlyB] = m.slice(1).map(Number)
-  // WITHIN THE SAFE-INTEGER DOMAIN, or the arithmetic below is IEEE-754
-  // rounding instead of counting: 2^53 A beside 2^53+1 "only A" compare equal
-  // as doubles, so a fabricated line could balance without adding up
-  // (re-review round 7). No real stage counts anywhere near this.
-  if (![a, b, union, merged, onlyA, onlyB].every(Number.isSafeInteger)) return false
-  if (m[5] !== undefined && !Number.isSafeInteger(statedInputs)) return false
+  // IN BIGINT, or the arithmetic is IEEE-754 rounding instead of counting:
+  // individually safe operands still produce unsafe SUMS near 2^53, where two
+  // unequal totals compare equal as doubles and a fabricated line balances
+  // without adding up (re-review rounds 7 and 8). No real stage counts
+  // anywhere near this; a forged one may claim whatever it likes.
+  const [a, b, union, merged, statedInputs, onlyA, onlyB] = m
+    .slice(1)
+    .map((v) => (v === undefined ? undefined : BigInt(v)))
   if (merged + onlyA + onlyB !== a + b) return false
   // The named unit is checked, not just parsed: a line stating a total the two
   // list sizes do not make would otherwise pass on the strength of its shape.
   if (m[5] !== undefined && statedInputs !== a + b) return false
-  if (merged === 1) return false
+  if (merged === 1n) return false
   if (onlyA > a || onlyB > b) return false
   // THE UNION'S SIZE FOLLOWS FROM THE DISPOSITIONS (four-eyes review, fourth
   // round). Every entry standing alone is one union entry, and the merged ones
@@ -355,7 +356,7 @@ export function receiptBalances(line) {
   // could have produced.
   const singles = onlyA + onlyB
   if (!merged) return union === singles
-  return union > singles && union <= singles + Math.floor(merged / 2)
+  return union > singles && union <= singles + merged / 2n
 }
 
 /**

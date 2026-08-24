@@ -65,6 +65,7 @@ const committedFixture = (path) => {
  *  the file's own hash and the blob text is the file's own bytes, so the
  *  recorder's blob recount folds exactly what the fixtures wrote. */
 const committedOidFixture = (path) => createHash('sha1').update(readFileSync(path)).digest('hex')
+const hashFileFixture = committedOidFixture
 const blobTextFixture = (...paths) => {
   const byOid = {}
   for (const p of paths) {
@@ -506,6 +507,7 @@ describe('the mode round-trips into the ledger', () => {
         committedHalf: committedFixture,
         committedUnion: committedOidFixture,
         blobText: blobTextFixture(listA, listB, union),
+        hashFile: hashFileFixture,
       })
       expect(selfMerged.ok).toBe(false)
       const text = (selfMerged.errors ?? []).join('\n')
@@ -553,6 +555,7 @@ describe('the mode round-trips into the ledger', () => {
         committedHalf: committedFixture,
         committedUnion: committedOidFixture,
         blobText: blobTextFixture(listA, listB, union),
+        hashFile: hashFileFixture,
       }
       const built = build({
         mode: 'blind-parallel',
@@ -612,15 +615,20 @@ describe('the mode round-trips into the ledger', () => {
 
       // A committed union that names NO merger refuses at the recorder, not
       // first at the gate (re-review round 5).
+      const unownedUnion = w('U-unowned.json', {
+        entries: [
+          { id: 'U1', from: ['A1'] },
+          { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
+        ],
+      })
       const unowned = build({
         mode: 'blind-parallel',
         ...tracked,
-        unionPath: w('U-unowned.json', {
-          entries: [
-            { id: 'U1', from: ['A1'] },
-            { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
-          ],
-        }),
+        // The committed-blob fixtures carry THIS union too, so the refusal is
+        // the ownership rule and never a missing fixture blob (re-review
+        // round 8).
+        blobText: blobTextFixture(listA, listB, unownedUnion),
+        unionPath: unownedUnion,
         listAPath: listA,
         listBPath: listB,
       })
@@ -804,6 +812,26 @@ describe('the mode round-trips into the ledger', () => {
       )
       expect(mystery.status).not.toBe(0)
       expect(`${mystery.stdout}${mystery.stderr}`).toMatch(/no vendor the review roster can place|must be VERIFIED/)
+
+      // A REWORDED DEFECT WITH IDENTICAL MODELS, OWNER AND SUMMARY still
+      // refuses: the hash comparison sees the content change the receipt
+      // cannot (re-review round 8).
+      const reworded = w('B-reworded.json', {
+        model: 'GPT-5.6 Sol',
+        entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect, but reworded after the fold' }],
+      })
+      const editedContent = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha2, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', reworded,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(editedContent.status).not.toBe(0)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
 
       // THE UNTRACKED-UNION REFUSAL, ISOLATED: committed halves, a complete
       // caller-written union — only the union's provenance can refuse here

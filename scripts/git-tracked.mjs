@@ -80,7 +80,11 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, conten
   const inside = relative(topReal, resolvePath(root, raw))
   if (!inside || inside === '..' || inside.startsWith(`..${sep}`) || inside.startsWith('../')) return false
   if (abs !== resolvePath(topReal, inside)) return false
-  const probe = run('git', ['ls-files', '--error-unmatch', '--', inside], {
+  // Git's tree paths use '/' whatever the platform; only the PLATFORM separator
+  // is converted, so a POSIX filename containing a literal backslash survives
+  // (re-review round 8).
+  const treePath = sep === '\\' ? inside.split(sep).join('/') : inside
+  const probe = run('git', ['ls-files', '--error-unmatch', '--', treePath], {
     windowsHide: true,
     cwd: topReal,
     encoding: 'utf8',
@@ -88,7 +92,7 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, conten
   if (probe.status !== 0) return false
   // The blob the repository carries at this path. A file that is in the index
   // but not in HEAD has no committed bytes to be equal to, and fails here.
-  const head = run('git', ['rev-parse', `HEAD:${inside}`], {
+  const head = run('git', ['rev-parse', `HEAD:${treePath}`], {
     windowsHide: true,
     cwd: topReal,
     encoding: 'utf8',

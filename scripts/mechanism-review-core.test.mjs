@@ -837,6 +837,23 @@ describe('evaluateMechanismReview', () => {
     expect(receiptBalances(wrong)).toBe(false)
   })
 
+  it('counts in BigInt, so IEEE-754 rounding cannot balance forged arithmetic', () => {
+    // Individually safe operands still produce unsafe SUMS near 2^53: both
+    // unequal totals of the first line round to the same double, and each later
+    // slot has its own way to hide one entry the same way (re-review round 8).
+    const MAX = '9007199254740991' // 2^53 - 1
+    const forged = [
+      `${MAX} A + 2 B entries → ${MAX} union entries (2 merged, 9007199254740989 only A, 1 only B): every input entry accounted for`,
+      `2 A + ${MAX} B entries → ${MAX} union entries (2 merged, 1 only A, 9007199254740989 only B): every input entry accounted for`,
+      `${MAX} A + 2 B entries → ${MAX} union entries (2 of the 9007199254740992 input entries merged, 9007199254740990 only A, 1 only B): every input entry accounted for`,
+    ]
+    for (const line of forged) expect(receiptBalances(line), line).toBe(false)
+    // A HONEST line in the same range still balances — the defence is exact
+    // arithmetic, not a size cap.
+    const honest = `${MAX} A + 2 B entries → 9007199254740992 union entries (2 merged, 9007199254740990 only A, 1 only B): every input entry accounted for`
+    expect(receiptBalances(honest)).toBe(true)
+  })
+
   it('refuses a receipt whose numbers do not add up', () => {
     const cooked = '3 A + 2 B entries → 4 union entries (1 merged, 1 only A, 1 only B): every input entry accounted for'
     expect(receiptBalances(cooked)).toBe(false)
