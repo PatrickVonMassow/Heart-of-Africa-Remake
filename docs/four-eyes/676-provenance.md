@@ -53,10 +53,15 @@ Half A is Claude's and half B is Sol's, so:
   (Opus 5)'s. A correction filed on 22.08.2026 replaced that with "Fable 5" on
   the strength of the mislabel; the correction was wrong and is withdrawn.
 - The original merge by Sol remains the recorded deviation: Sol wrote half B.
-- The model that wrote **neither** half is Fable 5, which is switched off. There
-  is therefore no third model available, and a re-merge by Claude is a
-  same-vendor merge of Claude's own half — the weaker two-model fallback of
-  CLAUDE.md §6, not the valid four-eyes result the document owes itself.
+- The model that wrote **neither** half is Fable 5. AT THE TIME OF THIS READING
+  (22.08.2026, afternoon) it was switched off, so no third model was available,
+  and a re-merge by Claude was a same-vendor merge of Claude's own half — the
+  weaker two-model fallback of CLAUDE.md §6, not the valid four-eyes result the
+  document owed itself. That conclusion is historical and RESOLVED the same
+  evening: the owner lifted the Fable suspension at 18:26 (recorded in
+  `.claude/fable-switch.json`), Fable 5 folded the stage blind from the two
+  versioned halves, and the counted result `676-union.json` supersedes both
+  fallback folds. `README.md` carries the resolution.
 
 ## How the mislabel survived five days
 
