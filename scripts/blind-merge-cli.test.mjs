@@ -195,9 +195,30 @@ describe('the command', () => {
   })
 
   it('refuses a merger that contradicts the switch', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted(), '--merged-by', 'Opus 5')
+    // The union's own merger (Sol) is not the one the ON switch owes (Fable).
+    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U-sol.json'))
     expect(r.status).toBe(1)
     expect(r.out).toMatch(/is not the one this stage owes/)
+  })
+
+  it('refuses a --merged-by flag that contradicts the committed union, and a union naming nobody', () => {
+    // The flag used to MASK the committed union: a union naming Sol passed with
+    // --merged-by Fable, and the printed ledger command named Fable (re-review
+    // round 4). The artefact names its own merger.
+    const masked = run('--a', p('A.json'), '--b', p('B.json'), '--union', p('U-sol.json'), '--merged-by', 'Fable 5')
+    expect(masked.status).toBe(1)
+    expect(masked.out).toMatch(/contradicts the committed union/)
+    const unowned = write('U-unowned.json', {
+      entries: [
+        { id: 'U1', from: ['A1'] },
+        { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
+      ],
+    })
+    git('add', 'U-unowned.json')
+    git('commit', '-q', '-m', 'File a union that names no merger')
+    const r = run('--a', p('A.json'), '--b', p('B.json'), '--union', unowned)
+    expect(r.status).toBe(1)
+    expect(r.out).toMatch(/names no "mergedBy"/)
   })
 
   it('refuses a hand-stated outage in place of the switch-owned merger reason', () => {
@@ -206,9 +227,10 @@ describe('the command', () => {
       p('A.json'),
       '--b',
       p('B.json'),
-      ...counted(),
+      '--union',
+      p('U-sol.json'),
       '--merged-by',
-      'Opus 5',
+      'GPT-5.6 Sol',
       '--fallback',
       'GPT-5.6 Sol was unreachable in this session',
     )

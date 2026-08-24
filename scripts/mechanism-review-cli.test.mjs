@@ -137,6 +137,7 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
   // match, and a row that was once true stayed "verified" after the halves at
   // those paths were replaced. The recorded blob oids are what bind it.
   const row = {
+    sha: 'f'.repeat(40),
     halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
     halfSources: ['docs/a.json', 'docs/b.json'],
     halfBlobs: ['aaaa1', 'bbbb2'],
@@ -673,7 +674,7 @@ describe('the mode round-trips into the ledger', () => {
       writeFileSync(join(repo, 'world.txt'), 'a fixture world\n')
       git('add', '-A')
       git('commit', '-q', '-m', 'Lay down the world\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
-      const sha = git('rev-parse', 'HEAD').stdout.trim()
+      const _sha = git('rev-parse', 'HEAD').stdout.trim()
 
       const w = (name, value) => {
         const path = join(dir, name)
@@ -693,6 +694,10 @@ describe('the mode round-trips into the ledger', () => {
       )
       git('add', '-A')
       git('commit', '-q', '-m', 'File the two blind halves and their union\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      // The fold is recorded against the commit that CARRIES the artefacts —
+      // the record's sha is where the halves and union are anchored, so a sha
+      // whose tree lacks them refuses (re-review round 4).
+      const sha2 = git('rev-parse', 'HEAD').stdout.trim()
       const listA = join(repo, 'docs', 'A.json')
       const listB = join(repo, 'docs', 'B.json')
       const union = join(repo, 'docs', 'U.json')
@@ -701,7 +706,7 @@ describe('the mode round-trips into the ledger', () => {
           process.execPath,
           [
             join(repo, 'scripts', 'mechanism-review.mjs'),
-            '--record', sha,
+            '--record', sha2,
             '--model', 'GPT-5.6 Sol',
             '--verdict', 'merge',
             '--evidence', 'read both lists and the union that folded them',
@@ -716,7 +721,7 @@ describe('the mode round-trips into the ledger', () => {
       const ok = record(union)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
-      expect(row).toMatchObject({ sha, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
+      expect(row).toMatchObject({ sha: sha2, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
       // The whole switch-generated sentence, not merely the status command: the
       // false "two models existed" wording would still have contained it
       // (re-review round 3).
@@ -740,7 +745,7 @@ describe('the mode round-trips into the ledger', () => {
         process.execPath,
         [
           join(repo, 'scripts', 'mechanism-review.mjs'),
-          '--record', sha, '--model', 'Mystery 9', '--verdict', 'merge',
+          '--record', sha2, '--model', 'Mystery 9', '--verdict', 'merge',
           '--evidence', 'read both lists and the union that folded them',
           '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', listB,
         ],
@@ -748,6 +753,19 @@ describe('the mode round-trips into the ledger', () => {
       )
       expect(mystery.status).not.toBe(0)
       expect(`${mystery.stdout}${mystery.stderr}`).toMatch(/no vendor the review roster can place|must be VERIFIED/)
+
+      // THE UNTRACKED-UNION REFUSAL, ISOLATED: committed halves, a complete
+      // caller-written union — only the union's provenance can refuse here
+      // (re-review round 4: the earlier cases confounded it with a dropped
+      // entry or untracked halves).
+      const looseUnion = w('U-loose.json', {
+        mergedBy: 'GPT-5.6 Sol',
+        entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }],
+      })
+      const unionLoose = record(looseUnion)
+      expect(unionLoose.status).not.toBe(0)
+      expect(`${unionLoose.stdout}${unionLoose.stderr}`).toMatch(/the union.*not a tracked, clean committed artefact/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
 
       // AN UNPROVABLE HALF REFUSES; IT DOES NOT FALL BACK TO THE TRAILERS. The
       // caller hands the three files over precisely so the halves decide instead
@@ -759,7 +777,7 @@ describe('the mode round-trips into the ledger', () => {
         process.execPath,
         [
           join(repo, 'scripts', 'mechanism-review.mjs'),
-          '--record', sha, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
+          '--record', sha2, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
           '--evidence', 'read both lists and the union that folded them',
           '--mode', 'blind-parallel', '--union', union, '--list-a', loose, '--list-b', listB,
         ],

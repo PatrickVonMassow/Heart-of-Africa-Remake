@@ -87,6 +87,17 @@ describe('isTrackedInGit — committed bytes only', () => {
     unlinkSync(join(repo, 'linkdir'))
   })
 
+  it('refuses an untracked parent symlink INSIDE the checkout that aliases a tracked target', () => {
+    // Cross-vendor re-review of point 889: alias -> docs made alias/half.json
+    // validate as the tracked docs/half.json, and the alias — a path HEAD does
+    // not carry — travelled into the ledger as a source. Git is asked about the
+    // caller's own spelling, and HEAD:alias/half.json does not exist.
+    symlinkSync(join(repo, 'docs'), join(repo, 'alias'))
+    expect(isTrackedInGit('alias/half.json', { root: repo })).toBe(false)
+    expect(isTrackedInGit('docs/half.json', { root: repo })).toBe(true)
+    unlinkSync(join(repo, 'alias'))
+  })
+
   it('refuses paths outside the checkout, lexical or absolute', () => {
     expect(isTrackedInGit('../outside/evil.json', { root: repo })).toBe(false)
     expect(isTrackedInGit(join(outside, 'evil.json'), { root: repo })).toBe(false)

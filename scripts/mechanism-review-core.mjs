@@ -1141,7 +1141,11 @@ export function mergeProblem(record = {}, commit = {}) {
   // was itself a bypass (four-eyes review, third round): omit `at`, `mergedBy`
   // and `accounting` together and nothing was ever checked.
   const at = Number(record.at)
-  if (Number.isFinite(at) && at > 0 && at < MERGE_ACCOUNTING_SINCE) return ''
+  // The grandfather clause reads the later of row and commit time, like every
+  // era cutoff (re-review round 4): a modern hand-edited row backdated before
+  // the accounting rule otherwise skips fold validation entirely.
+  const foldEra = Math.max(Number.isFinite(at) && at > 0 ? at : 0, Number(commit?.at) || 0)
+  if (Number.isFinite(at) && at > 0 && foldEra < MERGE_ACCOUNTING_SINCE) return ''
   const who = String(record.mergedBy ?? '').trim()
   if (!who) return 'no-merger'
   if (!receiptBalances(record.accounting)) return 'no-count'
@@ -1172,8 +1176,7 @@ export function mergeProblem(record = {}, commit = {}) {
   // with unproven halves, every legitimate new blind-parallel row carries its
   // verified halves — one that does not is hand-made and clears nothing. The
   // era reads the later of row and commit time, as everywhere else.
-  const modernAt = Math.max(Number.isFinite(at) ? at : 0, Number(commit?.at) || 0)
-  if (!halves.length && modernAt >= VERIFIED_REVIEWER_SINCE) return 'unverified-halves'
+  if (!halves.length && foldEra >= VERIFIED_REVIEWER_SINCE) return 'unverified-halves'
   const authors = (commit.authorModels ?? [commit.authorModel]).filter(Boolean)
   const check = validateMerger({
     mergedBy: who,
@@ -1193,17 +1196,21 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   if (evidence.length < 10 || /^<.*>$/.test(evidence) || blindReviewerAdmission(evidence)) return false
   const mode = String(record.mode ?? '').trim()
   const at = Number(record.at)
-  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && at < MODE_REQUIRED_SINCE)) return false
+  // EVERY era cutoff reads the later of row and commit time (re-review round 4:
+  // the commit-aware reading sat on one cutoff, so a row backdated past the
+  // OTHERS — mode, authorship — kept the older, laxer rules against a commit
+  // made today).
+  const effectiveAt = Math.max(Number.isFinite(at) && at > 0 ? at : 0, Number(commitAt) || 0)
+  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && effectiveAt < MODE_REQUIRED_SINCE)) return false
   // THE ERA IS THE COMMIT'S, NOT THE ROW'S ALONE (cross-vendor re-review of
   // point 889): `record.at` is written by the recording hand, so a hand-edited
   // row could backdate itself past a boundary — including all the way past the
   // authorship requirement itself, which nesting the new rule inside the old
   // gate silently allowed. A commit's timestamp is part of its sha and cannot
-  // move without changing the commit, so BOTH cutoffs read the later of the
-  // two. Its residual is stated rather than hidden: an author who backdates
-  // the COMMIT ITSELF at creation time moves both, and no marker the same hand
-  // writes can close that; the systemic answer is work-order point 880's.
-  const effectiveAt = Math.max(at, Number(commitAt) || 0)
+  // move without changing the commit. Its residual is stated rather than
+  // hidden: an author who backdates the COMMIT ITSELF at creation time moves
+  // both readings, and no marker the same hand writes can close that; the
+  // systemic answer is work-order point 880's.
   if (effectiveAt >= AUTHORSHIP_CHECK_SINCE) {
     const authorship = record.reviewerAuthorship
     if (!authorship || typeof authorship !== 'object') return false

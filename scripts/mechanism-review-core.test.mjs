@@ -449,6 +449,11 @@ describe('evaluateMechanismReview', () => {
     // …a reasonless one does not, and an unknown vendor never does.
     expect(judge(claim('GPT-5.6 Sol', { status: 'unverified' }), 'Claude Opus 5')).toBe(true)
     expect(judge(claim('Mystery 9', { status: 'unverified', reason: 'who knows' }), 'Claude Opus 5')).toBe(true)
+    // An OpenAI "agreement" is fabricated evidence — no harness transcript can
+    // hold that vendor's messages — and is refused even with matching names.
+    expect(
+      judge(claim('GPT-5.6 Sol', { status: 'agreement', actualModel: 'GPT-5.6 Sol' }), 'Claude Opus 5'),
+    ).toBe(true)
     // The rows recorded under the older reading keep their standing.
     const older = {
       ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
@@ -474,6 +479,42 @@ describe('evaluateMechanismReview', () => {
       }).block
     expect(judgeAt(VERIFIED_REVIEWER_SINCE + 1)).toBe(true)
     expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(false)
+  })
+
+  it('keys the AUTHORSHIP requirement itself on the commit, not only the narrowing', () => {
+    // A row backdated past AUTHORSHIP_CHECK_SINCE used to omit reviewerAuthorship
+    // entirely and clear a commit made today (re-review round 4).
+    const bare = record({ at: AUTHORSHIP_CHECK_SINCE - 1, model: 'Fable 5' })
+    const judgeAt = (commitAt) =>
+      evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: 'GPT-5.6 Sol', at: commitAt })],
+        records: [bare],
+      }).block
+    expect(judgeAt(AUTHORSHIP_CHECK_SINCE + 1)).toBe(true)
+    expect(judgeAt(AUTHORSHIP_CHECK_SINCE - 2)).toBe(false)
+  })
+
+  it('poisons a modern blind-parallel row that carries NO halves instead of reading the trailers', () => {
+    // Dropping halfAuthors from a hand-edited row used to fall back to the
+    // trailer proxy, which says nothing when the union commit does not name the
+    // merger (re-review round 4). The merger here appears in no trailer, so the
+    // proxy would have cleared it.
+    const row = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: 'GPT-5.6 Sol', mode: 'blind-parallel' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
+      mergedBy: 'Fable 5',
+      accounting: RECEIPT,
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [row],
+    })
+    expect(v.block).toBe(true)
+    expect(formatMechanismReviewVerdict(v)).toMatch(/half authors the repository does not confirm/)
   })
 
   it('names the unconfirmed-halves problem instead of calling it a self-merge', () => {
@@ -636,14 +677,25 @@ describe('evaluateMechanismReview', () => {
       })
       expect(v.block, JSON.stringify(over)).toBe(true)
     }
-    // A row genuinely older than the recorder's mode flag owes none.
+    // A row genuinely older than the recorder's mode flag owes none — judged
+    // against a commit of its own era, since every cutoff reads the later of
+    // row and commit time.
     const legacy = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], at: MODE_REQUIRED_SINCE - 9000 })],
+      records: [record({ mode: '', at: MODE_REQUIRED_SINCE - 5000 })],
+    })
+    expect(legacy.block).toBe(false)
+    // …and the SAME old row does not clear a commit made after the rule: a
+    // record predating the commit it clears reviewed something else.
+    const modernCommit = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [covered],
       records: [record({ mode: '', at: MODE_REQUIRED_SINCE - 5000 })],
     })
-    expect(legacy.block).toBe(false)
+    expect(modernCommit.block).toBe(true)
   })
 
   it('REFUSES a hand-edited row whose UNION was merged by an author of it', () => {
@@ -688,11 +740,13 @@ describe('evaluateMechanismReview', () => {
 
   it('leaves the rows written BEFORE the rule landed alone, and no younger one', () => {
     const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
-    // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands.
+    // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands —
+    // for a commit of its own era; the cutoffs read the later of row and commit
+    // time, so the legacy fixture's commit predates the rule too.
     const legacy = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
-      pendingCommits: pending,
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], at: MERGE_ACCOUNTING_SINCE - 2 })],
       records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE - 1 })],
     })
     expect(legacy.block).toBe(false)

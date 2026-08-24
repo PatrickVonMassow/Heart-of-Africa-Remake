@@ -36,7 +36,7 @@
 // The decision logic is pure (mechanism-review-core.mjs); this file does I/O and
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
-import { dirname, relative, resolve as resolvePath } from 'node:path'
+import { dirname, isAbsolute, relative, resolve as resolvePath, sep } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
@@ -108,43 +108,87 @@ export const RECORDS_PATH = recordsPathFor()
 const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 
-/** The committed model field and blob oid of a repository half — read from
- *  HEAD, never from the working tree, so what it answers is what a commit
- *  somebody can read actually says. Null when the path is not committed JSON
- *  with a model field. */
-export function committedHalfModel(path) {
+/** The committed model field and blob oid of a repository half — read from a
+ *  COMMIT, never from the working tree, so what it answers is what a commit
+ *  somebody can read actually says. `at` names the commit (default HEAD); the
+ *  fold consumers pass the reviewed sha, which binds the artefacts to the
+ *  commit the record clears instead of to whatever HEAD happens to be
+ *  (re-review round 4). Null when the path is not committed JSON with a model
+ *  field there. */
+export function committedHalfModel(path, { at = 'HEAD' } = {}) {
   try {
-    const raw = String(path ?? '').trim()
-    if (!raw) return null
     // AN ABSOLUTE PATH INSIDE THE CHECKOUT IS THE SAME ARTEFACT, and refusing it
     // outright made a caller that had resolved its own paths read "no committed
     // JSON with a model field" about a file the repository carries. It is
     // relativised against the checkout instead; anything that leaves the
     // checkout still has no committed bytes here and stays refused.
-    const rel = relative(REPO_ROOT, resolvePath(REPO_ROOT, raw))
-    if (!rel || rel.startsWith('..')) return null
-    const oid = git(['rev-parse', `HEAD:${rel}`])
-    const model = JSON.parse(git(['show', `HEAD:${rel}`]))?.model
+    const rel = repoRelative(path)
+    if (!rel || isAbsolute(rel)) return null
+    const ref = /^[0-9a-f]{7,40}$/i.test(String(at)) || at === 'HEAD' ? at : 'HEAD'
+    const oid = git(['rev-parse', `${ref}:${rel}`])
+    const model = JSON.parse(git(['show', `${ref}:${rel}`]))?.model
     return typeof model === 'string' && model.trim() ? { oid, model: model.trim() } : null
   } catch {
     return null
   }
 }
 
-/** A checkout path as the repository spells it — relative to REPO_ROOT. */
+/** The reviewer-vendor matrix, one place for recorder and carry alike: each
+ *  vendor must show exactly the evidence it CAN have (re-review round 4 —
+ *  the carry path accepted every "agreement" regardless of vendor, so a
+ *  fabricated OpenAI or unknown-vendor agreement could be carried forward). */
+export function reviewerVendorProblems(model, authorship = {}) {
+  const vendor = modelVendor(model)
+  const status = String(authorship?.status ?? '').trim()
+  if (vendor === 'unknown') {
+    return [
+      `the claimed reviewer "${model}" names no vendor the review roster can place — a reviewer nobody ` +
+        'can rule out clears nothing, whatever its claimed status',
+    ]
+  }
+  if (vendor === 'anthropic' && status !== 'agreement') {
+    return [
+      `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
+        'must be VERIFIED: pass --model-at <ISO> and --model-transcript <session.jsonl> so the claim can be ' +
+        'checked against message.model — an unverified claim from this vendor no longer clears the gate',
+    ]
+  }
+  if (vendor === 'openai') {
+    if (status !== 'unverified') {
+      return [
+        `the claimed reviewer "${model}" runs outside the harness, so no session transcript can hold its ` +
+          'messages — an "agreement" claiming one is fabricated evidence; record it as unverified with the reason stated',
+      ]
+    }
+    if (typeof authorship?.reason !== 'string' || !authorship.reason.trim()) {
+      return [
+        `the claimed reviewer "${model}" records an unverified identity with no reason — say why no ` +
+          'verification exists (external CLI reviewer, no harness transcript)',
+      ]
+    }
+  }
+  return []
+}
+
+/** A checkout path as the repository spells it — relative to REPO_ROOT. A
+ *  path OUTSIDE the checkout keeps the caller's spelling (and so stays
+ *  refusable); a legal repository name that merely BEGINS with two dots —
+ *  `..half.json` — is not "outside" (re-review round 4). */
 export function repoRelative(path) {
   const raw = String(path ?? '').trim()
   if (!raw) return ''
   const rel = relative(REPO_ROOT, resolvePath(REPO_ROOT, raw))
-  return !rel || rel.startsWith('..') ? raw : rel.split('\\').join('/')
+  const outside = !rel || rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')
+  return outside ? raw : rel.split('\\').join('/')
 }
 
-/** The committed blob oid at a path, or '' when HEAD carries none. */
-export function committedOid(path) {
+/** The committed blob oid at a path, or '' when the commit carries none. */
+export function committedOid(path, { at = 'HEAD' } = {}) {
   try {
     const rel = repoRelative(path)
-    if (!rel) return ''
-    return git(['rev-parse', `HEAD:${rel}`])
+    if (!rel || isAbsolute(rel)) return ''
+    const ref = /^[0-9a-f]{7,40}$/i.test(String(at)) || at === 'HEAD' ? at : 'HEAD'
+    return git(['rev-parse', `${ref}:${rel}`])
   } catch {
     return ''
   }
@@ -178,9 +222,17 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
   const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
   const blobs = Array.isArray(record?.halfBlobs) ? record.halfBlobs : []
   if (authors.length !== 2 || sources.length !== 2 || blobs.length !== 2) return false
+  // ANCHORED AT THE ROW'S OWN COMMIT, not at HEAD: the record clears exactly
+  // one sha, so the artefacts it names must be in THAT tree — a fold whose
+  // files exist only somewhere else in history is somebody else's fold
+  // (re-review round 4: HEAD anchoring let a valid historical fold be replayed
+  // under a row naming an unrelated commit, and let a true row rot when HEAD
+  // moved past its artefacts).
+  const at = String(record?.sha ?? '').trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(at)) return false
   const anchored = sources.every((src, i) => {
     if (!isTracked(src)) return false
-    const committed = committedHalf(src)
+    const committed = committedHalf(src, { at })
     if (committed === null) return false
     if (committed.oid !== String(blobs[i] ?? '').trim()) return false
     return sameModel(committed.model, authors[i])
@@ -195,7 +247,7 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
   const unionSource = String(record?.unionSource ?? '').trim()
   if (!unionBlob || !unionSource) return false
   if (!isTracked(unionSource)) return false
-  if (committedOidOf(unionSource) !== unionBlob) return false
+  if (committedOidOf(unionSource, { at }) !== unionBlob) return false
   const texts = [blobs[0], blobs[1], unionBlob].map((oid) => blobText(oid))
   if (texts.some((t) => t === null)) return false
   let a, b, union
@@ -473,6 +525,11 @@ export function buildRecord({
    *  (cross-vendor re-review of point 889). */
   let unionSource = ''
   let unionBlob = ''
+  // Resolved before the fold proof: the halves and the union are anchored in
+  // the REVIEWED commit's tree, which is what the row will claim (re-review
+  // round 4 — HEAD anchoring bound the record to whatever tree the recorder
+  // happened to stand on).
+  const commit = resolve(sha)
   if (missing.length < paths.length) {
     if (missing.length) {
       return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
@@ -488,14 +545,14 @@ export function buildRecord({
     // with what the count saw — anything less binds the record to bytes no
     // commit carries. Where that fails the trailer proxy stands.
     const untracked = [listAPath, listBPath].filter((path) => !isTracked(path))
-    const committed = untracked.length ? [] : [listAPath, listBPath].map((path) => committedHalf(path))
+    const committed = untracked.length ? [] : [listAPath, listBPath].map((path) => committedHalf(path, { at: commit.sha }))
     const uncommitted = untracked.length ? [] : [listAPath, listBPath].filter((_, i) => !committed[i])
     const contradicted = untracked.length || uncommitted.length
       ? []
       : [listAPath, listBPath].filter((_, i) => !sameModel(committed[i].model, counted.halfAuthors[i]))
     // The union answers to the same standard as the halves: committed, or the
     // receipt cannot be re-derived by anyone later.
-    const unionCommitted = isTracked(unionPath) ? committedUnion(unionPath) : ''
+    const unionCommitted = isTracked(unionPath) ? committedUnion(unionPath, { at: commit.sha }) : ''
     if (
       counted.halfAuthors?.length === 2 &&
       !untracked.length &&
@@ -545,7 +602,6 @@ export function buildRecord({
       }
     }
   }
-  const commit = resolve(sha)
   // WHO WROTE THE TWO HALVES, and only failing that, who touched the commit. The
   // trailer proxy reads the union commit's models as the list authors, which holds
   // only while the merging model is a DELEGATE whose output somebody else commits.
@@ -621,19 +677,7 @@ export function buildRecord({
   // the row anyway would report "recorded" for a review the gate then ignores —
   // silent debt the recording session believes settled.
   if (now >= VERIFIED_REVIEWER_SINCE && !authorshipRefusesPermission(reviewerAuthorship)) {
-    const reviewerVendor = modelVendor(model)
-    if (reviewerVendor === 'unknown') {
-      errors.push(
-        `the claimed reviewer "${model}" names no vendor the review roster can place — a reviewer nobody ` +
-          'can rule out clears nothing, whatever its claimed status',
-      )
-    } else if (reviewerVendor === 'anthropic' && reviewerAuthorship.status !== 'agreement') {
-      errors.push(
-        `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
-          'must be VERIFIED: pass --model-at <ISO> and --model-transcript <session.jsonl> so the claim can be ' +
-          'checked against message.model — an unverified claim from this vendor no longer clears the gate',
-      )
-    }
+    for (const problem of reviewerVendorProblems(model, reviewerAuthorship)) errors.push(problem)
   }
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block
@@ -827,10 +871,11 @@ export function buildCarriedRecord({
     claimedModel: String(src.model).trim(),
     reason: 'the source review predates transcript-backed authorship records',
   }
-  if (copiedAuthorship.status !== 'agreement' && modelVendor(src.model) !== 'openai') {
+  const vendorProblems = reviewerVendorProblems(src.model, copiedAuthorship)
+  if (vendorProblems.length) {
     errors.push(
-      `--carried-from: the source pass by "${src.model}" carries no verified reviewer identity, and a row ` +
-        'clearing a new commit may not copy an unverifiable Anthropic-vendor claim forward — review these files fresh',
+      `--carried-from: the source pass by "${src.model}" cannot be copied onto a new commit — review these files fresh:`,
+      ...vendorProblems,
     )
     return { ok: false, errors }
   }

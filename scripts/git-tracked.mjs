@@ -33,7 +33,7 @@
 // in one command and not the other, so it lives here once and both import it.
 import { spawnSync } from 'node:child_process'
 import { lstatSync, readFileSync, realpathSync } from 'node:fs'
-import { relative, resolve as resolvePath } from 'node:path'
+import { relative, resolve as resolvePath, sep } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 
 export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, content } = {}) {
@@ -64,8 +64,16 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, conten
   } catch {
     return false
   }
-  const inside = relative(topReal, abs)
-  if (!inside || inside.startsWith('..') || resolvePath(topReal, inside) !== abs) return false
+  // THE CALLER'S OWN SPELLING IS WHAT GIT IS ASKED ABOUT (cross-vendor
+  // re-review of point 889): deriving the tracked path from the RESOLVED
+  // target let an untracked parent symlink inside the checkout — alias ->
+  // docs/four-eyes — validate alias/A.json as its target, and the alias then
+  // travelled into the ledger as a source HEAD does not carry. The lexical
+  // relative path is what is probed, and the resolved path must be exactly
+  // where that lexical path lands — any parent symlink makes them differ.
+  const inside = relative(topReal, resolvePath(root, raw))
+  if (!inside || inside === '..' || inside.startsWith(`..${sep}`) || inside.startsWith('../')) return false
+  if (abs !== resolvePath(topReal, inside)) return false
   const probe = run('git', ['ls-files', '--error-unmatch', '--', inside], {
     windowsHide: true,
     cwd: topReal,

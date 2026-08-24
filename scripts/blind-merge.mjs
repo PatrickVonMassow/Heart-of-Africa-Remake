@@ -195,7 +195,13 @@ if (isMainModule(import.meta.url)) {
     // reading — and with Fable ON that returned no framing for the case where the
     // merger's own half is most likely among the unknowns (cross-vendor review of
     // point 889). mergerModel ignores blank slots on its own.
-    const slots = [trackedA ? String(a.model ?? '').trim() : '', trackedB ? String(b.model ?? '').trim() : '']
+    // A slot is filled ONLY from a committed model field: tracking alone let a
+    // --model flag on a tracked line-form half — a claim — steer the selection
+    // and suppress the framing (re-review round 4).
+    const slots = [
+      modelFromFile.A ? String(a.model ?? '').trim() : '',
+      modelFromFile.B ? String(b.model ?? '').trim() : '',
+    ]
     const deciding = slots.filter(Boolean)
     const bothKnown = deciding.length === 2
     const expectedMerger = mergerModel(fableState, deciding)
@@ -338,7 +344,27 @@ if (isMainModule(import.meta.url)) {
     // The union may name its own merger; the flag wins, and whichever is used is
     // the one validated AND the one printed below (four-eyes review: the printed
     // record command used to echo an empty --merged-by for the union-only form).
-    const declared = mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? ''))
+    const unionMergedBy = Array.isArray(rawU) ? '' : String(rawU?.mergedBy ?? '').trim()
+    if (mergedBy && unionMergedBy && !sameModel(mergedBy, unionMergedBy)) {
+      // The committed union names its own merger; a flag naming another model is
+      // either a typo or an attempt to write a ledger command that contradicts
+      // the artefact it points at (re-review round 4). Both are refused.
+      console.error(
+        `blind-merge: --merged-by "${mergedBy}" contradicts the committed union, which says ` +
+          `"${unionMergedBy}" merged it — the union names its own merger and the flag cannot rename it.`,
+      )
+      process.exit(1)
+    }
+    if (!unionMergedBy) {
+      // A union that names no owner cannot corroborate any fold; the verification
+      // path refuses such a row, so the count refuses to print its command.
+      console.error(
+        `blind-merge: the union (${pathU}) names no "mergedBy" — the committed union must say who ` +
+          'folded it, or the record it feeds could never be re-derived.',
+      )
+      process.exit(1)
+    }
+    const declared = mergedBy || unionMergedBy
     const switchFallback = mergerWroteAHalf ? mergeFallbackReason(fableState) : ''
     const mergerReason = fallback || switchFallback
     const merger = validateMerger({ mergedBy: expectedMerger, authors: [a.model, b.model], fallback: mergerReason })
