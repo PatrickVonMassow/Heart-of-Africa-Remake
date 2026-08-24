@@ -55,20 +55,29 @@ export const STALE_AFTER_MS = 10 * 60_000
  * second round). A time-only stamp cannot distinguish today from yesterday, and
  * "unprovable currency is stale" must not have a window in which it inverts.
  *
- * The three answers are distinct on purpose:
- *   · no record at all — nothing here has ever looked, so the age is UNKNOWN and
- *     the caller must treat it as stale rather than guess.
- *   · the content differs from the recorded one — somebody rewrote the card since
- *     the last look, so it is current, and now is when that was first seen.
- *   · the content matches — the card has stood untouched since it was recorded.
+ * WHAT THE RECORDED TIME MEANS IN EACH CASE. `now - seenAt` is the answer in
+ * both, and it is sound in both — but for different reasons, and the difference
+ * is what the third cross-vendor round (24.08.2026) forced:
+ *   · the content MATCHES the record — the card has stood untouched that long,
+ *     and the span is its EXACT age.
+ *   · the content DIFFERS — somebody rewrote the card at some unknown moment
+ *     between that observation and now, so the span is an UPPER BOUND on its
+ *     age. Treating a change as age zero was wrong: a card last looked at 24
+ *     hours ago and rewritten 23 hours ago is not fresh. An upper bound errs
+ *     only toward refreshing, which is the safe direction — and where the last
+ *     look was recent, the bound is small and no storm follows.
+ *   · no record at all — nothing here has ever looked, so nothing bounds the
+ *     age. It is UNKNOWN, and the caller must treat that as stale rather than
+ *     guess.
  */
 export function cardAge({ record = null, digest = '', now = 0 } = {}) {
   const seenAt = Number(record?.seenAt)
   if (!record || !record.digest || !Number.isFinite(seenAt)) {
     return { ageMs: null, remember: { digest, seenAt: now } }
   }
-  if (record.digest !== digest) return { ageMs: 0, remember: { digest, seenAt: now } }
-  return { ageMs: now - seenAt, remember: null }
+  const ageMs = now - seenAt
+  if (record.digest !== digest) return { ageMs, remember: { digest, seenAt: now } }
+  return { ageMs, remember: null }
 }
 
 /** Why a decision came out the way it did. Recorded, so a caller can say what

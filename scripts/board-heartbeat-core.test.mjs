@@ -147,10 +147,29 @@ describe('currency that cannot be proven is not currency', () => {
     expect(stood.ageMs).toBe(90_000)
     expect(stood.remember).toBeNull()
 
-    // Somebody rewrote the card: it is current, and now is when that was seen.
+    // Somebody rewrote the card between the last look and now, so the span since
+    // that look BOUNDS its age — it is not proof the card is brand new.
     const rewritten = cardAge({ record: { digest: 'a', seenAt: NOW - 90_000 }, digest: 'b', now: NOW })
-    expect(rewritten.ageMs).toBe(0)
+    expect(rewritten.ageMs).toBe(90_000)
     expect(rewritten.remember).toEqual({ digest: 'b', seenAt: NOW })
+
+    // THE DEFECT AN AGE OF ZERO HAD (third cross-vendor round, 24.08.2026): a
+    // card last looked at a day ago and rewritten some unknown time since is not
+    // fresh, and must not suppress a refresh for another ten minutes.
+    const longAgo = cardAge({ record: { digest: 'a', seenAt: NOW - 24 * 3_600_000 }, digest: 'b', now: NOW })
+    expect(longAgo.ageMs).toBe(24 * 3_600_000)
+    expect(
+      decideHeartbeat({
+        focus: FOCUS,
+        cardPoint: 847,
+        ageMs: longAgo.ageMs,
+        trigger: TRIGGERS.REVIEW_ROUND,
+        detail: 'x',
+      }).reason,
+    ).toBe(REASONS.STALE)
+
+    // …while a recent look bounds it tightly, so no storm follows an ordinary edit.
+    expect(cardAge({ record: { digest: 'a', seenAt: NOW - 1_000 }, digest: 'b', now: NOW }).ageMs).toBe(1_000)
 
     // A malformed record is ignorance, not evidence.
     expect(cardAge({ record: { digest: 'a' }, digest: 'a', now: NOW }).ageMs).toBeNull()

@@ -66,15 +66,19 @@ function gitCommonDir(root) {
  */
 export function readCard(state, root) {
   try {
-    if (!state?.dashboardPath) return { point: null, digest: '' }
+    if (!state?.dashboardPath) return { ok: false, point: null, digest: '' }
     const html = readFileSync(resolve(root, state.dashboardPath), 'utf8')
     const point = parseNowCardPoint(html)
     const card = point == null ? null : nowCard(html, point)
     // The WHOLE card is the content: its status line, its stamp and its title.
     // Anything that rewrites any of them is a card the reader has not seen.
-    return { point, digest: card ? createHash('sha256').update(card).digest('hex') : '' }
+    return { ok: true, point, digest: card ? createHash('sha256').update(card).digest('hex') : '' }
   } catch {
-    return { point: null, digest: '' }
+    // FAIL CLOSED, and say which failure this is. A board that could not be read
+    // is not a board without a now-card: collapsing the two let an unreadable
+    // file bypass the card/focus mismatch refusal and restamp the focus point
+    // while the real now-card named another (third cross-vendor round).
+    return { ok: false, point: null, digest: '' }
   }
 }
 
@@ -137,7 +141,10 @@ export function heartbeat({
     const owned = (path) => resolve(owner, relative(REPO_ROOT, path))
     const seenState = state ?? readJson(owned(STATE_PATH))
     const seenFocus = focus ?? readJson(owned(FOCUS_PATH))
-    const seen = card === undefined ? readCard(seenState, owner) : card
+    const seen = card === undefined ? readCard(seenState, owner) : { ok: true, ...card }
+    // Nothing may be written against a board this could not read: the mismatch
+    // refusal below rests on knowing which point the now-card actually names.
+    if (!seen.ok) return { refreshed: false, reason: 'board-unreadable' }
     const record = memory === undefined ? readJson(memoryPath(owner)) : memory
     const aged = cardAge({ record, digest: seen.digest, now })
     // Remembered BEFORE the decision, so a refusal further down still leaves the

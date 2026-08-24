@@ -110,6 +110,7 @@ describe('the production card reader, against real board markup', () => {
     const dir = withBoard(board(848, 'ein Stand', '10:17'))
     try {
       const seen = readCard({ dashboardPath: '.batch-dashboard.html' }, dir)
+      expect(seen.ok).toBe(true)
       expect(seen.point).toBe(848)
       expect(seen.digest).toMatch(/^[0-9a-f]{64}$/)
       // The digest follows the card's TEXT, not just its identity.
@@ -172,8 +173,9 @@ describe('the production card reader, against real board markup', () => {
         state: { dashboardPath: '.batch-dashboard.html' },
         focus: { point: 848, note: 'Fokus' },
         now: 1_700_000_000_000,
-        // A record of a DIFFERENT card: somebody wrote since the last look.
-        memory: { digest: 'ein anderer Kartenstand', seenAt: 1_700_000_000_000 - 99 * 60_000 },
+        // A record of a DIFFERENT card written moments ago: the change is bounded
+        // to that span, so the card is current.
+        memory: { digest: 'ein anderer Kartenstand', seenAt: 1_700_000_000_000 - 1_000 },
         remember: () => {},
         writeStatus: (point, status) => calls.push({ point, status }),
       })
@@ -248,7 +250,11 @@ describe('what it refuses, and what it survives', () => {
     expect(calls).toEqual([])
   })
 
-  it('survives a board file it cannot read at all', () => {
+  it('writes NOTHING against a board it could not read', () => {
+    // FAIL CLOSED (third cross-vendor round, 24.08.2026). An unreadable board is
+    // not a board without a now-card: if the two collapse, the mismatch refusal
+    // is bypassed and the focus point gets restamped while the real now-card
+    // names another. This case used to assert the opposite.
     const { calls, write } = recorder()
     const result = heartbeat({
       trigger: TRIGGERS.IN_FLIGHT,
@@ -257,10 +263,23 @@ describe('what it refuses, and what it survives', () => {
       focus: FOCUS,
       writeStatus: write,
     })
-    // Unreadable board → no point, no stamp: it refreshes what it can address,
-    // which here is the focus point, rather than throwing at its caller.
-    expect(result.refreshed).toBe(true)
-    expect(calls).toEqual([{ point: 847, status: 'Sol-Prüfrunden zu Punkt 847 · Wartestellung' }])
+    expect(result.refreshed).toBe(false)
+    expect(result.reason).toBe('board-unreadable')
+    expect(calls).toEqual([])
+  })
+
+  it('refuses a state that names no board at all', () => {
+    const { calls, write } = recorder()
+    const result = heartbeat({
+      trigger: TRIGGERS.REVIEW_ROUND,
+      detail: 'Runde',
+      state: {},
+      focus: FOCUS,
+      writeStatus: write,
+    })
+    expect(result.refreshed).toBe(false)
+    expect(result.reason).toBe('board-unreadable')
+    expect(calls).toEqual([])
   })
 })
 
