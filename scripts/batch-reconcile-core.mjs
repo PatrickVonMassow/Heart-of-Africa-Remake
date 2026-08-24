@@ -174,6 +174,7 @@ export function daemonPairResolution({ record = null, copy = null, probe = null 
     'superseded-copy': { action: 'write-copy-from-record' },
     'orphaned-copy': { action: 'clear-copy' },
     'impossible-copy': { action: 'refuse-and-alert', operator: true },
+    'ambiguous-generations': { action: 'refuse-and-alert', operator: true },
   }
   return { ...classified, ...actions[classified.reading] }
 }

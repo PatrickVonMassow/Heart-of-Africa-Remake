@@ -767,6 +767,7 @@ without an answer, and un-negated is not the same as confirmed.
 | present | matching | dead or unprobed | stale copy | as cold record, and clear the copy |
 | present | older generation | live | superseded copy | the record wins; rewrite the copy from it |
 | present | older generation | dead or unprobed | cold record | the record is what must be reconciled, and the copy goes with it |
+| present | DIFFERING random-string generation | — | ambiguous generations — random strings carry no order, so "older" is unprovable: the same evidence fits an earlier copy beside a live record and a newer copy beside a rolled-back record | refuse every mutation and alert; an operator supplies the ordering evidence — never an automatic rewrite or release |
 | absent | present | — | orphaned copy | clear the copy; a daemon is never concluded from the copy alone |
 | present | newer generation, or no generation, or this generation under another process identity | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
 | no generation | any | — | impossible by construction | a record nothing can be compared to fails closed like the row above |

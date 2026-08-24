@@ -290,6 +290,8 @@ export const DAEMON_PAIR_READINGS = Object.freeze({
   'superseded-copy': 'the copy is older than the record and the record is live — the record wins; rewrite the copy',
   'orphaned-copy': 'a copy with no record — clear it; a daemon is never concluded from the copy alone',
   'impossible-copy': 'a copy the write orders cannot produce — corruption, not a race: refuse every mutation and alert',
+  'ambiguous-generations':
+    'string generations differ and random strings carry no order — an earlier copy and a rolled-back record leave identical evidence: refuse mutations and alert; an operator supplies the ordering evidence',
 })
 
 /** Decides the pair from the pair alone. `probe` answers whether the RECORD's pid
@@ -327,9 +329,7 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null } 
       return impossible('the copy and the record carry generations of different kinds; the copy was not written from this record')
     }
     // Ordering exists only for numeric fixtures; random string generations can
-    // only be equal or different, and a copy from a FUTURE record is impossible
-    // by the write orders, so a differing string copy reads as from an earlier
-    // record below rather than as novelty here.
+    // only be equal or different.
     if (Number.isFinite(copy.generation) && copy.generation > record.generation) {
       return impossible(
         `copy generation ${copy.generation} is newer than the record's ${record.generation}; the write orders cannot produce this`,
@@ -337,6 +337,14 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null } 
     }
     if (copy.generation === record.generation && !sameProcess(record, copy)) {
       return impossible('the copy names this generation with another process, so it was not written from this record')
+    }
+    // DIFFERING STRING generations stay AMBIGUOUS: the same evidence fits an
+    // earlier copy beside a live record AND a newer copy beside a record that
+    // was rolled back or restored from a backup. Automatically rewriting or
+    // releasing either side would destroy exactly the evidence that decides
+    // it, so the pair refuses and alerts until ordering evidence exists.
+    if (typeof copy.generation === 'string' && copy.generation !== record.generation) {
+      return reading('ambiguous-generations')
     }
   }
 
@@ -355,9 +363,10 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null } 
 }
 
 /** The invariant in one predicate, so a caller can assert it without re-deriving
- *  the table: the copy may be absent or older, never newer. */
+ *  the table: the copy may be absent or PROVABLY older, never newer — a pair
+ *  whose order cannot be proven does not hold the invariant either. */
 export function daemonPairInvariantHolds({ record = null, copy = null } = {}) {
-  return classifyDaemonPair({ record, copy, probe: null }).reading !== 'impossible-copy'
+  return !['impossible-copy', 'ambiguous-generations'].includes(classifyDaemonPair({ record, copy, probe: null }).reading)
 }
 
 // ---------------------------------------------------------------------------

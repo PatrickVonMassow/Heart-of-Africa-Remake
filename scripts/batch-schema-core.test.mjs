@@ -273,15 +273,19 @@ describe('the daemon pair — record and the lock copy of it', () => {
       { record: { ...record, generation: 'gen-real-0001' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: alive },
       'healthy',
     ],
+    // Differing STRING generations carry no order: the same evidence fits an
+    // earlier copy beside a live record and a newer copy beside a rolled-back
+    // record, so neither rewriting nor releasing is safe — refuse and alert,
+    // whatever the probe says.
     [
-      'string generations, differing, live record: from an earlier record, never novelty',
+      'string generations, differing, live record: ambiguous, never assumed older',
       { record: { ...record, generation: 'gen-real-0002' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: alive },
-      'superseded-copy',
+      'ambiguous-generations',
     ],
     [
-      'string generations, differing, dead record',
+      'string generations, differing, dead record: ambiguous, never released automatically',
       { record: { ...record, generation: 'gen-real-0002' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: dead },
-      'cold-record',
+      'ambiguous-generations',
     ],
     [
       'generation kinds differ between copy and record',
