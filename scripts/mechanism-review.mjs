@@ -36,7 +36,7 @@
 // The decision logic is pure (mechanism-review-core.mjs); this file does I/O and
 // fails LOUD — it is a command, not a hook.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, relative, resolve as resolvePath } from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { isTrackedInGit } from './git-tracked.mjs'
@@ -112,8 +112,15 @@ const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_R
  *  with a model field. */
 export function committedHalfModel(path) {
   try {
-    const rel = String(path ?? '').trim()
-    if (!rel || rel.startsWith('/') || rel.includes('..')) return null
+    const raw = String(path ?? '').trim()
+    if (!raw) return null
+    // AN ABSOLUTE PATH INSIDE THE CHECKOUT IS THE SAME ARTEFACT, and refusing it
+    // outright made a caller that had resolved its own paths read "no committed
+    // JSON with a model field" about a file the repository carries. It is
+    // relativised against the checkout instead; anything that leaves the
+    // checkout still has no committed bytes here and stays refused.
+    const rel = relative(REPO_ROOT, resolvePath(REPO_ROOT, raw))
+    if (!rel || rel.startsWith('..')) return null
     const oid = git(['rev-parse', `HEAD:${rel}`])
     const model = JSON.parse(git(['show', `HEAD:${rel}`]))?.model
     return typeof model === 'string' && model.trim() ? { oid, model: model.trim() } : null
@@ -129,11 +136,21 @@ export function committedHalfModel(path) {
 export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel } = {}) {
   const authors = Array.isArray(record?.halfAuthors) ? record.halfAuthors : []
   const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
-  if (authors.length !== 2 || sources.length !== 2) return false
+  const blobs = Array.isArray(record?.halfBlobs) ? record.halfBlobs : []
+  // THE OID IS THE BINDING, THE PATH IS ONLY WHERE TO LOOK (cross-vendor review
+  // of point 889). Checking the path's current committed model alone verifies
+  // that SOME committed JSON there names the right model — so a hand-edited row
+  // could point at unrelated files whose model fields happen to match, and a row
+  // that was true would silently stay "verified" after the halves at those paths
+  // were replaced. The record names the exact blobs the fold counted; the file
+  // standing at the path today has to still be one of them.
+  if (authors.length !== 2 || sources.length !== 2 || blobs.length !== 2) return false
   return sources.every((src, i) => {
     if (!isTracked(src)) return false
     const committed = committedHalf(src)
-    return committed !== null && sameModel(committed.model, authors[i])
+    if (committed === null) return false
+    if (committed.oid !== String(blobs[i] ?? '').trim()) return false
+    return sameModel(committed.model, authors[i])
   })
 }
 
@@ -377,12 +394,44 @@ export function buildRecord({
     // The authors stored here are re-read from HEAD's blobs and must agree
     // with what the count saw — anything less binds the record to bytes no
     // commit carries. Where that fails the trailer proxy stands.
-    if (counted.halfAuthors?.length === 2 && [listAPath, listBPath].every((path) => isTracked(path))) {
-      const committed = [listAPath, listBPath].map((path) => committedHalf(path))
-      if (committed.every(Boolean) && committed.every((c, i) => sameModel(c.model, counted.halfAuthors[i]))) {
-        halfAuthors = committed.map((c) => c.model)
-        halfSources = [listAPath, listBPath]
-        halfBlobs = committed.map((c) => c.oid)
+    const untracked = [listAPath, listBPath].filter((path) => !isTracked(path))
+    const committed = untracked.length ? [] : [listAPath, listBPath].map((path) => committedHalf(path))
+    const uncommitted = untracked.length ? [] : [listAPath, listBPath].filter((_, i) => !committed[i])
+    const contradicted = untracked.length || uncommitted.length
+      ? []
+      : [listAPath, listBPath].filter((_, i) => !sameModel(committed[i].model, counted.halfAuthors[i]))
+    if (counted.halfAuthors?.length === 2 && !untracked.length && !uncommitted.length && !contradicted.length) {
+      halfAuthors = committed.map((c) => c.model)
+      halfSources = [listAPath, listBPath]
+      halfBlobs = committed.map((c) => c.oid)
+    } else if (mode === BLIND_PARALLEL) {
+      // A FAILED PROOF IS A REFUSAL, NOT A SHRUG (cross-vendor review of point
+      // 889). The caller handed over the three files precisely so the halves
+      // would decide instead of the commit trailers; when the proof does not
+      // come off, falling back to the trailers writes a blind-parallel record
+      // whose authorship nobody established — silently, because the diagnostic
+      // below only speaks where something else already failed. That is the
+      // unknown-authorship path this command exists to refuse.
+      const why = []
+      if (counted.halfAuthors?.length !== 2) {
+        why.push('neither half names its model, so there is no authorship to prove')
+      }
+      for (const path of untracked) why.push(`${path} is not a tracked, clean repository artefact`)
+      for (const path of uncommitted) why.push(`${path} has no committed JSON with a model field`)
+      for (const path of contradicted) {
+        const i = [listAPath, listBPath].indexOf(path)
+        why.push(
+          `${path} was counted as "${counted.halfAuthors[i]}" but the committed blob says ` +
+            `"${committed[i].model}" — the count read bytes no commit carries`,
+        )
+      }
+      return {
+        ok: false,
+        errors: [
+          'the halves were handed over but their authorship cannot be proved from the repository, ' +
+            'and a blind-parallel record may not fall back to the trailers of the recording commit:',
+          ...why,
+        ],
       }
     }
   }

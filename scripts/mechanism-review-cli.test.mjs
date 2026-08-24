@@ -24,6 +24,7 @@ import {
   resolveCommit,
   reviewFileSetKey,
   usage,
+  verifyHalfAuthors,
 } from './mechanism-review.mjs'
 import { LEDGER_RELATIVE_PATH, MODES, VERDICTS } from './mechanism-review-core.mjs'
 import { writeState as writeFableState } from './fable-switch-core.mjs'
@@ -85,6 +86,50 @@ describe('the flag surface', () => {
   it('states the per-file convergence boundary', () => {
     expect(usage()).toContain('later commit to')
     expect(usage()).toContain('commit touching only other')
+  })
+})
+
+describe('a ledger row\'s half-authorship claim is re-derived, never believed', () => {
+  // Cross-vendor review of point 889: verification read the model field of
+  // whatever JSON stands at the recorded path today. That answers "some committed
+  // file here names this model" — not "these are the halves that were folded". A
+  // hand-written row could name unrelated files whose model fields happen to
+  // match, and a row that was once true stayed "verified" after the halves at
+  // those paths were replaced. The recorded blob oids are what bind it.
+  const row = {
+    halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
+    halfSources: ['docs/a.json', 'docs/b.json'],
+    halfBlobs: ['aaaa1', 'bbbb2'],
+  }
+  const blobs = {
+    'docs/a.json': { oid: 'aaaa1', model: 'Claude Opus 5' },
+    'docs/b.json': { oid: 'bbbb2', model: 'GPT-5.6 Sol' },
+  }
+  const deps = (over = {}) => ({
+    isTracked: () => true,
+    committedHalf: (src) => blobs[src] ?? null,
+    ...over,
+  })
+
+  it('confirms a row whose paths still carry the exact blobs it counted', () => {
+    expect(verifyHalfAuthors(row, deps())).toBe(true)
+  })
+
+  it('refuses a row whose path now carries a DIFFERENT blob, model field notwithstanding', () => {
+    const replaced = { ...blobs, 'docs/b.json': { oid: 'cccc3', model: 'GPT-5.6 Sol' } }
+    expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => replaced[src] ?? null }))).toBe(false)
+  })
+
+  it('refuses a row that names no blobs at all — two strings are not evidence', () => {
+    const { halfBlobs, ...withoutBlobs } = row
+    expect(verifyHalfAuthors(withoutBlobs, deps())).toBe(false)
+    expect(verifyHalfAuthors({ ...row, halfBlobs: ['aaaa1'] }, deps())).toBe(false)
+  })
+
+  it('still refuses an untracked source or a contradicted model', () => {
+    expect(verifyHalfAuthors(row, deps({ isTracked: (src) => src !== 'docs/b.json' }))).toBe(false)
+    const renamed = { ...blobs, 'docs/a.json': { oid: 'aaaa1', model: 'Fable 5' } }
+    expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => renamed[src] ?? null }))).toBe(false)
   })
 })
 
@@ -555,8 +600,17 @@ describe('the mode round-trips into the ledger', () => {
         writeFileSync(path, typeof value === 'string' ? value : JSON.stringify(value))
         return path
       }
-      const listA = w('A.json', { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
-      const listB = w('B.txt', '- B1 | x.ts | the first defect said differently')
+      // THE HALVES ARE COMMITTED ARTEFACTS, because that is the only form whose
+      // authorship the recorder can prove (cross-vendor review of point 889).
+      const halfA = { model: 'Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] }
+      const halfB = { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first defect said differently' }] }
+      mkdirSync(join(repo, 'docs'), { recursive: true })
+      writeFileSync(join(repo, 'docs', 'A.json'), JSON.stringify(halfA))
+      writeFileSync(join(repo, 'docs', 'B.json'), JSON.stringify(halfB))
+      git('add', '-A')
+      git('commit', '-q', '-m', 'File the two blind halves\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      const listA = join(repo, 'docs', 'A.json')
+      const listB = join(repo, 'docs', 'B.json')
       const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] })
       const record = (unionPath) =>
         spawnSync(
@@ -581,6 +635,33 @@ describe('the mode round-trips into the ledger', () => {
       expect(row).toMatchObject({ sha, mergedBy: 'GPT-5.6 Sol', accountingSource: 'computed', mode: 'blind-parallel' })
       expect(row.mergeFallback).toContain('node scripts/fable-switch.mjs --status')
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
+      // The row says which blobs it read, so a later reader re-derives the proof.
+      expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-5.6 Sol'])
+      expect(row.halfSources).toEqual([listA, listB])
+      expect(row.halfBlobs).toEqual([
+        git('rev-parse', 'HEAD:docs/A.json').stdout.trim(),
+        git('rev-parse', 'HEAD:docs/B.json').stdout.trim(),
+      ])
+
+      // AN UNPROVABLE HALF REFUSES; IT DOES NOT FALL BACK TO THE TRAILERS. The
+      // caller hands the three files over precisely so the halves decide instead
+      // of the recording commit, and a fold whose halves cannot be read is the
+      // unknown-authorship case the rule exists to refuse. It used to write the
+      // record anyway, silently, off the commit's own co-authors.
+      const loose = w('loose-A.json', halfA)
+      const untracked = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', loose, '--list-b', listB,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(untracked.status).not.toBe(0)
+      expect(`${untracked.stdout}${untracked.stderr}`).toMatch(/not a tracked, clean repository artefact/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
 
       // …and a union that drops an entry exits non-zero and writes nothing more.
       const bad = record(w('U-bad.json', { entries: [{ id: 'U1', from: ['A1'] }] }))
