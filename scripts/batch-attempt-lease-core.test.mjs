@@ -505,6 +505,25 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(Object.keys(clean.claims)).toEqual(['/wt/a', '/wt/b'])
   })
 
+  it('refuses to RELEASE a claim it cannot read, even to the object that matches it', () => {
+    // The claim path validated both identities; the release path went straight to
+    // sameAttempt, which compares with ===. A stored record carrying an OBJECT as
+    // an id therefore matched a request presenting that same object, so a claim
+    // this module cannot read was freed by whoever held the reference — and the
+    // worktree it had guarded stood open for the next attempt. Freeing is the side
+    // where uncertainty lets a second attempt in, so it fails closed there too
+    // (cross-vendor review of point 893).
+    const shared = { value: 'a1' }
+    const unreadable = { batchId: 'b', pointId: 'p834', attemptId: shared }
+    const res = releaseWorktree({ claims: { '/wt/a': unreadable }, worktree: '/wt/a', attempt: unreadable })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/non-empty string/)
+    // And with a readable requester, the unreadable RECORD is what fails closed.
+    const stored = releaseWorktree({ claims: { '/wt/a': unreadable }, worktree: '/wt/a', attempt })
+    expect(stored.ok).toBe(false)
+    expect(stored.reason).toMatch(/uncertain fails closed/)
+  })
+
   it('releases only for the claiming attempt', () => {
     const { claims } = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
     expect(releaseWorktree({ claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)

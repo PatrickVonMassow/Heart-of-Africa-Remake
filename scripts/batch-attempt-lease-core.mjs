@@ -393,9 +393,20 @@ export function releaseWorktree({ claims = {}, worktree = null, attempt = {} } =
   const read = readClaims(claims)
   if (!read.ok) return { ok: false, reason: read.reason }
   claims = read.claims
+  // BOTH IDENTITIES ARE READ BEFORE THEY ARE COMPARED, as the claim reads them.
+  // sameAttempt compares with ===, so a stored record and a request carrying the
+  // SAME object as an id matched by reference: a claim this module cannot read was
+  // released by whoever held that object, and the worktree it had guarded was free
+  // for the next attempt (cross-vendor review of point 893). Unreadable ownership
+  // fails closed on the freeing side too — that is the side where it lets a second
+  // attempt in.
+  if (!attemptIdentity(attempt)) return { ok: false, reason: 'a release names its attempt, each part of it a non-empty string' }
   const keyed = worktreeClaimKey(worktree)
   // An unkeyable path can never be a stored key, so there is nothing to release.
   if (!keyed.ok || !Object.hasOwn(claims, keyed.key)) return { ok: true, claims: sealedClaims(claims), released: false }
+  if (!attemptIdentity(claims[keyed.key])) {
+    return { ok: false, reason: 'the worktree claim on record is unreadable; ownership is uncertain and uncertain fails closed' }
+  }
   if (!sameAttempt(claims[keyed.key], attempt)) {
     return { ok: false, reason: 'only the claiming attempt releases its worktree; reconciliation releases for the dead' }
   }
