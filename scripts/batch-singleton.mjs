@@ -937,6 +937,33 @@ function exitReapMutex(mutexPath) {
 }
 
 /**
+ * Runs `fn` under the SAME `.reaping` mutex that serializes lock takeover
+ * (docs/handover-architecture.md: every update of the EXISTING lock — the
+ * daemon copy, its clearing — takes this mutex and re-reads the lock inside
+ * it). A writer that used any OTHER mutex would still race a takeover: the
+ * takeover unlinks and recreates the lock under THIS mutex, so only a writer
+ * holding the same one can be sure the lock it re-read is the lock its rename
+ * replaces. Returns { ok: true, result } or { ok: false, reason } when the
+ * mutex could not be entered before `waitMs` ran out — the caller refuses,
+ * never writes.
+ */
+export function withLockWriteMutex(lockPath, fn, { waitMs = 2000 } = {}) {
+  const mutexPath = `${lockPath}.reaping`
+  const deadline = Date.now() + waitMs
+  while (!enterReapMutex(mutexPath)) {
+    if (Date.now() > deadline) {
+      return { ok: false, reason: 'the lock mutex is held; another lock writer or a takeover is mid-swap — retry or reconcile' }
+    }
+    // A synchronous, bounded spin: contention is measured in milliseconds.
+  }
+  try {
+    return { ok: true, result: fn() }
+  } finally {
+    exitReapMutex(mutexPath)
+  }
+}
+
+/**
  * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race' |
  * 'stale-event' | 'stale-fence'.
  *   - 'acquired'  — this session now owns the batch.
