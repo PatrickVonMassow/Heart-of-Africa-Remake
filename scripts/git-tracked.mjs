@@ -37,8 +37,11 @@ import { relative, resolve as resolvePath, sep } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 
 export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, content } = {}) {
-  const raw = String(path ?? '').trim()
-  if (!raw) return false
+  // THE CALLER'S SPELLING, UNTOUCHED: trimming rewrote a legal filename that
+  // begins or ends with whitespace into a different pathname (re-review round
+  // 5). Only an argument that is nothing but whitespace is refused.
+  const raw = String(path ?? '')
+  if (!raw.trim()) return false
   const real = run('git', ['rev-parse', '--path-format=absolute', '--show-toplevel'], {
     windowsHide: true,
     cwd: root,

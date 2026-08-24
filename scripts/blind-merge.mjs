@@ -364,7 +364,12 @@ if (isMainModule(import.meta.url)) {
       )
       process.exit(1)
     }
-    const declared = mergedBy || unionMergedBy
+    // THE ARTEFACT IS AUTHORITATIVE: the committed union's spelling is what is
+    // judged, and the flag is only a cross-check against it. Preferring the
+    // flag let a family-wide name bridge two different models — committed
+    // "GPT-6 Sol" plus "--merged-by Sol" passed both comparisons while the
+    // record then named the current Sol (re-review round 5).
+    const declared = unionMergedBy || mergedBy
     const switchFallback = mergerWroteAHalf ? mergeFallbackReason(fableState) : ''
     const mergerReason = fallback || switchFallback
     const merger = validateMerger({ mergedBy: expectedMerger, authors: [a.model, b.model], fallback: mergerReason })

@@ -221,6 +221,24 @@ describe('the command', () => {
     expect(r.out).toMatch(/names no "mergedBy"/)
   })
 
+  it('judges the committed union spelling, so a family-wide flag cannot bridge two models', () => {
+    // Committed "GPT-6 Sol" beside --merged-by "Sol": the flag matches both the
+    // union and the expected merger by family, but the artefact's own spelling
+    // is a DIFFERENT Sol than the switch owes — and that is what is judged.
+    const other = write('U-gpt6.json', {
+      mergedBy: 'GPT-6 Sol',
+      entries: [
+        { id: 'U1', from: ['A1'] },
+        { id: 'U2', from: ['A2', 'B1'], defect: 'the badge overlaps the date' },
+      ],
+    })
+    git('add', 'U-gpt6.json')
+    git('commit', '-q', '-m', 'File a union folded by a different Sol version')
+    const r = runOff('--a', p('claude-a.json'), '--b', p('B.json'), '--union', other, '--merged-by', 'Sol')
+    expect(r.status).toBe(1)
+    expect(r.out).toMatch(/is not the one this stage owes/)
+  })
+
   it('refuses a hand-stated outage in place of the switch-owned merger reason', () => {
     const r = run(
       '--a',

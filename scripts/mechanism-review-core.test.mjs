@@ -449,6 +449,11 @@ describe('evaluateMechanismReview', () => {
     // …a reasonless one does not, and an unknown vendor never does.
     expect(judge(claim('GPT-5.6 Sol', { status: 'unverified' }), 'Claude Opus 5')).toBe(true)
     expect(judge(claim('Mystery 9', { status: 'unverified', reason: 'who knows' }), 'Claude Opus 5')).toBe(true)
+    // Contradictory vendor markers are nobody: a label naming both families
+    // reached the OpenAI branch by first-match and cleared with only a reason.
+    expect(
+      judge(claim('Claude Opus 5 GPT-5', { status: 'unverified', reason: 'mixed markers' }), 'GPT-5.6 Sol'),
+    ).toBe(true)
     // An OpenAI "agreement" is fabricated evidence — no harness transcript can
     // hold that vendor's messages — and is refused even with matching names.
     expect(

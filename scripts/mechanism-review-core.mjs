@@ -1268,8 +1268,15 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
 
 export const modelVendor = (model) => {
   const value = String(model ?? '').toLowerCase()
-  if (/\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)) return 'openai'
-  if (/\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)) return 'anthropic'
+  const openai = /\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)
+  const anthropic = /\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)
+  // CONTRADICTORY MARKERS ARE NOBODY, not first-match-wins (re-review round 5):
+  // "Claude Opus 5 GPT-5" reached the OpenAI branch and cleared as
+  // unverified-with-reason, bypassing both the unknown-vendor refusal and the
+  // Anthropic agreement requirement.
+  if (openai && anthropic) return 'unknown'
+  if (openai) return 'openai'
+  if (anthropic) return 'anthropic'
   return 'unknown'
 }
 

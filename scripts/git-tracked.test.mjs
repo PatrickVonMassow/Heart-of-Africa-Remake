@@ -150,6 +150,16 @@ describe('isTrackedInGit — committed bytes only', () => {
     }
   })
 
+  it('checks a whitespace-bearing filename as itself, not as its trimmed cousin', () => {
+    // Trimming turned " spaced.json" into "spaced.json" — a different pathname —
+    // so the tracked answer was about a file the caller never named.
+    writeFileSync(join(repo, 'docs', ' spaced.json'), '{"model":"Opus 5","entries":[]}\n')
+    git(['add', 'docs/ spaced.json'], repo)
+    git(['commit', '-q', '-m', 'track a whitespace-bearing name'], repo)
+    expect(isTrackedInGit('docs/ spaced.json', { root: repo })).toBe(true)
+    expect(isTrackedInGit('docs/spaced.json', { root: repo })).toBe(false)
+  })
+
   // THE CONSUMER'S OWN BYTES ARE THE ONES THAT MUST MATCH. A caller that has
   // already read the file passes what it read, so the answer is about the text
   // it will parse rather than about a second read that could differ.

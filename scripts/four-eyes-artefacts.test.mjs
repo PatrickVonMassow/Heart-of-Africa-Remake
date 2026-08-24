@@ -195,8 +195,6 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // satisfied it. The row is picked by the sources it says it read, there must
     // be exactly one, and it has to name Fable 5 — the model that wrote neither
     // half — as the merger.
-    const entries = JSON.parse(read(UNION)).entries
-    const from = entries.map((e) => e.from)
     const rows = read(LEDGER)
       .split('\n')
       .filter(Boolean)
@@ -205,6 +203,12 @@ describe('the 676 stage is auditable from its raw halves', () => {
       .filter((r) => r.halfSources.join('|') === `${HALF_A}.json|${HALF_B}.json`)
     expect(rows, 'the 676 fold is recorded exactly once').toHaveLength(1)
     const row = rows[0]
+    // The union is read at the ROW'S sha, like everything else this case
+    // recomputes — the audit is of the historical fold, not of the working tree.
+    const entries = JSON.parse(
+      execFileSync('git', ['show', `${row.sha}:${row.unionSource}`], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true }),
+    ).entries
+    const from = entries.map((e) => e.from)
 
     const halfModel = (half) => JSON.parse(read(`${half}.json`)).model
     expect(row.halfAuthors).toEqual([halfModel(HALF_A), halfModel(HALF_B)])

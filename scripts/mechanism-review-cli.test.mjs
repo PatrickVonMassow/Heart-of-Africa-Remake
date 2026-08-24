@@ -201,8 +201,10 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     expect(verifyHalfAuthors(row, deps({ blobText: (oid) => unowned[oid] ?? null }))).toBe(false)
   })
 
-  it('still refuses an untracked source or a contradicted model', () => {
-    expect(verifyHalfAuthors(row, deps({ isTracked: (src) => src !== 'docs/b.json' }))).toBe(false)
+  it('still refuses a source absent from the row-sha tree or a contradicted model', () => {
+    // The anchor is the row's own commit: a source its tree does not carry is
+    // nothing — a working-tree condition would instead rot true historical rows.
+    expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => (src === 'docs/b.json' ? null : blobs[src]) }))).toBe(false)
     const renamed = { ...blobs, 'docs/a.json': { oid: 'aaaa1', model: 'Fable 5' } }
     expect(verifyHalfAuthors(row, deps({ committedHalf: (src) => renamed[src] ?? null }))).toBe(false)
   })
@@ -477,7 +479,10 @@ describe('the mode round-trips into the ledger', () => {
       }
       const listA = w('A.json', { model: 'Fable 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the first defect' }] })
       const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the first' }] })
-      const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect, both said it' }] })
+      const union = w('U.json', {
+        mergedBy: 'Fable 5',
+        entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect, both said it' }],
+      })
       const selfMerged = build({
         mode: 'blind-parallel',
         mergedBy: 'Fable 5',
@@ -521,6 +526,7 @@ describe('the mode round-trips into the ledger', () => {
       })
       const listB = w('B.json', { model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'y.ts', defect: 'the second' }] })
       const union = w('U.json', {
+        mergedBy: 'Claude Opus 5',
         entries: [
           { id: 'U1', from: ['A1'] },
           { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
@@ -564,17 +570,42 @@ describe('the mode round-trips into the ledger', () => {
       expect(untracked.record?.halfAuthors).toBeUndefined()
 
       // AND THE HOLE THAT FIXTURE STOOD IN: an author of a half is refused as the
-      // merger now that the halves say who wrote them.
+      // merger now that the halves say who wrote them — the union itself names
+      // the half-author, so the committed artefact carries the self-merge.
+      const selfUnion = w('U-self.json', {
+        mergedBy: 'GPT-5.6 Sol',
+        entries: [
+          { id: 'U1', from: ['A1'] },
+          { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
+        ],
+      })
       const selfMerged = build({
         mode: 'blind-parallel',
         mergedBy: 'GPT-5.6 Sol',
-        unionPath: union,
+        unionPath: selfUnion,
         listAPath: listA,
         listBPath: listB,
         ...tracked,
       })
       expect(selfMerged.ok).toBe(false)
       expect((selfMerged.errors ?? []).join('\n')).toMatch(/authored one of the two lists \(GPT-5\.6 Sol\)/)
+
+      // A committed union that names NO merger refuses at the recorder, not
+      // first at the gate (re-review round 5).
+      const unowned = build({
+        mode: 'blind-parallel',
+        unionPath: w('U-unowned.json', {
+          entries: [
+            { id: 'U1', from: ['A1'] },
+            { id: 'U2', from: ['A2', 'B1'], defect: 'the second defect, both said it' },
+          ],
+        }),
+        listAPath: listA,
+        listBPath: listB,
+        ...tracked,
+      })
+      expect(unowned.ok).toBe(false)
+      expect((unowned.errors ?? []).join('\n')).toMatch(/names no "mergedBy"/)
       expect(built.ok, (built.errors ?? []).join('\n')).toBe(true)
       expect(built.record.accounting).toMatch(/^2 A \+ 1 B entries → 2 union entries .*every input entry accounted for$/)
       expect(built.record.accountingSource).toBe('computed')

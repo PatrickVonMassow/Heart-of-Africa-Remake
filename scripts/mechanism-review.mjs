@@ -140,6 +140,22 @@ export function committedHalfModel(path, { at = 'HEAD' } = {}) {
 export function reviewerVendorProblems(model, authorship = {}) {
   const vendor = modelVendor(model)
   const status = String(authorship?.status ?? '').trim()
+  // THE EVIDENCE MUST BE ABOUT THE MODEL RECEIVING CREDIT (re-review round 5):
+  // a carried source hand-credited to one model beside an agreement quoted for
+  // another passed the vendor test on the credit alone.
+  const claimed = String(authorship?.claimedModel ?? '').trim()
+  if (claimed && !sameModel(claimed, model)) {
+    return [
+      `the reviewer identity evidence is about "${claimed}" while the credit names "${model}" — ` +
+        'evidence for one model proves nothing about another',
+    ]
+  }
+  if (status === 'agreement' && authorship?.actualModel && !sameModel(authorship.actualModel, model)) {
+    return [
+      `the transcript agreement names "${authorship.actualModel}" while the credit names "${model}" — ` +
+        'evidence for one model proves nothing about another',
+    ]
+  }
   if (vendor === 'unknown') {
     return [
       `the claimed reviewer "${model}" names no vendor the review roster can place — a reviewer nobody ` +
@@ -217,7 +233,7 @@ export function committedBlobText(oid) {
  *  claims, the union's committed mergedBy says what the row claims, the
  *  recomputed accounting balances and reproduces the recorded receipt, and the
  *  named paths still carry those exact blobs. The gate poisons anything less. */
-export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel, blobText = committedBlobText, committedOidOf = committedOid } = {}) {
+export function verifyHalfAuthors(record, { committedHalf = committedHalfModel, blobText = committedBlobText, committedOidOf = committedOid } = {}) {
   const authors = Array.isArray(record?.halfAuthors) ? record.halfAuthors : []
   const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
   const blobs = Array.isArray(record?.halfBlobs) ? record.halfBlobs : []
@@ -230,8 +246,10 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
   // moved past its artefacts).
   const at = String(record?.sha ?? '').trim()
   if (!/^[0-9a-f]{7,40}$/i.test(at)) return false
+  // The row's sha is the WHOLE anchor: what its tree carries is immutable
+  // evidence, and a working-tree condition would make a true historical row
+  // rot when later commits move or delete the artefacts (re-review round 5).
   const anchored = sources.every((src, i) => {
-    if (!isTracked(src)) return false
     const committed = committedHalf(src, { at })
     if (committed === null) return false
     if (committed.oid !== String(blobs[i] ?? '').trim()) return false
@@ -246,7 +264,6 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
   const unionBlob = String(record?.unionBlob ?? '').trim()
   const unionSource = String(record?.unionSource ?? '').trim()
   if (!unionBlob || !unionSource) return false
-  if (!isTracked(unionSource)) return false
   if (committedOidOf(unionSource, { at }) !== unionBlob) return false
   const texts = [blobs[0], blobs[1], unionBlob].map((oid) => blobText(oid))
   if (texts.some((t) => t === null)) return false
@@ -390,7 +407,8 @@ export function countUnionFiles({ unionPath, listAPath, listBPath }) {
   // merger check falls back to — see buildRecord below for why the proxy is wrong
   // whenever the merging model is also the one that commits the union.
   const halfAuthors = [a.model, b.model].map((m) => String(m ?? '').trim()).filter(Boolean)
-  return { ok: true, summary: summaryLine(result), halfAuthors, errors: [] }
+  const unionMergedBy = Array.isArray(union) ? '' : String(union?.mergedBy ?? '').trim()
+  return { ok: true, summary: summaryLine(result), halfAuthors, unionMergedBy, errors: [] }
 }
 
 /**
@@ -536,6 +554,29 @@ export function buildRecord({
     }
     const counted = countUnion({ unionPath, listAPath, listBPath })
     if (!counted.ok) return { ok: false, errors: counted.errors }
+    // THE ARTEFACT NAMES THE MERGER, and this command may not out-talk it
+    // (re-review round 5): a union with no mergedBy, or one contradicting the
+    // flag, used to record fine and only the GATE later refused the row — a
+    // "recorded" the ledger would never honor.
+    const unionOwner = String(counted.unionMergedBy ?? '').trim()
+    if (!unionOwner) {
+      return {
+        ok: false,
+        errors: [
+          `the union (${unionPath}) names no "mergedBy" — the committed union must say who folded it, ` +
+            'or the row could never be re-derived',
+        ],
+      }
+    }
+    if (String(mergedBy ?? '').trim() && !sameModel(mergedBy, unionOwner)) {
+      return {
+        ok: false,
+        errors: [
+          `--merged-by "${mergedBy}" contradicts the committed union, which says "${unionOwner}" merged it`,
+        ],
+      }
+    }
+    mergedBy = unionOwner
     receipt = counted.summary
     source = 'computed'
     // ONLY FROM TRACKED HALVES, AND ONLY FROM THEIR COMMITTED BYTES: an
