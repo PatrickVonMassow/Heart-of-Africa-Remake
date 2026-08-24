@@ -431,6 +431,20 @@ describe('a record is read once — the accessor class of the cross-vendor revie
       expect(claimed.reason, String(container)).toMatch(/uncertain fails closed/)
       expect(releaseWorktree({ claims: container, worktree: '/wt/a', attempt }).ok, String(container)).toBe(false)
     }
+    // A CONTAINER WHOSE SHAPE CANNOT BE READ is not a container with no prototype.
+    // The two answers were the same value, so a proxy over a populated Map whose
+    // getPrototypeOf trap throws was accepted and read as empty — the same silent
+    // success as above, reached through the guard meant to prevent it. A revoked
+    // proxy throws at the array test in the same breath.
+    const hostile = new Proxy(new Map([['/wt/a', { ...attempt }]]), {
+      getPrototypeOf() { throw new Error('unreadable') },
+    })
+    expect(claimWorktree({ claims: hostile, worktree: '/wt/a', attempt: other }).ok).toBe(false)
+    const revoked = Proxy.revocable({ '/wt/a': { ...attempt } }, {})
+    revoked.revoke()
+    expect(claimWorktree({ claims: revoked.proxy, worktree: '/wt/a', attempt: other }).ok).toBe(false)
+    expect(releaseWorktree({ claims: revoked.proxy, worktree: '/wt/a', attempt }).ok).toBe(false)
+
     // A map with no prototype at all is a plain collection and stays readable.
     const bare = Object.assign(Object.create(null), { '/wt/a': { ...attempt } })
     expect(claimWorktree({ claims: bare, worktree: '/wt/a', attempt: other }).reason).toMatch(/never share/)

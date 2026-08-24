@@ -426,8 +426,14 @@ function readClaims(claims) {
   // invariant broken by the one path that looks like success (cross-vendor review of
   // point 893). A record INSIDE the map is a reference like any other and is read
   // through `carriesFields` below; only the container is held to this.
-  const shape = readOnce(() => Object.getPrototypeOf(claims))
-  if (typeof claims !== 'object' || Array.isArray(claims) || (shape !== Object.prototype && shape !== null)) {
+  // THE READING OF THE SHAPE IS ITSELF GUARDED, AND ITS FAILURE IS NOT ITS ANSWER.
+  // A bare `readOnce(() => Object.getPrototypeOf(claims))` answered null both for a
+  // legitimate null prototype and for a trap that threw, so a proxy over a populated
+  // Map was ACCEPTED and read as empty; `Array.isArray` on a revoked proxy throws in
+  // the same breath (cross-vendor review of point 893). Both readings are taken
+  // together, inside the guard, and a shape that cannot be read at all is no shape.
+  const shape = readOnce(() => ({ proto: Object.getPrototypeOf(claims), isArray: Array.isArray(claims) }))
+  if (typeof claims !== 'object' || !shape || shape.isArray || (shape.proto !== Object.prototype && shape.proto !== null)) {
     return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
   }
   // A STORED KEY IS ITSELF A CANONICAL WORKTREE KEY. Canonicalising only the
