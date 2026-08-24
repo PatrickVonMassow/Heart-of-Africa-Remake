@@ -48,6 +48,17 @@ function usableLease(lease) {
   )
 }
 
+/** Every lease this module hands out is sealed DOWN TO ITS IDENTITY. Freezing the
+ *  envelope alone left `holder` a plain reference: the renewal spread copied the
+ *  one a JSON-restored lease carries — the daemon's persisted state, and the normal
+ *  case — so the holder of a returned lease could rewrite whose process owns it and
+ *  leaseAllowsWrite then authorised the substituted identity (cross-vendor review of
+ *  point 893). The identity is a FRESH frozen record, so no reference anyone already
+ *  holds reaches into a lease this module has handed out. */
+function sealedLease(lease) {
+  return Object.freeze({ ...lease, holder: Object.freeze({ pid: lease.holder.pid, pidStartedAt: lease.holder.pidStartedAt }) })
+}
+
 /** The moment before which a clock is ROLLED BACK for this lease. A renewal keeps
  *  the original grantedAt — that is the lease's identity — so a jump back to a
  *  moment after the grant but before the last renewal used to read as a merely
@@ -119,7 +130,7 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
     }
     if (sameProcess(existing.holder, holder)) {
       if (now <= existing.expiresAt) {
-        return { ok: true, renewed: true, lease: Object.freeze({ ...existing, renewedAt: now, expiresAt }) }
+        return { ok: true, renewed: true, lease: sealedLease({ ...existing, renewedAt: now, expiresAt }) }
       }
       // A LAPSED lease never extends silently (M38): once the renewal persisted,
       // expiredLeaseAlerts could no longer observe the lapse. The lapse is
@@ -139,12 +150,12 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
         renewed: false,
         lapsed: true,
         alert: `attempt lease ${existing.leaseId} lapsed ${now - existing.expiresAt}ms before its holder pid ${holder.pid} returned; re-granted as a new lease`,
-        lease: Object.freeze({
+        lease: sealedLease({
           batchId: attempt.batchId,
           pointId: attempt.pointId,
           attemptId: attempt.attemptId,
           leaseId,
-          holder: Object.freeze({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }),
+          holder,
           grantedAt: now,
           expiresAt,
         }),
@@ -185,12 +196,12 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
   return {
     ok: true,
     renewed: false,
-    lease: Object.freeze({
+    lease: sealedLease({
       batchId: attempt.batchId,
       pointId: attempt.pointId,
       attemptId: attempt.attemptId,
       leaseId,
-      holder: Object.freeze({ pid: holder.pid, pidStartedAt: holder.pidStartedAt }),
+      holder,
       grantedAt: now,
       expiresAt,
     }),
@@ -223,7 +234,9 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
   if (now > lease.expiresAt) {
     return { verdict: 'fenced', reason: 'the lease has expired; renew through the daemon before writing, or stop' }
   }
-  return { verdict: 'write', lease }
+  // The evidence a passed check hands back is sealed too: a `write` verdict must
+  // not carry a record anything downstream can rewrite.
+  return { verdict: 'write', lease: sealedLease(lease) }
 }
 
 /** Expiry is LOUD (M18/M38): every expired lease is an alert naming its attempt,

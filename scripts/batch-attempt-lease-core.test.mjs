@@ -27,6 +27,45 @@ describe('grantAttemptLease', () => {
     expect(renewed.lease.expiresAt).toBe(20_000 + ATTEMPT_LEASE_TTL_MS)
   })
 
+  it('freezes the identity a RENEWED lease carries, not merely the envelope around it', () => {
+    // The renewal spread `{ ...existing }`, which copies the REFERENCE to the
+    // holder, and freezing the outer object leaves that reference writable. The
+    // suite only ever renewed a freshly GRANTED lease, whose holder the grant path
+    // had already frozen; a lease restored from JSON — the daemon's persisted
+    // state, and the normal case — carries an unfrozen holder, so whoever held the
+    // renewal could rewrite whose process owns it and this module believed the
+    // rewrite (cross-vendor review of point 893).
+    const persisted = JSON.parse(JSON.stringify(grant().lease))
+    const renewed = grant({ existing: persisted, now: 20_000 })
+    expect(renewed).toMatchObject({ ok: true, renewed: true })
+    expect(Object.isFrozen(renewed.lease.holder)).toBe(true)
+    const impostor = { pid: 999, pidStartedAt: 7000 }
+    try {
+      renewed.lease.holder.pid = impostor.pid
+      renewed.lease.holder.pidStartedAt = impostor.pidStartedAt
+    } catch {
+      // A frozen holder throws on assignment under module strict mode — that IS the fix.
+    }
+    expect(renewed.lease.holder).toEqual(holder)
+    expect(leaseAllowsWrite({ lease: renewed.lease, holder: impostor, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
+    // Nor may it alias the persisted record it was renewed from.
+    persisted.holder.pid = 999
+    expect(renewed.lease.holder.pid).toBe(holder.pid)
+  })
+
+  it('hands the write verdict a sealed lease rather than the record the caller supplied', () => {
+    // `leaseAllowsWrite` returned the very object it was handed, so the evidence a
+    // passed check produces carried a rewritable identity for as long as anything
+    // downstream held it (cross-vendor review of point 893).
+    const persisted = JSON.parse(JSON.stringify(grant().lease))
+    const allowed = leaseAllowsWrite({ lease: persisted, holder, leaseId: 'L1', now: 20_000 })
+    expect(allowed.verdict).toBe('write')
+    expect(Object.isFrozen(allowed.lease)).toBe(true)
+    expect(Object.isFrozen(allowed.lease.holder)).toBe(true)
+    persisted.holder.pid = 999
+    expect(allowed.lease.holder.pid).toBe(holder.pid)
+  })
+
   it('never extends a LAPSED lease silently: the same holder is alerted and re-granted under a new id', () => {
     const first = grant().lease
     const after = 10_000 + ATTEMPT_LEASE_TTL_MS + 1
