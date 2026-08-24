@@ -1,4 +1,4 @@
-// THE DURABLE STATE STORE'S DECISIONS (point 834, step 2), swept without a
+// THE DURABLE STATE STORE'S DECISIONS (point 892, step 2), swept without a
 // filesystem: what replay calls an ordinary crash and what it calls corruption,
 // what the derived snapshot carries and what it quarantines, and how a sealed
 // snapshot judges its own bytes on the way back in.

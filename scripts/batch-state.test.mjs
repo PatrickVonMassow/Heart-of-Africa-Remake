@@ -1,4 +1,4 @@
-// THE DURABLE STATE STORE'S I/O (point 834, step 2), against a real filesystem in
+// THE DURABLE STATE STORE'S I/O (point 892, step 2), against a real filesystem in
 // a throwaway git repository: the store lands in the git COMMON directory so every
 // worktree reaches the same record, appends survive as either whole lines or an
 // ordinary-crash tail, snapshot replacement is atomic, and the reader refuses the

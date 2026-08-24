@@ -1,4 +1,4 @@
-// THE DURABILITY BOUNDARY OF NEW NAMES (point 834, step 2): an fsynced file
+// THE DURABILITY BOUNDARY OF NEW NAMES (point 892, step 2): an fsynced file
 // can vanish with its filename after a crash when the DIRECTORY entry never
 // reached the disk, so creating the store subtree and creating the journal
 // must each flush the directory holding the new name. A crash cannot be

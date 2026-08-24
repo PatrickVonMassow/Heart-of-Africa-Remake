@@ -1,5 +1,5 @@
 // THE DURABLE STATE STORE'S I/O — step 2 of the "Ordered work" in
-// docs/handover-architecture.md (work-order point 834, the front stage of 676).
+// docs/handover-architecture.md (work-order point 892, the front stage of 676).
 //
 // Thin by design: every decision lives in scripts/batch-state-core.mjs and
 // scripts/batch-schema-core.mjs; this file only moves bytes, and it moves them

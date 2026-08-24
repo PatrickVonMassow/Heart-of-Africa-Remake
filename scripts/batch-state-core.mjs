@@ -1,5 +1,5 @@
 // THE DURABLE STATE STORE'S DECISION CORE — step 2 of the "Ordered work" in
-// docs/handover-architecture.md (work-order point 834, the front stage of 676).
+// docs/handover-architecture.md (work-order point 892, the front stage of 676).
 //
 // Pure like step 1: no filesystem, no process, no clock. This module decides what
 // a journal's bytes MEAN — which lines are entries, which tail is an ordinary
