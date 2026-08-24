@@ -393,6 +393,17 @@ export function sameCredential(a, b) {
   return Boolean(a && b && a.generation === b.generation && a.fence === b.fence && a.seq === b.seq)
 }
 
+/** The ONE serialisation of a credential that may be written into the credential
+ *  ref: canonical JSON plus newline. Callers hash exactly these bytes (git
+ *  hash-object) to obtain the oid a publication pushes, and any verifier can
+ *  re-derive the same oid from the same credential — that is what binds the
+ *  pushed object to the credential the push claims to publish. */
+export function credentialBody(cred) {
+  const checked = credential(cred)
+  if (!checked.ok) return { ok: false, reason: checked.reason }
+  return { ok: true, body: `${canonicalJson(checked.credential)}\n` }
+}
+
 /** The next credential for one publishing act. Always a real change. */
 export function advancedCredential(current, { fence = current?.fence } = {}) {
   if (!current) return { ok: false, reason: 'no current credential to advance' }
@@ -403,8 +414,12 @@ export function advancedCredential(current, { fence = current?.fence } = {}) {
  *  It REFUSES to construct a publication whose credential update would be a no-op:
  *  such a push has no fence at all, which is worse than a rejected one because it
  *  succeeds. `expectedOid` is the oid of the credential currently published, or the
- *  empty string for the very first advance, which leases the ref's ABSENCE. */
-export function publicationPush({ current = null, next = null, expectedOid, refs = [] } = {}) {
+ *  empty string for the very first advance, which leases the ref's ABSENCE.
+ *  `credentialOid` is the oid of the object holding credentialBody(next)'s exact
+ *  bytes: the push names THAT oid in an explicit refspec, so what the remote ref
+ *  receives is the named object — never whatever a mutable local ref happens to
+ *  hold at execution time. */
+export function publicationPush({ current = null, next = null, expectedOid, credentialOid, refs = [] } = {}) {
   if (!next) return { ok: false, reason: 'no credential to publish' }
   if (!credential(next).ok) return { ok: false, reason: `the credential to publish is malformed: ${credential(next).reason}` }
   // Absence is null or undefined and NOTHING else: `!current` would read `false`
@@ -472,13 +487,24 @@ export function publicationPush({ current = null, next = null, expectedOid, refs
     return { ok: false, reason: 'the credential ref is appended by the push itself and is not work' }
   }
   if (!refs.length) return { ok: false, reason: 'a publication must carry work as well as the credential' }
+  // THE PUSHED CREDENTIAL IS AN OID, NOT A REF NAME: pushing the bare
+  // CREDENTIAL_REF would publish whatever the mutable local ref holds at
+  // execution time — possibly stale, possibly another credential — while the
+  // lease still matched, and the command and the credential would have come
+  // apart exactly where the contract says they cannot. The caller hashes
+  // credentialBody(next) (git hash-object -w) and presents that oid here; the
+  // refspec then names the object itself.
+  if (typeof credentialOid !== 'string' || !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(credentialOid)) {
+    return { ok: false, reason: "credentialOid must be the object id of credentialBody(next)'s bytes; a push through a mutable local ref is refused" }
+  }
   return {
     ok: true,
-    // The VALUE the caller must write into the credential ref, returned beside the
-    // command so the two cannot come apart: a push built here that carried some
-    // other blob would be a lease on one credential and a publication of another.
+    // The credential this push publishes, beside the command AND bound into it:
+    // the refspec carries credentialOid, so the remote receives the named
+    // object — a push built here cannot carry some other blob.
     credential: next,
-    args: ['push', '--atomic', `--force-with-lease=${CREDENTIAL_REF}:${expectedOid}`, 'origin', ...refs, CREDENTIAL_REF],
+    credentialOid,
+    args: ['push', '--atomic', `--force-with-lease=${CREDENTIAL_REF}:${expectedOid}`, 'origin', ...refs, `${credentialOid}:${CREDENTIAL_REF}`],
   }
 }
 
@@ -549,7 +575,13 @@ export function mayMintFence({ fenceStore = null, journalOk = false, journalHigh
  *  epoch: it re-reads the lock for each mutation and accepts only when the lock
  *  names the same session, carries the same fence, and is LIVE by the test this
  *  repository already uses. */
-export function validateMutation({ presented = {}, lock = null, probe = null, now = 0 } = {}) {
+export function validateMutation({ presented = {}, lock = null, probe = null, now = null } = {}) {
+  // THE CLOCK IS EVIDENCE, not a default: lease expiry is a judgment about time,
+  // and an omitted or non-finite `now` would compare as forever-fresh — an
+  // expired lock accepted precisely because nobody looked at a clock. Refused.
+  if (!Number.isFinite(now) || now <= 0) {
+    return { ok: false, reason: 'no usable clock was presented; lease expiry cannot be judged, so the mutation is refused' }
+  }
   if (!lock) return { ok: false, reason: 'no batch lock: a daemon with no live lock refuses every mutation' }
   // The equalities below require the value PRESENT before it is compared: two
   // absent values compare equal, so a presentation carrying no session or no fence
@@ -585,9 +617,18 @@ export function validateMutation({ presented = {}, lock = null, probe = null, no
 
 /** The window this design does not close, and closes the EFFECT of instead: a
  *  release can land between validation and write. So the daemon re-reads the lock
- *  immediately after the write and compensates when it moved. */
-export function revalidateAfterWrite({ validated = {}, lock = null } = {}) {
+ *  immediately after the write and compensates when it moved — and "moved" is the
+ *  WHOLE validation, not the identity alone: an unchanged lock whose lease ran
+ *  out, or whose owner died, during the mutation proves nothing either. A stale
+ *  coordinator's write must not stand because the file it abandoned still spells
+ *  its name. */
+export function revalidateAfterWrite({ validated = {}, lock = null, probe = null, now = null } = {}) {
   if (!lock) return { verdict: 'compensate', reason: 'the lock is gone' }
+  // The same clock rule as validation itself: expiry is a judgment about time,
+  // and without a usable `now` the mutation cannot be proven to stand.
+  if (!Number.isFinite(now) || now <= 0) {
+    return { verdict: 'compensate', reason: 'no usable clock, so the mutation cannot be proven to stand' }
+  }
   // The same absence rule as validation itself: a record that cannot name what it
   // validated cannot prove the mutation stands, and "cannot prove" compensates.
   if (typeof validated.sessionId !== 'string' || !validated.sessionId || !Number.isInteger(validated.fence) || validated.fence < 1) {
@@ -595,6 +636,12 @@ export function revalidateAfterWrite({ validated = {}, lock = null } = {}) {
   }
   if (lock.sessionId !== validated.sessionId || lock.fence !== validated.fence) {
     return { verdict: 'compensate', reason: 'the lock moved under the mutation' }
+  }
+  if (!Number.isFinite(lock.leaseUntil) || now > lock.leaseUntil) {
+    return { verdict: 'compensate', reason: 'the lease expired during the mutation; the unchanged lock proves nothing' }
+  }
+  if (probe?.live !== true || !sameProcess(lock, { pid: probe.pid, pidStartedAt: probe.startedAt })) {
+    return { verdict: 'compensate', reason: 'the lock owner is not probed live after the write' }
   }
   return { verdict: 'stands' }
 }
@@ -810,7 +857,11 @@ export function parseFramedLine(line) {
   try {
     parsed = JSON.parse(line)
   } catch {
-    return { ok: false, reason: 'truncated: the line is not complete JSON' }
+    // The delimiter is PRESENT, so these are not bytes that never finished: a
+    // newline-terminated line that is not valid JSON is completed corrupt
+    // evidence. Calling it truncated would let recovery discard corruption as
+    // ordinary crash residue.
+    return { ok: false, reason: 'corrupt: the delimited line is not valid JSON' }
   }
   if (!parsed || typeof parsed !== 'object' || !parsed.c) return { ok: false, reason: 'malformed: no checksum' }
   const { c, ...body } = parsed

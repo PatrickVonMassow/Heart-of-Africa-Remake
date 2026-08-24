@@ -350,7 +350,11 @@ async function serve(args) {
       return { ok: false, reason: `refused: the journal could not record ${request.cmd} (${logged.reason}); the local effect was reversed` }
     }
     applied.add(keyed.key)
-    const after = revalidateAfterWrite({ validated: presented, lock: readLock(repoDir) })
+    // The post-write check is the WHOLE validation again — identity, lease
+    // time, owner liveness — so a lease that expired or an owner that died
+    // during the mutation compensates like a moved lock does.
+    const lockAfter = readLock(repoDir)
+    const after = revalidateAfterWrite({ validated: presented, lock: lockAfter, probe: lockAfter ? probeOf(lockAfter.pid) : null, now: nowMs() })
     if (after.verdict === 'compensate') {
       const compensated = compensateFn ? await compensateFn(result) : { note: 'no local effect to reverse' }
       journalEntry({ kind: 'command', name: `${request.cmd}:compensated`, key: `${keyed.key}:comp`, payload: { reason: after.reason, ...compensated } }, validated.fence)
