@@ -60,7 +60,7 @@ import {
   resolveBoundaryDestination,
   takeoverDecision,
 } from './batch-claim-core.mjs'
-import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
+import { readDeclaration, refTipAt, registeredFeatureWriters, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessCiWait, assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import {
   RESUME_PROMPT,
@@ -1114,6 +1114,12 @@ const previousBatchWriters = state.writerObservations && typeof state.writerObse
   ? state.writerObservations
   : {}
 const fenceState = readFence()
+const featureWriterRegister = registeredFeatureWriters({
+  now,
+  // A clean boundary explicitly transfers declared agents. Recognising those
+  // records keeps that supported overlap while every undeclared checkout vetoes.
+  declaration: trigger.kind === SUCCESSOR_TRIGGERS.BOUNDARY ? declaration : null,
+})
 const ciWait = readJson(C('ci-status-guard-state.json'))?.ciWait ?? null
 const ciWaitAssessment = assessCiWait({ wait: ciWait, now, probePid })
 if (!batchParked && ciWaitAssessment.repair) {
@@ -1143,6 +1149,7 @@ let startDecision = successorStartDecision({
   batchWriters,
   previousBatchWriters,
   fenceState,
+  featureWriterRegister,
   probePid,
   now,
 })
@@ -1253,6 +1260,10 @@ if (verdict === 'skip-alive') {
         batchWriters: afterWriters,
         previousBatchWriters: state.writerObservations,
         fenceState: readFence(),
+        featureWriterRegister: registeredFeatureWriters({
+          now,
+          declaration: trigger.kind === SUCCESSOR_TRIGGERS.BOUNDARY ? declaration : null,
+        }),
         probePid,
         now,
       })

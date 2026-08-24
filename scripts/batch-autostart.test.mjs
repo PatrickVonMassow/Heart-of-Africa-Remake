@@ -672,6 +672,16 @@ describe('the launcher uses the canonical repository for batch-global state', ()
   })
 })
 
+describe('the launcher consults registered feature writers before spawning', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('passes the measured register through both the initial and recovery decisions', () => {
+    expect(source).toMatch(/const featureWriterRegister = registeredFeatureWriters\(/)
+    expect(source.match(/featureWriterRegister[:,]/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(source).toMatch(/registeredFeatureWriters\(\{[\s\S]{0,180}?SUCCESSOR_TRIGGERS\.BOUNDARY/)
+  })
+})
+
 // Recurring healthy-flow and remediation notices are EVENTS: another identical
 // occurrence is new information, not evidence that a request went unanswered.
 // The launcher itself cannot be imported, so this source contract pins the

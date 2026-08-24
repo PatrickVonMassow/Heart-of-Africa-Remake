@@ -403,6 +403,7 @@ export function launcherStartDecision({
   batchWriters = {},
   previousBatchWriters = {},
   fenceState = null,
+  featureWriterRegister = { readable: true, writers: [] },
   probePid = () => null,
   now = Date.now(),
 } = {}) {
@@ -467,6 +468,11 @@ export function launcherStartDecision({
       assessmentReason: typeof assessment?.reason === 'string' ? assessment.reason : lock ? 'unmeasured' : 'no-lock',
     },
     batchWriters: writers,
+    featureWriterRegister: {
+      readable: featureWriterRegister?.readable === true,
+      reason: typeof featureWriterRegister?.reason === 'string' ? featureWriterRegister.reason : null,
+      writers: Array.isArray(featureWriterRegister?.writers) ? featureWriterRegister.writers : [],
+    },
   }
   // A lock's OWN writer does not overrule an explicit handover, idle release or
   // expired lease: those are ownership transitions the existing assessment was
@@ -485,6 +491,29 @@ export function launcherStartDecision({
         (lock ? ' independently of the owner lock' : ' with no owner lock present'),
       veto: vetoes[0],
       vetoes,
+      evidence,
+    }
+  }
+  const ownerInactive = !lock || assessment?.alive !== true
+  if (ownerInactive && evidence.featureWriterRegister.readable !== true) {
+    return {
+      start: false,
+      code: 'writer-register-unreadable',
+      reason: `the registered feature-writer evidence is unreadable (${evidence.featureWriterRegister.reason ?? 'unknown cause'})`,
+      evidence,
+    }
+  }
+  const featureVetoes = ownerInactive ? evidence.featureWriterRegister.writers.filter(
+    (writer) => writer?.recognized !== true && writer?.output?.verdict === 'alive',
+  ) : []
+  if (featureVetoes.length > 0) {
+    const identities = featureVetoes.map((writer) => `${writer.branch} (${writer.worktree})`).join(', ')
+    return {
+      start: false,
+      code: 'registered-writer-live',
+      reason: `recent registered feature-writer activity measured for ${identities}`,
+      veto: featureVetoes[0],
+      vetoes: featureVetoes,
       evidence,
     }
   }
@@ -543,6 +572,7 @@ export function successorStartDecision({
   batchWriters = {},
   previousBatchWriters = {},
   fenceState = null,
+  featureWriterRegister = { readable: true, writers: [] },
   probePid = () => null,
   now = Date.now(),
 } = {}) {
@@ -654,12 +684,13 @@ export function successorStartDecision({
     batchWriters,
     previousBatchWriters,
     fenceState,
+    featureWriterRegister,
     probePid,
     now,
   })
   evidence.ownership = ownership.evidence
   if (!ownership.start) {
-    return refuse('owner-live', ownership.reason, {
+    return refuse(ownership.code ?? 'owner-live', ownership.reason, {
       ownership: ownership.evidence,
       veto: ownership.veto ?? null,
       vetoes: ownership.vetoes ?? [],

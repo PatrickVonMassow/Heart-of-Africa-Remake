@@ -295,6 +295,25 @@ export function porcelainPaths(out, { limit = 400 } = {}) {
   return paths
 }
 
+/** Checked-out feat/* branches from Git's worktree register. Detached trees and
+ * the main checkout are deliberately absent: only a registered feature
+ * checkout can be the lockless writer this evidence is meant to find. */
+export function registeredFeatureWorktrees(porcelain) {
+  if (typeof porcelain !== 'string') return []
+  const records = []
+  let current = null
+  for (const line of porcelain.split(/\r?\n/)) {
+    if (line.startsWith('worktree ')) {
+      if (current?.path && current.branch?.startsWith('feat/')) records.push(current)
+      current = { path: line.slice('worktree '.length).trim(), branch: '' }
+    } else if (current && line.startsWith('branch refs/heads/')) {
+      current.branch = line.slice('branch refs/heads/'.length).trim()
+    }
+  }
+  if (current?.path && current.branch?.startsWith('feat/')) records.push(current)
+  return records
+}
+
 /**
  * WHICH EVIDENCE CARRIES THE VERDICT? PURE.
  *
