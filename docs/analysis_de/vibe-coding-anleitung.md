@@ -403,6 +403,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
+- **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet irgendetwas dein Werkzeug
+  automatisch nach (Zeitplan, Wachhund, „mach weiter"-Automatik), kann eine zweite Sitzung neben
+  einer laufenden aufgehen — beide haben beim Start ehrlich gefragt, nur zu verschiedenen
+  Zeitpunkten. Wer einmal beim Betreten prüft, erfährt einen Besitzwechsel nie.
+  → *Prompt:* „Wenn zwei Läufe von dir gleichzeitig möglich sind, reicht eine Prüfung beim Start
+  nicht: Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist** statt
+  ihn zu überschreiben, und stell die Besitzfrage **vor jedem Schreibvorgang** neu."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -441,4 +449,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 8e34376139f84f1061473a31ddefd9be88441cd024b24d15ecce6282c00123e3 -->
+<!-- GUIDE-FINGERPRINT: 19e23a5c6f94d48c3fef8e4c7ab1d70aa664be353a310470e9bfd332e84fa873 -->

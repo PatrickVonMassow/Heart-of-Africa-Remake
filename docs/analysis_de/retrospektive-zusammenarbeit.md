@@ -51,6 +51,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
 | 24.08. | Ein Rot, das die Wiederholung heilt: eine Netzprobe im Testfall überlebt dessen Timeout — deterministisch rot nach jedem Push, grün beim zweiten Lauf (§3.171); zehn Prüfrunden mit zehn echten Befunden neben einem Punkt bei Runde 27 ohne Konvergenz — die Rundenzahl sagt nichts, die Bewegung des Urteils alles (§3.172) |
+| 24.08. mittags | Zwei Batch-Sitzungen arbeiteten fünf Minuten am selben Punkt: zwei CI-Übergaben für verschiedene Refs starteten beide, die zweite nahm die Sperre mit einem Zaunwert weit unter dem Stand, und die unterlegene erfuhr es nur durch eine beiläufige Wächter-Vorschau (§3.173, Punkt 897); dieselbe Sitzung fand, dass ein unbekanntes Flag an der Gegenlese-Kommandozeile stillschweigend geschluckt wird und trotzdem eine bezahlte Runde startet (Punkt 896) |
 | 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
 | 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
 | 23.08. morgens | Ein Test über einem erzeugten Dokument verglich es mit einer frischen Ernte derselben Quellen — fünf falsche Aufrufzeilen standen jahrelang unter grünem Test, gefunden erst beim Lesen eines Diffs (§3.165) |
@@ -89,7 +90,7 @@ Gelöst durch den harten Singleton: Liveness am **OS-PID + Prozessstartzeit**, *
 
 Der zweite Teil ist die eigentlich teure Lehre: Am selben Tag war eine Absicherung genau gegen „lebender Besitzer wird enteignet" gebaut worden — sie greift nur, wenn die Pacht abläuft, und dieser Fall kam durch die Tür „nachweislich tot", die davor rangiert. Die Absicherung war korrekt gebaut und wurde nie gefragt. **Wer gegen eine Fehlerart absichert, muss die Absicherung an jeder Tür anbringen, durch die diese Fehlerart hereinkommt** — sonst prüft man den Weg, den man sich vorgestellt hat, statt den, den der Fehler nimmt. Der Stand-down-Teil derselben Absicherung hat dagegen funktioniert: Die enteignete Sitzung erfuhr es beim nächsten Hook und trat sauber ab.
 
-Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist auf Nutzerbefehl erneut scharf (`Enable-ScheduledTask`, State *Ready*), nachdem der Singleton live gegengeprüft war — während eine Sitzung die Sperre hielt, spawnte der Starter nichts, sondern meldete „owner alive". Das ist die Vorbedingung der autonomen Sitzungsgrenze, und es zeigt die Reihenfolge, die vorher fehlte: erst die Exklusivität am OS-Fakt beweisen, dann die Redundanz wieder einschalten. Eine spontan auftauchende zweite Sitzung ist seitdem **erwartetes Verhalten**, kein Vorfall — solange sie für den Lock-Owner zurücktritt.
+Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist auf Nutzerbefehl erneut scharf (`Enable-ScheduledTask`, State *Ready*), nachdem der Singleton live gegengeprüft war — während eine Sitzung die Sperre hielt, spawnte der Starter nichts, sondern meldete „owner alive". Das ist die Vorbedingung der autonomen Sitzungsgrenze, und es zeigt die Reihenfolge, die vorher fehlte: erst die Exklusivität am OS-Fakt beweisen, dann die Redundanz wieder einschalten. Eine spontan auftauchende zweite Sitzung ist seitdem **erwartetes Verhalten**, kein Vorfall — solange sie für den Lock-Owner zurücktritt. **Nachtrag 24.08.2026:** Genau diese Bedingung hatte nie einen Mechanismus für eine bereits laufende Sitzung — siehe §3.173.
 
 ### 3.3 Berechtigungs-Rückfragen
 
@@ -1328,7 +1329,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 13:44 · Quellen-Fingerprint: `8e34376139f8…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 15:10 · Quellen-Fingerprint: `19e23a5c6f94…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1426,10 +1427,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 95 Prozess-/Meta-TASKS-Punkte (davon 37 offen).
+Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 96 Prozess-/Meta-TASKS-Punkte (davon 38 offen).
 
-<!-- RETRO-FINGERPRINT: 8e34376139f84f1061473a31ddefd9be88441cd024b24d15ecce6282c00123e3 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T11:44:32.756Z -->
+<!-- RETRO-FINGERPRINT: 19e23a5c6f94d48c3fef8e4c7ab1d70aa664be353a310470e9bfd332e84fa873 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T13:10:33.845Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3305,3 +3306,50 @@ gefährlich, weil er dauerhaft grün ist und dadurch als Beweis zählt. Prüffra
 *Welche Zeile ruft die Sache auf, die hier bewiesen werden soll — und was bliebe grün, wenn diese
 Sache völlig kaputt wäre?* Was ein Probelauf legitim abkürzen darf, ist die vergehende Zeit; was er
 nie abkürzen darf, ist den Aufruf.
+
+### 3.173 Die zweite Sitzung trat nicht zurück — weil nichts sie danach je wieder fragte
+
+§3.2 endet mit einem Satz, der die ganze Parallelitäts-Absicherung trägt: Eine spontan auftauchende
+zweite Sitzung sei „erwartetes Verhalten, kein Vorfall — **solange sie für den Lock-Owner
+zurücktritt**". Am 24.08.2026 mittags trat sie nicht zurück, und der Grund ist, dass niemand sie
+danach noch einmal gefragt hat.
+
+Gemessen: Sitzung A wurde vom Autostart-Starter geweckt (CI-Übergabe für `origin/main:7c93ebf5`);
+ihr SessionStart-Hook meldete „no live batch-writer process measured; owner lock assessed inactive
+(handed-over)" und ließ sie arbeiten — zu diesem Zeitpunkt korrekt. Um 14:51:49 startete Sitzung B
+aus einer **zweiten** CI-Übergabe, die für einen anderen Ref galt (`origin/feat/890-…:68214a5f`),
+und nahm die Sperre. Fünf Minuten lang arbeiteten beide an Punkt 890: A ließ eine Gegenlesung
+laufen und dazu Lint, Build und die Unit-Suite im Arbeitsbaum `point-890`, während B auf denselben
+Branch committete und pushte. Kurz darauf stand die Sperre wieder bei A.
+
+Drei Lücken, und die dritte ist die eigentliche:
+
+**Die Startentscheidung ist pro Ref, nicht pro Stapel.** Zwei grün gewordene CI-Läufe auf
+verschiedenen Refs erzeugen zwei Übergaben und damit zwei Sitzungen. Die zweite sieht die erste
+nicht, weil beide zum Startzeitpunkt eine ehrliche Antwort bekamen — nur eben zu verschiedenen
+Zeitpunkten.
+
+**Der Zaunwert wurde als Etikett geführt, nicht als Bedingung.** Während B hielt, trug die
+Sperrdatei `fence: 3`; als sie zu A zurückkam, stand dort `fence: 690`. Die laufende Zählung ist
+offensichtlich die zweite — der Anspruch der zweiten Sitzung trug also einen Wert weit **unter**
+dem Stand und wurde trotzdem in die Datei geschrieben statt als veraltet abgewiesen. Ein Zaun, der
+den kleineren Wert durchlässt, ordnet keine Ansprüche mehr, er protokolliert sie nur.
+
+**Und die unterlegene Sitzung erfährt es nicht.** A hat die Kollision nicht bemerkt, weil ein
+Wächter sie gestoppt hätte, sondern weil eine *Vorschau* — `guard-preflight` vor einer geplanten
+Landung — beiläufig „another live session owns the batch lock" druckte. Ohne diesen zufälligen
+Aufruf wäre A in `land-point` hineingelaufen, während B denselben Punkt landete. Der Stand-down aus
+§3.2 ist gebaut für den Moment des Starts; für eine Sitzung, die **schon läuft**, gibt es keinen
+wiederkehrenden Punkt, an dem die Besitzfrage neu gestellt wird.
+
+Ausgegangen ist es gut, und das ist der unangenehmste Teil des Befunds: B hat den Ledger-Eintrag,
+den A unversioniert im gemeinsamen Arbeitsbaum liegen ließ, aufgenommen und mitcommittet, und A's
+Commit an der Arbeitsordnung ritt auf B's Push nach `main` mit — weil beide Arbeitsbäume dieselbe
+Objektdatenbank teilen. Kein Verlust, keine Halblandung. Nur eben aus Zufall.
+
+**Lehre:** Eine Absicherung, die aus einer Bedingung besteht („solange sie zurücktritt"), ist erst
+gebaut, wenn die Bedingung einen Mechanismus hat — sonst steht sie als Annahme in genau dem
+Dokument, das erklärt, warum Annahmen hier nichts taugen. Besitz ist kein Zustand, den man beim
+Betreten prüft, sondern einer, der zwischen zwei Schreibvorgängen wechseln kann. Prüffrage:
+*Woran würde diese Sitzung merken, dass ihr der Stapel nicht mehr gehört — und wie viele
+Schreibvorgänge lägen zwischen diesem Moment und der Antwort?* Gebucht als Punkt 897.

@@ -68,8 +68,24 @@
 // that, with zero slack. No existing claim was dropped to fit it. Not escalated
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
+// Raised on 24.08.2026 by ONE genuinely new tip, measured at +8 lines / +89 words net:
+// two of your own runs on one project, where the second never learns it took over. It is a
+// beginner-reachable trap the moment anything restarts the tool automatically — a schedule, a
+// watchdog, a keep-going automation — and the guide had no entry for it: the concurrency
+// meta-rule speaks about parallel HELPERS a session hands out, not about two sessions of the
+// tool itself. Measured on this project the same day: two CI handovers for different refs
+// started two sessions, both worked the same work-order point for five minutes, and the losing
+// one found out only because a guard preview happened to say so (retrospective §3.173, point 897).
+// SHORTEN-BEFORE-RAISE was applied to the tip itself, not to its neighbours: as first written it
+// cost +11 lines / +129 words and broke the per-entry risk budget at 6 lines; cutting the risk
+// half to the required 4 lines paid back 3 lines and 40 words. No neighbouring entry was
+// tightened, because none of them carries this direction to fold into — the nearest, the
+// concurrency meta-rule, states the opposite case and keeps its own claim intact. No existing
+// claim was dropped. The long-form telling stays in the retrospective, where it belongs.
+// Not escalated to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
+// this written justification is the last step.
 export const LIMITS = {
-  maxLines: 444,
+  maxLines: 452,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -217,7 +233,7 @@ export const LIMITS = {
   // retrospective already carries in full (§3.171, §3.172). The guide measures
   // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
   // ceiling stays 444 because the file does.
-  maxWords: 3893,
+  maxWords: 3982,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
