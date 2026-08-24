@@ -14,7 +14,7 @@ import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSy
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
-import { REPO_ROOT } from './repo-paths.mjs'
+import { COMMON_REPO_ROOT, REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
 import { spawnProgressed, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
@@ -129,6 +129,10 @@ describe('statePathsFor — a redirected lock never reaches the repo .claude/', 
     // …and the repo defaults are themselves one consistent family, so a new
     // state file added to statePathsFor gets its default for free.
     expect(Object.values(statePathsFor(LOCK_PATH))).toEqual(expect.arrayContaining(defaults))
+  })
+
+  it('the default authority family lives in the common checkout', () => {
+    expect(LOCK_PATH).toBe(resolve(COMMON_REPO_ROOT, '.claude', 'batch-lock.json'))
   })
 })
 

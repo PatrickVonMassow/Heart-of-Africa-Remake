@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { repositoryRoot } from './repo-paths.mjs'
+import { repositoryCommonRoot, repositoryRoot } from './repo-paths.mjs'
 
 describe('repositoryRoot', () => {
   const temporaryDirectories = []
@@ -40,6 +40,26 @@ describe('repositoryRoot', () => {
         moduleUrl: pathToFileURL('/live/repository/scripts/repo-paths.mjs').href,
       }),
     ).toBe(resolve(repository))
+  })
+
+  it('resolves singleton state to the main checkout from every linked worktree', () => {
+    const parent = temporaryDirectory()
+    const repository = join(parent, 'main')
+    const linked = join(parent, 'linked')
+    mkdirSync(repository)
+    execFileSync('git', ['-C', repository, 'init', '-q'], { windowsHide: true })
+    execFileSync(
+      'git',
+      ['-C', repository, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'init'],
+      { windowsHide: true },
+    )
+    execFileSync('git', ['-C', repository, 'worktree', 'add', '-qb', 'fixture-linked', linked], { windowsHide: true })
+    const nested = join(linked, 'scripts')
+    mkdirSync(nested)
+
+    expect(repositoryRoot({ explicitRoot: '', cwd: nested })).toBe(resolve(linked))
+    expect(repositoryCommonRoot({ explicitRoot: '', cwd: nested })).toBe(resolve(repository))
+    expect(repositoryCommonRoot({ explicitRoot: '', cwd: repository })).toBe(resolve(repository))
   })
 
   it('falls back to the module location when cwd is not in a repository', () => {

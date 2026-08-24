@@ -54,7 +54,7 @@ import {
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
-import { repoPath } from './repo-paths.mjs'
+import { commonRepoPath } from './repo-paths.mjs'
 import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   LEASE_MS,
@@ -177,7 +177,11 @@ export function statePathsFor(lockPath) {
   }
 }
 
-export const LOCK_PATH = repoPath('.claude/batch-lock.json')
+// Unlike source paths, the batch authority belongs to the repository as a
+// whole. `commonRepoPath` follows Git's common directory back to the main
+// checkout, so a process launched from a linked author/reviewer worktree sees
+// this exact same lock and fence family.
+export const LOCK_PATH = commonRepoPath('.claude/batch-lock.json')
 const DEFAULT_PATHS = statePathsFor(LOCK_PATH)
 export const SESSIONS_SEEN_PATH = DEFAULT_PATHS.sessionsSeenPath
 export const SESSION_ACTIVITY_PATH = DEFAULT_PATHS.activityPath

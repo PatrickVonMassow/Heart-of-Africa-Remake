@@ -14,7 +14,7 @@
 // Git worktree containing cwd. The module URL is the compatibility fallback
 // when cwd does not identify a worktree.
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const worktreeRoot = (cwd) => {
@@ -31,6 +31,25 @@ const worktreeRoot = (cwd) => {
   }
 }
 
+const commonCheckoutRoot = (checkout) => {
+  try {
+    const commonDir = resolve(
+      checkout,
+      execFileSync('git', ['-C', checkout, 'rev-parse', '--git-common-dir'], {
+        encoding: 'utf8',
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim(),
+    )
+    // A normal repository and every linked worktree in it share the main
+    // checkout's `<root>/.git`. Custom external git-dir layouts deliberately
+    // fall back to the checkout: their metadata parent is not a working tree.
+    return basename(commonDir) === '.git' ? dirname(commonDir) : checkout
+  } catch {
+    return checkout
+  }
+}
+
 export function repositoryRoot({ explicitRoot = process.env.HOA_REPO_ROOT, cwd = process.cwd(), moduleUrl = import.meta.url } = {}) {
   if (typeof explicitRoot === 'string' && explicitRoot.trim()) return resolve(explicitRoot)
   if (typeof cwd === 'string' && cwd.trim()) {
@@ -44,7 +63,23 @@ export function repositoryRoot({ explicitRoot = process.env.HOA_REPO_ROOT, cwd =
   }
 }
 
+/**
+ * The one checkout shared by every linked worktree in this repository.
+ *
+ * Source and fixture paths follow the checkout the process was given; host-local
+ * singleton state cannot. Otherwise a CLI started from a linked worktree gets a
+ * second lock and a young fence counter beside the main checkout's live batch.
+ */
+export function repositoryCommonRoot(options = {}) {
+  const checkout = repositoryRoot(options)
+  return checkout ? commonCheckoutRoot(checkout) : ''
+}
+
 export const REPO_ROOT = repositoryRoot()
+export const COMMON_REPO_ROOT = repositoryCommonRoot()
 
 /** A path inside the repo: repoPath('.claude', 'batch-paused'). */
 export const repoPath = (...parts) => resolve(REPO_ROOT, ...parts)
+
+/** A host-local path shared by the main checkout and all its linked worktrees. */
+export const commonRepoPath = (...parts) => resolve(COMMON_REPO_ROOT, ...parts)
