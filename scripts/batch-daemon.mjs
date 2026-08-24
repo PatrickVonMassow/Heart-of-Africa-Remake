@@ -278,7 +278,11 @@ async function serve(args) {
 
   const recordAttemptState = (attemptId, pointId, record, underFence = currentFence) => {
     // Journal FIRST: an in-memory state the journal never accepted would let
-    // the daemon act on evidence no successor can ever see.
+    // the daemon act on evidence no successor can ever see. And never under a
+    // fence whose transition is not journalled yet — mutate orders this
+    // already; this is the writer's own guarantee for every other caller.
+    const transition = ensureFenceJournalled(underFence)
+    if (!transition.ok) return transition
     const logged = journalEntry({ kind: 'attempt-state', batchId: args.batch, pointId, attemptId, record }, underFence)
     if (logged.ok) attemptsState.set(attemptId, { batchId: args.batch, pointId, attemptId, state: record })
     return logged
@@ -303,6 +307,17 @@ async function serve(args) {
     }
     const keyed = idempotencyKey(request.cmd, request.payload ?? {})
     if (!keyed.ok) return { ok: false, reason: keyed.reason }
+    // THE TRANSITION PRECEDES EVERYTHING WRITTEN UNDER ITS FENCE — the
+    // operation's own entries included: applyFn may journal attempt states,
+    // and an attempt state that lands BEFORE its fence's transition reads as
+    // "fence not in force at this position" to every fence-placing reader
+    // (markUnverifiedTail), quarantining legitimate history. Appending it for
+    // a mutation later refused is truthful either way: the transition records
+    // the observed credential, not the mutation's success.
+    const transition = ensureFenceJournalled(validated.fence)
+    if (!transition.ok) {
+      return { ok: false, reason: `refused: the journal could not record the fence transition (${transition.reason})` }
+    }
     const application = applyOnce(applied, keyed.key, () => applyFn())
     if (!application.ok) return { ok: false, reason: application.reason }
     if (!application.applied) return { ok: true, alreadyApplied: true }
@@ -328,10 +343,7 @@ async function serve(args) {
     // append REVERSES the local effect and refuses the mutation: acknowledging
     // an effect the journal never recorded would leave the world ahead of every
     // durable trace of it.
-    const fenceLogged = ensureFenceJournalled(validated.fence)
-    const logged = fenceLogged.ok
-      ? journalEntry({ kind: 'command', name: request.cmd, key: keyed.key, payload: request.payload ?? {} }, validated.fence)
-      : fenceLogged
+    const logged = journalEntry({ kind: 'command', name: request.cmd, key: keyed.key, payload: request.payload ?? {} }, validated.fence)
     if (!logged.ok) {
       const compensated = compensateFn ? await compensateFn(result) : { note: 'no local effect to reverse' }
       console.error(`daemon: ${request.cmd} reversed after a journal refusal: ${JSON.stringify(compensated)}`)

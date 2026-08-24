@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
+import { markUnverifiedTail } from './batch-schema-core.mjs'
 import { openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { canonicalWorktree, controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
@@ -387,6 +388,55 @@ describe('two SIMULTANEOUS daemon starts', () => {
       await sleep(500)
     }
   }, 30_000)
+})
+
+describe('a handover fence is journalled before the first entry it authorises', () => {
+  const FT_BATCH = 'fence-order-batch'
+  const ftRequest = (fence, cmd, payload = {}) =>
+    controlRequest({ repoDir: repo, batchId: FT_BATCH, request: { cmd, sessionId: SID, fence, payload: { batchId: FT_BATCH, ...payload } } })
+
+  it('writes the fence transition ahead of an attempt state journalled by the same mutation', async () => {
+    const lockPath = join(repo, '.claude', 'batch-lock.json')
+    const lockBefore = readFileSync(lockPath, 'utf8')
+    const started = await startDaemon({ repoDir: repo, batchId: FT_BATCH, drill: true })
+    expect(started.ok, started.reason).toBe(true)
+    const store = openStateStore({ repoDir: repo, batchId: FT_BATCH })
+    try {
+      // The lock moves to the successor fence; the daemon has not journalled
+      // that fence yet. The FIRST mutation under it is one whose operation
+      // itself journals an attempt state — exactly where the transition used
+      // to land BEHIND the entry it authorises.
+      writeFileSync(lockPath, JSON.stringify({ ...JSON.parse(lockBefore), fence: FENCE + 1 }))
+      const res = await ftRequest(FENCE + 1, 'record-state', { pointId: 'p1', attemptId: 'ft1', state: 'queued', at: Date.now() })
+      expect(res.ok, res.reason).toBe(true)
+      const journal = readJournal(store)
+      expect(journal.verdict).toBe('ok')
+      const transition = journal.entries.find((e) => e.kind === 'fence-transition' && e.fence === FENCE + 1)
+      const state = journal.entries.find((e) => e.kind === 'attempt-state' && e.attemptId === 'ft1')
+      expect(transition, 'the successor fence has a transition').toBeTruthy()
+      expect(state).toBeTruthy()
+      expect(transition.seq).toBeLessThan(state.seq)
+      // The fence-placing reader agrees: no entry reads as written under a
+      // fence not in force at its position.
+      const transitions = journal.entries.filter((e) => e.kind === 'fence-transition')
+      const marked = markUnverifiedTail({ entries: journal.entries, transitions, lastConfirmedSeq: journal.entries.at(-1).seq, currentFence: FENCE + 1 })
+      expect(marked.filter((e) => e.quarantine)).toEqual([])
+      const down = await ftRequest(FENCE + 1, 'shutdown', {})
+      expect(down.ok).toBe(true)
+      await sleep(500)
+    } finally {
+      writeFileSync(lockPath, lockBefore)
+      const record = readJsonIfAny(store.daemonRecordPath)
+      if (record?.pid) {
+        try {
+          process.kill(record.pid, 'SIGTERM')
+        } catch {
+          /* already gone */
+        }
+      }
+      await sleep(300)
+    }
+  }, 25_000)
 })
 
 describe('writeLockCopy against a planted symlink', () => {
