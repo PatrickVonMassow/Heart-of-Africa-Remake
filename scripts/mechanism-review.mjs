@@ -171,7 +171,8 @@ export function reviewerVendorProblems(model, authorship = {}) {
   if (status === 'agreement') {
     const anchored =
       String(authorship?.transcript ?? '').trim() &&
-      authorship?.artefactAt != null &&
+      Number.isFinite(Number(authorship?.artefactAt)) &&
+      Number(authorship?.artefactAt) > 0 &&
       String(authorship?.messageId ?? '').trim()
     if (!anchored) {
       return [
