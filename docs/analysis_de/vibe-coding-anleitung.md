@@ -441,4 +441,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 Sie setzt auf, woran alles andere hängt — ersetzt aber die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 66ed1f40bca14685f084b21d1b2f953c6a34913da2c8fd45a4d2c99b474fb6b1 -->
+<!-- GUIDE-FINGERPRINT: e56372dd0aea4cc179ddb7635f6a6aca0fad411398a1647e3e97c2a21c961575 -->
