@@ -194,6 +194,16 @@ export function reviewerVendorProblems(model, authorship = {}) {
   return []
 }
 
+/** A spelling no canonicalization may silently repair: dot segments and
+ *  duplicate separators are junk, not alternative names (re-review round 11).
+ *  A leading empty segment is an absolute path's root and stays legal. */
+export function junkSpelling(path) {
+  const segments = String(path ?? '').split(/[\\/]/)
+  return segments.some(
+    (segment, i) => segment === '.' || segment === '..' || (segment === '' && i > 0),
+  )
+}
+
 /** A checkout path as the repository spells it — relative to REPO_ROOT. A
  *  path OUTSIDE the checkout keeps the caller's spelling (and so stays
  *  refusable); a legal repository name that merely BEGINS with two dots —
@@ -646,7 +656,20 @@ export function buildRecord({
     // with what the count saw — anything less binds the record to bytes no
     // commit carries. Where that fails the trailer proxy stands.
     // The caller's spellings are canonicalized DELIBERATELY here — the tracked
-    // check refuses non-canonical input by contract (re-review round 9).
+    // check refuses non-canonical input by contract (re-review round 9). What
+    // the conversion accepts is exactly an absolute path inside the checkout
+    // and platform separators; a JUNK spelling — dot segments, duplicate
+    // separators — refuses instead of being silently repaired, or the erasure
+    // would undo the refusal the tracked check owes (round 11).
+    const junk = [listAPath, listBPath, unionPath].filter((path) => junkSpelling(path))
+    if (junk.length) {
+      return {
+        ok: false,
+        errors: junk.map(
+          (path) => `${path} is not a canonical spelling — no dot segments, no duplicate separators; spell the tree path as the repository does`,
+        ),
+      }
+    }
     const canonA = repoRelative(listAPath)
     const canonB = repoRelative(listBPath)
     const untracked = [

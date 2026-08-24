@@ -863,6 +863,24 @@ describe('the mode round-trips into the ledger', () => {
       // Restore the fold-era wording for the cases below.
       git('revert', '-q', '--no-edit', 'HEAD')
 
+      // A JUNK SPELLING refuses instead of being silently repaired — the
+      // canonicalization accepts absolute-inside and platform separators,
+      // nothing else (re-review round 11).
+      const doubled = `${repo}/docs//B.json`
+      const junk = spawnSync(
+        process.execPath,
+        [
+          join(repo, 'scripts', 'mechanism-review.mjs'),
+          '--record', sha2, '--model', 'GPT-5.6 Sol', '--verdict', 'merge',
+          '--evidence', 'read both lists and the union that folded them',
+          '--mode', 'blind-parallel', '--union', union, '--list-a', listA, '--list-b', doubled,
+        ],
+        { cwd: repo, encoding: 'utf8', windowsHide: true },
+      )
+      expect(junk.status).not.toBe(0)
+      expect(`${junk.stdout}${junk.stderr}`).toMatch(/not a canonical spelling/)
+      expect(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+
       // THE UNTRACKED-UNION REFUSAL, ISOLATED: committed halves, a complete
       // caller-written union — only the union's provenance can refuse here
       // (re-review round 4: the earlier cases confounded it with a dropped
