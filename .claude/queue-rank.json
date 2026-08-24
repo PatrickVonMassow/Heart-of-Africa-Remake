@@ -713,6 +713,12 @@
       "why": "Es ist heute zweimal eingetreten: zwei Sitzungen arbeiteten fuenf Minuten am selben Punkt, und der unterlegenen fehlt bis heute jeder Moment, an dem sie den Verlust des Locks bemerkt — jede weitere Nacht des Batches laeuft ungeschuetzt in denselben halb gelandeten Merge.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "898": {
+      "at": "2026-08-24T14:37:17.169Z",
+      "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -760,7 +766,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T13:31:35.389Z",
+    "at": "2026-08-24T14:37:17.177Z",
     "points": [
       174,
       184,
@@ -1044,7 +1050,8 @@
       894,
       895,
       896,
-      897
+      897,
+      898
     ]
   }
 }

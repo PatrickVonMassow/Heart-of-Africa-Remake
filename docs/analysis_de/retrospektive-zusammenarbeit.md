@@ -60,6 +60,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.08. nachts | Die Vier-Augen-Regel sperrte sich selbst ein: Punkt 834 war fertig und grün, aber seine Prüfrunde liess sich auf keiner Basis beauftragen — ein Merge ohne Autor-Trailer nahm sieben Dateien den beweisbaren Gegenleser, und der Planer verweigerte darauf die ganze Runde statt dieser Dateien, obwohl die Ledger die Ausnahme-Satzart dafür längst führt (§3.169); derselbe Blick fand einen Auftragspunkt, der ohne Zeilenumbruch an den vorigen geklebt war und deshalb für jeden Leser der Datei nicht existierte |
 | 24.08. früh | Die Vorschau widersprach dem Tor: `guard-preflight` meldete den Mechanismus-Wächter als blockierend, während der Wächter selbst die Spanne gegen das Rundenbudget maß, eine Lesbarkeitslücke urteilte und den Zug durchließ — eine geplante 64-Pässe-Runde über 13,8 M Zeichen, die niemand verlangt (Punkt 873) |
 | 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
+| 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1329,7 +1330,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 15:10 · Quellen-Fingerprint: `19e23a5c6f94…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 16:37 · Quellen-Fingerprint: `c2b654c8a7ca…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1427,10 +1428,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 96 Prozess-/Meta-TASKS-Punkte (davon 38 offen).
+Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 97 Prozess-/Meta-TASKS-Punkte (davon 39 offen).
 
-<!-- RETRO-FINGERPRINT: 19e23a5c6f94d48c3fef8e4c7ab1d70aa664be353a310470e9bfd332e84fa873 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T13:10:33.845Z -->
+<!-- RETRO-FINGERPRINT: c2b654c8a7cab02f14814c0dbc448f7b409317ff47c2c048287c78a075c584a1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T14:37:18.060Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
