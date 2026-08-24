@@ -80,6 +80,7 @@ import {
 import {
   assembleMaterial,
   formatCoveragePlan,
+  formatPassFiles,
   formatPassManifest,
   formatShortfall,
   gitlinkPathsFromRawDiff,
@@ -481,6 +482,10 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
       `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
     )
   }
+  const unavailableFiles = [...new Set((plan.unreviewable ?? []).flatMap((group) => group.files ?? []))]
+  if (unavailableFiles.length) {
+    lines.push('  These files remain owed until Git verifies an explicit unavailable receipt.')
+  }
   const invalidated = formatInvalidatedCoverage(plan.invalidatedCoverage, { quoteFile: quotePassFile })
   if (invalidated) lines.push(invalidated)
   for (const item of plan.dropped ?? []) {
@@ -494,6 +499,23 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   }
   lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
+}
+
+const shellQuote = (value) => `"${String(value ?? '').replace(/(["\\$`])/g, '\\$1')}"`
+
+export function formatUnavailableReceiptRoute(plan, { sha = '', point = '' } = {}) {
+  const files = [...new Set((plan?.unreviewable ?? []).flatMap((group) => group?.files ?? []))]
+  if (!files.length) return ''
+  if (!/^\d+$/.test(String(point).trim())) {
+    return 'review-sol: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
+  }
+  return [
+    'review-sol: after every runnable pass is recorded, record only the measured unavailable remainder:',
+    '  node scripts/criticality-review-guard.mjs ' +
+      `--record-unavailable ${sha} --point ${String(point).trim()} ` +
+      `--files ${shellQuote(formatPassFiles(files))} ` +
+      `--reason ${shellQuote('no configured reviewer vendor is independent of these measured contributions')}`,
+  ].join('\n')
 }
 
 /**
@@ -844,6 +866,9 @@ export const usage = () =>
     'only other files leave them clear. No carry record or carry planning flag is needed.',
     'A commit written to answer a recorded finding owes a confirming clean pass only for',
     'the files it changes. The convergence cost is accepted, not hidden.',
+    'Files with no independent reviewer stay outside runnable pass indices instead of blocking',
+    'them. With --point <N>, the plan prints the Git-verified unavailable-receipt command for',
+    'that exact remainder; the receipt never claims that a review occurred.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     'cannot be reached the review is HANDED OVER to the first eligible Claude model',
     'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
@@ -958,6 +983,8 @@ if (isMainModule(import.meta.url)) {
       recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
     })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
+    const unavailableRoute = formatUnavailableReceiptRoute(plan, { sha: full, point })
+    if (unavailableRoute) console.error(unavailableRoute)
     if (plan.passes.length > MAX_PASS_TOTAL) {
       console.error(
         `review-sol: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
@@ -969,7 +996,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     if (!plan.passes.length || plan.uncoverable.length) {
-      console.error('review-sol: the authorship plan cannot cover every changed file; no record is offered.')
+      console.error(
+        plan.unreviewable.length && !plan.uncoverable.length
+          ? 'review-sol: no runnable review pass remains; use the verified unavailable receipt route above.'
+          : 'review-sol: the authorship plan cannot cover every changed file; no record is offered.',
+      )
       process.exit(4)
     }
     const selection = passFor(plan)

@@ -766,12 +766,13 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/--since/)
   })
 
-  it('names the bounded --since narrowing when no reviewer vendor is eligible', () => {
-    const r = run(['--sha', unreviewableSha, '--brief', 'judge it'])
+  it('names the verified receipt route when no reviewer vendor is eligible', () => {
+    const r = run(['--sha', unreviewableSha, '--brief', 'judge it', '--point', '870'])
     expect(r.status).toBe(4)
     expect(r.stderr).toMatch(/UNREVIEWABLE/)
-    expect(r.stderr).toMatch(/--since <the last reviewed sha>/)
-    expect(r.stderr).toMatch(/bounded 1\/1 pass/)
+    expect(r.stderr).toContain('criticality-review-guard.mjs --record-unavailable')
+    expect(r.stderr).toContain('--point 870')
+    expect(r.stderr).toContain('--files "unreviewable.txt"')
   })
 
   it('plans and runs the reviewable pass while naming the unavailable remainder', () => {

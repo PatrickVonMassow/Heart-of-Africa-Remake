@@ -36,9 +36,10 @@ import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { readRecords, verifyCarried } from './mechanism-review.mjs'
+import { appendRecord, readRecords, verifyCarried } from './mechanism-review.mjs'
 import { modelsFromTrailers } from './mechanism-review-core.mjs'
-import { planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import { parseRangeLog, planAuthorshipGroups } from './mechanism-review-range-core.mjs'
+import { parsePassFiles, quotePassFile, unquoteGitPath } from './review-material-core.mjs'
 import {
   ancestorIndex,
   evaluateCriticalityReview,
@@ -62,6 +63,10 @@ export const TICK_BRANCH = 'main'
 const TASKS_FILE = 'TASKS.md'
 const ARCHIVE_FILE = 'docs/tasks-archive.md'
 const AUTHORING_COMMISSION_KIND = 'authoring-commission'
+
+export const unavailableReceiptUsage = () =>
+  'node scripts/criticality-review-guard.mjs --record-unavailable <sha> --point <N> ' +
+  '--files "<exact measured paths>" --reason "<why no reviewer vendor is eligible>"'
 
 // maxBuffer is NOT a precaution here, it is the difference between a guard that
 // works and one that never once fires: `git show <rev>:docs/tasks-archive.md`
@@ -135,35 +140,166 @@ export function attachPointFileSets(records = [], measure = (base, sha) =>
   return rows
 }
 
+/** The point lane plus cc-only work authored while it merged main. */
+export const pointAuthorshipLogCommand = (commissionSha, reviewSha) => [
+  '-c',
+  'core.quotepath=on',
+  'log',
+  '--first-parent',
+  '--format=%x1e%H%x1f%ct%x1f%P',
+  '--name-only',
+  '--no-renames',
+  '--diff-merges=cc',
+  '--reverse',
+  `${commissionSha}..${reviewSha}`,
+]
+
 /** Git-owned authorship and touched-file facts for one point's own lane. */
-function pointAuthorship(commissionSha, reviewSha) {
-  const shas = gitRawFile([
-    'rev-list',
-    '--reverse',
-    '--first-parent',
-    '--no-merges',
-    `${commissionSha}..${reviewSha}`,
-  ])
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-  const commits = shas.map((sha) => {
+export function pointAuthorship(commissionSha, reviewSha) {
+  const commits = parseRangeLog(gitRawFile(pointAuthorshipLogCommand(commissionSha, reviewSha)), {
+    decodePath: unquoteGitPath,
+  })
+  const inRange = new Set(commits.map((commit) => commit.sha))
+  const attributed = commits.map((commit) => {
     const trailers = gitRawFile([
       'show',
       '-s',
       '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
-      sha,
+      commit.sha,
     ])
-    const files = gitRawFile(['diff-tree', '--no-commit-id', '--name-only', '-r', '-z', sha])
-      .split('\0')
-      .filter(Boolean)
-    return { sha, files, authorModels: modelsFromTrailers(trailers) }
+    const parentAuthorModels = Object.fromEntries(
+      (commit.parentShas ?? [])
+        .slice(1)
+        .filter((parent) => !inRange.has(parent))
+        .map((parent) => [
+          parent,
+          modelsFromTrailers(
+            gitRawFile([
+              'show',
+              '-s',
+              '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)',
+              parent,
+            ]),
+          ),
+        ]),
+    )
+    return { ...commit, authorModels: modelsFromTrailers(trailers), parentAuthorModels }
   })
-  const plan = planAuthorshipGroups({ commits })
+  const plan = planAuthorshipGroups({ commits: attributed })
   return {
-    pointFiles: [...new Set(commits.flatMap((commit) => commit.files))],
+    pointFiles: [...new Set(attributed.flatMap((commit) => commit.files))],
     unavailableFiles: [...new Set(plan.unreviewable.flatMap((group) => group.files))],
   }
+}
+
+const sameFileSet = (a = [], b = []) => {
+  const left = [...new Set(a.map(String))].sort()
+  const right = [...new Set(b.map(String))].sort()
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+/** Build the exception only after Git reproduces the caller's exact file set. */
+export function buildUnavailableReceipt({
+  sha = '',
+  point = '',
+  files = [],
+  reason = '',
+  records = [],
+  now = Date.now(),
+  resolveSha = (ref) => gitRawFile(['rev-parse', '--verify', `${ref}^{commit}`]).trim(),
+  isAncestor = gitIsStrictAncestor,
+  measure = pointAuthorship,
+} = {}) {
+  const errors = []
+  const ref = String(sha).trim()
+  const number = Number(point)
+  const claimed = [...new Set((Array.isArray(files) ? files : []).map(String).filter(Boolean))]
+  const why = String(reason).trim()
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) errors.push('--record-unavailable <sha> must be a 7–40 digit hexadecimal commit id')
+  if (!Number.isInteger(number) || number <= 0) errors.push('--point <N> must be a positive integer')
+  if (!claimed.length) errors.push('--files must name the exact non-empty unavailable file set')
+  if (why.length < 8) errors.push('--reason must explain why no configured reviewer vendor is eligible')
+  if (errors.length) return { ok: false, errors }
+
+  let full = ''
+  try {
+    full = resolveSha(ref)
+  } catch {
+    return { ok: false, errors: [`--record-unavailable: ${ref} is not a commit in this repository`] }
+  }
+  const commissions = (records ?? []).filter(
+    (row) =>
+      row?.kind === AUTHORING_COMMISSION_KIND &&
+      Number(row.point) === number &&
+      (row.sha === full || isAncestor(row.sha, full)),
+  )
+  if (!commissions.length) {
+    return { ok: false, errors: [`point ${number} has no reachable authoring commission at ${full.slice(0, 7)}`] }
+  }
+  const commission = commissions.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+  let measured
+  try {
+    measured = measure(commission.sha, full)
+  } catch (error) {
+    return { ok: false, errors: [`Git could not measure point ${number}'s unavailable files: ${error?.message ?? error}`] }
+  }
+  const actual = [...new Set((measured?.unavailableFiles ?? []).map(String).filter(Boolean))]
+  if (!actual.length) {
+    return { ok: false, errors: [`Git measures no unavailable files for point ${number} at ${full.slice(0, 7)}`] }
+  }
+  if (!sameFileSet(claimed, actual)) {
+    return {
+      ok: false,
+      errors: [`--files does not equal Git's unavailable set; expected ${actual.map(quotePassFile).join(', ')}`],
+    }
+  }
+  return {
+    ok: true,
+    record: {
+      kind: REVIEW_UNAVAILABLE_KIND,
+      point: number,
+      sha: full,
+      files: actual,
+      reason: why,
+      at: now,
+      atIso: new Date(now).toISOString(),
+    },
+  }
+}
+
+/** Strict parser for the manual write route; no unknown token is ignored. */
+export function parseUnavailableReceiptArgs(argv = []) {
+  const spec = new Map([
+    ['--record-unavailable', 'sha'],
+    ['--point', 'point'],
+    ['--files', 'files'],
+    ['--reason', 'reason'],
+  ])
+  const values = {}
+  const errors = []
+  for (let i = 0; i < argv.length; i++) {
+    const flag = String(argv[i])
+    const key = spec.get(flag)
+    if (!key) {
+      errors.push(`unknown unavailable-receipt argument ${flag}`)
+      continue
+    }
+    if (values[key] !== undefined) {
+      errors.push(`${flag} was given more than once`)
+      i++
+      continue
+    }
+    const value = argv[i + 1]
+    if (value === undefined || String(value).startsWith('--')) {
+      errors.push(`${flag} expects a value`)
+      continue
+    }
+    values[key] = String(value)
+    i++
+  }
+  const parsedFiles = parsePassFiles(values.files ?? '')
+  errors.push(...parsedFiles.errors.map((error) => error.replaceAll('--pass-files', '--files')))
+  return { ok: errors.length === 0, values: { ...values, files: parsedFiles.files }, errors }
 }
 
 /**
@@ -442,7 +578,34 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
 }
 
 if (isMainModule(import.meta.url)) {
-  const status = process.argv[2] === '--status'
+  const argv = process.argv.slice(2)
+  if (argv.includes('--record-unavailable')) {
+    try {
+      const parsed = parseUnavailableReceiptArgs(argv)
+      if (!parsed.ok) {
+        console.error(`criticality-review-guard: refusing unavailable receipt.\n  · ${parsed.errors.join('\n  · ')}`)
+        console.error(`\nusage: ${unavailableReceiptUsage()}`)
+        process.exit(1)
+      }
+      const built = buildUnavailableReceipt({ ...parsed.values, records: readRecords() })
+      if (!built.ok) {
+        console.error(`criticality-review-guard: refusing unavailable receipt.\n  · ${built.errors.join('\n  · ')}`)
+        console.error(`\nusage: ${unavailableReceiptUsage()}`)
+        process.exit(1)
+      }
+      appendRecord(built.record)
+      console.log(
+        `recorded: ${built.record.sha.slice(0, 7)} point ${built.record.point} has ` +
+          `${built.record.files.length} Git-verified unavailable file(s)\n` +
+          '  ledger: .claude/mechanism-reviews.jsonl (tracked — commit it with the reviewed passes)',
+      )
+      process.exit(0)
+    } catch (error) {
+      console.error(`criticality-review-guard: unavailable receipt failed: ${error?.message ?? error}`)
+      process.exit(1)
+    }
+  }
+  const status = argv[0] === '--status'
   try {
     let sessionId = ''
     try {
