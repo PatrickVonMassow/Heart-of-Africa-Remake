@@ -132,12 +132,25 @@ describe('the reviewer-vendor matrix binds evidence to the credited model', () =
     expect(
       reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Fable 5', actualModel: 'Claude Fable 5' }).join(' '),
     ).toMatch(/evidence for one model proves nothing about another/)
+    expect(junkSpelling('docs/half.json')).toBe(false)
   })
 
   it('accepts exactly what each vendor can prove', () => {
     expect(
-      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Opus 5', actualModel: 'Claude Opus 5' }),
+      reviewerVendorProblems('Claude Opus 5', {
+        status: 'agreement',
+        claimedModel: 'Claude Opus 5',
+        actualModel: 'Claude Opus 5',
+        transcript: '/home/node/.claude/projects/x/session.jsonl',
+        artefactAt: 1_787_600_000_000,
+        messageId: 'msg_01',
+      }),
     ).toEqual([])
+    // …and an agreement with nothing to audit — no transcript, time or message
+    // id — is a hand-forged pair, not evidence (confirming pass, round 13).
+    expect(
+      reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Opus 5', actualModel: 'Claude Opus 5' }).join(' '),
+    ).toMatch(/nothing to audit/)
     expect(
       reviewerVendorProblems('GPT-5.6 Sol', { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' }),
     ).toEqual([])

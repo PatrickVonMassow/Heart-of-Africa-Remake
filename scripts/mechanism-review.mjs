@@ -164,6 +164,22 @@ export function reviewerVendorProblems(model, authorship = {}) {
         'evidence for one model proves nothing about another',
     ]
   }
+  // AN AGREEMENT MUST SAY WHERE IT WAS READ (confirming pass, round 13): the
+  // recorder's own agreements carry the transcript path, the artefact time and
+  // the message id; a hand-forged {status, claimedModel} pair carries none and
+  // may not ride a carry onto a new commit.
+  if (status === 'agreement') {
+    const anchored =
+      String(authorship?.transcript ?? '').trim() &&
+      authorship?.artefactAt != null &&
+      String(authorship?.messageId ?? '').trim()
+    if (!anchored) {
+      return [
+        `the agreement for "${model}" quotes no transcript, artefact time or message id — an identity ` +
+          'claim with nothing to audit clears nothing',
+      ]
+    }
+  }
   if (vendor === 'unknown') {
     return [
       `the claimed reviewer "${model}" names no vendor the review roster can place — a reviewer nobody ` +
@@ -200,11 +216,14 @@ export function reviewerVendorProblems(model, authorship = {}) {
 export function junkSpelling(path) {
   // Split on the PLATFORM's separators only: on POSIX a backslash is a legal
   // filename byte, not a separator, and treating it as one falsely rejected
-  // such a name (confirming pass, round 12).
+  // such a name (confirming pass, round 12). On Windows a UNC root —
+  // \\server\share — legitimately begins with two empty segments (round 13).
+  const raw = String(path ?? '')
   const splitter = sep === '\\' ? /[\\/]/ : /\//
-  const segments = String(path ?? '').split(splitter)
+  const unc = sep === '\\' && (raw.startsWith('\\\\') || raw.startsWith('//'))
+  const segments = raw.split(splitter).slice(unc ? 2 : 0)
   return segments.some(
-    (segment, i) => segment === '.' || segment === '..' || (segment === '' && i > 0),
+    (segment, i) => segment === '.' || segment === '..' || (segment === '' && (unc || i > 0)),
   )
 }
 
