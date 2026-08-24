@@ -8,7 +8,7 @@
     "A1",
     "B1"
    ],
-   "defect": "Decision: the two goals are not inherently conflicting; the conflict is an artefact of coupling worker lifetime and recoverability to the main session's process parentage. The successor already has the information it needs — the in-flight declaration names branch, worktree, pid and log — it lacks only a live process. Handover must therefore cease to mean terminating active work."
+   "defect": "Decision: the two goals are not inherently conflicting; the conflict is an artefact of coupling worker lifetime and recoverability to the main session's process parentage. The in-flight declaration names branch, worktree, pid and log — enough to LOCATE the run, but not to adopt it: PID is reusable, so adoption additionally requires the stable batch, job, attempt and process-start identities and the adoption record that M17 defines. Handover must therefore cease to mean terminating active work."
   },
   {
    "id": "M2",
