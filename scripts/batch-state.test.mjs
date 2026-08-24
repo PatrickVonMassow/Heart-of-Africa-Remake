@@ -5,7 +5,7 @@
 // paths an attacker or an accident could plant.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -109,6 +109,15 @@ describe('journal append and read-back', () => {
     appendJournalEntry(store, entry(2))
     writeFileSync(store.journalPath, readFileSync(store.journalPath, 'utf8').replace('"k1"', '"kX"'))
     expect(readJournal(store).verdict).toBe('corrupt')
+  })
+
+  it('refuses a DANGLING journal symlink instead of creating its target elsewhere', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'batch-dangle' })
+    const target = join(repo, 'planted-target.jsonl')
+    symlinkSync(target, store.journalPath) // target does NOT exist: existsSync would say false
+    expect(() => appendJournalEntry(store, entry(1))).toThrow(/symlink|ELOOP/)
+    expect(existsSync(target)).toBe(false)
+    expect(() => readJournal(store)).toThrow(/symlink/)
   })
 
   it('refuses a journal that is a symlink', () => {

@@ -17,7 +17,7 @@
 // STILL DARK: nothing on today's authoring path imports this file; its first
 // runtime caller is the daemon of step 3, and the activation flag refuses to
 // enable while steps 8 and 9 are not green.
-import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, writeSync } from 'node:fs'
+import { closeSync, constants as fsConstants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, writeSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { frameEntry } from './batch-schema-core.mjs'
@@ -38,8 +38,16 @@ export function validBatchId(batchId) {
 }
 
 function refuseSymlink(path, what) {
-  if (!existsSync(path)) return
-  if (lstatSync(path).isSymbolicLink()) throw new Error(`${what} is a symlink and is refused: ${path}`)
+  // lstat DIRECTLY: existsSync follows symlinks and answers false for a
+  // DANGLING one, which would wave exactly the planted link through that the
+  // 'a'-open would then create a target for, outside the store.
+  let stat
+  try {
+    stat = lstatSync(path)
+  } catch {
+    return // absent is fine; the opens below guard creation with O_NOFOLLOW or exclusivity
+  }
+  if (stat.isSymbolicLink()) throw new Error(`${what} is a symlink and is refused: ${path}`)
 }
 
 function assertInside(root, path) {
@@ -89,7 +97,10 @@ export function appendJournalEntry(store, entry) {
   const framed = frameEntry(entry)
   if (!framed.ok) return { ok: false, reason: framed.reason }
   refuseSymlink(store.journalPath, 'the journal')
-  const fd = openSync(store.journalPath, 'a', 0o600)
+  // O_NOFOLLOW closes the check/open race the lstat above cannot: a symlink
+  // swapped in between fails the open itself with ELOOP instead of being
+  // followed anywhere the planter chose.
+  const fd = openSync(store.journalPath, fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o600)
   try {
     writeSync(fd, framed.line)
     fsyncSync(fd)
