@@ -22,6 +22,7 @@ import {
   readRecords,
   recordsPathFor,
   resolveCommit,
+  junkSpelling,
   reverifyReviewerAgreement,
   reviewerVendorProblems,
   reviewFileSetKey,
@@ -102,6 +103,20 @@ describe('the flag surface', () => {
   it('states the per-file convergence boundary', () => {
     expect(usage()).toContain('later commit to')
     expect(usage()).toContain('commit touching only other')
+  })
+})
+
+describe('a junk spelling is judged by the PLATFORM separators', () => {
+  it('flags dot segments and duplicate separators, and leaves POSIX backslash names alone', () => {
+    expect(junkSpelling('docs//half.json')).toBe(true)
+    expect(junkSpelling('docs/./half.json')).toBe(true)
+    expect(junkSpelling('docs/../half.json')).toBe(true)
+    expect(junkSpelling('docs/half.json')).toBe(false)
+    expect(junkSpelling('/abs/inside/half.json')).toBe(false)
+    if (process.platform !== 'win32') {
+      // A backslash is a legal filename byte on POSIX, not a separator.
+      expect(junkSpelling('docs/back\\slash.json')).toBe(false)
+    }
   })
 })
 

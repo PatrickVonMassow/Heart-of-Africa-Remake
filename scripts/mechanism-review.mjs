@@ -198,7 +198,11 @@ export function reviewerVendorProblems(model, authorship = {}) {
  *  duplicate separators are junk, not alternative names (re-review round 11).
  *  A leading empty segment is an absolute path's root and stays legal. */
 export function junkSpelling(path) {
-  const segments = String(path ?? '').split(/[\\/]/)
+  // Split on the PLATFORM's separators only: on POSIX a backslash is a legal
+  // filename byte, not a separator, and treating it as one falsely rejected
+  // such a name (confirming pass, round 12).
+  const splitter = sep === '\\' ? /[\\/]/ : /\//
+  const segments = String(path ?? '').split(splitter)
   return segments.some(
     (segment, i) => segment === '.' || segment === '..' || (segment === '' && i > 0),
   )
