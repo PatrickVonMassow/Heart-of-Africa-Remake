@@ -29,7 +29,7 @@ import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { probePid, processStartTime } from './batch-singleton.mjs'
 import { PROCESS_START_TOLERANCE_MS } from './batch-schema-core.mjs'
-import { openStateStore } from './batch-state.mjs'
+import { openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
 
@@ -183,6 +183,16 @@ async function parentDeathScenario({ keep }) {
 
     const down = await successorRequest('shutdown', { drain: true })
     check('the daemon drained on request', down.ok === true)
+
+    // The reply alone proves nothing about what the drain WROTE: the journal
+    // must replay clean, and the daemon's stop must carry the SUCCESSOR's
+    // fence — a stop under the dead parent's fence would be a write under a
+    // credential the lock no longer carries.
+    await sleep(1500)
+    const journal = readJournal(openStateStore({ repoDir: repo, batchId: BATCH }))
+    check('the journal replays clean after the handover shutdown', journal.verdict === 'ok', JSON.stringify(journal.corruption))
+    const stop = journal.entries.filter((e) => e.kind === 'daemon-lifecycle' && e.event === 'stop').pop()
+    check('the shutdown was journalled under the successor fence', stop?.fence === newFence, `stop fence: ${stop?.fence}`)
 
     return { ok: checks.every((c) => c.ok), scenario: 'parent-death', checks, sandbox: keep ? sandbox : undefined }
   } finally {

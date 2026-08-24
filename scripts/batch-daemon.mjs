@@ -135,6 +135,11 @@ async function serve(args) {
   const applied = appliedKeys(journal.entries)
   let seq = journal.entries.reduce((max, e) => Math.max(max, e.seq ?? 0), 0)
   const fence = fenceStore.fence
+  // The NEWEST fence a validated mutation presented. A handover moves the lock
+  // to a successor fence while this daemon keeps serving; everything it writes
+  // afterwards — drain states, its own stop entry — must carry that fence, not
+  // the one it happened to be started under.
+  let currentFence = fence
 
   const identity = { pid: process.pid, pidStartedAt: processStartTime(process.pid) ?? nowMs() - process.uptime() * 1000 }
   const existing = readJsonIfAny(store.daemonRecordPath)
@@ -163,7 +168,7 @@ async function serve(args) {
   // corrupt journal, and the caller of the failing mutation gets a refusal,
   // never a sequence number over missing bytes.
   let journalFailed = null
-  const journalEntry = (entry, underFence = fence) => {
+  const journalEntry = (entry, underFence = currentFence) => {
     if (journalFailed) return { ok: false, reason: journalFailed }
     const next = seq + 1
     let res
@@ -230,7 +235,7 @@ async function serve(args) {
     writeFileSync(join(store.dir, 'daemon-heartbeat'), `${nowMs()}\n`)
   }, DAEMON_HEARTBEAT_MS)
 
-  const recordAttemptState = (attemptId, pointId, record, underFence = fence) => {
+  const recordAttemptState = (attemptId, pointId, record, underFence = currentFence) => {
     // Journal FIRST: an in-memory state the journal never accepted would let
     // the daemon act on evidence no successor can ever see.
     const logged = journalEntry({ kind: 'attempt-state', batchId: args.batch, pointId, attemptId, record }, underFence)
@@ -249,6 +254,7 @@ async function serve(args) {
     const presented = { sessionId: request.sessionId, fence: request.fence }
     const validated = validateMutation({ presented, lock, probe: lock ? probeOf(lock.pid) : null, now: nowMs() })
     if (!validated.ok) return { ok: false, reason: validated.reason }
+    currentFence = validated.fence
     // Every command's idempotency key includes the batch, so the payload must
     // name THIS batch — a request keyed for another one is not a retry here.
     if ((request.payload?.batchId ?? null) !== args.batch) {
@@ -528,6 +534,7 @@ async function serve(args) {
 
   async function performShutdown(drain) {
     draining = true
+    if (!journalCorrupt) ensureFenceJournalled(currentFence)
     if (drain) {
       for (const [attemptId, worker] of workers) {
         const stop = await stopWorker(worker, 'daemon drain')
@@ -543,7 +550,7 @@ async function serve(args) {
           state: 'cancelled',
           reason: 'daemon drain',
           actor: 'daemon',
-          fence,
+          fence: currentFence,
           at: nowMs(),
           lastCommit: status?.sha ?? null,
           lastPushedSha: status?.sha ?? null,
