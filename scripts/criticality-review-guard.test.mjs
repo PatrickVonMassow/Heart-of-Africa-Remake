@@ -20,6 +20,9 @@ import {
   attachUnavailableClearances,
   baselineFor,
   bootstrapBase,
+  buildUnavailableReceipt,
+  parseUnavailableReceiptArgs,
+  pointAuthorshipLogCommand,
   pointFilesCommand,
   readWorkOrder,
   showAt,
@@ -111,6 +114,21 @@ describe('point file-set measurement', () => {
     ])
   })
 
+  it('includes only first-parent work plus cc-only merge resolutions in unavailable measurement', () => {
+    expect(pointAuthorshipLogCommand('base', 'review')).toEqual([
+      '-c',
+      'core.quotepath=on',
+      'log',
+      '--first-parent',
+      '--format=%x1e%H%x1f%ct%x1f%P',
+      '--name-only',
+      '--no-renames',
+      '--diff-merges=cc',
+      '--reverse',
+      'base..review',
+    ])
+  })
+
   it('replaces forged ledger coverage and leaves a failed measurement unknown', () => {
     const commission = {
       kind: 'authoring-commission',
@@ -196,6 +214,53 @@ describe('point file-set measurement', () => {
     })
     expect(rows[2].unavailableVerified).toBeUndefined()
     expect(rows[2].unavailableFiles).toBeUndefined()
+  })
+
+  it('builds a receipt only when its file set equals the Git measurement', () => {
+    const commission = {
+      kind: 'authoring-commission',
+      point: 870,
+      sha: 'a'.repeat(40),
+      at: 100,
+    }
+    const common = {
+      sha: 'b'.repeat(40),
+      point: '870',
+      reason: 'both configured vendors authored these contributions',
+      records: [commission],
+      now: 1_787_000_000_000,
+      resolveSha: () => 'b'.repeat(40),
+      isAncestor: () => true,
+      measure: () => ({ unavailableFiles: ['scripts/both.mjs', ' edge.mjs'] }),
+    }
+    const wrong = buildUnavailableReceipt({ ...common, files: ['scripts/both.mjs'] })
+    expect(wrong.ok).toBe(false)
+    expect(wrong.errors[0]).toContain("does not equal Git's unavailable set")
+    expect(wrong.errors[0]).toContain('" edge.mjs"')
+
+    const exact = buildUnavailableReceipt({ ...common, files: [' edge.mjs', 'scripts/both.mjs'] })
+    expect(exact).toMatchObject({
+      ok: true,
+      record: {
+        kind: 'criticality-review-unavailable',
+        point: 870,
+        sha: 'b'.repeat(40),
+        files: ['scripts/both.mjs', ' edge.mjs'],
+      },
+    })
+  })
+
+  it('parses the receipt file list byte-exact and refuses unknown CLI input', () => {
+    const parsed = parseUnavailableReceiptArgs([
+      '--record-unavailable', 'b'.repeat(40),
+      '--point', '870',
+      '--files', 'plain.mjs," edge.mjs"',
+      '--reason', 'no independent reviewer exists',
+    ])
+    expect(parsed).toMatchObject({ ok: true, values: { files: ['plain.mjs', ' edge.mjs'] } })
+    expect(parseUnavailableReceiptArgs(['--record-unavailable', 'abc1234', '--file', 'x']).errors).toContain(
+      'unknown unavailable-receipt argument --file',
+    )
   })
 })
 
@@ -400,6 +465,84 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     rmSync(resolve(repo, 'docs/tasks-archive.md'), { recursive: true })
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
     expect(runHook().decision?.decision, 'the gate must still be there afterwards').toBe('block')
+  })
+})
+
+describe('the unavailable-receipt CLI', { timeout: 30_000 }, () => {
+  it('refuses a mismatched file claim and appends the exact Git-measured set', () => {
+    const receiptRepo = mkdtempSync(resolve(tmpdir(), 'hoa-unavailable-receipt-'))
+    try {
+      cpSync(resolve(process.cwd(), 'scripts'), resolve(receiptRepo, 'scripts'), {
+        recursive: true,
+        filter: (src) => !/[\\/](verify|git-hooks)([\\/]|$)/.test(src),
+      })
+      mkdirSync(resolve(receiptRepo, '.claude'), { recursive: true })
+      const runGit = (...args) =>
+        spawnSync('git', ['-c', 'core.hooksPath=', '-c', 'commit.gpgsign=false', ...args], {
+          windowsHide: true,
+          cwd: receiptRepo,
+          encoding: 'utf8',
+        })
+      expect(runGit('init', '-q', '-b', 'main').status).toBe(0)
+      expect(runGit('config', 'user.email', 'receipt@test.local').status).toBe(0)
+      expect(runGit('config', 'user.name', 'receipt test').status).toBe(0)
+      writeFileSync(resolve(receiptRepo, 'seed.txt'), 'base\n')
+      expect(runGit('add', 'seed.txt').status).toBe(0)
+      expect(
+        runGit(
+          'commit', '-q', '-m',
+          'Seed the receipt range\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+        ).status,
+      ).toBe(0)
+      const base = runGit('rev-parse', 'HEAD').stdout.trim()
+      writeFileSync(
+        resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'),
+        `${JSON.stringify({ kind: 'authoring-commission', point: 870, sha: base, model: 'GPT-5.6 Sol', at: 1 })}\n`,
+      )
+      mkdirSync(resolve(receiptRepo, 'src'), { recursive: true })
+      writeFileSync(resolve(receiptRepo, 'src/both.mjs'), 'export const both = true\n')
+      expect(runGit('add', 'src/both.mjs').status).toBe(0)
+      expect(
+        runGit(
+          'commit', '-q', '-m',
+          'Add a both-vendor contribution\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+        ).status,
+      ).toBe(0)
+      const head = runGit('rev-parse', 'HEAD').stdout.trim()
+      const command = resolve(receiptRepo, 'scripts/criticality-review-guard.mjs')
+      const args = [
+        '--record-unavailable', head,
+        '--point', '870',
+        '--reason', 'both configured vendors authored this contribution',
+      ]
+      const wrong = spawnSync(process.execPath, [command, ...args, '--files', 'src/wrong.mjs'], {
+        windowsHide: true,
+        cwd: receiptRepo,
+        encoding: 'utf8',
+      })
+      expect(wrong.status).toBe(1)
+      expect(wrong.stderr).toContain("does not equal Git's unavailable set")
+      expect(readFileSync(resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'), 'utf8').trim().split('\n')).toHaveLength(1)
+
+      const exact = spawnSync(process.execPath, [command, ...args, '--files', 'src/both.mjs'], {
+        windowsHide: true,
+        cwd: receiptRepo,
+        encoding: 'utf8',
+      })
+      expect(exact.status, exact.stderr).toBe(0)
+      const rows = readFileSync(resolve(receiptRepo, '.claude/mechanism-reviews.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map(JSON.parse)
+      expect(rows[1]).toMatchObject({
+        kind: 'criticality-review-unavailable',
+        point: 870,
+        sha: head,
+        files: ['src/both.mjs'],
+      })
+    } finally {
+      rmSync(receiptRepo, { recursive: true, force: true })
+    }
   })
 })
 

@@ -8,7 +8,7 @@ import { sameModel } from './mechanism-review-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
-  'Narrow with --since <the last reviewed sha> to a reviewable subset; when it fits, review-sol records that subset as a bounded 1/1 pass.'
+  'Review every runnable pass and record the exact measured remainder with the criticality-review-unavailable command printed by review-sol.'
 export const NO_ELIGIBLE_REVIEWER_REASON =
   `every configured reviewer vendor authored part of this contribution. ${UNREVIEWABLE_NARROWING_REMEDY}`
 export const UNKNOWN_AUTHOR_REVIEWER_REASON =
@@ -116,7 +116,13 @@ const authorshipResolver = (commits = []) => {
     const parents = uniq(commit?.parentShas)
     if (parents.length < 2) return own
     resolving.add(sha)
-    const merged = uniq(parents.slice(1).flatMap((parent) => resolve(bySha.get(parent))))
+    const merged = uniq(
+      parents.slice(1).flatMap((parent) => {
+        const inRange = bySha.get(parent)
+        if (inRange) return resolve(inRange)
+        return commit?.parentAuthorModels?.[parent] ?? []
+      }),
+    )
     resolving.delete(sha)
     cache.set(sha, merged)
     return merged

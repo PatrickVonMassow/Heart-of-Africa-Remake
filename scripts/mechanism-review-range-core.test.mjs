@@ -144,7 +144,7 @@ describe('authorship-cut mechanism review planning', () => {
       files: ['unknown-guard.mjs'],
     })
     expect(plan.groups[0].unreviewableReason).toMatch(
-      /--since <the last reviewed sha>.*bounded 1\/1 pass/,
+      /Review every runnable pass.*criticality-review-unavailable/,
     )
     expect(plan.unreviewable).toEqual([plan.groups[0]])
   })
@@ -167,6 +167,26 @@ describe('authorship-cut mechanism review planning', () => {
         reviewer: 'GPT-5.6 Sol',
       }),
     ])
+    expect(plan.unreviewable).toEqual([])
+  })
+
+  it('attributes a trailerless merge when its merged-parent tip is outside the measured range', () => {
+    const mergedParent = sha('b')
+    const plan = planAuthorshipGroups({
+      commits: [
+        {
+          sha: sha('c'),
+          parentShas: [sha('a'), mergedParent],
+          parentAuthorModels: { [mergedParent]: ['Claude Opus 5'] },
+          files: ['scripts/conflict-resolution.mjs'],
+        },
+      ],
+    })
+    expect(plan.groups[0]).toMatchObject({
+      files: ['scripts/conflict-resolution.mjs'],
+      authors: ['Claude Opus 5'],
+      reviewer: 'GPT-5.6 Sol',
+    })
     expect(plan.unreviewable).toEqual([])
   })
 
