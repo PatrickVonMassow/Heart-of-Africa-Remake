@@ -49,6 +49,7 @@ import {
   ledgerPathFrom,
   modelFromTrailers,
   modelsFromTrailers,
+  modelVendor,
   MODES,
   parseArgs,
   sameModel,
@@ -56,6 +57,7 @@ import {
   validateRecord,
   resolveMergePolicy,
   VERDICTS,
+  VERIFIED_REVIEWER_SINCE,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
 import { currentFableState } from './fable-switch.mjs'
@@ -503,6 +505,23 @@ export function buildRecord({
     errors.push(
       `the claimed review model "${reviewerAuthorship.claimedModel}" disagrees with transcript message.model ` +
         `"${reviewerAuthorship.actualModel}" at the review artefact timestamp — four-eyes permission is refused`,
+    )
+  }
+  // WHAT THE GATE WILL NOT COMPOSE, THE RECORDER DOES NOT WRITE (cross-vendor
+  // review of point 889, pass 3): from VERIFIED_REVIEWER_SINCE an unverified
+  // claim only clears for a reviewer no harness transcript can cover. Writing
+  // the row anyway would report "recorded" for a review the gate then ignores —
+  // silent debt the recording session believes settled.
+  if (
+    now >= VERIFIED_REVIEWER_SINCE &&
+    reviewerAuthorship.status !== 'agreement' &&
+    !authorshipRefusesPermission(reviewerAuthorship) &&
+    modelVendor(model) !== 'openai'
+  ) {
+    errors.push(
+      `the claimed reviewer "${model}" is one whose session transcript the harness holds, so its identity ` +
+        'must be VERIFIED: pass --model-at <ISO> and --model-transcript <session.jsonl> so the claim can be ' +
+        'checked against message.model — an unverified claim from this vendor no longer clears the gate',
     )
   }
   // Optional, but never sloppy: a mistyped point number would record a review

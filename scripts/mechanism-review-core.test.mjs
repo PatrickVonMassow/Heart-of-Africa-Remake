@@ -11,6 +11,7 @@ import {
   BLIND_PARALLEL,
   BLOCKING_VERDICT,
   AUTHORSHIP_CHECK_SINCE,
+  VERIFIED_REVIEWER_SINCE,
   evaluateMechanismReview,
   formatArgErrors,
   formatMechanismReviewVerdict,
@@ -415,6 +416,45 @@ describe('evaluateMechanismReview', () => {
     expect(
       evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [contradicted] }).block,
     ).toBe(true)
+  })
+
+  it('refuses an UNVERIFIED claim from a reviewer the harness could have verified', () => {
+    // Cross-vendor review of point 889 (pass 3): "unverified" used to clear for
+    // every vendor, so an unknown actual reviewer could claim an independent
+    // model and clear the commit without anyone having proved who read the code.
+    // An Anthropic reviewer's session transcript exists at recording time, so
+    // agreement is achievable and anything less no longer composes.
+    const claim = (model, authorship) => ({
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model }),
+      reviewerAuthorship: { claimedModel: model, ...authorship },
+    })
+    // The commit under review is authored by the OTHER vendor each time, so the
+    // only thing deciding these cases is the authorship claim itself.
+    const judge = (rec, authorModel) =>
+      evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel })],
+        records: [rec],
+      }).block
+    expect(judge(claim('Claude Opus 5', { status: 'unverified', reason: 'transcript expired' }), 'GPT-5.6 Sol')).toBe(true)
+    expect(
+      judge(claim('Claude Opus 5', { status: 'agreement', actualModel: 'Claude Opus 5' }), 'GPT-5.6 Sol'),
+    ).toBe(false)
+    // An OpenAI reviewer runs outside the harness — no Claude transcript can
+    // hold its messages — so a REASONED unverified claim still composes…
+    expect(
+      judge(claim('GPT-5.6 Sol', { status: 'unverified', reason: 'external CLI reviewer, no harness transcript' }), 'Claude Opus 5'),
+    ).toBe(false)
+    // …a reasonless one does not, and an unknown vendor never does.
+    expect(judge(claim('GPT-5.6 Sol', { status: 'unverified' }), 'Claude Opus 5')).toBe(true)
+    expect(judge(claim('Mystery 9', { status: 'unverified', reason: 'who knows' }), 'Claude Opus 5')).toBe(true)
+    // The rows recorded under the older reading keep their standing.
+    const older = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
+    }
+    expect(judge(older, 'GPT-5.6 Sol')).toBe(false)
   })
 
   it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {

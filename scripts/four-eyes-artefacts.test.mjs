@@ -213,7 +213,7 @@ describe('the 676 stage is auditable from its raw halves', () => {
     expect(row.halfAuthors).not.toContain(row.mergedBy)
     // …and the row names the exact blobs it counted, so the claim above is
     // re-derivable from the repository rather than read off two strings.
-    const oid = (rel) => execFileSync('git', ['rev-parse', `HEAD:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+    const oid = (rel) => execFileSync('git', ['rev-parse', `HEAD:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true }).trim()
     expect(row.halfBlobs).toEqual([oid(`${HALF_A}.json`), oid(`${HALF_B}.json`)])
 
     const m = /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) of the (\d+) input entries merged, (\d+) only A, (\d+) only B\)/.exec(row.accounting)

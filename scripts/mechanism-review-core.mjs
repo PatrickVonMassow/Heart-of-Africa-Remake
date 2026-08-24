@@ -376,6 +376,20 @@ export const MODE_REQUIRED_SINCE = Date.UTC(2026, 7, 8)
  * transcript verdict. The exact boundary preserves every earlier 22.08 row. */
 export const AUTHORSHIP_CHECK_SINCE = 1_787_415_913_284
 
+/** From here on, "unverified" is no longer a clearance for a reviewer the
+ * harness could have verified. Cross-vendor review of point 889 (pass 3): an
+ * unknown actual reviewer could claim an independent model, record the claim
+ * with `status: 'unverified'`, and clear the commit — which is the
+ * unknown-authorship case the gate exists to refuse. Where the claimed
+ * reviewer is an Anthropic model, its session transcript exists in the harness
+ * at recording time, so AGREEMENT is achievable and anything less is refused.
+ * An OpenAI reviewer runs outside the harness — no Claude transcript can hold
+ * its messages, so demanding one would end every cross-vendor review — and
+ * stays recordable as unverified, but only with the reason stated; an unknown
+ * vendor is refused outright. The boundary preserves the rows recorded under
+ * the older reading (both vendors' 24.08 reviews among them). */
+export const VERIFIED_REVIEWER_SINCE = 1_787_588_100_000
+
 /**
  * May THIS model MERGE the two lists of a blind-parallel stage? (point 634)
  *
@@ -1177,6 +1191,12 @@ export function reviewRecordWellFormed(record = {}) {
     if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
     if (!sameModel(authorship.claimedModel, record.model)) return false
     if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
+    // See VERIFIED_REVIEWER_SINCE: an unverified claim clears only where
+    // verification was impossible by construction, and says why it was.
+    if (at >= VERIFIED_REVIEWER_SINCE && authorship.status === 'unverified') {
+      if (modelVendor(record.model) !== 'openai') return false
+      if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
+    }
   }
   return record.carried === undefined || record.carriedVerified === true
 }
@@ -1210,7 +1230,7 @@ function pendingEndStateFiles(pendingCommits, endStateFiles) {
   return artefacts
 }
 
-const modelVendor = (model) => {
+export const modelVendor = (model) => {
   const value = String(model ?? '').toLowerCase()
   if (/\bsol\b|\bgpt[- ]?5(?:\.|\b)/.test(value) || /openai\.com/.test(value)) return 'openai'
   if (/\b(?:claude|opus|fable|sonnet|haiku)\b/.test(value) || /anthropic\.com/.test(value)) return 'anthropic'
