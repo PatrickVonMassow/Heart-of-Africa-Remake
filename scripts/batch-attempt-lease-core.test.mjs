@@ -414,6 +414,22 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(releaseWorktree({ claims: null, worktree: '/wt/a', attempt })).toMatchObject({ ok: true, released: false })
   })
 
+  it('keeps every key it was given an own entry, including one named __proto__', () => {
+    // JSON.parse makes `__proto__` an OWN property, and writing it back with a
+    // plain assignment sets the prototype instead of storing it — so the map this
+    // module handed out silently lost the entry and carried a claim record as its
+    // prototype. No claim key can be `__proto__` (a key is an absolute path), but a
+    // map this module hands out must contain what it was given and nothing else.
+    const poisoned = JSON.parse('{"__proto__": {"batchId": "b", "pointId": "p834", "attemptId": "aX"}, "/wt/a": {"batchId": "b", "pointId": "p834", "attemptId": "a1"}}')
+    const claimed = claimWorktree({ claims: poisoned, worktree: '/wt/b', attempt: { ...attempt, attemptId: 'a2' } })
+    expect(claimed.ok).toBe(true)
+    expect(Object.getPrototypeOf(claimed.claims)).toBe(Object.prototype)
+    expect(Object.hasOwn(claimed.claims, '__proto__')).toBe(true)
+    const released = releaseWorktree({ claims: JSON.parse(JSON.stringify(claimed.claims)), worktree: '/wt/a', attempt })
+    expect(released).toMatchObject({ ok: true, released: true })
+    expect(Object.getPrototypeOf(released.claims)).toBe(Object.prototype)
+  })
+
   it('releases only for the claiming attempt', () => {
     const { claims } = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
     expect(releaseWorktree({ claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)

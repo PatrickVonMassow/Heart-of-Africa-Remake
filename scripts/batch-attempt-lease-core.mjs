@@ -309,11 +309,15 @@ function readClaims(claims) {
  *  record this module cannot read passes through untouched, so the collision path
  *  still fails closed on it rather than seeing a tidied copy. */
 function sealedClaims(claims) {
-  const sealed = {}
-  for (const [key, record] of Object.entries(claims)) {
-    sealed[key] = record && typeof record === 'object' ? Object.freeze({ ...record }) : record
-  }
-  return Object.freeze(sealed)
+  // fromEntries and not `sealed[key] = …`: a persisted map carrying a `__proto__`
+  // key — JSON.parse makes it an OWN property — would set the new map's PROTOTYPE
+  // instead of storing the entry, so the map handed out silently lost a key and
+  // carried a claim record as its prototype.
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(claims).map(([key, record]) => [key, record && typeof record === 'object' ? Object.freeze({ ...record }) : record]),
+    ),
+  )
 }
 
 /** One worktree, one attempt — the fail-closed worktree lock of M39. `claims` maps
