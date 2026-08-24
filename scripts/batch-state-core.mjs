@@ -78,10 +78,14 @@ export function splitFrames(text) {
  *  quirk. A gap is legal — quarantined entries of a prior read may have been
  *  compacted away by an operator, and a gap cannot re-order what remains.
  *
- *  Fence authority is POSITIONAL: a transition puts its own fence in force, and
- *  every later non-transition entry must carry that fence until another
- *  transition. Validly framed bytes written before any transition, or under a
- *  different fence, remain evidence but are quarantined as unauthorized. */
+ *  Fence authority is POSITIONAL and MONOTONIC: a transition above every fence
+ *  already observed puts its own fence in force, and every later non-transition
+ *  entry must carry that fence until another higher transition. A transition at
+ *  or below the prior high water is corruption, not quarantine: a legal
+ *  single-writer append-only journal cannot lower or repeat the epoch, and letting
+ *  it do so would re-authorize a fenced-out coordinator. Validly framed bytes
+ *  written before any transition, or under a different fence, remain evidence but
+ *  are quarantined as unauthorized. */
 export function replayJournal(text) {
   const frames = splitFrames(text)
   const entries = []
@@ -110,16 +114,25 @@ export function replayJournal(text) {
       return
     }
     lastSeq = entry.seq
-    if (Number.isInteger(entry.fence) && (highWater === null || entry.fence > highWater)) highWater = entry.fence
     const quarantine = []
     if (!JOURNAL_KINDS.includes(entry.kind)) quarantine.push(`unknown kind: ${entry.kind}`)
     if (entry.kind === 'fence-transition') {
+      // highWater includes unauthorized records too. A later transition has to
+      // clear all observed epochs, not merely the last authorized one, otherwise
+      // a high-fence record followed by a lower transition launders the lower
+      // coordinator back into authority. Repeats are equally impossible for the
+      // single writer and therefore structural corruption rather than quarantine.
+      if (highWater !== null && entry.fence <= highWater) {
+        corruption.push({ index, reason: `fence transition ${entry.fence} does not rise above high water ${highWater}` })
+        return
+      }
       fenceInForce = entry.fence
     } else if (fenceInForce === null) {
       quarantine.push('no fence transition precedes this entry')
     } else if (entry.fence !== fenceInForce) {
       quarantine.push(`fence ${entry.fence} is not the fence in force (${fenceInForce}) at this position`)
     }
+    if (highWater === null || entry.fence > highWater) highWater = entry.fence
     entries.push(quarantine.length ? { ...entry, quarantine: quarantine.join('; ') } : entry)
   })
   return {

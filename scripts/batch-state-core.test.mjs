@@ -52,6 +52,28 @@ describe('replayJournal', () => {
     expect(replay.highWater).toBe(7)
   })
 
+  it('treats a fence transition that does not clear prior authority as corruption', () => {
+    const downgraded = replayJournal(
+      line({ seq: 1, fence: 10, kind: 'fence-transition' })
+      + line({ seq: 2, fence: 10, kind: 'command', key: 'authorized' })
+      + line({ seq: 3, fence: 8, kind: 'fence-transition' })
+      + line({ seq: 4, fence: 8, kind: 'command', key: 'fenced-out' }),
+    )
+    expect(downgraded.verdict).toBe('corrupt')
+    expect(downgraded.corruption[0].reason).toMatch(/fence transition 8 does not rise above high water 10/)
+    expect(downgraded.entries.at(-1).quarantine).toMatch(/fence 8 is not the fence in force \(10\)/)
+    expect(downgraded.highWater).toBe(10)
+
+    // High water includes unauthorized entries too: a transition cannot bless a
+    // lower epoch merely because the higher one was observed before authority.
+    const belowObserved = replayJournal(
+      line({ seq: 1, fence: 12, kind: 'command', key: 'observed-first' })
+      + line({ seq: 2, fence: 11, kind: 'fence-transition' }),
+    )
+    expect(belowObserved.verdict).toBe('corrupt')
+    expect(belowObserved.highWater).toBe(12)
+  })
+
   it('reads a truncated FINAL record as an ordinary crash: dropped, reported, still ok', () => {
     const whole = line({ seq: 1, fence: 7, kind: 'fence-transition' })
     const partial = line({ seq: 2, fence: 7, kind: 'command', key: 'k2' }).slice(0, 20)
@@ -89,8 +111,8 @@ describe('replayJournal', () => {
   it('quarantines use of a fence until its transition has appeared, and after a different transition', () => {
     const replay = replayJournal(
       line({ seq: 1, fence: 7, kind: 'command', key: 'too-early' })
-      + line({ seq: 2, fence: 7, kind: 'fence-transition' })
-      + line({ seq: 3, fence: 8, kind: 'command', key: 'wrong-fence' }),
+      + line({ seq: 2, fence: 8, kind: 'fence-transition' })
+      + line({ seq: 3, fence: 9, kind: 'command', key: 'wrong-fence' }),
     )
     expect(replay.entries[0].quarantine).toMatch(/no fence transition precedes/)
     expect(replay.entries[1].quarantine).toBeUndefined()
