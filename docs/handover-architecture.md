@@ -181,7 +181,7 @@ The attached material does not disclose the existing progress-board source path,
 
    Add `scripts/batch-schema-core.mjs`, the pure schema and invariant layer every later step reads. Specify identities, attempt states and their valid transitions, the coordinator credential and its lease epoch, the daemon record and its lock copy, checksum framing, the schema version rule, retry request ids and the rule that every mutating command declares its compensation and is idempotent. The daemon-pair table of mechanism 2 is decided here rather than assumed, and the credential's acceptance cases — a push under a previous generation refused, a fence store that lost its generation refusing to mint — belong to this step. Verify with `npx vitest run scripts/batch-schema-core.test.mjs` (the union's `scripts/__tests__/batch-schema.test.mjs` is translated to this repository's convention).
 
-   `CLAUDE.md`'s lifecycle rules are NOT written here, and that is the dark rule rather than an omission: the lane may not be advertised until the step-8 slice is green, and CLAUDE.md is where this project states what runs. They land with that slice, together with the activation flag's release.
+   `CLAUDE.md`'s lifecycle rules are NOT written here, and that is the dark rule rather than an omission: the lane may not be advertised until steps 8 AND 9 are green — reconciliation without a landing a successor can finish still strands adopted work, so crash-recoverable serial landing is part of the interlock, exactly as `STEPS_REQUIRED_FOR_ACTIVATION` in `scripts/durable-lane-flag-core.mjs` encodes it — and CLAUDE.md is where this project states what runs. They land with that slice, together with the activation flag's release.
 
 2. Build the durable state store.
 
@@ -815,7 +815,7 @@ that daemon; and one post-adoption lifecycle operation completing — a cancella
 the branch, or a landing.
 
 It runs as `node scripts/batch-daemon.mjs drill --scenario parent-death` and is a precondition of
-the step-8 slice, not a later trial.
+activation itself — the steps-8-and-9 slice the flag's interlock waits for — not a later trial.
 
 
 ## The raw blind halves
