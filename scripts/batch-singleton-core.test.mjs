@@ -10,14 +10,14 @@
 //       cause: a stale heartbeat with a LIVE pid (mid-long-tool-call) is ALIVE;
 //   (5) a non-owner session at the batch-progress-guard → stands down.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmdirSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
-import { REPO_ROOT } from './repo-paths.mjs'
+import { COMMON_REPO_ROOT, REPO_ROOT } from './repo-paths.mjs'
 import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import { parseActivityJournal } from './batch-activity-journal-core.mjs'
-import { spawnProgressed } from './batch-autostart-core.mjs'
+import { spawnProgressed, successorStartDecision, SUCCESSOR_TRIGGERS } from './batch-autostart-core.mjs'
 import {
   assessOwner,
   classifyParallel,
@@ -129,6 +129,10 @@ describe('statePathsFor — a redirected lock never reaches the repo .claude/', 
     // …and the repo defaults are themselves one consistent family, so a new
     // state file added to statePathsFor gets its default for free.
     expect(Object.values(statePathsFor(LOCK_PATH))).toEqual(expect.arrayContaining(defaults))
+  })
+
+  it('the default authority family lives in the common checkout', () => {
+    expect(LOCK_PATH).toBe(resolve(COMMON_REPO_ROOT(), '.claude', 'batch-lock.json'))
   })
 })
 
@@ -713,6 +717,24 @@ describe('renewLease / grantFence (the I/O half)', () => {
     expect(lockOf().leaseUntil).toBeGreaterThan(Date.now())
   })
 
+  it('a transiently busy grant mutex cannot leave the acquired lock without a fence number', () => {
+    const mutexPath = `${fencePath}.claiming`
+    mkdirSync(mutexPath)
+    let waited = false
+
+    expect(acquire('s1', opts({
+      fenceMutexWaitMs: 100,
+      fenceMutexSleep: () => {
+        waited = true
+        rmdirSync(mutexPath)
+      },
+    }))).toBe('acquired')
+
+    expect(waited).toBe(true)
+    expect(lockOf().fence).toBe(1)
+    expect(readFence({ fencePath })).toMatchObject({ fence: 1, holder: 's1' })
+  })
+
   /** The lock of a session that fell silent: heartbeat AND lease both run out.
    *  (A FRESH heartbeat with an expired lease is a contradictory state — the
    *  PostToolUse stamp is younger than the PreToolUse renewal that precedes it —
@@ -742,6 +764,40 @@ describe('renewLease / grantFence (the I/O half)', () => {
     rmSync(fencePath, { force: true })
     expect(acquire('s2', opts())).toBe('acquired')
     expect(readFence({ fencePath }).fence).toBe(10)
+  })
+
+  it('the production successor acquisition refuses a proposed fence that fell behind the durable mark', () => {
+    const start = successorStartDecision({
+      trigger: { kind: SUCCESSOR_TRIGGERS.WATCHDOG },
+      spawnToken: 'stale-spawn',
+      openPoints: 1,
+      assessment: { alive: false, reason: 'no-lock' },
+      // This is the young worktree counter from the measured incident. The
+      // production decision carries its next generation into acquire().
+      fenceState: { fence: 2 },
+      now: NOW,
+    })
+    expect(start).toMatchObject({ start: true, reservation: { requestedFence: 3 } })
+
+    const standing = {
+      v: 1,
+      fence: 690,
+      holder: 'current-session',
+      at: NOW,
+      holders: [{ sessionId: 'current-session', fence: 690, at: NOW }],
+    }
+    writeFileSync(fencePath, JSON.stringify(standing, null, 2))
+    const before = readFileSync(fencePath, 'utf8')
+
+    expect(acquire('stale-session', opts({
+      kind: 'pending-spawn',
+      requestedFence: start.reservation.requestedFence,
+      extra: start.reservation,
+      now: NOW + 1,
+    }))).toBe('stale-fence')
+    expect(existsSync(lockPath)).toBe(false)
+    expect(readFileSync(fencePath, 'utf8')).toBe(before)
+    expect(readFence({ fencePath })).toMatchObject({ fence: 690, holder: 'current-session' })
   })
 
   it('renewLease writes only for the owner, and only once per interval', () => {

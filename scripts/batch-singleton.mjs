@@ -54,13 +54,13 @@ import {
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
-import { repoPath } from './repo-paths.mjs'
-import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
+import { commonRepoPath } from './repo-paths.mjs'
+import { sleepSync, writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   LEASE_MS,
   renewedLock,
   renewalDecision,
-  nextFence,
+  fenceClaimDecision,
   grantedFenceState,
   normaliseFence,
 } from './batch-lease-core.mjs'
@@ -138,6 +138,10 @@ export const PARALLEL_FRESH_MS = 10 * 60 * 1000
 /** A reap-mutex directory older than this belongs to a crashed reaper and may
  *  be cleared. */
 export const REAP_MUTEX_STALE_MS = 60 * 1000
+/** A fence writer's atomic write can itself retry for ~0.8 s. A claimant waits
+ *  just beyond that bounded window before accepting a genuinely unavailable
+ *  grant door and falling back to an unfenced lock. */
+export const FENCE_MUTEX_WAIT_MS = 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
@@ -177,7 +181,11 @@ export function statePathsFor(lockPath) {
   }
 }
 
-export const LOCK_PATH = repoPath('.claude/batch-lock.json')
+// Unlike source paths, the batch authority belongs to the repository as a
+// whole. `commonRepoPath` follows Git's common directory back to the main
+// checkout, so a process launched from a linked author/reviewer worktree sees
+// this exact same lock and fence family.
+export const LOCK_PATH = commonRepoPath('.claude/batch-lock.json')
 const DEFAULT_PATHS = statePathsFor(LOCK_PATH)
 export const SESSIONS_SEEN_PATH = DEFAULT_PATHS.sessionsSeenPath
 export const SESSION_ACTIVITY_PATH = DEFAULT_PATHS.activityPath
@@ -900,6 +908,26 @@ function enterReapMutex(mutexPath) {
   }
 }
 
+/**
+ * Fence grants are shorter than reap operations, and a claimant has already won
+ * the owner lock before it reaches this door. Give the current grant one bounded
+ * write window to finish, then retry the atomic mkdir. This prevents ordinary
+ * contention from erasing the new lock's fence number while preserving the
+ * established fail-open exit for a genuinely stuck mutex.
+ */
+function enterFenceMutex(mutexPath, opts = {}) {
+  if (enterReapMutex(mutexPath)) return true
+  const waitMs = opts.fenceMutexWaitMs ?? FENCE_MUTEX_WAIT_MS
+  if (!(Number.isFinite(waitMs) && waitMs > 0)) return false
+  const sleep = opts.fenceMutexSleep ?? sleepSync
+  const deadline = Date.now() + waitMs
+  while (Date.now() < deadline) {
+    sleep(Math.min(10, Math.max(1, deadline - Date.now())))
+    if (enterReapMutex(mutexPath)) return true
+  }
+  return false
+}
+
 function exitReapMutex(mutexPath) {
   try {
     rmdirSync(mutexPath)
@@ -909,11 +937,14 @@ function exitReapMutex(mutexPath) {
 }
 
 /**
- * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race'.
+ * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race' |
+ * 'stale-event' | 'stale-fence'.
  *   - 'acquired'  — this session now owns the batch.
  *   - 'mine'      — it already did (heartbeat refreshed).
  *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
  *   - 'lost-race' — a concurrent starter won. STAND DOWN.
+ *   - 'stale-event' — the lock no longer matches the triggering event.
+ *   - 'stale-fence' — the explicit generation proposal no longer advances the mark.
  * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
  *
  * THERE IS NO `takeWedged` ANY MORE (point 434). A wedged owner used to be a case
@@ -995,15 +1026,37 @@ export function acquire(sessionId, opts = {}) {
    * nobody could record simply blocks nobody (fail-open, as everywhere here).
    */
   const claim = () => {
-    if (!tryExclusiveCreate(lockPath, identity(null))) return false
+    if (!tryExclusiveCreate(lockPath, identity(null))) return 'lost-race'
     try {
-      const fence = grantFence(sessionId, { fencePath, priorFence, now, takeover: takenFrom })
+      const fence = grantFence(sessionId, {
+        fencePath,
+        priorFence,
+        requestedFence: opts.requestedFence,
+        fenceMutexWaitMs: opts.fenceMutexWaitMs,
+        fenceMutexSleep: opts.fenceMutexSleep,
+        now,
+        takeover: takenFrom,
+      })
       const fresh = readOwnerLock(lockPath)
+      // An explicit proposal is part of the acquisition's authority. If the
+      // durable mark has already reached it, this claimant never owned that
+      // generation: remove only our just-created, still-unfenced lock and
+      // report the refusal. Callers without a proposal retain the historic
+      // fail-open behaviour for an unavailable fence file.
+      if (opts.requestedFence !== undefined && fence === null) {
+        if (fresh?.sessionId === sessionId && fresh.fence === null) rmSync(lockPath, { force: true })
+        return 'stale-fence'
+      }
       if (fence !== null && fresh && fresh.sessionId === sessionId) {
         writeJsonAtomic(lockPath, { ...fresh, fence }, opts)
       }
     } catch {
-      /* see above — an unrecordable fence never fails an acquisition */
+      if (opts.requestedFence !== undefined) {
+        const fresh = readOwnerLock(lockPath)
+        if (fresh?.sessionId === sessionId && fresh.fence === null) rmSync(lockPath, { force: true })
+        return 'stale-fence'
+      }
+      /* see above — an unrecordable implicit fence never fails an acquisition */
     }
     const acquired = readOwnerLock(lockPath)
     emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, acquired, {
@@ -1016,7 +1069,7 @@ export function acquire(sessionId, opts = {}) {
         takenFrom,
       },
     })
-    return true
+    return 'acquired'
   }
 
   // Sweep the litter of past failed writes (point 340 (b)) — only tmp files
@@ -1028,7 +1081,8 @@ export function acquire(sessionId, opts = {}) {
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
     if (opts.expected) return 'stale-event'
-    if (claim()) return 'acquired'
+    const result = claim()
+    if (result !== 'lost-race') return result
   }
 
   const lock = readOwnerLock(lockPath)
@@ -1058,8 +1112,7 @@ export function acquire(sessionId, opts = {}) {
       if (now - st.mtimeMs < REAP_MUTEX_STALE_MS) return 'held'
     } catch {
       // vanished between the existsSync and here — retry the fast path once
-      if (claim()) return 'acquired'
-      return 'lost-race'
+      return claim()
     }
   }
 
@@ -1095,8 +1148,7 @@ export function acquire(sessionId, opts = {}) {
     } catch {
       return 'lost-race'
     }
-    if (claim()) return 'acquired'
-    return 'lost-race'
+    return claim()
   } finally {
     exitReapMutex(mutexPath)
   }
@@ -1178,11 +1230,19 @@ export function recordFenceNotice(sessionId, fence, opts = {}) {
  * doctor. It is the one record that outlives `acquire` unlinking the lock.
  */
 export function grantFence(sessionId, opts = {}) {
+  const fencePath = opts.fencePath ?? FENCE_PATH
+  const mutexPath = `${fencePath}.claiming`
+  if (!enterFenceMutex(mutexPath, opts)) return null
   try {
-    const fencePath = opts.fencePath ?? FENCE_PATH
     const now = opts.now ?? Date.now()
     const state = normaliseFence(readJson(fencePath))
-    const fence = nextFence({ fenceState: state, priorFence: opts.priorFence })
+    const decision = fenceClaimDecision({
+      fenceState: state,
+      priorFence: opts.priorFence,
+      requestedFence: opts.requestedFence,
+    })
+    if (!decision.accept) return null
+    const fence = decision.fence
     writeJsonAtomic(
       fencePath,
       // `takeover` names WHO lost the batch and WHY, so the dispossessed session
@@ -1193,6 +1253,8 @@ export function grantFence(sessionId, opts = {}) {
     return fence
   } catch {
     return null
+  } finally {
+    exitReapMutex(mutexPath)
   }
 }
 
@@ -1515,8 +1577,10 @@ export function retireBatchWriter(sessionId, opts = {}) {
 export function revokeWriterFence(sessionId, generation, opts = {}) {
   const rejected = (reason, fence = null) => ({ revoked: false, reason, fence })
   if (!sessionId || !Number.isSafeInteger(generation) || generation < 0) return rejected('invalid-authority')
+  const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
+  const mutexPath = `${fencePath}.claiming`
+  if (!enterFenceMutex(mutexPath, opts)) return rejected('write-busy')
   try {
-    const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
     const current = readFence({ fencePath })
     if (current.fence !== generation) return rejected('generation-changed', current.fence)
     if (current.holder && current.holder !== sessionId) return rejected('holder-changed', current.fence)
@@ -1538,6 +1602,8 @@ export function revokeWriterFence(sessionId, generation, opts = {}) {
     return { revoked: true, reason: 'revoked', fence: next }
   } catch {
     return rejected('write-failed')
+  } finally {
+    exitReapMutex(mutexPath)
   }
 }
 

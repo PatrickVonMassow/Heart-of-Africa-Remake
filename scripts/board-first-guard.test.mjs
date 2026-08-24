@@ -144,6 +144,36 @@ describe('board-first-guard (spawned)', () => {
     }
   })
 
+  it('refuses a mutation after lock ownership moves and names the stand-down path', () => {
+    const now = Date.now()
+    writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+      v: 2,
+      sessionId: 'successor-session',
+      claimedAt: now,
+      leaseUntil: now + 60 * 60_000,
+      pid: process.pid,
+    })
+
+    const r = callGuard('Bash', { command: 'npm run build' })
+    expect(r.status, r.stderr).toBe(0)
+    const reason = r.decision?.hookSpecificOutput?.permissionDecisionReason ?? ''
+    expect(reason).toContain('BATCH OWNERSHIP STAND-DOWN')
+    expect(reason).toContain('STAND-DOWN PATH')
+    expect(reason).toContain('npm run build')
+  })
+
+  it('still permits reads after ownership moves', () => {
+    const now = Date.now()
+    writeJson(resolve(repo, '.claude', 'batch-lock.json'), {
+      v: 2,
+      sessionId: 'successor-session',
+      claimedAt: now,
+      leaseUntil: now + 60 * 60_000,
+      pid: process.pid,
+    })
+    expect(callGuard('Bash', { command: 'git status --short' }).stdout.trim()).toBe('')
+  })
+
   // --- THE NO-WORK CLAIM (point 470) -----------------------------------------
   // Spawned, because the claim is read from a FILE the wrapper resolves through
   // `dashboardPath` — a pure test can prove the rule but not that the wrapper

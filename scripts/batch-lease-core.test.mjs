@@ -22,6 +22,7 @@ import {
   renewalDecision,
   normaliseFence,
   nextFence,
+  fenceClaimDecision,
   grantedFenceState,
   fenceHeldBy,
   fenceStatus,
@@ -155,6 +156,33 @@ describe('the fence — monotonic, max-wins, in its own file', () => {
     // A stale grant number cannot walk the mark backwards.
     const backwards = grantedFenceState({ fenceState: state, sessionId: 'sX', fence: 2, now: T0 })
     expect(backwards.fence).toBe(FENCE_HOLDER_HISTORY + 5)
+  })
+
+  it('refuses an explicit claim at or below the durable high-water mark', () => {
+    const state = { fence: 690, holder: 'current' }
+    expect(fenceClaimDecision({ fenceState: state, requestedFence: 3 })).toEqual({
+      accept: false,
+      reason: 'stale-fence',
+      fence: null,
+      highWater: 690,
+    })
+    expect(fenceClaimDecision({ fenceState: state, requestedFence: 690 }).accept).toBe(false)
+    expect(fenceClaimDecision({ fenceState: state, requestedFence: 691 })).toMatchObject({
+      accept: true,
+      fence: 691,
+      highWater: 690,
+    })
+  })
+
+  it('includes the outgoing lock copy in admission and allocates the next claim when none is proposed', () => {
+    expect(fenceClaimDecision({ fenceState: { fence: 3 }, priorFence: 690 })).toEqual({
+      accept: true,
+      reason: 'accepted',
+      fence: 691,
+      highWater: 690,
+    })
+    expect(fenceClaimDecision({ fenceState: { fence: 3 }, priorFence: 690, requestedFence: 690 }).accept).toBe(false)
+    expect(fenceClaimDecision({ fenceState: { fence: Number.MAX_SAFE_INTEGER } }).reason).toBe('fence-exhausted')
   })
 
   it('one session re-acquiring keeps only its newest grant', () => {

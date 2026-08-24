@@ -22718,3 +22718,92 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: low — no product behaviour; the cost is operator blindness during the longest
   sessions, exactly when visibility matters most.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 466. The doc verification checks a sentence the README no longer has (30.07.2026,
+  found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
+  `main`, so it is PRE-EXISTING and was not caused by that work; bundle Testinfrastruktur).
+  `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
+  and "README count matches CLAUDE.md §7.1" — because the README no longer carries the
+  "All N acceptance criteria" phrase the check greps for. A verification that is red for a
+  reason nobody is fixing trains everyone to ignore it, which is the failure mode that let a
+  red run sit unnoticed for three weeks before.
+  FINAL STATE: decide it in the commit and act, do not silence it — either the README carries
+  the count again (and the check keeps it honest), or the two checks go and their intent is
+  written into the commit message. Whichever way, `node scripts/verify/docs.mjs` exits 0 on a
+  clean `main`.
+  IN THE SAME POINT: `docs.mjs` gains the `Detail:` pointer check that mirrors its existing
+  `Evidence:` checks — every acceptance criterion whose detail was moved out must resolve to
+  a real section in `docs/acceptance-criteria-detail.md`, so the move can never rot the way an
+  unchecked pointer does. That is a gate change and therefore needs the other model's recorded
+  review before it lands (`mechanism-review-guard`).
+  VERIFIABLE: `docs.mjs` green on `main`; the pure layer covers the pointer check against a
+  present, a missing and a misspelled detail section.
+
+- [x] 890. The handover architecture document is read as the spec it is, before its code lands.
+  CUT OUT OF POINT 834 (user rule 24.08.2026, general procedure: a large point that stops
+  converging is cut into standalone points, each worked on its own, no confirmation needed).
+  834 stood at authoring round 27 with four recorded `do-not-merge` passes behind it; its branch
+  `feat/834-durable-authoring-lane` is BUILT and machine-green at 091f66b5 (13,419 unit cases,
+  lint, build), and what remained was never building but CROSS-VENDOR REVIEW of ~12,000 lines
+  that no single round can hold — `review-sol.mjs --plan` cuts that range into FOURTEEN passes.
+  The seams are this point and 889, 891, 892, 893, 894, 895 and 834 itself; this one goes first.
+  `docs/handover-architecture.md`
+  grew by ~900 lines on `feat/834-durable-authoring-lane`: the three mechanisms the union did not
+  carry (how the daemon escapes the spawning session's tool-call lifetime; the migration rule
+  relating today's batch lock to the renewable coordinator lease and its epoch, with precedence,
+  atomic cutover, split-brain prevention and rollback; and ordered ownership plus tests for the
+  prose-only requirements — daemon authorization, state permissions, retention, resource headroom,
+  experimental sampling). It is ONE file and one full review pass of the fourteen (~178,000
+  characters), and it is the text every code slice is judged against, so it is read FIRST.
+  HOW THE BRANCH IS CUT: `feat/890-<slug>` off main, carrying `docs/handover-architecture.md`
+  from `feat/834-durable-authoring-lane` and nothing else.
+  WHAT MUST HOLD IN THE TEXT: the five items 834's design stage left owed are settled here, not
+  rediscovered while building — (i) the daemon's existence is recorded twice, in its own durable
+  identity file and in a copy inside the batch lock, and the document must define the crash-safe
+  transition and the reconciliation invariant for that pair rather than claim the two can never
+  disagree; (ii) the sentence "B advances the ref as the first act of acquisition" contradicts the
+  mandatory order that follows it — acquire, start the daemon if one is to be started, advance the
+  credential, then publish — and goes; (iii) the recovery procedure's third outcome consumes a
+  case its fourth quarantines, so ABANDONED must not be concluded from "the history contains the
+  expected-before oid and nothing derived from this attempt": that case is UNKNOWN; (iv) the
+  omissions table's idempotency case still demands that a repeated `--commit` advance the fence
+  once, while step 7 and mechanism 2 say `--commit` never advances it — the case asserts the fence
+  is UNCHANGED; and (v) the admitted residuals stay recorded as LIMITS, not quietly dropped: an
+  undeclared old-path child evades every start check, work begun on the old path gains nothing
+  from this design, one push of publishing authority survives local dispossession by design so
+  that exactly one publisher exists at all times, and the drill's check-to-signal interval has one
+  branch it cannot observe.
+  FINAL STATE: the document says, per mechanism, what is BUILT on main and what is still owed, so
+  a reader cannot mistake the design for the deployed plane. It names the points that own each
+  remaining step (891-895, 834) and the remainder of 676 behind them.
+  VERIFIABLE: the doc-budget check for this file; the cross-vendor review of the file recorded
+  green before the merge; `npm run test:unit`, lint, build.
+  Criticality: high — every code slice is reviewed against this text, so a false sentence here
+  becomes a defect in five branches.
+  Bundle: unbundled (batch autonomy).
+
+- [x] 897. Two batch sessions ran at once, because the start decision reads the lock only at start.
+  MEASURED 24.08.2026. Session `14ea8484` (CI handoff for `origin/main:7c93ebf5`) was started by the
+  OS autostart launcher; its SessionStart hook reported `no live batch-writer process measured;
+  owner lock assessed inactive (handed-over)` and let it work. At 14:51:49 a SECOND session
+  `db6ce51a` (PID 1517719, CI handoff for `origin/feat/890-…:68214a5f`) started and took the lock at
+  12:53:52Z with `fence: 3`, `trigger: ci-terminal`. Both sessions were then active on point 890 for
+  about five minutes: the first started a Sol review and ran lint/build/test:unit in the `point-890`
+  worktree while the second committed and pushed to the same branch. Minutes later the lock flipped
+  back to `14ea8484` at `fence: 690` — so the intruding claim carried a REGRESSED fence and was
+  overwritten rather than refused.
+  Three gaps: (i) two CI-terminal handoffs for DIFFERENT refs (main and a feature branch) spawn two
+  sessions, and the second does not see the first; (ii) a claim whose fence goes BACKWARDS (3 after
+  690) is accepted into the lock file instead of being refused as stale; (iii) a running session has
+  no point at which it notices the lock was taken from underneath it — the collision surfaced only
+  because `guard-preflight` happened to print `another live session owns the batch lock`, and the
+  losing session keeps running afterwards.
+  FINAL STATE: at most one batch session is startable per batch regardless of how many refs conclude
+  green; a claim with a fence at or below the recorded one is REFUSED, not written; and a session
+  re-checks lock ownership before each mutation, standing down the moment it no longer holds it.
+  VERIFIABLE: unit cases — a second ci-terminal handoff for a different ref while a live session
+  holds the lock does not spawn; a claim with a lower fence is refused and the file is unchanged; a
+  mutation attempted after ownership moved is refused with the stand-down path named.
+  Criticality: high — two writers on one point is how a half-landed merge and a lost commit happen;
+  it was caught here by luck, not by a check.
+  Bundle: Session- & Repo-Hygiene.

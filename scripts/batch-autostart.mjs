@@ -1568,6 +1568,7 @@ const acq = acquire(launcherSid, {
     : predecessorToken && lock?.spawnToken
       ? { spawnToken: predecessorToken }
       : undefined,
+  requestedFence: startDecision.reservation.requestedFence,
   extra: {
     ...startDecision.reservation,
     ...(dispossessed
