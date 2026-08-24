@@ -116,7 +116,18 @@ export function agreementVerdict({ durable = null, probes = {}, now, maxSilenceM
       `the last acknowledged checkpoint (${checkpointSha.slice(0, 12)}) is not verified reachable from the remote tip (${remoteSha.slice(0, 12)})`,
     )
   }
-  const lane = Object.freeze({ batchId: durable.batchId, pointId: durable.pointId, attemptId: durable.attemptId })
+  // THE LANE BINDING NAMES THE PROCESS, NOT ONLY THE ATTEMPT. The probes above
+  // verify that the declared worker is the one running, but a token carrying only
+  // {batchId, pointId, attemptId} forgets WHICH process that was: a replacement
+  // holder under the same attempt would be handed over on the dead holder's
+  // agreement, unprobed (cross-vendor review of point 834).
+  const lane = Object.freeze({
+    batchId: durable.batchId,
+    pointId: durable.pointId,
+    attemptId: durable.attemptId,
+    pid: durable.pid,
+    pidStartedAt: durable.pidStartedAt,
+  })
   if (alerts.length) return { verdict: 'expired', alerts, lane }
   return { verdict: 'live', alerts: [], lane }
 }
@@ -138,6 +149,11 @@ export function laneBoundaryVerdict({ durable = null, agreement = null } = {}) {
   const boundTo = agreement.lane
   if (!boundTo || boundTo.batchId !== durable.batchId || boundTo.pointId !== durable.pointId || boundTo.attemptId !== durable.attemptId) {
     return { verdict: 'block', reason: 'the agreement is not bound to this lane — it names no lane or another lane\'s identities, so it proves nothing here' }
+  }
+  // And to the PROCESS the probes actually saw. Same attempt, different holder is
+  // the replay this binding exists to stop.
+  if (!sameProcess({ pid: boundTo.pid, pidStartedAt: boundTo.pidStartedAt }, { pid: durable.pid, pidStartedAt: durable.pidStartedAt })) {
+    return { verdict: 'block', reason: 'the agreement was taken for another process of this lane — a replacement holder is not covered by the dead holder\'s probes' }
   }
   return { verdict: 'hand-over' }
 }

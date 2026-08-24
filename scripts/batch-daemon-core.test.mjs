@@ -153,6 +153,23 @@ describe('the daemon record and its readiness nonce', () => {
     expect(readinessSatisfied({ record: null, expectedNonce: nonce }).ok).toBe(false)
     expect(readinessSatisfied({ record }).ok).toBe(false)
   })
+
+  it('does not accept the nonce as a record — cross-vendor review of point 834', () => {
+    // The nonce says WHOSE record this is; it does not say that a record is
+    // there. Matching on it alone, `{ launchNonce }` and nothing else ended the
+    // wait, and the launcher served a daemon whose identity it had never read.
+    const nonce = mintLaunchNonce()
+    expect(readinessSatisfied({ record: { launchNonce: nonce }, expectedNonce: nonce }).ok).toBe(false)
+    const full = buildDaemonRecord({ ...fields, launchNonce: nonce }).record
+    for (const field of ['pid', 'pidStartedAt', 'generation', 'fence', 'startedAt']) {
+      const { [field]: _dropped, ...truncated } = full
+      expect(readinessSatisfied({ record: truncated, expectedNonce: nonce }).ok, field).toBe(false)
+    }
+    // A half-written value is refused for the same reason a missing one is.
+    expect(readinessSatisfied({ record: { ...full, fence: 0 }, expectedNonce: nonce }).ok).toBe(false)
+    expect(readinessSatisfied({ record: { ...full, startedAt: NaN }, expectedNonce: nonce }).ok).toBe(false)
+    expect(readinessSatisfied({ record: full, expectedNonce: nonce }).ok).toBe(true)
+  })
 })
 
 describe('exclusive daemon existence', () => {

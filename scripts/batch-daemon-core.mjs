@@ -164,6 +164,15 @@ export function readinessSatisfied({ record = null, expectedNonce = null } = {})
   if (typeof expectedNonce !== 'string' || !expectedNonce) return { ok: false, reason: 'no nonce to wait for' }
   if (!record) return { ok: false, reason: 'no record yet' }
   if (record.launchNonce !== expectedNonce) return { ok: false, reason: "a previous daemon's record; not this launch" }
+  // THE NONCE SAYS WHOSE RECORD IT IS, NOT THAT IT IS A RECORD. Matching on the
+  // nonce alone declared readiness for `{ launchNonce }` and nothing else — a
+  // half-written or truncated record satisfied the wait, and the launcher went on
+  // to serve a daemon whose durable identity it had never read (cross-vendor
+  // review of point 834). The wait ends on a record that would also be accepted
+  // if it were being written now.
+  const rebuilt = buildDaemonRecord(record)
+  if (!rebuilt.ok) return { ok: false, reason: `the record carries this launch's nonce but is not usable: ${rebuilt.reason}` }
+  if (!Number.isFinite(record.startedAt)) return { ok: false, reason: 'the record carries no usable start time' }
   return { ok: true }
 }
 

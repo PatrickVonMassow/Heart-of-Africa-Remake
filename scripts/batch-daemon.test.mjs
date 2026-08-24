@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
 import { markUnverifiedTail } from './batch-schema-core.mjs'
-import { openStateStore, readJournal } from './batch-state.mjs'
+import { ensureFenceStore, openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { canonicalWorktree, controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -59,7 +59,11 @@ beforeAll(async () => {
     join(repo, '.claude', 'batch-lock.json'),
     JSON.stringify({ sessionId: SID, pid: process.pid, pidStartedAt: processStartTime(process.pid), leaseUntil: Date.now() + 3_600_000, fence: FENCE }),
   )
-  writeFileSync(join(repo, '.claude', 'batch-fence.json'), JSON.stringify({ fence: FENCE, generation: 'gen-sandbox-1' }))
+  // Only what the SINGLETON's fence file holds. The generation the daemon serves
+  // under is the LANE's, minted into its own state store by startDaemon — it
+  // cannot live here, because every acquisition rewrites this file from a fixed
+  // field set and would erase it.
+  writeFileSync(join(repo, '.claude', 'batch-fence.json'), JSON.stringify({ v: 1, fence: FENCE }))
 }, 30_000)
 
 afterAll(async () => {
@@ -165,7 +169,10 @@ describe('the daemon lifecycle in the sandbox', () => {
     const started = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
     expect(started.ok, started.reason).toBe(true)
     record = started.record
-    expect(record.generation).toBe('gen-sandbox-1')
+    // The generation is minted, not configured; what matters is that it is a real
+    // one and that the store keeps handing out the SAME one.
+    expect(record.generation).toMatch(/^[0-9a-f]{32}$/)
+    expect(record.generation).toBe(JSON.parse(readFileSync(openStateStore({ repoDir: repo, batchId: BATCH }).fenceStorePath, 'utf8')).generation)
     expect(record.fence).toBe(FENCE)
     const second = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
     expect(second.ok).toBe(false)
@@ -354,6 +361,10 @@ describe('two SIMULTANEOUS daemon starts', () => {
   it('lets exactly one claim the record before anything is journalled', async () => {
     const CC_BATCH = 'concurrent-batch'
     const store = openStateStore({ repoDir: repo, batchId: CC_BATCH })
+    // These two race `serve` DIRECTLY, so nothing has seeded this batch's fence
+    // store the way startDaemon would; without it both would exit on the missing
+    // generation and the race under test would never happen.
+    expect(ensureFenceStore(store, { fence: FENCE }).ok).toBe(true)
     const procs = ['nonce-one', 'nonce-two'].map((nonce) =>
       spawn('node', ['scripts/batch-daemon.mjs', 'serve', '--repo', repo, '--batch', CC_BATCH, '--nonce', nonce, '--drill'], {
         windowsHide: true,

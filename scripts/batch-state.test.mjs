@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import {
   abandonedTemporaries,
   appendJournalEntry,
+  ensureFenceStore,
   openStateStore,
   readJournal,
   readReceipt,
@@ -71,6 +72,66 @@ describe('openStateStore', () => {
     const wt = join(repo, 'wt')
     execFileSync('git', ['worktree', 'add', '-q', wt], { windowsHide: true, cwd: repo })
     expect(stateRootFor(wt)).toBe(stateRootFor(repo))
+  })
+})
+
+describe('the lane\'s own fence store', () => {
+  // The daemon refuses to serve without a generation, and the generation cannot
+  // live in `.claude/batch-fence.json`: the batch singleton rebuilds that file
+  // from a fixed field set on every acquisition, so the next acquire erases it.
+  // Measured 24.08.2026 — the parent-death drill only passed because it wrote
+  // that file by hand and no real acquisition ever touched it.
+  it('mints a generation once, and keeps it while the fence rises', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    const first = ensureFenceStore(store, { fence: 8 })
+    expect(first.ok).toBe(true)
+    expect(first.minted).toBe(true)
+    expect(first.fenceStore.generation).toMatch(/^[0-9a-f]{32}$/)
+    expect(first.fenceStore.fence).toBe(8)
+
+    const raised = ensureFenceStore(store, { fence: 9 })
+    expect(raised.ok).toBe(true)
+    expect(raised.minted).toBe(false)
+    // The SAME generation: a fresh one silently invalidates every credential a
+    // running publisher still holds.
+    expect(raised.fenceStore.generation).toBe(first.fenceStore.generation)
+    expect(raised.fenceStore.fence).toBe(9)
+    expect(JSON.parse(readFileSync(store.fenceStorePath, 'utf8')).fence).toBe(9)
+  })
+
+  it('never rolls the fence back to an older lock\'s number', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    ensureFenceStore(store, { fence: 9 })
+    const back = ensureFenceStore(store, { fence: 3 })
+    expect(back.ok).toBe(true)
+    expect(back.fenceStore.fence).toBe(9)
+  })
+
+  it('refuses a store it cannot read instead of minting a new generation over it', () => {
+    // An ERASED store has nothing to invalidate and is re-minted; a CORRUPT one
+    // may still belong to a live publisher, so it fails closed and waits for an
+    // operator.
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    ensureFenceStore(store, { fence: 8 })
+    writeFileSync(store.fenceStorePath, '{ not json')
+    const res = ensureFenceStore(store, { fence: 9 })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/cannot be read/)
+  })
+
+  it('refuses a store that lost its generation rather than inventing one', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    writeFileSync(store.fenceStorePath, JSON.stringify({ v: 1, fence: 8 }))
+    const res = ensureFenceStore(store, { fence: 9 })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/refuses to invent one/)
+  })
+
+  it('refuses to seed without a usable fence', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    for (const fence of [undefined, 0, -1, 1.5, NaN, '8']) {
+      expect(ensureFenceStore(store, { fence }).ok, String(fence)).toBe(false)
+    }
   })
 })
 

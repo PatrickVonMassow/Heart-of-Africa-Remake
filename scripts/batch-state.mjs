@@ -21,7 +21,7 @@ import { closeSync, constants as fsConstants, existsSync, fstatSync, fsyncSync, 
 import { dirname, join, resolve, sep } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { frameEntry } from './batch-schema-core.mjs'
+import { SCHEMA_VERSION, frameEntry } from './batch-schema-core.mjs'
 import { readSnapshotText, replayJournal, sealSnapshotText } from './batch-state-core.mjs'
 
 /** The one directory family the store may live in. Resolved from the repository
@@ -105,6 +105,15 @@ export function openStateStore({ repoDir = process.cwd(), batchId } = {}) {
     journalPath: join(dir, 'events.jsonl'),
     snapshotPath: join(dir, 'snapshot.json'),
     daemonRecordPath: join(dir, 'daemon.json'),
+    // THE LANE'S OWN FENCE STORE, deliberately NOT `.claude/batch-fence.json`.
+    // That file belongs to the batch singleton, whose only writer rebuilds it
+    // from a fixed field set on every acquisition — so a `generation` written
+    // there is erased by the next acquire, and the daemon that needs it can
+    // never start again (measured 24.08.2026, cross-vendor review of point 834:
+    // the drill only passed because it hand-seeded the file and never let a real
+    // acquisition touch it). The number is seeded FROM the lock; the generation
+    // lives where nothing else writes.
+    fenceStorePath: join(dir, 'fence.json'),
     receiptsDir,
   }
   const loose = []
@@ -171,6 +180,45 @@ function repairCutTail(store) {
  *  because appending onto a fragment would weld it into delimited corruption.
  *  Returns the framed line's byte length so a caller can account, never the
  *  unflushed promise of one. */
+/**
+ * The lane's fence store: `{ generation, fence }`.
+ *
+ * The GENERATION is minted once, when the store is created, and never again —
+ * `mayMintFence` refuses a store that has lost it rather than inventing one,
+ * because a fresh generation silently invalidates every credential a running
+ * publisher holds. The FENCE tracks the batch epoch and only ever RISES: it is
+ * seeded from the owner lock at every daemon start, and a lock carrying an older
+ * number than the store has already seen does not roll it back.
+ *
+ * A store that exists but cannot be read is a REFUSAL, never a re-mint: that is
+ * the difference between an erased store (nothing to invalidate) and a corrupt
+ * one (a running publisher whose generation we would be throwing away).
+ */
+export function ensureFenceStore(store, { fence } = {}) {
+  if (!Number.isSafeInteger(fence) || fence < 1) return { ok: false, reason: 'a fence store is seeded with a usable fence' }
+  const path = store.fenceStorePath
+  let existing = null
+  try {
+    existing = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      return { ok: false, reason: `the fence store exists but cannot be read; minting over it would invalidate a live generation: ${error.message}` }
+    }
+  }
+  if (existing) {
+    if (typeof existing.generation !== 'string' || !existing.generation || !Number.isSafeInteger(existing.fence)) {
+      return { ok: false, reason: 'the fence store has lost its generation or fence and refuses to invent one' }
+    }
+    if (fence <= existing.fence) return { ok: true, fenceStore: existing, minted: false }
+    const raised = { ...existing, fence }
+    writeFileAtomic(path, `${JSON.stringify(raised)}\n`)
+    return { ok: true, fenceStore: raised, minted: false }
+  }
+  const fresh = { v: SCHEMA_VERSION, generation: randomBytes(16).toString('hex'), fence }
+  writeFileAtomic(path, `${JSON.stringify(fresh)}\n`)
+  return { ok: true, fenceStore: fresh, minted: true }
+}
+
 export function appendJournalEntry(store, entry) {
   const framed = frameEntry(entry)
   if (!framed.ok) return { ok: false, reason: framed.reason }

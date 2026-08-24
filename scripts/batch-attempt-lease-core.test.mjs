@@ -110,6 +110,40 @@ describe('leaseAllowsWrite — the check before every checkpoint and push (M40)'
   })
 })
 
+describe('the clock a lease is judged against — cross-vendor review of point 834', () => {
+  it('refuses to grant without a clock instead of dating the lease at the epoch', () => {
+    // `now` used to default to 0, so an OMITTED clock passed the finiteness guard
+    // and every lease was granted and dated in 1970 — a lease that has been
+    // expired since before the batch existed, or, read the other way, evidence
+    // nobody supplied.
+    const res = grantAttemptLease({ attempt, holder, leaseId: 'L1' })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/usable clock/)
+  })
+
+  it('fences a rolled-back clock rather than reading the lease as unexpired', () => {
+    // Expiry was judged with `now > expiresAt` alone. A clock BEFORE the grant
+    // satisfies that as comfortably as a clock inside the term, so a rollback
+    // handed the holder a valid-looking lease for the length of the rollback.
+    const lease = grant().lease
+    const res = leaseAllowsWrite({ lease, holder, leaseId: 'L1', now: lease.grantedAt - 60_000 })
+    expect(res.verdict).toBe('fenced')
+    expect(res.reason).toMatch(/rolled-back clock/)
+    // The moment of the grant itself is not a rollback.
+    expect(leaseAllowsWrite({ lease, holder, leaseId: 'L1', now: lease.grantedAt }).verdict).toBe('write')
+  })
+
+  it('fences a persisted lease that carries no grant time, or an impossible window', () => {
+    // Without `grantedAt` the rollback check above cannot run at all, so such a
+    // lease is unreadable ownership, not a lease missing a decoration.
+    const lease = grant().lease
+    const { grantedAt, ...ungranted } = lease
+    expect(leaseAllowsWrite({ lease: ungranted, holder, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
+    const inverted = { ...lease, expiresAt: lease.grantedAt - 1 }
+    expect(leaseAllowsWrite({ lease: inverted, holder, leaseId: 'L1', now: lease.grantedAt }).verdict).toBe('fenced')
+  })
+})
+
 describe('expiredLeaseAlerts', () => {
   it('alerts per expired lease and stays silent inside the term', () => {
     const lease = grant().lease

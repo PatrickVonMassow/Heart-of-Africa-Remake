@@ -27,8 +27,10 @@ import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, rena
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
-import { probePid, processStartTime } from './batch-singleton.mjs'
+import { acquire, probePid, processStartTime } from './batch-singleton.mjs'
 import { PROCESS_START_TOLERANCE_MS } from './batch-schema-core.mjs'
+import { IDLE_WINDOW_MS } from './batch-ownership-core.mjs'
+import { LEASE_MS } from './batch-lease-core.mjs'
 import { openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
@@ -62,7 +64,11 @@ function buildSandbox() {
   git(['checkout', '-q', '-b', 'feat/drill'], worktree)
   git(['push', '-q', 'origin', 'feat/drill'], worktree)
   mkdirSync(join(repo, '.claude'), { recursive: true })
-  writeFileSync(join(repo, '.claude', 'batch-fence.json'), JSON.stringify({ fence: FENCE_BEFORE, generation: 'gen-drill-1' }))
+  // Only what the SINGLETON's fence file legitimately holds: a number for the
+  // parent's acquisition to advance past. The generation the daemon needs is the
+  // lane's own, minted in its state store — hand-seeding it here was what let the
+  // drill pass over a fence file no real acquisition had ever written.
+  writeFileSync(join(repo, '.claude', 'batch-fence.json'), JSON.stringify({ v: 1, fence: FENCE_BEFORE }))
   return { sandbox, originDir, repo, worktree }
 }
 
@@ -70,10 +76,19 @@ function buildSandbox() {
  *  session does, then an endless mid-authoring sleep for the observer to kill. */
 async function parentSession({ repo, worktree, readyPath }) {
   const sid = 'doomed-session'
-  writeFileSync(
-    join(repo, '.claude', 'batch-lock.json'),
-    JSON.stringify({ sessionId: sid, pid: process.pid, pidStartedAt: processStartTime(process.pid), leaseUntil: Date.now() + 3_600_000, fence: FENCE_BEFORE }),
-  )
+  // THE PARENT'S LOCK IS ACQUIRED, NOT WRITTEN. A hand-built lock is not the
+  // shape acquisition produces — it carried no `claimedAt`, so every later
+  // ownership read judged it as "no lock" and the successor's real acquisition
+  // could not reap it. The drill is about what happens to a REAL owner.
+  const acquired = acquire(sid, {
+    lockPath: join(repo, '.claude', 'batch-lock.json'),
+    fencePath: join(repo, '.claude', 'batch-fence.json'),
+    pid: process.pid,
+    pidStartedAt: processStartTime(process.pid),
+  })
+  if (acquired !== 'acquired') throw new Error(`parent: could not acquire the drill lock: ${acquired}`)
+  const parentFence = readJsonIfAny(join(repo, '.claude', 'batch-lock.json'))?.fence
+  if (!Number.isInteger(parentFence)) throw new Error('parent: acquisition minted no fence')
   const started = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
   if (!started.ok) throw new Error(`parent: daemon refused: ${started.reason}`)
   const copied = writeLockCopy({ repoDir: repo, record: started.record, sessionId: sid })
@@ -84,13 +99,13 @@ async function parentSession({ repo, worktree, readyPath }) {
     request: {
       cmd: 'start-attempt',
       sessionId: sid,
-      fence: FENCE_BEFORE,
+      fence: parentFence,
       payload: { batchId: BATCH, pointId: 'p-drill', attemptId: 'a-drill', branch: 'feat/drill', worktree, adapter: 'stub' },
     },
   })
   if (!attempt.ok) throw new Error(`parent: start-attempt refused: ${attempt.reason}`)
   const tmp = `${readyPath}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify({ record: started.record, attempt: attempt.result }))
+  writeFileSync(tmp, JSON.stringify({ record: started.record, attempt: attempt.result, fence: parentFence }))
   renameSync(tmp, readyPath)
   // Mid-authoring, like the session of 21.08.2026: awaiting a tool call that
   // will never return. The observer kills this whole group without warning.
@@ -136,6 +151,13 @@ async function parentDeathScenario({ keep }) {
       return { ok: false, scenario: 'parent-death', checks }
     }
     const record = ready.record
+    // The fence the DEAD session held, as its own acquisition minted it — not a
+    // constant the drill assumes. Everything below that must be refused is
+    // refused against this number.
+    const deadFence = ready.fence
+    if (!check('the parent reported the fence its acquisition minted', Number.isInteger(deadFence), String(deadFence))) {
+      return { ok: false, scenario: 'parent-death', checks }
+    }
 
     // Let the worker prove it works BEFORE the kill, so survival is of a running
     // authoring process, not of an idle one. The baseline is the tip the SETUP
@@ -160,40 +182,68 @@ async function parentDeathScenario({ keep }) {
     const shaAfterKill = await waitForNewSha({ originDir, since: shaBeforeKill, timeoutMs: 20_000 })
     check('the worker pushed a SHA that did not exist at the kill', Boolean(shaAfterKill) && shaAfterKill !== shaBeforeKill)
 
-    // THE FRESH SESSION: acquires the lock, presenting the NEW fence the next
-    // acquisition mints (acquisition is the fence's only writer).
+    // THE FRESH SESSION: acquires the lock through THE REAL ACQUISITION PATH, and
+    // presents whatever fence that path mints. This used to be two hard-coded
+    // writes of `batch-fence.json` and `batch-lock.json` with `FENCE_BEFORE + 1`,
+    // which simulated the outcome of a takeover and therefore could not detect a
+    // broken one: an acquisition that minted no number, reused the dispossessed
+    // one, or lost the race would all have passed (cross-vendor review of point
+    // 834). The successor now takes the batch off the dead session exactly as a
+    // real one does — which is also the only way this drill proves that a
+    // SIGKILLed owner's lock can be reaped at all.
     const successorSid = 'successor-session'
-    const newFence = FENCE_BEFORE + 1
-    writeFileSync(join(repo, '.claude', 'batch-fence.json'), JSON.stringify({ fence: newFence, generation: 'gen-drill-1' }))
-    writeFileSync(
-      join(repo, '.claude', 'batch-lock.json'),
-      JSON.stringify({
-        sessionId: successorSid,
-        pid: process.pid,
-        pidStartedAt: processStartTime(process.pid),
-        leaseUntil: Date.now() + 3_600_000,
-        fence: newFence,
-        daemon: { pid: record.pid, pidStartedAt: record.pidStartedAt, generation: record.generation },
-      }),
+    const lockPath = join(repo, '.claude', 'batch-lock.json')
+    const fencePath = join(repo, '.claude', 'batch-fence.json')
+    // THE ONE THING THE DRILL FAST-FORWARDS IS TIME. A state change inside the
+    // idle window proves life outright and WITHOUT a pid probe (rule 3 of
+    // ownershipVerdict) — deliberately, because a session mid-tool-call writes no
+    // heartbeat. A session killed seconds ago therefore still reads alive, and a
+    // real successor waits that window out. The drill injects the clock instead
+    // of sleeping five minutes; everything the acquisition then does — the dead-pid
+    // assessment, the reap mutex, the unlink and recreate, the fence mint — runs
+    // for real against the real lock the parent acquired.
+    const successorNow = Date.now() + IDLE_WINDOW_MS + LEASE_MS + 60_000
+    const outcome = acquire(successorSid, {
+      lockPath,
+      fencePath,
+      now: successorNow,
+      pid: process.pid,
+      pidStartedAt: processStartTime(process.pid),
+    })
+    check('the fresh session acquired the dead owner\'s lock through the real path', outcome === 'acquired', String(outcome))
+    const successorLock = readJsonIfAny(lockPath)
+    const newFence = successorLock?.fence
+    // The fence is the whole point of the acquisition: a takeover that does not
+    // SUPERSEDE the dispossessed number leaves the dead session's credentials
+    // valid, and the two negative probes below would then pass for the wrong
+    // reason — because nothing had changed, not because the daemon enforces it.
+    check(
+      'that acquisition minted a fence strictly above the dispossessed one',
+      Number.isInteger(newFence) && newFence > deadFence,
+      `fence ${JSON.stringify(newFence)} against ${deadFence}`,
     )
+    // Acquisition writes the lock; the daemon copy is the owner's own second
+    // write, through the same mutex a live session uses.
+    const copiedBySuccessor = writeLockCopy({ repoDir: repo, record, sessionId: successorSid, fence: newFence })
+    check('the successor recorded the surviving daemon in its own lock', copiedBySuccessor.ok === true, copiedBySuccessor.reason ?? '')
     const successorRequest = (cmd, payload) =>
       controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd, sessionId: successorSid, fence: newFence, payload: { batchId: BATCH, ...payload } } })
 
     // THE NEGATIVE HALF OF THE FENCE, without which this drill would pass on a
     // daemon that ignores epochs entirely: the DEAD session's credentials, and
     // the superseded fence even under the live session id, must be REFUSED.
-    // The lock and fence writes above simulate what acquisition installs; these
-    // two probes are what prove the daemon actually reads them.
+    // The acquisition above installed those credentials for real; these two
+    // probes are what prove the daemon actually reads them.
     const staleSession = await controlRequest({
       repoDir: repo,
       batchId: BATCH,
-      request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: FENCE_BEFORE, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
+      request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
     })
     check("the dead session's (sessionId, fence) is REFUSED after the takeover", staleSession.ok !== true, staleSession.ok ? 'accepted' : '')
     const staleFence = await controlRequest({
       repoDir: repo,
       batchId: BATCH,
-      request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: FENCE_BEFORE, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
+      request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
     })
     check('the superseded fence is REFUSED even under the live session id', staleFence.ok !== true, staleFence.ok ? 'accepted' : '')
 

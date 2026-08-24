@@ -3,6 +3,7 @@
 // lane crosses a boundary only as a live, transferable, agreeing whole.
 import { describe, it, expect } from 'vitest'
 import { AGREEMENT_SILENCE_MS, agreementVerdict, durableBlock, laneBoundaryVerdict } from './batch-adoption-core.mjs'
+import { PROCESS_START_TOLERANCE_MS } from './batch-schema-core.mjs'
 
 const block = () => durableBlock({ batchId: 'b', pointId: 'p834', attemptId: 'a1', pid: 100, pidStartedAt: 5000, transferable: true }).durable
 
@@ -43,7 +44,7 @@ describe('agreementVerdict (M18)', () => {
     expect(agreementVerdict({ durable: block(), probes: liveProbes(), now: 100_000 })).toEqual({
       verdict: 'live',
       alerts: [],
-      lane: { batchId: 'b', pointId: 'p834', attemptId: 'a1' },
+      lane: { batchId: 'b', pointId: 'p834', attemptId: 'a1', pid: 100, pidStartedAt: 5000 },
     })
   })
 
@@ -118,11 +119,28 @@ describe('agreementVerdict (M18)', () => {
 })
 
 describe('laneBoundaryVerdict', () => {
-  const laneOf = (d) => ({ batchId: d.batchId, pointId: d.pointId, attemptId: d.attemptId })
+  const laneOf = (d) => ({ batchId: d.batchId, pointId: d.pointId, attemptId: d.attemptId, pid: d.pid, pidStartedAt: d.pidStartedAt })
 
   it('hands over only a live transferable lane whose agreement names it', () => {
     const d = block()
     expect(laneBoundaryVerdict({ durable: d, agreement: { verdict: 'live', alerts: [], lane: laneOf(d) } })).toEqual({ verdict: 'hand-over' })
+  })
+
+  it('BLOCKS an agreement taken for a different process of the SAME lane', () => {
+    // Cross-vendor review of point 834: the lane token used to carry only the
+    // three lane ids, so an agreement earned by the process that has since died
+    // authorized hand-over of whatever now holds the same attempt — a holder no
+    // probe in this module ever saw. A recycled pid is the same case: the number
+    // matches and the start time does not.
+    const d = block()
+    const replacement = { verdict: 'live', alerts: [], lane: { ...laneOf(d), pid: 4242, pidStartedAt: 9_000 } }
+    expect(laneBoundaryVerdict({ durable: d, agreement: replacement }).verdict).toBe('block')
+    const recycledPid = { verdict: 'live', alerts: [], lane: { ...laneOf(d), pidStartedAt: d.pidStartedAt + PROCESS_START_TOLERANCE_MS + 1 } }
+    expect(laneBoundaryVerdict({ durable: d, agreement: recycledPid }).verdict).toBe('block')
+    // An agreement from an older shape, with no process named at all, proves
+    // nothing about the holder either.
+    const { pid, pidStartedAt, ...lanelessProcess } = laneOf(d)
+    expect(laneBoundaryVerdict({ durable: d, agreement: { verdict: 'live', alerts: [], lane: lanelessProcess } }).verdict).toBe('block')
   })
 
   it('BLOCKS an agreement bound to another lane, or to none', () => {

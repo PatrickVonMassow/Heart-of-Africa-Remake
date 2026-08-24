@@ -34,7 +34,7 @@ import {
 } from './batch-schema-core.mjs'
 import { AGREEMENT_SILENCE_MS } from './batch-adoption-core.mjs'
 import { appliedKeys, deriveSnapshot } from './batch-state-core.mjs'
-import { appendJournalEntry, openStateStore, readJournal, writeFileAtomic, writeSnapshot } from './batch-state.mjs'
+import { appendJournalEntry, ensureFenceStore, openStateStore, readJournal, writeFileAtomic, writeSnapshot } from './batch-state.mjs'
 import {
   DRAIN_STEPS,
   buildDaemonRecord,
@@ -61,9 +61,6 @@ const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise,
 
 function lockPathFor(repoDir) {
   return join(repoDir, '.claude', 'batch-lock.json')
-}
-function fenceStorePathFor(repoDir) {
-  return join(repoDir, '.claude', 'batch-fence.json')
 }
 
 function readLock(repoDir) {
@@ -150,7 +147,7 @@ async function serve(args) {
     }
   }
   const store = openStateStore({ repoDir, batchId: args.batch })
-  const fenceStore = readJsonIfAny(fenceStorePathFor(repoDir))
+  const fenceStore = readJsonIfAny(store.fenceStorePath)
   if (!fenceStore || typeof fenceStore.generation !== 'string' || !fenceStore.generation || !Number.isInteger(fenceStore.fence)) {
     console.error('daemon: the fence store is missing its generation or fence; a batch that cannot prove who owns it must stop')
     process.exit(1)
@@ -873,6 +870,17 @@ export async function startDaemon({ repoDir, batchId, drill = false, waitMs = ST
     if (!gate.ok) return { ok: false, reason: gate.reason }
   }
   const store = openStateStore({ repoDir: resolved, batchId })
+  // SEED THE LANE'S FENCE STORE FROM THE OWNER LOCK, here, because this is the
+  // one moment that knows both. The daemon refuses to serve without a generation,
+  // and the generation cannot live in the singleton's fence file — every acquire
+  // rewrites that file from a fixed field set and would erase it. The number is
+  // the lock's; a store that has already seen a higher one is not rolled back.
+  const lockFence = readLock(resolved)?.fence
+  if (!Number.isSafeInteger(lockFence) || lockFence < 1) {
+    return { ok: false, reason: 'the batch lock carries no usable fence, so the daemon cannot be told which epoch it serves' }
+  }
+  const seeded = ensureFenceStore(store, { fence: lockFence })
+  if (!seeded.ok) return { ok: false, reason: seeded.reason }
   const nonce = mintLaunchNonce()
   spawnDetached({
     cmd: process.execPath,

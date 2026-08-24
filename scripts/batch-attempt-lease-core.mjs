@@ -33,7 +33,13 @@ function usableLease(lease) {
       Number.isInteger(lease.holder.pid) &&
       lease.holder.pid > 0 &&
       Number.isFinite(lease.holder.pidStartedAt) &&
+      // BOTH ENDS OF THE VALIDITY WINDOW, not just the far one. A lease without
+      // a grant time cannot be checked against a rolled-back clock at all, and
+      // a window that ends before it begins is not a window (cross-vendor review
+      // of point 834). Ownership this module cannot date is uncertain ownership.
+      Number.isFinite(lease.grantedAt) &&
       Number.isFinite(lease.expiresAt) &&
+      lease.expiresAt >= lease.grantedAt &&
       sameAttempt(lease, lease),
   )
 }
@@ -52,7 +58,11 @@ function usableLease(lease) {
  *      probe — before the attempt may be re-granted, and then only as a NEW lease id.
  *  A recycled pid presenting the dead holder's number is caught by sameProcess:
  *  the start time does not match, so it is a different process like any other. */
-export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, now = 0, ttlMs = ATTEMPT_LEASE_TTL_MS, leaseId = null, holderProvenDead = false } = {}) {
+// NO DEFAULT CLOCK. `now = 0` made an OMITTED clock look like a usable one at the
+// epoch: the finiteness guard below passed, and every lease was granted and dated
+// in 1970 (cross-vendor review of point 834). A missing clock is missing evidence
+// here exactly as it is everywhere else in this file.
+export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, now, ttlMs = ATTEMPT_LEASE_TTL_MS, leaseId = null, holderProvenDead = false } = {}) {
   if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) {
     return { ok: false, reason: 'a lease names its batch, point and attempt' }
   }
@@ -149,6 +159,13 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
   }
   if (!sameProcess(lease.holder, holder)) {
     return { verdict: 'fenced', reason: 'the lease is held by another process identity; a recycled pid does not inherit it' }
+  }
+  // A CLOCK BEFORE THE GRANT IS NOT EARLINESS, IT IS ROLLBACK, and a rolled-back
+  // clock makes every expiry comparison below meaningless — the lease would read
+  // valid for as long as the rollback lasts, which is precisely the window a
+  // fenced worker must not write in.
+  if (now < lease.grantedAt) {
+    return { verdict: 'fenced', reason: `the clock is ${lease.grantedAt - now}ms before this lease was granted — a rolled-back clock cannot judge expiry` }
   }
   if (now > lease.expiresAt) {
     return { verdict: 'fenced', reason: 'the lease has expired; renew through the daemon before writing, or stop' }
