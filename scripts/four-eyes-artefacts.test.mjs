@@ -207,6 +207,20 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // referencing some other committed JSON with matching owner and accounting
     // would otherwise disconnect the provenance chain (re-review round 7).
     expect(row.unionSource).toBe(UNION)
+    const rowReachable = (() => {
+      try {
+        execFileSync('git', ['cat-file', '-e', `${row.sha}^{commit}`], { cwd: REPO_ROOT, windowsHide: true })
+        return true
+      } catch {
+        return false
+      }
+    })()
+    if (!rowReachable) {
+      console.warn(
+        `four-eyes-artefacts: SKIPPED the row-sha audit — ${row.sha.slice(0, 7)} is not in this clone (shallow checkout); a full clone runs it`,
+      )
+      return
+    }
     // The union is read at the ROW'S sha, like everything else this case
     // recomputes — the audit is of the historical fold, not of the working tree.
     const entries = JSON.parse(
@@ -217,6 +231,12 @@ describe('the 676 stage is auditable from its raw halves', () => {
     // EVERYTHING RECOMPUTED HERE IS READ AT THE ROW'S OWN SHA (re-review rounds
     // 5 and 6): the audit is of the historical fold, so working-tree or HEAD
     // reads would let later edits rot a true row or dress up a false one.
+    //
+    // A SHALLOW CLONE CANNOT HOLD THE ROW'S TREE — CI checks out at
+    // fetch-depth 2 on purpose (.github/workflows/ci.yml documents why deeper
+    // reddened the job) — so, like the queue-calibration suite, this audit
+    // skips there and says why rather than going red for the checkout. Every
+    // full clone still runs it.
     const atRow = (rel) =>
       execFileSync('git', ['show', `${row.sha}:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
     const halfModel = (half) => JSON.parse(atRow(`${half}.json`)).model
