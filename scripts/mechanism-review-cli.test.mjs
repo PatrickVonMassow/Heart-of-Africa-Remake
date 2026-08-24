@@ -152,7 +152,7 @@ describe('the reviewer-vendor matrix binds evidence to the credited model', () =
       reviewerVendorProblems('Claude Opus 5', { status: 'agreement', claimedModel: 'Claude Opus 5', actualModel: 'Claude Opus 5' }).join(' '),
     ).toMatch(/nothing to audit/)
     // …and the artefact time must BE a time — a truthy non-number anchors nothing.
-    for (const artefactAt of ['', false, {}, 'yesterday', 0]) {
+    for (const artefactAt of ['', false, {}, 'yesterday', 0, [1], '1787600000000']) {
       expect(
         reviewerVendorProblems('Claude Opus 5', {
           status: 'agreement',
