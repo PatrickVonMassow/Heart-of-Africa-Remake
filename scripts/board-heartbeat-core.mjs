@@ -45,6 +45,31 @@ const KNOWN = new Set(Object.values(TRIGGERS))
  */
 export const STALE_AFTER_MS = 10 * 60_000
 
+/** Minutes-since-midnight of a `Stand HH:MM` stamp, or null when there is none
+ *  to read. The board writes this stamp onto the now-card itself, so it answers
+ *  the only question that matters here: when was THIS card's status written. */
+export function stampMinutes(stamp) {
+  const m = /(\d{1,2}):(\d{2})/.exec(String(stamp ?? ''))
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (!Number.isInteger(h) || !Number.isInteger(min) || h > 23 || min > 59) return null
+  return h * 60 + min
+}
+
+/**
+ * How long the card's own stamp has stood, in ms.
+ *
+ * The stamp carries no date, so it is read as the most recent occurrence at or
+ * before now — a stamp "ahead" of the clock belongs to yesterday. Anything that
+ * old is far past every threshold anyway, so the wrap costs no precision where
+ * the answer matters.
+ */
+export function stampAgeMs(stampMin, nowMin) {
+  if (!Number.isInteger(stampMin) || !Number.isInteger(nowMin)) return null
+  return (((nowMin - stampMin) % 1440) + 1440) % 1440 * 60_000
+}
+
 /** Why a decision came out the way it did. Recorded, so a caller can say what
  *  it did without re-deriving it. */
 export const REASONS = Object.freeze({
@@ -69,9 +94,8 @@ export function heartbeatStatus({ note, detail } = {}) {
  * @param {object}  a
  * @param {object}  a.focus      the declared focus ({point, note}), or null
  * @param {number}  a.cardPoint  the now-card's title point, or null when unknown
- * @param {number}  a.statusAt   epoch ms the card's status was last written;
- *                               null/undefined when nothing recorded it
- * @param {number}  a.now        epoch ms
+ * @param {number}  a.ageMs      how long the card's own status stamp has stood;
+ *                               null when there is no stamp to read
  * @param {string}  a.trigger    one of TRIGGERS
  * @param {string}  a.detail     one line: what this trigger just recorded
  * @param {number}  a.staleAfterMs
@@ -80,8 +104,7 @@ export function heartbeatStatus({ note, detail } = {}) {
 export function decideHeartbeat({
   focus = null,
   cardPoint = null,
-  statusAt = null,
-  now = 0,
+  ageMs = null,
   trigger = '',
   detail = '',
   staleAfterMs = STALE_AFTER_MS,
@@ -96,16 +119,12 @@ export function decideHeartbeat({
   if (focus.point != null && cardPoint != null && cardPoint !== focus.point) return no(REASONS.CARD_MISMATCH)
 
   const status = heartbeatStatus({ note: focus.note, detail })
-  // Nothing ever recorded a stamp, so currency CANNOT be proven — and an
-  // unprovable currency is treated as stale, never as fresh. A fresh checkout
-  // and a lost state file both land here.
-  const stamped = Number.isFinite(statusAt) && statusAt > 0
-  if (!stamped) return { refresh: true, reason: REASONS.NEVER_STAMPED, status, ageMs: null }
-
-  const ageMs = now - statusAt
-  // A clock that went backwards must not be read as "very fresh" forever; a
-  // negative age is as unprovable as a missing stamp.
-  if (ageMs < 0) return { refresh: true, reason: REASONS.NEVER_STAMPED, status, ageMs }
+  // No stamp on the card, so its currency CANNOT be proven — and an unprovable
+  // currency is treated as stale, never as fresh. A card the board never
+  // stamped and an unreadable clock both land here.
+  if (!Number.isFinite(ageMs) || ageMs < 0) {
+    return { refresh: true, reason: REASONS.NEVER_STAMPED, status, ageMs: null }
+  }
   if (ageMs < staleAfterMs) return { refresh: false, reason: REASONS.CURRENT, status: null, ageMs }
   return { refresh: true, reason: REASONS.STALE, status, ageMs }
 }

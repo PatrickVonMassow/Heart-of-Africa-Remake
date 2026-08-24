@@ -17,36 +17,47 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { parseNowCardPoint } from './dashboard-guard-core.mjs'
-import { decideHeartbeat, TRIGGERS } from './board-heartbeat-core.mjs'
+import { nowCard } from './board-core.mjs'
+import { berlinMinutes } from './dashboard-guard.mjs'
+import { decideHeartbeat, stampAgeMs, stampMinutes, TRIGGERS } from './board-heartbeat-core.mjs'
 
 export { TRIGGERS }
 
-/** The now-card's title point on the registered dashboard, or null. */
-function readCardPoint(state) {
+/**
+ * The now-card as the board actually shows it: its title point, and how long its
+ * own `Stand HH:MM` status stamp has stood.
+ *
+ * READ FROM THE CARD, NEVER FROM A PUBLISH TIMESTAMP. A transport-wide stamp
+ * such as `pagesPublishedAt` moves whenever ANY board write publishes — a queue
+ * render, a done-card rotation, an open question — so an untouched now-card
+ * would read as current and the restamp this exists for would be suppressed
+ * (cross-vendor review, 24.08.2026). The card's own stamp answers the only
+ * question that matters: when was THIS status written.
+ */
+function readCard(state, nowMin) {
   try {
-    if (!state?.dashboardPath) return null
-    return parseNowCardPoint(readFileSync(resolve(REPO_ROOT, state.dashboardPath), 'utf8'))
+    if (!state?.dashboardPath) return { point: null, ageMs: null }
+    const html = readFileSync(resolve(REPO_ROOT, state.dashboardPath), 'utf8')
+    const point = parseNowCardPoint(html)
+    const card = point == null ? null : nowCard(html, point)
+    const stamp = card ? /<span class="stamp">Stand ([^<]*)<\/span>/.exec(card)?.[1] : null
+    return { point, ageMs: stampAgeMs(stampMinutes(stamp), nowMin) }
   } catch {
-    return null
+    return { point: null, ageMs: null }
   }
 }
 
 /**
- * When the board last went LIVE. `pagesPublishedAt` is the transport's own
- * stamp — the moment the page a reader opens was last written. The legacy
- * `publishedAt` mirror is deliberately not consulted: nothing has written it
- * since the board moved to its current transport, so it would read as ancient
- * forever and make every trigger publish.
+ * Restamp the now-card through the ordinary board command, which owns the edit,
+ * the archive rotation and the publish in one step.
+ *
+ * The spawn is injectable so this adapter is exercised for real rather than
+ * replaced wholesale by the tests around it (cross-vendor review, 24.08.2026):
+ * the argv it builds, the text it hands over on stdin and its refusal to treat
+ * a non-zero exit as success are the behaviour, not incidental detail.
  */
-function lastPublishedAt(state) {
-  const at = state?.pagesPublishedAt
-  return Number.isFinite(at) && at > 0 ? at : null
-}
-
-/** Restamp the now-card through the ordinary board command, which owns the
- *  edit, the archive rotation and the publish in one step. */
-function runBoardStatus(point, status) {
-  const result = spawnSync(
+export function runBoardStatus(point, status, { spawn = spawnSync } = {}) {
+  const result = spawn(
     process.execPath,
     [resolve(REPO_ROOT, 'scripts', 'board.mjs'), 'status', String(point), '--text-stdin'],
     // windowsHide: the Stop chain and every recording step run unattended;
@@ -71,20 +82,19 @@ function runBoardStatus(point, status) {
 export function heartbeat({
   trigger,
   detail = '',
-  now = Date.now(),
   state = readJson(STATE_PATH),
   focus = readJson(FOCUS_PATH),
-  cardPoint = undefined,
+  nowMinutes = berlinMinutes(),
+  card = undefined,
   writeStatus = runBoardStatus,
   stderr = (line) => console.error(line),
 } = {}) {
   try {
-    const card = cardPoint === undefined ? readCardPoint(state) : cardPoint
+    const seen = card === undefined ? readCard(state, nowMinutes) : card
     const decision = decideHeartbeat({
       focus,
-      cardPoint: card,
-      statusAt: lastPublishedAt(state),
-      now,
+      cardPoint: seen.point,
+      ageMs: seen.ageMs,
       trigger,
       detail,
     })
@@ -92,7 +102,7 @@ export function heartbeat({
 
     // The card is addressed by NUMBER, so a refresh needs one. A non-point focus
     // is legitimate work, but there is no card here to carry it.
-    const target = focus?.point ?? card
+    const target = focus?.point ?? seen.point
     if (target == null) return { refreshed: false, reason: 'no-target' }
 
     writeStatus(target, decision.status)

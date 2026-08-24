@@ -6,11 +6,12 @@ import {
   heartbeatStatus,
   REASONS,
   STALE_AFTER_MS,
+  stampAgeMs,
+  stampMinutes,
   TRIGGERS,
 } from './board-heartbeat-core.mjs'
 
 const FOCUS = { point: 847, note: 'Sol-Prüfrunden zu Punkt 847' }
-const NOW = 1_700_000_000_000
 
 describe('the in-turn heartbeat refreshes a stale now-card', () => {
   // THE MEASURED FAILURE, one case per trigger: a long turn keeps recording, the
@@ -20,8 +21,7 @@ describe('the in-turn heartbeat refreshes a stale now-card', () => {
       const decision = decideHeartbeat({
         focus: FOCUS,
         cardPoint: 847,
-        statusAt: NOW - STALE_AFTER_MS - 1,
-        now: NOW,
+        ageMs: STALE_AFTER_MS + 1,
         trigger,
         detail: 'Runde 3 abgeschlossen (do-not-merge)',
       })
@@ -35,8 +35,7 @@ describe('the in-turn heartbeat refreshes a stale now-card', () => {
       const decision = decideHeartbeat({
         focus: FOCUS,
         cardPoint: 847,
-        statusAt: NOW - 1_000,
-        now: NOW,
+        ageMs: 1_000,
         trigger,
         detail: 'Runde 4 abgeschlossen',
       })
@@ -51,8 +50,7 @@ describe('the in-turn heartbeat refreshes a stale now-card', () => {
       decideHeartbeat({
         focus: FOCUS,
         cardPoint: 847,
-        statusAt: NOW - ageMs,
-        now: NOW,
+        ageMs,
         trigger: TRIGGERS.REVIEW_ROUND,
         detail: 'x',
       }).refresh
@@ -68,8 +66,7 @@ describe('what the heartbeat refuses to do', () => {
     const decision = decideHeartbeat({
       focus: FOCUS,
       cardPoint: 720,
-      statusAt: NOW - STALE_AFTER_MS - 1,
-      now: NOW,
+      ageMs: STALE_AFTER_MS + 1,
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 3',
     })
@@ -81,8 +78,7 @@ describe('what the heartbeat refuses to do', () => {
     const decision = decideHeartbeat({
       focus: null,
       cardPoint: 847,
-      statusAt: NOW - STALE_AFTER_MS - 1,
-      now: NOW,
+      ageMs: STALE_AFTER_MS + 1,
       trigger: TRIGGERS.IN_FLIGHT,
       detail: 'Suite läuft',
     })
@@ -94,8 +90,7 @@ describe('what the heartbeat refuses to do', () => {
     const decision = decideHeartbeat({
       focus: FOCUS,
       cardPoint: 847,
-      statusAt: NOW - STALE_AFTER_MS - 1,
-      now: NOW,
+      ageMs: STALE_AFTER_MS + 1,
       trigger: 'timer',
       detail: 'tick',
     })
@@ -107,8 +102,7 @@ describe('what the heartbeat refuses to do', () => {
     const decision = decideHeartbeat({
       focus: { point: null, note: 'Abschluss vorbereiten' },
       cardPoint: null,
-      statusAt: NOW - STALE_AFTER_MS - 1,
-      now: NOW,
+      ageMs: STALE_AFTER_MS + 1,
       trigger: TRIGGERS.MECHANISM_RECORD,
       detail: 'Prüfung aufgezeichnet',
     })
@@ -122,8 +116,7 @@ describe('currency that cannot be proven is not currency', () => {
     const decision = decideHeartbeat({
       focus: FOCUS,
       cardPoint: 847,
-      statusAt: null,
-      now: NOW,
+      ageMs: null,
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 1',
     })
@@ -131,18 +124,28 @@ describe('currency that cannot be proven is not currency', () => {
     expect(decision.reason).toBe(REASONS.NEVER_STAMPED)
   })
 
-  it('refreshes when the clock went backwards, rather than reading it as fresh', () => {
-    // A backwards clock would otherwise park the card as "current" indefinitely.
+  it('refreshes on a negative age rather than reading it as very fresh', () => {
     const decision = decideHeartbeat({
       focus: FOCUS,
       cardPoint: 847,
-      statusAt: NOW + 60_000,
-      now: NOW,
+      ageMs: -60_000,
       trigger: TRIGGERS.REVIEW_ROUND,
       detail: 'Runde 1',
     })
     expect(decision.refresh).toBe(true)
     expect(decision.reason).toBe(REASONS.NEVER_STAMPED)
+  })
+
+  it('reads the card stamp, and wraps a stamp ahead of the clock to yesterday', () => {
+    expect(stampMinutes('04:15')).toBe(255)
+    expect(stampMinutes('Stand 23:59')).toBe(1439)
+    expect(stampMinutes('nonsense')).toBeNull()
+    expect(stampMinutes('99:99')).toBeNull()
+    // 05:15 now, stamped 04:15 → one hour.
+    expect(stampAgeMs(255, 315)).toBe(60 * 60_000)
+    // 00:10 now, stamped 23:50 → twenty minutes, not minus 23 hours.
+    expect(stampAgeMs(1430, 10)).toBe(20 * 60_000)
+    expect(stampAgeMs(null, 10)).toBeNull()
   })
 })
 
