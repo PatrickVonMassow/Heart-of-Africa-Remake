@@ -121,6 +121,23 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(second.reason).toMatch(/never share/)
   })
 
+  it('collides raw-string aliases of one worktree instead of granting both', () => {
+    const first = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
+    for (const alias of ['/wt/a/.', '/wt//a', '/wt/a/', '/wt/b/../a']) {
+      const aliased = claimWorktree({ claims: first.claims, worktree: alias, attempt: { ...attempt, attemptId: 'a2' } })
+      expect(aliased.ok, alias).toBe(false)
+      expect(aliased.reason, alias).toMatch(/never share/)
+    }
+    // The holder itself reaches its claim through any alias, and releases it too.
+    expect(claimWorktree({ claims: first.claims, worktree: '/wt/a/.', attempt })).toMatchObject({ ok: true, alreadyHeld: true })
+    expect(releaseWorktree({ claims: first.claims, worktree: '/wt/a/', attempt })).toMatchObject({ ok: true, released: true })
+  })
+
+  it('refuses relative paths outright', () => {
+    expect(claimWorktree({ claims: {}, worktree: 'wt/a', attempt }).ok).toBe(false)
+    expect(releaseWorktree({ claims: { '/wt/a': attempt }, worktree: 'wt/a', attempt })).toMatchObject({ ok: true, released: false })
+  })
+
   it('fails closed on an unreadable claim record', () => {
     const res = claimWorktree({ claims: { '/wt/a': {} }, worktree: '/wt/a', attempt })
     expect(res.ok).toBe(false)

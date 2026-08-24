@@ -15,6 +15,7 @@
 // here is the local half; the remote half is the credential lease on
 // refs/hoa/coordinator (batch-schema-core.mjs, publicationPush), which is a check
 // that IS the push. Both halves fail closed.
+import { normalize } from 'node:path'
 import { sameAttempt, sameProcess } from './batch-schema-core.mjs'
 
 /** How long a granted lease holds without renewal. Generous against load stalls —
@@ -164,17 +165,36 @@ export function expiredLeaseAlerts({ leases = [], now = 0 } = {}) {
     }))
 }
 
-/** One worktree, one attempt — the fail-closed worktree lock of M39. `claims` maps
- *  worktree path to the attempt that holds it; a claim by a second attempt is
- *  refused while the first is not RELEASED — expiry does not release, death alone
- *  does not release, only the daemon's explicit release after reconciliation does. */
-export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
-  if (typeof worktree !== 'string' || !worktree) return { ok: false, reason: 'a claim names its worktree' }
-  if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) return { ok: false, reason: 'a claim names its attempt' }
-  if (!Object.hasOwn(claims, worktree)) {
-    return { ok: true, claims: Object.freeze({ ...claims, [worktree]: { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId } }) }
+/** The KEY a worktree is claimed under: absolute, lexically normalised, trailing
+ *  separators stripped — `/wt/a/.`, `/wt//a` and `/wt/a/` all key as `/wt/a`, so
+ *  a raw-string alias cannot defeat the one-worktree/one-attempt invariant.
+ *  SYMLINK aliases cannot be resolved purely: the daemon realpath-resolves every
+ *  path BEFORE presenting it here (canonicalWorktree in batch-daemon.mjs), and
+ *  that resolution is pinned by its own test. */
+export function worktreeClaimKey(worktree) {
+  if (typeof worktree !== 'string' || !worktree.startsWith('/')) {
+    return { ok: false, reason: 'a worktree claim needs an absolute path' }
   }
-  const holder = claims[worktree]
+  // normalize resolves every `.` and `..` segment of an absolute path (the
+  // root's parent is the root), so the key can no longer carry either.
+  let key = normalize(worktree)
+  while (key.length > 1 && key.endsWith('/')) key = key.slice(0, -1)
+  return { ok: true, key }
+}
+
+/** One worktree, one attempt — the fail-closed worktree lock of M39. `claims` maps
+ *  the CANONICAL worktree key to the attempt that holds it; a claim by a second
+ *  attempt is refused while the first is not RELEASED — expiry does not release,
+ *  death alone does not release, only the daemon's explicit release after
+ *  reconciliation does. */
+export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
+  const keyed = worktreeClaimKey(worktree)
+  if (!keyed.ok) return { ok: false, reason: keyed.reason }
+  if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) return { ok: false, reason: 'a claim names its attempt' }
+  if (!Object.hasOwn(claims, keyed.key)) {
+    return { ok: true, claims: Object.freeze({ ...claims, [keyed.key]: { batchId: attempt.batchId, pointId: attempt.pointId, attemptId: attempt.attemptId } }) }
+  }
+  const holder = claims[keyed.key]
   if (sameAttempt(holder, attempt)) return { ok: true, claims, alreadyHeld: true }
   if (!holder || !holder.batchId || !holder.pointId || !holder.attemptId) {
     return { ok: false, reason: 'the worktree claim on record is unreadable; ownership is uncertain and uncertain fails closed' }
@@ -183,11 +203,13 @@ export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {
 }
 
 export function releaseWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
-  if (!Object.hasOwn(claims, worktree)) return { ok: true, claims, released: false }
-  if (!sameAttempt(claims[worktree], attempt)) {
+  const keyed = worktreeClaimKey(worktree)
+  // An unkeyable path can never be a stored key, so there is nothing to release.
+  if (!keyed.ok || !Object.hasOwn(claims, keyed.key)) return { ok: true, claims, released: false }
+  if (!sameAttempt(claims[keyed.key], attempt)) {
     return { ok: false, reason: 'only the claiming attempt releases its worktree; reconciliation releases for the dead' }
   }
   const next = { ...claims }
-  delete next[worktree]
+  delete next[keyed.key]
   return { ok: true, claims: Object.freeze(next), released: true }
 }

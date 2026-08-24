@@ -14,7 +14,7 @@ import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
 import { openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
-import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
+import { canonicalWorktree, controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 
 const BATCH = 'drill-batch'
@@ -90,6 +90,29 @@ describe('the dark pin', () => {
     const refused = await startDaemon({ repoDir: REPO_ROOT, batchId: BATCH, drill: true })
     expect(refused.ok).toBe(false)
     expect(refused.reason).toMatch(/sandbox/)
+  })
+})
+
+describe('canonicalWorktree — the symlink half of one-worktree/one-attempt', () => {
+  it('resolves a symlink alias to the same canonical path as its target', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'canon-'))
+    try {
+      const real = join(dir, 'real-wt')
+      mkdirSync(real)
+      const link = join(dir, 'alias-wt')
+      execFileSync('ln', ['-s', real, link], { windowsHide: true })
+      const viaReal = canonicalWorktree(real)
+      const viaLink = canonicalWorktree(link)
+      expect(viaReal.ok && viaLink.ok).toBe(true)
+      expect(viaLink.path).toBe(viaReal.path)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a relative path and a path that does not exist', () => {
+    expect(canonicalWorktree('relative/wt').ok).toBe(false)
+    expect(canonicalWorktree('/definitely/not/there').ok).toBe(false)
   })
 })
 

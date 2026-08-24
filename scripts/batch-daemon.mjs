@@ -18,7 +18,7 @@
 // path is the path that runs. --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
-import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { createServer, createConnection } from 'node:net'
 import { join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -63,6 +63,21 @@ function fenceStorePathFor(repoDir) {
 
 function readLock(repoDir) {
   return readJsonIfAny(lockPathFor(repoDir))
+}
+
+/** The SYMLINK half of the one-worktree/one-attempt invariant: the pure claim
+ *  key normalises lexically, but only realpath removes link aliases — two
+ *  attempts naming `/wt/a` and a symlink to it must collide. A worktree that
+ *  cannot be resolved does not exist and cannot be claimed. */
+export function canonicalWorktree(worktree) {
+  if (typeof worktree !== 'string' || !worktree.startsWith('/')) {
+    return { ok: false, reason: 'a worktree is an absolute path' }
+  }
+  try {
+    return { ok: true, path: realpathSync(worktree) }
+  } catch (error) {
+    return { ok: false, reason: `the worktree cannot be canonicalised (does it exist?): ${error.message}` }
+  }
 }
 
 function probeOf(pid) {
@@ -211,9 +226,14 @@ async function serve(args) {
       mutate(
         request,
         () => {
-          const { pointId, attemptId, branch, worktree, adapter } = request.payload ?? {}
+          const { pointId, attemptId, branch, adapter } = request.payload ?? {}
           const cap = mayStartAttempt({ attempts: [...attemptsState.values()] })
           if (!cap.ok) return { ok: false, reason: cap.reason }
+          // Realpath BEFORE claiming, so a symlink alias of a claimed worktree
+          // collides with it instead of slipping past the raw-string key.
+          const canonical = canonicalWorktree(request.payload?.worktree)
+          if (!canonical.ok) return { ok: false, reason: canonical.reason }
+          const worktree = canonical.path
           const leaseId = mintLaunchNonce()
           if (leases.get(attemptId)) return { ok: false, reason: `attempt ${attemptId} already holds a lease; a retry is a new attempt id` }
           const claimed = claimWorktree({ claims: worktreeClaims, worktree, attempt: { batchId: args.batch, pointId, attemptId } })
