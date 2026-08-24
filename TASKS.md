@@ -11525,3 +11525,55 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but a prescribed command that cannot be run teaches the
   session to work around its own tooling.
   Bundle: Chat & Tafel.
+
+- [ ] 871. The boundary's dictated handover card claims nothing is running while it transfers a live
+  author run. MEASURED 24.08.2026, 03:22, on main: `node scripts/batch-boundary.mjs --prepare
+  --context` reported the in-flight work as TRANSFERABLE
+  (`feat/870-reviewable-merge-attribution@bc7aa777`) and its own commit path states that the
+  successor adopts it "so the running author keeps building through the handover"
+  (`scripts/batch-boundary.mjs:1020`). The board card it dictates VERBATIM in the same breath ends
+  with "Hier laeuft nichts weiter." — `scripts/batch-boundary-core.mjs:1059` appends that sentence
+  unconditionally, with no branch for a transferred declaration. So the operator is told to publish,
+  to the user's live board, that nothing is running while a detached GPT-5.6 Sol authoring run is
+  committing and pushing. The session that measured it published the dictated text with a truthful
+  sentence appended instead.
+  THIS IS NOT THE ALREADY-LANDED POINT 800: that one was card versus publish gate; this one is card
+  versus the boundary's OWN transfer logic, and 800's fix left it standing.
+  FINAL STATE: when the boundary transfers a declaration, the dictated card says the run continues
+  and is adopted by the successor, instead of claiming the opposite.
+  VERIFIABLE: a unit case over the card composer — with a transferred in-flight declaration the
+  dictated text names the continuing run and does NOT contain "Hier laeuft nichts weiter."; without
+  one it still does.
+  Criticality: medium — no product behaviour, but the batch's own handover text writes a falsehood
+  onto the user's board, and the operator is told to publish it verbatim.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 872. A merge's conflict resolution is still attributed to the side it merged, not to the model
+  that resolved it, and most merges give it nothing to read. FOUND 24.08.2026 in the cross-vendor
+  review of point 870 (recorded at `081f782b`). That point made a cc-only resolution attributable by
+  falling back to the SECOND PARENT's `Co-Authored-By` trailers
+  (`scripts/review-sol.mjs:parentAuthorModels`, consumed by the pure resolver in
+  `scripts/mechanism-review-range-core.mjs`), which unblocked point 834 — the 834 range went from a
+  refusal at 87 % coverage to 12 runnable passes at 100 %. Two residuals survive it, and neither
+  blocked that landing.
+  RESIDUAL ONE: the merged tip's model is the model of the side that was merged IN, not of whoever
+  resolved the conflict. It is only ever the right answer because an `author-sol` session "merges
+  nothing" (`scripts/author-sol.mjs:507`), so every merge in this repository is performed by a Claude
+  owner and the merged tip is main, also Claude. Nothing enforces that coupling; the day a non-Claude
+  lane merges, a model may be planned as reviewer of its own conflict resolution — the exact hole the
+  four-eyes gate exists to close.
+  RESIDUAL TWO: the fallback reads a trailer that is usually absent. MEASURED on main: ten of the
+  last twelve merge commits carry NO `Co-Authored-By` trailer at all, landing merges included. A
+  resolution on top of such a tip therefore still resolves to "unknown", so point 870's ATTRIBUTABLE
+  half only fires when the merged tip happens to carry a trailer. The deadlock does not return — 870's
+  other half lets the round proceed and owes the remainder to a verified receipt — but the
+  attribution is the exception, not the rule.
+  FINAL STATE: the other branch of point 870's FINAL STATE is built — a merge commit carries the
+  trailer of the model that resolved it by rule, and a guard says so when it does not; the
+  second-parent fallback stays only as the reading for history written before the rule.
+  VERIFIABLE: unit cases — a merge without a resolver trailer is refused by the guard with the
+  command that repairs it; a cc-only resolution on a trailer-bearing merge is attributed to the
+  RESOLVER and not to the merged side; and a range whose merged tip carries no trailer is still
+  attributed, because the merge itself now does.
+  Criticality: high — it is a four-eyes gate that can plan a model as reviewer of its own work.
+  Bundle: Modell & Wächter.
