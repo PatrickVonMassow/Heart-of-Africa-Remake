@@ -243,6 +243,35 @@ describe('journal append and read-back', () => {
     expect(readFileSync(appended.repairedTail)).toEqual(cutInsideEuro)
   })
 
+  it('returns repaired-tail evidence even when existing corruption refuses the append', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b-corrupt-tail' })
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
+    appendJournalEntry(store, entry(2))
+    const tampered = readFileSync(store.journalPath, 'utf8').replace('"k2"', '"kX"')
+    writeFileSync(store.journalPath, tampered)
+    const fragment = Buffer.from('{"crash-cut":true')
+    appendFileSync(store.journalPath, fragment)
+
+    const refused = appendJournalEntry(store, entry(3))
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/journal is corrupt/)
+    expect(readFileSync(refused.repairedTail)).toEqual(fragment)
+    expect(abandonedTemporaries(store)).toContain(refused.repairedTail)
+  })
+
+  it('returns repaired-tail evidence when missing fence authority refuses the append', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b-unauthorized-tail' })
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
+    const fragment = Buffer.from('{"crash-cut":true')
+    appendFileSync(store.journalPath, fragment)
+
+    const refused = appendJournalEntry(store, entry(2, { fence: 8 }))
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/without fence authority/)
+    expect(readFileSync(refused.repairedTail)).toEqual(fragment)
+    expect(abandonedTemporaries(store)).toContain(refused.repairedTail)
+  })
+
   it('reads a tampered middle as corruption — the verdict mayMintFence refuses on', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
     appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))

@@ -280,16 +280,20 @@ export function appendJournalEntry(store, entry) {
   if (!framed.ok) return { ok: false, reason: framed.reason }
   refuseSymlink(store.journalPath, 'the journal')
   const repaired = repairCutTail(store)
+  // Repair has already moved durable evidence and truncated the journal before
+  // any replay refusal below can be known. Every exit after that boundary must
+  // disclose the preserved path; failure is not permission to hide a mutation.
+  const repairEvidence = repaired.repaired ? { repairedTail: repaired.droppedPath } : {}
   const journalFile = readFileNoFollowIfExists(store.journalPath)
   const exists = journalFile.exists
   const before = journalFile.text ?? ''
   const candidate = replayJournal(before + framed.line)
   const appended = candidate.entries.at(-1)
   if (candidate.verdict !== 'ok') {
-    return { ok: false, reason: `the journal is corrupt and refuses an append: ${candidate.corruption.at(-1)?.reason ?? 'unknown corruption'}` }
+    return { ok: false, reason: `the journal is corrupt and refuses an append: ${candidate.corruption.at(-1)?.reason ?? 'unknown corruption'}`, ...repairEvidence }
   }
   if (!appended || appended.seq !== entry.seq || appended.quarantine) {
-    return { ok: false, reason: `the journal refuses an entry without fence authority: ${appended?.quarantine ?? 'the entry could not be placed'}` }
+    return { ok: false, reason: `the journal refuses an entry without fence authority: ${appended?.quarantine ?? 'the entry could not be placed'}`, ...repairEvidence }
   }
   // O_NOFOLLOW closes the check/open race the lstat above cannot: a symlink
   // swapped in between fails the open itself with ELOOP instead of being
@@ -305,7 +309,7 @@ export function appendJournalEntry(store, entry) {
   // The journal's very first entry created its FILENAME too, and a name is
   // durable only once the directory is flushed with it.
   if (created) fsyncDir(store.dir)
-  return { ok: true, bytes: Buffer.byteLength(framed.line), ...(repaired.repaired ? { repairedTail: repaired.droppedPath } : {}) }
+  return { ok: true, bytes: Buffer.byteLength(framed.line), ...repairEvidence }
 }
 
 /** The journal, read and judged by the core. A missing journal is an EMPTY one
@@ -432,15 +436,17 @@ export function readReceipt(store, receiptId) {
   return readSnapshotText(receipt.text)
 }
 
-/** What the reader IGNORES tells the operator what a crash left behind: `.tmp-`
- *  leftovers beside store records AND receipts are listed, never read, never
- *  silently deleted — they are interrupted-write evidence. */
+/** What the reader IGNORES tells the operator what a crash or repair left behind:
+ *  `.tmp-` leftovers beside store records and receipts, plus `.dropped-` journal
+ *  tails, are listed, never read, never silently deleted. A repaired tail is not a
+ *  temporary write, but it belongs here because a crash after repair and before
+ *  returning its path would otherwise make that preserved evidence undiscoverable. */
 export function abandonedTemporaries(store) {
   if (!existsSync(store.dir)) return []
   return [store.dir, store.receiptsDir].flatMap((dir) => {
     if (!existsSync(dir)) return []
     return readdirSync(dir)
-      .filter((name) => name.includes('.tmp-'))
+      .filter((name) => name.includes('.tmp-') || name.includes('.dropped-'))
       .map((name) => join(dir, name))
   })
 }
