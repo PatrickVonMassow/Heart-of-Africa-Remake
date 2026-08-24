@@ -163,6 +163,23 @@ describe('unconfirmedIntents', () => {
     ]
     expect(unconfirmedIntents(ordered)).toEqual([])
   })
+
+  it('ONE confirmation answers ONE intent: a reused id must not erase every earlier intent under it', () => {
+    // Two different intents share an id — the frame can only validate
+    // "nonempty", so uniqueness is a writer's claim, not a fact. A single
+    // confirmation answers the nearest preceding intent; the other one stays
+    // listed for the remote to answer, instead of vanishing from reconciliation.
+    const entries = [
+      { seq: 1, fence: 7, kind: 'publish-intent', publicationId: 'p1', moves: [{ ref: 'refs/heads/a' }] },
+      { seq: 3, fence: 7, kind: 'publish-intent', publicationId: 'p1', moves: [{ ref: 'refs/heads/b' }] },
+      { seq: 4, fence: 7, kind: 'publish-confirmed', publicationId: 'p1' },
+    ]
+    const open = unconfirmedIntents(entries)
+    expect(open).toHaveLength(1)
+    expect(open[0].seq).toBe(1)
+    // Two confirmations answer both.
+    expect(unconfirmedIntents([...entries, { seq: 5, fence: 7, kind: 'publish-confirmed', publicationId: 'p1' }])).toEqual([])
+  })
 })
 
 describe('deriveSnapshot', () => {
@@ -186,6 +203,55 @@ describe('deriveSnapshot', () => {
     expect(snap.attempts).toHaveLength(0)
     expect(snap.quarantined).toHaveLength(2)
     expect(snap.quarantined[1].reason).toMatch(/names no attempt/)
+  })
+
+  it('enforces the transition law on replay: terminal work can never fold back to running', () => {
+    // Both records are individually well-formed; their SEQUENCE is what is
+    // illegal. Folding the second in would produce a running snapshot for an
+    // attempt that already landed — terminal work run twice.
+    const entries = [
+      { seq: 1, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'running' }) },
+      { seq: 2, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'ready-for-review', lastPushedSha: 'e'.repeat(40) }) },
+      { seq: 3, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'landing', lastPushedSha: 'e'.repeat(40) }) },
+      { seq: 4, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'landed', lastPushedSha: 'e'.repeat(40) }) },
+      { seq: 5, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'running' }) },
+    ]
+    const snap = deriveSnapshot(entries, { batchId: 'b' })
+    expect(snap.attempts[0].state.state).toBe('landed')
+    expect(snap.quarantined).toHaveLength(1)
+    expect(snap.quarantined[0]).toMatchObject({ seq: 5 })
+    expect(snap.quarantined[0].reason).toMatch(/illegal transition landed -> running/)
+    // A skipped state is equally illegal on replay: running -> landed directly.
+    const skipped = deriveSnapshot(
+      [
+        { seq: 1, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'running' }) },
+        { seq: 2, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'landed', lastPushedSha: 'e'.repeat(40) }) },
+      ],
+      { batchId: 'b' },
+    )
+    expect(skipped.attempts[0].state.state).toBe('running')
+    expect(skipped.quarantined).toHaveLength(1)
+  })
+
+  it('a repeat of the same NON-terminal state is an update; a terminal repeat quarantines', () => {
+    const update = deriveSnapshot(
+      [
+        { seq: 1, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'running' }) },
+        { seq: 2, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'running', lastPushedSha: 'e'.repeat(40) }) },
+      ],
+      { batchId: 'b' },
+    )
+    expect(update.attempts[0].state.lastPushedSha).toBe('e'.repeat(40))
+    expect(update.quarantined).toHaveLength(0)
+    const terminalRepeat = deriveSnapshot(
+      [
+        { seq: 1, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'failed', reason: 'x' }) },
+        { seq: 2, fence: 7, kind: 'attempt-state', batchId: 'b', pointId: 'p', attemptId: 'a1', record: stateRecord({ state: 'failed', reason: 'y' }) },
+      ],
+      { batchId: 'b' },
+    )
+    expect(terminalRepeat.attempts[0].state.reason).toBe('x')
+    expect(terminalRepeat.quarantined).toHaveLength(1)
   })
 
   it('carries the applied keys and the unresolved publications a successor must chase', () => {

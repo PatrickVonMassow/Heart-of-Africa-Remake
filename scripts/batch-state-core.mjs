@@ -16,7 +16,7 @@
 // contain it, so the verdict is `corrupt`, and `mayMintFence` (step 1) refuses to
 // mint on that verdict — an old fence file beside a broken journal must not hand
 // out a number a durable record already carries.
-import { SCHEMA_VERSION, attemptStateRecord, canonicalJson, checkSchemaVersion, checksumOf, migrateRecord, parseFramedLine, sameAttempt } from './batch-schema-core.mjs'
+import { SCHEMA_VERSION, TERMINAL_ATTEMPT_STATES, attemptStateRecord, attemptTransition, canonicalJson, checkSchemaVersion, checksumOf, migrateRecord, parseFramedLine, sameAttempt } from './batch-schema-core.mjs'
 
 // ---------------------------------------------------------------------------
 // 1. THE ENTRY KINDS THE LANE JOURNALS
@@ -171,25 +171,31 @@ function oidLike(v) {
  *  published, which is exactly why mechanism 2 refuses to read quarantine as
  *  uniformly local. */
 export function unconfirmedIntents(entries = []) {
-  // A confirmation suppresses an intent only when the journal could have MEANT
-  // it: not quarantined — nothing unauthorised erases a publication from
-  // recovery — and appended AFTER the intent it confirms, because a
-  // confirmation that precedes its intent confirms an earlier publication
-  // under a reused id, never this one. Fail closed either way: a doubtful
-  // confirmation leaves the intent listed for the remote to answer.
-  const confirmedSeqs = new Map()
+  // ONE confirmation answers ONE intent — the nearest PRECEDING unconfirmed
+  // intent with its id. A publicationId is unique only because a writer says
+  // so: "nonempty" is all the frame can validate, so two intents sharing an id
+  // followed by a single confirmation must leave the OTHER intent listed, not
+  // let one confirmation blanket every earlier intent under the same name and
+  // make an unresolved publication disappear from reconciliation. A
+  // confirmation suppresses only when the journal could have MEANT it: not
+  // quarantined — nothing unauthorised erases a publication from recovery —
+  // and appended AFTER the intent it confirms. Fail closed either way: a
+  // doubtful confirmation leaves the intent listed for the remote to answer.
+  const open = []
   for (const e of entries) {
-    if (e.kind === 'publish-confirmed' && !e.quarantine && typeof e.publicationId === 'string' && Number.isInteger(e.seq)) {
-      const seqs = confirmedSeqs.get(e.publicationId) ?? []
-      seqs.push(e.seq)
-      confirmedSeqs.set(e.publicationId, seqs)
+    if (e.kind === 'publish-intent' && typeof e.publicationId === 'string') {
+      open.push(e)
+    } else if (e.kind === 'publish-confirmed' && !e.quarantine && typeof e.publicationId === 'string' && Number.isInteger(e.seq)) {
+      for (let i = open.length - 1; i >= 0; i -= 1) {
+        const intent = open[i]
+        if (intent.publicationId === e.publicationId && Number.isInteger(intent.seq) && intent.seq < e.seq) {
+          open.splice(i, 1)
+          break
+        }
+      }
     }
   }
-  return entries.filter((e) => {
-    if (e.kind !== 'publish-intent' || typeof e.publicationId !== 'string') return false
-    if (!Number.isInteger(e.seq)) return true
-    return !(confirmedSeqs.get(e.publicationId) ?? []).some((seq) => seq > e.seq)
-  })
+  return open
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +230,22 @@ export function deriveSnapshot(entries = [], { batchId = null } = {}) {
     }
     const existing = attempts.find((a) => sameAttempt(a, identity))
     if (existing) {
+      // REPLAY ENFORCES THE TRANSITION LAW, not merely each record's shape: a
+      // checksummed `running` after `landed` is two individually well-formed
+      // records whose SEQUENCE is illegal, and folding it in would produce a
+      // running snapshot that lets terminal work run twice. A repeat of the
+      // same non-terminal state is an UPDATE (a checkpoint advancing
+      // lastPushedSha), not a transition; a terminal state re-recorded is not.
+      const from = existing.state.state
+      const to = checked.record.state
+      const selfUpdate = from === to && !TERMINAL_ATTEMPT_STATES.includes(from)
+      if (!selfUpdate) {
+        const legal = attemptTransition(from, to)
+        if (!legal.ok) {
+          quarantined.push({ seq: e.seq, reason: `attempt-state: illegal transition ${from} -> ${to} (${legal.reason})` })
+          continue
+        }
+      }
       existing.state = checked.record
       existing.stateSeq = e.seq
     } else {

@@ -103,6 +103,27 @@ describe('journal append and read-back', () => {
     expect(journal.droppedTail).not.toBeNull()
   })
 
+  it('repairs a crash-cut tail on the NEXT append instead of welding it into corruption', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    appendJournalEntry(store, entry(1))
+    appendJournalEntry(store, entry(2))
+    const bytes = readFileSync(store.journalPath, 'utf8')
+    const cut = bytes.slice(0, -15) // entry 2 loses its delimiter and tail
+    writeFileSync(store.journalPath, cut)
+    // Without the repair, this append would concatenate onto the fragment and
+    // replay would see one delimited corrupt line — a permanently wedged journal.
+    const appended = appendJournalEntry(store, entry(3))
+    expect(appended.ok).toBe(true)
+    const journal = readJournal(store)
+    expect(journal.verdict).toBe('ok')
+    expect(journal.entries.map((e) => e.seq)).toEqual([1, 3])
+    expect(journal.droppedTail).toBeNull()
+    // The fragment is preserved beside the journal as evidence, never eaten.
+    const fragment = cut.slice(cut.lastIndexOf('\n') + 1)
+    expect(appended.repairedTail).toBeTruthy()
+    expect(readFileSync(appended.repairedTail, 'utf8')).toBe(fragment)
+  })
+
   it('reads a tampered middle as corruption — the verdict mayMintFence refuses on', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
     appendJournalEntry(store, entry(1))
@@ -174,6 +195,22 @@ describe('receipts', () => {
     const back = readReceipt(store, 'boundary-1')
     expect(back.ok).toBe(true)
     expect(back.snapshot).toMatchObject({ kind: 'boundary', fence: 7 })
+  })
+
+  it('a receipt is written ONCE: same bytes are idempotent, different bytes are refused with the original intact', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    expect(writeReceipt(store, 'sealed-1', { kind: 'boundary', fence: 7 }).ok).toBe(true)
+    // The exact same body again: idempotent, not an overwrite.
+    const again = writeReceipt(store, 'sealed-1', { kind: 'boundary', fence: 7 })
+    expect(again.ok).toBe(true)
+    expect(again.alreadyWritten).toBe(true)
+    // A DIFFERENT body under the same id is a reused or racing receipt id, and
+    // silently replacing durable evidence with another validly sealed body is
+    // exactly what create-once exists to prevent.
+    const clash = writeReceipt(store, 'sealed-1', { kind: 'boundary', fence: 8 })
+    expect(clash.ok).toBe(false)
+    expect(clash.reason).toMatch(/already exists with different content/)
+    expect(readReceipt(store, 'sealed-1').snapshot).toMatchObject({ fence: 7 })
   })
 
   it('refuses a receipt id that is a path, and a receipt that is a symlink', () => {

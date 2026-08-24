@@ -17,7 +17,7 @@
 // STILL DARK: nothing on today's authoring path imports this file; its first
 // runtime caller is the daemon of step 3, and the activation flag refuses to
 // enable while steps 8 and 9 are not green.
-import { closeSync, constants as fsConstants, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, statSync, writeSync } from 'node:fs'
+import { closeSync, constants as fsConstants, existsSync, fstatSync, fsyncSync, ftruncateSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { dirname, join, resolve, sep } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -115,21 +115,74 @@ export function openStateStore({ repoDir = process.cwd(), batchId } = {}) {
   return { ...store, looseModes: loose }
 }
 
+/** Writes ALL of `text` through `fd` or throws: writeSync's return value is a
+ *  byte count, and a short write acknowledged as complete would let a partial
+ *  journal frame count as durable or an incomplete snapshot be renamed over
+ *  the last good one. The loop finishes the write; a count that stops
+ *  advancing is an error, never a success. */
+function writeAllSync(fd, text) {
+  const buf = Buffer.isBuffer(text) ? text : Buffer.from(text)
+  let written = 0
+  while (written < buf.length) {
+    const n = writeSync(fd, buf, written, buf.length - written)
+    if (!Number.isInteger(n) || n <= 0) throw new Error(`short write: ${written} of ${buf.length} bytes reached the file`)
+    written += n
+  }
+  return buf.length
+}
+
+/** A crash can cut the journal's final frame before its delimiter. Replay reads
+ *  that tail as an ordinary dropped crash — but an APPEND after it would
+ *  concatenate the next frame onto the fragment, turning two harmless pieces
+ *  into one delimited corrupt line and wedging the journal permanently. So the
+ *  writer repairs BEFORE it appends: the fragment's bytes are preserved beside
+ *  the journal (evidence, never silently eaten), then truncated away. */
+function repairCutTail(store) {
+  if (!existsSync(store.journalPath)) return { repaired: false }
+  const fd = openSync(store.journalPath, fsConstants.O_RDWR | fsConstants.O_NOFOLLOW)
+  try {
+    const size = fstatSync(fd).size
+    if (size === 0) return { repaired: false }
+    const last = Buffer.alloc(1)
+    readSync(fd, last, 0, 1, size - 1)
+    if (last[0] === 0x0a) return { repaired: false }
+    const buf = Buffer.alloc(size)
+    let read = 0
+    while (read < size) {
+      const n = readSync(fd, buf, read, size - read, read)
+      if (n <= 0) throw new Error('the journal shrank while its tail was being inspected')
+      read += n
+    }
+    const cutAt = buf.lastIndexOf(0x0a) + 1
+    const droppedPath = `${store.journalPath}.dropped-${randomBytes(8).toString('hex')}`
+    writeFileAtomic(droppedPath, buf.subarray(cutAt).toString('utf8'))
+    ftruncateSync(fd, cutAt)
+    fsyncSync(fd)
+    return { repaired: true, droppedPath }
+  } finally {
+    closeSync(fd)
+  }
+}
+
 /** One journal append: frame, write, FLUSH, close. The frame is a single write of
  *  a single line, so a crash leaves either nothing or a truncated tail — the two
- *  cases replay reads as ordinary. Returns the framed line's byte length so a
- *  caller can account, never the unflushed promise of one. */
+ *  cases replay reads as ordinary. A truncated tail left by an EARLIER crash is
+ *  repaired (preserved beside the journal, then cut) before this frame goes in,
+ *  because appending onto a fragment would weld it into delimited corruption.
+ *  Returns the framed line's byte length so a caller can account, never the
+ *  unflushed promise of one. */
 export function appendJournalEntry(store, entry) {
   const framed = frameEntry(entry)
   if (!framed.ok) return { ok: false, reason: framed.reason }
   refuseSymlink(store.journalPath, 'the journal')
+  const repaired = repairCutTail(store)
   // O_NOFOLLOW closes the check/open race the lstat above cannot: a symlink
   // swapped in between fails the open itself with ELOOP instead of being
   // followed anywhere the planter chose.
   const created = !existsSync(store.journalPath)
   const fd = openSync(store.journalPath, fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o600)
   try {
-    writeSync(fd, framed.line)
+    writeAllSync(fd, framed.line)
     fsyncSync(fd)
   } finally {
     closeSync(fd)
@@ -137,7 +190,7 @@ export function appendJournalEntry(store, entry) {
   // The journal's very first entry created its FILENAME too, and a name is
   // durable only once the directory is flushed with it.
   if (created) fsyncDir(store.dir)
-  return { ok: true, bytes: Buffer.byteLength(framed.line) }
+  return { ok: true, bytes: Buffer.byteLength(framed.line), ...(repaired.repaired ? { repairedTail: repaired.droppedPath } : {}) }
 }
 
 /** The journal, read and judged by the core. A missing journal is an EMPTY one
@@ -168,7 +221,7 @@ export function writeFileAtomic(path, text) {
   const tmp = `${path}.tmp-${randomBytes(8).toString('hex')}`
   const fd = openSync(tmp, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)
   try {
-    writeSync(fd, text)
+    writeAllSync(fd, text)
     fsyncSync(fd)
   } finally {
     closeSync(fd)
@@ -195,15 +248,57 @@ export function readSnapshot(store) {
   return readSnapshotText(readFileSync(store.snapshotPath, 'utf8'))
 }
 
-/** Receipts share the snapshot's discipline: sealed, atomic, owner-only. The name
- *  is the receipt's id, one path segment like a batch id. */
+/** Receipts share the snapshot's sealing and owner-only discipline, but NOT its
+ *  replacement: a receipt is durable EVIDENCE, and evidence is written once. A
+ *  reused or racing receipt id must never silently overwrite what an earlier
+ *  writer sealed, so the create is a hard-link into place — atomic, exclusive,
+ *  first writer wins. Writing the SAME bytes again is idempotent; different
+ *  bytes under an existing id are refused with both contents intact. */
 export function writeReceipt(store, receiptId, body) {
   if (!validBatchId(receiptId)) return { ok: false, reason: `not a usable receipt id: ${JSON.stringify(receiptId)}` }
   const sealed = sealSnapshotText(body)
   if (!sealed.ok) return { ok: false, reason: sealed.reason }
   const path = join(store.receiptsDir, `${receiptId}.json`)
   assertInside(store.receiptsDir, path)
-  writeFileAtomic(path, sealed.text)
+  refuseSymlink(path, 'a receipt')
+  const sameAsExisting = () => {
+    try {
+      return readFileSync(path, 'utf8') === sealed.text
+    } catch {
+      return false
+    }
+  }
+  const tmp = `${path}.tmp-${randomBytes(8).toString('hex')}`
+  const fd = openSync(tmp, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600)
+  try {
+    writeAllSync(fd, sealed.text)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  try {
+    // link(2) fails with EEXIST when the name is taken — unlike rename, which
+    // replaces. That failure is the whole point: it is what makes two writers
+    // racing on one id resolve to one durable receipt and one loud refusal.
+    linkSync(tmp, path)
+  } catch (error) {
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* the leftover is listed by abandonedTemporaries */
+    }
+    if (error?.code === 'EEXIST') {
+      if (sameAsExisting()) return { ok: true, alreadyWritten: true }
+      return { ok: false, reason: `receipt ${receiptId} already exists with different content; a receipt is written once and never overwritten` }
+    }
+    return { ok: false, reason: `the receipt could not be created: ${error.message}` }
+  }
+  try {
+    unlinkSync(tmp)
+  } catch {
+    /* the leftover is listed by abandonedTemporaries */
+  }
+  fsyncDir(store.receiptsDir)
   return { ok: true }
 }
 
