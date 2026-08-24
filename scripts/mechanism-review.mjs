@@ -843,6 +843,14 @@ if (isMainModule(import.meta.url)) {
         `${built.record.model} → ${built.record.verdict} (${built.record.mode})\n  ${built.record.evidence}\n` +
         `  ledger: ${RECORDS_PATH} (tracked — commit it with the change it judges)`,
     )
+    // A long turn records many verdicts and reaches no Stop hook; each recording
+    // carries the board so the page shows this verdict while the next round runs.
+    // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
+    // must still run where the board stack is absent — the CLI fixtures build a
+    // minimal repo — and a board that cannot follow must never fail the work.
+    await import('./board-heartbeat.mjs')
+      .then((m) => m.heartbeat({ trigger: m.TRIGGERS.MECHANISM_RECORD, detail: `Prüfung aufgezeichnet: ${built.record.sha.slice(0, 7)} → ${built.record.verdict}` }))
+      .catch(() => {})
     process.exit(0)
   } catch (e) {
     console.error(`mechanism-review failed: ${(e && e.message) || e}`)

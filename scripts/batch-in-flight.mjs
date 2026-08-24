@@ -1630,6 +1630,13 @@ if (isMain) {
         'must still be moving), so re-declare after every change and clear it with --clear when the ' +
         'wait is over. The batch lock stays HELD: no successor is spawned, this session is still the batch.',
     )
+    // A declared wait is visible to the launcher but left no trace on the board.
+    // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
+    // must still run where the board stack is absent — the CLI fixtures build a
+    // minimal repo — and a board that cannot follow must never fail the work.
+    await import('./board-heartbeat.mjs')
+      .then((m) => m.heartbeat({ trigger: m.TRIGGERS.IN_FLIGHT, detail: `Wartestellung: ${waitingOn}` }))
+      .catch(() => {})
   } else {
     fail(`unknown option "${argv[0]}".\n${usage}`)
   }

@@ -1147,6 +1147,14 @@ if (isMainModule(import.meta.url)) {
       console.log(`--- ${SOL_MODEL_NAME} said ---\n${said}\n--- end of review ---\n`)
     }
     console.log(formatReviewReport({ decision, sha: full, mode, point, partial, shortfall, plan, pass }))
+    // Round N goes on the board while round N+1 runs: fifteen rounds in one turn
+    // used to leave the page standing on finished work for hours.
+    // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
+    // must still run where the board stack is absent — the CLI fixtures build a
+    // minimal repo — and a board that cannot follow must never fail the work.
+    await import('./board-heartbeat.mjs')
+      .then((m) => m.heartbeat({ trigger: m.TRIGGERS.REVIEW_ROUND, detail: `Prüfrunde zu ${full.slice(0, 7)} beantwortet: ${decision.verdict || 'ohne Urteil'}` }))
+      .catch(() => {})
     // A fallback is not an error of THIS command — it did its job by refusing to
     // invent a review — but it must not read as a finished one either, so the
     // exit code distinguishes them for any script that chains on it. A short-fall
