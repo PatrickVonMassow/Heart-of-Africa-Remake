@@ -247,7 +247,7 @@ describe('the clock a lease is judged against — cross-vendor review of point 8
     // Without `grantedAt` the rollback check above cannot run at all, so such a
     // lease is unreadable ownership, not a lease missing a decoration.
     const lease = grant().lease
-    const { grantedAt, ...ungranted } = lease
+    const { grantedAt: _grantedAt, ...ungranted } = lease
     expect(leaseAllowsWrite({ lease: ungranted, holder, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
     const inverted = { ...lease, expiresAt: lease.grantedAt - 1 }
     expect(leaseAllowsWrite({ lease: inverted, holder, leaseId: 'L1', now: lease.grantedAt }).verdict).toBe('fenced')
