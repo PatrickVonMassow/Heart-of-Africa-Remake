@@ -138,7 +138,11 @@ export function grantAttemptLease({ existing = null, attempt = {}, holder = {}, 
  *  full affirmative match is `fenced`, and a fenced worker STOPS and leaves its
  *  branch intact — the reasons differ so the operator learns what happened, the
  *  verdict never does. */
-export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, now = 0 } = {}) {
+export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, now } = {}) {
+  // The clock is part of the evidence: without a finite `now` the expiry
+  // comparison below is vacuously false and an expired lease would answer
+  // `write`. Missing evidence fences, like every other uncertainty here.
+  if (!Number.isFinite(now)) return { verdict: 'fenced', reason: 'no finite current time was supplied; expiry cannot be judged and uncertain fails closed' }
   if (!usableLease(lease)) return { verdict: 'fenced', reason: 'no usable lease; ownership is uncertain and uncertain fails closed' }
   if (typeof leaseId !== 'string' || !leaseId || leaseId !== lease.leaseId) {
     return { verdict: 'fenced', reason: 'the lease id presented is not the lease that stands; this attempt was re-granted' }
@@ -153,16 +157,24 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
 }
 
 /** Expiry is LOUD (M18/M38): every expired lease is an alert naming its attempt,
- *  never merely an unblocked slot. The daemon raises these; it frees nothing. */
-export function expiredLeaseAlerts({ leases = [], now = 0 } = {}) {
-  return leases
-    .filter((l) => usableLease(l) && now > l.expiresAt)
-    .map((l) => ({
-      batchId: l.batchId,
-      pointId: l.pointId,
-      attemptId: l.attemptId,
-      alert: `attempt lease expired ${now - l.expiresAt}ms ago and its holder pid ${l.holder.pid} is not proven dead`,
-    }))
+ *  never merely an unblocked slot. The daemon raises these; it frees nothing.
+ *  A MALFORMED lease is louder still, not quieter: it is durable ownership this
+ *  module can no longer read, and silently skipping it would hide exactly the
+ *  uncertainty the rest of this file fails closed on. The same goes for a clock
+ *  this function cannot use — with no finite `now`, every lease is reported as
+ *  unjudgeable rather than silently fresh. */
+export function expiredLeaseAlerts({ leases = [], now } = {}) {
+  const identity = (l) => ({ batchId: l?.batchId ?? null, pointId: l?.pointId ?? null, attemptId: l?.attemptId ?? null })
+  if (!Number.isFinite(now)) {
+    return leases.map((l) => ({ ...identity(l), alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }))
+  }
+  return leases.flatMap((l) => {
+    if (!usableLease(l)) {
+      return [{ ...identity(l), alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
+    }
+    if (now <= l.expiresAt) return []
+    return [{ ...identity(l), alert: `attempt lease expired ${now - l.expiresAt}ms ago and its holder pid ${l.holder.pid} is not proven dead` }]
+  })
 }
 
 /** The KEY a worktree is claimed under: absolute, lexically normalised, trailing

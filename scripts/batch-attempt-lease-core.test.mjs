@@ -98,6 +98,16 @@ describe('leaseAllowsWrite — the check before every checkpoint and push (M40)'
     expect(leaseAllowsWrite({ lease, holder: { pid: 100, pidStartedAt: 99_000 }, leaseId: 'L1', now: 20_000 }).verdict).toBe('fenced')
     expect(leaseAllowsWrite({ lease, holder, leaseId: 'L1', now: 10_000 + ATTEMPT_LEASE_TTL_MS + 1 }).verdict).toBe('fenced')
   })
+
+  it('fences on a missing or non-finite clock instead of writing on an expired lease', () => {
+    // With no usable `now`, the expiry comparison is vacuously false; an
+    // expired lease would otherwise answer `write`.
+    for (const now of [undefined, NaN, Infinity, -Infinity]) {
+      const res = leaseAllowsWrite({ lease, holder, leaseId: 'L1', now })
+      expect(res.verdict, String(now)).toBe('fenced')
+      expect(res.reason, String(now)).toMatch(/finite current time/)
+    }
+  })
 })
 
 describe('expiredLeaseAlerts', () => {
@@ -108,6 +118,21 @@ describe('expiredLeaseAlerts', () => {
     expect(alerts).toHaveLength(1)
     expect(alerts[0]).toMatchObject({ pointId: 'p834', attemptId: 'a1' })
     expect(alerts[0].alert).toMatch(/not proven dead/)
+  })
+
+  it('quarantines a malformed lease with its own alert instead of skipping it', () => {
+    const broken = { batchId: 'b', pointId: 'p834', attemptId: 'a9' } // no leaseId, holder, expiry
+    const alerts = expiredLeaseAlerts({ leases: [broken], now: 20_000 })
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]).toMatchObject({ pointId: 'p834', attemptId: 'a9' })
+    expect(alerts[0].alert).toMatch(/malformed/)
+  })
+
+  it('reports every lease as unjudgeable when the clock itself is unusable', () => {
+    const lease = grant().lease
+    const alerts = expiredLeaseAlerts({ leases: [lease], now: NaN })
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].alert).toMatch(/cannot be judged/)
   })
 })
 
