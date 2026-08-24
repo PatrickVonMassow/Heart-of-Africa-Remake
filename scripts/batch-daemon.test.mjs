@@ -178,6 +178,25 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(foreign.ok).toBe(false)
   })
 
+  it('fences shutdown like every other mutation: no credentials, wrong batch or a stranger cannot drain', async () => {
+    const bare = await controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd: 'shutdown', payload: { batchId: BATCH, drain: true } } })
+    expect(bare.ok).toBe(false)
+    const foreign = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'shutdown', sessionId: 'someone-else', fence: FENCE, payload: { batchId: BATCH, drain: true } },
+    })
+    expect(foreign.ok).toBe(false)
+    const wrongBatch = await controlRequest({
+      repoDir: repo,
+      batchId: BATCH,
+      request: { cmd: 'shutdown', sessionId: SID, fence: FENCE, payload: { batchId: 'other-batch', drain: true } },
+    })
+    expect(wrongBatch.ok).toBe(false)
+    // The daemon is still alive and serving after all three refusals.
+    expect((await request('status')).ok).toBe(true)
+  })
+
   it('starts a stub worker that commits and pushes on its own', async () => {
     const before = git(['rev-parse', 'feat/stub'], originDir)
     const started = await request('start-attempt', { pointId: 'p1', attemptId: 'a1', branch: 'feat/stub', worktree, adapter: 'stub' })

@@ -373,6 +373,26 @@ async function serve(args) {
       }),
 
     shutdown: (request) => {
+      // Shutdown drains workers and releases the identity record — a mutation
+      // like any other, so it is fenced like any other: batch identity, the
+      // freshly read lock, (sessionId, fence), owner liveness and lease
+      // freshness. A stale session cannot drain a daemon it no longer owns.
+      // The way out of a daemon whose journal is corrupt is the OS's, not the
+      // socket's: SIGTERM from the record's owner.
+      if (journalCorrupt) {
+        return { ok: false, reason: 'the journal is corrupt; socket shutdown is refused — stop the daemon by SIGTERM and reconcile (step 8)' }
+      }
+      if ((request.payload?.batchId ?? null) !== args.batch) {
+        return { ok: false, reason: `the payload names batch ${String(request.payload?.batchId)}, this daemon serves ${args.batch}` }
+      }
+      const lock = readLock(repoDir)
+      const validated = validateMutation({
+        presented: { sessionId: request.sessionId, fence: request.fence },
+        lock,
+        probe: lock ? probeOf(lock.pid) : null,
+        now: nowMs(),
+      })
+      if (!validated.ok) return { ok: false, reason: validated.reason }
       const drain = request.payload?.drain === true
       setTimeout(() => performShutdown(drain), 20)
       return { ok: true, draining: drain, steps: DRAIN_STEPS }
@@ -613,7 +633,18 @@ async function main() {
       console.error('the record is cold; reconcile it (step 8) rather than stopping a stranger')
       process.exit(1)
     }
-    const reply = await controlRequest({ repoDir, batchId: args.batch, request: { cmd: 'shutdown', payload: { drain: args.drain === true } } })
+    // Shutdown is a fenced mutation: the caller presents its OWN session and
+    // fence, and the daemon validates them against the freshly read lock.
+    const fence = Number(args.fence)
+    if (!args.session || !Number.isInteger(fence)) {
+      console.error('stop is a fenced mutation: --session <sid> and --fence <n> are required')
+      process.exit(2)
+    }
+    const reply = await controlRequest({
+      repoDir,
+      batchId: args.batch,
+      request: { cmd: 'shutdown', sessionId: args.session, fence, payload: { batchId: args.batch, drain: args.drain === true } },
+    })
     console.log(JSON.stringify(reply))
     process.exit(reply.ok ? 0 : 1)
   }
@@ -623,7 +654,7 @@ async function main() {
     console.log(JSON.stringify(result, null, 2))
     process.exit(result.ok ? 0 : 1)
   }
-  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--drill] [--drain] [--scenario <name>]')
+  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>]')
   process.exit(2)
 }
 
