@@ -203,6 +203,19 @@ on its own branch, and carries its own review:
 Until 834 has landed and the flag has been switched on, nothing in this repository advertises
 a surviving lane, and `scripts/durable-lane-flag-core.mjs` REFUSES to enable one.
 
+**WHAT SWITCHING IT ON DOES AND DOES NOT MEAN, because the interlock alone does not say it.**
+The flag's precondition is steps 8 and 9 — discovery, adoption, reconciliation and the landing a
+successor can finish — and that is what an enabled lane delivers: an authoring run survives the
+DEATH of the session that spawned it, which is the measured defect this design exists to remove.
+It does NOT deliver a safe PLANNED handover. The checkpoint barrier (M19, M20, step 6) and the
+two-phase boundary (M21-M24, step 7) are unbuilt in the remainder of 676, so while they are
+unbuilt the boundary DRAINS: `drain-before-boundary` is not the degraded mode there, it is the
+only permitted one, and a boundary that carries a live daemon-owned worker across is forbidden
+until step 6 and step 7 stand. Point 834 may flip the switch only together with that enforcement,
+and the point that builds the flag (891) owes the case that pins it. Nothing here — board, brief,
+handover text or `CLAUDE.md` — may describe the lane as surviving a handover before then; it
+survives a crash.
+
 ### Ordered work
 
 1. Define schemas and invariants before process changes.
@@ -245,7 +258,7 @@ a surviving lane, and `scripts/durable-lane-flag-core.mjs` REFUSES to enable one
 
 10. Project state and alerts into the board.
 
-    Implement `scripts/batch-board.mjs` to show every lane, heartbeat age, ETA, coordinator epoch, backlog, boundary state and red mismatches. Alerts cover stalled workers, missing successor readiness, marker deletion and rejected old-epoch mutations. Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt), then browser behaviour with `npm test -- <suite>` against a suite under `scripts/verify/` — this repository has no Playwright and no `tests/` directory, so the union's `tests/*.spec.ts` names are translated, not created.
+    Implement `scripts/batch-board.mjs` to show every lane, heartbeat age, ETA, coordinator epoch, backlog, boundary state and red mismatches. Alerts cover stalled workers, missing successor readiness, marker deletion and rejected old-epoch mutations. Verify data projection with `npx vitest run scripts/batch-board-core.test.mjs` (unbuilt), then the rendered page with `npm test -- docs` — the only existing suite that reads a shipped document — plus a NEW suite `scripts/verify/board.mjs` that this step creates and runs as `npm test -- board` if it adds page behaviour a document check cannot see. This repository has no Playwright and no `tests/` directory, so the union's `tests/progress-board-batch.spec.ts` and `tests/batch-handover.spec.ts` name no file here: they are replaced by those two, not created.
 
 11. Implement unbiased metrics.
 
@@ -574,6 +587,11 @@ coordinator epoch", which would make the boundary a second, unsynchronised write
 number and reopen everything above. It does not advance it. `--commit` seals the snapshot and
 RECORDS the fence it ran under; the next acquisition takes the next number, as every acquisition
 already does. Step 7 is corrected to that wording in the same commit that builds it.
+M22's own line — "record the next coordinator epoch and nonce" — is the union's wording and is
+superseded by this mechanism for the same reason; the union table is frozen evidence and is not
+edited, so the correction is stated here. What `--commit` seals into the snapshot is THE FENCE IT
+RAN UNDER. The next number does not exist yet at that moment and is minted by the next
+acquisition, which is the only writer of it.
 
 **FENCE LOSS IS FAIL-CLOSED, AND SO IS JOURNAL LOSS.** `.claude/batch-fence.json` is monotonic
 and never deleted, but "never" is an intention, not a guarantee — a wiped `.claude`, a restored
@@ -729,14 +747,20 @@ discovers while building:
 1. **An undeclared old-path child can evade every start check.** The precondition probes live
    sessions, in-flight declarations and worktree processes, and none of those can see a detached
    child nobody declared — which is precisely the condition this point exists to remove, so it is
-   at its worst before the point lands and gone after it. Until then the honest reading is that
-   the first daemon is started when the batch is provably idle. This design also does not measure
+   at its WORST before the point lands. It is NOT gone after it: rollback restores today's old
+   path and a fresh daemon may be started afterwards, so the same blind spot returns at every
+   old-path-to-daemon transition, and an earlier wording claiming the landing removed it is
+   withdrawn. The honest reading, before the first start and after every rollback alike, is that a
+   daemon is started only when the batch is provably idle. This design also does not measure
    or improve the recoverability of work begun on the old path.
 2. **One push of publishing authority after local dispossession.** The credential ref decides who
    publishes, so between a successor's local acquisition and its advance of that ref, the
    predecessor is still the named publisher. This is deliberate — it keeps exactly one publisher
-   at all times — but it means a lock file and the remote can disagree about ownership for the
-   length of one push.
+   at all times — but it means a lock file and the remote can disagree about ownership. THE BOUND
+   IS CONDITIONAL, and the first draft understated it as "the length of one push": one push is the
+   bound only where every local acquisition is serialized and conforming. A predecessor that does
+   not conform, or repeated compare-and-swap losses on the credential ref, can delay the advance
+   indefinitely, and the design leaves that case to the operator rather than resolving it.
 3. **The unprovable journal tail after a daemon crash.** Resolved against the remote where an
    entry names a publishing intent, quarantined where it does not. An entry that is neither is not
    possible by construction, but the construction is a rule the implementation must keep.
@@ -781,7 +805,10 @@ copy still names it. The schemas of step 1 encode STATES, so this pair's transit
 here, BEFORE they are encoded — otherwise the schemas encode a lie.
 
 - **The record** is `<state-store>/daemon.json`: pid, pid start time, generation, schema version,
-  the fence being served, the launch nonce. Its only writer is the daemon itself, by
+  the fence being served, the launch nonce, and its LIFECYCLE STATE — `starting`, `running` or
+  `stopping`. The state is what tells a live process that is COMING UP from one that is GOING
+  DOWN; without it both leave the identical observation (record present, copy absent, process
+  live) and the pair alone cannot tell adoption from a stop in progress. Its only writer is the daemon itself, by
   write–flush–rename, and `start` claims it by exclusive create.
 - **The copy** is the `daemon` field of `.claude/batch-lock.json`: pid, pid start time and
   generation, nothing else. Its only writer is the mutex-guarded compare-and-swap defined above
@@ -790,11 +817,20 @@ here, BEFORE they are encoded — otherwise the schemas encode a lie.
   work" are one read for the current owner, and for nothing else.
 
 **Two write orders, and each is crash-safe in the same direction.** START writes the record
-durably first; the lock owner then reads it, matches the launch nonce, probes the identity and
-writes the copy. STOP clears the copy first; the daemon releases its record as its last act. A
+durably first — `starting`, then `running` once it serves — and the lock owner then reads it,
+matches the launch nonce, probes the identity and writes the copy. STOP writes `stopping` into the
+record durably FIRST, then clears the copy, and the daemon releases its record as its last act. A
 HANDOVER deletes the lock file, so the copy is gone by construction and the successor rewrites it
 from the record. Every one of these leaves, at worst, a record with no copy — the ordinary state
 at every handover, never an incident.
+
+**THE STATE IS WRITTEN BEFORE THE COPY IS CLEARED, and that order is the whole point.** A stop
+that cleared the copy first and then recorded its intent would leave the adoption window open for
+exactly as long as the crash window it is meant to close: the lock owner would read a live
+`running` record with no copy, call it unadopted, and re-adopt a daemon that is shutting down.
+A crash between the two writes of STOP therefore leaves `stopping` behind, never `running`, and a
+crash during START leaves `starting`, which is not adoptable either — the lock owner waits for
+`running` or reconciles the record as cold once the process is gone.
 
 **THE INVARIANT, in one sentence: the record is the sole authority on the daemon's existence, and
 the copy may only ever be ABSENT, MATCHING or SUPERSEDED — never NOVEL.** "Older" is not an order
@@ -817,27 +853,40 @@ twice changes nothing, because every resolution is a write toward the record's o
 asked first, because a copy no write order could have produced says nothing about liveness and
 must not be resolved by it. Only then does the record's own probe decide, because the record is
 the authority on existence: a dead record is COLD whatever the copy says, and the copy's staleness
-is part of that resolution rather than a reading competing with it. An unprobed record is read
-exactly like a dead one — this table never treats "not asked" as "alive", and a probe that
-carries no AFFIRMATIVE verdict is "not asked": a failed or partial probe returns an identity
-without an answer, and un-negated is not the same as confirmed.
+is part of that resolution rather than a reading competing with it. An UNPROBED record is neither alive nor dead: it is
+UNKNOWN. This table never treats "not asked" as "alive" — a probe that carries no AFFIRMATIVE
+verdict is "not asked", because a failed or partial probe returns an identity without an answer
+and un-negated is not the same as confirmed. But it never treats "not asked" as DEAD either, and
+an earlier wording that read an unprobed record exactly like a dead one is withdrawn: releasing a
+record and minting a new generation on the strength of a probe that never answered is how two live
+daemons are made, against M39's rule that a restart follows PROVEN death and M41's rule that
+uncertainty is quarantined. Unknown therefore has its own rows below: refuse every mutation, alert,
+and change nothing until the probe answers or an operator supplies the evidence.
 
 | Record | Copy | Probe | Reading | Resolution |
 |---|---|---|---|---|
 | absent | absent | — | no daemon | today's path, legal and normal |
 | present | matching | live | healthy | nothing to do |
-| present | absent | live | unadopted — a handover, or a crash between the two writes | the lock owner probes the record and writes the copy |
-| present | absent | dead or unprobed | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
-| present | matching | dead or unprobed | stale copy | as cold record, and clear the copy |
+| present, `running` | absent | live | unadopted — a handover, or a crash between the two writes | the lock owner probes the record and writes the copy |
+| present, `starting` or `stopping` | absent | live | coming up, or going down — never adoptable | wait for `running`, or for the process to go; a `stopping` record is never re-adopted |
+| present | absent | dead, PROVEN | cold record | reconcile its workers (step 8), release the record; a new daemon mints a new generation |
+| present | absent | unprobed, or the probe failed | UNKNOWN | refuse every mutation and alert; no release, no new generation, retry the probe — an unanswered probe is not a death certificate |
+| present | matching | dead, PROVEN | stale copy | as cold record, and clear the copy |
+| present | matching | unprobed, or the probe failed | UNKNOWN | as the unknown row above; the copy is left exactly as it is |
 | present | journal-superseded generation | live | superseded copy | the record wins; rewrite the copy from it |
-| present | journal-superseded generation | dead or unprobed | cold record | the record is what must be reconciled, and the copy goes with it |
+| present | journal-superseded generation | dead, PROVEN | cold record | the record is what must be reconciled, and the copy goes with it |
+| present | journal-superseded generation | unprobed, or the probe failed | UNKNOWN | as the unknown row above |
 | present | differing generation the JOURNAL cannot place — never minted there, or the journal unreadable | — | ambiguous generations — the strings themselves carry no order, and without the journal's mint history "superseded" is unprovable: the same evidence fits an earlier copy beside a live record and a newer copy beside a rolled-back record | refuse every mutation and alert; an operator supplies the ordering evidence — never an automatic rewrite or release |
 | absent | present | — | orphaned copy | clear the copy; a daemon is never concluded from the copy alone |
 | present | a generation the journal orders AFTER the record's, or no generation, or this generation under another process identity | — | impossible by construction | refuse every mutation and alert; an operator act, never an automatic one |
 | no generation | any | — | impossible by construction | a record nothing can be compared to fails closed like the row above |
 
-Its acceptance cases are step 1's own: every row of this table decided from the pair alone, and
-the forbidden row refused rather than resolved.
+Its acceptance cases are step 1's own: every row of this table decided from the pair alone plus
+the record's lifecycle state, the forbidden row refused rather than resolved, and each UNKNOWN row
+asserted to change nothing — no release, no mint, no copy write. Two of them are ordering cases
+rather than table lookups and must fail if the order is reversed: a crash between STOP's two
+writes leaves `stopping` and the lock owner does not adopt it, and a crash between START's two
+writes leaves `starting` and the lock owner does not adopt that either.
 
 #### 3. Ordered ownership for the prose-only omissions
 
