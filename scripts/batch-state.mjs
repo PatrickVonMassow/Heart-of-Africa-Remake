@@ -226,6 +226,18 @@ export function ensureFenceStore(store, { fence } = {}) {
       writeFileAtomic(path, `${JSON.stringify(raised)}\n`)
       return { ok: true, fenceStore: raised, minted: false }
     }
+    let journal
+    try {
+      journal = readJournal(store)
+    } catch (error) {
+      return { ok: false, reason: `the journal cannot be proved sound, so a fence generation will not be minted: ${error.message}` }
+    }
+    if (journal.verdict !== 'ok') {
+      return { ok: false, reason: `the journal is ${journal.verdict}; minting a fence generation is refused` }
+    }
+    if (journal.exists) {
+      return { ok: false, reason: 'the journal already exists but its fence generation is missing; minting a replacement is refused' }
+    }
     const fresh = { v: SCHEMA_VERSION, generation: randomBytes(16).toString('hex'), fence }
     writeFileAtomic(path, `${JSON.stringify(fresh)}\n`)
     return { ok: true, fenceStore: fresh, minted: true }

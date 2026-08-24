@@ -140,6 +140,17 @@ describe('the lane\'s own fence store', () => {
     expect(res.reason).toMatch(/refuses to invent one/)
   })
 
+  it('refuses to mint a missing generation beside a checksum-corrupt journal', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b1' })
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
+    writeFileSync(store.journalPath, readFileSync(store.journalPath, 'utf8').replace('"fence":7', '"fence":8'))
+    expect(readJournal(store).verdict).toBe('corrupt')
+    const result = ensureFenceStore(store, { fence: 8 })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toMatch(/journal is corrupt/)
+    expect(existsSync(store.fenceStorePath)).toBe(false)
+  })
+
   it('refuses to seed without a usable fence', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b1' })
     for (const fence of [undefined, 0, -1, 1.5, NaN, '8']) {
