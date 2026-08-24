@@ -255,6 +255,14 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
     if (!usableLease(l)) {
       return [{ ...identity(l), alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
     }
+    // A CLOCK BEHIND THE LEASE'S LAST EVIDENCE IS THE ONE STATE THIS FUNCTION MUST
+    // NOT REPORT AS FRESH. `now <= expiresAt` holds for the whole length of a
+    // rollback, so a rolled-back clock silenced the alert on exactly the state
+    // every other decision here fences (cross-vendor review of point 893). An
+    // unusable clock is an alert here as it is a refusal everywhere else.
+    if (now < clockFloor(l)) {
+      return [{ ...identity(l), alert: `the clock is ${clockFloor(l) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }]
+    }
     if (now <= l.expiresAt) return []
     return [{ ...identity(l), alert: `attempt lease expired ${now - l.expiresAt}ms ago and its holder pid ${l.holder.pid} is not proven dead` }]
   })

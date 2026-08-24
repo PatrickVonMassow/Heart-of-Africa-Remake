@@ -272,6 +272,25 @@ describe('expiredLeaseAlerts', () => {
     expect(alerts[0].alert).toMatch(/malformed/)
   })
 
+  it('alerts on a clock rolled back behind the lease instead of reading it as fresh', () => {
+    // The only answer this function may not give is silence. `now <= expiresAt`
+    // was read as FRESH even when `now` sat before the lease's own last evidence
+    // of the clock — exactly the state every other decision in this file fences
+    // as a rollback. Only non-finite clocks were tested (cross-vendor review of
+    // point 893).
+    const lease = grant().lease
+    const before = expiredLeaseAlerts({ leases: [lease], now: lease.grantedAt - 1 })
+    expect(before).toHaveLength(1)
+    expect(before[0]).toMatchObject({ pointId: 'p834', attemptId: 'a1' })
+    expect(before[0].alert).toMatch(/rolled-back clock/)
+    // A renewal keeps the original grantedAt, so the fence is dated at the last
+    // renewal here as it is everywhere else.
+    const renewed = grant({ existing: lease, now: 200_000 }).lease
+    expect(expiredLeaseAlerts({ leases: [renewed], now: 20_000 })[0].alert).toMatch(/rolled-back clock/)
+    // The moment of the last renewal itself is not a rollback, and is still fresh.
+    expect(expiredLeaseAlerts({ leases: [renewed], now: 200_000 })).toEqual([])
+  })
+
   it('reports every lease as unjudgeable when the clock itself is unusable', () => {
     const lease = grant().lease
     const alerts = expiredLeaseAlerts({ leases: [lease], now: NaN })
