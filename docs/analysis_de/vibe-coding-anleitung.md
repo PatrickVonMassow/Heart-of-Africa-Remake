@@ -409,12 +409,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
-- **Die Ausnahme fragt den falschen Prozess, wer da handelt.** Ein Riegel nimmt eine Sonderrolle
-  aus — und liest dafür sein eigenes Arbeitsverzeichnis statt das des geprüften Aufrufs. Dann greift
-  die Ausnahme nie für die, für die es sie gibt.
-  → *Prompt:* „Sag mir bei jeder Ausnahme, WOHER die Identität des Aufrufers stammt: aus dem Aufruf
-  oder aus dem Prüfer selbst? Und was passiert, wenn beide in verschiedenen Verzeichnissen stehen?"
-
 - **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet irgendetwas dein Werkzeug
   automatisch nach (Zeitplan, Wachhund, „mach weiter"-Automatik), kann eine zweite Sitzung neben
   einer laufenden aufgehen — beide haben beim Start ehrlich gefragt, nur zu verschiedenen
@@ -461,4 +455,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 5088348fe2b9d8c212e66f8d6b86665b7d5479d647c838bd31afa1a38f108155 -->
+<!-- GUIDE-FINGERPRINT: 18cc48ad6c54d5abbafbab095631ef8853c25f4f89cf938093deba263664cde5 -->
