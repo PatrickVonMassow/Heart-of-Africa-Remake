@@ -433,11 +433,14 @@ export function readReceipt(store, receiptId) {
 }
 
 /** What the reader IGNORES tells the operator what a crash left behind: `.tmp-`
- *  leftovers are listed, never read, never silently deleted — they are the
- *  interrupted-replacement evidence the union's step 2 test asks about. */
+ *  leftovers beside store records AND receipts are listed, never read, never
+ *  silently deleted — they are interrupted-write evidence. */
 export function abandonedTemporaries(store) {
   if (!existsSync(store.dir)) return []
-  return readdirSync(store.dir)
-    .filter((name) => name.includes('.tmp-'))
-    .map((name) => join(store.dir, name))
+  return [store.dir, store.receiptsDir].flatMap((dir) => {
+    if (!existsSync(dir)) return []
+    return readdirSync(dir)
+      .filter((name) => name.includes('.tmp-'))
+      .map((name) => join(dir, name))
+  })
 }

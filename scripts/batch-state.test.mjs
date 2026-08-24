@@ -339,6 +339,13 @@ describe('receipts', () => {
     expect(flushed).toContain(store.receiptsDir)
   })
 
+  it('reports interrupted receipt temporaries from the directory where they are created', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    const leftover = join(store.receiptsDir, 'boundary-1.json.tmp-crashed')
+    writeFileSync(leftover, '{ incomplete receipt')
+    expect(abandonedTemporaries(store)).toContain(leftover)
+  })
+
   it('refuses a receipt id that is a path, and a receipt that is a symlink', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
     expect(writeReceipt(store, '../escape', {}).ok).toBe(false)
