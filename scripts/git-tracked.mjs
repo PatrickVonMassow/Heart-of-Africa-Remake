@@ -14,17 +14,29 @@
 // while the bytes the tooling reads are the caller's, not the repository's. So
 // the check refuses a symlink at the path itself, resolves the REAL path (a
 // parent directory that is a link out of the checkout fails containment), and
-// requires the working tree CLEAN for that path — no unstaged or staged
-// difference between what is read and what is committed.
+// then compares the BYTES THE CALLER READ with the blob HEAD carries.
+//
+// THE COMPARISON IS ON CONTENT, NOT ON `git status` (cross-vendor review of
+// point 889). An empty porcelain status does not establish that the bytes read
+// from the working tree equal the committed blob: `assume-unchanged` and
+// `skip-worktree` suppress the comparison outright, and a clean/smudge filter
+// makes a differing working tree report clean by design — either would let an
+// edited `model` field pass as committed evidence. Hashing the bytes and
+// comparing the oid asks the question the contract actually makes.
+//
+// The caller passes the bytes it read as `content`; a caller that has not read
+// the file yet leaves it out and the file is read here. Only the first form
+// proves the contract end to end — that what the tooling PARSED is what the
+// repository carries — so every four-eyes consumer supplies it.
 //
 // Cross-vendor review of point 834 found the first version of this check applied
 // in one command and not the other, so it lives here once and both import it.
 import { spawnSync } from 'node:child_process'
-import { lstatSync, realpathSync } from 'node:fs'
+import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import { relative, resolve as resolvePath } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 
-export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync } = {}) {
+export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, content } = {}) {
   const raw = String(path ?? '').trim()
   if (!raw) return false
   const real = run('git', ['rev-parse', '--path-format=absolute', '--show-toplevel'], {
@@ -60,14 +72,26 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync } = {})
     encoding: 'utf8',
   })
   if (probe.status !== 0) return false
-  // CLEAN, or the answer is about bytes nobody committed: a tracked file with
-  // working-tree or staged changes is caller-controlled content wearing a
-  // tracked name. `--porcelain` prints nothing exactly when the path matches
-  // its committed state.
-  const status = run('git', ['status', '--porcelain', '--', inside], {
+  // The blob the repository carries at this path. A file that is in the index
+  // but not in HEAD has no committed bytes to be equal to, and fails here.
+  const head = run('git', ['rev-parse', `HEAD:${inside}`], {
     windowsHide: true,
     cwd: topReal,
     encoding: 'utf8',
   })
-  return status.status === 0 && String(status.stdout ?? '').trim() === ''
+  if (head.status !== 0) return false
+  let bytes
+  try {
+    bytes = content === undefined ? readFileSync(abs) : Buffer.from(String(content), 'utf8')
+  } catch {
+    return false
+  }
+  const hashed = run('git', ['hash-object', '--stdin'], {
+    windowsHide: true,
+    cwd: topReal,
+    encoding: 'utf8',
+    input: bytes,
+  })
+  if (hashed.status !== 0) return false
+  return String(hashed.stdout ?? '').trim() === String(head.stdout ?? '').trim()
 }

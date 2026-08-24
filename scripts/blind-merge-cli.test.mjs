@@ -219,6 +219,22 @@ describe('the command', () => {
     expect(countedOff.out).toContain('--merged-by "GPT-5.6 Sol"')
   })
 
+  it('does not turn "Fable is off" into "the merger wrote a half" when no author is the merger', () => {
+    // Cross-vendor review of point 889: with partial knowledge the switch state
+    // was read as authorship. Half A is tracked and Claude Opus 5's, half B is a
+    // temp file naming nobody, so the merger Sol matches no author at all — and
+    // the command still printed "it wrote a half itself — the recorded two-model
+    // fallback" merely because the switch was off.
+    const trackedA = join(dirname(CLI), '..', 'docs', 'four-eyes', '676-blind-a-opus5.json')
+    const r = runOff('--a', trackedA, '--b', p('B.txt'))
+    expect(r.status).toBe(0)
+    expect(r.out).toContain('MERGING MODEL — GPT-5.6 Sol')
+    expect(r.out).not.toContain('it wrote a half itself')
+    expect(r.out).toContain('it wrote no KNOWN half')
+    // And the framing is still owed, because the unnamed half could be Sol's own.
+    expect(r.out).toContain('DECORRELATED MERGE FRAMING')
+  })
+
   it('refuses an unknown flag and a missing list rather than guessing', () => {
     expect(run('--a', p('A.json'), '--b', p('B.txt'), '--wibble', 'x').status).toBe(2)
     expect(run('--a', p('A.json')).status).toBe(2)

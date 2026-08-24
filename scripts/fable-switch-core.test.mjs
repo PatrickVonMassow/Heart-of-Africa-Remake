@@ -131,9 +131,18 @@ describe('decisions derived from the state', () => {
     expect(mergePromptFraming(off(), [FABLE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
     expect(mergePromptFraming(on(), [FABLE_MODEL, ''])).toMatch(/DECORRELATED MERGE FRAMING/)
     expect(mergePromptFraming(on(), ['', SOL_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
-    // Nothing supplied at all is a caller not using this, and stays as it was.
-    expect(mergePromptFraming(on(), [])).toBe('')
-    expect(mergePromptFraming(on())).toBe('')
+  })
+
+  it('owes the framing when NOTHING is known about the halves, switch state included', () => {
+    // The empty list used to be a third state — "a caller not using this" — that fell
+    // back to the switch-only reading and, with Fable ON, dropped the framing. Two
+    // unknown halves reach that state by filtering, which is how the least safe case
+    // got the answer meant for a caller not asking about authors (cross-vendor review
+    // of point 889). Unknown is now unknown wherever it comes from.
+    expect(mergePromptFraming(on(), [])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(on(), ['', ''])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(on())).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergePromptFraming(off(), [])).toMatch(/DECORRELATED MERGE FRAMING/)
   })
 
   it('tells two Sol versions apart instead of treating every Sol as one model', () => {
@@ -146,10 +155,9 @@ describe('decisions derived from the state', () => {
     expect(mergerModel(off(), [FABLE_MODEL, 'Sol'])).toBe(CLAUDE_MODEL)
   })
 
-  it('adds an independent merge framing only for the same-model fallback', () => {
-    expect(mergePromptFraming(on())).toBe('')
-    expect(mergePromptFraming(off())).toMatch(/DECORRELATED MERGE FRAMING/)
+  it('names the model whose framing must not be reused, which is the selected merger', () => {
     expect(mergePromptFraming(off())).toMatch(/do not reuse.*Sol's own half/)
+    expect(mergePromptFraming(on())).toMatch(/do not reuse.*Fable 5's own half/)
   })
 
   it('emits one checkable switch fallback without accepting a bare claim', () => {

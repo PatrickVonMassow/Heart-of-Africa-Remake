@@ -187,19 +187,20 @@ export function mergerModel(value, authors = []) {
 export function mergePromptFraming(value, authors = []) {
   const merger = mergerModel(value, authors)
   const slots = Array.isArray(authors) ? authors : authors == null ? [] : [authors]
-  // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE. Three states, not two:
-  //   · NOTHING supplied — a caller not using this at all, so the older switch-only
-  //     reading stands and nothing about existing callers shifts.
-  //   · BOTH halves named — the strict reading: framing owed only on a real self-merge.
-  //   · PARTLY named — the caller is telling us who it knows, and one half is unknown.
-  //     That unknown half could be the merger's own, so the framing is OWED. Reading
-  //     the silence the other way retires the framing exactly where it is least safe
-  //     (four-eyes finding 2 on this change: with the switch ON and one half blank the
-  //     previous version dropped it, and a test of mine pinned that unsafe outcome).
+  // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE, and the safe reading is ONE
+  // rule rather than a special case for silence. The framing is owed unless both
+  // halves are named AND neither name is the merger's: an unnamed half could be
+  // the merger's own, so it is treated as though it were.
+  //
+  // The earlier version had a third state — nothing supplied at all — which fell
+  // back to the switch-only reading and, with Fable ON, returned no framing.
+  // Cross-vendor review of point 889 measured what that costs: the caller filtered
+  // its blank slots away, two unknown halves arrived as an empty array, and the
+  // least safe case got the answer meant for a caller that was not asking about
+  // authors. The caller no longer filters, and this no longer has a branch that
+  // reads silence as safety.
   const named = slots.filter((author) => String(author ?? '').trim())
-  const selfMerge = slots.length === 0
-    ? !fableIsOn(value)
-    : named.length < 2 || named.some((author) => sameModelName(merger, author))
+  const selfMerge = named.length < 2 || named.some((author) => sameModelName(merger, author))
   if (!selfMerge) return ''
   return (
     'DECORRELATED MERGE FRAMING: reconstruct the union from the two numbered evidence lists ' +

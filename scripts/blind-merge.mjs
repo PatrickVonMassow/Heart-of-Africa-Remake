@@ -137,14 +137,19 @@ if (isMainModule(import.meta.url)) {
     } = parsed.values
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
-    const a = parseListText('A', readText(pathA))
-    const b = parseListText('B', readText(pathB))
+    const rawA = readText(pathA)
+    const rawB = readText(pathB)
+    const a = parseListText('A', rawA)
+    const b = parseListText('B', rawB)
     // A TRACKED HALF NAMES ITS OWN AUTHOR AND THE FLAG MAY NOT OVERRULE IT. The flag
     // exists for the line form, which carries no model field; letting it rewrite a
     // tracked file's author would hand back exactly the hole the tracked check closes
     // — point at the real half, then rename its author (four-eyes review, point 834).
-    const trackedA = isTrackedInGit(pathA)
-    const trackedB = isTrackedInGit(pathB)
+    // THE BYTES PARSED ABOVE ARE THE ONES THAT MUST BE COMMITTED, so they are
+    // what the check is asked about — not a second read that could differ from
+    // it (cross-vendor review of point 889).
+    const trackedA = isTrackedInGit(pathA, { content: rawA })
+    const trackedB = isTrackedInGit(pathB, { content: rawB })
     const overruled = []
     for (const [name, list, flag, tracked] of [
       ['a', a, modelA, trackedA],
@@ -171,7 +176,15 @@ if (isMainModule(import.meta.url)) {
     // tracked discarded the one authorship that WAS known, and with one
     // tracked half written by the switch-selected model the merge went to
     // that very author under a printed "it wrote neither half".
-    const deciding = [trackedA ? String(a.model ?? '').trim() : '', trackedB ? String(b.model ?? '').trim() : ''].filter(Boolean)
+    // ONE SLOT PER HALF, BLANK WHERE THE AUTHOR IS UNKNOWN. The blanks carry the
+    // shape of the question and may not be dropped before it is asked: a filtered
+    // list of two unknown halves is an EMPTY array, which mergePromptFraming reads
+    // as "this caller does not supply authors at all" — the older switch-only
+    // reading — and with Fable ON that returned no framing for the case where the
+    // merger's own half is most likely among the unknowns (cross-vendor review of
+    // point 889). mergerModel ignores blank slots on its own.
+    const slots = [trackedA ? String(a.model ?? '').trim() : '', trackedB ? String(b.model ?? '').trim() : '']
+    const deciding = slots.filter(Boolean)
     const bothKnown = deciding.length === 2
     const expectedMerger = mergerModel(fableState, deciding)
     // WHETHER THE SELECTION IS A THIRD MODEL OR THE FALLBACK, because the two owe
@@ -181,9 +194,20 @@ if (isMainModule(import.meta.url)) {
     // (four-eyes finding 3 on this change). With PARTIAL knowledge the merger
     // provably wrote no KNOWN half, and "wrote neither half" is exactly what
     // an untracked half cannot prove — the sentence says so instead.
-    const mergerWroteAHalf = bothKnown
-      ? deciding.some((author) => sameModel(expectedMerger, author))
-      : deciding.some((author) => sameModel(expectedMerger, author)) || Boolean(mergeFallbackReason(fableState))
+    // WHETHER A CLAIMED AUTHOR IS THE MERGER — the same question validateMerger
+    // asks below, asked of the same names, so the printed sentence and the
+    // recorded fallback cannot disagree with the verdict. A claim is weaker
+    // evidence than a tracked half, which is why it may not SELECT the merger;
+    // for the opposite direction it is conservative to believe it, because
+    // believing it records a fallback where refusing it would hide one.
+    //
+    // What it is NOT is a fact about the switch. The partial-knowledge branch
+    // used to read "or Fable is off" as "the merger wrote a half", so with one
+    // half unnamed and Fable OFF the command printed "it wrote a half itself"
+    // and attached a two-model fallback to a merger that no author, known or
+    // claimed, matches (cross-vendor review of point 889).
+    const claimedAuthors = [a.model, b.model].map((m) => String(m ?? '').trim()).filter(Boolean)
+    const mergerWroteAHalf = claimedAuthors.some((author) => sameModel(expectedMerger, author))
     const mergerBecause = mergerWroteAHalf
       ? 'it wrote a half itself — the recorded two-model fallback'
       : bothKnown
@@ -240,7 +264,7 @@ if (isMainModule(import.meta.url)) {
         )
       }
       console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/fable-switch.mjs --status)`)
-      const framing = mergePromptFraming(fableState, deciding)
+      const framing = mergePromptFraming(fableState, slots)
       if (framing) console.log(`\n${framing}`)
       console.log(
         '\nThese pairs are a RANKING, not the merge: read BOTH lists in full and pair anything\n' +
