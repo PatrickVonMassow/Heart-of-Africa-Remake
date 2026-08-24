@@ -32,6 +32,7 @@ import { PROCESS_START_TOLERANCE_MS } from './batch-schema-core.mjs'
 import { openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
+import { resumeBatch } from './resume-batch.mjs'
 
 const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
@@ -129,9 +130,12 @@ async function parentDeathScenario({ keep }) {
     const record = ready.record
 
     // Let the worker prove it works BEFORE the kill, so survival is of a running
-    // authoring process, not of an idle one.
-    const shaBeforeKill = await waitForNewSha({ originDir, since: null, timeoutMs: 15_000 })
-    check('the worker pushed while the parent lived', Boolean(shaBeforeKill))
+    // authoring process, not of an idle one. The baseline is the tip the SETUP
+    // pushed: waiting from null would return that pre-existing tip immediately
+    // and pass without any worker push at all.
+    const shaAtSetup = git(['rev-parse', 'feat/drill'], originDir)
+    const shaBeforeKill = await waitForNewSha({ originDir, since: shaAtSetup, timeoutMs: 15_000 })
+    check('the worker pushed while the parent lived', Boolean(shaBeforeKill) && shaBeforeKill !== shaAtSetup)
 
     // THE KILL: the whole process group, SIGKILL, no warning — a dying session
     // taking its children.
@@ -167,8 +171,14 @@ async function parentDeathScenario({ keep }) {
     const successorRequest = (cmd, payload) =>
       controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd, sessionId: successorSid, fence: newFence, payload: { batchId: BATCH, ...payload } } })
 
-    const adopted = await successorRequest('adopt-attempt', { attemptId: 'a-drill', fence: newFence })
-    check('the fresh session adopted the attempt under the new fence', adopted.ok === true, adopted.reason ?? '')
+    // ADOPTION AFTER RECONCILIATION, in that order: the successor gathers the
+    // durable evidence first (step 8), and only a lane that reconciliation
+    // reads as running is adopted — through the fenced daemon mutation.
+    const resumed = await resumeBatch({ repoDir: repo, batchId: BATCH, sessionId: successorSid })
+    const lane = resumed.lanes.find((l) => l.attemptId === 'a-drill')
+    check('reconciliation read the surviving lane as running before any adoption', lane?.reading === 'running', lane?.reason ?? '')
+    const adopted = resumed.adoptions.find((a) => a.attemptId === 'a-drill')
+    check('the fresh session adopted the attempt under the new fence, after reconciliation', adopted?.ok === true, adopted?.reason ?? '')
 
     const checkpoint = await successorRequest('request-checkpoint', { requestId: 'succ-cp-1', waitMs: 15_000 })
     const answer = checkpoint.ok ? checkpoint.result.answers.find((a) => a.attemptId === 'a-drill') : null
