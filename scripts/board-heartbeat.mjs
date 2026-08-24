@@ -186,7 +186,6 @@ export function heartbeat({
     const aged = cardAge({ record, digest: seen.digest, now })
     // Remembered BEFORE the decision, so a refusal further down still leaves the
     // reader able to age this card next time instead of answering UNKNOWN forever.
-    if (aged.remember) keep(aged.remember)
     const decision = decideHeartbeat({
       focus: seenFocus,
       cardPoint: seen.point,
@@ -194,7 +193,18 @@ export function heartbeat({
       trigger,
       detail,
     })
-    if (!decision.refresh) return { refreshed: false, reason: decision.reason }
+    if (!decision.refresh) {
+      // Nothing will be written, so what was observed is worth keeping: it is
+      // what bounds this card's age at the next look.
+      if (aged.remember) keep(aged.remember)
+      return { refreshed: false, reason: decision.reason }
+    }
+
+    // FROM HERE THE RECORD WAITS FOR THE WRITE (sixth cross-vendor round).
+    // Persisting the observation first would stamp the STALE card as seen just
+    // now, so a write that then failed would leave the next heartbeat calling
+    // the unchanged card current — the refresh suppressing its own retry for
+    // ten minutes. Nothing is recorded unless the board really moved.
 
     // The card is addressed by NUMBER, so a refresh needs one. A non-point focus
     // is legitimate work, but there is no card here to carry it.

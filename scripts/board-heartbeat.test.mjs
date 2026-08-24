@@ -143,14 +143,13 @@ describe('the production card reader, against real board markup', () => {
           writeStatus: (point, status) => calls.push({ point, status }),
         })
 
-      // Never looked: unprovable, so it refreshes AND records what it saw. It
-      // records TWICE — the observation, then the card as it stands after the
-      // write, whose time it knows exactly because it just wrote it.
+      // Never looked: unprovable, so it refreshes — and records ONLY after the
+      // board moved, stamping the moment it knows because it just wrote it.
       const first = run(NOW, null)
       expect(first.refreshed).toBe(true)
       expect(first.reason).toBe(REASONS.NEVER_STAMPED)
-      expect(kept).toHaveLength(2)
-      expect(kept[1].seenAt).toBe(NOW)
+      expect(kept).toHaveLength(1)
+      expect(kept[0].seenAt).toBe(NOW)
       const seen = kept.at(-1)
 
       // The same card a minute later: current, nothing written.
@@ -223,9 +222,51 @@ describe('the production card reader, against real board markup', () => {
       expect(result.refreshed).toBe(true)
       expect(result.reread).toBe(false)
       expect(said.join('\n')).toMatch(/written but could not be read back/)
-      // Only the pre-write observation was recorded; nothing claims to know the
-      // new card, so the next look treats its age as unknown.
-      expect(kept).toHaveLength(1)
+      // NOTHING was recorded: the pre-write observation waits for the write, and
+      // the reread that would have replaced it failed. The next look therefore
+      // has no record at all and treats the age as unknown.
+      expect(kept).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a failed write records NOTHING, so the next trigger retries at once', () => {
+    // SIXTH ROUND: recording the observation before the write stamped the stale
+    // card as seen just now, so a failed write made the next heartbeat call it
+    // current and suppressed the retry for ten minutes — the refresh silencing
+    // itself precisely when it had not happened.
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    try {
+      const NOW = 1_700_000_000_000
+      const kept = []
+      const attempts = []
+      const run = (memory, fail) =>
+        heartbeat({
+          trigger: TRIGGERS.REVIEW_ROUND,
+          detail: 'Runde',
+          root: dir,
+          state: { dashboardPath: '.batch-dashboard.html' },
+          focus: { point: 848, note: 'Fokus' },
+          now: NOW,
+          memory,
+          remember: (value) => kept.push(value),
+          writeStatus: () => {
+            attempts.push(1)
+            if (fail) throw new Error('publish refused')
+          },
+          stderr: () => {},
+        })
+
+      const failed = run(null, true)
+      expect(failed.refreshed).toBe(false)
+      expect(failed.reason).toBe('failed')
+      expect(kept).toEqual([])
+
+      // The very next trigger tries again rather than waiting out a threshold.
+      const retried = run(null, false)
+      expect(retried.refreshed).toBe(true)
+      expect(attempts).toHaveLength(2)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
