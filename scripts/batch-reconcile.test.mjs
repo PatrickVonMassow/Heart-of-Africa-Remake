@@ -170,6 +170,21 @@ describe('reconciliation over a live batch, then over its corpse', () => {
     }
   })
 
+  it('the CLI exits RED while a lane alerts and refill is refused', () => {
+    // The suite's end state: the r1 worker is dead but unresolved (missing,
+    // alerting), so refill is refused — automation must see red, not green.
+    let status = 0
+    let out = ''
+    try {
+      out = execFileSync('node', ['scripts/batch-reconcile.mjs', '--repo', repo, '--batch', BATCH], { windowsHide: true, encoding: 'utf8' })
+    } catch (error) {
+      status = error.status
+      out = `${error.stdout ?? ''}`
+    }
+    expect(status).toBe(1)
+    expect(JSON.parse(out).refill.ok).toBe(false)
+  })
+
   it('counts a publication id only as a parsed TRAILER, never as a message occurrence', () => {
     const id = 'pub-trailer-test-1'
     writeFileSync(join(worktree, 'pub.txt'), 'one\n')

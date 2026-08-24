@@ -283,6 +283,17 @@ if (isMainModule(import.meta.url)) {
     report.applied = applyPairResolution({ repoDir, batchId, report, sessionId: arg('--session') ?? null })
   }
   console.log(JSON.stringify(report, null, 2))
-  const red = !report.registry.ok || report.lanes.some((l) => l.quarantine) || report.publications.some((p) => p.quarantine) || report.pair.action === 'refuse-and-alert'
+  // GREEN MEANS RESOLVED, nothing less: quarantined journal entries, alerting
+  // lanes (a stalled worker IS an alert), quarantined publications, a refused
+  // refill and a failed apply are all unresolved reconciliation, and automation
+  // reading this exit code must not treat any of them as done.
+  const red =
+    !report.registry.ok ||
+    report.quarantined.length > 0 ||
+    report.lanes.some((l) => l.quarantine || l.alert) ||
+    report.publications.some((p) => p.quarantine) ||
+    report.pair.action === 'refuse-and-alert' ||
+    !report.refill.ok ||
+    report.applied?.ok === false
   process.exit(red ? 1 : 0)
 }
