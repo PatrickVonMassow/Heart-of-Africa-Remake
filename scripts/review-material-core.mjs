@@ -101,10 +101,14 @@ export function formatPassManifest(plan, pass) {
   const patchOnly = new Set(pass?.patchOnly ?? [])
   const absentByDesign = new Map((pass?.absentByDesign ?? []).map((entry) => [entry.path, entry.reason]))
   const carried = pass?.files ?? []
+  const unavailable = (plan?.unreviewable ?? []).flatMap((group) => group?.files ?? [])
   const lines = [
     `=== REVIEW PASS ${index}/${total} — THE SHAPE OF THIS MATERIAL ===`,
-    `This range is too large for one review round, so it is reviewed in ${total} passes over its`,
-    'FILE SET, whose union covers the range. This material is ONE of those passes. The DIFFSTAT',
+    `This range is reviewed in ${total} runnable ${total === 1 ? 'pass' : 'passes'} over its REVIEWABLE FILE SET.`,
+    unavailable.length
+      ? 'Files for which no independent reviewer vendor exists are named separately below and remain owed.'
+      : 'The runnable passes together cover the complete changed file set.',
+    'This material is ONE of those passes. The DIFFSTAT',
     'below describes the WHOLE range for context: it names files this pass deliberately omits.',
     `THIS PASS CARRIES ${carried.length} file(s), each at the delivery level stated:`,
   ]
@@ -127,6 +131,10 @@ export function formatPassManifest(plan, pass) {
   if ((plan?.uncoverable ?? []).length) {
     lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
     for (const u of plan.uncoverable) lines.push(`  · ${quotePassFile(u.path)}`)
+  }
+  if (unavailable.length) {
+    lines.push('UNAVAILABLE TO THE REVIEWER CHAIN — this pass does not cover these files:')
+    for (const path of unavailable) lines.push(`  · ${quotePassFile(path)}`)
   }
   lines.push(
     'A file declared ABSENT BY DESIGN here is NOT truncated — the two mean opposite things:',

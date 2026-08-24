@@ -117,16 +117,26 @@ file authored by every configured vendor has no independent reviewer. Recording
 a review nobody could run is forbidden. Record that bounded fact in the shared
 ledger instead:
 
-```json
-{"kind":"criticality-review-unavailable","point":769,"sha":"<point head>","files":["<exact unreviewable path>"],"reason":"<why no configured vendor is eligible>","at":<epoch milliseconds>}
+```sh
+node scripts/criticality-review-guard.mjs --record-unavailable <point-head-sha> \
+    --point <N> --files "<exact unreviewable paths>" \
+    --reason "<why no configured reviewer vendor is eligible>"
 ```
+
+`review-sol --point <N>` prints this command with the unavailable paths it
+measured. It still plans and runs every independently reviewable pass; each
+ordinary pass record names only the files that round actually read, and the
+unavailable receipt covers only the remainder.
 
 This is not a waiver on its own word. The criticality guard discards any
 `unavailableVerified`, `unavailableFiles`, or `pointFiles` fields supplied by
-the row, rebuilds the point's first-parent non-merge authorship from its recorded
-`authoring-commission`, and accepts the receipt only when `files` is exactly the
-set for which the authorship planner finds no eligible vendor. Real review rows
-must still cover every other changed file. The receipt never answers a
+the row, rebuilds the point's first-parent authorship from its recorded
+`authoring-commission` (including cc-only conflict resolutions, but excluding
+files merely imported from main), and accepts the receipt only when `files` is
+exactly the set for which the authorship planner finds no eligible vendor. The
+record command performs the same Git comparison before it appends anything, so
+a missing or extra path is refused immediately. Real review rows must still
+cover every other changed file. The receipt never answers a
 `merge-with-fixes` or `do-not-merge`; those findings still need a descendant
 clean review or the existing `review-findings-filed` disposition.
 

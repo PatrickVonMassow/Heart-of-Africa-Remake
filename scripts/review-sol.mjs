@@ -80,6 +80,7 @@ import {
 import {
   assembleMaterial,
   formatCoveragePlan,
+  formatPassFiles,
   formatPassManifest,
   formatShortfall,
   gitlinkPathsFromRawDiff,
@@ -103,7 +104,6 @@ import {
   outstandingFiles,
   parseRangeLog,
   planAuthorshipGroups,
-  UNREVIEWABLE_NARROWING_REMEDY,
 } from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
@@ -332,11 +332,30 @@ function gatherRange(sha, base, onlyPaths = null) {
 /** Commit/file authorship facts for a range, in the same path semantics as the guard. */
 export function gatherAuthorshipCommits(sha, base) {
   const raw = git(mechanismLogCommand(base, sha), { raw: true })
-  return parseRangeLog(raw, { decodePath: unquoteGitPath }).map((commit) => {
+  const commits = parseRangeLog(raw, { decodePath: unquoteGitPath })
+  const inRange = new Set(commits.map((commit) => commit.sha))
+  return commits.map((commit) => {
     const field = git([
       'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', commit.sha,
     ])
-    return { ...commit, authorModels: modelsInTrailerField(field), authorModel: modelsInTrailerField(field)[0] ?? '' }
+    const authorModels = modelsInTrailerField(field)
+    // A main-into-feature merge's second parent is already reachable from the
+    // range base, so `base..sha` deliberately omits that parent commit. The
+    // merge's cc-only resolution is still a real contribution. Preserve the
+    // merged tip's model evidence beside the merge so the pure resolver can
+    // attribute it without widening the reviewed range to unrelated main work.
+    const parentAuthorModels = Object.fromEntries(
+      (commit.parentShas ?? [])
+        .slice(1)
+        .filter((parent) => !inRange.has(parent))
+        .map((parent) => {
+          const trailers = git([
+            'show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', parent,
+          ])
+          return [parent, modelsInTrailerField(trailers)]
+        }),
+    )
+    return { ...commit, authorModels, authorModel: authorModels[0] ?? '', parentAuthorModels }
   })
 }
 
@@ -387,6 +406,11 @@ export function buildAuthorshipPassPlan({
     const sized = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
     rawSize += Number(sized.rawSize ?? 0)
     statTruncated ||= Boolean(sized.statTruncated)
+    // No eligible vendor can spend these passes honestly. They stay measured
+    // and named through `unreviewable`, but never occupy a runnable pass index:
+    // one unavailable slice must not prevent reviewers from reading every
+    // independent slice beside it.
+    if (!group.reviewer) continue
     uncoverable.push(...(sized.uncoverable ?? []).map((item) => ({ ...item, reviewer: group.reviewer })))
     for (const child of sized.passes ?? []) {
       const childFiles = child.files ?? []
@@ -413,7 +437,7 @@ export function buildAuthorshipPassPlan({
   const total = passes.length
   const numbered = passes.map((pass, index) => ({ ...pass, index: index + 1, total }))
   return {
-    fits: total === 1 && uncoverable.length === 0,
+    fits: total === 1 && uncoverable.length === 0 && authorship.unreviewable.length === 0,
     passes: numbered,
     uncoverable,
     rawSize,
@@ -437,8 +461,9 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   } else if (plan.fits) lines.push('  It fits in one round.')
   else {
     lines.push(
-      `  ${String(sha).slice(0, 7) || 'This range'} requires ${plan.passes.length} PASSES over the ` +
-        'END-STATE FILE SET, cut by independent reviewer and then by size:',
+      `  ${String(sha).slice(0, 7) || 'This range'} has ${plan.passes.length} RUNNABLE ` +
+        `${plan.passes.length === 1 ? 'PASS' : 'PASSES'} over the END-STATE FILE SET's reviewable material, ` +
+        'cut by independent reviewer and then by size:',
     )
   }
   if (plan.mixedFiles?.length) {
@@ -457,6 +482,10 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
       `  UNREVIEWABLE: ${group.files.map(quotePassFile).join(', ')} — ${group.unreviewableReason}`,
     )
   }
+  const unavailableFiles = [...new Set((plan.unreviewable ?? []).flatMap((group) => group.files ?? []))]
+  if (unavailableFiles.length) {
+    lines.push('  These files remain owed until Git verifies an explicit unavailable receipt.')
+  }
   const invalidated = formatInvalidatedCoverage(plan.invalidatedCoverage, { quoteFile: quotePassFile })
   if (invalidated) lines.push(invalidated)
   for (const item of plan.dropped ?? []) {
@@ -470,6 +499,23 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   }
   lines.push(formatCoveragePlan(plan))
   return lines.join('\n')
+}
+
+const shellQuote = (value) => `"${String(value ?? '').replace(/(["\\$`])/g, '\\$1')}"`
+
+export function formatUnavailableReceiptRoute(plan, { sha = '', point = '' } = {}) {
+  const files = [...new Set((plan?.unreviewable ?? []).flatMap((group) => group?.files ?? []))]
+  if (!files.length) return ''
+  if (!/^\d+$/.test(String(point).trim())) {
+    return 'review-sol: unavailable files need a point-bound receipt; rerun this plan with --point <N> to print its verified record command.'
+  }
+  return [
+    'review-sol: after every runnable pass is recorded, record only the measured unavailable remainder:',
+    '  node scripts/criticality-review-guard.mjs ' +
+      `--record-unavailable ${sha} --point ${String(point).trim()} ` +
+      `--files ${shellQuote(formatPassFiles(files))} ` +
+      `--reason ${shellQuote('no configured reviewer vendor is independent of these measured contributions')}`,
+  ].join('\n')
 }
 
 /**
@@ -820,6 +866,9 @@ export const usage = () =>
     'only other files leave them clear. No carry record or carry planning flag is needed.',
     'A commit written to answer a recorded finding owes a confirming clean pass only for',
     'the files it changes. The convergence cost is accepted, not hidden.',
+    'Files with no independent reviewer stay outside runnable pass indices instead of blocking',
+    'them. With --point <N>, the plan prints the Git-verified unavailable-receipt command for',
+    'that exact remainder; the receipt never claims that a review occurred.',
     `Reviews run on ${SOL_MODEL_NAME} at reasoning effort ${SOL_REASONING_EFFORT} (CLAUDE.md §6). When it`,
     'cannot be reached the review is HANDED OVER to the first eligible Claude model',
     'allowed by the shared Fable switch (`node scripts/fable-switch.mjs --status`)',
@@ -903,7 +952,7 @@ if (isMainModule(import.meta.url)) {
           error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
         }
       }
-      if (plan.passes.length < 2) {
+      if (plan.passes.length < 2 && !(plan.unreviewable?.length > 0)) {
         return {
           error:
             `--pass ${passFlag}: this range packs into one coverable pass beside files beyond ` +
@@ -934,13 +983,8 @@ if (isMainModule(import.meta.url)) {
       recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
     })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
-    if (plan.unreviewable.length) {
-      console.error(
-        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; ' +
-          `no round can clear it. ${UNREVIEWABLE_NARROWING_REMEDY}`,
-      )
-      process.exit(4)
-    }
+    const unavailableRoute = formatUnavailableReceiptRoute(plan, { sha: full, point })
+    if (unavailableRoute) console.error(unavailableRoute)
     if (plan.passes.length > MAX_PASS_TOTAL) {
       console.error(
         `review-sol: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,
@@ -952,7 +996,11 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
     if (!plan.passes.length || plan.uncoverable.length) {
-      console.error('review-sol: the authorship plan cannot cover every changed file; no record is offered.')
+      console.error(
+        plan.unreviewable.length && !plan.uncoverable.length
+          ? 'review-sol: no runnable review pass remains; use the verified unavailable receipt route above.'
+          : 'review-sol: the authorship plan cannot cover every changed file; no record is offered.',
+      )
       process.exit(4)
     }
     const selection = passFor(plan)
