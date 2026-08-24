@@ -22781,3 +22781,29 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: high — every code slice is reviewed against this text, so a false sentence here
   becomes a defect in five branches.
   Bundle: unbundled (batch autonomy).
+
+- [x] 897. Two batch sessions ran at once, because the start decision reads the lock only at start.
+  MEASURED 24.08.2026. Session `14ea8484` (CI handoff for `origin/main:7c93ebf5`) was started by the
+  OS autostart launcher; its SessionStart hook reported `no live batch-writer process measured;
+  owner lock assessed inactive (handed-over)` and let it work. At 14:51:49 a SECOND session
+  `db6ce51a` (PID 1517719, CI handoff for `origin/feat/890-…:68214a5f`) started and took the lock at
+  12:53:52Z with `fence: 3`, `trigger: ci-terminal`. Both sessions were then active on point 890 for
+  about five minutes: the first started a Sol review and ran lint/build/test:unit in the `point-890`
+  worktree while the second committed and pushed to the same branch. Minutes later the lock flipped
+  back to `14ea8484` at `fence: 690` — so the intruding claim carried a REGRESSED fence and was
+  overwritten rather than refused.
+  Three gaps: (i) two CI-terminal handoffs for DIFFERENT refs (main and a feature branch) spawn two
+  sessions, and the second does not see the first; (ii) a claim whose fence goes BACKWARDS (3 after
+  690) is accepted into the lock file instead of being refused as stale; (iii) a running session has
+  no point at which it notices the lock was taken from underneath it — the collision surfaced only
+  because `guard-preflight` happened to print `another live session owns the batch lock`, and the
+  losing session keeps running afterwards.
+  FINAL STATE: at most one batch session is startable per batch regardless of how many refs conclude
+  green; a claim with a fence at or below the recorded one is REFUSED, not written; and a session
+  re-checks lock ownership before each mutation, standing down the moment it no longer holds it.
+  VERIFIABLE: unit cases — a second ci-terminal handoff for a different ref while a live session
+  holds the lock does not spawn; a claim with a lower fence is refused and the file is unchanged; a
+  mutation attempted after ownership moved is refused with the stand-down path named.
+  Criticality: high — two writers on one point is how a half-landed merge and a lost commit happen;
+  it was caught here by luck, not by a check.
+  Bundle: Session- & Repo-Hygiene.
