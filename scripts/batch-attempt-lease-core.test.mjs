@@ -354,6 +354,22 @@ describe('a record is read once — the accessor class of the cross-vendor revie
     expect(alerts[1].attemptId).toBe('a1')
   })
 
+  it('keeps an unreadable HOLDER distinguishable from an absent one', () => {
+    // The holder's reading was taken inside the lease's and its failure collapsed
+    // into `holder: null` — indistinguishable from a lease that carries no holder.
+    // The sweep then called such a lease MALFORMED, a statement about its content,
+    // when the truth is that no reading could be taken at all.
+    const unreadableHolder = { ...grant().lease, holder: { get pid() { throw new Error('unreadable') }, pidStartedAt: 5000 } }
+    const alerts = expiredLeaseAlerts({ leases: [unreadableHolder], now: 30_000 })
+    expect(alerts[0].alert).toMatch(/could not be read at all/)
+    // An ABSENT holder stays what it is: a lease this module can read and refuse.
+    const noHolder = { ...grant().lease, holder: null }
+    expect(expiredLeaseAlerts({ leases: [noHolder], now: 30_000 })[0].alert).toMatch(/malformed/)
+    // Both fail closed for the writer, as every unreadable record does.
+    expect(leaseAllowsWrite({ lease: unreadableHolder, holder, leaseId: 'L1', now: 15_000 }).verdict).toBe('fenced')
+    expect(grantAttemptLease({ existing: unreadableHolder, attempt, holder, now: 15_000, leaseId: 'L2' }).ok).toBe(false)
+  })
+
   it('refuses rather than THROWS on every path that reads a record', () => {
     // Taking the reading is itself fallible, and a reader that lets the exception
     // out turns a documented refusal into a crash — in the grant and the write

@@ -84,11 +84,22 @@ function snapshotLease(lease) {
     pointId: lease.pointId,
     attemptId: lease.attemptId,
     leaseId: lease.leaseId,
-    holder: snapshotHolder(lease.holder),
+    holder: lease.holder,
     grantedAt: lease.grantedAt,
     expiresAt: lease.expiresAt,
   }))
   if (!snapshot) return null
+  // A HOLDER THAT EXISTS BUT CANNOT BE READ IS A LEASE THAT CANNOT BE READ.
+  // Collapsing that reading into "no holder" reported the lease as MALFORMED — a
+  // statement about its content — when the truth is that no reading could be taken
+  // at all, and the two must stay distinguishable (cross-vendor review of point
+  // 893). A holder that is not an object at all is content, and stays as it is for
+  // the usability check to refuse.
+  if (snapshot.holder && typeof snapshot.holder === 'object') {
+    const holder = snapshotHolder(snapshot.holder)
+    if (!holder) return null
+    snapshot.holder = holder
+  }
   // An OMITTED renewal stays omitted: `renewedAt: undefined` is a renewal the
   // usability check would have to treat as present-but-unreadable. It is READ ONCE
   // like every other field — testing `lease.renewedAt` and then assigning it again
