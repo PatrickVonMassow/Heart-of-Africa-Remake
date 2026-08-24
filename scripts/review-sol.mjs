@@ -103,7 +103,6 @@ import {
   outstandingFiles,
   parseRangeLog,
   planAuthorshipGroups,
-  UNREVIEWABLE_NARROWING_REMEDY,
 } from './mechanism-review-range-core.mjs'
 
 /** Where codex keeps the ChatGPT login, and where we park a copy of it. */
@@ -406,6 +405,11 @@ export function buildAuthorshipPassPlan({
     const sized = planPasses({ ...range, budget: MATERIAL_BUDGET_CHARS })
     rawSize += Number(sized.rawSize ?? 0)
     statTruncated ||= Boolean(sized.statTruncated)
+    // No eligible vendor can spend these passes honestly. They stay measured
+    // and named through `unreviewable`, but never occupy a runnable pass index:
+    // one unavailable slice must not prevent reviewers from reading every
+    // independent slice beside it.
+    if (!group.reviewer) continue
     uncoverable.push(...(sized.uncoverable ?? []).map((item) => ({ ...item, reviewer: group.reviewer })))
     for (const child of sized.passes ?? []) {
       const childFiles = child.files ?? []
@@ -432,7 +436,7 @@ export function buildAuthorshipPassPlan({
   const total = passes.length
   const numbered = passes.map((pass, index) => ({ ...pass, index: index + 1, total }))
   return {
-    fits: total === 1 && uncoverable.length === 0,
+    fits: total === 1 && uncoverable.length === 0 && authorship.unreviewable.length === 0,
     passes: numbered,
     uncoverable,
     rawSize,
@@ -456,8 +460,9 @@ export function formatAuthorshipPlan(plan, { sha = '' } = {}) {
   } else if (plan.fits) lines.push('  It fits in one round.')
   else {
     lines.push(
-      `  ${String(sha).slice(0, 7) || 'This range'} requires ${plan.passes.length} PASSES over the ` +
-        'END-STATE FILE SET, cut by independent reviewer and then by size:',
+      `  ${String(sha).slice(0, 7) || 'This range'} has ${plan.passes.length} RUNNABLE ` +
+        `${plan.passes.length === 1 ? 'PASS' : 'PASSES'} over the END-STATE FILE SET's reviewable material, ` +
+        'cut by independent reviewer and then by size:',
     )
   }
   if (plan.mixedFiles?.length) {
@@ -922,7 +927,7 @@ if (isMainModule(import.meta.url)) {
           error: `--pass ${passFlag} names a pass of a split this range does not need — it fits in one round.`,
         }
       }
-      if (plan.passes.length < 2) {
+      if (plan.passes.length < 2 && !(plan.unreviewable?.length > 0)) {
         return {
           error:
             `--pass ${passFlag}: this range packs into one coverable pass beside files beyond ` +
@@ -953,13 +958,6 @@ if (isMainModule(import.meta.url)) {
       recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
     })
     console.error(formatAuthorshipPlan(plan, { sha: full }))
-    if (plan.unreviewable.length) {
-      console.error(
-        'review-sol: UNREVIEWABLE — at least one contribution has no eligible non-author vendor; ' +
-          `no round can clear it. ${UNREVIEWABLE_NARROWING_REMEDY}`,
-      )
-      process.exit(4)
-    }
     if (plan.passes.length > MAX_PASS_TOTAL) {
       console.error(
         `review-sol: this range needs ${plan.passes.length} passes — more than the ${MAX_PASS_TOTAL} a record can hold.`,

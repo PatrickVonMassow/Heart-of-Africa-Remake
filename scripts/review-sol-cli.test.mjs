@@ -92,6 +92,7 @@ let fableSha = ''
 let solSha = ''
 let solHeadSha = ''
 let unreviewableSha = ''
+let partlyReviewableSha = ''
 let mergeResolutionSha = ''
 let orphanSha = ''
 let bulkSha = ''
@@ -355,6 +356,21 @@ beforeAll(() => {
     'Write across both authoring lanes\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
   )
   unreviewableSha = git('rev-parse', 'HEAD')
+
+  // One independently reviewable file beside one both-vendor file. The latter
+  // remains owed, but it must not suppress the pass the former can earn.
+  git('checkout', '-q', '-b', 'partly-reviewable', 'main')
+  commit('reviewable.txt', 'written by one authoring lane\n', 'Add the reviewable part', 'Opus 5')
+  writeFileSync(join(repo, 'unavailable.txt'), 'written by both authoring lanes\n')
+  git('add', '-A')
+  git(
+    'commit',
+    '--no-verify',
+    '-q',
+    '-m',
+    'Add the unavailable part\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+  )
+  partlyReviewableSha = git('rev-parse', 'HEAD')
 
   // A feature branch resolves a conflict while merging a newer main. The
   // merge itself has no trailer and its second parent is outside `main..head`,
@@ -758,6 +774,33 @@ describe('the guards around the run', () => {
     expect(r.stderr).toMatch(/bounded 1\/1 pass/)
   })
 
+  it('plans and runs the reviewable pass while naming the unavailable remainder', () => {
+    const planned = run(['--sha', partlyReviewableSha, '--brief', 'judge what can be reviewed'])
+    expect(planned.status).toBe(4)
+    expect(planned.stderr).toContain('1 RUNNABLE PASS')
+    expect(planned.stderr).toContain('reviewable.txt')
+    expect(planned.stderr).toContain('UNREVIEWABLE: unavailable.txt')
+    expect(planned.stderr).toContain('50% planned coverage (1/2 changed files)')
+
+    provenId()
+    const reviewed = run([
+      '--sha', partlyReviewableSha,
+      '--brief', 'judge what can be reviewed',
+      '--pass', '1',
+    ])
+    expect(reviewed.status, reviewed.stderr).toBe(0)
+    const printed = recordCommandIn(reviewed.stdout)
+    expect(printed).toContain('--pass 1/1')
+    expect(printed).toContain('--pass-files "reviewable.txt"')
+    expect(printed).not.toContain('unavailable.txt')
+    expect(reviewed.stdout).toContain('Coverage: PARTIAL REVIEW — 50% of changed files (1/2)')
+    const sent = readFileSync(join(dir, 'stdin.txt'), 'utf8')
+    expect(sent).toContain('reviewable.txt')
+    expect(sent).toContain('UNAVAILABLE TO THE REVIEWER CHAIN')
+    expect(sent).toContain('unavailable.txt')
+    expect(sent).not.toContain('written by both authoring lanes')
+  })
+
   it('records a narrowed one-round range as exactly one scoped pass', () => {
     provenId()
     const r = run(['--sha', headSha, '--since', `${headSha}~1`, '--brief', 'judge it'])
@@ -1029,7 +1072,7 @@ describe('a range too large for one round', () => {
     const r = run(['--sha', bulkSha, '--brief', 'judge the bulk range'])
     expect(r.status, r.stderr).toBe(4)
     expect(r.stderr).toContain('material budget is 200000 characters')
-    expect(r.stderr).toContain('PASSES over the END-STATE FILE SET')
+    expect(r.stderr).toContain("PASSES over the END-STATE FILE SET's reviewable material")
     expect(r.stderr).toContain('bulk-a.txt')
     expect(r.stderr).toContain('bulk-b.txt')
     expect(r.stderr).toContain('--pass 1')
