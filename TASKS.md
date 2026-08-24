@@ -1971,6 +1971,32 @@ put it is the mistake this line exists to stop.
   Bundle: unbundled (batch autonomy).
 
 
+- [ ] 888. Naming the cross-vendor reviewer in a commit trailer silently removes those files from
+  cross-vendor review. CLAUDE.md §6 permits a commit to name its reviewer in a second model trailer.
+  Nothing in the machinery distinguishes that from a second AUTHOR: `modelsFromTrailers`
+  (`scripts/mechanism-review-core.mjs`) returns EVERY `Co-Authored-By` model, and
+  `mechanism-review-guard` feeds all of them to the authorship split. MEASURED 24.08.2026 on
+  `feat/834-durable-authoring-lane`: two fix commits carrying `Claude Opus 5` plus `GPT-5.6 Sol`
+  turned five reviewable files — `docs/handover-architecture.md`, `.claude/mechanism-reviews.jsonl`,
+  `docs/four-eyes/676-provenance.md`, `scripts/four-eyes-artefacts.test.mjs`,
+  `docs/four-eyes/676-blind-a-opus5.json` — into UNREVIEWABLE ("every configured reviewer vendor
+  authored part of this contribution"), which downgrades them from a real review to a
+  measured-remainder receipt. The commits were rewritten WITHOUT the trailer to recover
+  reviewability, so the branch is clean; the rule that produced it is not.
+  WHY IT MATTERS BEYOND THE INCIDENT: this is a documented practice that WEAKENS the gate while
+  looking like extra diligence, and it fails silently — the guard reports a legitimate-sounding
+  refusal, not a mistake. Anyone following §6 to the letter reaches the same state.
+  FINAL STATE: a reviewer attribution and an authorship attribution are distinguishable. Either the
+  reviewer gets its own trailer key that the authorship read ignores, or §6 stops sanctioning the
+  second model trailer — decided in one place, with CLAUDE.md and the machinery changed together. A
+  case pins that a commit naming a reviewer keeps the file reviewable by that vendor's counterpart.
+  VERIFIABLE: a commit carrying an Anthropic author and an OpenAI reviewer attribution still reports
+  as reviewable by the OpenAI chain in `node scripts/mechanism-review-guard.mjs --status`.
+  Criticality: medium — it does not corrupt anything, but it quietly turns a four-eyes review into a
+  receipt, which is the class of gap the ledger exists to prevent.
+  Bundle: unbundled (batch autonomy).
+
+
 - [ ] 867. An exhausted vendor allowance parks its point on a probe, not on the user. Point 861's
   inventory row Q2: an OpenAI author or reviewer run can return `allowance-exhausted` while that
   vendor's result is mandatory, because cross-vendor evidence may not be substituted. Routing to the
