@@ -11562,3 +11562,83 @@ to land than a mechanism that needs a review.
   either way.
   Criticality: medium — it does not lose work, but it sends sessions on demands nobody makes.
   Bundle: Modell & Wächter.
+
+- [ ] 875. A corrupt Fable-switch file makes the whole tree uncommittable, and the gate that does
+  it promises the opposite in its own header. MEASURED 24.08.2026 in the cross-vendor catch-up
+  review of `76837c8` (recorded `merge-with-fixes`): `scripts/model-trailer-gate.mjs:34-38` exits 1
+  whenever `currentFableState()` reports not-ok, and `scripts/fable-switch.mjs:37-44` returns
+  `unreadableState()` for a corrupt, truncated or unparsable `.claude/fable-switch.json`. So an
+  ENVIRONMENT fault refuses every commit in the repository.
+  WHAT IT COSTS: the file's own header states the rule it breaks — "FAIL-OPEN on an internal error,
+  like every gate here — a broken gate must never make the tree uncommittable" — and CLAUDE.md §7.2
+  says to fail soft for environment transients and loud for product defects. An interrupted write
+  during a switch change therefore stops the batch on a fault that has nothing to do with any commit.
+  Recovery does not itself need a commit (an absent file yields the default state), which is why
+  this is moderate rather than fatal.
+  FINAL STATE: the gate distinguishes a switch it CANNOT READ from a switch that says something it
+  must refuse. The first allows the commit and reports the fault loudly with the command that
+  repairs it; the second keeps refusing exactly as it does today.
+  VERIFIABLE: unit cases — a corrupt/truncated switch file allows the commit and prints the repair
+  route; an absent switch file behaves as today; a readable switch whose state forbids the trailer
+  still exits 1.
+  Criticality: medium — it cannot lose work, but it can stop every commit on an environment fault.
+  Bundle: Modell & Wächter.
+
+- [ ] 876. Guard-health reads absence and measurement failure as one state, and clears a dead
+  enforcer on a bare substring. MEASURED 24.08.2026 by the cross-vendor review of `aeedceb`
+  (recorded `do-not-merge`), four findings:
+  (1) `scripts/guard-health-guard.mjs:38` appends the settings text before parsing it and the catch
+  at `:41` keeps that non-empty partial text, so the emptiness check at `:84` takes malformed or
+  half-written settings for a valid measurement and can raise `cannot-fire` findings out of missing
+  data.
+  (2) `scripts/guard-health-guard.mjs:44` treats every failure of querying or reading the active git
+  `hooksPath` as "no hooksPath", so a gate wired only through a temporarily unreadable git hook is
+  declared dead on a reading that never happened.
+  (3) `scripts/guard-health-core.mjs:471` declares wiring by raw substring inclusion over the whole
+  settings file and every file of the hooks directory (`guard-health-guard.mjs:39,52`) without
+  checking command position, a recognised hook filename or executability — a mention inside another
+  command's arguments, in a comment, or in a disabled sample hook clears a genuinely dead enforcer.
+  (4) `scripts/repository-integrity.test.mjs:109` asserts an exact source substring, which a comment
+  or an inactive property also satisfies while equivalent valid configuration fails; and since the
+  renamed module no longer matches `ENFORCER_RE` (`guard-health-core.mjs:23`), no test proves that
+  Vitest actually invokes that boundary.
+  WHAT IT COSTS: both directions are wrong at once. The guard refuses on data it never read, and it
+  clears enforcers that cannot fire — which is the single failure the whole guard exists to detect.
+  FINAL STATE: absence, measurement failure and presence are three states, not two: a reading that
+  failed says so and never becomes a finding. Wiring is declared from a PARSED settings entry and a
+  recognised, executable hook file, never from a substring anywhere in the text.
+  VERIFIABLE: unit cases — half-written settings yield "not measured" rather than `cannot-fire`; an
+  unreadable `hooksPath` query yields "not measured" rather than "no hooksPath"; an enforcer named
+  only inside another command's arguments, only in a comment, and only in a non-executable sample
+  hook each stay UNCLEARED; and a case that proves the repository boundary is actually invoked by
+  the runner rather than merely spelled in the source.
+  Criticality: high — a guard that clears a dead enforcer removes the detection everything else
+  assumes.
+  Bundle: Modell & Wächter.
+
+- [ ] 877. The urgency parser reads negation by proximity and takes a question for a claim.
+  MEASURED 24.08.2026 by the cross-vendor review of `c3f5ad8` (recorded `do-not-merge`):
+  (1) `scripts/queue-rank-core.mjs:160` associates a negation with whatever is near it rather than
+  with what it negates — "Without a fix, it blocks the release" and "It cannot be deferred because
+  it blocks the release" both come back false, because `without`/`cannot` falls inside the same
+  60-character clause, and the guard then issues a `not-high` refusal against a body that states the
+  blocking condition outright.
+  (2) `scripts/queue-rank-core.mjs:94` counts an interrogative or hypothetical mention as an
+  assertion: "Does this block the release?" returns true and, with a recorded reason, keeps a
+  machine-filed point ahead of the release. The case at `scripts/queue-rank-core.test.mjs:545` does
+  not catch it, because its next sentence independently states "It stops the batch."
+  (3) `scripts/queue-order-guard-core.mjs:355`: the new parsed-record entry point has no test at
+  all — nothing passes a `parseRankRecord(...)` result with normalized `null` optional parts through
+  `releaseBoundaryProblemFrom`, which is the exact regression the change claims to fix, so neither
+  that boundary nor its CLI call path is pinned.
+  WHAT IT COSTS: the parser decides whether a point may stand ahead of a release. One direction
+  refuses work whose urgency is written down plainly; the other lets a merely rhetorical mention
+  hold the release boundary open.
+  FINAL STATE: negation is resolved against the clause it governs, not against a character window;
+  an interrogative or conditional mention is not an assertion; and the parsed-record path carries a
+  test that fails without the fix.
+  VERIFIABLE: unit cases for both quoted sentences, for the question form with and without a
+  supporting sentence, and one that drives `releaseBoundaryProblemFrom` from a `parseRankRecord`
+  result whose optional parts are null.
+  Criticality: medium — it misorders the queue in both directions, but loses no work.
+  Bundle: Modell & Wächter.
