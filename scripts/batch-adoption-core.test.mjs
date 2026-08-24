@@ -13,6 +13,7 @@ const liveProbes = (over = {}) => ({
   launcherOwned: true,
   checkpointSha: 'abc123',
   remoteSha: 'abc123',
+  remoteHasCheckpoint: true,
   ...over,
 })
 
@@ -50,7 +51,12 @@ describe('agreementVerdict (M18)', () => {
       [liveProbes({ heartbeatAt: null }), /heartbeat is unreadable/],
       [liveProbes({ logAdvancedAt: 100_000 - AGREEMENT_SILENCE_MS - 1 }), /log stopped advancing/],
       [liveProbes({ launcherOwned: undefined }), /launcher does not affirm/],
-      [liveProbes({ checkpointSha: 'abc123', remoteSha: 'fff000' }), /not the remote tip/],
+      [liveProbes({ checkpointSha: 'abc123', remoteSha: 'fff000', remoteHasCheckpoint: false }), /not verified reachable/],
+      // MISSING evidence is disagreement, never a pass: an unverified or
+      // unpushed checkpoint must not produce `live`.
+      [liveProbes({ checkpointSha: null }), /no acknowledged checkpoint/],
+      [liveProbes({ remoteSha: null }), /remote tip is unreadable/],
+      [liveProbes({ remoteHasCheckpoint: undefined }), /not verified reachable/],
     ]
     for (const [probes, pattern] of cases) {
       const res = agreementVerdict({ durable: block(), probes, now: 100_000 })
@@ -65,9 +71,15 @@ describe('agreementVerdict (M18)', () => {
     expect(agreementVerdict({ durable: nonTransferable, probes: liveProbes(), now: 100_000 }).verdict).toBe('not-transferable')
   })
 
-  it('tolerates abbreviated-versus-full SHA agreement but not disagreement', () => {
-    const abbreviated = liveProbes({ checkpointSha: 'abc123', remoteSha: 'abc123def4567890' })
-    expect(agreementVerdict({ durable: block(), probes: abbreviated, now: 100_000 }).verdict).toBe('live')
+  it('agrees through the ancestry verdict, never through string prefixes', () => {
+    // A legitimate DESCENDANT tip agrees when the prober verified ancestry —
+    // string equality is not required.
+    const descendant = liveProbes({ checkpointSha: 'abc123', remoteSha: 'ffee00112233', remoteHasCheckpoint: true })
+    expect(agreementVerdict({ durable: block(), probes: descendant, now: 100_000 }).verdict).toBe('live')
+    // A PREFIX match between abbreviated hashes proves nothing: without the
+    // affirmative ancestry verdict it is a disagreement.
+    const prefixAlias = liveProbes({ checkpointSha: 'abc123', remoteSha: 'abc123def4567890', remoteHasCheckpoint: null })
+    expect(agreementVerdict({ durable: block(), probes: prefixAlias, now: 100_000 }).verdict).toBe('expired')
   })
 })
 

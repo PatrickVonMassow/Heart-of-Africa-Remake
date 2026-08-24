@@ -54,6 +54,9 @@ export function durableBlock({ batchId, pointId, attemptId, pid, pidStartedAt, t
  *                     lease holder — an AFFIRMATIVE verdict, absent when unknown
  *    checkpointSha    the last acknowledged checkpoint SHA, or null
  *    remoteSha        the branch tip on the remote, or null
+ *    remoteHasCheckpoint  true only when the prober VERIFIED the checkpoint is
+ *                     reachable from the remote tip (`git merge-base
+ *                     --is-ancestor <checkpoint> <tip>`, equality included)
  *
  *  The verdict is `live` only when nothing disagrees. Anything else is
  *  `expired` WITH the alerts that say what stopped agreeing. */
@@ -62,7 +65,7 @@ export function agreementVerdict({ durable = null, probes = {}, now = 0, maxSile
   if (!durable || durable.transferable !== true) {
     return { verdict: 'not-transferable', alerts: ['the declaration carries no transferable durable block'] }
   }
-  const { heartbeatAt, logAdvancedAt, workerProbe, launcherOwned, checkpointSha, remoteSha } = probes
+  const { heartbeatAt, logAdvancedAt, workerProbe, launcherOwned, checkpointSha, remoteSha, remoteHasCheckpoint } = probes
 
   if (!(workerProbe?.live === true) || !sameProcess({ pid: durable.pid, pidStartedAt: durable.pidStartedAt }, { pid: workerProbe.pid, pidStartedAt: workerProbe.startedAt })) {
     alerts.push(`the declared worker process (pid ${durable.pid}) is not the one running — dead, or a recycled pid`)
@@ -74,11 +77,20 @@ export function agreementVerdict({ durable = null, probes = {}, now = 0, maxSile
   // AFFIRMATIVE like every probe in this design: only `true` is ownership, and
   // an unprobed launcher is a disagreement, not a pass.
   if (launcherOwned !== true) alerts.push('the launcher does not affirm ownership of this attempt')
-  // A checkpoint SHA that the remote does not carry is a checkpoint that LIED or
-  // a push that vanished; either way the record and the world disagree.
-  if (presentString(checkpointSha) && presentString(remoteSha) && checkpointSha !== remoteSha) {
-    const agrees = remoteSha.startsWith(checkpointSha) || checkpointSha.startsWith(remoteSha)
-    if (!agrees) alerts.push(`the last acknowledged checkpoint (${checkpointSha.slice(0, 12)}) is not the remote tip (${remoteSha.slice(0, 12)})`)
+  // The checkpoint's agreement is ANCESTRY, affirmatively probed — never string
+  // comparison: a prefix match between abbreviated hashes is not identity, and a
+  // legitimate descendant tip is not a disagreement. Missing evidence is itself
+  // a disagreement: an unpushed or unverified checkpoint must never read live,
+  // because a checkpoint the remote cannot prove is a checkpoint that LIED or a
+  // push that vanished.
+  if (!presentString(checkpointSha)) {
+    alerts.push('no acknowledged checkpoint SHA: a lane with nothing pushed to prove does not agree')
+  } else if (!presentString(remoteSha)) {
+    alerts.push('the remote tip is unreadable, so the last acknowledged checkpoint cannot be verified against it')
+  } else if (remoteHasCheckpoint !== true) {
+    alerts.push(
+      `the last acknowledged checkpoint (${checkpointSha.slice(0, 12)}) is not verified reachable from the remote tip (${remoteSha.slice(0, 12)})`,
+    )
   }
   if (alerts.length) return { verdict: 'expired', alerts }
   return { verdict: 'live', alerts: [] }
