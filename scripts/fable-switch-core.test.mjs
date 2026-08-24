@@ -145,6 +145,19 @@ describe('decisions derived from the state', () => {
     expect(mergePromptFraming(off(), [])).toMatch(/DECORRELATED MERGE FRAMING/)
   })
 
+  it('reads a name carrying both vendors as writing EVERY model it mentions', () => {
+    // "Fable / GPT-5.6 Sol" resolved to Sol by first-match, and mergerModel then
+    // offered Fable as untainted although the marker names Fable. A mixed name
+    // disqualifies every model it mentions instead of qualifying one of them.
+    // With every roster model tainted by the mixed name, the switch's own answer
+    // is kept for the caller to judge — which records the two-model fallback and
+    // owes the decorrelated framing, instead of printing "wrote neither half".
+    expect(mergerModel(on(), ['Fable / GPT-5.6 Sol', 'Claude Opus 5'])).toBe(FABLE_MODEL)
+    expect(mergePromptFraming(on(), ['Fable / GPT-5.6 Sol', 'Claude Opus 5'])).toMatch(/DECORRELATED MERGE FRAMING/)
+    expect(mergerModel(off(), ['Fable / GPT-5.6 Sol', CLAUDE_MODEL])).toBe(SOL_MODEL)
+    expect(mergePromptFraming(off(), ['Fable / GPT-5.6 Sol', CLAUDE_MODEL])).toMatch(/DECORRELATED MERGE FRAMING/)
+  })
+
   it('tells two Sol versions apart instead of treating every Sol as one model', () => {
     // "GPT-5.6 Sol" carries its version on the VENDOR word, so a search keyed on "sol"
     // found no digits and made every Sol compare equal. A half written by a different

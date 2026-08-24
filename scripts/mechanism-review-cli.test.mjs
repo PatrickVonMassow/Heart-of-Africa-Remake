@@ -61,6 +61,19 @@ const committedFixture = (path) => {
   return { oid: createHash('sha1').update(bytes).digest('hex'), model: model.trim() }
 }
 
+/** Fixture stand-ins for the committed-artefact readers: the "committed" oid is
+ *  the file's own hash and the blob text is the file's own bytes, so the
+ *  recorder's blob recount folds exactly what the fixtures wrote. */
+const committedOidFixture = (path) => createHash('sha1').update(readFileSync(path)).digest('hex')
+const blobTextFixture = (...paths) => {
+  const byOid = {}
+  for (const p of paths) {
+    const bytes = readFileSync(p)
+    byOid[createHash('sha1').update(bytes).digest('hex')] = bytes.toString('utf8')
+  }
+  return (oid) => byOid[oid] ?? null
+}
+
 describe('the flag surface', () => {
   it('knows every flag its usage documents', () => {
     const flags = [
@@ -491,7 +504,8 @@ describe('the mode round-trips into the ledger', () => {
         listBPath: listB,
         isTracked: () => true,
         committedHalf: committedFixture,
-        committedUnion: () => 'u'.repeat(40),
+        committedUnion: committedOidFixture,
+        blobText: blobTextFixture(listA, listB, union),
       })
       expect(selfMerged.ok).toBe(false)
       const text = (selfMerged.errors ?? []).join('\n')
@@ -534,7 +548,12 @@ describe('the mode round-trips into the ledger', () => {
       })
       // The halves decide the merger only where they are TRACKED artefacts, so the
       // temp fixtures say so explicitly; the untracked case is asserted below.
-      const tracked = { isTracked: () => true, committedHalf: committedFixture, committedUnion: () => 'u'.repeat(40) }
+      const tracked = {
+        isTracked: () => true,
+        committedHalf: committedFixture,
+        committedUnion: committedOidFixture,
+        blobText: blobTextFixture(listA, listB, union),
+      }
       const built = build({
         mode: 'blind-parallel',
         mergedBy: 'Claude Opus 5',
@@ -552,7 +571,7 @@ describe('the mode round-trips into the ledger', () => {
       expect(built.record.halfSources).toEqual([listA, listB])
       // …and the union the count read is content-addressed in the row, so the
       // receipt is re-derivable later (cross-vendor re-review of point 889).
-      expect(built.record.unionBlob).toBe('u'.repeat(40))
+      expect(built.record.unionBlob).toBe(committedOidFixture(union))
 
       // UNTRACKED HALVES ARE CALLER-WRITTEN and decide nothing: the trailer proxy
       // stands, and with it the older refusal. Without this the change would be
@@ -586,6 +605,7 @@ describe('the mode round-trips into the ledger', () => {
         listAPath: listA,
         listBPath: listB,
         ...tracked,
+        blobText: blobTextFixture(listA, listB, selfUnion),
       })
       expect(selfMerged.ok).toBe(false)
       expect((selfMerged.errors ?? []).join('\n')).toMatch(/authored one of the two lists \(GPT-5\.6 Sol\)/)
@@ -594,6 +614,7 @@ describe('the mode round-trips into the ledger', () => {
       // first at the gate (re-review round 5).
       const unowned = build({
         mode: 'blind-parallel',
+        ...tracked,
         unionPath: w('U-unowned.json', {
           entries: [
             { id: 'U1', from: ['A1'] },
@@ -602,7 +623,6 @@ describe('the mode round-trips into the ledger', () => {
         }),
         listAPath: listA,
         listBPath: listB,
-        ...tracked,
       })
       expect(unowned.ok).toBe(false)
       expect((unowned.errors ?? []).join('\n')).toMatch(/names no "mergedBy"/)

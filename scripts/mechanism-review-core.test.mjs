@@ -522,6 +522,22 @@ describe('evaluateMechanismReview', () => {
     expect(formatMechanismReviewVerdict(v)).toMatch(/half authors the repository does not confirm/)
   })
 
+  it('judges a mode wearing stray whitespace by its trimmed value on BOTH gates', () => {
+    // " blind-parallel " passed well-formedness (which trims) and fell out of
+    // mergeProblem (which compared raw), so one space bypassed every fold check.
+    const row = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE + 1, model: 'GPT-5.6 Sol', mode: ' blind-parallel ' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [row],
+    })
+    expect(v.block).toBe(true)
+  })
+
   it('names the unconfirmed-halves problem instead of calling it a self-merge', () => {
     // mergeLine used to answer every problem beyond no-merger/no-count with
     // "which wrote one of the two lists" — a false self-merge diagnosis for a

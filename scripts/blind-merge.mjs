@@ -416,7 +416,7 @@ if (isMainModule(import.meta.url)) {
         `${reviewerAt ? `    --model-at "${reviewerAt}"` : ''}` +
         `${reviewerTranscript ? ` --model-transcript "${reviewerTranscript}"` : ''}` +
         `${reviewerAt || reviewerTranscript ? ' \\\n' : ''}` +
-        `    --verdict merge --mode blind-parallel --merged-by "${expectedMerger}"` +
+        `    --verdict merge --mode blind-parallel --merged-by "${declared || expectedMerger}"` +
         `${merger.fallback ? ` --merge-fallback "${mergerReason}"` : ''} \\\n` +
         // THE THREE FILES TRAVEL INTO THE RECORD: without them the recorder
         // falls back to the trailer proxy and the ledger row binds to nothing

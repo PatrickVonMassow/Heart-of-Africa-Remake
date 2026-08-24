@@ -1135,7 +1135,10 @@ export function validateRecord({
  * so a second one named in the trailers cannot merge its own list either.
  */
 export function mergeProblem(record = {}, commit = {}) {
-  if (String(record.mode ?? '') !== BLIND_PARALLEL) return ''
+  // TRIMMED, like the well-formedness check reads it: " blind-parallel " passed
+  // there and fell out HERE, so a hand-edited row bypassed every fold check by
+  // one space (re-review round 6).
+  if (String(record.mode ?? '').trim() !== BLIND_PARALLEL) return ''
   // A row is grandfathered only by a REAL timestamp older than the rule. A row
   // with NO `at` is not old, it is unstamped — reading a missing field as legacy
   // was itself a bypass (four-eyes review, third round): omit `at`, `mergedBy`

@@ -105,7 +105,8 @@ Half A is Claude's and half B is Sol's, so:
 
 ## The merger's own authorship (recorded 24.08.2026)
 
-Cross-vendor review asked what backs `mergedBy: "Fable 5"` beyond commit
+Cross-vendor review asked what backs `mergedBy: "Claude Fable 5"` — the union's
+own spelling, which the ledger row carries verbatim — beyond commit
 attribution. The fold ran as a DELEGATED subagent, and its sidechain transcript
 is the message metadata:
 

@@ -191,8 +191,11 @@ export function reviewerVendorProblems(model, authorship = {}) {
  *  refusable); a legal repository name that merely BEGINS with two dots —
  *  `..half.json` — is not "outside" (re-review round 4). */
 export function repoRelative(path) {
-  const raw = String(path ?? '').trim()
-  if (!raw) return ''
+  // The caller's spelling survives — trimming rewrote a legal whitespace-bearing
+  // filename into a different pathname (re-review round 6). Only an argument
+  // that is nothing but whitespace is empty.
+  const raw = String(path ?? '')
+  if (!raw.trim()) return ''
   const rel = relative(REPO_ROOT, resolvePath(REPO_ROOT, raw))
   const outside = !rel || rel === '..' || rel.startsWith(`..${sep}`) || rel.startsWith('../')
   return outside ? raw : rel.split('\\').join('/')
@@ -208,6 +211,30 @@ export function committedOid(path, { at = 'HEAD' } = {}) {
   } catch {
     return ''
   }
+}
+
+/** Recompute a fold's receipt from three committed blobs — the halves and the
+ *  union — so the receipt a row carries is derived from exactly the bytes the
+ *  row binds. */
+export function recountFromBlobs(oids, blobText = committedBlobText) {
+  const texts = oids.map((oid) => blobText(oid))
+  const missing = oids.filter((_, i) => texts[i] === null)
+  if (missing.length) {
+    return { ok: false, errors: missing.map((oid) => `blob ${String(oid).slice(0, 12)} is not in the repository`) }
+  }
+  let a, b, union
+  try {
+    a = parseListText('A', texts[0])
+    b = parseListText('B', texts[1])
+    union = JSON.parse(texts[2])
+  } catch (e) {
+    return { ok: false, errors: [`the committed artefacts do not parse: ${(e && e.message) || e}`] }
+  }
+  const inputs = validateInputs(a, b)
+  if (!inputs.ok) return { ok: false, errors: inputs.errors }
+  const result = accountUnion({ a, b, union })
+  if (!result.ok) return { ok: false, errors: [formatAccounting(result)] }
+  return { ok: true, summary: summaryLine(result), errors: [] }
 }
 
 /** The bytes of one committed blob, by oid — content-addressed, so the answer
@@ -442,6 +469,7 @@ export function buildRecord({
   isTracked = isTrackedInGit,
   committedHalf = committedHalfModel,
   committedUnion = committedOid,
+  blobText = committedBlobText,
   fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
@@ -609,6 +637,33 @@ export function buildRecord({
       halfBlobs = committed.map((c) => c.oid)
       unionSource = repoRelative(unionPath)
       unionBlob = unionCommitted
+      // THE RECEIPT COMES FROM THE BYTES THE ROW BINDS (re-review round 6): the
+      // count above read the WORKING TREE, and the row names blobs from the
+      // reviewed commit — two sets of bytes that can differ while every model
+      // field matches, leaving a row verification must refuse. The fold is
+      // therefore recomputed from the committed blobs, and a divergence refuses
+      // here rather than surfacing as a poisoned row later.
+      const committedReceipt = recountFromBlobs([...halfBlobs, unionBlob], blobText)
+      if (!committedReceipt.ok) {
+        return {
+          ok: false,
+          errors: [
+            `the committed artefacts at ${commit.sha.slice(0, 7)} do not fold to the counted receipt:`,
+            ...committedReceipt.errors,
+          ],
+        }
+      }
+      if (committedReceipt.summary !== counted.summary) {
+        return {
+          ok: false,
+          errors: [
+            'the working tree and the committed artefacts disagree — the count read ' +
+              `"${counted.summary}" while the blobs at ${commit.sha.slice(0, 7)} fold to ` +
+              `"${committedReceipt.summary}"; commit what you counted, then record`,
+          ],
+        }
+      }
+      receipt = committedReceipt.summary
     } else if (mode === BLIND_PARALLEL) {
       // A FAILED PROOF IS A REFUSAL, NOT A SHRUG (cross-vendor review of point
       // 889). The caller handed over the three files precisely so the halves

@@ -43,6 +43,11 @@ The same-commit filing rule corroborates only what a trailer can say: the commit
 author-model trailer backs the half THAT SESSION'S MODEL wrote — it cannot vouch for the
 other model's half, which always needs its own evidence of one of the two kinds above.
 
+The FILING rule above is process, and the tooling enforces its checkable core —
+every artefact COMMITTED — rather than same-commitness: a recovered stage files
+its halves after the fact, as 676 did, and refusing that would make the one
+stage the rule was written for unrecordable.
+
 What the TOOLING checks against this rule, and what it cannot: `blind-merge.mjs` counts
 only halves whose `model` field is committed, which makes every author claim a readable,
 attributable commit — the auditability floor — and refuses everything below it. Whether

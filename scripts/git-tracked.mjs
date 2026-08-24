@@ -48,7 +48,10 @@ export function isTrackedInGit(path, { root = REPO_ROOT, run = spawnSync, conten
     encoding: 'utf8',
   })
   if (real.status !== 0) return false
-  const top = String(real.stdout ?? '').trim()
+  // Only git's own line terminator comes off: .trim() would clip a checkout
+  // directory whose NAME ends in whitespace and reject every artefact in it
+  // (re-review round 6).
+  const top = String(real.stdout ?? '').replace(/\r?\n$/, '')
   // The path itself may not be a symlink, wherever it points: the bytes read
   // through it are whatever the link's owner serves, not the tracked blob.
   let abs

@@ -210,15 +210,24 @@ describe('the 676 stage is auditable from its raw halves', () => {
     ).entries
     const from = entries.map((e) => e.from)
 
-    const halfModel = (half) => JSON.parse(read(`${half}.json`)).model
+    // EVERYTHING RECOMPUTED HERE IS READ AT THE ROW'S OWN SHA (re-review rounds
+    // 5 and 6): the audit is of the historical fold, so working-tree or HEAD
+    // reads would let later edits rot a true row or dress up a false one.
+    const atRow = (rel) =>
+      execFileSync('git', ['show', `${row.sha}:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+    const halfModel = (half) => JSON.parse(atRow(`${half}.json`)).model
     expect(row.halfAuthors).toEqual([halfModel(HALF_A), halfModel(HALF_B)])
     // THE MERGER WROTE NEITHER HALF — the one rule the fold step exists to keep.
-    expect(row.mergedBy).toBe('Fable 5')
+    // The committed union at the row's sha is the authority on who folded it;
+    // the row carries that spelling, and it is the Fable family.
+    expect(row.mergedBy).toBe(JSON.parse(atRow(row.unionSource)).mergedBy)
+    expect(row.mergedBy).toMatch(/Fable/)
     expect(row.halfAuthors).not.toContain(row.mergedBy)
     // …and the row names the exact blobs it counted, so the claim above is
     // re-derivable from the repository rather than read off two strings.
-    const oid = (rel) => execFileSync('git', ['rev-parse', `HEAD:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true }).trim()
+    const oid = (rel) => execFileSync('git', ['rev-parse', `${row.sha}:${rel}`], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true }).trim()
     expect(row.halfBlobs).toEqual([oid(`${HALF_A}.json`), oid(`${HALF_B}.json`)])
+    expect(row.unionBlob).toBe(oid(row.unionSource))
 
     const m = /^(\d+) A \+ (\d+) B entries → (\d+) union entries \((\d+) of the (\d+) input entries merged, (\d+) only A, (\d+) only B\)/.exec(row.accounting)
     expect(m, `not a receipt line: ${row.accounting}`).not.toBe(null)
@@ -228,8 +237,8 @@ describe('the 676 stage is auditable from its raw halves', () => {
     expect(merged).toBe(from.filter((f) => f.length > 1).reduce((n, f) => n + f.length, 0))
     expect(onlyA).toBe(single('A'))
     expect(onlyB).toBe(single('B'))
-    expect(a).toBe(JSON.parse(read(`${HALF_A}.json`)).entries.length)
-    expect(b).toBe(JSON.parse(read(`${HALF_B}.json`)).entries.length)
+    expect(a).toBe(JSON.parse(atRow(`${HALF_A}.json`)).entries.length)
+    expect(b).toBe(JSON.parse(atRow(`${HALF_B}.json`)).entries.length)
     // The denominator the merged count is OF — read past, and so unchecked, by
     // the receipt pattern this case used to carry.
     expect(inputs).toBe(a + b)

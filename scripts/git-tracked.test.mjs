@@ -150,6 +150,19 @@ describe('isTrackedInGit — committed bytes only', () => {
     }
   })
 
+  it('answers correctly from a checkout whose directory name ends in whitespace', () => {
+    // .trim() on git's toplevel output clipped such a root and rejected every
+    // committed artefact in it; only the line terminator may come off.
+    const wsRoot = join(sandbox, 'repo-ws ')
+    mkdirSync(wsRoot)
+    execFileSync('git', ['init', '-q'], { windowsHide: true, cwd: wsRoot })
+    git(['config', 'core.autocrlf', 'false'], wsRoot)
+    writeFileSync(join(wsRoot, 'half.json'), '{"model":"Opus 5","entries":[]}\n')
+    git(['add', 'half.json'], wsRoot)
+    git(['commit', '-q', '-m', 'seed'], wsRoot)
+    expect(isTrackedInGit('half.json', { root: wsRoot })).toBe(true)
+  })
+
   it('checks a whitespace-bearing filename as itself, not as its trimmed cousin', () => {
     // Trimming turned " spaced.json" into "spaced.json" — a different pathname —
     // so the tracked answer was about a file the caller never named.
