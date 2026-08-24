@@ -23,14 +23,26 @@ claim in the ledger.
 
 **And the `model` field is still only a claim — its durable backing is a tracked
 provenance record.** Authorship is established by the metadata of the messages that
-produced the text, which lives in unversioned transcripts and can be deleted. The rule
-is therefore two-part: an UNCONTESTED half is filed in the same commit by the session
-that produced it, so the commit's own trailer corroborates the field; a CONTESTED or
-after-the-fact label is settled only by a provenance record filed HERE that quotes the
-producing-message metadata verbatim (model id, line, timestamp, tool-call id), the way
-`676-provenance.md` does for both 676 halves. Once quoted into a tracked record, the reading
-survives transcript deletion; a `model` field that neither route backs does not decide
-the merger question.
+produced the text, which lives in unversioned transcripts and can be deleted. What that
+metadata can look like differs by how the half was made, and the rule names both kinds:
+
+- **A session-authored half** is proven by the `message.model` of the assistant message
+  that wrote it — quoted with line, tool-call id and timestamp.
+- **A delegated half** (another model run through a wrapper such as `ask-sol.mjs`) has no
+  such message; its strongest existing evidence is the DELEGATION CHAIN quoted from the
+  transcript — the commissioning tool call, the wrapper's banner naming the model it
+  reached, the await on the answer artefact, and the step that parsed the entries out of
+  it. This is weaker than message metadata — a wrapper banner is self-reported — and is
+  recorded as the delegation it is, never upgraded to a message-level reading. Closing
+  that residual (an attestation from the delegate's own side) is work-order point 880's.
+
+A CONTESTED or after-the-fact label is settled only by a provenance record filed HERE
+that quotes the applicable evidence verbatim, the way `676-provenance.md` does for both
+676 halves. Once quoted into a tracked record, the reading survives transcript deletion.
+The same-commit filing rule corroborates only what a trailer can say: the commit's
+author-model trailer backs the half THAT SESSION'S MODEL wrote — it cannot vouch for the
+other model's half, which always needs its own evidence of one of the two kinds above. A
+`model` field that no route backs does not decide the merger question.
 
 ## Counting a union against its halves
 

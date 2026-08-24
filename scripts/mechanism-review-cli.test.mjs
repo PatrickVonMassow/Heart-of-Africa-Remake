@@ -22,6 +22,7 @@ import {
   readRecords,
   recordsPathFor,
   resolveCommit,
+  reverifyReviewerAgreement,
   reviewFileSetKey,
   usage,
   verifyHalfAuthors,
@@ -89,6 +90,45 @@ describe('the flag surface', () => {
   })
 })
 
+describe('a recorded reviewer AGREEMENT is re-checked against its transcript', () => {
+  // The two model strings in a ledger row are hand-editable; the transcript is
+  // the evidence they quote (cross-vendor re-review of point 889). While it
+  // still exists it is re-read; a contradiction downgrades the row to the
+  // refusal it earns. An expired transcript keeps the recorded reading — the
+  // ledger outlives the transcripts, and rotting old reviews into refusals
+  // would punish age, not forgery.
+  const row = (over = {}) => ({
+    reviewerAuthorship: {
+      status: 'agreement',
+      claimedModel: 'Claude Opus 5',
+      actualModel: 'Claude Opus 5',
+      artefactAt: 1_787_588_200_000,
+      transcript: '/tmp/somewhere/session.jsonl',
+      ...over,
+    },
+  })
+
+  it('downgrades an agreement the transcript now contradicts', () => {
+    const check = () => ({ status: 'disagreement', actualModel: 'claude-haiku-4-5', reason: 'the claimed author disagrees with message.model' })
+    const out = reverifyReviewerAgreement(row(), { check })
+    expect(out.status).toBe('disagreement')
+    expect(out.actualModel).toBe('claude-haiku-4-5')
+  })
+
+  it('keeps a recorded agreement whose transcript has expired', () => {
+    const check = () => ({ status: 'unverified', reason: 'the session transcript is missing or unreadable' })
+    expect(reverifyReviewerAgreement(row(), { check }).status).toBe('agreement')
+  })
+
+  it('touches nothing without a transcript path or below agreement', () => {
+    const check = () => {
+      throw new Error('must not be called')
+    }
+    expect(reverifyReviewerAgreement(row({ transcript: undefined }), { check }).status).toBe('agreement')
+    expect(reverifyReviewerAgreement(row({ status: 'unverified' }), { check }).status).toBe('unverified')
+  })
+})
+
 describe('a ledger row\'s half-authorship claim is re-derived, never believed', () => {
   // Cross-vendor review of point 889: verification read the model field of
   // whatever JSON stands at the recorded path today. That answers "some committed
@@ -100,14 +140,24 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
     halfSources: ['docs/a.json', 'docs/b.json'],
     halfBlobs: ['aaaa1', 'bbbb2'],
+    unionBlob: 'uuuu3',
+    mergedBy: 'Fable 5',
+    accounting: '1 A + 1 B entries → 1 union entries (2 of the 2 input entries merged, 0 only A, 0 only B): every input entry accounted for',
   }
   const blobs = {
     'docs/a.json': { oid: 'aaaa1', model: 'Claude Opus 5' },
     'docs/b.json': { oid: 'bbbb2', model: 'GPT-5.6 Sol' },
   }
+  // The committed bytes behind those oids — what the fold is recomputed from.
+  const texts = {
+    aaaa1: JSON.stringify({ model: 'Claude Opus 5', entries: [{ id: 'A1', file: 'x.ts', defect: 'the defect' }] }),
+    bbbb2: JSON.stringify({ model: 'GPT-5.6 Sol', entries: [{ id: 'B1', file: 'x.ts', defect: 'the defect restated' }] }),
+    uuuu3: JSON.stringify({ mergedBy: 'Fable 5', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }),
+  }
   const deps = (over = {}) => ({
     isTracked: () => true,
     committedHalf: (src) => blobs[src] ?? null,
+    blobText: (oid) => texts[oid] ?? null,
     ...over,
   })
 
@@ -124,6 +174,20 @@ describe('a ledger row\'s half-authorship claim is re-derived, never believed', 
     const { halfBlobs: _halfBlobs, ...withoutBlobs } = row
     expect(verifyHalfAuthors(withoutBlobs, deps())).toBe(false)
     expect(verifyHalfAuthors({ ...row, halfBlobs: ['aaaa1'] }, deps())).toBe(false)
+  })
+
+  it('re-performs the fold from the committed bytes, so the receipt is bound to them', () => {
+    // A row whose recorded accounting the recomputation does not reproduce is a
+    // claim about a fold that did not happen over these blobs.
+    expect(verifyHalfAuthors({ ...row, accounting: '2 A + 1 B entries → 2 union entries (2 of the 3 input entries merged, 1 only A, 0 only B): every input entry accounted for' }, deps())).toBe(false)
+    // A union blob whose mergedBy contradicts the row's is someone else's fold.
+    const forged = { ...texts, uuuu3: JSON.stringify({ mergedBy: 'GPT-5.6 Sol', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the defect' }] }) }
+    expect(verifyHalfAuthors(row, deps({ blobText: (oid) => forged[oid] ?? null }))).toBe(false)
+    // No union binding at all — nothing to recompute from — is not verified.
+    const { unionBlob: _unionBlob, ...withoutUnion } = row
+    expect(verifyHalfAuthors(withoutUnion, deps())).toBe(false)
+    // An absent blob (repository without the object) cannot confirm anything.
+    expect(verifyHalfAuthors(row, deps({ blobText: () => null }))).toBe(false)
   })
 
   it('still refuses an untracked source or a contradicted model', () => {
@@ -411,6 +475,7 @@ describe('the mode round-trips into the ledger', () => {
         listBPath: listB,
         isTracked: () => true,
         committedHalf: committedFixture,
+        committedUnion: () => 'u'.repeat(40),
       })
       expect(selfMerged.ok).toBe(false)
       const text = (selfMerged.errors ?? []).join('\n')
@@ -452,7 +517,7 @@ describe('the mode round-trips into the ledger', () => {
       })
       // The halves decide the merger only where they are TRACKED artefacts, so the
       // temp fixtures say so explicitly; the untracked case is asserted below.
-      const tracked = { isTracked: () => true, committedHalf: committedFixture }
+      const tracked = { isTracked: () => true, committedHalf: committedFixture, committedUnion: () => 'u'.repeat(40) }
       const built = build({
         mode: 'blind-parallel',
         mergedBy: 'Claude Opus 5',
@@ -465,7 +530,12 @@ describe('the mode round-trips into the ledger', () => {
       // The record CARRIES the halves, because the gate re-judges it later and
       // would otherwise fall back to the trailer proxy and call this a self-merge.
       expect(built.record.halfAuthors).toEqual(['Fable 5', 'GPT-5.6 Sol'])
+      // Sources are stored repo-relative where they resolve inside the checkout;
+      // these temp fixtures live outside it and stay as given.
       expect(built.record.halfSources).toEqual([listA, listB])
+      // …and the union the count read is content-addressed in the row, so the
+      // receipt is re-derivable later (cross-vendor re-review of point 889).
+      expect(built.record.unionBlob).toBe('u'.repeat(40))
 
       // UNTRACKED HALVES ARE CALLER-WRITTEN and decide nothing: the trailer proxy
       // stands, and with it the older refusal. Without this the change would be
@@ -607,11 +677,15 @@ describe('the mode round-trips into the ledger', () => {
       mkdirSync(join(repo, 'docs'), { recursive: true })
       writeFileSync(join(repo, 'docs', 'A.json'), JSON.stringify(halfA))
       writeFileSync(join(repo, 'docs', 'B.json'), JSON.stringify(halfB))
+      writeFileSync(
+        join(repo, 'docs', 'U.json'),
+        JSON.stringify({ mergedBy: 'GPT-5.6 Sol', entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] }),
+      )
       git('add', '-A')
-      git('commit', '-q', '-m', 'File the two blind halves\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      git('commit', '-q', '-m', 'File the two blind halves and their union\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
       const listA = join(repo, 'docs', 'A.json')
       const listB = join(repo, 'docs', 'B.json')
-      const union = w('U.json', { entries: [{ id: 'U1', from: ['A1', 'B1'], defect: 'the first defect' }] })
+      const union = join(repo, 'docs', 'U.json')
       const record = (unionPath) =>
         spawnSync(
           process.execPath,
@@ -637,11 +711,14 @@ describe('the mode round-trips into the ledger', () => {
       expect(row.accounting).toMatch(/1 A \+ 1 B entries → 1 union entries .*every input entry accounted for/)
       // The row says which blobs it read, so a later reader re-derives the proof.
       expect(row.halfAuthors).toEqual(['Opus 5', 'GPT-5.6 Sol'])
-      expect(row.halfSources).toEqual([listA, listB])
+      // Stored repo-relative, so the ledger row is valid from every checkout.
+      expect(row.halfSources).toEqual(['docs/A.json', 'docs/B.json'])
       expect(row.halfBlobs).toEqual([
         git('rev-parse', 'HEAD:docs/A.json').stdout.trim(),
         git('rev-parse', 'HEAD:docs/B.json').stdout.trim(),
       ])
+      expect(row.unionSource).toBe('docs/U.json')
+      expect(row.unionBlob).toBe(git('rev-parse', 'HEAD:docs/U.json').stdout.trim())
 
       // AN UNPROVABLE HALF REFUSES; IT DOES NOT FALL BACK TO THE TRAILERS. The
       // caller hands the three files over precisely so the halves decide instead
@@ -1025,7 +1102,21 @@ describe('the mode round-trips into the ledger', () => {
       const subject = 'Route the __F__ marker past the splitter'
       git('commit', '-q', '-m', `${subject}\n\nCo-Authored-By: GPT-5.6 Sol <noreply@openai.com>`)
       const sha = git('rev-parse', 'HEAD').stdout.trim()
-      const record = (model) =>
+      // The Anthropic reviewer's identity is VERIFIED (post-VERIFIED_REVIEWER_SINCE
+      // rows from that vendor no longer clear unverified), so the fixture carries
+      // the transcript its claim quotes.
+      const reviewAt = '2026-08-24T16:20:00.000Z'
+      const transcript = join(dir, 'session.jsonl')
+      writeFileSync(
+        transcript,
+        `${JSON.stringify({
+          timestamp: reviewAt,
+          type: 'assistant',
+          isSidechain: false,
+          message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' },
+        })}\n`,
+      )
+      const record = (model, ...extra) =>
         spawnSync(
           process.execPath,
           [
@@ -1035,6 +1126,7 @@ describe('the mode round-trips into the ledger', () => {
             '--verdict', 'merge',
             '--evidence', 'read the fixture change against its stated intent',
             '--mode', 'review',
+            ...extra,
           ],
           { cwd: repo, encoding: 'utf8', windowsHide: true },
         )
@@ -1047,9 +1139,14 @@ describe('the mode round-trips into the ledger', () => {
       expect(self.stderr, `${self.stdout}${self.stderr}`).toContain('SELF-REVIEW is refused')
       expect(self.stderr).toContain('GPT-5.6 Sol')
 
+      // An Anthropic reviewer with no identity evidence is refused outright.
+      const unproven = record('Claude Fable 5')
+      expect(unproven.status).not.toBe(0)
+      expect(`${unproven.stdout}${unproven.stderr}`).toContain('must be VERIFIED')
+
       // A cross-model record works, and the ledger row carries the subject
       // whole and the authorship exactly as the trailer spells it.
-      const ok = record('Claude Fable 5')
+      const ok = record('Claude Fable 5', '--model-at', reviewAt, '--model-transcript', transcript)
       expect(ok.status, `${ok.stdout}${ok.stderr}`).toBe(0)
       const row = JSON.parse(readFileSync(join(repo, '.claude', 'mechanism-reviews.jsonl'), 'utf8').trim())
       expect(row.subject).toBe(subject)

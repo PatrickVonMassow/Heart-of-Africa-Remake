@@ -457,6 +457,48 @@ describe('evaluateMechanismReview', () => {
     expect(judge(older, 'GPT-5.6 Sol')).toBe(false)
   })
 
+  it('keys the reviewer-verification era on the COMMIT, so a backdated row buys nothing', () => {
+    // record.at is written by the recording hand; the commit timestamp is part
+    // of its sha. A hand-edited row claiming a pre-boundary `at` against a
+    // post-boundary commit answers to the new rule regardless.
+    const backdated = {
+      ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
+    }
+    const judgeAt = (commitAt) =>
+      evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], authorModel: 'GPT-5.6 Sol', at: commitAt })],
+        records: [backdated],
+      }).block
+    expect(judgeAt(VERIFIED_REVIEWER_SINCE + 1)).toBe(true)
+    expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(false)
+  })
+
+  it('names the unconfirmed-halves problem instead of calling it a self-merge', () => {
+    // mergeLine used to answer every problem beyond no-merger/no-count with
+    // "which wrote one of the two lists" — a false self-merge diagnosis for a
+    // row whose halves the repository simply did not confirm.
+    const row = {
+      ...record({ at: MERGE_ACCOUNTING_SINCE + 1, model: 'GPT-5.6 Sol', mode: 'blind-parallel' }),
+      mergedBy: 'Fable 5',
+      accounting: RECEIPT,
+      halfAuthors: ['Claude Opus 5', 'GPT-5.6 Sol'],
+      halfAuthorsVerified: false,
+    }
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)] })],
+      records: [row],
+    })
+    expect(v.block).toBe(true)
+    const text = formatMechanismReviewVerdict(v)
+    expect(text).toMatch(/half authors the repository does not confirm/)
+    expect(text).not.toMatch(/wrote one of the two lists/)
+  })
+
   it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {
     const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [commit()], records: [] })
     const text = formatMechanismReviewVerdict(v, {

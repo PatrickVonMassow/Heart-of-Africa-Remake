@@ -391,7 +391,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     commits,
     endStateFiles,
     records,
-    recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
+    recordUsable: (record, commit) => reviewRecordWellFormed(record, { commitAt: commit?.at }) && !mergeProblem(record, commit),
   })
   const authorshipPlan = planAuthorshipGroups({
     commits: commitsForFiles(debt.outstanding),

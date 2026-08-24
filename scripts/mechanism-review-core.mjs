@@ -1175,7 +1175,7 @@ export function mergeProblem(record = {}, commit = {}) {
 }
 
 /** Ledger-era validity shared by the gate and the per-file debt planner. */
-export function reviewRecordWellFormed(record = {}) {
+export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   if (!VERDICTS.includes(String(record.verdict))) return false
   if (typeof record.model !== 'string' || !record.model.trim()) return false
   if (!ledgerAtUsable(record.at)) return false
@@ -1193,7 +1193,14 @@ export function reviewRecordWellFormed(record = {}) {
     if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
     // See VERIFIED_REVIEWER_SINCE: an unverified claim clears only where
     // verification was impossible by construction, and says why it was.
-    if (at >= VERIFIED_REVIEWER_SINCE && authorship.status === 'unverified') {
+    // THE ERA IS THE COMMIT'S, NOT THE ROW'S ALONE (cross-vendor re-review of
+    // point 889): `record.at` is written by the recording hand, so a
+    // hand-edited row could backdate itself past the boundary. A commit's
+    // timestamp is part of its sha — it cannot be moved without changing the
+    // commit — so a row clearing a post-boundary commit answers to the new
+    // rule whatever its own `at` claims.
+    const effectiveAt = Math.max(at, Number(commitAt) || 0)
+    if (effectiveAt >= VERIFIED_REVIEWER_SINCE && authorship.status === 'unverified') {
       if (modelVendor(record.model) !== 'openai') return false
       if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
     }
@@ -1290,7 +1297,7 @@ export function evaluateMechanismReview({
     // standard from the day the recorder began demanding it (see
     // MODE_REQUIRED_SINCE): a row of that era naming no usable mode can only
     // have arrived by hand.
-    const rowWellFormed = reviewRecordWellFormed
+    const rowWellFormed = (r) => reviewRecordWellFormed(r, { commitAt: commit.at })
     const wellFormed = covering.filter(rowWellFormed)
     // A MALFORMED REFUSAL POISONS, IT DOES NOT VANISH (final-round pass 1,
     // applied to both gates): a covering do-not-merge whose timestamp fails
@@ -1639,6 +1646,12 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       }
       if (problem === 'no-count') {
         return `      ${who} merged the union, but the record carries no count of it — a merge nobody counted`
+      }
+      if (problem === 'unverified-halves') {
+        return (
+          '      the record names half authors the repository does not confirm — ' +
+          'a claim the committed halves cannot back clears nothing'
+        )
       }
       return (
         `      the union was merged by ${who}, which wrote one of the two lists — ` +

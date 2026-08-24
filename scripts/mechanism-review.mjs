@@ -131,29 +131,82 @@ export function committedHalfModel(path) {
   }
 }
 
-/** Is a ledger row's halfAuthors claim BACKED BY THE REPOSITORY? The ledger is
- *  hand-editable, so the two names alone are not evidence: each named source
- *  must be a tracked, clean artefact whose COMMITTED model field says exactly
- *  what the row claims. The gate poisons a claim this cannot confirm. */
-export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel } = {}) {
+/** A checkout path as the repository spells it — relative to REPO_ROOT. */
+export function repoRelative(path) {
+  const raw = String(path ?? '').trim()
+  if (!raw) return ''
+  const rel = relative(REPO_ROOT, resolvePath(REPO_ROOT, raw))
+  return !rel || rel.startsWith('..') ? raw : rel.split('\\').join('/')
+}
+
+/** The committed blob oid at a path, or '' when HEAD carries none. */
+export function committedOid(path) {
+  try {
+    const rel = repoRelative(path)
+    if (!rel) return ''
+    return git(['rev-parse', `HEAD:${rel}`])
+  } catch {
+    return ''
+  }
+}
+
+/** The bytes of one committed blob, by oid — content-addressed, so the answer
+ *  is the same from every checkout that has the object. Null when absent. */
+export function committedBlobText(oid) {
+  try {
+    const id = String(oid ?? '').trim()
+    if (!/^[0-9a-f]{40}$/i.test(id)) return null
+    return git(['cat-file', 'blob', id])
+  } catch {
+    return null
+  }
+}
+
+/** Is a ledger row's fold claim BACKED BY THE REPOSITORY? The ledger is
+ *  hand-editable, so none of its strings are evidence on their own. The row
+ *  names the exact blobs it counted — two halves and the union — and this
+ *  RE-PERFORMS the count from those committed bytes (cross-vendor re-review of
+ *  point 889: checking only that each path's current committed model matched
+ *  meant a hand-edited row could point at unrelated files with suitable model
+ *  fields, and neither the union nor the accounting was bound to anything).
+ *  Verified now means: the halves' committed model fields say what the row
+ *  claims, the union's committed mergedBy says what the row claims, the
+ *  recomputed accounting balances and reproduces the recorded receipt, and the
+ *  named paths still carry those exact blobs. The gate poisons anything less. */
+export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committedHalf = committedHalfModel, blobText = committedBlobText } = {}) {
   const authors = Array.isArray(record?.halfAuthors) ? record.halfAuthors : []
   const sources = Array.isArray(record?.halfSources) ? record.halfSources : []
   const blobs = Array.isArray(record?.halfBlobs) ? record.halfBlobs : []
-  // THE OID IS THE BINDING, THE PATH IS ONLY WHERE TO LOOK (cross-vendor review
-  // of point 889). Checking the path's current committed model alone verifies
-  // that SOME committed JSON there names the right model — so a hand-edited row
-  // could point at unrelated files whose model fields happen to match, and a row
-  // that was true would silently stay "verified" after the halves at those paths
-  // were replaced. The record names the exact blobs the fold counted; the file
-  // standing at the path today has to still be one of them.
   if (authors.length !== 2 || sources.length !== 2 || blobs.length !== 2) return false
-  return sources.every((src, i) => {
+  const anchored = sources.every((src, i) => {
     if (!isTracked(src)) return false
     const committed = committedHalf(src)
     if (committed === null) return false
     if (committed.oid !== String(blobs[i] ?? '').trim()) return false
     return sameModel(committed.model, authors[i])
   })
+  if (!anchored) return false
+  // The fold itself, recomputed from the committed bytes the row names.
+  const unionBlob = String(record?.unionBlob ?? '').trim()
+  if (!unionBlob) return false
+  const texts = [blobs[0], blobs[1], unionBlob].map((oid) => blobText(oid))
+  if (texts.some((t) => t === null)) return false
+  let a, b, union
+  try {
+    a = parseListText('A', texts[0])
+    b = parseListText('B', texts[1])
+    union = JSON.parse(texts[2])
+  } catch {
+    return false
+  }
+  if (!sameModel(a.model, authors[0]) || !sameModel(b.model, authors[1])) return false
+  const declaredMerger = String(record?.mergedBy ?? '').trim()
+  const unionMerger = Array.isArray(union) ? '' : String(union?.mergedBy ?? '').trim()
+  if (declaredMerger && unionMerger && !sameModel(declaredMerger, unionMerger)) return false
+  if (!validateInputs(a, b).ok) return false
+  const result = accountUnion({ a, b, union })
+  if (!result.ok) return false
+  return summaryLine(result) === String(record?.accounting ?? '').trim()
 }
 
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
@@ -161,7 +214,28 @@ export function verifyHalfAuthors(record, { isTracked = isTrackedInGit, committe
  *  A row claiming half authors is STAMPED with whether the repository confirms
  *  the claim (`halfAuthorsVerified`), because the merge gate must never trust
  *  two hand-editable strings to bypass the self-merge fence. */
-export function readRecords(path = RECORDS_PATH, { verifyHalves = verifyHalfAuthors } = {}) {
+/** Re-check a recorded AGREEMENT against the transcript it names, where that
+ *  transcript still exists. The two model strings in a ledger row are
+ *  hand-editable; the transcript is the evidence they quote. A contradiction
+ *  DOWNGRADES the row to disagreement, which the gate refuses; a transcript
+ *  that has expired keeps the recorded reading — the ledger outlives the
+ *  transcripts, and rotting every old review into a refusal would punish age,
+ *  not forgery. The remaining gap — a claim naming a transcript that never
+ *  existed — is work-order point 880's. */
+export function reverifyReviewerAgreement(record, { check = checkAuthorshipFile } = {}) {
+  const claim = record?.reviewerAuthorship
+  if (!claim || claim.status !== 'agreement') return claim
+  if (!claim.transcript || claim.artefactAt == null) return claim
+  const fresh = check({
+    claimedModel: claim.claimedModel,
+    artefactAt: claim.artefactAt,
+    transcriptPath: claim.transcript,
+  })
+  if (fresh.status !== 'disagreement') return claim
+  return { ...claim, status: 'disagreement', actualModel: fresh.actualModel, reason: fresh.reason }
+}
+
+export function readRecords(path = RECORDS_PATH, { verifyHalves = verifyHalfAuthors, reverifyReviewer = reverifyReviewerAgreement } = {}) {
   // No checkout, no ledger — an empty history, not another tree's file.
   if (!path) return []
   let text = ''
@@ -191,6 +265,7 @@ export function readRecords(path = RECORDS_PATH, { verifyHalves = verifyHalfAuth
         if (Array.isArray(rec.halfAuthors) && rec.halfAuthors.length) {
           rec.halfAuthorsVerified = verifyHalves(rec) === true
         }
+        if (rec.reviewerAuthorship) rec.reviewerAuthorship = reverifyReviewer(rec)
         out.push(rec)
       }
     } catch {
@@ -286,6 +361,7 @@ export function buildRecord({
   countUnion = countUnionFiles,
   isTracked = isTrackedInGit,
   committedHalf = committedHalfModel,
+  committedUnion = committedOid,
   fableState,
 } = {}) {
   // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
@@ -382,6 +458,11 @@ export function buildRecord({
   /** …and the COMMITTED blob oids the authors were read from, so a later
    *  reader can re-derive the exact evidence instead of trusting two strings. */
   let halfBlobs = []
+  /** The union the count actually read, as a committed blob too: the receipt is
+   *  only re-derivable when all three inputs of the fold are content-addressed
+   *  (cross-vendor re-review of point 889). */
+  let unionSource = ''
+  let unionBlob = ''
   if (missing.length < paths.length) {
     if (missing.length) {
       return { ok: false, errors: [`counting the union needs all three files; missing ${missing.join(' and ')}`] }
@@ -402,10 +483,24 @@ export function buildRecord({
     const contradicted = untracked.length || uncommitted.length
       ? []
       : [listAPath, listBPath].filter((_, i) => !sameModel(committed[i].model, counted.halfAuthors[i]))
-    if (counted.halfAuthors?.length === 2 && !untracked.length && !uncommitted.length && !contradicted.length) {
+    // The union answers to the same standard as the halves: committed, or the
+    // receipt cannot be re-derived by anyone later.
+    const unionCommitted = isTracked(unionPath) ? committedUnion(unionPath) : ''
+    if (
+      counted.halfAuthors?.length === 2 &&
+      !untracked.length &&
+      !uncommitted.length &&
+      !contradicted.length &&
+      unionCommitted
+    ) {
       halfAuthors = committed.map((c) => c.model)
-      halfSources = [listAPath, listBPath]
+      // REPO-RELATIVE, whatever the caller typed: an absolute path is only valid
+      // in the checkout that recorded it, and the ledger travels (cross-vendor
+      // re-review of point 889).
+      halfSources = [listAPath, listBPath].map((path) => repoRelative(path))
       halfBlobs = committed.map((c) => c.oid)
+      unionSource = repoRelative(unionPath)
+      unionBlob = unionCommitted
     } else if (mode === BLIND_PARALLEL) {
       // A FAILED PROOF IS A REFUSAL, NOT A SHRUG (cross-vendor review of point
       // 889). The caller handed over the three files precisely so the halves
@@ -426,6 +521,9 @@ export function buildRecord({
           `${path} was counted as "${counted.halfAuthors[i]}" but the committed blob says ` +
             `"${committed[i].model}" — the count read bytes no commit carries`,
         )
+      }
+      if (!untracked.length && !uncommitted.length && !contradicted.length && !unionCommitted) {
+        why.push(`${unionPath} (the union) is not a tracked, clean committed artefact — the receipt could not be re-derived`)
       }
       return {
         ok: false,
@@ -583,7 +681,7 @@ export function buildRecord({
       // the merger committed its own union — so a merge accepted here would be
       // condemned as a self-merge on the next read (four-eyes finding on this
       // change). The sources travel with it so the claim stays checkable.
-      ...(halfAuthors.length === 2 ? { halfAuthors, halfSources, halfBlobs } : {}),
+      ...(halfAuthors.length === 2 ? { halfAuthors, halfSources, halfBlobs, unionSource, unionBlob } : {}),
       // The count itself, so the ledger holds the receipt and not only the claim
       // — and WHERE it came from: `computed` was measured from the files here,
       // `stated` was typed by whoever ran the merge.
@@ -705,6 +803,24 @@ export function buildCarriedRecord({
   }
   if (errors.length) return { ok: false, errors }
   const src = sources.reduce((x, y) => (Number(y.at ?? 0) >= Number(x.at ?? 0) ? y : x))
+  // A CARRY IS WRITTEN ONLY IF THE GATE WILL COMPOSE IT (cross-vendor re-review
+  // of point 889): the carried row clears a NEW commit, so it answers to the
+  // commit-era reviewer rule. Copying an unverified Anthropic identity forward
+  // would report "recorded" for a row the gate then refuses — silent debt. Such
+  // a pass is reviewed fresh instead; the identity of the fresh reviewer can be
+  // proven, the legacy one's cannot.
+  const copiedAuthorship = src.reviewerAuthorship ?? {
+    status: 'unverified',
+    claimedModel: String(src.model).trim(),
+    reason: 'the source review predates transcript-backed authorship records',
+  }
+  if (copiedAuthorship.status !== 'agreement' && modelVendor(src.model) !== 'openai') {
+    errors.push(
+      `--carried-from: the source pass by "${src.model}" carries no verified reviewer identity, and a row ` +
+        'clearing a new commit may not copy an unverifiable Anthropic-vendor claim forward — review these files fresh',
+    )
+    return { ok: false, errors }
+  }
   const copiedEvidence = `CARRIED from ${source.sha.slice(0, 7)} (blobs verified identical): ${String(src.evidence ?? '').trim()}`
   const check = validateRecord({
     sha: commit.sha,
@@ -725,11 +841,7 @@ export function buildCarriedRecord({
       subject: commit.subject,
       authoredBy: commit.authoredBy,
       model: String(src.model).trim(),
-      reviewerAuthorship: src.reviewerAuthorship ?? {
-        status: 'unverified',
-        claimedModel: String(src.model).trim(),
-        reason: 'the source review predates transcript-backed authorship records',
-      },
+      reviewerAuthorship: copiedAuthorship,
       verdict: String(src.verdict).trim(),
       evidence: copiedEvidence,
       mode: String(src.mode).trim(),

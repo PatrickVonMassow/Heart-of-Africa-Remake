@@ -151,11 +151,16 @@ if (isMainModule(import.meta.url)) {
     const trackedA = isTrackedInGit(pathA, { content: rawA })
     const trackedB = isTrackedInGit(pathB, { content: rawB })
     const overruled = []
+    /** Which halves carry their author IN THE COMMITTED FILE — the only form the
+     *  count below may believe; a flag is a claim wearing whatever name the
+     *  caller typed. */
+    const modelFromFile = { A: false, B: false }
     for (const [name, list, flag, tracked] of [
       ['a', a, modelA, trackedA],
       ['b', b, modelB, trackedB],
     ]) {
       const stated = String(list.model ?? '').trim()
+      modelFromFile[name.toUpperCase()] = tracked && Boolean(stated)
       if (flag && tracked && stated && !sameModel(flag, stated)) {
         overruled.push(
           `--model-${name} "${flag}" contradicts the tracked half, which says "${stated}" — ` +
@@ -277,6 +282,37 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
+    // THE COUNT IS ONLY RECORDABLE FROM TRACKED HALVES (cross-vendor re-review
+    // of point 889): the union form is the step whose printed record command
+    // feeds the ledger, and validateMerger below judges the merger against
+    // a.model and b.model. For an untracked half those names are the CALLER'S
+    // CLAIM — `--model-b "Fable 5"` on a half Sol actually wrote clears Sol as
+    // merger with no fallback recorded. The prompt form keeps working with
+    // claims (plus the owed framing); the count refuses them, exactly as
+    // mechanism-review.mjs refuses to record a fold whose halves it cannot
+    // prove. README.md's filing rule makes this the normal order anyway: the
+    // halves are committed before the union is counted.
+    const unproven = [
+      ['A', pathA, trackedA],
+      ['B', pathB, trackedB],
+    ].filter(([name, , tracked]) => !tracked || !modelFromFile[name])
+    if (unproven.length) {
+      console.error('blind-merge: the count decides who may merge, so it reads only PROVEN halves.\n')
+      for (const [name, path, tracked] of unproven) {
+        console.error(
+          !tracked
+            ? `  ✗ list ${name} (${path}) is not a tracked, clean repository artefact — its author ` +
+                'field is whatever the caller wrote, and the merger may not be judged against a claim'
+            : `  ✗ list ${name} (${path}) is tracked but carries no model field of its own — ` +
+                'a --model flag is a claim, and the merger may not be judged against a claim',
+        )
+      }
+      console.error(
+        '\nFile both halves under docs/four-eyes/ — JSON, each with its model field, in the same commit ' +
+          'as the union (docs/four-eyes/README.md) — then count.',
+      )
+      process.exit(1)
+    }
     const rawU = readJson(pathU)
     // The union may name its own merger; the flag wins, and whichever is used is
     // the one validated AND the one printed below (four-eyes review: the printed

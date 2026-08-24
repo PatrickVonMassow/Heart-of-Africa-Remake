@@ -22,15 +22,20 @@ const write = (name, value) => {
   return p(name)
 }
 
-/** Run the command; never throws — the exit code is what is under test. */
+/** Run the command; never throws — the exit code is what is under test. The
+ *  cwd is the sandbox repository, so the tracked-half check answers about the
+ *  sandbox's commits rather than the live checkout's. */
 const runWith = (switchFile, ...args) => {
+  const env = { ...process.env, FABLE_SWITCH_FILE: switchFile }
+  delete env.HOA_REPO_ROOT
   try {
     return {
       status: 0,
       out: execFileSync(process.execPath, [CLI, ...args], {
         encoding: 'utf8',
         windowsHide: true,
-        env: { ...process.env, FABLE_SWITCH_FILE: switchFile },
+        cwd: dir,
+        env,
       }),
     }
   } catch (e) {
@@ -40,8 +45,19 @@ const runWith = (switchFile, ...args) => {
 const run = (...args) => runWith(switchOn, ...args)
 const runOff = (...args) => runWith(switchOff, ...args)
 
+/** The sandbox repository the count-form halves are committed into. */
+const git = (...args) =>
+  execFileSync('git', args, {
+    windowsHide: true,
+    cwd: dir,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
+  }).trim()
+
 beforeAll(() => {
   dir = mkdtempSync(join(tmpdir(), 'hoa-blind-merge-'))
+  git('init', '-q')
+  git('config', 'core.autocrlf', 'false')
   switchOn = write('fable-on.json', writeState('on', { why: 'test capacity restored', by: 'test', now: 1 }))
   switchOff = write('fable-off.json', writeState('off', { why: 'test capacity exhausted', by: 'test', now: 1 }))
   write('A.json', {
@@ -51,6 +67,21 @@ beforeAll(() => {
       { id: 'A2', file: 'src/ui/hud.tsx', defect: 'the health badge overlaps the date' },
     ],
   })
+  // The counted form of half B: tracked JSON carrying its own model field. The
+  // line form (B.txt) stays for the PROMPT step, whose claims never feed a record.
+  write('B.json', {
+    model: 'GPT-5.6 Sol',
+    entries: [{ id: 'B1', file: 'src/ui/hud.tsx', defect: 'the affliction badge sits on the date' }],
+  })
+  // A committed half authored by the Claude family, for the merger-exclusion cases.
+  write('claude-a.json', {
+    model: 'Claude Opus 5',
+    entries: [{ id: 'A1', file: 'src/ui/hud.tsx', defect: 'the health badge overlaps the date' }],
+  })
+  // A committed line-form half: tracked, but its author still only claimable.
+  write('tracked-b.txt', ['- B1 | src/ui/hud.tsx | the affliction badge sits on the date', 'VERDICT: merge'].join('\n'))
+  git('add', 'A.json', 'B.json', 'claude-a.json', 'tracked-b.txt')
+  git('commit', '-q', '-m', 'File the blind halves')
   write('B.txt', ['- B1 | src/ui/hud.tsx | the affliction badge sits on the date', 'VERDICT: merge'].join('\n'))
   write('U.json', {
     mergedBy: 'Fable 5',
@@ -71,12 +102,12 @@ beforeAll(() => {
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('the command', () => {
-  /** The line form carries no author, so the flag names it. A function, not a
-   *  constant: the temp dir only exists once beforeAll has run. */
-  const counted = () => ['--union', p('U.json'), '--model-b', 'GPT-5.6 Sol']
+  /** The count reads only committed halves, so B is the tracked JSON half. A
+   *  function, not a constant: the temp dir only exists once beforeAll has run. */
+  const counted = () => ['--union', p('U.json')]
 
   it('exits 0 on a union that accounts for every entry, and prints the record command', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Fable 5')
+    const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted(), '--merged-by', 'Fable 5')
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/every input entry accounted for/)
     expect(r.out).toMatch(/--merged-by "Fable 5"/)
@@ -85,16 +116,25 @@ describe('the command', () => {
 
   it('takes the merger from the union file when the flag is absent — and echoes THAT name', () => {
     // It used to validate the union's name and then print --merged-by "".
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted())
+    const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted())
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/--merged-by "Fable 5"/)
     expect(r.out).not.toMatch(/--merged-by ""/)
   })
 
-  it('EXITS 1 WHEN A LIST NAMES NO AUTHOR — the merger could not be checked against it', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Fable 5')
-    expect(r.status).toBe(1)
-    expect(r.out).toMatch(/list B names no model/)
+  it('EXITS 1 WHEN A HALF CANNOT PROVE ITS AUTHOR — untracked, or tracked without a model field', () => {
+    // An untracked half is caller-written; a tracked line-form half is committed
+    // but still names nobody, and a --model flag on it is a claim. Both used to
+    // reach the count (cross-vendor re-review of point 889: with one half
+    // untracked and mislabelled, the actual author was selected as merger with
+    // no fallback recorded).
+    const untracked = run('--a', p('A.json'), '--b', p('B.txt'), '--union', p('U.json'), '--merged-by', 'Fable 5')
+    expect(untracked.status).toBe(1)
+    expect(untracked.out).toMatch(/list B .*not a tracked, clean repository artefact/)
+    const claimed = run('--a', p('A.json'), '--b', p('tracked-b.txt'), '--model-b', 'GPT-5.6 Sol', '--union', p('U.json'), '--merged-by', 'Fable 5')
+    expect(claimed.status).toBe(1)
+    expect(claimed.out).toMatch(/list B .*tracked but carries no model field/)
+    expect(claimed.out).toMatch(/may not be judged against a claim/)
   })
 
   it('refuses when a claimed list author contradicts per-message transcript metadata', () => {
@@ -142,11 +182,9 @@ describe('the command', () => {
       '--a',
       p('A.json'),
       '--b',
-      p('B.txt'),
+      p('B.json'),
       '--union',
       p('U-dropped.json'),
-      '--model-b',
-      'GPT-5.6 Sol',
       '--merged-by',
       'Fable 5',
     )
@@ -157,7 +195,7 @@ describe('the command', () => {
   })
 
   it('refuses a merger that contradicts the switch', () => {
-    const r = run('--a', p('A.json'), '--b', p('B.txt'), ...counted(), '--merged-by', 'Opus 5')
+    const r = run('--a', p('A.json'), '--b', p('B.json'), ...counted(), '--merged-by', 'Opus 5')
     expect(r.status).toBe(1)
     expect(r.out).toMatch(/is not the one this stage owes/)
   })
@@ -167,7 +205,7 @@ describe('the command', () => {
       '--a',
       p('A.json'),
       '--b',
-      p('B.txt'),
+      p('B.json'),
       ...counted(),
       '--merged-by',
       'Opus 5',
@@ -185,8 +223,7 @@ describe('the command', () => {
     // no provable author. Requiring BOTH halves to be tracked used to discard
     // that knowledge — the known author could be selected as merger under a
     // printed "it wrote neither half".
-    const trackedA = join(dirname(CLI), '..', 'docs', 'four-eyes', '676-blind-a-opus5.json')
-    const r = run('--a', trackedA, '--b', p('B.txt'), '--model-b', 'GPT-5.6 Sol')
+    const r = run('--a', p('claude-a.json'), '--b', p('B.txt'), '--model-b', 'GPT-5.6 Sol')
     expect(r.status).toBe(0)
     expect(r.out).toMatch(/MERGING MODEL — /)
     // The known author of the tracked half is excluded from the selection.
@@ -211,7 +248,7 @@ describe('the command', () => {
     expect(prompt.out).toContain('DECORRELATED MERGE FRAMING')
 
     const countedOff = runOff(
-      '--a', p('A.json'), '--b', p('B.txt'), '--union', p('U-sol.json'), '--model-b', 'GPT-5.6 Sol',
+      '--a', p('A.json'), '--b', p('B.json'), '--union', p('U-sol.json'),
     )
     expect(countedOff.status).toBe(0)
     expect(countedOff.out).toContain('WEAKER TWO-MODEL fallback')
@@ -225,8 +262,7 @@ describe('the command', () => {
     // temp file naming nobody, so the merger Sol matches no author at all — and
     // the command still printed "it wrote a half itself — the recorded two-model
     // fallback" merely because the switch was off.
-    const trackedA = join(dirname(CLI), '..', 'docs', 'four-eyes', '676-blind-a-opus5.json')
-    const r = runOff('--a', trackedA, '--b', p('B.txt'))
+    const r = runOff('--a', p('claude-a.json'), '--b', p('B.txt'))
     expect(r.status).toBe(0)
     expect(r.out).toContain('MERGING MODEL — GPT-5.6 Sol')
     expect(r.out).not.toContain('it wrote a half itself')
