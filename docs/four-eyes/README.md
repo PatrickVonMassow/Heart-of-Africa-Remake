@@ -18,6 +18,17 @@ authors that leave itself untainted. Tracking does not make a half unforgeable. 
 makes a forgery a commit somebody can read, which is the same footing as every other
 claim in the ledger.
 
+**And the `model` field is still only a claim — its durable backing is a tracked
+provenance record.** Authorship is established by the metadata of the messages that
+produced the text, which lives in unversioned transcripts and can be deleted. The rule
+is therefore two-part: an UNCONTESTED half is filed in the same commit by the session
+that produced it, so the commit's own trailer corroborates the field; a CONTESTED or
+after-the-fact label is settled only by a provenance record filed HERE that quotes the
+producing-message metadata verbatim (model id, line, timestamp, tool-call id), the way
+`676-provenance.md` does for half A. Once quoted into a tracked record, the reading
+survives transcript deletion; a `model` field that neither route backs does not decide
+the merger question.
+
 ## Counting a union against its halves
 
     node scripts/blind-merge.mjs --a docs/four-eyes/<stage>-blind-a-<model>.json \
