@@ -1327,7 +1327,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 07:41 · Quellen-Fingerprint: `dfcc09109371…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 08:28 · Quellen-Fingerprint: `66ed1f40bca1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1423,10 +1423,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 93 Prozess-/Meta-TASKS-Punkte (davon 36 offen).
+Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 95 Prozess-/Meta-TASKS-Punkte (davon 38 offen).
 
-<!-- RETRO-FINGERPRINT: dfcc091093717c3679d5d8f0acdafde0f044343c4e7effe58c8b07054ce0cb38 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T05:41:34.648Z -->
+<!-- RETRO-FINGERPRINT: 66ed1f40bca14685f084b21d1b2f953c6a34913da2c8fd45a4d2c99b474fb6b1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T06:28:06.060Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2384,6 +2384,28 @@ verdrahtet gelesen worden wäre. Die Auflösung war der Name: Das Modul ist kein
 sondern die Grenze des Prüflaufs selbst — und heißt jetzt so. **Zusatzlehre:** Wenn ein Register
 ein Ding falsch einordnet, ist die erste Frage, ob das Ding richtig benannt ist, und erst die
 zweite, ob das Register mehr lernen muss.
+
+### 3.171 Dieselbe Klasse, zweimal an einem Tag — und der Punkt lag schon im Auftragsbuch
+
+Am 24.08.2026, wenige Stunden nachdem Punkt 873 die Divergenz zwischen Vorschau und Tor
+aufgeschrieben hatte, lief die Nachfolgesitzung ungebremst hinein: `guard-preflight` meldete den
+Mechanismus-Wächter als blockierend, die Sitzung nahm das für eine Forderung, plante 64
+Gegenlese-Pässe über 13,8 M Zeichen und arbeitete elf davon ab — bis sie beim Anhängen neuer Punkte
+über den Text von 873 stolperte und das Tor selbst befragte. Das Tor urteilte »Lesbarkeitslücke«
+und ließ den Zug durch; verlangt hatte niemand etwas.
+
+Bemerkenswert ist nicht der Fehler der Vorschau, der stand schon geschrieben. Bemerkenswert ist,
+dass ein gemessener, im Auftragsbuch stehender Befund eine Sitzung nicht erreicht, weil er dort
+steht, wo sie nicht liest: 273 offene Punkte tief. **Lehre:** Ein Befund über ein WERKZEUG, das
+jede Sitzung benutzt, gehört an das Werkzeug — als Warnzeile in seiner eigenen Ausgabe —, nicht
+allein in die Warteschlange. Solange 873 offen ist, muss `guard-preflight` in der betroffenen Zeile
+selbst sagen, dass sie mit dem Tor uneins sein kann und wie man das Tor fragt.
+
+**Zweite Lehre, gegen die erste gehalten:** Die elf Pässe waren keine verlorene Zeit — sie fanden
+sieben belegte Defekte, darunter fünf Wege, eine Vier-Augen-Pflicht ohne zweite Augen zu erfüllen,
+und einen Zaun, den eine Sitzung ohne Sperre umgeht. Unverlangte Arbeit ist nicht automatisch
+wertlose Arbeit. Aber sie war unverlangt, und das entscheidet die nächste Sitzung nur dann richtig,
+wenn das Werkzeug es ihr sagt.
 
 ### 3.147 Der Wächter urteilte richtig und gab falsch Auskunft — gefragt wird nur die Auskunft
 

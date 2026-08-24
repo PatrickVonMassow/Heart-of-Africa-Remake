@@ -612,11 +612,65 @@
       "origin": "machine",
       "place": "last"
     },
-    "874": {
-      "at": "2026-08-24T03:45:06.345Z",
-      "why": "Die Lebendmessung irrt in Richtung 'tote Bahn lebt' und verbietet dem Nachfolger ausdruecklich den Neustart — waehrend des Release-Laufs wuerde ein gestorbener Autorenlauf als arbeitend gemeldet, und der Zweig, den sie repariert, steht ohnehin vorn",
+    "875": {
+      "at": "2026-08-24T06:26:44.960Z",
+      "why": "An environment fault stops every commit, but the switch file is repaired without one — it waits behind the fences that protect main.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "876": {
+      "at": "2026-08-24T06:26:45.034Z",
+      "why": "It clears a dead enforcer, which is severe, but no enforcer is known to be dead today — it waits behind the two fences that are demonstrably open.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "877": {
+      "at": "2026-08-24T06:26:45.113Z",
+      "why": "It misorders the release queue in both directions and loses no work; 883 is its other half and waits with it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "878": {
+      "at": "2026-08-24T06:26:45.188Z",
+      "why": "It needs a lock collision inside a thirty-second window to bite, and the CI failure still arrives by mail from the workflow itself.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "879": {
+      "at": "2026-08-24T06:26:51.714Z",
+      "why": "A session holding no batch lock can move refs/heads/main today — the release is cut on main, so the fence has to hold before the cut, not after it.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "880": {
+      "at": "2026-08-24T06:26:51.791Z",
+      "why": "It is the gate the release's own four-eyes evidence rests on: every review recorded until it is fixed may be a self-review, so a release cut before it carries unprovable clearance.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "881": {
+      "at": "2026-08-24T06:26:45.274Z",
+      "why": "The fence defaults to observe and refuses nothing; it must be settled before its arming point lands, not before the queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "882": {
+      "at": "2026-08-24T06:26:45.350Z",
+      "why": "It only bites for a document somebody deleted or mis-keyed, and the guard reports every document it did measure.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "883": {
+      "at": "2026-08-24T06:26:45.423Z",
+      "why": "The other half of 877; both are queue ordering, which costs attention rather than work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "884": {
+      "at": "2026-08-24T06:26:45.501Z",
+      "why": "One fuse dated at point 1000 and one half-covered assertion — nothing bites at 884.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -664,7 +718,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T03:45:06.354Z",
+    "at": "2026-08-24T06:26:51.799Z",
     "points": [
       174,
       184,
@@ -929,7 +983,16 @@
       871,
       872,
       873,
-      874
+      875,
+      876,
+      877,
+      878,
+      879,
+      880,
+      881,
+      882,
+      883,
+      884
     ]
   }
 }

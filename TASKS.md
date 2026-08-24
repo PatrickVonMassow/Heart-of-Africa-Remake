@@ -245,6 +245,86 @@ put it is the mistake this line exists to stop.
   here loses work rather than merely slowing it.
   Bundle: unbundled (batch autonomy).
 
+- [ ] 879. `--help` and eight git subcommands walk straight through the main-write fence. MEASURED
+  24.08.2026 by the cross-vendor review of `fc64b34` (recorded `do-not-merge`), every case run
+  through the pure classifier:
+  (1) `scripts/command-classify-core.mjs:555` returns `read` for any segment carrying `--help`,
+  BEFORE the `MUTATING_SCRIPTS` check at `:572` — and `scripts/land-point.mjs:587-594` parses only
+  the numeric argument and its named flags, ignoring `--help` entirely. So
+  `node scripts/land-point.mjs 594 --model "…" --help` classifies as read-only while performing the
+  real merge, tick and push: `board-first-core.mjs:151` demands no board for it and
+  `batch-lease-core.mjs:783` reports `writes:false`, so a session holding NO batch lock passes the
+  fence. The module's own invariant at `:607` says the judgement is by NAME, not by flags; the test
+  at `command-classify-core.test.mjs:462` pins that for `--dry` alone.
+  (2) `:462-465` `GIT_WRITES` omits every ref-moving subcommand. Measured as NOT mutating:
+  `git pull --rebase origin main`, `git fetch --prune`, `git update-ref refs/heads/main <sha>`,
+  `git branch feat/x`, `git branch -f main <sha>` (the flag list at `:490` has no `-f/--force`),
+  `git gc --prune=now`, `git submodule update --init`, `git symbolic-ref HEAD refs/heads/x`. A
+  lockless session may therefore move `refs/heads/main` in the main checkout — the exact class the
+  rule exists for, which its own test proves only for `git commit`.
+  (3) Three lexer gaps: `:539-546` rejects any redirection operator ending in `&`, so
+  `node gen.mjs >& all.log` is a read while `&> all.log` is a write; process substitution is not
+  unwrapped, so `diff <(git push) x` hides a push; and a here-document BODY is lexed as commands,
+  so a board or chat text that quotes `git push origin main` inside a heredoc denies the call —
+  the over-block direction the header forbids at `:22`.
+  WHAT IT COSTS: this module answers "does this call write" for the fence, the board gate and the
+  context fence at once. (1) and (2) are holes in the lockless-main rule; (3) costs turns on quoted
+  text, which is what that rule was written to stop.
+  FINAL STATE: the mutating-script rule outranks `--help`, or `--help` is judged only for scripts
+  that actually implement it. `GIT_WRITES` covers every subcommand that can move a ref or rewrite
+  the object store. Redirection with `&`, process substitution and here-document bodies are lexed
+  correctly, with quoted text never deciding.
+  VERIFIABLE: unit cases for each measured string above, in both directions.
+  Criticality: high — a lockless session may move main.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 880. The four-eyes duty can be cleared without an independent review, five measured ways.
+  MEASURED 24.08.2026 by the cross-vendor review of `1862687` and `e0ebcff` (both recorded
+  `do-not-merge`), each route executed against `evaluateMechanismReview`/`validateRecord`:
+  (1) `scripts/mechanism-review-core.mjs:1270-1272` (and `validateRecord` at `:1081`) — the
+  ordinary, PASS-LESS path, which is the one the guard's own refusal text tells you to run, checks
+  only `sameModel(record.model, commit.authorModel)`: no vendor rule, only the FIRST co-author, no
+  unknown-authorship rule. So `--model "GPT-5.6"` clears a commit trailed `GPT-5.6 Sol` (different
+  `family`, same vendor); a commit with two model trailers is cleared by its SECOND author; and an
+  unrecognised author designation is cleared by anyone. The strict file-scoped path at `:1285`
+  applies the full test — the legacy path simply does not consult it.
+  (2) `:1285` — `(commit.authorModels ?? [commit.authorModel]).filter(Boolean)` yields `[]` for a
+  commit whose trailers name no model (an empty array is not nullish), so the vendor set is EMPTY
+  and both guards pass: any model, including the author, clears it. The concrete case is the evil
+  merge CLAUDE.md §6 warns about — merges carry no model trailer. `mechanism-review-range-core.mjs:221`
+  gets this right and maps an empty author list to `unknown`, so `--status` prints the file as
+  UNREVIEWABLE while the Stop hook clears it.
+  (3) `:1300-1305` — on the file-scoped path a recorded `do-not-merge` is answered by the newest
+  timestamp alone, with no descent requirement. A `merge` re-recorded at the SAME sha retires the
+  refusal, which contradicts the rule written forty lines below (`:1452-1461`, user decision
+  18.08.2026: a same-sha re-record fixes nothing).
+  (4) `:1279-1314` — every record this CLI writes carries `pass.endState`
+  (`mechanism-review.mjs:372`), and `fileClaim` rows are excluded from both `legacyCovering` and
+  `legacySound`. So the split-completeness demand and the pass-less-beside-a-split poison can no
+  longer fire for ANY new record: one `pass 1/3` row clears the commit while passes 2 and 3 are
+  never recorded. About twenty tests still pin a shape nothing writes.
+  (5) All three era cutoffs key on `record.at` (`:1108`, `:1134-1141`), a field the recording hand
+  controls, and nothing requires a record to postdate the commit it clears — a row dated before
+  `AUTHORSHIP_CHECK_SINCE` clears a commit made today.
+  Plus the baseline: `.claude/mechanism-review-baseline.json` is gitignored (`.gitignore:177`), so a
+  fresh clone, a fresh worktree or a `git clean -xfd` removes it; `bootstrapBase`
+  (`scripts/mechanism-review-guard.mjs:139-155`) then takes `merge-base(main, HEAD)`, which ON MAIN
+  is HEAD — the pending set is empty, the turn clears, and `:630` writes the new baseline at HEAD.
+  All outstanding mechanism debt is grandfathered in one turn, unreported.
+  WHAT IT COSTS: this is the gate the whole model policy rests on. Every route above turns a
+  four-eyes duty into a formality without anybody noticing, and route (4) applies to every record
+  written from now on.
+  FINAL STATE: one identity test, applied on every clearance path — vendor-based, over ALL co-author
+  trailers, treating a commit with no named author as `unknown` and therefore unreviewable. A
+  refusal is answered only by a record whose sha DESCENDS from the refused one. A split records its
+  own completeness. A record may not predate the commit it clears. The baseline is either tracked or
+  its absence is reported and refuses to clear rather than bootstrapping at HEAD.
+  VERIFIABLE: unit cases for each of the five measured routes and for the baseline bootstrap on
+  main; and the file-scoped branch gets tests at all — the suite currently contains no occurrence of
+  `endState`.
+  Criticality: high — it is the gate that makes every other model rule enforceable.
+  Bundle: Modell & Wächter.
+
 - [ ] 848. The board can freeze for hours while a single-turn batch session works, because every
   currency mechanism bites only at a turn end. MEASURED 23.08.2026 ~05:00: the board's last
   publish was 02:30 (the point-720 boundary card "Übergabe an eine frische Sitzung"); the
@@ -11677,86 +11757,6 @@ to land than a mechanism that needs a review.
   token, an offline host and a non-200.
   Criticality: high — it drops a decided red on an environment fault.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 879. `--help` and eight git subcommands walk straight through the main-write fence. MEASURED
-  24.08.2026 by the cross-vendor review of `fc64b34` (recorded `do-not-merge`), every case run
-  through the pure classifier:
-  (1) `scripts/command-classify-core.mjs:555` returns `read` for any segment carrying `--help`,
-  BEFORE the `MUTATING_SCRIPTS` check at `:572` — and `scripts/land-point.mjs:587-594` parses only
-  the numeric argument and its named flags, ignoring `--help` entirely. So
-  `node scripts/land-point.mjs 594 --model "…" --help` classifies as read-only while performing the
-  real merge, tick and push: `board-first-core.mjs:151` demands no board for it and
-  `batch-lease-core.mjs:783` reports `writes:false`, so a session holding NO batch lock passes the
-  fence. The module's own invariant at `:607` says the judgement is by NAME, not by flags; the test
-  at `command-classify-core.test.mjs:462` pins that for `--dry` alone.
-  (2) `:462-465` `GIT_WRITES` omits every ref-moving subcommand. Measured as NOT mutating:
-  `git pull --rebase origin main`, `git fetch --prune`, `git update-ref refs/heads/main <sha>`,
-  `git branch feat/x`, `git branch -f main <sha>` (the flag list at `:490` has no `-f/--force`),
-  `git gc --prune=now`, `git submodule update --init`, `git symbolic-ref HEAD refs/heads/x`. A
-  lockless session may therefore move `refs/heads/main` in the main checkout — the exact class the
-  rule exists for, which its own test proves only for `git commit`.
-  (3) Three lexer gaps: `:539-546` rejects any redirection operator ending in `&`, so
-  `node gen.mjs >& all.log` is a read while `&> all.log` is a write; process substitution is not
-  unwrapped, so `diff <(git push) x` hides a push; and a here-document BODY is lexed as commands,
-  so a board or chat text that quotes `git push origin main` inside a heredoc denies the call —
-  the over-block direction the header forbids at `:22`.
-  WHAT IT COSTS: this module answers "does this call write" for the fence, the board gate and the
-  context fence at once. (1) and (2) are holes in the lockless-main rule; (3) costs turns on quoted
-  text, which is what that rule was written to stop.
-  FINAL STATE: the mutating-script rule outranks `--help`, or `--help` is judged only for scripts
-  that actually implement it. `GIT_WRITES` covers every subcommand that can move a ref or rewrite
-  the object store. Redirection with `&`, process substitution and here-document bodies are lexed
-  correctly, with quoted text never deciding.
-  VERIFIABLE: unit cases for each measured string above, in both directions.
-  Criticality: high — a lockless session may move main.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 880. The four-eyes duty can be cleared without an independent review, five measured ways.
-  MEASURED 24.08.2026 by the cross-vendor review of `1862687` and `e0ebcff` (both recorded
-  `do-not-merge`), each route executed against `evaluateMechanismReview`/`validateRecord`:
-  (1) `scripts/mechanism-review-core.mjs:1270-1272` (and `validateRecord` at `:1081`) — the
-  ordinary, PASS-LESS path, which is the one the guard's own refusal text tells you to run, checks
-  only `sameModel(record.model, commit.authorModel)`: no vendor rule, only the FIRST co-author, no
-  unknown-authorship rule. So `--model "GPT-5.6"` clears a commit trailed `GPT-5.6 Sol` (different
-  `family`, same vendor); a commit with two model trailers is cleared by its SECOND author; and an
-  unrecognised author designation is cleared by anyone. The strict file-scoped path at `:1285`
-  applies the full test — the legacy path simply does not consult it.
-  (2) `:1285` — `(commit.authorModels ?? [commit.authorModel]).filter(Boolean)` yields `[]` for a
-  commit whose trailers name no model (an empty array is not nullish), so the vendor set is EMPTY
-  and both guards pass: any model, including the author, clears it. The concrete case is the evil
-  merge CLAUDE.md §6 warns about — merges carry no model trailer. `mechanism-review-range-core.mjs:221`
-  gets this right and maps an empty author list to `unknown`, so `--status` prints the file as
-  UNREVIEWABLE while the Stop hook clears it.
-  (3) `:1300-1305` — on the file-scoped path a recorded `do-not-merge` is answered by the newest
-  timestamp alone, with no descent requirement. A `merge` re-recorded at the SAME sha retires the
-  refusal, which contradicts the rule written forty lines below (`:1452-1461`, user decision
-  18.08.2026: a same-sha re-record fixes nothing).
-  (4) `:1279-1314` — every record this CLI writes carries `pass.endState`
-  (`mechanism-review.mjs:372`), and `fileClaim` rows are excluded from both `legacyCovering` and
-  `legacySound`. So the split-completeness demand and the pass-less-beside-a-split poison can no
-  longer fire for ANY new record: one `pass 1/3` row clears the commit while passes 2 and 3 are
-  never recorded. About twenty tests still pin a shape nothing writes.
-  (5) All three era cutoffs key on `record.at` (`:1108`, `:1134-1141`), a field the recording hand
-  controls, and nothing requires a record to postdate the commit it clears — a row dated before
-  `AUTHORSHIP_CHECK_SINCE` clears a commit made today.
-  Plus the baseline: `.claude/mechanism-review-baseline.json` is gitignored (`.gitignore:177`), so a
-  fresh clone, a fresh worktree or a `git clean -xfd` removes it; `bootstrapBase`
-  (`scripts/mechanism-review-guard.mjs:139-155`) then takes `merge-base(main, HEAD)`, which ON MAIN
-  is HEAD — the pending set is empty, the turn clears, and `:630` writes the new baseline at HEAD.
-  All outstanding mechanism debt is grandfathered in one turn, unreported.
-  WHAT IT COSTS: this is the gate the whole model policy rests on. Every route above turns a
-  four-eyes duty into a formality without anybody noticing, and route (4) applies to every record
-  written from now on.
-  FINAL STATE: one identity test, applied on every clearance path — vendor-based, over ALL co-author
-  trailers, treating a commit with no named author as `unknown` and therefore unreviewable. A
-  refusal is answered only by a record whose sha DESCENDS from the refused one. A split records its
-  own completeness. A record may not predate the commit it clears. The baseline is either tracked or
-  its absence is reported and refuses to clear rather than bootstrapping at HEAD.
-  VERIFIABLE: unit cases for each of the five measured routes and for the baseline bootstrap on
-  main; and the file-scoped branch gets tests at all — the suite currently contains no occurrence of
-  `endState`.
-  Criticality: high — it is the gate that makes every other model rule enforceable.
-  Bundle: Modell & Wächter.
 
 - [ ] 881. Armed, the context fence would refuse the very commands that end a session — and on a
   fresh machine it refuses everything. MEASURED 24.08.2026 by the cross-vendor review of `a759962`
