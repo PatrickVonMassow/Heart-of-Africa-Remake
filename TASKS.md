@@ -175,7 +175,11 @@ put it is the mistake this line exists to stop.
   daemon's doubly-recorded existence (890 item (i)).
   IT IS BUILT DARK, AND THE INTERLOCK IS THE POINT: the flag REFUSES to enable while the
   discovery/adoption/reconciliation slice (895) and the drills (834) are not green, and a unit
-  case pins that refusal. Controlling what the board, the brief and the handover ADVERTISE does
+  case pins that refusal. THE CROSS-VENDOR READ OF 890 ADDED A SECOND CASE (24.08.2026, P0): the
+  interlock's precondition is steps 8 and 9, so an enabled lane survives the DEATH of its session
+  and NOT a planned handover — the checkpoint barrier and the two-phase boundary are unbuilt in
+  the remainder of 676. While they are, draining before the boundary is the only permitted mode,
+  and a case pins that an enabled flag demands it. Controlling what the board, the brief and the handover ADVERTISE does
   not control what is SWITCHED ON, which is why the refusal is a mechanism and not a habit.
   FINAL STATE: the schema and invariant core lands with nothing importing it yet, today's
   authoring path untouched, and the flag off and unable to be turned on.
@@ -299,7 +303,10 @@ put it is the mistake this line exists to stop.
   fence store so the drill runs through the REAL acquisition path, and that commit has never been
   read by a reviewer.
   THE SWITCH IS THE LAST ACT, AND IT IS RECORDED: the flag of 891 refuses to enable while 895 and
-  this point are not green. Enabling it is a separate, deliberate step taken after this drill
+  this point are not green. AND IT IS FLIPPED ONLY WITH ITS CONDITION (cross-vendor read of 890,
+  24.08.2026): what an enabled lane delivers is survival of a session DEATH, not a planned
+  handover, so while the checkpoint barrier and the two-phase boundary stand unbuilt in 676 the
+  boundary must DRAIN, and this point switches nothing on until that enforcement is in place. Enabling it is a separate, deliberate step taken after this drill
   passes on main, and it is what first makes the surviving lane something the board, the brief and
   the handover may advertise.
   THE RESIDUALS ARE ADMITTED, NOT SOLVED, and stay recorded as limits in
