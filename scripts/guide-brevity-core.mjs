@@ -84,8 +84,24 @@
 // claim was dropped. The long-form telling stays in the retrospective, where it belongs.
 // Not escalated to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
+// Raised on 24.08.2026 by ONE genuinely new tip, measured at +6 lines / +56 words net:
+// a REFUSAL whose own stated remedy leaves you worse off than the block did. Measured on this
+// project the same day: a Stop guard read a fact about the whole repository out of whichever
+// checkout its process happened to stand in, refused a session that had done nothing wrong, and
+// told it to register the dashboard — which, followed literally in that checkout, would have
+// written a second registration where the dashboard does not even exist (point 898, third
+// sibling). SHORTEN-BEFORE-RAISE was applied twice. First the tip's other half — "reads a
+// project-wide fact in the wrong place" — was FOLDED into the existing "Der Test hing an seiner
+// Umgebung" entry, which already carries that direction for tests; it now names guards too and
+// its prompt carries both, at no extra entry. Then the remaining tip was cut from four risk lines
+// to two, because the failure needs no telling: who follows the remedy is worse off. As first
+// drafted the whole addition cost +8 lines / +89 words; folding and cutting paid back 2 lines and
+// 33 words, and the ceilings move by exactly what is left, with zero slack. No existing claim was
+// dropped. The long-form telling stays in the retrospective and in the work order, where it
+// belongs. Not escalated to the user, under his general withdrawal of ask-before-raising of
+// 10.08.2026; this written justification is the last step.
 export const LIMITS = {
-  maxLines: 452,
+  maxLines: 458,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -233,7 +249,7 @@ export const LIMITS = {
   // retrospective already carries in full (§3.171, §3.172). The guide measures
   // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
   // ceiling stays 444 because the file does.
-  maxWords: 3982,
+  maxWords: 4038,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

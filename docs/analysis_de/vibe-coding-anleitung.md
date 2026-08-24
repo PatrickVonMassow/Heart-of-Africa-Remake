@@ -203,10 +203,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
-- **Der Test hing an seiner Umgebung, nicht am Verhalten.** Er misst dein Repository statt deinen
-  Code und ist nur dort grün, wo er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt** und baut sich seine Voraussetzung
-  **selbst** — wahr wegen des Codes, nie wegen des Checkouts."
+- **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
+  statt deinen Code, oder lesen eine projektweite Angabe aus dem zufälligen Arbeitsverzeichnis —
+  und sind nur dort richtig, wo sie zufällig liefen.
+  → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
+  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -219,6 +220,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz, oder weiter, und sperrt Unbeteiligte.
   → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
+
+- **Die Verweigerung nennt eine Abhilfe, die den Schaden erst anrichtet.** Wer ihr folgt, steht
+  schlechter da als vorher.
+  → *Prompt:* „Prüf jede Verweigerung an dem Ort, an dem sie feuern kann: **Führt ihre eigene
+  Abhilfe dort zum guten Zustand?**"
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -449,4 +455,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 53be52caf8ea1fa161de27d0e81edbd69a8bdc6827272d2d3cc917ede44fed25 -->
+<!-- GUIDE-FINGERPRINT: 18cc48ad6c54d5abbafbab095631ef8853c25f4f89cf938093deba263664cde5 -->
