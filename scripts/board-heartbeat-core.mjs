@@ -76,16 +76,21 @@ export const STALE_AFTER_MS = 10 * 60_000
  *     it — may stamp `now`.
  *   · no record at all — nothing here has ever looked, so nothing bounds the
  *     age. It is UNKNOWN, and the caller must treat that as stale rather than
- *     guess.
+ *     guess. Its `remember` is marked `firstSight`, because writing it down
+ *     would CLAIM the card was current at this moment rather than record that
+ *     it was seen: only a party that just wrote the card may make that claim
+ *     (ninth cross-vendor round). A no-write path must not persist it, or a
+ *     refusal — no focus, or a card the focus disagrees with — would convert an
+ *     unknown age into a fresh one and suppress the first real refresh.
  */
 export function cardAge({ record = null, digest = '', now = 0 } = {}) {
   const seenAt = Number(record?.seenAt)
   if (!record || !record.digest || !Number.isFinite(seenAt)) {
-    return { ageMs: null, remember: { digest, seenAt: now } }
+    return { ageMs: null, remember: { digest, seenAt: now }, firstSight: true }
   }
   const ageMs = now - seenAt
-  if (record.digest !== digest) return { ageMs, remember: { digest, seenAt } }
-  return { ageMs, remember: null }
+  if (record.digest !== digest) return { ageMs, remember: { digest, seenAt }, firstSight: false }
+  return { ageMs, remember: null, firstSight: false }
 }
 
 /** Why a decision came out the way it did. Recorded, so a caller can say what

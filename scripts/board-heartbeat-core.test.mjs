@@ -141,6 +141,10 @@ describe('currency that cannot be proven is not currency', () => {
     const first = cardAge({ record: null, digest: 'a', now: NOW })
     expect(first.ageMs).toBeNull()
     expect(first.remember).toEqual({ digest: 'a', seenAt: NOW })
+    // MARKED, because writing it down would claim the card is current now
+    // rather than record that it was seen (ninth cross-vendor round).
+    expect(first.firstSight).toBe(true)
+    expect(cardAge({ record: { digest: 'a', seenAt: NOW - 1 }, digest: 'b', now: NOW }).firstSight).toBe(false)
 
     // Unchanged since it was recorded: the age is exactly that span.
     const stood = cardAge({ record: { digest: 'a', seenAt: NOW - 90_000 }, digest: 'a', now: NOW })

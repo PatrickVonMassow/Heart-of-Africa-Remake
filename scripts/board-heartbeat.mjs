@@ -202,9 +202,11 @@ export function heartbeat({
       detail,
     })
     if (!decision.refresh) {
-      // Nothing will be written, so what was observed is worth keeping: it is
-      // what bounds this card's age at the next look.
-      if (aged.remember) keep(aged.remember)
+      // Nothing will be written, so a BOUND is worth keeping — it is what ages
+      // this card at the next look. A FIRST SIGHT is not: writing it down would
+      // claim the card was current now, and the next valid trigger would find
+      // it fresh and skip the refresh this refusal never performed.
+      if (aged.remember && !aged.firstSight) keep(aged.remember)
       return { refreshed: false, reason: decision.reason }
     }
 
@@ -218,9 +220,9 @@ export function heartbeat({
     // is legitimate work, but there is no card here to carry it.
     const target = seenFocus?.point ?? seen.point
     if (target == null) {
-      // Another no-write path, so the observation is kept here too: nothing was
-      // written, and this is what bounds the card's age at the next look.
-      if (aged.remember) keep(aged.remember)
+      // The same rule as the other no-write path: a bound is kept, a first
+      // sight is not.
+      if (aged.remember && !aged.firstSight) keep(aged.remember)
       return { refreshed: false, reason: 'no-target' }
     }
 

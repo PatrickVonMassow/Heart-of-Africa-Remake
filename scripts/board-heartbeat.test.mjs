@@ -304,6 +304,45 @@ describe('the production card reader, against real board markup', () => {
     expect(said.join('\n')).toMatch(/EROFS/)
   })
 
+  it('a refusal does not make the next valid trigger skip its refresh', () => {
+    // NINTH ROUND: a no-focus or mismatched refusal used to persist its first
+    // sight as "seen now". The next trigger — with a proper focus — then found
+    // the unchanged card fresh and published nothing, so the refusal had
+    // silently consumed the refresh it never performed.
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    try {
+      const NOW = 1_700_000_000_000
+      const state = { dashboardPath: '.batch-dashboard.html' }
+      let stored = null
+      const calls = []
+      const run = (focus) =>
+        heartbeat({
+          trigger: TRIGGERS.REVIEW_ROUND,
+          detail: 'Runde',
+          root: dir,
+          state,
+          focus,
+          now: NOW,
+          memory: stored,
+          remember: (value) => {
+            stored = value
+          },
+          writeStatus: (point, status) => calls.push({ point, status }),
+        })
+
+      // Refused: the focus names another card than the board does.
+      expect(run({ point: 720, note: 'anderswo' }).reason).toBe(REASONS.CARD_MISMATCH)
+      expect(calls).toEqual([])
+
+      // The very next valid trigger still refreshes: the age was never proven.
+      const valid = run({ point: 848, note: 'Fokus' })
+      expect(valid.refreshed).toBe(true)
+      expect(calls).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('a card rewritten by somebody else reads as current, not as stale', () => {
     const dir = withBoard(board(848, 'ein Stand', '10:17'))
     try {
@@ -347,9 +386,9 @@ describe('what it refuses, and what it survives', () => {
     expect(result.refreshed).toBe(false)
     expect(result.reason).toBe('no-target')
     expect(calls).toEqual([])
-    // Nothing was written, so the observation is still the age bound for the
-    // next look — this path used to drop it (seventh cross-vendor round).
-    expect(kept).toHaveLength(1)
+    // A FIRST SIGHT is not written down on a no-write path: that would claim the
+    // card was current now and let the next valid trigger skip its refresh.
+    expect(kept).toEqual([])
   })
 
   it('NEVER throws when the board write fails — the caller recorded real work', () => {
