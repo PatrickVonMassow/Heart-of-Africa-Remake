@@ -262,7 +262,8 @@ export function attemptStateRecord({ state, reason, ...rest } = {}) {
 
 /** The daemon's own durable identity record, written by the daemon and by nobody
  *  else. `fence` is the fence it was started under; `launchNonce` is what makes a
- *  readiness wait immune to a previous daemon's leftover record. */
+ *  readiness wait immune to a previous daemon's leftover record; `state` tells a
+ *  live process coming UP from one going DOWN. */
 export const DAEMON_RECORD_FIELDS = Object.freeze([
   'v',
   'pid',
@@ -271,7 +272,28 @@ export const DAEMON_RECORD_FIELDS = Object.freeze([
   'fence',
   'launchNonce',
   'startedAt',
+  'state',
 ])
+
+export const DAEMON_LIFECYCLE_STATES = Object.freeze(['starting', 'running', 'stopping'])
+
+/** START writes starting -> running -> lock copy. STOP writes running -> stopping
+ *  -> record absent -> copy absent. A stopped daemon never returns to running;
+ *  another start is a new record with a new generation. */
+export const DAEMON_LIFECYCLE_TRANSITIONS = Object.freeze({
+  starting: Object.freeze(['running']),
+  running: Object.freeze(['stopping']),
+  stopping: Object.freeze([]),
+})
+
+export function daemonLifecycleTransition(from, to) {
+  if (!DAEMON_LIFECYCLE_STATES.includes(from)) return { ok: false, reason: `unknown daemon state: ${from}` }
+  if (!DAEMON_LIFECYCLE_STATES.includes(to)) return { ok: false, reason: `unknown daemon state: ${to}` }
+  if (!DAEMON_LIFECYCLE_TRANSITIONS[from].includes(to)) {
+    return { ok: false, reason: `${from} -> ${to} is not a daemon lifecycle transition` }
+  }
+  return { ok: true }
+}
 
 /** The copy in .claude/batch-lock.json: identity only. It exists so that "is there
  *  a daemon" and "may I work" are ONE read for the current lock owner, and for
@@ -284,19 +306,26 @@ export const DAEMON_COPY_FIELDS = Object.freeze(['pid', 'pidStartedAt', 'generat
 export const DAEMON_PAIR_READINGS = Object.freeze({
   'no-daemon': "today's path — legal and normal",
   healthy: 'record and copy agree and the process is live — nothing to do',
+  transitioning:
+    'the daemon is starting or stopping — refuse every mutation and adoption; wait for running or proven death',
   unadopted: 'a handover, or a crash between the two writes — the lock owner probes the record and writes the copy',
   'cold-record': 'the daemon is gone — reconcile its workers (step 8), release the record, mint a new generation',
   'stale-copy': 'the daemon is gone and the copy still names it — as cold-record, and clear the copy',
-  'superseded-copy': 'the copy is older than the record and the record is live — the record wins; rewrite the copy',
+  unknown: 'the record process was not proven live or dead — refuse every mutation and alert; change nothing',
+  'superseded-copy':
+    'the journal proves the copy generation preceded the live running record — the record wins; rewrite the copy',
   'orphaned-copy': 'a copy with no record — clear it; a daemon is never concluded from the copy alone',
   'impossible-copy': 'a copy the write orders cannot produce — corruption, not a race: refuse every mutation and alert',
   'ambiguous-generations':
     'string generations differ and random strings carry no order — an earlier copy and a rolled-back record leave identical evidence: refuse mutations and alert; an operator supplies the ordering evidence',
 })
 
-/** Decides the pair from the pair alone. `probe` answers whether the RECORD's pid
- *  is live (pid and pid start time), and is consulted for no other purpose; a null
- *  probe means "not probed", which is only ever enough where the record is absent.
+/** Decides the pair from the pair, the record's process probe and generation
+ *  ordering evidence. `probe.live === true` proves the RECORD's process live;
+ *  `probe.live === false` proves it dead; an absent, failed or identity-mismatched
+ *  probe is UNKNOWN and changes nothing. `generationOrder` is evidence read from
+ *  the journal's generation-mint history, never an ordering guessed from random
+ *  generation strings (or from their fixture representation).
  *
  *  THE ORDER OF THE QUESTIONS IS THE MECHANISM. "Is the copy possible at all" comes
  *  first, because a copy that the write orders cannot produce says nothing about
@@ -304,12 +333,20 @@ export const DAEMON_PAIR_READINGS = Object.freeze({
  *  decide, because the record is the authority on existence: a DEAD record is cold
  *  whatever the copy says, and the copy's staleness is part of that resolution
  *  rather than a competing reading. */
-export function classifyDaemonPair({ record = null, copy = null, probe = null } = {}) {
-  const reading = (name, extra = {}) => ({ reading: name, resolution: DAEMON_PAIR_READINGS[name], ...extra })
+export function classifyDaemonPair({ record = null, copy = null, probe = null, generationOrder = null } = {}) {
+  const reading = (name, { actions = [], ...extra } = {}) => ({
+    reading: name,
+    resolution: DAEMON_PAIR_READINGS[name],
+    actions: Object.freeze(actions),
+    ...extra,
+  })
   const impossible = (why) => reading('impossible-copy', { reason: why })
 
-  if (copy && !record) return reading('orphaned-copy')
+  if (copy && !record) return reading('orphaned-copy', { actions: ['clear-copy'] })
   if (!record) return reading('no-daemon')
+  if (!DAEMON_LIFECYCLE_STATES.includes(record.state)) {
+    return impossible('the record carries no known lifecycle state, so a live process cannot be classified')
+  }
   // A generation is the credential's: a minted random STRING in the real store
   // (mechanism 2 — "recovery mints a fresh random generation"), a number only in
   // synthetic fixtures. Both are generations; a record carrying neither is not
@@ -328,45 +365,46 @@ export function classifyDaemonPair({ record = null, copy = null, probe = null } 
     if (typeof copy.generation !== typeof record.generation) {
       return impossible('the copy and the record carry generations of different kinds; the copy was not written from this record')
     }
-    // Ordering exists only for numeric fixtures; random string generations can
-    // only be equal or different.
-    if (Number.isFinite(copy.generation) && copy.generation > record.generation) {
-      return impossible(
-        `copy generation ${copy.generation} is newer than the record's ${record.generation}; the write orders cannot produce this`,
-      )
-    }
     if (copy.generation === record.generation && !sameProcess(record, copy)) {
       return impossible('the copy names this generation with another process, so it was not written from this record')
     }
-    // DIFFERING STRING generations stay AMBIGUOUS: the same evidence fits an
-    // earlier copy beside a live record AND a newer copy beside a record that
-    // was rolled back or restored from a backup. Automatically rewriting or
-    // releasing either side would destroy exactly the evidence that decides
-    // it, so the pair refuses and alerts until ordering evidence exists.
-    if (typeof copy.generation === 'string' && copy.generation !== record.generation) {
-      return reading('ambiguous-generations')
+    if (copy.generation !== record.generation) {
+      if (generationOrder === 'record-before-copy') {
+        return impossible('the journal orders the copy generation after the record; the write orders cannot produce this')
+      }
+      if (generationOrder !== 'copy-before-record') return reading('ambiguous-generations')
     }
   }
 
-  // The same affirmative rule as `validateMutation`: a probe without a verdict is
-  // an unprobed record, and this table never reads "not asked" as "alive".
-  const live = probe?.live === true && sameProcess(record, probe)
-  if (!live) {
-    if (!copy) return reading('cold-record')
-    // A dead record is cold whichever copy stands beside it. `stale-copy` is the
-    // named case where the copy still points at exactly this daemon, because that
-    // is the copy a successor would otherwise trust.
-    return copy.generation === record.generation ? reading('stale-copy') : reading('cold-record')
+  const sameProbedProcess = sameProcess(record, probe)
+  const processVerdict =
+    sameProbedProcess && probe.live === true
+      ? 'live'
+      : sameProbedProcess && probe.live === false
+        ? 'dead'
+        : 'unknown'
+  if (processVerdict === 'unknown') return reading('unknown')
+  if (processVerdict === 'dead') {
+    if (!copy) return reading('cold-record', { actions: ['reconcile-workers', 'release-record'] })
+    if (copy.generation === record.generation) {
+      return reading('stale-copy', { actions: ['reconcile-workers', 'release-record', 'clear-copy'] })
+    }
+    return reading('cold-record', { actions: ['reconcile-workers', 'release-record', 'clear-copy'] })
   }
-  if (!copy) return reading('unadopted')
-  return copy.generation === record.generation ? reading('healthy') : reading('superseded-copy')
+  if (record.state !== 'running') return reading('transitioning')
+  if (!copy) return reading('unadopted', { actions: ['write-copy'] })
+  return copy.generation === record.generation
+    ? reading('healthy')
+    : reading('superseded-copy', { actions: ['rewrite-copy'] })
 }
 
 /** The invariant in one predicate, so a caller can assert it without re-deriving
  *  the table: the copy may be absent or PROVABLY older, never newer — a pair
  *  whose order cannot be proven does not hold the invariant either. */
-export function daemonPairInvariantHolds({ record = null, copy = null } = {}) {
-  return !['impossible-copy', 'ambiguous-generations'].includes(classifyDaemonPair({ record, copy, probe: null }).reading)
+export function daemonPairInvariantHolds({ record = null, copy = null, generationOrder = null } = {}) {
+  return !['impossible-copy', 'ambiguous-generations'].includes(
+    classifyDaemonPair({ record, copy, probe: null, generationOrder }).reading,
+  )
 }
 
 // ---------------------------------------------------------------------------

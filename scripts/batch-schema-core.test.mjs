@@ -14,7 +14,10 @@ import {
   ATTEMPT_TRANSITIONS,
   CREDENTIAL_REF,
   DAEMON_COMMANDS,
+  DAEMON_LIFECYCLE_STATES,
+  DAEMON_LIFECYCLE_TRANSITIONS,
   DAEMON_PAIR_READINGS,
+  DAEMON_RECORD_FIELDS,
   MIGRATIONS,
   PROCESS_START_TOLERANCE_MS,
   PUBLISHED_ACTS,
@@ -32,6 +35,7 @@ import {
   credential,
   credentialAccepted,
   credentialBody,
+  daemonLifecycleTransition,
   daemonPairInvariantHolds,
   fenceInForceAt,
   frameEntry,
@@ -234,30 +238,59 @@ describe('attempt states and transitions (union M16)', () => {
 })
 
 describe('the daemon pair — record and the lock copy of it', () => {
-  const record = { v: 1, pid: 900, pidStartedAt: NOW - 600_000, generation: 7, fence: 604, launchNonce: 'n1', startedAt: NOW - 600_000 }
-  const copy = { pid: 900, pidStartedAt: NOW - 600_000, generation: 7 }
+  const record = {
+    v: 1,
+    pid: 900,
+    pidStartedAt: NOW - 600_000,
+    generation: 'gen-2',
+    fence: 604,
+    launchNonce: 'n1',
+    startedAt: NOW - 600_000,
+    state: 'running',
+  }
+  const copy = { pid: 900, pidStartedAt: NOW - 600_000, generation: 'gen-2' }
   const alive = { pid: 900, pidStartedAt: NOW - 600_000, live: true }
   const dead = { pid: 900, pidStartedAt: NOW - 600_000, live: false }
+  const older = { ...copy, generation: 'gen-1', pid: 880, pidStartedAt: NOW - 900_000 }
+  const orderedOlder = { generationOrder: 'copy-before-record' }
 
-  // ENUMERATED OVER THE INPUTS, not over the output labels: every combination of
-  // record, copy and probe this classifier can be handed, each with the reading it
-  // must produce. A label-keyed table would have passed while whole input states
-  // went undecided, which is exactly what the review found.
-  const older = { ...copy, generation: 6, pid: 880, pidStartedAt: NOW - 900_000 }
+  // ENUMERATED OVER THE INPUTS, including every crash window in mechanism 2's
+  // table. UNKNOWN is separate from proven death, and no live row omits the
+  // lifecycle state that distinguishes a start from a stop.
   const inputs = [
     ['record absent, copy absent', { record: null, copy: null, probe: null }, 'no-daemon'],
     ['record absent, copy absent, probe offered', { record: null, copy: null, probe: alive }, 'no-daemon'],
     ['copy with no record', { record: null, copy, probe: null }, 'orphaned-copy'],
-    ['matching copy, live record', { record, copy, probe: alive }, 'healthy'],
+    ['matching copy, live running record', { record, copy, probe: alive }, 'healthy'],
+    ['matching copy, live starting record', { record: { ...record, state: 'starting' }, copy, probe: alive }, 'transitioning'],
+    ['matching copy, live stopping record', { record: { ...record, state: 'stopping' }, copy, probe: alive }, 'transitioning'],
     ['matching copy, dead record', { record, copy, probe: dead }, 'stale-copy'],
-    ['matching copy, unprobed record', { record, copy, probe: null }, 'stale-copy'],
-    ['no copy, live record', { record, copy: null, probe: alive }, 'unadopted'],
+    ['matching copy, unprobed record', { record, copy, probe: null }, 'unknown'],
+    ['matching copy, failed probe', { record, copy, probe: { ...alive, live: null } }, 'unknown'],
+    ['no copy, live running record', { record, copy: null, probe: alive }, 'unadopted'],
+    ['no copy, live starting record', { record: { ...record, state: 'starting' }, copy: null, probe: alive }, 'transitioning'],
+    ['no copy, live stopping record', { record: { ...record, state: 'stopping' }, copy: null, probe: alive }, 'transitioning'],
     ['no copy, dead record', { record, copy: null, probe: dead }, 'cold-record'],
-    ['no copy, unprobed record', { record, copy: null, probe: null }, 'cold-record'],
-    ['older copy, live record', { record, copy: older, probe: alive }, 'superseded-copy'],
-    ['older copy, dead record', { record, copy: older, probe: dead }, 'cold-record'],
-    ['probe of another process', { record, copy, probe: { pid: 901, pidStartedAt: NOW, live: true } }, 'stale-copy'],
-    ['copy newer than the record', { record, copy: { ...copy, generation: 8 }, probe: alive }, 'impossible-copy'],
+    ['no copy, unprobed record', { record, copy: null, probe: null }, 'unknown'],
+    ['superseded copy, live running record', { record, copy: older, probe: alive, ...orderedOlder }, 'superseded-copy'],
+    [
+      'superseded copy, live starting record',
+      { record: { ...record, state: 'starting' }, copy: older, probe: alive, ...orderedOlder },
+      'transitioning',
+    ],
+    [
+      'superseded copy, live stopping record',
+      { record: { ...record, state: 'stopping' }, copy: older, probe: alive, ...orderedOlder },
+      'transitioning',
+    ],
+    ['superseded copy, dead record', { record, copy: older, probe: dead, ...orderedOlder }, 'cold-record'],
+    ['superseded copy, unprobed record', { record, copy: older, probe: null, ...orderedOlder }, 'unknown'],
+    ['probe of another process', { record, copy, probe: { pid: 901, pidStartedAt: NOW, live: true } }, 'unknown'],
+    [
+      'journal orders copy after record',
+      { record, copy: older, probe: alive, generationOrder: 'record-before-copy' },
+      'impossible-copy',
+    ],
     ['copy with no generation', { record, copy: { ...copy, generation: undefined }, probe: alive }, 'impossible-copy'],
     [
       'same generation, another process',
@@ -265,38 +298,44 @@ describe('the daemon pair — record and the lock copy of it', () => {
       'impossible-copy',
     ],
     ['record with no generation', { record: { ...record, generation: undefined }, copy, probe: alive }, 'impossible-copy'],
-    // REAL records carry the credential's minted random STRING generation
-    // (mechanism 2); the numeric rows above are synthetic fixtures. The first
-    // shipped table accepted only numbers, so every real daemon record read as
-    // impossible-copy — these rows pin the repair.
+    ['record with no lifecycle state', { record: { ...record, state: undefined }, copy, probe: alive }, 'impossible-copy'],
+    ['record with an unknown lifecycle state', { record: { ...record, state: 'ready' }, copy, probe: alive }, 'impossible-copy'],
+    // Differing generations without journal evidence carry no order: the same
+    // pair fits an earlier copy and a rolled-back record. Probe state cannot make
+    // that ambiguity safe to rewrite or release.
     [
-      'string generations, matching, live record',
-      { record: { ...record, generation: 'gen-real-0001' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: alive },
-      'healthy',
-    ],
-    // Differing STRING generations carry no order: the same evidence fits an
-    // earlier copy beside a live record and a newer copy beside a rolled-back
-    // record, so neither rewriting nor releasing is safe — refuse and alert,
-    // whatever the probe says.
-    [
-      'string generations, differing, live record: ambiguous, never assumed older',
-      { record: { ...record, generation: 'gen-real-0002' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: alive },
+      'differing generations, live record: ambiguous without journal order',
+      { record, copy: older, probe: alive },
       'ambiguous-generations',
     ],
     [
-      'string generations, differing, dead record: ambiguous, never released automatically',
-      { record: { ...record, generation: 'gen-real-0002' }, copy: { ...copy, generation: 'gen-real-0001' }, probe: dead },
+      'differing generations, dead record: ambiguous without journal order',
+      { record, copy: older, probe: dead },
       'ambiguous-generations',
     ],
     [
       'generation kinds differ between copy and record',
-      { record: { ...record, generation: 'gen-real-0001' }, copy, probe: alive },
+      { record, copy: { ...copy, generation: 2 }, probe: alive },
       'impossible-copy',
     ],
-    // A probe that found the identity and never answered is an unprobed record.
-    ['probe without a verdict', { record, copy, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'stale-copy'],
-    ['probe without a verdict, no copy', { record, copy: null, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'cold-record'],
+    ['probe without a verdict', { record, copy, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'unknown'],
+    ['probe without a verdict, no copy', { record, copy: null, probe: { pid: 900, pidStartedAt: NOW - 600_000 } }, 'unknown'],
   ]
+
+  it('puts the lifecycle state in the durable record and permits only the crash-safe write order', () => {
+    expect(DAEMON_RECORD_FIELDS).toContain('state')
+    expect(Object.keys(DAEMON_LIFECYCLE_TRANSITIONS).sort()).toEqual([...DAEMON_LIFECYCLE_STATES].sort())
+    expect(daemonLifecycleTransition('starting', 'running').ok).toBe(true)
+    expect(daemonLifecycleTransition('running', 'stopping').ok).toBe(true)
+    for (const [from, to] of [
+      ['starting', 'stopping'],
+      ['running', 'starting'],
+      ['stopping', 'running'],
+      ['stopping', 'starting'],
+    ]) {
+      expect(daemonLifecycleTransition(from, to).ok, `${from} -> ${to}`).toBe(false)
+    }
+  })
 
   it('decides every input state, and produces every reading it declares', () => {
     const produced = new Set()
@@ -317,17 +356,36 @@ describe('the daemon pair — record and the lock copy of it', () => {
   })
 
   it('the invariant predicate refuses exactly what the write orders cannot produce', () => {
-    expect(daemonPairInvariantHolds({ record, copy: { ...copy, generation: 8 } })).toBe(false)
+    expect(daemonPairInvariantHolds({ record, copy: older })).toBe(false)
+    expect(daemonPairInvariantHolds({ record, copy: older, ...orderedOlder })).toBe(true)
+    expect(daemonPairInvariantHolds({ record, copy: older, generationOrder: 'record-before-copy' })).toBe(false)
     expect(daemonPairInvariantHolds({ record, copy: { ...copy, pid: 880, pidStartedAt: NOW } })).toBe(false)
     expect(daemonPairInvariantHolds({ record, copy })).toBe(true)
-    expect(daemonPairInvariantHolds({ record, copy: older })).toBe(true)
     expect(daemonPairInvariantHolds({ record, copy: null })).toBe(true)
     expect(daemonPairInvariantHolds({ record: null, copy })).toBe(true)
   })
 
   it('liveness is never read from the copy — only the record probes', () => {
     expect(classifyDaemonPair({ record, copy, probe: dead }).reading).toBe('stale-copy')
-    expect(classifyDaemonPair({ record, copy, probe: { ...alive, live: false } }).reading).toBe('stale-copy')
+    expect(classifyDaemonPair({ record, copy: { ...copy, live: true }, probe: null }).reading).toBe('unknown')
+  })
+
+  it('UNKNOWN and transition rows change nothing — no release, mint, adoption or copy write', () => {
+    for (const [, input, expected] of inputs) {
+      if (!['unknown', 'transitioning', 'ambiguous-generations', 'impossible-copy'].includes(expected)) continue
+      expect(classifyDaemonPair(input).actions, expected).toEqual([])
+    }
+  })
+
+  it('orders the recovery writes for each actionable crash residue', () => {
+    expect(classifyDaemonPair({ record, copy: null, probe: alive }).actions).toEqual(['write-copy'])
+    expect(classifyDaemonPair({ record, copy, probe: dead }).actions).toEqual([
+      'reconcile-workers',
+      'release-record',
+      'clear-copy',
+    ])
+    expect(classifyDaemonPair({ record, copy: older, probe: alive, ...orderedOlder }).actions).toEqual(['rewrite-copy'])
+    expect(classifyDaemonPair({ record: null, copy, probe: null }).actions).toEqual(['clear-copy'])
   })
 })
 
