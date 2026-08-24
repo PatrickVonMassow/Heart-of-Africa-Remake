@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import {
   abandonedTemporaries,
   appendJournalEntry,
+  durabilityProbe,
   ensureFenceStore,
   openStateStore,
   readJournal,
@@ -28,6 +29,7 @@ beforeEach(() => {
   execFileSync('git', ['init', '-q'], { windowsHide: true, cwd: repo })
 })
 afterEach(() => {
+  durabilityProbe.onDirFsync = null
   rmSync(repo, { recursive: true, force: true })
 })
 
@@ -306,6 +308,16 @@ describe('receipts', () => {
     expect(clash.ok).toBe(false)
     expect(clash.reason).toMatch(/already exists with different content/)
     expect(readReceipt(store, 'sealed-1').snapshot).toMatchObject({ fence: 7 })
+  })
+
+  it('flushes the receipt directory before identical EEXIST is reported as durable success', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    writeReceipt(store, 'sealed-1', { kind: 'boundary', fence: 7 })
+    const flushed = []
+    durabilityProbe.onDirFsync = (path) => flushed.push(path)
+    const again = writeReceipt(store, 'sealed-1', { kind: 'boundary', fence: 7 })
+    expect(again).toMatchObject({ ok: true, alreadyWritten: true })
+    expect(flushed).toContain(store.receiptsDir)
   })
 
   it('refuses a receipt id that is a path, and a receipt that is a symlink', () => {

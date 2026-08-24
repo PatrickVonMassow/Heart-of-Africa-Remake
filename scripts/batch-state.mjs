@@ -374,7 +374,13 @@ export function writeReceipt(store, receiptId, body) {
       /* the leftover is listed by abandonedTemporaries */
     }
     if (error?.code === 'EEXIST') {
-      if (sameAsExisting()) return { ok: true, alreadyWritten: true }
+      if (sameAsExisting()) {
+        // The winning process may have crashed after link(2) but before its
+        // directory fsync. This retry cannot claim durable idempotent success
+        // until it has made the already-present name durable itself.
+        fsyncDir(store.receiptsDir)
+        return { ok: true, alreadyWritten: true }
+      }
       return { ok: false, reason: `receipt ${receiptId} already exists with different content; a receipt is written once and never overwritten` }
     }
     return { ok: false, reason: `the receipt could not be created: ${error.message}` }
