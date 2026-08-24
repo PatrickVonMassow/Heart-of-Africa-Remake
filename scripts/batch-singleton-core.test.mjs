@@ -744,6 +744,22 @@ describe('renewLease / grantFence (the I/O half)', () => {
     expect(readFence({ fencePath }).fence).toBe(10)
   })
 
+  it('a lower fence claim is refused and leaves the persisted file byte-for-byte unchanged', () => {
+    const standing = {
+      v: 1,
+      fence: 690,
+      holder: 'current-session',
+      at: NOW,
+      holders: [{ sessionId: 'current-session', fence: 690, at: NOW }],
+    }
+    writeFileSync(fencePath, JSON.stringify(standing, null, 2))
+    const before = readFileSync(fencePath, 'utf8')
+
+    expect(grantFence('stale-session', { fencePath, requestedFence: 3, now: NOW + 1 })).toBe(null)
+    expect(readFileSync(fencePath, 'utf8')).toBe(before)
+    expect(readFence({ fencePath })).toMatchObject({ fence: 690, holder: 'current-session' })
+  })
+
   it('renewLease writes only for the owner, and only once per interval', () => {
     acquire('s1', opts())
     const first = lockOf().leaseUntil

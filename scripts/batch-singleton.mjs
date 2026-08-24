@@ -60,7 +60,7 @@ import {
   LEASE_MS,
   renewedLock,
   renewalDecision,
-  nextFence,
+  fenceClaimDecision,
   grantedFenceState,
   normaliseFence,
 } from './batch-lease-core.mjs'
@@ -1178,11 +1178,19 @@ export function recordFenceNotice(sessionId, fence, opts = {}) {
  * doctor. It is the one record that outlives `acquire` unlinking the lock.
  */
 export function grantFence(sessionId, opts = {}) {
+  const fencePath = opts.fencePath ?? FENCE_PATH
+  const mutexPath = `${fencePath}.claiming`
+  if (!enterReapMutex(mutexPath)) return null
   try {
-    const fencePath = opts.fencePath ?? FENCE_PATH
     const now = opts.now ?? Date.now()
     const state = normaliseFence(readJson(fencePath))
-    const fence = nextFence({ fenceState: state, priorFence: opts.priorFence })
+    const decision = fenceClaimDecision({
+      fenceState: state,
+      priorFence: opts.priorFence,
+      requestedFence: opts.requestedFence,
+    })
+    if (!decision.accept) return null
+    const fence = decision.fence
     writeJsonAtomic(
       fencePath,
       // `takeover` names WHO lost the batch and WHY, so the dispossessed session
@@ -1193,6 +1201,8 @@ export function grantFence(sessionId, opts = {}) {
     return fence
   } catch {
     return null
+  } finally {
+    exitReapMutex(mutexPath)
   }
 }
 
@@ -1515,8 +1525,10 @@ export function retireBatchWriter(sessionId, opts = {}) {
 export function revokeWriterFence(sessionId, generation, opts = {}) {
   const rejected = (reason, fence = null) => ({ revoked: false, reason, fence })
   if (!sessionId || !Number.isSafeInteger(generation) || generation < 0) return rejected('invalid-authority')
+  const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
+  const mutexPath = `${fencePath}.claiming`
+  if (!enterReapMutex(mutexPath)) return rejected('write-busy')
   try {
-    const fencePath = opts.fencePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).fencePath
     const current = readFence({ fencePath })
     if (current.fence !== generation) return rejected('generation-changed', current.fence)
     if (current.holder && current.holder !== sessionId) return rejected('holder-changed', current.fence)
@@ -1538,6 +1550,8 @@ export function revokeWriterFence(sessionId, generation, opts = {}) {
     return { revoked: true, reason: 'revoked', fence: next }
   } catch {
     return rejected('write-failed')
+  } finally {
+    exitReapMutex(mutexPath)
   }
 }
 
