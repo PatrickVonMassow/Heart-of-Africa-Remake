@@ -458,6 +458,27 @@ describe('a record is read once — the accessor class of the cross-vendor revie
     expect(claimWorktree({ claims: bare, worktree: '/wt/a', attempt })).toMatchObject({ ok: true, alreadyHeld: true })
   })
 
+  it('sees a claim that was defined out of sight', () => {
+    // No exotic container is needed for the same fail-open loss: a claim defined
+    // NON-ENUMERABLY is invisible to Object.entries while being every bit an entry,
+    // so a populated plain map read as empty and the held worktree was handed on.
+    // A key that is a symbol, hidden or computed is not a worktree claim at all.
+    const other = { ...attempt, attemptId: 'a2' }
+    const hidden = {}
+    Object.defineProperty(hidden, '/wt/a', { value: { ...attempt }, enumerable: false })
+    const claimed = claimWorktree({ claims: hidden, worktree: '/wt/a', attempt: other })
+    expect(claimed.ok).toBe(false)
+    expect(claimed.reason).toMatch(/hidden or computed/)
+    expect(releaseWorktree({ claims: hidden, worktree: '/wt/a', attempt }).ok).toBe(false)
+
+    const computed = {}
+    Object.defineProperty(computed, '/wt/a', { get() { return { ...attempt } }, enumerable: true })
+    expect(claimWorktree({ claims: computed, worktree: '/wt/a', attempt: other }).reason).toMatch(/hidden or computed/)
+
+    const keyed = { [Symbol('/wt/a')]: { ...attempt } }
+    expect(claimWorktree({ claims: keyed, worktree: '/wt/a', attempt: other }).reason).toMatch(/symbol key/)
+  })
+
   it('refuses a claims map it cannot read at all rather than throwing out of the claim', () => {
     const boom = { batchId: 'b', pointId: 'p834', get attemptId() { throw new Error('unreadable') } }
     const res = claimWorktree({ claims: { '/wt/a': boom }, worktree: '/wt/b', attempt })

@@ -15,6 +15,16 @@
 // here is the local half; the remote half is the credential lease on
 // refs/hoa/coordinator (batch-schema-core.mjs, publicationPush), which is a check
 // that IS the push. Both halves fail closed.
+// WHERE THIS MODULE'S TRUST BEGINS. Its inputs are persisted state — JSON the
+// daemon wrote — and records this module itself minted. It therefore reads every
+// input ONCE into plain values, judges the copy, and fails closed on anything it
+// cannot read: a malformed lease, an unreadable claims container, a hidden or
+// non-canonical entry, an identity that is not three names. What it does NOT
+// defend against is a caller inside the daemon's own process forging arguments,
+// because that caller can already call these functions with whatever it likes, or
+// not call them at all; the exotic-container refusals above exist so that CORRUPT
+// or hand-edited state cannot be mistaken for absence, not to make this a security
+// boundary against code running beside it.
 import { normalize } from 'node:path'
 import { types } from 'node:util'
 import { sameAttempt, sameProcess } from './batch-schema-core.mjs'
@@ -419,65 +429,67 @@ export function worktreeClaimKey(worktree) {
  *  point 893, the class the review closed for the existing lease). */
 function readClaims(claims) {
   if (claims === null || claims === undefined) return { ok: true, claims: {} }
-  // THE MAP ITSELF IS A PLAIN COLLECTION OF RECORDS, and that is checked by its
-  // PROTOTYPE, not by `typeof`. A Map, a Date or a class instance answered `object`
-  // and carried no own enumerable entries at all, so `Object.entries` saw an EMPTY
-  // map: a claims container this module cannot read was reported as no ownership,
-  // and the worktree it held was handed to the next attempt — the fail-closed
-  // invariant broken by the one path that looks like success (cross-vendor review of
-  // point 893). A record INSIDE the map is a reference like any other and is read
-  // through `carriesFields` below; only the container is held to this.
-  // THE READING OF THE SHAPE IS ITSELF GUARDED, AND ITS FAILURE IS NOT ITS ANSWER.
-  // A bare `readOnce(() => Object.getPrototypeOf(claims))` answered null both for a
-  // legitimate null prototype and for a trap that threw, so a proxy over a populated
-  // Map was ACCEPTED and read as empty; `Array.isArray` on a revoked proxy throws in
-  // the same breath (cross-vendor review of point 893). Both readings are taken
-  // together, inside the guard, and a shape that cannot be read at all is no shape.
-  // AND A CONTAINER THAT ANSWERS FOR ITSELF IS NOT ONE OF THESE. Every check above
-  // asks the container what it is, and a proxy answers whatever it likes: one over a
-  // populated Map can report Object.prototype, deny being an array and then show no
-  // entries at all, so the fail-closed guard passes it and the held worktree is
-  // handed on (cross-vendor review of point 893). A claims map is persisted data or
-  // a map this module minted; a proxy in that position is never legitimate, and it
-  // is the one exotic container no structural check can unmask — `types.isProxy`
-  // asks the runtime instead of the value. RECORDS inside the map need no such
-  // check: their fields are copied and only the VALUES decide, so a record that
-  // lies says no more than a plain one carrying the same values.
+  const unreadable = (why) => ({ ok: false, reason: why })
+  // THE CONTAINER IS A PLAIN MAP, and `typeof` is not what says so. A Map, a Date or
+  // a class instance all answer `object` and carry no own enumerable entries, so
+  // `Object.entries` saw an EMPTY map: a container full of ownership was reported as
+  // no ownership at all and the worktree it held went to the next attempt — the
+  // fail-closed invariant broken by the one path that looks like success. The
+  // prototype says it instead, and BOTH readings are taken inside one guard, because
+  // a bare guarded read answered null for a legitimate null prototype and for a trap
+  // that threw alike. A PROXY is refused outright: every structural check asks the
+  // container what it is, and a proxy answers whatever it likes, so the runtime is
+  // asked instead. (Cross-vendor review of point 893, four rounds of it.)
   const shape = readOnce(() => ({ proto: Object.getPrototypeOf(claims), isArray: Array.isArray(claims) }))
   if (typeof claims !== 'object' || types.isProxy(claims) || !shape || shape.isArray || (shape.proto !== Object.prototype && shape.proto !== null)) {
-    return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
+    return unreadable('the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed')
   }
+  // EVERY OWN KEY IS INSPECTED, not just the enumerable string ones an iteration
+  // shows. A claim defined non-enumerably is invisible to `Object.entries` while
+  // being every bit an entry, so a populated map read as empty without any exotic
+  // container at all — the same fail-open ownership loss (cross-vendor review of
+  // point 893). A key that is a symbol, a hidden entry or a computed one is not a
+  // worktree claim, and a map carrying one is not a map this module can read.
+  const keys = readOnce(() => [...Object.getOwnPropertyNames(claims), ...Object.getOwnPropertySymbols(claims)])
+  if (!keys) return unreadable('the worktree claims on record could not be read at all; ownership is uncertain and uncertain fails closed')
   // A STORED KEY IS ITSELF A CANONICAL WORKTREE KEY. Canonicalising only the
   // REQUESTED path left the alias open from the other side: a map keyed `/wt/a/`
   // answered `hasOwn('/wt/a')` with false, so a second attempt was granted the
-  // worktree the first one holds and the map came back carrying both spellings —
-  // one worktree, two attempts, which is the single invariant this function exists
-  // for (cross-vendor review of point 893). Only this module writes these keys, and
-  // it writes them canonical, so any other spelling is corrupted or hand-edited
-  // ownership: unreadable, and unreadable fails closed rather than being tidied
-  // into a key nobody persisted.
+  // worktree the first one holds and the map came back carrying both spellings.
+  // Only this module writes these keys and it writes them canonical, so any other
+  // spelling is corrupted or hand-edited ownership: unreadable, and unreadable fails
+  // closed rather than being tidied into a key nobody persisted.
+  //
   // AND THE MAP IS READ HERE, ONCE, INTO PLAIN RECORDS. Every decision below — the
   // occupancy test, the identity comparison, the map that is handed back — used to
-  // reach through to the caller's own records, so an accessor could show a valid
-  // name to the guard and another value to the comparison or to the sealing that
-  // followed (cross-vendor review of point 893). A record is copied field by field
-  // and NOT tidied: an unreadable one stays exactly as unreadable as it was, so the
-  // collision path still fails closed on it. A record whose own reading THROWS is
-  // the loudest kind of unreadable and is answered as such, never as a crash.
+  // reach through to the caller's own records, so an accessor could show a valid name
+  // to the guard and another value to the comparison or the sealing that followed. A
+  // record is copied field by field and NOT tidied: an unreadable one stays exactly
+  // as unreadable as it was, so the collision path still fails closed on it. A record
+  // whose own reading THROWS is the loudest kind of unreadable and is answered as
+  // such, never as a crash.
   const read = {}
   try {
-    for (const [key, record] of Object.entries(claims)) {
+    for (const key of keys) {
+      if (typeof key === 'symbol') {
+        return unreadable('the worktree claims on record carry a symbol key; a claim is keyed by a worktree path, and uncertain fails closed')
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(claims, key)
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) {
+        return unreadable(
+          `the worktree claims on record carry ${JSON.stringify(key)} as a hidden or computed entry; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
+        )
+      }
       const keyed = worktreeClaimKey(key)
       if (!keyed.ok || keyed.key !== key) {
-        return {
-          ok: false,
-          reason: `the worktree claims on record carry the non-canonical key ${JSON.stringify(key)}; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
-        }
+        return unreadable(
+          `the worktree claims on record carry the non-canonical key ${JSON.stringify(key)}; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
+        )
       }
-      read[key] = carriesFields(record) ? { ...record } : record
+      read[key] = carriesFields(descriptor.value) ? { ...descriptor.value } : descriptor.value
     }
   } catch {
-    return { ok: false, reason: 'the worktree claims on record could not be read at all; ownership is uncertain and uncertain fails closed' }
+    return unreadable('the worktree claims on record could not be read at all; ownership is uncertain and uncertain fails closed')
   }
   return { ok: true, claims: read }
 }
