@@ -151,12 +151,20 @@ describe('the lane\'s own fence store', () => {
 describe('journal append and read-back', () => {
   it('appends framed lines and replays them whole', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
-    expect(appendJournalEntry(store, entry(1)).ok).toBe(true)
+    expect(appendJournalEntry(store, entry(1, { kind: 'fence-transition' })).ok).toBe(true)
     expect(appendJournalEntry(store, entry(2)).ok).toBe(true)
     const journal = readJournal(store)
     expect(journal.exists).toBe(true)
     expect(journal.verdict).toBe('ok')
     expect(journal.entries.map((e) => e.seq)).toEqual([1, 2])
+  })
+
+  it('refuses to write anything under a fence before that fence transition is durable', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    const refused = appendJournalEntry(store, entry(1))
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/without fence authority/)
+    expect(readJournal(store).exists).toBe(false)
   })
 
   it('refuses to append what frameEntry refuses, and writes nothing for it', () => {
@@ -167,30 +175,32 @@ describe('journal append and read-back', () => {
 
   it('reads a crash-cut final line as the ordinary dropped tail', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
-    appendJournalEntry(store, entry(1))
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
     appendJournalEntry(store, entry(2))
+    appendJournalEntry(store, entry(3))
     const bytes = readFileSync(store.journalPath, 'utf8')
     writeFileSync(store.journalPath, bytes.slice(0, -15))
     const journal = readJournal(store)
     expect(journal.verdict).toBe('ok')
-    expect(journal.entries).toHaveLength(1)
+    expect(journal.entries).toHaveLength(2)
     expect(journal.droppedTail).not.toBeNull()
   })
 
   it('repairs a crash-cut tail on the NEXT append instead of welding it into corruption', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
-    appendJournalEntry(store, entry(1))
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
     appendJournalEntry(store, entry(2))
+    appendJournalEntry(store, entry(3))
     const bytes = readFileSync(store.journalPath, 'utf8')
     const cut = bytes.slice(0, -15) // entry 2 loses its delimiter and tail
     writeFileSync(store.journalPath, cut)
     // Without the repair, this append would concatenate onto the fragment and
     // replay would see one delimited corrupt line — a permanently wedged journal.
-    const appended = appendJournalEntry(store, entry(3))
+    const appended = appendJournalEntry(store, entry(4))
     expect(appended.ok).toBe(true)
     const journal = readJournal(store)
     expect(journal.verdict).toBe('ok')
-    expect(journal.entries.map((e) => e.seq)).toEqual([1, 3])
+    expect(journal.entries.map((e) => e.seq)).toEqual([1, 2, 4])
     expect(journal.droppedTail).toBeNull()
     // The fragment is preserved beside the journal as evidence, never eaten.
     const fragment = cut.slice(cut.lastIndexOf('\n') + 1)
@@ -200,7 +210,7 @@ describe('journal append and read-back', () => {
 
   it('reads a tampered middle as corruption — the verdict mayMintFence refuses on', () => {
     const store = openStateStore({ repoDir: repo, batchId: 'b' })
-    appendJournalEntry(store, entry(1))
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
     appendJournalEntry(store, entry(2))
     writeFileSync(store.journalPath, readFileSync(store.journalPath, 'utf8').replace('"k1"', '"kX"'))
     expect(readJournal(store).verdict).toBe('corrupt')

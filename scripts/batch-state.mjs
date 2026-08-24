@@ -240,10 +240,20 @@ export function appendJournalEntry(store, entry) {
   if (!framed.ok) return { ok: false, reason: framed.reason }
   refuseSymlink(store.journalPath, 'the journal')
   const repaired = repairCutTail(store)
+  const exists = existsSync(store.journalPath)
+  const before = exists ? readFileSync(store.journalPath, 'utf8') : ''
+  const candidate = replayJournal(before + framed.line)
+  const appended = candidate.entries.at(-1)
+  if (candidate.verdict !== 'ok') {
+    return { ok: false, reason: `the journal is corrupt and refuses an append: ${candidate.corruption.at(-1)?.reason ?? 'unknown corruption'}` }
+  }
+  if (!appended || appended.seq !== entry.seq || appended.quarantine) {
+    return { ok: false, reason: `the journal refuses an entry without fence authority: ${appended?.quarantine ?? 'the entry could not be placed'}` }
+  }
   // O_NOFOLLOW closes the check/open race the lstat above cannot: a symlink
   // swapped in between fails the open itself with ELOOP instead of being
   // followed anywhere the planter chose.
-  const created = !existsSync(store.journalPath)
+  const created = !exists
   const fd = openSync(store.journalPath, fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o600)
   try {
     writeAllSync(fd, framed.line)

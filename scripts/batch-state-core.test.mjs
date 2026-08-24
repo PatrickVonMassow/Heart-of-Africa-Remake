@@ -43,16 +43,17 @@ describe('splitFrames', () => {
 
 describe('replayJournal', () => {
   it('replays a healthy journal: ok, in order, high water from the fences', () => {
-    const text = line({ seq: 1, fence: 6, kind: 'fence-transition' }) + line({ seq: 2, fence: 7, kind: 'command', key: 'k1' })
+    const text = line({ seq: 1, fence: 6, kind: 'fence-transition' }) + line({ seq: 2, fence: 7, kind: 'fence-transition' }) + line({ seq: 3, fence: 7, kind: 'command', key: 'k1' })
     const replay = replayJournal(text)
     expect(replay.verdict).toBe('ok')
-    expect(replay.entries.map((e) => e.seq)).toEqual([1, 2])
+    expect(replay.entries.map((e) => e.seq)).toEqual([1, 2, 3])
+    expect(replay.entries.every((e) => !e.quarantine)).toBe(true)
     expect(replay.droppedTail).toBeNull()
     expect(replay.highWater).toBe(7)
   })
 
   it('reads a truncated FINAL record as an ordinary crash: dropped, reported, still ok', () => {
-    const whole = line({ seq: 1, fence: 7, kind: 'command', key: 'k1' })
+    const whole = line({ seq: 1, fence: 7, kind: 'fence-transition' })
     const partial = line({ seq: 2, fence: 7, kind: 'command', key: 'k2' }).slice(0, 20)
     const replay = replayJournal(whole + partial)
     expect(replay.verdict).toBe('ok')
@@ -62,7 +63,7 @@ describe('replayJournal', () => {
   })
 
   it('reads a checksum mismatch as corruption wherever it stands — even on the final line', () => {
-    const good = line({ seq: 1, fence: 7, kind: 'command', key: 'k1' })
+    const good = line({ seq: 1, fence: 7, kind: 'fence-transition' })
     const tampered = line({ seq: 2, fence: 7, kind: 'command', key: 'k2' }).replace('"k2"', '"kX"')
     const replay = replayJournal(good + tampered)
     expect(replay.verdict).toBe('corrupt')
@@ -77,11 +78,23 @@ describe('replayJournal', () => {
   })
 
   it('refuses a seq that repeats or steps backwards as corruption, and allows a gap', () => {
+    const transition = line({ seq: 1, fence: 7, kind: 'fence-transition' })
     const a = line({ seq: 3, fence: 7, kind: 'command', key: 'k1' })
     const repeat = line({ seq: 3, fence: 7, kind: 'command', key: 'k2' })
-    expect(replayJournal(a + repeat).verdict).toBe('corrupt')
+    expect(replayJournal(transition + a + repeat).verdict).toBe('corrupt')
     const gap = a + line({ seq: 9, fence: 7, kind: 'command', key: 'k2' })
-    expect(replayJournal(gap).verdict).toBe('ok')
+    expect(replayJournal(transition + gap).verdict).toBe('ok')
+  })
+
+  it('quarantines use of a fence until its transition has appeared, and after a different transition', () => {
+    const replay = replayJournal(
+      line({ seq: 1, fence: 7, kind: 'command', key: 'too-early' })
+      + line({ seq: 2, fence: 7, kind: 'fence-transition' })
+      + line({ seq: 3, fence: 8, kind: 'command', key: 'wrong-fence' }),
+    )
+    expect(replay.entries[0].quarantine).toMatch(/no fence transition precedes/)
+    expect(replay.entries[1].quarantine).toBeUndefined()
+    expect(replay.entries[2].quarantine).toMatch(/not the fence in force/)
   })
 
   it('quarantines an unknown kind in place instead of condemning the journal', () => {
@@ -105,7 +118,7 @@ describe('replayJournal', () => {
 describe('appliedKeys', () => {
   it('rebuilds the applied set from command entries and never from quarantined ones', () => {
     const entries = replayJournal(
-      line({ seq: 1, fence: 7, kind: 'command', key: 'k1' }) + line({ seq: 2, fence: 7, kind: 'weather-report', key: 'k2' }),
+      line({ seq: 1, fence: 7, kind: 'fence-transition' }) + line({ seq: 2, fence: 7, kind: 'command', key: 'k1' }) + line({ seq: 3, fence: 7, kind: 'weather-report', key: 'k2' }),
     ).entries
     const keys = appliedKeys(entries)
     expect(keys.has('k1')).toBe(true)

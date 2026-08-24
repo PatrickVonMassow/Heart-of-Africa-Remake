@@ -76,7 +76,12 @@ export function splitFrames(text) {
  *  Seq must be STRICTLY INCREASING: one writer appending to one file cannot
  *  legally produce a repeat or a step backwards, so either is corruption, not a
  *  quirk. A gap is legal — quarantined entries of a prior read may have been
- *  compacted away by an operator, and a gap cannot re-order what remains. */
+ *  compacted away by an operator, and a gap cannot re-order what remains.
+ *
+ *  Fence authority is POSITIONAL: a transition puts its own fence in force, and
+ *  every later non-transition entry must carry that fence until another
+ *  transition. Validly framed bytes written before any transition, or under a
+ *  different fence, remain evidence but are quarantined as unauthorized. */
 export function replayJournal(text) {
   const frames = splitFrames(text)
   const entries = []
@@ -84,6 +89,7 @@ export function replayJournal(text) {
   let droppedTail = null
   let lastSeq = 0
   let highWater = null
+  let fenceInForce = null
   frames.forEach((frame, index) => {
     const parsed = parseFramedLine(frame)
     if (!parsed.ok) {
@@ -105,11 +111,16 @@ export function replayJournal(text) {
     }
     lastSeq = entry.seq
     if (Number.isInteger(entry.fence) && (highWater === null || entry.fence > highWater)) highWater = entry.fence
-    if (!JOURNAL_KINDS.includes(entry.kind)) {
-      entries.push({ ...entry, quarantine: `unknown kind: ${entry.kind}` })
-      return
+    const quarantine = []
+    if (!JOURNAL_KINDS.includes(entry.kind)) quarantine.push(`unknown kind: ${entry.kind}`)
+    if (entry.kind === 'fence-transition') {
+      fenceInForce = entry.fence
+    } else if (fenceInForce === null) {
+      quarantine.push('no fence transition precedes this entry')
+    } else if (entry.fence !== fenceInForce) {
+      quarantine.push(`fence ${entry.fence} is not the fence in force (${fenceInForce}) at this position`)
     }
-    entries.push(entry)
+    entries.push(quarantine.length ? { ...entry, quarantine: quarantine.join('; ') } : entry)
   })
   return {
     verdict: corruption.length ? 'corrupt' : 'ok',
