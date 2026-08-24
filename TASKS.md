@@ -12007,3 +12007,50 @@ to land than a mechanism that needs a review.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
   Bundle: Chat & Tafel.
 
+
+- [ ] 899. `board-first-guard` locks a delegated author out of its own worktree. MEASURED
+  24.08.2026 by the delegated author of point 893. The guard means to exempt a delegated worktree —
+  `scripts/board-first-guard.mjs:383` returns early on `isWorktreeCheckout(REPO_ROOT)` — but
+  `REPO_ROOT` is derived from the HOOK PROCESS's cwd, and for an attached agent that is the main
+  checkout `/workspace/hoa`, not the agent's worktree. So the exemption never fires for the very
+  sessions it exists for, and the author is refused until it produces a board card it cannot
+  produce: `scripts/board.mjs` does not run in a worktree (no `.batch-dashboard.html` there),
+  `EnterWorktree` refuses, and the board belongs to the owner anyway. The block cleared by itself
+  that time and no work was lost; the next one costs a whole run. Note that the payload already
+  carries the answer — `:321` reads `payload.cwd || REPO_ROOT` for the write target — so the
+  information the exemption needs is present and simply not used at `:246`, `:316`, `:353` and
+  `:383`.
+  FINAL STATE: the worktree exemption is decided by the checkout the GUARDED CALL runs in, taken
+  from the payload, and only falls back to the hook process's own root when the payload names no
+  cwd; the same reading governs claim renewal, so an agent in a worktree neither renews nor is
+  measured against the owner's claim. A delegated author writing inside its own worktree is never
+  refused for a board card it has no way to write.
+  VERIFIABLE: unit cases over the guard's decision with a payload cwd inside a linked worktree while
+  the hook root is the main checkout (exempt), a payload cwd in the main checkout (guarded as
+  today), and a payload with no cwd at all (falls back to the hook root, behaviour unchanged).
+  Criticality: medium — it refuses a delegated author's writes without a remedy the author can
+  reach, and the current pass is luck, not design.
+  Bundle: Chat & Tafel.
+
+- [ ] 900. The review recorder answers a failed identity check with the advice to do what was
+  already done. MEASURED 24.08.2026 while recording the round-three verdict on point 892.
+  `scripts/mechanism-review.mjs:191-196` refuses an Anthropic-claimed reviewer whose authorship
+  status is not `agreement` with the text "pass --model-at <ISO> and --model-transcript
+  <session.jsonl>" — and prints exactly that even when BOTH flags were supplied and the check ran.
+  The real reason is computed one layer down and then dropped: `checkAuthorshipFile` returned
+  `unverified` with `reason: "the transcript has no model-bearing message covering the artefact
+  timestamp"`, because the natural reading of "artefact timestamp" is `new Date().toISOString()`
+  and the harness writes the session transcript with a lag, so NOW is always past its last
+  model-bearing message. Cost here: three refusals and a hand-probe of `authorship-check-io.mjs`
+  before the reason was visible; the working input turned out to be the timestamp of the last
+  model-bearing message in the transcript.
+  FINAL STATE: the refusal states the measured reason it already holds — no message covering that
+  timestamp, transcript unreadable, model disagreement — and names them apart, so the fix follows
+  from the text; where the reason is the timestamp, the refusal says which range the transcript
+  does cover. The generic "pass the two flags" advice is reserved for the case where they are
+  genuinely absent.
+  VERIFIABLE: unit cases over the refusal text — both flags absent yields the flag advice; both
+  flags present with an uncovered timestamp yields the coverage reason and the covered range; an
+  unreadable transcript yields the read error; a real model disagreement yields the disagreement.
+  Criticality: low — it costs a reviewer minutes and a source read, never correctness.
+  Bundle: Modell & Wächter.
