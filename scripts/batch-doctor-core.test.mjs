@@ -47,6 +47,14 @@ describe('planRemediation', () => {
     expect(needsRepair(plan)).toBe(false)
   })
 
+  it('reports a worktree-private batch lock as torn and never as authority', () => {
+    const path = '/repo/.claude/worktrees/point-1/.claude/batch-lock.json'
+    const plan = planRemediation({ ...clean, privateBatchLock: { path } })
+    expect(plan).toMatchObject([{ action: 'alert-private-batch-lock', level: 'alert' }])
+    expect(plan[0].reason).toContain(path)
+    expect(needsRepair(plan)).toBe(false)
+  })
+
   it('ahead-only (unpushed owner commits) is the NORMAL state — no action', () => {
     const plan = planRemediation({ ...clean, divergence: { ahead: 3, behind: 0 } })
     expect(plan).toEqual([])

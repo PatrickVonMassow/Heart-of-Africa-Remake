@@ -43,8 +43,9 @@ import {
 } from './batch-doctor-states.mjs'
 import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, assessOwner, bootTimeMs, probePid, LOCK_PATH, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
+import { CHECKOUT_ROOT, REPO_ROOT } from './repo-paths.mjs'
 
-const REPO = fileURLToPath(new URL('..', import.meta.url))
+const REPO = REPO_ROOT || fileURLToPath(new URL('..', import.meta.url))
 const LOG = join(REPO, '.claude', 'doctor.log')
 const repair = process.argv.includes('--repair')
 const gate = process.argv.includes('--gate')
@@ -179,6 +180,11 @@ const strays = gather(
 const tasksRecoverable = tasksParses ? false : gather('HEAD:TASKS.md', () => tasksRecoverableFromHead({ git }), false)
 const stalePendingSpawn = gather('the batch lock', () => findStalePendingSpawn({ lockPath: LOCK_PATH, now: nowMs, probe: probePid }), null)
 const boardBehind = gather('the board publish record', () => findBoardBehind({ repo: REPO }), null)
+const privateBatchLockPath =
+  CHECKOUT_ROOT && CHECKOUT_ROOT !== REPO ? join(CHECKOUT_ROOT, '.claude', 'batch-lock.json') : ''
+const privateBatchLock = privateBatchLockPath && existsSync(privateBatchLockPath)
+  ? { path: privateBatchLockPath }
+  : null
 
 log(
   `state: branch=${branch} mergeInProgress=${mergeInProgress} dirty=${dirtyFiles.length} ` +
@@ -191,6 +197,7 @@ log(
     `tasksRecoverable=${tasksRecoverable} stalePendingSpawn=${stalePendingSpawn ? 'yes' : 'no'} ` +
     `boardBehind=${boardBehind ? 'yes' : 'no'} ownerAlive=${ownerAlive}`,
 )
+if (privateBatchLock) log(`TORN: worktree-private batch lock found at ${privateBatchLock.path}; it is not authority`)
 
 // --- Plan + execute ------------------------------------------------------------
 
@@ -209,6 +216,7 @@ const plan = planRemediation({
   stalePendingSpawn,
   boardBehind,
   ownerAlive,
+  privateBatchLock,
 })
 
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')

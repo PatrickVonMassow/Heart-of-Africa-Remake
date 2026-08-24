@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { repositoryRoot } from './repo-paths.mjs'
+import { repositoryCheckoutRoot, repositoryRoot } from './repo-paths.mjs'
 
 describe('repositoryRoot', () => {
   const temporaryDirectories = []
@@ -40,6 +40,46 @@ describe('repositoryRoot', () => {
         moduleUrl: pathToFileURL('/live/repository/scripts/repo-paths.mjs').href,
       }),
     ).toBe(resolve(repository))
+  })
+
+  it('resolves a linked worktree through the common repository to the main checkout', () => {
+    const repository = temporaryDirectory()
+    const worktree = temporaryDirectory()
+    execFileSync('git', ['-C', repository, 'init', '-q', '-b', 'main'], { windowsHide: true })
+    execFileSync('git', ['-C', repository, 'config', 'user.email', 'test@example.invalid'], { windowsHide: true })
+    execFileSync('git', ['-C', repository, 'config', 'user.name', 'test'], { windowsHide: true })
+    execFileSync('git', ['-C', repository, 'commit', '--allow-empty', '-qm', 'initial'], { windowsHide: true })
+    mkdirSync(join(repository, '.claude'))
+    rmSync(worktree, { recursive: true, force: true })
+    execFileSync('git', ['-C', repository, 'worktree', 'add', '-q', '-b', 'feat/test', worktree], { windowsHide: true })
+
+    expect(repositoryRoot({ explicitRoot: '', cwd: worktree })).toBe(resolve(repository))
+    expect(repositoryCheckoutRoot({ cwd: worktree })).toBe(resolve(worktree))
+  })
+
+  it('gives linked processes one real singleton lock in the main checkout', () => {
+    const repository = temporaryDirectory()
+    const worktree = temporaryDirectory()
+    execFileSync('git', ['-C', repository, 'init', '-q', '-b', 'main'], { windowsHide: true })
+    execFileSync('git', ['-C', repository, 'config', 'user.email', 'test@example.invalid'], { windowsHide: true })
+    execFileSync('git', ['-C', repository, 'config', 'user.name', 'test'], { windowsHide: true })
+    execFileSync('git', ['-C', repository, 'commit', '--allow-empty', '-qm', 'initial'], { windowsHide: true })
+    mkdirSync(join(repository, '.claude'))
+    rmSync(worktree, { recursive: true, force: true })
+    execFileSync('git', ['-C', repository, 'worktree', 'add', '-q', '-b', 'feat/lock-test', worktree], { windowsHide: true })
+
+    const singletonUrl = pathToFileURL(resolve('scripts/batch-singleton.mjs')).href
+    const run = (cwd, expression) =>
+      execFileSync(process.execPath, ['--input-type=module', '--eval', `const m = await import(${JSON.stringify(singletonUrl)}); ${expression}`], {
+        cwd,
+        encoding: 'utf8',
+        windowsHide: true,
+      }).trim()
+
+    expect(run(worktree, "console.log(m.acquire('fixture-session', { pid: process.pid, pidStartedAt: Date.now() }))")).toBe('acquired')
+    expect(existsSync(join(repository, '.claude', 'batch-lock.json'))).toBe(true)
+    expect(existsSync(join(worktree, '.claude', 'batch-lock.json'))).toBe(false)
+    expect(run(repository, 'console.log(m.readOwnerLock()?.sessionId ?? \'missing\')')).toBe('fixture-session')
   })
 
   it('falls back to the module location when cwd is not in a repository', () => {

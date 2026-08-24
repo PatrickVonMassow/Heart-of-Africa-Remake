@@ -26,6 +26,7 @@
  *   stalePendingSpawn: { sessionId, ageMs }, // (e) a pending-spawn lock nobody converted
  *   boardBehind: { reason },                 // (f) local board newer than the published page
  *   ownerAlive,                              // a live owner forbids the process sweep
+ *   privateBatchLock: { path },              // forbidden worktree-local authority
  * }
  * Returns an ordered list of actions:
  *   { action, level: 'auto' | 'repair' | 'alert', reason, targets? }
@@ -49,6 +50,16 @@ export function planRemediation(state) {
       reason:
         `${locks.length} stale git lock file(s) survive a killed commit or push (${locks.map((l) => l.path).join(', ')}). ` +
         'No git process can be holding them any more, and while they lie there every write git is asked for is refused.',
+    })
+  }
+
+  if (state.privateBatchLock?.path) {
+    plan.push({
+      action: 'alert-private-batch-lock',
+      level: 'alert',
+      reason:
+        `A linked worktree carries a private batch lock at ${state.privateBatchLock.path}. ` +
+        'It is torn state, never singleton authority; only the main checkout lock may be honoured.',
     })
   }
 
