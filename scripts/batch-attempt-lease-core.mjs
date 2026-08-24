@@ -285,6 +285,21 @@ export function worktreeClaimKey(worktree) {
   return { ok: true, key }
 }
 
+/** The claims map a caller presents, or a refusal. Absence is null or an omitted
+ *  field — exactly as it is for a lease — and every other unreadable value is
+ *  uncertain ownership. `Object.hasOwn` answers false on a primitive, so a
+ *  persisted `false`, `0`, `''` or `NaN` fell through to the fresh-claim path and
+ *  the worktree was handed out as if nothing held it, while a persisted string was
+ *  spread into a map of its own characters and a null map threw (hostile re-read of
+ *  point 893, the class the review closed for the existing lease). */
+function readClaims(claims) {
+  if (claims === null || claims === undefined) return { ok: true, claims: {} }
+  if (typeof claims !== 'object' || Array.isArray(claims)) {
+    return { ok: false, reason: 'the worktree claims on record are unreadable; ownership is uncertain and uncertain fails closed' }
+  }
+  return { ok: true, claims }
+}
+
 /** Every claims map this module hands out is sealed DOWN TO ITS RECORDS, and the
  *  records are fresh copies. A frozen map around writable records, or a map handed
  *  straight back to its caller, is ownership evidence its holder can rewrite: the
@@ -309,6 +324,9 @@ function sealedClaims(claims) {
  *  around a writable record let a holder relabel ownership, after which another
  *  attempt read as the holder (cross-vendor review of point 893). */
 export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
+  const read = readClaims(claims)
+  if (!read.ok) return { ok: false, reason: read.reason }
+  claims = read.claims
   const keyed = worktreeClaimKey(worktree)
   if (!keyed.ok) return { ok: false, reason: keyed.reason }
   if (!attempt.batchId || !attempt.pointId || !attempt.attemptId) return { ok: false, reason: 'a claim names its attempt' }
@@ -324,6 +342,11 @@ export function claimWorktree({ claims = {}, worktree = null, attempt = {} } = {
 }
 
 export function releaseWorktree({ claims = {}, worktree = null, attempt = {} } = {}) {
+  // A release out of a map this module cannot read is a freeing action taken on
+  // unknown ownership, so it refuses here exactly as the claim does.
+  const read = readClaims(claims)
+  if (!read.ok) return { ok: false, reason: read.reason }
+  claims = read.claims
   const keyed = worktreeClaimKey(worktree)
   // An unkeyable path can never be a stored key, so there is nothing to release.
   if (!keyed.ok || !Object.hasOwn(claims, keyed.key)) return { ok: true, claims: sealedClaims(claims), released: false }

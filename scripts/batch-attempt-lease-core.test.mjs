@@ -392,6 +392,28 @@ describe('worktree claims — one worktree, one attempt, fail closed', () => {
     expect(res.reason).toMatch(/uncertain fails closed/)
   })
 
+  it('quarantines an unreadable claims map instead of reading it as no claims at all', () => {
+    // The same class the review closed for the existing LEASE, in the claims map:
+    // `Object.hasOwn` answers false on a primitive, so a persisted `false`, `0`,
+    // `''` or `NaN` fell through to the fresh-claim path and the worktree was
+    // handed out as if nothing held it — and a persisted string was spread into a
+    // map of its own characters. Unreadable is uncertain, and uncertain fails
+    // closed (hostile re-read of point 893).
+    for (const persisted of [false, 0, '', NaN, 'garbage', ['/wt/a']]) {
+      const claimed = claimWorktree({ claims: persisted, worktree: '/wt/a', attempt })
+      expect(claimed.ok, String(persisted)).toBe(false)
+      expect(claimed.reason, String(persisted)).toMatch(/uncertain fails closed/)
+      const released = releaseWorktree({ claims: persisted, worktree: '/wt/a', attempt })
+      expect(released.ok, String(persisted)).toBe(false)
+      expect(released.reason, String(persisted)).toMatch(/uncertain fails closed/)
+    }
+    // Absence is null or an omitted field, exactly as it is for a lease, and only
+    // absence claims. Neither may throw the way a null map used to.
+    expect(claimWorktree({ claims: null, worktree: '/wt/a', attempt }).ok).toBe(true)
+    expect(claimWorktree({ worktree: '/wt/a', attempt }).ok).toBe(true)
+    expect(releaseWorktree({ claims: null, worktree: '/wt/a', attempt })).toMatchObject({ ok: true, released: false })
+  })
+
   it('releases only for the claiming attempt', () => {
     const { claims } = claimWorktree({ claims: {}, worktree: '/wt/a', attempt })
     expect(releaseWorktree({ claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
