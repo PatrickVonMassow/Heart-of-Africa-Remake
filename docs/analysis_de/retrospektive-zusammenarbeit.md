@@ -55,6 +55,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 23.08. morgens | Ein Test über einem erzeugten Dokument verglich es mit einer frischen Ernte derselben Quellen — fünf falsche Aufrufzeilen standen jahrelang unter grünem Test, gefunden erst beim Lesen eines Diffs (§3.165) |
 | 22.08. | Der Vier-Augen-Schnitt der Bauordnung ließ einen gezählten Eintrag liegen, weil eine Regel-Signatur sechs Regeln zu weit greift — der Mechanismus entschied mit (§3.156); derselbe Tag zeigte den Prüfstand, der an der Umgebung statt am Code stirbt, und den Starter, der seine Einzigartigkeit aus einer Notizdatei liest (Punkte 830, 831); das Etikett einer blind geschriebenen Hälfte war der einzige Verfasser-Nachweis und log fünf Tage lang (§3.157); und der Parallel-Detektor meldete die Chat-Sitzung des Nutzers als zweiten Arbeiter, der derselbe Wächter gerade Stillstehen angesagt hatte (§3.158, Punkt 841) |
 | 21.08. abends | Die Übergabe trug den Zustand, aber nicht das Leben: Der delegierte Autorenlauf starb mit seiner Elternsitzung, die Deklaration meldete ihn weiter als laufend, und seine angefangene Arbeit lag unversioniert im Arbeitsbaum und blockierte dort die eigene Fortsetzung (§3.155) |
+| 24.08. nachts | Die Vier-Augen-Regel sperrte sich selbst ein: Punkt 834 war fertig und grün, aber seine Prüfrunde liess sich auf keiner Basis beauftragen — ein Merge ohne Autor-Trailer nahm sieben Dateien den beweisbaren Gegenleser, und der Planer verweigerte darauf die ganze Runde statt dieser Dateien, obwohl die Ledger die Ausnahme-Satzart dafür längst führt (§3.169); derselbe Blick fand einen Auftragspunkt, der ohne Zeilenumbruch an den vorigen geklebt war und deshalb für jeden Leser der Datei nicht existierte |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
@@ -1324,7 +1325,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 23.08.2026, 23:16 · Quellen-Fingerprint: `6640b433952e…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 03:11 · Quellen-Fingerprint: `34d8df6ffe1b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1361,7 +1362,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 19 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 20 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1422,8 +1423,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 91 Prozess-/Meta-TASKS-Punkte (davon 35 offen).
 
-<!-- RETRO-FINGERPRINT: 6640b433952e9365eda8c88882a402e625a9b380a3d76f1005a0d3044a89af0d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-23T21:16:14.079Z -->
+<!-- RETRO-FINGERPRINT: 34d8df6ffe1bf5bee31997ff4c0ceb1d44fc7687c6fd0c9ed03b5eed854d5679 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T01:11:34.999Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3085,3 +3086,37 @@ der ein Widerspruch zwischen ihnen auffallen kann, bevor er Code wird. Prüffrag
 Anlegen eines Punktes: *Wenn es das schon gibt — wäre der bestehende Zielzustand für
 meinen Fall richtig, oder erklärt er ihn zum Fehler?* Ein Befund, der einen bestehenden
 Punkt WIDERLEGT, gehört zwingend in diesen Punkt und nicht daneben.
+
+### 3.169 Die Vier-Augen-Regel hat sich selbst eingesperrt
+
+In der Nacht zum 24.08.2026 war Punkt 834 fertig: 94 Commits, 28 Autorenrunden, die letzte
+allein rund 62 $, und die Tore grün — Build, Lint, 13350 Unit-Tests. Gefehlt hat nur das
+Gegenlesen. Es liess sich nicht beauftragen. Nicht „es fiel schlecht aus" — es liess sich
+auf **keiner** Basis überhaupt starten.
+
+Der Grund war ein Merge, der Konflikte über 41 Dateien mit 2119 Einfügungen aufgelöst und
+keinen `Co-Authored-By`-Trailer getragen hatte. Der Planer liest den Bereich mit
+`--diff-merges=cc`, und das ist richtig so: eine Konfliktauflösung IST geschriebener Code.
+Nur steht bei diesem keine Hand darunter. Für sieben Enddateien war damit kein
+unabhängiger Gegenleser mehr beweisbar — und der Planer verweigerte daraufhin nicht diese
+sieben, sondern die GANZE Runde. 87 % lesbares Material blieben wegen der übrigen 13 %
+ungelesen.
+
+Das Bitterste stand schon im Haus: Die Ledger führt eine Satzart für genau diese Ausnahme,
+`criticality-review-unavailable`, gegen Git verifiziert. Ihre eigene Dokumentation sagt
+aber, sie „answers no refusal" — kein Befehl schreibt sie, und der Planer liest sie nie.
+Zwei Hälften desselben Mechanismus, gebaut für denselben Fall, und nie miteinander
+verbunden. Der vom Werkzeug selbst genannte Ausweg, enger zu schneiden, führte in zwei
+weitere Sackgassen: teurer (21 statt 13 Pässe) und mitten in einen bereits gefilten
+Nachbardefekt. Übrig blieben nur eine Historien-Umschreibung, die jede aufgezeichnete
+Prüf-Sha des Zweigs entwertet hätte, oder das Vorbeirecherchieren an der eigenen Regel.
+
+**Lehre:** Ein Wächter über einer Regel, die niemand umgehen darf, braucht trotzdem einen
+gebauten, geprüften Weg für den Fall, dass seine Vorbedingung nachweislich nicht
+herstellbar ist — sonst sperrt er irgendwann die Arbeit ein, die er schützen sollte. Das
+ist dieselbe Klasse wie 3.153, nur eine Stufe härter: dort verlangte ein Tor eine Freigabe,
+die seine Werkzeuge nicht herstellen konnten; hier EXISTIERT die Freigabe als Satzart und
+ist trotzdem wirkungslos, weil niemand sie schreibt und niemand sie liest. Prüffrage beim
+Bauen eines Wächters: *Was passiert, wenn meine Vorbedingung unerfüllbar ist — habe ich
+dafür einen Weg, und ist er an beiden Enden angeschlossen?* Und: eine Verweigerung sollte
+so schmal sein wie ihr Grund. Alles-oder-nichts ist die teuerste Form, recht zu haben.
