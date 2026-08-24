@@ -64,8 +64,12 @@ function snapshotLease(lease) {
   if (!identity || !holder) return null
   const snapshot = { ...identity, leaseId: lease.leaseId, holder, grantedAt: lease.grantedAt, expiresAt: lease.expiresAt }
   // An OMITTED renewal stays omitted: `renewedAt: undefined` is a renewal the
-  // usability check would have to treat as present-but-unreadable.
-  if (lease.renewedAt !== undefined) snapshot.renewedAt = lease.renewedAt
+  // usability check would have to treat as present-but-unreadable. It is READ ONCE
+  // like every other field — testing `lease.renewedAt` and then assigning it again
+  // let a getter show a late renewal to the test and an earlier one to the record
+  // the clock fence is dated by (cross-vendor review of point 893).
+  const renewedAt = lease.renewedAt
+  if (renewedAt !== undefined) snapshot.renewedAt = renewedAt
   return snapshot
 }
 
@@ -294,22 +298,40 @@ export function leaseAllowsWrite({ lease = null, holder = {}, leaseId = null, no
  *  this function cannot use — with no finite `now`, every lease is reported as
  *  unjudgeable rather than silently fresh. */
 export function expiredLeaseAlerts({ leases = [], now } = {}) {
-  const identity = (l) => ({ batchId: l?.batchId ?? null, pointId: l?.pointId ?? null, attemptId: l?.attemptId ?? null })
+  const UNNAMED = { batchId: null, pointId: null, attemptId: null }
+  // An attempt is NAMED in an alert only by what reads as a name; a malformed lease
+  // is reported, and reporting it must not hand an object into a message.
+  const named = (v) => (typeof v === 'string' && v ? v : null)
   // A COLLECTION THIS FUNCTION CANNOT READ IS AN ALERT, NOT A CRASH. `leases.map`
   // threw on any persisted value that is not an array, and a sweep that throws
   // raises no alert for ANY lease — precisely the silence this function must never
   // answer. Absence is null or an omitted field, as it is everywhere else here.
   if (leases === null || leases === undefined) return []
   if (!Array.isArray(leases)) {
-    return [{ ...identity(null), alert: 'the persisted attempt leases are unreadable; ownership is uncertain and it is quarantined, not skipped' }]
-  }
-  if (!Number.isFinite(now)) {
-    return leases.map((l) => ({ ...identity(l), alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }))
+    return [{ ...UNNAMED, alert: 'the persisted attempt leases are unreadable; ownership is uncertain and it is quarantined, not skipped' }]
   }
   return leases.flatMap((raw) => {
-    const l = snapshotLease(raw)
+    // ONE READING PER LEASE, AND A READING THAT THROWS IS ITS OWN ALERT. The
+    // malformed path reached back through the failed snapshot to name the attempt,
+    // so a getter that succeeded once and threw on the second call took the WHOLE
+    // sweep down — and a sweep that throws raises no alert for any lease, which is
+    // the silence this function exists to prevent (cross-vendor review of point 893).
+    let lease = null
+    let name = UNNAMED
+    try {
+      lease = snapshotLease(raw)
+      name = lease
+        ? { batchId: lease.batchId, pointId: lease.pointId, attemptId: lease.attemptId }
+        : { batchId: named(raw?.batchId), pointId: named(raw?.pointId), attemptId: named(raw?.attemptId) }
+    } catch {
+      return [{ ...UNNAMED, alert: 'a persisted attempt lease could not be read at all; its ownership is uncertain and it is quarantined, not skipped' }]
+    }
+    if (!Number.isFinite(now)) {
+      return [{ ...name, alert: 'no finite current time was supplied; this lease cannot be judged and stands unverified' }]
+    }
+    const l = lease
     if (!usableLease(l)) {
-      return [{ ...identity(raw), alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
+      return [{ ...name, alert: 'a persisted attempt lease is malformed; its ownership is uncertain and it is quarantined, not skipped' }]
     }
     // A CLOCK BEHIND THE LEASE'S LAST EVIDENCE IS THE ONE STATE THIS FUNCTION MUST
     // NOT REPORT AS FRESH. `now <= expiresAt` holds for the whole length of a
@@ -317,10 +339,10 @@ export function expiredLeaseAlerts({ leases = [], now } = {}) {
     // every other decision here fences (cross-vendor review of point 893). An
     // unusable clock is an alert here as it is a refusal everywhere else.
     if (now < clockFloor(l)) {
-      return [{ ...identity(l), alert: `the clock is ${clockFloor(l) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }]
+      return [{ ...name, alert: `the clock is ${clockFloor(l) - now}ms before this lease's last renewal — a rolled-back clock cannot judge expiry` }]
     }
     if (now <= l.expiresAt) return []
-    return [{ ...identity(l), alert: `attempt lease expired ${now - l.expiresAt}ms ago and its holder pid ${l.holder.pid} is not proven dead` }]
+    return [{ ...name, alert: `attempt lease expired ${now - l.expiresAt}ms ago and its holder pid ${l.holder.pid} is not proven dead` }]
   })
 }
 
@@ -362,16 +384,30 @@ function readClaims(claims) {
   // it writes them canonical, so any other spelling is corrupted or hand-edited
   // ownership: unreadable, and unreadable fails closed rather than being tidied
   // into a key nobody persisted.
-  for (const key of Object.keys(claims)) {
-    const keyed = worktreeClaimKey(key)
-    if (!keyed.ok || keyed.key !== key) {
-      return {
-        ok: false,
-        reason: `the worktree claims on record carry the non-canonical key ${JSON.stringify(key)}; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
+  // AND THE MAP IS READ HERE, ONCE, INTO PLAIN RECORDS. Every decision below — the
+  // occupancy test, the identity comparison, the map that is handed back — used to
+  // reach through to the caller's own records, so an accessor could show a valid
+  // name to the guard and another value to the comparison or to the sealing that
+  // followed (cross-vendor review of point 893). A record is copied field by field
+  // and NOT tidied: an unreadable one stays exactly as unreadable as it was, so the
+  // collision path still fails closed on it. A record whose own reading THROWS is
+  // the loudest kind of unreadable and is answered as such, never as a crash.
+  const read = {}
+  try {
+    for (const [key, record] of Object.entries(claims)) {
+      const keyed = worktreeClaimKey(key)
+      if (!keyed.ok || keyed.key !== key) {
+        return {
+          ok: false,
+          reason: `the worktree claims on record carry the non-canonical key ${JSON.stringify(key)}; which attempt holds a worktree is then uncertain, and uncertain fails closed`,
+        }
       }
+      read[key] = record && typeof record === 'object' ? { ...record } : record
     }
+  } catch {
+    return { ok: false, reason: 'the worktree claims on record could not be read at all; ownership is uncertain and uncertain fails closed' }
   }
-  return { ok: true, claims }
+  return { ok: true, claims: read }
 }
 
 /** Every claims map this module hands out is sealed DOWN TO ITS RECORDS, and the

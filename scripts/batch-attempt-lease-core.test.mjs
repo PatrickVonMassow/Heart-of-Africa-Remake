@@ -278,6 +278,74 @@ describe('the clock a lease is judged against — cross-vendor review of point 8
   })
 })
 
+describe('a record is read once — the accessor class of the cross-vendor review', () => {
+  const flipping = (first, second) => {
+    let read = 0
+    return () => (read++ === 0 ? first : second)
+  }
+
+  it('dates the clock fence at the renewal it READ, not at a later reading of it', () => {
+    // `if (lease.renewedAt !== undefined) snapshot.renewedAt = lease.renewedAt`
+    // read the field twice: a getter showed a late renewal to the test and an
+    // earlier one to the record the fence is dated by, so the rolled-back clock
+    // this module fences on read as merely early again.
+    const late = flipping(30_000, 12_000)
+    const persisted = { ...grant().lease, get renewedAt() { return late() } }
+    const res = leaseAllowsWrite({ lease: persisted, holder, leaseId: 'L1', now: 15_000 })
+    expect(res.verdict).toBe('fenced')
+    expect(res.reason).toMatch(/rolled-back clock/)
+  })
+
+  it('hands back the ownership it VALIDATED after an idempotent claim', () => {
+    // The occupancy test ran on the validated identity while the map handed back
+    // was sealed around a SECOND reading of the same record: a1's idempotent claim
+    // returned frozen ownership naming a2, and a2 could then release the worktree
+    // a1 holds.
+    const attemptId = flipping('a1', 'a2')
+    const stored = { batchId: 'b', pointId: 'p834', get attemptId() { return attemptId() } }
+    const held = claimWorktree({ claims: { '/wt/a': stored }, worktree: '/wt/a', attempt })
+    expect(held).toMatchObject({ ok: true, alreadyHeld: true })
+    expect(held.claims['/wt/a'].attemptId).toBe('a1')
+    expect(releaseWorktree({ claims: held.claims, worktree: '/wt/a', attempt: { ...attempt, attemptId: 'a2' } }).ok).toBe(false)
+  })
+
+  it('quarantines a lease whose reading THROWS instead of losing the whole sweep', () => {
+    // The malformed path reached back through the failed snapshot to name the
+    // attempt. A getter that answered once and threw on the second call took the
+    // entire sweep down with it — and a sweep that throws raises no alert for any
+    // lease, which is the silence this function exists to prevent.
+    const batchId = flipping('b', null)
+    const hostile = {
+      get batchId() {
+        const v = batchId()
+        if (v === null) throw new Error('unreadable')
+        return v
+      },
+      pointId: 'p834',
+      attemptId: 'aX',
+      leaseId: 'LX',
+      holder: null,
+      grantedAt: 10_000,
+      expiresAt: 20_000,
+    }
+    const expired = grant().lease
+    const alerts = expiredLeaseAlerts({ leases: [hostile, expired], now: 10_000 + ATTEMPT_LEASE_TTL_MS + 500 })
+    expect(alerts).toHaveLength(2)
+    expect(alerts[0].alert).toMatch(/could not be read at all/)
+    expect(alerts[0].attemptId).toBeNull()
+    expect(alerts[1].alert).toMatch(/expired/)
+    expect(alerts[1].attemptId).toBe('a1')
+  })
+
+  it('refuses a claims map it cannot read at all rather than throwing out of the claim', () => {
+    const boom = { batchId: 'b', pointId: 'p834', get attemptId() { throw new Error('unreadable') } }
+    const res = claimWorktree({ claims: { '/wt/a': boom }, worktree: '/wt/b', attempt })
+    expect(res.ok).toBe(false)
+    expect(res.reason).toMatch(/could not be read at all/)
+    expect(releaseWorktree({ claims: { '/wt/a': boom }, worktree: '/wt/a', attempt }).ok).toBe(false)
+  })
+})
+
 describe('expiredLeaseAlerts', () => {
   it('alerts per expired lease and stays silent inside the term', () => {
     const lease = grant().lease
