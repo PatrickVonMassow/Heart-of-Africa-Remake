@@ -5827,25 +5827,35 @@ Build order, chosen so no two parallel agents own the same file:
   start stamp is rejected, one with `start · ~end` passes) and the gate's refusal; a live
   handover leaves no stale card behind.
 
-- [ ] 466. The doc verification checks a sentence the README no longer has (30.07.2026,
-  found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
-  `main`, so it is PRE-EXISTING and was not caused by that work; bundle Testinfrastruktur).
-  `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
-  and "README count matches CLAUDE.md §7.1" — because the README no longer carries the
-  "All N acceptance criteria" phrase the check greps for. A verification that is red for a
-  reason nobody is fixing trains everyone to ignore it, which is the failure mode that let a
-  red run sit unnoticed for three weeks before.
-  FINAL STATE: decide it in the commit and act, do not silence it — either the README carries
-  the count again (and the check keeps it honest), or the two checks go and their intent is
-  written into the commit message. Whichever way, `node scripts/verify/docs.mjs` exits 0 on a
-  clean `main`.
-  IN THE SAME POINT: `docs.mjs` gains the `Detail:` pointer check that mirrors its existing
-  `Evidence:` checks — every acceptance criterion whose detail was moved out must resolve to
-  a real section in `docs/acceptance-criteria-detail.md`, so the move can never rot the way an
-  unchecked pointer does. That is a gate change and therefore needs the other model's recorded
-  review before it lands (`mechanism-review-guard`).
-  VERIFIABLE: `docs.mjs` green on `main`; the pure layer covers the pointer check against a
-  present, a missing and a misspelled detail section.
+- [ ] 466. The doc verification is red on a clean `main`, and its pointer checks now judge
+  nothing. RE-MEASURED 24.08.2026 on `main` (`npm test -- docs`, twice, same six checks):
+  `docs` reports 4 pass, 6 fail, and every failure is a POINTER check reporting
+  "0 evidence pointers judged / no pointers matched" plus the mirror-image orphan complaint
+  naming all 32 sections. The cause is not the README sentence this point was filed for in
+  July — those checks pass again. It is the doc-floor cut of 20.08.2026 (`79b6e4f1`): CLAUDE.md
+  §7.1 no longer carries a per-criterion `Evidence: docs/acceptance-evidence.md §N.` or
+  `Detail: docs/acceptance-criteria-detail.md §N.` line. It carries ONE blanket sentence
+  instead — "its condition and its evidence live under the same number" — while
+  `scripts/verify/docs.mjs` still greps for the per-criterion lines, finds none, and fails
+  both families: no pointer resolves, and every section in both target documents reads as an
+  orphan.
+  WHAT IT COSTS: `docs` is in the SMALL gate, so EVERY point that touches a `.md` file meets
+  this red and has to charge it away — which is exactly the training-to-ignore-a-red this
+  point was filed against. It has been red since 20.08.2026.
+  FINAL STATE: the check follows the rule the document now states. §7.1's blanket sentence IS
+  the pointer, so `docs.mjs` judges it that way: every criterion number in §7.1 resolves to a
+  section of the same number in BOTH target documents, and neither document holds a section no
+  criterion has — the orphan direction that made the original check worth having is kept.
+  Restoring 32 pointer lines to CLAUDE.md is the alternative and is rejected unless the budget
+  measurement says otherwise: that file sits near its measured ceiling
+  (`scripts/doc-budget-core.mjs`), and the cut that removed them was deliberate.
+  That is a gate change and needs the other vendor's recorded review before it lands
+  (`mechanism-review-guard`).
+  VERIFIABLE: `npm test -- docs` green on a clean `main`; the pure layer covers a present, a
+  missing and a misspelled section in each of the two target documents, and an orphan section
+  in each.
+  Criticality: medium — it blocks nothing, but it is a standing red in the everyday gate.
+  Bundle: Testinfrastruktur.
 
 - [ ] 531. The spec documents still describe the old bird's-eye collision (found
   06.08.2026 while closing point 299, escalated by the building agent rather than
