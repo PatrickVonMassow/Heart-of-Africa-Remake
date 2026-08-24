@@ -1048,6 +1048,57 @@ describe('the stand-down boundary — declared children cross ownership', () => 
     ])
   })
 
+  it('does not let a gone recorded pid refute a foreign explicit branch', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/B'] })
+    expect(probe.evidence).toEqual([
+      { kind: 'branch', ref: 'feat/A' },
+      { kind: 'branch', ref: 'feat/B' },
+    ])
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: (ref) => (ref === 'feat/B' ? NOW - 60_000 : NOW - 60 * 60_000),
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: false,
+      reason: 'agent-alive',
+      judgedOn: 'git',
+      output: { verdict: 'alive' },
+    })
+  })
+
+  it('keeps a gone recorded pid when explicit arguments re-state its own address', () => {
+    const recorded = declaration({
+      evidence: [
+        { kind: 'branch', ref: 'feat/A' },
+        { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED },
+      ],
+    })
+    const probe = agentCheckDeclaration(recorded, { branches: ['feat/A'] })
+    expect(probe.evidence).toEqual(recorded.evidence)
+    expect(
+      checkDeclaredAgentOutput(probe, {
+        now: NOW,
+        branchProbe: () => NOW - 60_000,
+        pidProbe: () => dead(),
+      }),
+    ).toMatchObject({
+      checked: true,
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      output: { verdict: 'dead' },
+    })
+  })
+
   it('turns a live declared agent into a transfer, never a silent stand-down', () => {
     expect(
       standDownBoundaryDecision({

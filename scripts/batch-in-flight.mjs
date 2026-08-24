@@ -708,17 +708,30 @@ export function declaredAgentCheckCommand(declaration) {
 /**
  * The declaration is the source of truth for `--agent-check`. Explicit output
  * addresses remain useful for one-off checks, but they augment the recorded
- * evidence instead of replacing it: otherwise the hook's printed command can
- * silently omit the pid identity that the declaration already knows.
+ * addresses instead of replacing them. A recorded pid comes along only when
+ * every explicit address is already in that declaration: one combined verdict
+ * cannot truthfully apply agent A's pid refutation to foreign agent B output.
+ * We drop pids for that mixed probe instead of splitting the printed verdict,
+ * because its purpose is to answer all named output with one replacement
+ * decision; separate verdicts could again call one quiet address dead while
+ * another address in the same requested probe is moving.
  */
 export function agentCheckDeclaration(declaration, { worktrees = [], branches = [], logs = [] } = {}) {
   const base = declaration && typeof declaration === 'object' ? declaration : {}
-  const evidence = Array.isArray(base.evidence) ? [...base.evidence] : []
+  const recordedEvidence = Array.isArray(base.evidence) ? base.evidence : []
   const key = (item) => {
     if (item?.kind === 'worktree' || item?.kind === 'log') return `${item.kind}:${String(item.path ?? '').trim()}`
     if (item?.kind === 'branch') return `branch:${String(item.ref ?? '').trim()}`
     return null
   }
+  const explicitEvidence = [
+    ...worktrees.map((path) => ({ kind: 'worktree', path })),
+    ...branches.map((ref) => ({ kind: 'branch', ref })),
+    ...logs.map((path) => ({ kind: 'log', path })),
+  ]
+  const recordedAddresses = new Set(recordedEvidence.map(key).filter(Boolean))
+  const hasForeignAddress = explicitEvidence.some((item) => !recordedAddresses.has(key(item)))
+  const evidence = recordedEvidence.filter((item) => !hasForeignAddress || item?.kind !== 'pid')
   const seen = new Set(evidence.map(key).filter(Boolean))
   const add = (item) => {
     const identity = key(item)
@@ -726,9 +739,7 @@ export function agentCheckDeclaration(declaration, { worktrees = [], branches = 
     seen.add(identity)
     evidence.push(item)
   }
-  for (const path of worktrees) add({ kind: 'worktree', path })
-  for (const ref of branches) add({ kind: 'branch', ref })
-  for (const path of logs) add({ kind: 'log', path })
+  for (const item of explicitEvidence) add(item)
   return { ...base, evidence }
 }
 
