@@ -192,7 +192,7 @@ function repairCutTail(store) {
     }
     const cutAt = buf.lastIndexOf(0x0a) + 1
     const droppedPath = `${store.journalPath}.dropped-${randomBytes(8).toString('hex')}`
-    writeFileAtomic(droppedPath, buf.subarray(cutAt).toString('utf8'))
+    writeFileAtomic(droppedPath, buf.subarray(cutAt))
     ftruncateSync(fd, cutAt)
     fsyncSync(fd)
     return { repaired: true, droppedPath }

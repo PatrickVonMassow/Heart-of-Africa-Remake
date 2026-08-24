@@ -5,7 +5,7 @@
 // paths an attacker or an accident could plant.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -230,6 +230,17 @@ describe('journal append and read-back', () => {
     const fragment = cut.slice(cut.lastIndexOf('\n') + 1)
     expect(appended.repairedTail).toBeTruthy()
     expect(readFileSync(appended.repairedTail, 'utf8')).toBe(fragment)
+  })
+
+  it('preserves the exact bytes of a cut tail ending inside a multibyte character', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    appendJournalEntry(store, entry(1, { kind: 'fence-transition' }))
+    const complete = Buffer.from('{"note":"€')
+    const cutInsideEuro = complete.subarray(0, complete.length - 1)
+    appendFileSync(store.journalPath, cutInsideEuro)
+    const appended = appendJournalEntry(store, entry(3))
+    expect(appended.ok).toBe(true)
+    expect(readFileSync(appended.repairedTail)).toEqual(cutInsideEuro)
   })
 
   it('reads a tampered middle as corruption — the verdict mayMintFence refuses on', () => {
