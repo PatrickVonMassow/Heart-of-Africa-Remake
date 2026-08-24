@@ -587,6 +587,18 @@
       "why": "Machine-filed from a review, criticality medium and not blocking: the six vacuous checks can be classified against a baseline, so it stands behind the release like every other non-urgent machine finding",
       "origin": "machine",
       "place": "last"
+    },
+    "869": {
+      "at": "2026-08-24T01:05:03.714Z",
+      "why": "a board CLI nuisance with a working manual route; it blocks nothing and stands behind the release like every other non-urgent finding",
+      "origin": "machine",
+      "place": "last"
+    },
+    "870": {
+      "at": "2026-08-24T01:05:08.893Z",
+      "why": "it deadlocks the queue itself: point 834 stands first and cannot be reviewed or landed at all until this is fixed, so no release work behind it can move either",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -634,7 +646,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T00:09:56.782Z",
+    "at": "2026-08-24T01:05:08.900Z",
     "points": [
       174,
       184,
@@ -894,7 +906,9 @@
       856,
       857,
       867,
-      868
+      868,
+      869,
+      870
     ]
   }
 }
