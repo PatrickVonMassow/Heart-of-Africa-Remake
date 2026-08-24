@@ -35,7 +35,7 @@ function readCardPoint(state) {
  * When the board last went LIVE. `pagesPublishedAt` is the transport's own
  * stamp — the moment the page a reader opens was last written. The legacy
  * `publishedAt` mirror is deliberately not consulted: nothing has written it
- * since the artifact transport was retired, so it would read as ancient
+ * since the board moved to its current transport, so it would read as ancient
  * forever and make every trigger publish.
  */
 function lastPublishedAt(state) {

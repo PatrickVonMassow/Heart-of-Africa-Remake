@@ -51,8 +51,8 @@ describe('a recording step carries the board', () => {
   })
 
   it('reads staleness from the LIVE publish stamp, not from the retired mirror', () => {
-    // `publishedAt` belongs to the artifact transport retired on 29.07.2026 and
-    // is never written any more. Reading it would make every trigger publish.
+    // `publishedAt` belongs to the transport retired on 29.07.2026 and is never
+    // written any more. Reading it would make every trigger publish.
     const { calls, write } = recorder()
     const result = heartbeat({
       trigger: TRIGGERS.IN_FLIGHT,
