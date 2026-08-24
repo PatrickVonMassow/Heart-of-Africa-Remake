@@ -18,7 +18,7 @@
 // path is the path that runs. --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
-import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
+import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { createServer, createConnection } from 'node:net'
 import { join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -28,9 +28,11 @@ import {
   attemptStateRecord,
   idempotencyKey,
   applyOnce,
+  sameProcess,
   validateMutation,
   revalidateAfterWrite,
 } from './batch-schema-core.mjs'
+import { AGREEMENT_SILENCE_MS } from './batch-adoption-core.mjs'
 import { appliedKeys, deriveSnapshot } from './batch-state-core.mjs'
 import { appendJournalEntry, openStateStore, readJournal, writeSnapshot } from './batch-state.mjs'
 import {
@@ -84,6 +86,14 @@ function probeOf(pid) {
   if (!Number.isInteger(pid) || pid < 1) return { live: false }
   const probe = probePid(pid)
   return { live: probe?.exists === true, pid, startedAt: probe?.startedAt ?? null }
+}
+
+function mtimeOf(path) {
+  try {
+    return statSync(path).mtimeMs
+  } catch {
+    return null
+  }
 }
 
 /** Durable exclusive create: 'wx' so a second daemon cannot claim the record,
@@ -433,7 +443,36 @@ async function serve(args) {
         const { attemptId } = request.payload ?? {}
         const known = attemptsState.get(attemptId)
         if (!known) return { ok: false, reason: `no such attempt: ${attemptId}` }
-        return { ok: true, attemptId, adoptedBy: request.sessionId, fence: request.fence, worker: workers.has(attemptId) ? workers.get(attemptId).pid : null }
+        // Adoption is an OPERATION against verified evidence, never a reading
+        // of the in-memory map (M17/M18): the successor takes over supervision
+        // only of a worker whose lease stands on disk AND in memory, whose
+        // recorded process identity probes live, and whose heartbeat moves.
+        // Everything else — dead holder, revoked lease, silent heartbeat — is
+        // reconciliation's case (step 8), not adoption's.
+        const worker = workers.get(attemptId)
+        if (!worker) {
+          return { ok: false, reason: `attempt ${attemptId} has no live worker under this daemon; reconcile it (step 8) instead of adopting` }
+        }
+        const lease = leases.get(attemptId)
+        const onDisk = readJsonIfAny(attemptPaths(worker.dir).leasePath)?.lease ?? null
+        if (!lease || !onDisk || onDisk.leaseId !== lease.leaseId) {
+          return { ok: false, reason: `attempt ${attemptId} carries no standing lease; a revoked or missing lease is reconciled, not adopted` }
+        }
+        const probe = probeOf(lease.holder?.pid)
+        if (probe.live !== true || !sameProcess(lease.holder, { pid: probe.pid, pidStartedAt: probe.startedAt })) {
+          return { ok: false, reason: `the lease holder of ${attemptId} does not probe live under its recorded identity; nothing that cannot answer is adopted` }
+        }
+        const heartbeatAt = mtimeOf(attemptPaths(worker.dir).heartbeatPath)
+        if (!Number.isFinite(heartbeatAt) || nowMs() - heartbeatAt > AGREEMENT_SILENCE_MS) {
+          return { ok: false, reason: `the worker of ${attemptId} has a missing or silent heartbeat; a stalled lane is reconciled, not adopted` }
+        }
+        return {
+          ok: true,
+          attemptId,
+          adoptedBy: request.sessionId,
+          fence: request.fence,
+          worker: { pid: lease.holder.pid, pidStartedAt: lease.holder.pidStartedAt, leaseId: lease.leaseId },
+        }
       }),
 
     'record-state': (request) =>

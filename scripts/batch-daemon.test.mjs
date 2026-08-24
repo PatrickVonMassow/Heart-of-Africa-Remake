@@ -247,6 +247,18 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(repeat).toMatchObject({ ok: true, alreadyApplied: true })
   }, 20_000)
 
+  it('adopts only a verified live lane: standing lease, live holder, moving heartbeat', async () => {
+    const live = await request('adopt-attempt', { attemptId: 'a1', fence: FENCE })
+    expect(live.ok, live.reason).toBe(true)
+    expect(live.result.worker.pid).toBeGreaterThan(0)
+    expect(live.result.worker.leaseId).toBeTruthy()
+    // A recorded attempt WITHOUT a live worker under this daemon is
+    // reconciliation's case: mere presence in the state map adopts nothing.
+    const dead = await request('adopt-attempt', { attemptId: 'cap-b', fence: FENCE })
+    expect(dead.ok).toBe(false)
+    expect(dead.reason).toMatch(/reconcile/)
+  })
+
   it('fences a resumed worker whose lease moved on: it stops, branch intact (M40)', async () => {
     // A second stub on its own branch, so fencing one lane cannot disturb the
     // checkpoint lane above.
