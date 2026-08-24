@@ -50,6 +50,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 13.08. | Der Nachprüfer findet eine echte zweite Klippe im geheilten Mechanismus — und jede der fünf gemessenen Kuren verschlechtert gesunde Dörfer stärker, als der Fehler schadet: Befund wird gebucht statt behoben (§3.115) |
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
+| 24.08. | Ein Rot, das die Wiederholung heilt: eine Netzprobe im Testfall überlebt dessen Timeout — deterministisch rot nach jedem Push, grün beim zweiten Lauf (§3.171); zehn Prüfrunden mit zehn echten Befunden neben einem Punkt bei Runde 27 ohne Konvergenz — die Rundenzahl sagt nichts, die Bewegung des Urteils alles (§3.172) |
 | 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
 | 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
 | 23.08. morgens | Ein Test über einem erzeugten Dokument verglich es mit einer frischen Ernte derselben Quellen — fünf falsche Aufrufzeilen standen jahrelang unter grünem Test, gefunden erst beim Lesen eines Diffs (§3.165) |
@@ -1327,7 +1328,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 09:21 · Quellen-Fingerprint: `27bcbac0f4c4…`
+Zuletzt aktualisiert: Montag, 24.08.2026, 11:47 · Quellen-Fingerprint: `bc6e11eec1d3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1423,10 +1424,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 95 Prozess-/Meta-TASKS-Punkte (davon 38 offen).
+Erfasste Quellen: 88 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 95 Prozess-/Meta-TASKS-Punkte (davon 37 offen).
 
-<!-- RETRO-FINGERPRINT: 27bcbac0f4c4dc04343f7b5275dadb9bc4c4afa4127889c5d3a52b2dc7627cde -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T07:21:13.897Z -->
+<!-- RETRO-FINGERPRINT: bc6e11eec1d314c1cbab52baec0d86dca181e2931b303a46a6e22066e27e7c2e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-24T09:47:30.654Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3216,3 +3217,62 @@ das Letzte sein, was ein Sterbender hinterlässt?* Und für Verweigerungstexte: 
 Nachfolger in Großbuchstaben verbietet zu handeln, sollte die Messung, auf die er sich
 stützt, im selben Atemzug nennen — hier stand `judgedOn: "git"` als Feld in der Ausgabe und
 rettete die Diagnose, während der Fließtext daneben nur Gewissheit behauptete.
+
+### 3.171 Ein Rot, das die Wiederholung heilt, ist das gefährlichste Rot
+
+Am 24.08.2026 fiel `scripts/guard-preflight-core.test.mjs` in einen Timeout — und lief bei der
+nächsten Ausführung grün durch. Genau diese Signatur verbieten unsere eigenen Regeln als Beweis:
+Eine Wiederholung ist VERDÄCHTIG und deckt nichts ab. Trotzdem ist sie verführerisch, denn ein
+Rot, das beim zweiten Mal verschwindet, sieht aus wie Rauschen auf einer belegten Maschine.
+
+Die Auflösung kam nicht aus dem Wiederholen, sondern aus dem Zerlegen. Jeder Gather-Schritt wurde
+einzeln gemessen: `ci-status-guard` brauchte 38.150 ms, jeder andere Schritt blieb unter 500 ms.
+GitHub Actions ist aus diesem Container nicht erreichbar, also brennt die KALTE Probe für jede
+gepushte Referenz ihr Netz-Timeout ab, bevor sie antwortet; danach liegt die Antwort im Cache und
+derselbe Fall braucht 3,4 s. Der Testtimeout liegt mit 30 s zwischen beiden Werten. Der Fall ist
+damit nicht flatterhaft, sondern deterministisch: rot beim ersten vollen Lauf nach jedem Push,
+grün bei jedem weiteren. Zwei Gegenproben trennten Ursache von Verdacht — derselbe Fall auf
+`main` und auf einem fremden Zweig, beide grün.
+
+Die Klasse ist heimtückischer als ein schlichter Fehlschlag, weil sie die Diagnose gegen sich
+selbst wendet. Wer einmal wiederholt, hat eine grüne Suite und ein gutes Gefühl; wer die Regel
+befolgt und die Ursache sucht, zahlt zwei volle Suite-Läufe. Der billige Weg führt zur falschen
+Antwort, der teure zur richtigen — und nur der teure hinterlässt etwas, das der nächsten Sitzung
+hilft. Der Befund steht jetzt als eigener Punkt im Arbeitsauftrag, statt als Wissen in einem
+Gesprächsverlauf zu sterben.
+
+**Lehre:** Ein Rot, das eine Wiederholung heilt, ist keine Erlaubnis weiterzugehen, sondern eine
+Frage nach der Ursache. Die Messung, die sie beantwortet, zerlegt den roten Schritt in seine
+Teile und vergleicht ihn mit einer Umgebung, in der er grün ist — nie mit sich selbst beim
+zweiten Versuch. Prüffragen: *Warum war der zweite Lauf anders als der erste?* Und wenn die
+Antwort „Cache", „Netz" oder „Last" lautet: *Steht dieser Unterschied irgendwo geschrieben, wo
+ihn der nächste Leser eines roten Laufs findet?* Verwandt mit §3.83 (rote Suiten, die der
+Prüfstand verursacht) und §3.159 (ein grüner Prüfstand beweist nur, was er lädt).
+
+### 3.172 Zehn Runden, zehn echte Befunde — und die Frage, wann Iterieren aufhört
+
+Dieselbe Sitzung trug zwei gegensätzliche Erfahrungen mit demselben Verfahren. Der neue
+Board-Heartbeat ging zehn kreuzvendorielle Runden; jede fand einen echten Defekt, das Urteil
+wanderte über `do-not-merge` und `merge-with-fixes` bis zu einem sauberen `merge`, und mehrere
+Funde waren Klassen, die eine Sitzung allein kaum findet: eine Frische-Quelle, die jede fremde
+Veröffentlichung mitverschiebt; eine Alterung modulo 24 Stunden, die einmal täglich zehn Minuten
+lang falsch frisch meldet; eine Aufzeichnung vor dem Schreiben, die einen fehlgeschlagenen
+Schreibversuch die eigene Wiederholung unterdrücken lässt. Das Verfahren hat hier genau das
+geleistet, wofür es existiert.
+
+Auf demselben Zweig lag der Gegenfall: Ein anderer Punkt stand bei Autorenrunde 27, die vier
+letzten aufgezeichneten Prüfpässe lauteten alle `do-not-merge`, und der Kern seiner Arbeit war
+weiterhin offen. Dieselbe Schleife, dieselbe Sorgfalt — nur ohne Konvergenz. Der Unterschied ist
+nicht die Anzahl der Runden, sondern ihre Richtung: Wandert das Urteil, schließt sich der Abstand;
+bleibt es stehen, während der Umfang nicht kleiner wird, iteriert das Verfahren an einem
+Gegenstand, der für eine Runde zu groß ist.
+
+Was fehlt, ist keine Obergrenze — eine feste Zahl hätte den guten Fall bei Runde fünf abgewürgt —
+sondern eine Beobachtung: Bewegt sich das Urteil? Schrumpft der offene Umfang? Findet jede Runde
+etwas Neues oder Varianten desselben? Diese Frage habe ich nicht selbst entschieden, sondern als
+Karte in »Von dir zu klären« gestellt, weil sie festlegt, wann ich Arbeit des Nutzers abbreche.
+
+**Lehre:** Die Rundenzahl allein sagt nichts. Ein Verfahren, das bei jeder Wiederholung einen
+echten Defekt findet und dessen Urteil wandert, arbeitet; eines, dessen Urteil steht, während der
+Umfang bleibt, braucht einen kleineren Gegenstand statt einer weiteren Runde. Prüffrage vor jeder
+neuen Runde: *Hat sich seit der letzten etwas bewegt außer der Zählung?*
