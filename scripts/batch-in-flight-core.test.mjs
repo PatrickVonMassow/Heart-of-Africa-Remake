@@ -1099,6 +1099,22 @@ describe('the stand-down boundary — declared children cross ownership', () => 
     expect(successorAgentOrientation({ declaration: agent, sid: SID, agentCheck: working })).toBe('')
   })
 
+  it('carries a process refutation into the stand-down and successor verdicts', () => {
+    const refuted = {
+      respawn: true,
+      reason: 'process-refuted',
+      judgedOn: 'process',
+      detail: 'pid 9001 (author) — process-gone refutes work output 1 min old',
+    }
+    expect(
+      standDownBoundaryDecision({ sid: SID, declaration: agent, agentCheck: refuted, transfer: { available: false } }),
+    ).toEqual({ action: 'stand-down', reason: 'agent-process-refuted' })
+    const text = successorAgentOrientation({ declaration: agent, sid: 'successor', agentCheck: refuted })
+    expect(text).toContain('PROCESS MEASURED DEAD')
+    expect(text).toContain('pid 9001 (author)')
+    expect(text).not.toContain('STATE UNKNOWN')
+  })
+
   it('writes the transfer at stand-down, and the successor sees and adopts it', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-standdown-'))
     const repo = join(dir, 'repo')

@@ -299,11 +299,12 @@ export function porcelainPaths(out, { limit = 400 } = {}) {
  * WHICH EVIDENCE CARRIES THE VERDICT? PURE.
  *
  * `items` is the output of `checkEvidence`, one per declared piece. Returns
- * { judgedOn, outputFresh, fresh, silent } — `judgedOn` is the strongest kind
- * that still checks out ('git' > 'process' > 'log', 'none' when nothing does),
- * and it is REPORTED wherever a verdict is printed, because the 30.07 mistake
- * was not visible in the verdict itself: "evidence-gone" named a log without
- * ever saying that a stronger source had been asked and had answered.
+ * { judgedOn, outputFresh, fresh, silent, refutations } — `judgedOn` is a
+ * positive process refutation where one exists, otherwise the strongest kind
+ * that still checks out ('git' > 'process' > 'log', 'none' when nothing does).
+ * It is REPORTED wherever a verdict is printed, because the 30.07 mistake was
+ * not visible in the verdict itself: "evidence-gone" named a log without ever
+ * saying that a stronger source had been asked and had answered.
  */
 export function evidenceVerdict(items = []) {
   const list = Array.isArray(items) ? items : []
@@ -871,6 +872,8 @@ export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
  * ms, or null where the probe could not answer.
  *
  * Returns { verdict, judgedOn, ageMs, detail }:
+ *   'dead'         — recorded process identity was positively refuted as gone
+ *                    or reused; `refutations` names it and the output it beats.
  *   'alive'        — something moved inside the grace window. `judgedOn` names
  *                    what: 'git' (its worktree or branch) or 'log'.
  *   'quiet'        — git output COULD be measured and has stood still.
@@ -940,9 +943,10 @@ export function agentOutputVerdict({
  * MAY THIS AGENT BE REPLACED? PURE. Takes the verdict above.
  * Returns { respawn, reason, judgedOn, detail }.
  *
- * Only a measurable, quiet output permits it. 'alive' and 'unmeasurable' both
- * refuse — the second because "I could not look" must never read as "it is gone",
- * the same asymmetry `GIT_STATE_UNVERIFIABLE` enforces on the release side.
+ * Measurable quiet output and a positively refuted process permit it. 'alive'
+ * and 'unmeasurable' both refuse — the second because "I could not look" must
+ * never read as "it is gone", the same asymmetry
+ * `GIT_STATE_UNVERIFIABLE` enforces on the release side.
  */
 export function respawnDecision({ output } = {}) {
   const o = output ?? { verdict: 'unmeasurable', judgedOn: 'none', detail: 'nothing probed' }
@@ -995,6 +999,7 @@ export function standDownBoundaryDecision({ sid = '', declaration = null, agentC
 
   const measured = agentCheck?.reason
   const working = measured === 'agent-alive'
+  const processRefuted = measured === 'process-refuted'
   const unknown = measured === 'output-unmeasurable' || !measured
   const available = transfer?.available === true
   if (available) {
@@ -1002,7 +1007,7 @@ export function standDownBoundaryDecision({ sid = '', declaration = null, agentC
   }
   if (working) return { action: 'block', reason: transfer?.blocked === true ? 'checkpoint-required' : 'transfer-unavailable' }
   if (unknown) return { action: 'block', reason: 'agent-unmeasurable' }
-  return plain('agent-measured-quiet')
+  return plain(processRefuted ? 'agent-process-refuted' : 'agent-measured-quiet')
 }
 
 /** The successor-facing words for the child measurement. PURE. */
@@ -1018,6 +1023,9 @@ export function successorAgentOrientation({ declaration = null, sid = '', agentC
   }
   if (agentCheck?.reason === 'output-quiet') {
     return `PREDECESSOR CHILD OUTPUT MEASURED QUIET (${agentCheck.detail}); replacement is permitted only from that measurement, not from the lock.${transferred} Re-run \`${probe}\` immediately before replacing it.`
+  }
+  if (agentCheck?.reason === 'process-refuted') {
+    return `PREDECESSOR CHILD PROCESS MEASURED DEAD (${agentCheck.detail}); replacement is permitted from that process measurement, which refutes the recorded output.${transferred} Re-run \`${probe}\` immediately before replacing it.`
   }
   return `PREDECESSOR CHILD STATE UNKNOWN (${agentCheck?.detail || 'its worktree/branch could not be read'}). The lock does not answer for children, so do not call the agent dead.${transferred} Probe with \`${probe}\`.`
 }
