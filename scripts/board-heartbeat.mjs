@@ -70,9 +70,15 @@ export function readCard(state, root) {
     const html = readFileSync(resolve(root, state.dashboardPath), 'utf8')
     const point = parseNowCardPoint(html)
     const card = point == null ? null : nowCard(html, point)
+    // `ok` MEANS THE NOW-CARD WAS FOUND, not merely that the file opened. A
+    // board whose markup names no card the reader can identify is exactly as
+    // unusable as one that would not open: acting on it would mean writing to
+    // the focus point without knowing which card the board actually names, and
+    // that is the mismatch refusal bypassed (fifth cross-vendor round).
+    if (card == null) return { ok: false, point, digest: '' }
     // The WHOLE card is the content: its status line, its stamp and its title.
     // Anything that rewrites any of them is a card the reader has not seen.
-    return { ok: true, point, digest: card ? createHash('sha256').update(card).digest('hex') : '' }
+    return { ok: true, point, digest: createHash('sha256').update(card).digest('hex') }
   } catch {
     // FAIL CLOSED, and say which failure this is. A board that could not be read
     // is not a board without a now-card: collapsing the two let an unreadable
@@ -173,7 +179,7 @@ export function heartbeat({
     if (!seen.ok) {
       // REPORTED, not merely returned: callers discard the reason, and the
       // module promises that a board which stopped following is said out loud.
-      stderr('board heartbeat: the now-card could not be read — the board is not being carried')
+      stderr('board heartbeat: no now-card could be read from the board — it is not being carried')
       return { refreshed: false, reason: 'board-unreadable' }
     }
     const record = memory === undefined ? readJson(memoryPath(owner)) : memory
@@ -199,7 +205,16 @@ export function heartbeat({
     // NOW the card's age is known exactly rather than bounded: this wrote it.
     // Re-read so the digest recorded is the one the board actually carries.
     const written = card === undefined ? readCard(seenState, owner) : null
-    keep({ digest: written?.digest ?? '', seenAt: now })
+    if (written && !written.ok) {
+      // The write went through, but what it produced cannot be read back. The
+      // record is left ALONE rather than filled with an empty digest: the next
+      // observation then finds content it has no record of and treats the age as
+      // unknown, which is the stale-and-safe direction. Saying so is the point —
+      // a silent success here would claim a reread that did not happen.
+      stderr('board heartbeat: the now-card was written but could not be read back — its age is unknown again')
+      return { refreshed: true, reason: decision.reason, status: decision.status, reread: false }
+    }
+    if (written) keep({ digest: written.digest, seenAt: now })
     return { refreshed: true, reason: decision.reason, status: decision.status }
   } catch (error) {
     // NEVER fatal: see the header. The caller recorded real work; the board

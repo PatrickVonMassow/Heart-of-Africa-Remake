@@ -166,6 +166,71 @@ describe('the production card reader, against real board markup', () => {
     }
   })
 
+  it('refuses readable HTML that names no now-card it can identify', () => {
+    // FIFTH ROUND: "the file opened" is not "I know which card the board shows".
+    // Acting on this would write to the focus point without ever having read a
+    // card — the mismatch refusal bypassed by a parse failure instead of an
+    // unreadable file.
+    const dir = withBoard('<main><p>kein Karten-Markup</p></main>')
+    try {
+      const seen = readCard({ dashboardPath: '.batch-dashboard.html' }, dir)
+      expect(seen.ok).toBe(false)
+
+      const calls = []
+      const said = []
+      const result = heartbeat({
+        trigger: TRIGGERS.REVIEW_ROUND,
+        detail: 'Runde',
+        root: dir,
+        state: { dashboardPath: '.batch-dashboard.html' },
+        focus: { point: 848, note: 'Fokus' },
+        now: 1_700_000_000_000,
+        memory: null,
+        remember: () => {},
+        writeStatus: (point, status) => calls.push({ point, status }),
+        stderr: (line) => said.push(line),
+      })
+      expect(result.refreshed).toBe(false)
+      expect(result.reason).toBe('board-unreadable')
+      expect(calls).toEqual([])
+      expect(said.join('\n')).toMatch(/no now-card could be read/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('says so when the card was written but cannot be read back', () => {
+    // The write succeeded; the reread did not. Claiming a silent success here
+    // would assert a reread that never happened, and recording an empty digest
+    // would be worse than recording nothing (fifth cross-vendor round).
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    try {
+      const kept = []
+      const said = []
+      const result = heartbeat({
+        trigger: TRIGGERS.REVIEW_ROUND,
+        detail: 'Runde',
+        root: dir,
+        state: { dashboardPath: '.batch-dashboard.html' },
+        focus: { point: 848, note: 'Fokus' },
+        now: 1_700_000_000_000,
+        memory: null,
+        remember: (value) => kept.push(value),
+        // A writer that leaves the board unreadable behind it.
+        writeStatus: () => writeFileSync(join(dir, '.batch-dashboard.html'), '<main>weg</main>'),
+        stderr: (line) => said.push(line),
+      })
+      expect(result.refreshed).toBe(true)
+      expect(result.reread).toBe(false)
+      expect(said.join('\n')).toMatch(/written but could not be read back/)
+      // Only the pre-write observation was recorded; nothing claims to know the
+      // new card, so the next look treats its age as unknown.
+      expect(kept).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('a card rewritten by somebody else reads as current, not as stale', () => {
     const dir = withBoard(board(848, 'ein Stand', '10:17'))
     try {
@@ -282,7 +347,7 @@ describe('what it refuses, and what it survives', () => {
       writeStatus: () => {},
       stderr: (line) => said.push(line),
     })
-    expect(said.join('\n')).toMatch(/could not be read/)
+    expect(said.join('\n')).toMatch(/no now-card could be read/)
   })
 
   it('refuses a state that names no board at all', () => {
