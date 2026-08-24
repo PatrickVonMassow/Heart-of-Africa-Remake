@@ -403,6 +403,7 @@ export function launcherStartDecision({
   batchWriters = {},
   previousBatchWriters = {},
   fenceState = null,
+  includeOwnerWriter = false,
   probePid = () => null,
   now = Date.now(),
 } = {}) {
@@ -473,8 +474,8 @@ export function launcherStartDecision({
   // built to decide, and handover deliberately leaves its process alive. What
   // this independent registry adds is the process the lock DOES NOT name — a
   // lockless writer, or a second writer beside a stale lock.
-  const vetoes = writers.filter(
-    (writer) => writer.authoritative && (!lock || writer.sessionId !== evidence.lock.sessionId),
+  const vetoes = writers.filter((writer) =>
+    writer.authoritative && (includeOwnerWriter === true || !lock || writer.sessionId !== evidence.lock.sessionId),
   )
   if (vetoes.length > 0) {
     const identities = vetoes.map((writer) => `${writer.sessionId} (pid ${writer.pid})`).join(', ')
@@ -654,6 +655,13 @@ export function successorStartDecision({
     batchWriters,
     previousBatchWriters,
     fenceState,
+    // A clean boundary is itself a successor transport and deliberately overlaps
+    // the predecessor while that process finishes. A terminal CI notification is
+    // not: several refs may conclude together, and none may turn the still-live
+    // current session into one new session per ref merely because its lock still
+    // carries a handover mark. Its current fenced writer identity therefore
+    // vetoes CI-terminal starts just like a writer outside the lock.
+    includeOwnerWriter: kind === SUCCESSOR_TRIGGERS.CI_TERMINAL,
     probePid,
     now,
   })
