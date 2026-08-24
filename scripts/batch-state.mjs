@@ -51,6 +51,25 @@ function refuseSymlink(path, what) {
   if (stat.isSymbolicLink()) throw new Error(`${what} is a symlink and is refused: ${path}`)
 }
 
+/** Test seam for the durability boundary: fsync cannot be observed from
+ *  outside the process, so the test records which directories were flushed
+ *  through this hook. Production leaves it null. */
+export const durabilityProbe = { onDirFsync: null }
+
+/** A new NAME is durable only once its directory is flushed: an fsynced file
+ *  can still vanish with its filename after a crash if the directory entry
+ *  never reached the disk. Called for every created directory and for the
+ *  journal's own creation. */
+function fsyncDir(path) {
+  const fd = openSync(path, 'r')
+  try {
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+  durabilityProbe.onDirFsync?.(path)
+}
+
 function assertInside(root, path) {
   const resolved = resolve(path)
   if (resolved !== resolve(root) && !resolved.startsWith(resolve(root) + sep)) {
@@ -69,11 +88,17 @@ export function openStateStore({ repoDir = process.cwd(), batchId } = {}) {
   assertInside(root, dir)
   for (const p of [root, dir]) {
     refuseSymlink(p, 'a state directory')
-    mkdirSync(p, { recursive: true, mode: 0o700 })
+    if (!existsSync(p)) {
+      mkdirSync(p, { recursive: true, mode: 0o700 })
+      fsyncDir(dirname(p))
+    }
   }
   const receiptsDir = join(dir, 'receipts')
   refuseSymlink(receiptsDir, 'the receipts directory')
-  mkdirSync(receiptsDir, { recursive: true, mode: 0o700 })
+  if (!existsSync(receiptsDir)) {
+    mkdirSync(receiptsDir, { recursive: true, mode: 0o700 })
+    fsyncDir(dir)
+  }
   const store = {
     batchId,
     dir,
@@ -101,6 +126,7 @@ export function appendJournalEntry(store, entry) {
   // O_NOFOLLOW closes the check/open race the lstat above cannot: a symlink
   // swapped in between fails the open itself with ELOOP instead of being
   // followed anywhere the planter chose.
+  const created = !existsSync(store.journalPath)
   const fd = openSync(store.journalPath, fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_NOFOLLOW, 0o600)
   try {
     writeSync(fd, framed.line)
@@ -108,6 +134,9 @@ export function appendJournalEntry(store, entry) {
   } finally {
     closeSync(fd)
   }
+  // The journal's very first entry created its FILENAME too, and a name is
+  // durable only once the directory is flushed with it.
+  if (created) fsyncDir(store.dir)
   return { ok: true, bytes: Buffer.byteLength(framed.line) }
 }
 
