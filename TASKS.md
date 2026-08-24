@@ -12040,3 +12040,51 @@ to land than a mechanism that needs a review.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
   Bundle: Chat & Tafel.
 
+
+- [ ] 896. `review-sol.mjs` swallows an unknown flag and spends a real cross-vendor pass on it.
+  MEASURED 24.08.2026 while reviewing point 890: the call
+  `review-sol.mjs --sha 8d25cf42 --brief "plan probe" --point 890 --plan` was accepted. `--plan`
+  does not exist — the usage does not list it and `review-sol-core.mjs` uses `plan` only as an
+  internal coverage object. Instead of refusing the command line, the script ignored the unknown
+  flag and started a FULL billed Sol round that ran ~2.5 minutes and appended a `merge` record to
+  `.claude/mechanism-reviews.jsonl`. Two costs: a typo or a misremembered flag spelling burns a Sol
+  pass and its wall-clock, and the ledger gains a record whose brief names no examination intent —
+  here the evidence line saved it only because a convergent review reads the whole material anyway.
+  `mechanism-review.mjs` already does this correctly, refusing with `unknown flag --help`.
+  RELATED, same measurement: point 890's own text in `TASKS.md` names `review-sol.mjs --plan` as
+  the command that cuts a range into fourteen passes. Either the flag is missing from the script or
+  the text names it wrongly; both are straightened out together.
+  FINAL STATE: `review-sol.mjs` validates its command line and refuses an unknown flag BEFORE it
+  starts codex, in the same refusal form `mechanism-review.mjs` uses; and the planning capability
+  the 890 text refers to is either present under the name that text uses or the text is corrected.
+  VERIFIABLE: unit cases — an unknown flag is refused without launching a review; the documented
+  planning invocation runs; `npm run test:unit`, lint, build.
+  Criticality: medium — it wastes a paid review round and can file a meaningless brief in the
+  four-eyes ledger, which is the record other points are judged against.
+  Bundle: Modell & Wächter.
+
+- [ ] 897. Two batch sessions ran at once, because the start decision reads the lock only at start.
+  MEASURED 24.08.2026. Session `14ea8484` (CI handoff for `origin/main:7c93ebf5`) was started by the
+  OS autostart launcher; its SessionStart hook reported `no live batch-writer process measured;
+  owner lock assessed inactive (handed-over)` and let it work. At 14:51:49 a SECOND session
+  `db6ce51a` (PID 1517719, CI handoff for `origin/feat/890-…:68214a5f`) started and took the lock at
+  12:53:52Z with `fence: 3`, `trigger: ci-terminal`. Both sessions were then active on point 890 for
+  about five minutes: the first started a Sol review and ran lint/build/test:unit in the `point-890`
+  worktree while the second committed and pushed to the same branch. Minutes later the lock flipped
+  back to `14ea8484` at `fence: 690` — so the intruding claim carried a REGRESSED fence and was
+  overwritten rather than refused.
+  Three gaps: (i) two CI-terminal handoffs for DIFFERENT refs (main and a feature branch) spawn two
+  sessions, and the second does not see the first; (ii) a claim whose fence goes BACKWARDS (3 after
+  690) is accepted into the lock file instead of being refused as stale; (iii) a running session has
+  no point at which it notices the lock was taken from underneath it — the collision surfaced only
+  because `guard-preflight` happened to print `another live session owns the batch lock`, and the
+  losing session keeps running afterwards.
+  FINAL STATE: at most one batch session is startable per batch regardless of how many refs conclude
+  green; a claim with a fence at or below the recorded one is REFUSED, not written; and a session
+  re-checks lock ownership before each mutation, standing down the moment it no longer holds it.
+  VERIFIABLE: unit cases — a second ci-terminal handoff for a different ref while a live session
+  holds the lock does not spawn; a claim with a lower fence is refused and the file is unchanged; a
+  mutation attempted after ownership moved is refused with the stand-down path named.
+  Criticality: high — two writers on one point is how a half-landed merge and a lost commit happen;
+  it was caught here by luck, not by a check.
+  Bundle: Session- & Repo-Hygiene.
