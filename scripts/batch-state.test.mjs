@@ -256,6 +256,14 @@ describe('journal append and read-back', () => {
     expect(() => appendJournalEntry(store, entry(1))).toThrow(/symlink/)
     expect(() => readJournal(store)).toThrow(/symlink/)
   })
+
+  it('fails closed when journal inspection errors instead of reporting a clean missing journal', () => {
+    const store = openStateStore({ repoDir: repo, batchId: 'b' })
+    const notDirectory = join(store.dir, 'not-a-directory')
+    writeFileSync(notDirectory, 'blocking path component')
+    const inaccessible = { ...store, journalPath: join(notDirectory, 'events.jsonl') }
+    expect(() => readJournal(inaccessible)).toThrow(/cannot be inspected|ENOTDIR/)
+  })
 })
 
 describe('atomic snapshot replacement', () => {

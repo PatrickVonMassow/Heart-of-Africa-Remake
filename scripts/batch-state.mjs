@@ -46,8 +46,9 @@ function refuseSymlink(path, what) {
   let stat
   try {
     stat = lstatSync(path)
-  } catch {
-    return // absent is fine; the opens below guard creation with O_NOFOLLOW or exclusivity
+  } catch (error) {
+    if (error?.code === 'ENOENT') return // absent is fine; guarded opens decide creation
+    throw new Error(`${what} cannot be inspected and is refused: ${path}: ${error.message}`, { cause: error })
   }
   if (stat.isSymbolicLink()) throw new Error(`${what} is a symlink and is refused: ${path}`)
 }
@@ -153,6 +154,15 @@ function readFileNoFollow(path, encoding = 'utf8') {
   }
 }
 
+function readFileNoFollowIfExists(path, encoding = 'utf8') {
+  try {
+    return { exists: true, text: readFileNoFollow(path, encoding) }
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { exists: false, text: null }
+    throw error
+  }
+}
+
 /** A crash can cut the journal's final frame before its delimiter. Replay reads
  *  that tail as an ordinary dropped crash — but an APPEND after it would
  *  concatenate the next frame onto the fragment, turning two harmless pieces
@@ -160,8 +170,13 @@ function readFileNoFollow(path, encoding = 'utf8') {
  *  writer repairs BEFORE it appends: the fragment's bytes are preserved beside
  *  the journal (evidence, never silently eaten), then truncated away. */
 function repairCutTail(store) {
-  if (!existsSync(store.journalPath)) return { repaired: false }
-  const fd = openSync(store.journalPath, fsConstants.O_RDWR | fsConstants.O_NOFOLLOW)
+  let fd
+  try {
+    fd = openSync(store.journalPath, fsConstants.O_RDWR | fsConstants.O_NOFOLLOW)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { repaired: false }
+    throw error
+  }
   try {
     const size = fstatSync(fd).size
     if (size === 0) return { repaired: false }
@@ -265,8 +280,9 @@ export function appendJournalEntry(store, entry) {
   if (!framed.ok) return { ok: false, reason: framed.reason }
   refuseSymlink(store.journalPath, 'the journal')
   const repaired = repairCutTail(store)
-  const exists = existsSync(store.journalPath)
-  const before = exists ? readFileNoFollow(store.journalPath) : ''
+  const journalFile = readFileNoFollowIfExists(store.journalPath)
+  const exists = journalFile.exists
+  const before = journalFile.text ?? ''
   const candidate = replayJournal(before + framed.line)
   const appended = candidate.entries.at(-1)
   if (candidate.verdict !== 'ok') {
@@ -298,8 +314,8 @@ export function appendJournalEntry(store, entry) {
  *  evidence as prohibiting. This reader only reports what it found. */
 export function readJournal(store) {
   refuseSymlink(store.journalPath, 'the journal')
-  if (!existsSync(store.journalPath)) return { exists: false, ...replayJournal('') }
-  return { exists: true, ...replayJournal(readFileNoFollow(store.journalPath)) }
+  const journal = readFileNoFollowIfExists(store.journalPath)
+  return { exists: journal.exists, ...replayJournal(journal.text ?? '') }
 }
 
 /** WRITE–FLUSH–RENAME, the only way a committed snapshot or receipt is produced:
@@ -343,8 +359,8 @@ export function writeSnapshot(store, body) {
 
 export function readSnapshot(store) {
   refuseSymlink(store.snapshotPath, 'the snapshot')
-  if (!existsSync(store.snapshotPath)) return readSnapshotText(null)
-  return readSnapshotText(readFileNoFollow(store.snapshotPath))
+  const snapshot = readFileNoFollowIfExists(store.snapshotPath)
+  return readSnapshotText(snapshot.text)
 }
 
 /** Receipts share the snapshot's sealing and owner-only discipline, but NOT its
@@ -412,8 +428,8 @@ export function readReceipt(store, receiptId) {
   const path = join(store.receiptsDir, `${receiptId}.json`)
   assertInside(store.receiptsDir, path)
   refuseSymlink(path, 'a receipt')
-  if (!existsSync(path)) return readSnapshotText(null)
-  return readSnapshotText(readFileNoFollow(path))
+  const receipt = readFileNoFollowIfExists(path)
+  return readSnapshotText(receipt.text)
 }
 
 /** What the reader IGNORES tells the operator what a crash left behind: `.tmp-`
