@@ -27,6 +27,7 @@
  *   boardBehind: { reason },                 // (f) local board newer than the published page
  *   ownerAlive,                              // a live owner forbids the process sweep
  *   privateBatchLock: { path },              // forbidden worktree-local authority
+ *   tornOwnerSession: { recordedSessionId, sessionId }, // same process, wrong id
  * }
  * Returns an ordered list of actions:
  *   { action, level: 'auto' | 'repair' | 'alert', reason, targets? }
@@ -60,6 +61,18 @@ export function planRemediation(state) {
       reason:
         `A linked worktree carries a private batch lock at ${state.privateBatchLock.path}. ` +
         'It is torn state, never singleton authority; only the main checkout lock may be honoured.',
+    })
+  }
+
+
+  if (state.tornOwnerSession?.sessionId) {
+    plan.push({
+      action: 'repair-owner-session-id',
+      level: 'repair',
+      reason:
+        `The current batch process owns this lock, but it records session ${state.tornOwnerSession.recordedSessionId ?? 'unknown'} ` +
+        `instead of ${state.tornOwnerSession.sessionId}. Repair must pass through transitionOwnerSession so the observed ` +
+        'generation, process incarnation and lifecycle record are rechecked atomically.',
     })
   }
 

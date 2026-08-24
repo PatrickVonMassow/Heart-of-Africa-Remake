@@ -1761,9 +1761,35 @@ export function transitionOwnerSession(sessionId, opts = {}) {
       now: opts.now,
       reason: 'session-transition',
     })
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, readOwnerLock(lockPath), {
+      lockPath,
+      at: opts.now ?? Date.now(),
+      cause: 'session-transition',
+      evidence: { sessionIdBefore: current.sessionId, generation },
+    })
     return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
   } finally {
     exitReapMutex(mutexPath)
+  }
+}
+
+/** Diagnose the one torn owner identity batch-doctor may repair. PURE.
+ * The current session id must be valid and its exact process incarnation must
+ * own the current lock; an id mismatch alone never grants this verdict. */
+export function ownerSessionTear({ sessionId, lock, ancestor } = {}) {
+  if (!validTransitionSessionId(sessionId)) return { torn: false, reason: 'invalid-session-id' }
+  if (!lock) return { torn: false, reason: 'no-lock' }
+  if (lock.sessionId === sessionId) return { torn: false, reason: 'consistent' }
+  const permission = resolveOwnership({ lock, sessionId, ancestor })
+  if (!permission.mine || permission.via !== 'process') {
+    return { torn: false, reason: `not-owner:${permission.via}` }
+  }
+  if (ownerLockGeneration(lock) === null) return { torn: false, reason: 'lock-without-generation' }
+  return {
+    torn: true,
+    reason: 'owner-session-id-mismatch',
+    recordedSessionId: lock.sessionId,
+    sessionId,
   }
 }
 

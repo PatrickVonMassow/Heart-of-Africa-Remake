@@ -55,6 +55,7 @@ import {
   sweepableTmpFiles,
   resolveOwnership,
   transitionOwnerSession,
+  ownerSessionTear,
   validTransitionSessionId,
   ourClaudeProcess,
   findClaudeAncestor,
@@ -1569,6 +1570,22 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       }),
     ).toEqual({ transitioned: false, reason: 'lock-generation-changed' })
     expect(readOwnerLock(lockPath).sessionId).toBe('successor')
+  })
+
+  it('diagnoses only a valid id on this exact owner process as the repairable torn state', () => {
+    acquire('before-compaction', opts())
+    const lock = readOwnerLock(lockPath)
+    const ancestor = { pid: lock.pid, startedAt: lock.pidStartedAt }
+    expect(ownerSessionTear({ sessionId: 'after-compaction', lock, ancestor })).toMatchObject({
+      torn: true,
+      reason: 'owner-session-id-mismatch',
+      recordedSessionId: 'before-compaction',
+    })
+    expect(ownerSessionTear({ sessionId: 'before-compaction', lock, ancestor })).toEqual({ torn: false, reason: 'consistent' })
+    expect(ownerSessionTear({ sessionId: 'x', lock, ancestor })).toEqual({ torn: false, reason: 'invalid-session-id' })
+    expect(
+      ownerSessionTear({ sessionId: 'after-compaction', lock, ancestor: { ...ancestor, startedAt: ancestor.startedAt - 60_000 } }),
+    ).toMatchObject({ torn: false, reason: 'not-owner:pid-reused' })
   })
 
   it('validates transition ids without coupling them to the harness UUID format', () => {

@@ -41,7 +41,20 @@ import {
   tasksRecoverableFromHead,
   tasksTextParses,
 } from './batch-doctor-states.mjs'
-import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, assessOwner, bootTimeMs, probePid, LOCK_PATH, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
+import {
+  readOwnerLock,
+  detectParallel,
+  readUnhandledAlert,
+  markAlertHandled,
+  assessOwner,
+  bootTimeMs,
+  findClaudeAncestor,
+  ownerSessionTear,
+  probePid,
+  transitionOwnerSession,
+  LOCK_PATH,
+  DOCTOR_STATE_PATH,
+} from './batch-singleton.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
 import { CHECKOUT_ROOT, REPO_ROOT } from './repo-paths.mjs'
 
@@ -132,7 +145,16 @@ try {
 }
 
 const owner = readOwnerLock()
-const readerSid = process.env.CLAUDE_SESSION_ID ?? owner?.sessionId ?? ''
+const sessionFlagAt = process.argv.indexOf('--session')
+const argvSessionId = sessionFlagAt >= 0 && process.argv[sessionFlagAt + 1] && !process.argv[sessionFlagAt + 1].startsWith('--')
+  ? process.argv[sessionFlagAt + 1]
+  : ''
+const environmentSessionId = process.env.CLAUDE_SESSION_ID ?? ''
+const sessionAssertionAgrees = !(argvSessionId && environmentSessionId && argvSessionId !== environmentSessionId)
+const activeSessionId = sessionAssertionAgrees ? (argvSessionId || environmentSessionId) : ''
+const readerSid = activeSessionId || owner?.sessionId || ''
+const ownerAncestor = activeSessionId ? findClaudeAncestor() : null
+const tornOwnerSession = ownerSessionTear({ sessionId: activeSessionId, lock: owner, ancestor: ownerAncestor })
 const parallelNow = detectParallel(owner?.sessionId ?? '')
 const rawAlert = readUnhandledAlert()
 // AN ALERT MUST NAME SOMEONE ELSE (point 431, third half). The alert is a file:
@@ -198,6 +220,10 @@ log(
     `boardBehind=${boardBehind ? 'yes' : 'no'} ownerAlive=${ownerAlive}`,
 )
 if (privateBatchLock) log(`TORN: worktree-private batch lock found at ${privateBatchLock.path}; it is not authority`)
+if (!sessionAssertionAgrees) log('TORN-ID REPAIR REFUSED: --session and CLAUDE_SESSION_ID name different sessions')
+if (tornOwnerSession.torn) {
+  log(`TORN: this process owns the lock, but it records session ${tornOwnerSession.recordedSessionId} instead of ${activeSessionId}`)
+}
 
 // --- Plan + execute ------------------------------------------------------------
 
@@ -217,6 +243,7 @@ const plan = planRemediation({
   boardBehind,
   ownerAlive,
   privateBatchLock,
+  tornOwnerSession: tornOwnerSession.torn ? tornOwnerSession : null,
 })
 
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
@@ -293,6 +320,17 @@ for (const a of plan) {
     } else if (a.action === 'republish-board') {
       republishBoard({ repo: REPO })
       log('EXECUTED republish-board: scripts/board-publish.mjs re-ran — the reader sees the current board again')
+    } else if (a.action === 'repair-owner-session-id') {
+      const transitioned = transitionOwnerSession(activeSessionId, {
+        lock: owner,
+        ancestor: ownerAncestor,
+        lockPath: LOCK_PATH,
+      })
+      if (!transitioned.transitioned) throw new Error(`owner session transition refused (${transitioned.reason})`)
+      log(
+        `EXECUTED repair-owner-session-id: ${transitioned.sessionIdBefore} -> ${activeSessionId} through ` +
+          'transitionOwnerSession (generation and process incarnation rechecked; lifecycle recorded)',
+      )
     }
   } catch (e) {
     log(`FAILED ${a.action}: ${e && e.message} — fix by hand`)
