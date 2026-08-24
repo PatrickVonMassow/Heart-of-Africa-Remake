@@ -169,8 +169,16 @@ export function heartbeat({
       const write = remember ?? ((v) => writeJsonAtomic(memoryPath(owner), v))
       try {
         write(value)
-      } catch {
-        // Bookkeeping about bookkeeping: never worth failing a recorded review.
+      } catch (error) {
+        // Never worth failing a recorded review — but never silent either. A
+        // record that cannot be written leaves every later look with no memory
+        // of this card, so each one finds its age unknown, calls it stale and
+        // publishes again: a refresh loop nothing would otherwise explain
+        // (eighth cross-vendor round).
+        stderr(
+          'board heartbeat: the card record could not be written — every trigger will republish ' +
+            `until this is fixed (${String(error?.message ?? error)})`,
+        )
       }
     }
     const seen = card === undefined ? readCard(seenState, owner) : { ok: true, ...card }

@@ -272,6 +272,38 @@ describe('the production card reader, against real board markup', () => {
     }
   })
 
+  it('SAYS SO when the record cannot be written — that is a republish loop', () => {
+    // A record that never persists leaves every later look with no memory of the
+    // card, so each finds the age unknown, calls it stale and publishes again.
+    // Swallowing that silently hides a loop nothing else explains.
+    const said = []
+    const dir = withBoard(board(848, 'ein Stand', '10:17'))
+    let result
+    try {
+      result = heartbeat({
+        trigger: TRIGGERS.REVIEW_ROUND,
+        detail: 'Runde',
+        root: dir,
+        state: { dashboardPath: '.batch-dashboard.html' },
+        focus: { point: 848, note: 'Fokus' },
+        now: 1_700_000_000_000,
+        memory: null,
+        remember: () => {
+          throw new Error('EROFS: read-only file system')
+        },
+        writeStatus: () => {},
+        stderr: (line) => said.push(line),
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    // The work still counts: the board was written, only the memory of it failed.
+    expect(result.refreshed).toBe(true)
+    expect(said.join('\n')).toMatch(/card record could not be written/)
+    expect(said.join('\n')).toMatch(/republish/)
+    expect(said.join('\n')).toMatch(/EROFS/)
+  })
+
   it('a card rewritten by somebody else reads as current, not as stale', () => {
     const dir = withBoard(board(848, 'ein Stand', '10:17'))
     try {
