@@ -52,6 +52,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
 | 24.08. | Ein Rot, das die Wiederholung heilt: eine Netzprobe im Testfall überlebt dessen Timeout — deterministisch rot nach jedem Push, grün beim zweiten Lauf (§3.171); zehn Prüfrunden mit zehn echten Befunden neben einem Punkt bei Runde 27 ohne Konvergenz — die Rundenzahl sagt nichts, die Bewegung des Urteils alles (§3.172) |
 | 25.08. nachts | Dieselbe Tür, zweiter Rückfall: Das Kritikalitätstor kann den Dateisatz eines selbst verfassten Punktes nicht messen, weil sein Anker nur beim delegierten Autorenlauf entsteht — ein gemergter, abgehakter und dreizehnmal geprüfter HIGH-Punkt sperrte jedes Zugende, bis eine überflüssige Ganzbereichsrunde ihn räumte (§3.153, Punkt 903) |
+| 25.08. früh | Der delegierte Autor überholte seine eigene Veröffentlichung und kam allein nicht zurück: Nach dem Umschreiben bereits gepushter Commits scheiterte jeder weitere Zwischen-Push, und der Lauf wiederholte zehn Minuten lang denselben nackten Versuch, obwohl der Lease-gesicherte Weg im selben Wrapper längst existiert — der Zweig blieb blind, und die Diagnose druckte einen Bereich aus zwei undefinierten Variablen (§3.174, Punkt 906) |
 | 24.08. mittags | Zwei Batch-Sitzungen arbeiteten fünf Minuten am selben Punkt: zwei CI-Übergaben für verschiedene Refs starteten beide, die zweite nahm die Sperre mit einem Zaunwert weit unter dem Stand, und die unterlegene erfuhr es nur durch eine beiläufige Wächter-Vorschau (§3.173, Punkt 897); dieselbe Sitzung fand, dass ein unbekanntes Flag an der Gegenlese-Kommandozeile stillschweigend geschluckt wird und trotzdem eine bezahlte Runde startet (Punkt 896) |
 | 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
 | 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
@@ -1333,7 +1334,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 03:17 · Quellen-Fingerprint: `b36ec74d953f…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 04:43 · Quellen-Fingerprint: `5aa9049900ab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1433,8 +1434,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 98 Prozess-/Meta-TASKS-Punkte (davon 39 offen).
 
-<!-- RETRO-FINGERPRINT: b36ec74d953fa4b6f88e1fa5010e3f2e9afa836c7ca2b2968b20197b2d308b7e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T01:17:31.782Z -->
+<!-- RETRO-FINGERPRINT: 5aa9049900abb997b564b571cd384ab79a6d54845f42f55d02703c6e016d08cf -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T02:43:48.175Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3369,3 +3370,37 @@ Dokument, das erklärt, warum Annahmen hier nichts taugen. Besitz ist kein Zusta
 Betreten prüft, sondern einer, der zwischen zwei Schreibvorgängen wechseln kann. Prüffrage:
 *Woran würde diese Sitzung merken, dass ihr der Stapel nicht mehr gehört — und wie viele
 Schreibvorgänge lägen zwischen diesem Moment und der Antwort?* Gebucht als Punkt 897.
+
+### 3.174 Wer seine eigene Veröffentlichung überschreibt, kommt allein nicht mehr heraus
+
+Der 24.08.2026 hatte die Klasse schon in der Zeitleiste: Ein delegierter Autor schrieb Commits um,
+die er bereits veröffentlicht hatte, sein Abschluss-Push scheiterte als non-fast-forward, und sein
+Bericht meldete fertige Arbeit als „nur lokal". Damals endete der Befund beim irreführenden
+Bericht. Am 25.08.2026 früh zeigte derselbe Mechanismus die schärfere Hälfte: Der Lauf kommt aus
+dem Zustand nicht mehr heraus.
+
+Gemessen auf `feat/894-daemon-control-plane`, während GPT-5.6 Sol den zweiten Prüfdurchgang fuhr.
+Der Läufer hatte zwei Commits gepusht und schrieb dieselbe Historie danach lokal um — die Bäume
+waren auf beiden Seiten byte-identisch, nur die Elternkette unterschied sich. Von diesem Moment an
+scheiterte **jeder** weitere Zwischen-Push mit derselben Meldung, und `author-sol.mjs` wiederholte
+zehn Minuten lang den identischen nackten Push, statt sich zu versöhnen. Der Zweig war für den
+Rest des Laufs unveröffentlichbar; jeder spätere Checkpoint blieb unsichtbar auf der Gegenseite —
+genau die Aussetzung, wegen der die Hausregel sagt, dass nur überlebt, was gepusht wurde.
+
+Zwei Dinge fallen dabei auseinander, und beide sind es wert, getrennt benannt zu werden. Das eine
+ist die fehlende Erholung: Der Wrapper besitzt für seine Checkpoints längst einen Lease-gesicherten
+Compare-and-Swap — genau den Mechanismus, dessen Reparatur der Inhalt dieses Punktes war —, aber
+sein Zwischen-Push benutzt ihn nicht. Der Lauf hatte die Lösung an Bord und griff nicht danach.
+Das andere ist die Diagnose: Die Zeile, die die gefährdeten Commits benennen soll, druckte
+`fatal: ambiguous argument 'undefined..undefined'`. Sie baute ihren Bereich aus zwei undefinierten
+Variablen und sagte damit über das, was auf dem Spiel stand, exakt nichts.
+
+Das Zusammenspiel ist die eigentliche Kostenstelle. Ein Bericht, der „PUSH FAILED — the work is
+committed but only local" sagt, während der Inhalt längst drüben liegt, schickt jeden Leser auf die
+Suche nach verlorener Arbeit, die nie verloren war — und wer diesen Bericht einmal als Fehlalarm
+abtut, übersieht den echten Fall beim nächsten Mal. Genau deshalb darf die Quittung nicht über den
+eigenen Push urteilen, sondern über die Ankunft: dieselbe Unterscheidung, die dieser Punkt für die
+Checkpoints eingeführt hat, fehlt eine Ebene darüber noch.
+
+Prüffrage: *Wenn dieser Lauf seine eigene Veröffentlichung überholt — kommt er allein zurück, und
+sagt sein Bericht, was wirklich fehlt?* Gebucht als Punkt 906.

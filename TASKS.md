@@ -12104,3 +12104,34 @@ to land than a mechanism that needs a review.
   rows stays under the runtime it had before the listing was hoisted.
   Criticality: low — it costs time on every turn end, it loses nothing.
   Bundle: Modell & Wächter.
+
+- [ ] 906. The delegated author's interim push cannot recover a branch it rewrote itself, and its
+  failure report names an undefined range. MEASURED 25.08.2026 on `feat/894-daemon-control-plane`,
+  during GPT-5.6 Sol's second review leg on point 894. The runner pushed two commits, then rewrote
+  that same history locally — the trees were byte-identical on both sides (`2a98e852…`), only the
+  parent chain differed. From that moment every interim push failed as `non-fast-forward … the tip
+  of your current branch is behind its remote counterpart`, and `scripts/author-sol.mjs` retried the
+  identical plain push for the remaining ten minutes of the run instead of reconciling. Two defects
+  sit on that path. First, the interim push has no lease-gated recovery, so a branch the runner
+  itself rewrote stays unpushable for the rest of the run and every later checkpoint is invisible on
+  the remote — the exact exposure behind the house rule that only what was pushed survives. Second,
+  the diagnostic that should name the unpushed commits printed `fatal: ambiguous argument
+  'undefined..undefined'`, so it built its rev range from two undefined variables and reported
+  nothing usable about what was at risk. The run's closing report then said `PUSH FAILED — the work
+  is committed but only local`, which is true of the local ref and misleading about the work: the
+  content was already on the remote. This is the same class as the 24.08.2026 entry in the
+  retrospective timeline, but that one ended at the misleading report; this one adds that the run
+  cannot get out of the state on its own.
+  FINAL STATE: the interim push reconciles a rewritten branch through the same lease-gated
+  compare-and-swap the wrapper already uses for checkpoints — a rejected push is re-observed, an
+  already-contained head is accepted, and a head that legitimately supersedes the remote is pushed
+  under a lease on the observed tip rather than retried bare; a remote that moved outside the local
+  history still refuses. The failure diagnostic names the actual commits at risk or says it could
+  not determine them, and never prints an undefined range.
+  VERIFIABLE: unit cases over the interim-push path — a runner that rewrites its own pushed history
+  reconciles and reports the checkpoint transferred; a genuinely unpushed head still reports failure;
+  a divergent remote still refuses; and the diagnostic on each of those three paths contains no
+  `undefined` and names either the commits or its own inability to name them.
+  Criticality: medium — it loses no work, but it blinds the remote for the rest of a run and its
+  report sends the reader looking for work that was never lost.
+  Bundle: Session- & Repo-Hygiene.
