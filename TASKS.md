@@ -12010,3 +12010,37 @@ to land than a mechanism that needs a review.
   closed work is really in `main`.
   Bundle: Modell & Wächter.
 
+
+- [ ] 918. A sha whose ref has already moved on is reported as a red CI verdict, and
+  the successor session is sent down a repair path for code that is not broken. MEASURED
+  25.08.2026 at this session's start: the CI-terminal handoff named
+  `origin/main:19d0a59fa9934a58fd5867a783efb94be119fb2f:CI:32880517245` as "concluded RED" and
+  declared the fresh session the repair path — inspect the failure, repair it, run the gates, push
+  the fixing commit before taking any work-order point. The run had concluded `cancelled`, not
+  `failure`: `da78cf5b` was pushed to `main` about two minutes after `19d0a59f`, and
+  `concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }`
+  (`.github/workflows/ci.yml:43-45`) stopped the older run. Its sibling job `windows-argv-proof`
+  had already succeeded; only `fast` was cancelled mid-flight. No defect existed, and no fixing
+  push was possible — the sha was no longer main's tip.
+  WHY THE EXISTING CUT DOES NOT REACH IT: `verdictRuns` (`scripts/ci-status-guard-core.mjs:51-61`)
+  already drops a superseded cancellation, and its comment states the principle exactly — "a
+  cancellation carries NO information about the code: the run was stopped, it did not judge". But
+  it only drops one when ANOTHER run of the same workflow CONCLUDED on the SAME sha. A sha the
+  ref has already moved past never gets a second run, so its lone cancellation is read as a
+  genuine verdict.
+  WHAT IT COSTS: this reproduces on every back-to-back push to `main`, which is the batch's
+  routine landing rhythm — merge commit, then the tick commit, then the board commit. The cost is
+  a whole session's opening spent proving a non-defect, and worse, a handoff that cries red often
+  enough to be discounted is the exact failure the guard was built against (point 387).
+  FINAL STATE: the same reasoning is extended across shas of one ref — when a pushed sha is an
+  ancestor of a NEWER pushed sha on the same ref, its cancellation carries no information and the
+  newer sha's run holds the verdict. It must never turn a red green: `failure`, `timed_out` and
+  `startup_failure` stay untouched, and a lone cancellation on a ref's CURRENT tip still demands
+  attention exactly as it does today.
+  VERIFIABLE: Vitest over the pure decision — a ref with two pushed shas, the older cancelled and
+  the newer green, yields no block; the same pair with the newer `failure` still blocks; a lone
+  cancellation on the tip still blocks; and an older cancelled sha that is NOT an ancestor of the
+  newer one (a force-push) is not silently dropped. Plus `npm run test:unit`, lint, build.
+  Criticality: med — no player-visible defect, but it spends whole sessions on phantom repairs and
+  erodes the one signal that guarantees a red CI is noticed.
+  Bundle: Modell & Wächter.
