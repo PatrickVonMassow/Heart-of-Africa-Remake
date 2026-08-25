@@ -129,15 +129,31 @@ export function retentionDecision({ attempt = {}, now, retainMs = RETAIN_BULK_MS
 // 4. CONTROL AUTHORIZATION
 // ---------------------------------------------------------------------------
 
-/** The control socket lives in the owner-only state directory, which is the
- *  operating system's enforcement; this is the daemon's own second look at the
- *  peer's credentials, and it accepts only the exact uid the daemon runs as. */
-export function controlAuthorized({ peerUid = null, daemonUid = null } = {}) {
-  if (!Number.isInteger(peerUid) || !Number.isInteger(daemonUid)) {
-    return { ok: false, reason: 'peer credentials could not be established; a control request without them is refused' }
+/** Prefer an exact peer uid. Where the socket API cannot supply one, accept
+ *  only affirmative evidence that the kernel's pathname boundary is owned by
+ *  this daemon and has the exact owner-only modes the serving process creates. */
+export function controlAuthorized({ peerUid = null, daemonUid = null, pathBoundary = null } = {}) {
+  if (!Number.isInteger(daemonUid)) {
+    return { ok: false, reason: 'the daemon uid could not be established; control is refused' }
   }
-  if (peerUid !== daemonUid) return { ok: false, reason: `foreign uid ${peerUid}; the daemon answers only its owner` }
-  return { ok: true }
+  if (Number.isInteger(peerUid)) {
+    if (peerUid !== daemonUid) return { ok: false, reason: `foreign uid ${peerUid}; the daemon answers only its owner` }
+    return { ok: true, proof: 'peer-uid' }
+  }
+
+  const socket = pathBoundary?.socket
+  const directories = pathBoundary?.directories
+  if (
+    socket?.kind !== 'socket' ||
+    socket.uid !== daemonUid ||
+    socket.mode !== 0o600 ||
+    !Array.isArray(directories) ||
+    directories.length === 0 ||
+    directories.some((entry) => entry?.kind !== 'directory' || entry.uid !== daemonUid || entry.mode !== 0o700)
+  ) {
+    return { ok: false, reason: 'peer credentials are unavailable and the owner-only control path could not be established; control is refused' }
+  }
+  return { ok: true, proof: 'owner-only-path' }
 }
 
 // ---------------------------------------------------------------------------

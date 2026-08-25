@@ -17,9 +17,18 @@
 // path is the path that runs. --drill starts a daemon ONLY against a sandbox
 // repository outside this checkout; the refusal of a drill against the real
 // repository is pinned by a test.
+//
+// CONTROL AUTHORIZATION: Node's public `node:net` API exposes no Unix peer uid.
+// The fallback therefore does not claim to identify the connecting process. It
+// proves, again on every accepted connection before reading or dispatching its
+// request, that the socket is owned by the daemon uid at mode 0600 and that both
+// directories carrying it (the state root and batch directory) are owned by
+// that uid at mode 0700. Those are the pathname permissions the kernel required
+// the peer to cross. If any owner, type, mode or uid cannot be established, the
+// server returns a refusal and closes the connection without running a verb.
 import { closeSync, chmodSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { createServer, createConnection } from 'node:net'
-import { join, resolve, sep } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { probePid, processStartTime, withLockWriteMutex } from './batch-singleton.mjs'
@@ -36,6 +45,7 @@ import { appendJournalEntry, ensureFenceStore, openStateStore, readJournal, writ
 import {
   DRAIN_STEPS,
   buildDaemonRecord,
+  controlAuthorized,
   mayCreateDaemonRecord,
   mayStartAttempt,
   mintLaunchNonce,
@@ -57,6 +67,32 @@ export const FLAG_PATH_SUFFIX = join('.claude', 'durable-lane-flag.json')
 
 const nowMs = () => Date.now()
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms))
+
+function controlPathAuthorization(socketPath, stateDir) {
+  const daemonUid = typeof process.getuid === 'function' ? process.getuid() : null
+  const evidence = (path, kind) => {
+    const stat = statSync(path)
+    return {
+      kind: kind === 'socket' && stat.isSocket() ? 'socket' : kind === 'directory' && stat.isDirectory() ? 'directory' : 'other',
+      uid: stat.uid,
+      mode: stat.mode & 0o777,
+    }
+  }
+  try {
+    return controlAuthorized({
+      // `node:net` has no public Unix peer-credential API. The file header
+      // states exactly what this path-boundary fallback proves instead.
+      peerUid: null,
+      daemonUid,
+      pathBoundary: {
+        socket: evidence(socketPath, 'socket'),
+        directories: [evidence(dirname(stateDir), 'directory'), evidence(stateDir, 'directory')],
+      },
+    })
+  } catch (error) {
+    return { ok: false, reason: `the owner-only control path could not be inspected; control is refused (${error.message})` }
+  }
+}
 
 function lockPathFor(repoDir) {
   return join(repoDir, '.claude', 'batch-lock.json')
@@ -813,6 +849,14 @@ async function serve(args) {
   if (existsSync(socketPath)) unlinkSync(socketPath) // ours by the exclusive record above
   let queue = Promise.resolve()
   const server = createServer((connection) => {
+    // AUTHORIZATION PRECEDES DATA AND DISPATCH. In particular, do not enqueue
+    // an unauthorized request behind authorized work: no bytes from it become
+    // a command, so no partially executed verb is possible.
+    const authorization = controlPathAuthorization(socketPath, store.dir)
+    if (!authorization.ok) {
+      connection.end(`${JSON.stringify({ ok: false, reason: `control authorization refused: ${authorization.reason}` })}\n`)
+      return
+    }
     let buffered = ''
     connection.on('data', (chunk) => {
       buffered += chunk

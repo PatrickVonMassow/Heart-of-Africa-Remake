@@ -8,7 +8,7 @@
 // acknowledgment, cancellation that preserves the branch, drain and restart.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { processStartTime } from './batch-singleton.mjs'
@@ -205,6 +205,35 @@ describe('the daemon lifecycle in the sandbox', () => {
       expect(res.ok, inherited).toBe(false)
       expect(res.reason, inherited).toMatch(/unknown command/)
     }
+  })
+
+  it('authorizes on the server path before dispatch: a broken owner-only boundary is refused and runs no verb', async () => {
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    const before = readJournal(store).entries
+    const attemptId = 'must-never-dispatch'
+    chmodSync(store.dir, 0o777)
+    try {
+      const refused = await controlRequest({
+        repoDir: repo,
+        batchId: BATCH,
+        request: {
+          cmd: 'record-state',
+          sessionId: SID,
+          fence: FENCE,
+          payload: { batchId: BATCH, pointId: 'p-auth', attemptId, state: 'queued', at: Date.now() },
+        },
+      })
+      expect(refused.ok).toBe(false)
+      expect(refused.reason).toMatch(/control authorization refused.*owner-only control path/)
+    } finally {
+      chmodSync(store.dir, 0o700)
+    }
+    const after = readJournal(store).entries
+    expect(after).toHaveLength(before.length)
+    expect(after.some((entry) => entry.attemptId === attemptId)).toBe(false)
+    // Restoring the boundary restores service; the refusal closed only the
+    // unauthorized connection, not the listening daemon.
+    expect((await request('status')).ok).toBe(true)
   })
 
   it('fences shutdown like every other mutation: no credentials, wrong batch or a stranger cannot drain', async () => {
