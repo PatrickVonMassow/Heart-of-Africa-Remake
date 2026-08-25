@@ -23036,3 +23036,55 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: unit cases for each measured string above, in both directions.
   Criticality: high — a lockless session may move main.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 834. The drills prove the takeover on the real path, and only then may the dark lane be
+  switched on. THIS POINT WAS CUT ON 24.08.2026 (user rule, general procedure: a large point that
+  stops converging is cut into standalone points and each is worked on its own, no confirmation
+  needed). It had reached authoring round 27 with four recorded `do-not-merge` passes behind it,
+  and what remained was not building but CROSS-VENDOR REVIEW of ~12,000 lines that no single round
+  can hold. The seams became points 889 (the four-eyes ledger repair), 890 (the architecture
+  document), 891 (schemas, invariants and the activation flag), 892 (the durable state store),
+  893 (attempt leases and epoch fencing), 894 (the daemon and the detached worker contract) and
+  895 (fenced discovery, adoption, reconciliation and the landing slice). THIS NUMBER KEEPS THE
+  CLAIM ITSELF: the authoring lane survives the session that spawned it — which may only be
+  claimed once a drill has demonstrated it.
+  WHAT IT COSTS TODAY, measured: on 21.08.2026 an authoring run for point 597 died with its parent
+  session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost. The lane the seven
+  points above build is the cure; this point is the proof and the switch.
+  HOW THE BRANCH IS CUT: `feat/834-<slug>` off main, carrying `scripts/batch-daemon-drill.mjs` and
+  its test and `scripts/detached-escape-drill.mjs` and its test from
+  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated. LANDS LAST, after
+  895 — the drill imports the daemon, the store, the singleton and the resume path.
+  THE DRILL MUST CALL THE THING IT CLAIMS TO PROVE. It kills the SPAWNING PARENT SESSION mid-
+  authoring and then shows that daemon and worker survive it and that a FRESH session discovers,
+  adopts and reconciles them. A launcher-client exit, a daemon restart and a normal handover are
+  NOT equivalent, and the worst finding of the four review rounds behind this point was that the
+  drill had been simulating the takeover it claimed to prove — 091f66b5 gave the lane its own
+  fence store so the drill runs through the REAL acquisition path, and that commit has never been
+  read by a reviewer.
+  THE SWITCH IS THE LAST ACT, AND IT IS RECORDED: the flag of 891 refuses to enable while 895 and
+  this point are not green. AND IT IS FLIPPED ONLY WITH ITS CONDITION (cross-vendor read of 890,
+  24.08.2026): what an enabled lane delivers is survival of a session DEATH, not a planned
+  handover, so while the checkpoint barrier and the two-phase boundary stand unbuilt in 676 the
+  boundary must DRAIN, and this point switches nothing on until that enforcement is in place. Enabling it is a separate, deliberate step taken after this drill
+  passes on main, and it is what first makes the surviving lane something the board, the brief and
+  the handover may advertise.
+  THE RESIDUALS ARE ADMITTED, NOT SOLVED, and stay recorded as limits in
+  `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the very
+  defect this lane removes, so it is worst before it lands); work begun on the old path gains
+  nothing from this design; one push of publishing authority survives local dispossession, by
+  design, so that exactly one publisher exists at all times; and the drill's check-to-signal
+  interval has one branch it cannot observe.
+  WHAT FOLLOWS: the remainder of 676 keeps its number and its rank and begins after this point —
+  bounded dispatch, the checkpoint barrier, the two-phase boundary, successor reconciliation
+  beyond the slice claimed here, crash-recoverable landing, board projection, metrics, staged
+  failure trials and the measured baseline trial. It must not codify an answer about transferring
+  a live Agent-tool child that contradicts the one the landed point 716 carries.
+  FINAL STATE: the parent-death drill and the escape drill run on main, the drill's takeover is
+  the real one, and the lane may be switched on.
+  VERIFIABLE: the parent-session-death drill end to end; the escape drill's measurement; the
+  interlock proven by turning the flag on only after 895 is green; `npm run test:unit`, lint,
+  build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
+  Bundle: unbundled (batch autonomy).
