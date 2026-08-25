@@ -42,7 +42,8 @@ import {
   selectCleanupTargets,
 } from './land-cleanup-core.mjs'
 import { worktreeActiveAt } from './batch-in-flight.mjs'
-import { probePid } from './batch-singleton.mjs'
+import { probePid, readOwnerLock } from './batch-singleton.mjs'
+import { acquireLandingLock, assertLandingReady, recordLandingStage, releaseLandingLock } from './batch-landing-journal.mjs'
 import {
   GATE_COMMANDS,
   LandingError,
@@ -592,6 +593,8 @@ async function main(argv) {
   const namedBranch = args[args.indexOf('--branch') + 1]
   const branchArg = args.includes('--branch') ? namedBranch : null
   const model = args.includes('--model') ? args[args.indexOf('--model') + 1] : ''
+  const batchId = args.includes('--batch') ? args[args.indexOf('--batch') + 1] : null
+  const landingId = args.includes('--landing-id') ? args[args.indexOf('--landing-id') + 1] : null
 
   if (!Number.isInteger(number) || number <= 0) {
     console.error(
@@ -653,12 +656,24 @@ async function main(argv) {
   let gate
   let audit
   let board
+  let landingClaimant = null
   // WHEN THE LANDING BEGAN. A working file written into a worktree AFTER this
   // instant means somebody is in there right now, whatever else the evidence says.
   const since = Date.now()
   try {
     const branches = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads']).split('\n')
     branch = branchArg || resolveBranch({ branches, number })
+    if (batchId && !dry) {
+      const owner = readOwnerLock()
+      if (!landingId || !owner?.sessionId || !Number.isInteger(owner.fence)) {
+        throw new LandingError('durable landing requires --landing-id and the live batch-lock owner', { step: 'merge', repair: 'reconcile the batch lock and name the prepared landing transaction' })
+      }
+      landingClaimant = { landingId, sessionId: owner.sessionId, fence: owner.fence, stage: 'picture-webgl2' }
+      const held = acquireLandingLock({ repoDir: REPO_ROOT, batchId, claimant: landingClaimant })
+      if (!held.ok) throw new LandingError(held.reason, { step: 'merge', repair: 'recover or finish the standing landing transaction before another landing' })
+      const ready = assertLandingReady({ repoDir: REPO_ROOT, batchId, branchSha: git(['rev-parse', branch]), targetSha: git(['rev-parse', 'HEAD']), fence: owner.fence })
+      if (!ready.ok) throw new LandingError(ready.reason, { step: 'merge', repair: ready.rework ? 'restart review evidence on the current candidate and target' : 'complete the staged landing evidence' })
+    }
     // BEFORE the merge the landing has taken nothing yet, so what it is about to
     // absorb is the BRANCH; afterwards the cleanup step asks against main instead.
     cleanup = selectCleanup({ branch, since, mergeTarget: branch })
@@ -711,7 +726,14 @@ async function main(argv) {
   try {
     // 1. MERGE. --no-ff always (see MERGE_ARGS in the core for why).
     try {
-      git([...MERGE_ARGS, branch], { stdio: ['ignore', 'pipe', 'pipe'] })
+      const mergeArgs = batchId
+        ? [...MERGE_ARGS.filter((arg) => arg !== '--no-edit'), branch, '-m', `Merge branch '${branch}'\n\nPublication-Id: ${landingId}`]
+        : [...MERGE_ARGS, branch]
+      git(mergeArgs, { stdio: ['ignore', 'pipe', 'pipe'] })
+      if (batchId) {
+        const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'merge', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD']), publicationId: landingId } })
+        if (!recorded.ok) throw new Error(`landing journal refused merge evidence: ${recorded.reason}`)
+      }
       step('merge', VERDICT.ok, `${branch} -> main`)
     } catch (e) {
       // A conflicted merge is ABORTED, not left in the index: a half-merged main
@@ -805,6 +827,10 @@ async function main(argv) {
     try {
       git(['push', 'origin', 'main'], { stdio: ['ignore', 'pipe', 'pipe'] })
       step('push', VERDICT.ok, 'tick committed, main pushed')
+      if (batchId) {
+        const recorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'bookkeeping', evidence: { at: Date.now(), complete: true, commitSha: git(['rev-parse', 'HEAD']) } })
+        if (!recorded.ok) throw new Error(`landing journal refused bookkeeping evidence: ${recorded.reason}`)
+      }
     } catch (e) {
       error = new LandingError('main could not be pushed', {
         step: 'push',
@@ -836,6 +862,15 @@ async function main(argv) {
       }
     } else {
       step('board', VERDICT.skipped, board.reason)
+    }
+    if (batchId) {
+      const boardHash = createHash('sha256').update(readIf(BOARD_FILE)).digest('hex')
+      const boardRecorded = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'board', evidence: { at: Date.now(), published: true, boardHash } })
+      if (!boardRecorded.ok) throw new LandingError(`landing journal refused board evidence: ${boardRecorded.reason}`, { step: 'board' })
+      const landed = recordLandingStage({ repoDir: REPO_ROOT, batchId, stage: 'landed', evidence: { at: Date.now(), mergeSha: git(['rev-parse', 'HEAD^']) } })
+      if (!landed.ok) throw new LandingError(`landing journal refused terminal evidence: ${landed.reason}`, { step: 'board' })
+      const released = releaseLandingLock({ repoDir: REPO_ROOT, batchId, claimant: landingClaimant })
+      if (!released.ok) throw new LandingError(`landing completed but its lock remains: ${released.reason}`, { step: 'board' })
     }
 
     // 7. CLEANUP: worktrees first (a tree holding the branch blocks its deletion),
