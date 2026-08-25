@@ -410,7 +410,7 @@ describe('the mode round-trips into the ledger', () => {
   const build = (over = {}) =>
     buildRecord({
       sha: 'b'.repeat(40),
-      model: 'Fable 5',
+      model: 'GPT-5.6 Sol',
       verdict: 'merge',
       evidence: 'read the core against the spec and ran the pure cases',
       now: 1_700_000_000_000,
@@ -437,7 +437,7 @@ describe('the mode round-trips into the ledger', () => {
     // The numbers ADD UP — the receipt is checked, not just shaped: 4 + 3 inputs,
     // each one merged or standing alone, 2 folds plus 3 singles = 5 union entries.
     '4 A + 3 B entries → 5 union entries (4 merged, 2 only A, 1 only B): every input entry accounted for'
-  const merged = { mergedBy: 'GPT-5.6 Sol', accounting: ACCOUNTED }
+  const merged = { mergedBy: 'Fable 5', accounting: ACCOUNTED }
   const forMode = (mode) => (mode === 'blind-parallel' ? { mode, ...merged } : { mode })
 
   it('writes the mode and reads it back, for both modes', () => {
@@ -513,15 +513,15 @@ describe('the mode round-trips into the ledger', () => {
     withLedger((path) => {
       appendRecord(built.record, path)
       const back = readRecords(path)[0]
-      expect(back.mergedBy).toBe('GPT-5.6 Sol')
+      expect(back.mergedBy).toBe('Fable 5')
       expect(back.accounting).toBe(ACCOUNTED)
       expect(back.mergeFallback).toBeUndefined()
     })
     const two = build({
       mode: 'blind-parallel',
       ...merged,
-      mergedBy: 'Fable 5',
-      mergeFallback: 'GPT-5.6 Sol was unreachable, so only two models were in this session',
+      mergedBy: 'GPT-5.6 Sol',
+      mergeFallback: 'Fable 5 was unreachable, so only two models were in this session',
     })
     expect(two.ok, (two.errors ?? []).join('\n')).toBe(true)
     expect(two.record.mergeFallback).toMatch(/only two models/)
@@ -529,8 +529,8 @@ describe('the mode round-trips into the ledger', () => {
 
   it('refuses a blind-parallel record with no merger, no count, or a merger that wrote a list', () => {
     expect(build({ mode: 'blind-parallel' }).ok).toBe(false)
-    expect(build({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol' }).ok).toBe(false)
-    const own = build({ mode: 'blind-parallel', ...merged, mergedBy: 'Opus 5' })
+    expect(build({ mode: 'blind-parallel', mergedBy: 'Fable 5' }).ok).toBe(false)
+    const own = build({ mode: 'blind-parallel', ...merged, mergedBy: 'GPT-5.6 Sol' })
     expect(own.ok).toBe(false)
     expect(own.errors.join('\n')).toMatch(/may not merge them/i)
   })
@@ -541,7 +541,7 @@ describe('the mode round-trips into the ledger', () => {
     // that identity came from — the recording commit, because a valid fold IS a
     // commit by the third model. The refusal now names what it read and the one
     // flag triple that replaces the proxy with the halves themselves.
-    const refused = build({ mode: 'blind-parallel', ...merged, mergedBy: 'Opus 5' })
+    const refused = build({ mode: 'blind-parallel', ...merged, mergedBy: 'GPT-5.6 Sol' })
     expect(refused.ok).toBe(false)
     const text = refused.errors.join('\n')
     expect(text).toMatch(/the two halves were NOT read/)
@@ -736,7 +736,13 @@ describe('the mode round-trips into the ledger', () => {
         ].join('\n')
 
       writeFileSync(transcript, line('claude-fable-5'))
-      const agreed = build({ mode: 'review', modelAt: at, modelTranscript: transcript })
+      const agreed = build({
+        mode: 'review',
+        model: 'Fable 5',
+        modelAt: at,
+        modelTranscript: transcript,
+        resolve: (ref) => stub({ sha: String(ref), authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }),
+      })
       expect(agreed.ok, (agreed.errors ?? []).join('\n')).toBe(true)
       expect(agreed.record.reviewerAuthorship).toMatchObject({
         status: 'agreement',
@@ -746,7 +752,13 @@ describe('the mode round-trips into the ledger', () => {
       })
 
       writeFileSync(transcript, line('claude-opus-5'))
-      const contradicted = build({ mode: 'review', modelAt: at, modelTranscript: transcript })
+      const contradicted = build({
+        mode: 'review',
+        model: 'Fable 5',
+        modelAt: at,
+        modelTranscript: transcript,
+        resolve: (ref) => stub({ sha: String(ref), authoredBy: 'GPT-5.6 Sol <noreply@openai.com>' }),
+      })
       expect(contradicted.ok).toBe(false)
       expect(contradicted.errors.join('\n')).toMatch(/disagrees with transcript message\.model.*permission is refused/)
     } finally {
@@ -1352,7 +1364,7 @@ describe('the mode round-trips into the ledger', () => {
       const self = record('GPT-5.6 Sol')
       // The refusal is asserted by its own wording, not a bare exit code — a
       // spawn that never ran would satisfy .not.toBe(0) with empty output.
-      expect(self.stderr, `${self.stdout}${self.stderr}`).toContain('SELF-REVIEW is refused')
+      expect(self.stderr, `${self.stdout}${self.stderr}`).toContain('SAME-VENDOR REVIEW is refused')
       expect(self.stderr).toContain('GPT-5.6 Sol')
 
       // An Anthropic reviewer with no identity evidence is refused outright.

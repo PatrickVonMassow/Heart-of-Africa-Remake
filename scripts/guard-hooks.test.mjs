@@ -573,18 +573,6 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
   const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
   const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
   const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
-  // An Anthropic reviewer's identity must be VERIFIED since point 889, so the
-  // fixture reviewer carries the transcript its claim quotes.
-  const FABLE_AT = '2026-08-24T16:20:00.000Z'
-  const fableTranscript = () => {
-    const path = resolve(repo, 'fable-session.jsonl')
-    writeFileSync(
-      path,
-      `${JSON.stringify({ timestamp: FABLE_AT, type: 'assistant', isSidechain: false, message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' } })}\n`,
-    )
-    return ['--model-at', FABLE_AT, '--model-transcript', path]
-  }
-
   let base = ''
   let guardSha = ''
 
@@ -605,11 +593,10 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
   it('ALLOWS once a DIFFERENT model has recorded a review', () => {
     const r = review([
       '--record', guardSha,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'merge',
       '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
       '--mode', 'review',
-      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(base)
@@ -625,17 +612,16 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--mode', 'review',
     ])
     expect(r.status).toBe(1)
-    expect(r.stderr).toMatch(/SELF-REVIEW is refused/)
+    expect(r.stderr).toMatch(/SAME-VENDOR REVIEW is refused/)
   })
 
   it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
     const r = review([
       '--record', guardSha,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'do-not-merge',
       '--evidence', 'the fast path waves through the files the unit layer measures',
       '--mode', 'review',
-      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(base)
@@ -666,11 +652,10 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
 
     const r = review([
       '--record', branchHead,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'merge-with-fixes',
       '--evidence', 'reviewed both commits of the branch at its head',
       '--mode', 'review',
-      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(from)
@@ -737,11 +722,10 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
 
     const r = review([
       '--record', sideHead,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'merge',
       '--evidence', 'reviewed the fourth demo guard on its branch before the merge',
       '--mode', 'review',
-      ...fableTranscript(),
     ])
     expect(r.status, r.stderr).toBe(0)
     const merge = git('merge', '--no-ff', '-m', `merge the clean side branch\n\n${AUTHOR}`, 'clean-side')
@@ -768,7 +752,8 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     rmSync(resolve(repo, BASELINE), { force: true })
     try {
       const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-      expect(hook.decision.reason).toContain('scripts/demo5-guard.mjs')
+      expect(hook.decision.reason).toContain('local review baseline is missing')
+      expect(hook.decision.reason).toContain('cannot bootstrap at HEAD')
     } finally {
       git('checkout', '-q', trunk)
     }
@@ -871,18 +856,14 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     expect(readFileSync(resolve(repo, BASELINE), 'utf8')).toBe(before)
   })
 
-  it('grandfathers what predates the baseline, and arms itself at HEAD', () => {
-    // The unreviewed demo guard is still in history and the ledger is empty —
-    // exactly the state the twenty-odd existing guards are in. Nothing is owed,
-    // and the gate pins the baseline so it audits from here on.
+  it('refuses a missing baseline when the recovery anchor is unavailable', () => {
     write(LEDGER, '')
     rmSync(resolve(repo, BASELINE), { force: true })
-    const at = head()
     const hook = runHook('mechanism-review-guard.mjs')
     expect(hook.status, hook.stderr).toBe(0)
-    expect(hook.stdout.trim()).toBe('')
-    const state = JSON.parse(readFileSync(resolve(repo, BASELINE), 'utf8'))
-    expect(Object.values(state.baselines)).toContain(at)
+    expect(hook.decision?.decision).toBe('block')
+    expect(hook.decision.reason).toContain('local review baseline is missing')
+    expect(existsSync(resolve(repo, BASELINE))).toBe(false)
   })
 
   it('stands down silently while the batch is paused', () => {

@@ -250,6 +250,55 @@ export function sameModel(a, b) {
   return x.version === y.version
 }
 
+/**
+ * Why `reviewer` cannot be independent of EVERY author named by a commit.
+ *
+ * Four eyes is a vendor boundary, not a model-family boundary.  The author list
+ * is authoritative even when it is empty: an empty list means authorship is
+ * unknown, never "no author to conflict with".  Keeping this as one predicate
+ * gives the recorder, whole-range reviews and file-scoped reviews the same
+ * fail-closed answer.
+ */
+export function reviewIdentityProblem(reviewer, commit = {}) {
+  const authors = Array.isArray(commit.authorModels)
+    ? commit.authorModels
+    : Array.isArray(commit.authors)
+      ? commit.authors
+      : [commit.authorModel ?? commit.authoredBy].filter(Boolean)
+  const named = authors.map((author) => String(author ?? '').trim()).filter(Boolean)
+  if (!named.length || named.some((author) => modelVendor(author) === 'unknown')) return 'unknown-author'
+  const reviewerVendor = modelVendor(reviewer)
+  if (reviewerVendor === 'unknown') return 'unknown-reviewer'
+  return named.some((author) => modelVendor(author) === reviewerVendor) ? 'same-vendor' : ''
+}
+
+/** Only a convergent reading of the changed code can cover that code. */
+export function attestsToCodeReading(record = {}) {
+  return String(record.mode ?? '').trim() === 'review' && !String(record.specExamination ?? '').trim()
+}
+
+const containedBy = (record, sha) => {
+  if (String(record?.sha ?? '') === String(sha)) return true
+  const fact = record?.containedShas
+  return fact instanceof Set
+    ? fact.has(String(sha))
+    : Array.isArray(fact) && fact.map(String).includes(String(sha))
+}
+
+const descendsFrom = (record, earlier) =>
+  String(record?.sha ?? '') !== String(earlier?.sha ?? '') && containedBy(record, earlier?.sha)
+
+const openRefusalsIn = (records = []) => {
+  const clearing = records.filter((record) => String(record.verdict) !== BLOCKING_VERDICT)
+  return records.filter(
+    (refusal) =>
+      String(refusal.verdict) === BLOCKING_VERDICT &&
+      !clearing.some(
+        (answer) => Number(answer.at) > Number(refusal.at) && descendsFrom(answer, refusal),
+      ),
+  )
+}
+
 /** The family words of a model this project would recognise. */
 const MODEL_FAMILY = 'sol|gpt|fable|opus|claude|sonnet|haiku|gemini|grok|llama|mistral|qwen|deepseek'
 
@@ -1044,6 +1093,8 @@ export function validateRecord({
   verdict,
   evidence,
   authoredBy,
+  commitAt,
+  at,
   mode,
   framing,
   authorFraming,
@@ -1121,12 +1172,27 @@ export function validateRecord({
     // ledger line naming nothing in front of a gate that then reads green.
     errors.push(`--evidence: "${ev}" is still the placeholder — write what the review actually checked`)
   }
-  if (String(model ?? '').trim() && String(authoredBy ?? '').trim() && sameModel(model, authoredBy)) {
-    errors.push(
-      `a SELF-REVIEW is refused: ${short(sha)} was authored by "${String(authoredBy).trim()}" and ` +
-        `"${String(model).trim()}" is the same model. The value of a second pair of eyes is that ` +
-        'they are different eyes — have the other model review it.',
-    )
+  if (String(model ?? '').trim()) {
+    const identity = reviewIdentityProblem(model, {
+      authors: Array.isArray(authors) ? authors : [authoredBy].filter(Boolean),
+    })
+    if (identity === 'unknown-author') {
+      errors.push(
+        `an INDEPENDENT REVIEW cannot be proved for ${short(sha)}: its commit names no recognised model ` +
+          'author in its Co-Authored-By trailers. Unknown authorship is unreviewable, not authorless.',
+      )
+    } else if (identity === 'unknown-reviewer') {
+      errors.push(`the claimed reviewer "${String(model).trim()}" has no recognised vendor, so independence cannot be proved`)
+    } else if (identity === 'same-vendor') {
+      errors.push(
+        `a SAME-VENDOR REVIEW is refused: ${short(sha)} was authored by ` +
+          `"${(Array.isArray(authors) ? authors : [authoredBy]).filter(Boolean).join(', ')}" and ` +
+          `"${String(model).trim()}" is from that vendor. Four eyes requires the other vendor.`,
+      )
+    }
+  }
+  if (Number(commitAt) > 0 && ledgerAtUsable(Number(commitAt)) && ledgerAtUsable(at) && Number(at) < Number(commitAt)) {
+    errors.push('a review record may not predate the commit it claims to clear')
   }
   return { ok: errors.length === 0, errors }
 }
@@ -1206,43 +1272,24 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   if (evidence.length < 10 || /^<.*>$/.test(evidence) || blindReviewerAdmission(evidence)) return false
   const mode = String(record.mode ?? '').trim()
   const at = Number(record.at)
-  // EVERY era cutoff reads the later of row and commit time (re-review round 4:
-  // the commit-aware reading sat on one cutoff, so a row backdated past the
-  // OTHERS — mode, authorship — kept the older, laxer rules against a commit
-  // made today).
-  const effectiveAt = Math.max(Number.isFinite(at) && at > 0 ? at : 0, Number(commitAt) || 0)
-  if (mode ? !MODES.includes(mode) : !(Number.isFinite(at) && at > 0 && effectiveAt < MODE_REQUIRED_SINCE)) return false
-  // THE ERA IS THE COMMIT'S, NOT THE ROW'S ALONE (cross-vendor re-review of
-  // point 889): `record.at` is written by the recording hand, so a hand-edited
-  // row could backdate itself past a boundary — including all the way past the
-  // authorship requirement itself, which nesting the new rule inside the old
-  // gate silently allowed. A commit's timestamp is part of its sha and cannot
-  // move without changing the commit. Its residual is stated rather than
-  // hidden: an author who backdates the COMMIT ITSELF at creation time moves
-  // both readings, and no marker the same hand writes can close that; the
-  // systemic answer is work-order point 880's.
-  if (effectiveAt >= AUTHORSHIP_CHECK_SINCE) {
-    const authorship = record.reviewerAuthorship
-    if (!authorship || typeof authorship !== 'object') return false
-    if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
-    if (!sameModel(authorship.claimedModel, record.model)) return false
-    if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
-    // See VERIFIED_REVIEWER_SINCE: what each vendor CAN prove is what it must.
-    if (effectiveAt >= VERIFIED_REVIEWER_SINCE) {
-      const vendor = modelVendor(record.model)
-      // A vendor the roster cannot place is a reviewer nobody can rule out —
-      // no status clears it (re-review round 3: the vendor rule sat only on
-      // the unverified branch, so an unknown vendor with a written-in
-      // "agreement" passed the two string comparisons above).
-      if (vendor === 'unknown') return false
-      if (vendor === 'anthropic' && authorship.status !== 'agreement') return false
-      if (vendor === 'openai') {
-        // No harness transcript can hold an OpenAI reviewer's messages, so an
-        // "agreement" claiming one is fabricated evidence, not strong evidence.
-        if (authorship.status !== 'unverified') return false
-        if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
-      }
-    }
+  if (!MODES.includes(mode)) return false
+  // A review cannot happen before the commit it claims to have read.  This is a
+  // direct ordering invariant, not an era selector controlled by either clock.
+  if (Number(commitAt) > 0 && at < Number(commitAt)) return false
+  // Identity evidence is required by the code evaluating the row, not by a
+  // timestamp supplied by the row or its author.  Backdating either object can
+  // therefore select no weaker version of the rule.
+  const authorship = record.reviewerAuthorship
+  if (!authorship || typeof authorship !== 'object') return false
+  if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
+  if (!sameModel(authorship.claimedModel, record.model)) return false
+  if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
+  const vendor = modelVendor(record.model)
+  if (vendor === 'unknown') return false
+  if (vendor === 'anthropic' && authorship.status !== 'agreement') return false
+  if (vendor === 'openai') {
+    if (authorship.status !== 'unverified') return false
+    if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
   }
   return record.carried === undefined || record.carriedVerified === true
 }
@@ -1294,9 +1341,9 @@ export const modelVendor = (model) => {
  * The gate itself.
  *
  * Inputs (plain data — the wrapper does the git work):
- *   baseline        sha the tree has already confirmed, or null (grandfathering:
- *                   with no baseline nothing is owed, which is how the twenty-odd
- *                   guards that predate this gate stay out of it)
+ *   baseline        sha the tree has already confirmed, or null. A missing
+ *                   baseline is a refusal: the wrapper may recover only from
+ *                   the immutable policy anchor, never from current HEAD.
  *   head            current HEAD
  *   pendingCommits  [{ sha, subject, at, authorModel, files, coveringRecordShas }]
  *                   — the commits in baseline..HEAD that touch a mechanism path;
@@ -1309,6 +1356,7 @@ export const modelVendor = (model) => {
  */
 export function evaluateMechanismReview({
   baseline = null,
+  baselineMissing = false,
   head = '',
   pendingCommits = [],
   records = [],
@@ -1316,7 +1364,19 @@ export function evaluateMechanismReview({
   fence = null,
   sessionId = '',
 } = {}) {
-  if (!baseline) return { block: false, clear: true, bootstrap: true, findings: [], head }
+  // Missing local evidence is itself a finding. It may never mean "start at
+  // HEAD": on main that makes the pending range empty and forgives every debt
+  // in one turn. The wrapper may seed a durable recovery anchor after reporting
+  // this refusal, but this evaluation never clears on absence.
+  if (!baseline || baselineMissing) {
+    return {
+      block: true,
+      clear: false,
+      bootstrap: false,
+      findings: [{ kind: 'missing-baseline', commit: null, records: [] }],
+      head,
+    }
+  }
 
   // A MULTIMAP, not one row per sha (point 714). A range reviewed in passes has
   // several records at the SAME sha, and keying them by sha alone kept only the
@@ -1373,14 +1433,16 @@ export function evaluateMechanismReview({
     // way — by an edit, or from a branch whose CLI predates the rule. Rows older
     // than MERGE_ACCOUNTING_SINCE are grandfathered by DATE; treating a MISSING
     // field as legacy is what let an edited row simply omit it.
-    const selfReviews = wellFormed.filter((r) => sameModel(r.model, commit?.authorModel) || mergeProblem(r, commit))
-    // A SPEC EXAMINATION READS TEXT, NOT CODE. It deliberately shares the
-    // append-only ledger with reviews, but it cannot satisfy this gate: in
-    // particular, its merge verdict at a descendant sha must never discharge
-    // a do-not-merge that demanded a code fix. Keep it out of `sound` so it can
-    // neither clear an otherwise unreviewed commit nor answer a refusal.
+    const selfReviews = wellFormed.filter(
+      (r) => attestsToCodeReading(r) && reviewIdentityProblem(r.model, commit),
+    )
+    // COVERAGE MEANS ONE THING ON EVERY PATH: a well-formed, convergent reading
+    // of this code by a vendor that authored none of it. A spec examination
+    // reads the commission; a blind-parallel row attests to independently
+    // producing and folding lists. Neither attests to reading this commit, so
+    // neither joins `sound` or answers a refusal.
     const sound = wellFormed.filter(
-      (r) => !r?.specExamination && !sameModel(r.model, commit?.authorModel) && !mergeProblem(r, commit),
+      (r) => attestsToCodeReading(r) && !reviewIdentityProblem(r.model, commit),
     )
 
     // END-STATE FILE PASSES CLEAR WHAT THEY READ. The record's own sha is the
@@ -1394,13 +1456,31 @@ export function evaluateMechanismReview({
       String(r.pass.endState) === String(r.sha) &&
       Array.isArray(r?.pass?.files) &&
       !Array.isArray(r?.pass?.commits)
-    const commitVendors = new Set((commit.authorModels ?? [commit.authorModel]).filter(Boolean).map(modelVendor))
-    const scoped = sound.filter(
-      (r) => {
-        const reviewerVendor = modelVendor(r.model)
-        return fileScopedShape(r) && reviewerVendor !== 'unknown' && !commitVendors.has('unknown') && !commitVendors.has(reviewerVendor)
-      },
+    const scoped = sound.filter(fileScopedShape)
+
+    // New recorder rows are file-scoped, but they are still parts of ONE split.
+    // No part clears until every numbered part of that split is present. Without
+    // this check pass 1/3 cleared its named file and the legacy composition code
+    // never saw it because `endState` excluded it from that path.
+    const scopedSplits = [...new Set(covering.filter(fileClaim).map((r) => String(r?.sha ?? '')))].flatMap((sha) => {
+      const rows = scoped.filter((r) => String(r?.sha ?? '') === sha)
+      const expected = [...new Set(rows.flatMap((r) => (Array.isArray(r?.pass?.files) ? r.pass.files : [])))]
+      return passComposition(rows, { expect: expected })
+    })
+    const incompleteScoped = scopedSplits.filter((split) => !split.complete)
+    const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
+    const standingScoped = incompleteScoped.filter(
+      (split) => !scopedWholeReviews.some(
+        (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
+      ),
     )
+    if (standingScoped.length) {
+      const worst = standingScoped.reduce((a, b) =>
+        ((b.missing?.length ?? 0) + (b.uncovered?.length ?? 0) >=
+        (a.missing?.length ?? 0) + (a.uncovered?.length ?? 0) ? b : a))
+      findings.push({ kind: 'incomplete-passes', commit, records: worst.records, passes: worst, besideSplit: scopedWholeReviews })
+      continue
+    }
     const remainingFiles = []
     let scopedRefusal = null
     for (const file of commit.files ?? []) {
@@ -1409,9 +1489,12 @@ export function evaluateMechanismReview({
         remainingFiles.push(file)
         continue
       }
-      const latest = rows.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
-      if (String(latest.verdict) === BLOCKING_VERDICT) {
+      const open = openRefusalsIn(rows)
+      if (open.length) {
+        const latest = open.reduce((a, b) => (Number(b.at) >= Number(a.at) ? b : a))
         scopedRefusal = !scopedRefusal || Number(latest.at) >= Number(scopedRefusal.at) ? latest : scopedRefusal
+        remainingFiles.push(file)
+      } else if (!rows.some((row) => String(row.verdict) !== BLOCKING_VERDICT)) {
         remainingFiles.push(file)
       }
     }
@@ -1422,7 +1505,6 @@ export function evaluateMechanismReview({
     if (!remainingFiles.length) continue
     commit = { ...commit, files: remainingFiles }
     const legacyContributionShape = (r) => Array.isArray(r?.pass?.commits)
-    const legacyCovering = covering.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
     const legacySound = sound.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
 
     // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
@@ -1484,7 +1566,7 @@ export function evaluateMechanismReview({
     const passRow = (r) => r?.pass !== undefined && r?.pass !== null
     // THE SPLIT IS READ OFF EVERY RECORD AT EVERY COVERING SHA, sound or not
     // (fourth cross-vendor round, widened by the fifth): a pass row excluded as
-    // a self-review or a broken merge still WITNESSES that the offering tool
+    // a same-vendor review or a broken merge still WITNESSES that the offering tool
     // measured a range containing THIS COMMIT as too large for one round — the
     // measurement stands whether or not that row's verdict may count, and a
     // MALFORMED one (an index outside its total, no file list) witnesses it no
@@ -1498,7 +1580,9 @@ export function evaluateMechanismReview({
     // way out stays honest and is always open: complete the recorded passes.
     // Only records that COMPOSE must be sound; the evidence of the split need
     // not be.
-    const split = legacyCovering.some(passRow)
+    // File-scoped rows are split evidence too. Excluding them let a pass-less
+    // whole-range row stand beside a recorded 1/3 and bypass completeness.
+    const split = covering.some((r) => !legacyContributionShape(r) && passRow(r))
     const besideSplit = split ? legacySound.filter((r) => !r?.pass) : []
     const valid = [
       ...(split ? [] : legacySound.filter((r) => !r?.pass)),
@@ -1571,17 +1655,7 @@ export function evaluateMechanismReview({
     // `containedShas`) and handed in as data; a clearing record whose fact is
     // missing answers nothing — no ancestry fact, no clearance — and a
     // same-sha re-record fixes nothing, exactly as at the sibling gate.
-    const clearing = valid.filter((r) => String(r.verdict) !== BLOCKING_VERDICT)
-    const refusals = valid.filter((r) => String(r.verdict) === BLOCKING_VERDICT)
-    const answers = (c, u) => {
-      if (String(c.sha) === String(u.sha)) return false
-      const fact = c.containedShas
-      const set = fact instanceof Set ? fact : Array.isArray(fact) ? new Set(fact.map(String)) : null
-      return set ? set.has(String(u.sha)) : false
-    }
-    const open = refusals.filter(
-      (u) => !clearing.some((c) => Number(c.at ?? 0) > Number(u.at ?? 0) && answers(c, u)),
-    )
+    const open = openRefusalsIn(valid)
     if (open.length) {
       const latest = open.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
       findings.push({ kind: 'do-not-merge', commit, records: [latest] })
@@ -1613,6 +1687,17 @@ export function evaluateMechanismReview({
 /** Render the verdict as the guard's refusal — every offender, and the way out. */
 export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } = {}) {
   if (!verdict?.block) return ''
+  if ((verdict.findings ?? []).some((finding) => finding.kind === 'missing-baseline')) {
+    return [
+      'FOUR-EYES GATE ON MECHANISMS: the local review baseline is missing.',
+      '',
+      'Absence cannot bootstrap at HEAD: on main that would make the pending range empty and',
+      'silently grandfather every outstanding mechanism review. This stop is refused. The guard',
+      'will seed its tracked-history recovery anchor when available. If this branch cannot reach',
+      'that anchor, merge origin/main into this branch. Then end the turn again so the guard can',
+      'seed the anchor and judge the complete range from it.',
+    ].join('\n')
+  }
   const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
   const unreviewable = Array.isArray(authorshipPlan?.unreviewable) ? authorshipPlan.unreviewable : []
   const lines = [
@@ -1711,7 +1796,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
         ? `      authored by ${author}; no review recorded`
         : blind
           ? mergeLine()
-          : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
+          : `      the only review on record is from ${author}'s vendor — a same-vendor review is not independent`,
     )
   }
   if (unreviewable.length) {
@@ -1739,7 +1824,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     lines.push(
       '',
       'Ask the planner for the runnable pass commands; each recorded pass clears only its',
-      'listed files at their reviewed end state, so the two vendors accumulate coverage without self-review:',
+      'listed files at their reviewed end state, so the two vendors accumulate independent coverage:',
       '',
       `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
       '',
@@ -1749,11 +1834,11 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     lines.push(
       '',
       'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
-      'nobody looks again. Have the OTHER model review the change — plan and result — and',
+      'nobody looks again. Have the OTHER vendor review the change — plan and result — and',
       'record what it said:',
       '',
       '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode review`,
       '',
       'One record covers every mechanism commit it contains, so reviewing the branch head is',
       'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',

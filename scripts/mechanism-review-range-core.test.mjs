@@ -206,6 +206,13 @@ describe('per-file end-state review baseline', () => {
     at,
     containedShas: contained,
     pass: { index: 1, total: 1, files, endState: head },
+    evidence: 'checked the complete end-state patch for the named files',
+    mode: 'review',
+    reviewerAuthorship: {
+      status: 'unverified',
+      claimedModel: 'GPT-5.6 Sol',
+      reason: 'external CLI reviewer',
+    },
   })
 
   it('keeps a covered file clear after a later commit touches only another file', () => {
@@ -343,7 +350,7 @@ describe('per-file end-state review baseline', () => {
     expect(debt.invalidatedCoverage).toEqual([])
   })
 
-  it('keeps a newer refusal visible and lets a later clearance settle it', () => {
+  it('keeps a refusal visible until a later clearance descends from its sha', () => {
     const change = commit('a', 'Claude Opus 5', ['guard'])
     const base = { head: change.sha, files: ['guard'], contained: [change.sha] }
     const refused = outstandingFiles({
@@ -354,14 +361,45 @@ describe('per-file end-state review baseline', () => {
     })
     expect(refused.refusals).toHaveLength(1)
     expect(refused.outstanding).toHaveLength(1)
-    const cleared = outstandingFiles({
+    const sameSha = outstandingFiles({
       commits: [change],
       endStateFiles: ['guard'],
       recordUsable: usable,
       records: [row({ ...base, verdict: 'do-not-merge', at: 100 }), row({ ...base, verdict: 'merge', at: 200 })],
     })
+    expect(sameSha.refusals).toHaveLength(1)
+    expect(sameSha.covered).toEqual([])
+    const answer = row({
+      head: sha('b'),
+      files: ['guard'],
+      contained: [change.sha, sha('b')],
+      verdict: 'merge',
+      at: 200,
+    })
+    const cleared = outstandingFiles({
+      commits: [change],
+      endStateFiles: ['guard'],
+      recordUsable: usable,
+      records: [row({ ...base, verdict: 'do-not-merge', at: 100 }), answer],
+    })
     expect(cleared.refusals).toEqual([])
     expect(cleared.covered).toHaveLength(1)
+  })
+
+  it('reports every file of an incomplete scoped split as still owed', () => {
+    const change = commit('a', 'Claude Opus 5', ['a', 'b'])
+    const first = {
+      ...row({ head: change.sha, files: ['a'], contained: [change.sha], at: 100 }),
+      pass: { index: 1, total: 2, files: ['a'], endState: change.sha },
+    }
+    const debt = outstandingFiles({
+      commits: [change],
+      endStateFiles: ['a', 'b'],
+      recordUsable: usable,
+      records: [first],
+    })
+    expect(debt.covered).toEqual([])
+    expect(debt.outstanding.map((artefact) => artefact.file)).toEqual(['a', 'b'])
   })
 
   it('rebuilds authorship history for only the still-owed files', () => {
@@ -377,7 +415,7 @@ describe('per-file end-state review baseline', () => {
     ])
   })
 
-  it('lets one recorded pass clear its files in the mechanism gate', () => {
+  it('lets no file of a split clear until every recorded pass is complete', () => {
     const head = sha('a')
     const pending = {
       ...commit('a', 'Claude Opus 5', ['a', 'shared']),
@@ -386,6 +424,7 @@ describe('per-file end-state review baseline', () => {
     }
     const record = {
       ...row({ head, files: ['a'], contained: [head], at: 1_787_000_000_000 }),
+      pass: { index: 1, total: 2, files: ['a'], endState: head },
       evidence: 'checked file a against its complete end-state patch',
       mode: 'review',
     }
@@ -397,7 +436,7 @@ describe('per-file end-state review baseline', () => {
       endStateFiles: ['a', 'shared'],
     })
     expect(partial.block).toBe(true)
-    expect(partial.findings.map((finding) => finding.commit.files)).toEqual([['shared']])
+    expect(partial.findings.map((finding) => finding.commit.files)).toEqual([['a'], ['shared']])
 
     const second = {
       ...record,
