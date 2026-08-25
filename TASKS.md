@@ -12006,30 +12006,3 @@ to land than a mechanism that needs a review.
   Criticality: med — no player-visible defect, but it puts a red gate in front of the routine
   act of recording a finding, which is exactly where the batch must not be slowed.
   Bundle: Session- & Repo-Hygiene.
-
-- [ ] 923. The preflight and the four-eyes gate return opposite verdicts for the same HEAD, so
-  the one report that exists to answer "would a guard block me" cannot be believed. MEASURED
-  25.08.2026 at `df540a3f`, seconds apart and in the same tree: the Stop-path guard
-  (`echo '{"session_id":"…"}' | node scripts/mechanism-review-guard.mjs`) reported REVIEW GAP —
-  "a review nobody can produce is not demanded: this turn may end" — while
-  `node scripts/guard-preflight.mjs --for answer --session <id>` reported the SAME guard as
-  "would-block: FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE: this range contains contributions
-  with no eligible reviewer vendor."
-  WHY IT MATTERS: `gatherMechanismReviewInputs` is exported precisely so the preflight judges
-  the gate "from the SAME gathering the Stop hook uses rather than a second copy of this git
-  work, which would drift and hand back a false 'clean'"
-  (`scripts/mechanism-review-guard.mjs:275-280`). This is that drift, in the false-BLOCK
-  direction: the comment guarded against a false green and the measured failure is a false red,
-  which costs a session's opening hunting a refusal the real gate never raises. A preflight that
-  contradicts the guard is useless in both directions, because the reader cannot tell which of
-  the two to believe.
-  FINAL STATE: preflight and Stop path yield the same block/allow decision and the same finding
-  kind for the same HEAD, or the preflight states in its own row which additional condition it
-  is judging that the Stop path is not — so a difference is a stated difference, never a
-  contradiction.
-  VERIFIABLE: Vitest driving both paths over one fixed set of inputs (baseline, head, pending
-  commits, records) and asserting the same decision and the same finding kind, including the
-  review-gap case that produced this divergence; plus `npm run test:unit`, lint, build.
-  Criticality: med — no player-visible defect, but it is the batch's own "may I act" report
-  disagreeing with the gate it reports on.
-  Bundle: Session- & Repo-Hygiene.
