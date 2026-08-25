@@ -21,6 +21,8 @@ import { spawnProgressed, successorStartDecision, SUCCESSOR_TRIGGERS } from './b
 import {
   assessOwner,
   classifyParallel,
+  claimGeneration,
+  detectParallel,
   isProbeSessionId,
   ownsLock,
   PROBE_SESSION_PREFIX,
@@ -53,6 +55,7 @@ import {
   sweepableTmpFiles,
   resolveOwnership,
   transitionOwnerSession,
+  ownerSessionTear,
   validTransitionSessionId,
   ourClaudeProcess,
   findClaudeAncestor,
@@ -64,6 +67,8 @@ import {
   SESSIONS_SEEN_PATH,
   SESSION_ACTIVITY_PATH,
   noteBatchWriter,
+  noteTopLevelSession,
+  noteSessionStandDown,
   retireBatchWriter,
   revokeWriterFence,
   readSessionProcesses,
@@ -1077,6 +1082,11 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(acquire('', opts())).toBe('held')
   })
 
+  it('a placeholder id is refused before the lock can be written', () => {
+    expect(acquire('x', opts())).toBe('invalid')
+    expect(existsSync(lockPath)).toBe(false)
+  })
+
   it('release only by the owner', () => {
     acquire('s1', opts())
     expect(release('s2', lockPath)).toBe(false)
@@ -1618,13 +1628,36 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('successor')
   })
 
+  it('diagnoses only a valid id on this exact owner process as the repairable torn state', () => {
+    acquire('before-compaction', opts())
+    const lock = readOwnerLock(lockPath)
+    const ancestor = { pid: lock.pid, startedAt: lock.pidStartedAt }
+    expect(ownerSessionTear({ sessionId: 'after-compaction', lock, ancestor })).toMatchObject({
+      torn: true,
+      reason: 'owner-session-id-mismatch',
+      recordedSessionId: 'before-compaction',
+    })
+    expect(ownerSessionTear({ sessionId: 'before-compaction', lock, ancestor })).toEqual({ torn: false, reason: 'consistent' })
+    expect(ownerSessionTear({ sessionId: 'x', lock, ancestor })).toEqual({ torn: false, reason: 'invalid-session-id' })
+    expect(
+      ownerSessionTear({ sessionId: 'after-compaction', lock, ancestor: { ...ancestor, startedAt: ancestor.startedAt - 60_000 } }),
+    ).toMatchObject({ torn: false, reason: 'not-owner:pid-reused' })
+  })
+
   it('validates transition ids without coupling them to the harness UUID format', () => {
     for (const sid of ['after-compaction', '830a6878-915f-4838-92fc-4af7859c4758']) {
       expect(validTransitionSessionId(sid)).toBe(true)
     }
-    for (const sid of ['', ' preflight-safe', 'preflight-test', 'line\nbreak', null, 42]) {
+    for (const sid of ['', 'x', 'X', ' preflight-safe', 'preflight-test', 'line\nbreak', null, 42]) {
       expect(validTransitionSessionId(sid)).toBe(false)
     }
+  })
+
+  it('a placeholder ownership query leaves the recorded owner byte-identical', () => {
+    acquire('before-compaction', opts())
+    const before = readFileSync(lockPath, 'utf8')
+    expect(ownsLock('x', { lockPath, ancestor: { pid: process.pid, startedAt: NOW } }).mine).toBe(true)
+    expect(readFileSync(lockPath, 'utf8')).toBe(before)
   })
 
   it('a SECOND WINDOW is still a second window — its own claude process gives it away', () => {
@@ -2164,6 +2197,131 @@ describe('classifyParallel (active detector, subagent-safe)', () => {
       now: NOW,
     })
     expect(parallel).toEqual([])
+  })
+
+  it('treats a placeholder owner as UNKNOWN, never as evidence of a foreign session', () => {
+    expect(validTransitionSessionId('x')).toBe(false)
+    expect(
+      classifyParallel({
+        sessionsSeen: { real: NOW - 60_000 },
+        activity: { real: NOW - 1_000 },
+        ownerSid: 'x',
+        now: NOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('recognises the lock pid only with the same incarnation and ownership generation', () => {
+    const owner = { sessionId: 'foreign-id', pid: 42, pidStartedAt: NOW - 60_000, fence: 17 }
+    const base = {
+      sessionsSeen: {
+        real: { seenAt: NOW - 60_000, pid: 42, pidStartedAt: NOW - 60_000, generation: 17 },
+      },
+      activity: { real: NOW - 1_000 },
+      ownerSid: owner.sessionId,
+      owner,
+      now: NOW,
+    }
+    expect(classifyParallel(base)).toEqual([])
+    expect(
+      classifyParallel({
+        ...base,
+        sessionsSeen: { real: { ...base.sessionsSeen.real, pidStartedAt: NOW - 120_000 } },
+      }).map((entry) => entry.sid),
+    ).toEqual(['real'])
+    expect(
+      classifyParallel({
+        ...base,
+        sessionsSeen: { real: { ...base.sessionsSeen.real, generation: 16 } },
+      }).map((entry) => entry.sid),
+    ).toEqual(['real'])
+  })
+
+  it('keeps an unchanged singleton stand-down as attended observation only', () => {
+    const owner = { sessionId: 'owner', pid: 10, pidStartedAt: NOW - 100_000, fence: 17 }
+    const claim = { sessionId: 'claimant', at: NOW - 10_000, pid: 77, pidStartedAt: NOW - 20_000 }
+    const writer = { generation: null, batchWriterAt: null }
+    const record = {
+      seenAt: NOW - 60_000,
+      pid: 42,
+      pidStartedAt: NOW - 50_000,
+      generation: null,
+      stoodDown: {
+        at: NOW - 40_000,
+        pid: 42,
+        pidStartedAt: NOW - 50_000,
+        ownerSession: 'owner',
+        ownerGeneration: 17,
+        claimGeneration: claimGeneration(claim),
+        writerGeneration: null,
+        writerAt: null,
+      },
+    }
+    const base = {
+      sessionsSeen: { observer: record, owner: NOW - 100_000 },
+      activity: { observer: NOW - 1_000, owner: NOW - 1_000 },
+      ownerSid: 'owner',
+      owner,
+      processes: { observer: writer },
+      claim,
+      now: NOW,
+    }
+    expect(classifyParallel(base)).toEqual([])
+    expect(classifyParallel({ ...base, owner: { ...owner, fence: 18 } }).map((entry) => entry.sid)).toEqual(['observer'])
+    expect(classifyParallel({ ...base, claim: { ...claim, activityAt: NOW } }).map((entry) => entry.sid)).toEqual(['observer'])
+    expect(
+      classifyParallel({ ...base, processes: { observer: { generation: 18, batchWriterAt: NOW - 1_000 } } })
+        .map((entry) => entry.sid),
+    ).toEqual(['observer'])
+  })
+
+  it('replays the placeholder incident through the real detector without an alert', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-placeholder-detector-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const paths = statePathsFor(lockPath)
+    try {
+      writeFileSync(lockPath, JSON.stringify({ sessionId: 'x', pid: 42, pidStartedAt: NOW - 60_000, fence: 17 }))
+      writeFileSync(paths.sessionsSeenPath, JSON.stringify({
+        real: { seenAt: NOW - 50_000, pid: 42, pidStartedAt: NOW - 60_000, generation: 17 },
+      }))
+      writeFileSync(paths.activityPath, JSON.stringify({ real: NOW - 1_000 }))
+      expect(detectParallel('x', { lockPath, now: NOW })).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('persists process-qualified stand-down evidence for the real detector', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-stand-down-detector-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const paths = statePathsFor(lockPath)
+    const owner = { sessionId: 'owner', claimedAt: NOW - 80_000, pid: 10, pidStartedAt: NOW - 80_000, fence: 17 }
+    const observerProcess = { pid: 42, startedAt: NOW - 60_000 }
+    try {
+      writeFileSync(lockPath, JSON.stringify(owner))
+      noteTopLevelSession('observer', {
+        path: paths.sessionsSeenPath,
+        lockPath,
+        lock: owner,
+        now: NOW - 50_000,
+        processIdentity: observerProcess,
+      })
+      expect(noteSessionStandDown('observer', {
+        path: paths.sessionsSeenPath,
+        processesPath: paths.ancestorCachePath,
+        lockPath,
+        lock: owner,
+        claim: null,
+        writer: null,
+        now: NOW - 40_000,
+        processIdentity: observerProcess,
+      })).toBe(true)
+      writeFileSync(paths.activityPath, JSON.stringify({ observer: NOW - 1_000 }))
+      expect(detectParallel('owner', { lockPath, now: NOW })).toEqual([])
+      expect(detectParallel('owner', { lockPath, owner: { ...owner, fence: 18 }, now: NOW })).toHaveLength(1)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

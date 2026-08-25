@@ -146,6 +146,12 @@ export function ladderEntry(state, key) {
     lastSentAt,
     firstSentAt: Number.isFinite(Number(e.firstSentAt)) ? Number(e.firstSentAt) : lastSentAt,
     sends: Number.isFinite(Number(e.sends)) ? Number(e.sends) : 0,
+    // Carried through so a later rung does not silently drop the decision record
+    // the board derives its state card from (point 749). Defended like the rest:
+    // only a record with a readable body counts as one.
+    ...(e.record && typeof e.record === 'object' && String(e.record.body ?? '').trim()
+      ? { record: e.record }
+      : {}),
   }
 }
 
@@ -286,7 +292,7 @@ export function escalationDecision({
 /** Book a delivered alert on the ladder — pure state transition. Entries that
  *  have not been touched for two reset windows are dropped, so the file cannot
  *  grow without bound. */
-export function advanceLadder(state, { key, decision, now = Date.now(), resetMs = ALERT_RESET_MS }) {
+export function advanceLadder(state, { key, decision, now = Date.now(), resetMs = ALERT_RESET_MS, record = null }) {
   const alerts = state?.alerts && typeof state.alerts === 'object' ? { ...state.alerts } : {}
   for (const [k, e] of Object.entries(alerts)) {
     const at = Number(e?.lastSentAt)
@@ -298,6 +304,13 @@ export function advanceLadder(state, { key, decision, now = Date.now(), resetMs 
     lastSentAt: now,
     firstSentAt: decision.reset || !prev ? now : prev.firstSentAt,
     sends: (decision.reset || !prev ? 0 : prev.sends) + 1,
+    // THE DECISION RECORD LIVES ON THE RUNG (point 749). The last rung used to
+    // post it as a "Von dir zu klären" card, which asked the user to act on a
+    // machine-side incident and then outlived the condition; the board derives
+    // its state card from here instead, so the record disappears with the alert.
+    // An entry the ladder RESETS drops its old record with it: the condition it
+    // described is the one that was treated as cleared.
+    ...(record ? { record } : decision.reset ? {} : prev?.record ? { record: prev.record } : {}),
   }
   return { alerts }
 }

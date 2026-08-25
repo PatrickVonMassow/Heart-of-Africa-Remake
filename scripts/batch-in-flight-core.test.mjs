@@ -32,6 +32,7 @@ import {
   checkEvidence,
   combineWorktreeStamps,
   porcelainPaths,
+  registeredFeatureWorktrees,
   worktreeStamp,
   describeInFlight,
   evidenceVerdict,
@@ -96,6 +97,7 @@ import {
   gatherInFlight,
   gatherSlots,
   openFeatBranches,
+  registeredFeatureWriters,
   maxAgeMs,
   readDeclaration,
   resolveRefName,
@@ -361,6 +363,58 @@ describe('the worktree stamp reads BOTH sources and says which one answered', ()
     // verbatim — trimming it would make its stat miss (four-eyes review, finding 6).
     expect(porcelainPaths(rec('?? odd name .ts', '?? tab\tname.ts'))).toEqual(['odd name .ts', 'tab\tname.ts'])
     for (const junk of ['', null, undefined, '\0\0', 'XY']) expect(porcelainPaths(junk), String(junk)).toEqual([])
+  })
+})
+
+describe('the launcher-facing feature worktree register', () => {
+  const porcelain = [
+    'worktree /repo',
+    'HEAD aaaaa',
+    'branch refs/heads/main',
+    '',
+    'worktree /repo/.claude/worktrees/point-515',
+    'HEAD bbbbb',
+    'branch refs/heads/feat/515-detector',
+    '',
+    'worktree /repo/.claude/worktrees/detached',
+    'HEAD ccccc',
+    'detached',
+    '',
+  ].join('\n')
+
+  it('reads only registered feature checkouts from porcelain', () => {
+    expect(registeredFeatureWorktrees(porcelain)).toEqual([
+      { path: '/repo/.claude/worktrees/point-515', branch: 'feat/515-detector' },
+    ])
+  })
+
+  it('asks the same agent-check evidence and recognises a declared transfer', () => {
+    const declaration = {
+      evidence: [{ kind: 'branch', ref: 'feat/515-detector' }],
+    }
+    const result = registeredFeatureWriters({
+      now: NOW,
+      declaration,
+      exec: () => porcelain,
+      openProbe: () => ({ readable: true, branches: [{ ref: 'feat/515-detector' }] }),
+      check: ({ branch, worktree, now }) => ({
+        output: agentOutputVerdict({ branchTipAt: now - 1_000, now }),
+        reason: 'agent-alive',
+        detail: `${branch} moving in ${worktree}`,
+      }),
+    })
+    expect(result).toMatchObject({
+      readable: true,
+      writers: [{ branch: 'feat/515-detector', recognized: true, output: { verdict: 'alive' } }],
+    })
+  })
+
+  it('refuses to invent an empty register when Git cannot enumerate worktrees', () => {
+    expect(registeredFeatureWriters({ exec: () => { throw new Error('broken') } })).toEqual({
+      readable: false,
+      writers: [],
+      reason: 'git-worktree-register-unreadable',
+    })
   })
 })
 

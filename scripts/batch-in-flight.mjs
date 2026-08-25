@@ -53,6 +53,7 @@ import {
   describeInFlight,
   markTransferred,
   porcelainPaths,
+  registeredFeatureWorktrees,
   respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
@@ -691,6 +692,56 @@ export function checkAgentOutput(
     ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
   })
   return { output, ...respawnDecision({ output }) }
+}
+
+/** Measure every OPEN feat/* checkout Git currently registers through the same
+ * branch/worktree grace decision as `--agent-check`. A declared boundary agent
+ * is marked recognised so a supported transfer can carry it into the successor;
+ * every other recently moving checkout is an independent writer veto. */
+export function registeredFeatureWriters({
+  cwd = REPO_ROOT,
+  now = Date.now(),
+  declaration = null,
+  exec = execFileSync,
+  check = checkAgentOutput,
+  openProbe = openFeatBranches,
+} = {}) {
+  let trees
+  try {
+    const porcelain = exec('git', ['worktree', 'list', '--porcelain'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    trees = registeredFeatureWorktrees(porcelain)
+  } catch {
+    return { readable: false, writers: [], reason: 'git-worktree-register-unreadable' }
+  }
+  const open = openProbe({ cwd })
+  if (!open.readable) return { readable: false, writers: [], reason: 'open-feature-branches-unreadable' }
+  const openRefs = new Set(open.branches.map((item) => item.ref).filter((ref) => ref.startsWith('feat/')))
+  const declared = declaredAgentProbe(declaration)
+  const declaredBranches = new Set(declared.branches.map((ref) => String(ref).replace(/^refs\/heads\//, '')))
+  const declaredPaths = new Set(declared.worktrees.map((path) => resolve(String(path))))
+  const writers = trees
+    .filter((tree) => openRefs.has(tree.branch))
+    .map((tree) => {
+      const measured = check({ worktree: tree.path, branch: tree.branch, now })
+      return {
+        branch: tree.branch,
+        worktree: tree.path,
+        recognized: declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path)),
+        output: measured.output ?? null,
+        reason: measured.reason ?? null,
+        detail: measured.detail ?? null,
+      }
+    })
+  if (writers.some((writer) => writer.output?.verdict === 'unmeasurable')) {
+    return { readable: false, writers, reason: 'registered-feature-output-unmeasurable' }
+  }
+  return { readable: true, writers, reason: 'measured' }
 }
 
 const commandValue = (value) => JSON.stringify(String(value))

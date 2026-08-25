@@ -629,9 +629,19 @@ describe('the launcher acts on the pause record', () => {
   it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
     const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
     const block = codeLines.slice(recovery, recovery + 18).join('\n')
-    expect(block).toMatch(/boardCard\(recovery\.title, recovery\.body\)/)
+    // Point 749: NO board call at all — the pause marker is the record and the
+    // board derives its state card from it, so the recovery clock is written
+    // unconditionally rather than behind a successful board write.
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
     expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
     expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+  })
+
+  it('records the runaway self-pause in the pause marker and creates no card at all', () => {
+    const start = lineOf(/state\.failCount >= RUNAWAY_FAIL_LIMIT/, 'the runaway pause')
+    const block = codeLines.slice(start, start + 40).join('\n')
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
+    expect(block).toMatch(/formatPauseRecord\(\{/)
   })
 
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
@@ -639,7 +649,7 @@ describe('the launcher acts on the pause record', () => {
     const block = codeLines.slice(brake, brake + 32).join('\n')
     expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
-    expect(block).toMatch(/boardCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
     expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 
@@ -648,6 +658,28 @@ describe('the launcher acts on the pause record', () => {
     const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
     expect(drill, 'no --pause-report hook').toBeGreaterThanOrEqual(0)
     expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
+  })
+})
+
+describe('the launcher uses the canonical repository for batch-global state', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('takes REPO from repo-paths while retaining source-relative script lookup', () => {
+    expect(source).toMatch(/import \{ REPO_ROOT \} from '\.\/repo-paths\.mjs'/)
+    expect(source).toMatch(/const R = \(p\) => fileURLToPath/)
+    expect(source).toMatch(/const REPO = REPO_ROOT/)
+    expect(source).not.toMatch(/const REPO = R\('\.\.'\)/)
+    expect(source).toMatch(/const C = \(n\) => join\(REPO, '\.claude', n\)/)
+  })
+})
+
+describe('the launcher consults registered feature writers before spawning', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('passes the measured register through both the initial and recovery decisions', () => {
+    expect(source).toMatch(/const featureWriterRegister = registeredFeatureWriters\(/)
+    expect(source.match(/featureWriterRegister[:,]/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(source).toMatch(/registeredFeatureWriters\(\{[\s\S]{0,180}?SUCCESSOR_TRIGGERS\.BOUNDARY/)
   })
 })
 

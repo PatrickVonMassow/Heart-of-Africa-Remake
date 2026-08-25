@@ -55,6 +55,8 @@ import {
   refreshFooter,
   removeVdzk,
   setCardStatus,
+  applyDerivedStateCard,
+  stripDerivedStateCard,
   setCardTitle,
   toDone,
   doneCards,
@@ -97,6 +99,46 @@ describe('setCardStatus', () => {
   it('refuses a non-numeric point and an empty document', () => {
     expect(() => setCardStatus(board(), 'abc', 'X', '09:00')).toThrow(/not a point number/)
     expect(() => setCardStatus('', 361, 'X', '09:00')).toThrow(/empty document/)
+  })
+})
+
+describe('applyDerivedStateCard — the machine reports state instead of asking', () => {
+  const derived = { title: 'Batch pausiert', body: 'Umgebungsausfall. Nächster Versuch 25.08.2026, 15:10.' }
+  const running = () => fullBoard({ now: nowEntry(361, 'Etwas', '10:00 · ~12:00'), vdzk: vdzkEntry('Eine echte Frage') })
+
+  it('stands BESIDE a running point card instead of overwriting its status', () => {
+    const out = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    expect(out).toContain('Batch pausiert')
+    expect(out).toContain('data-state="derived"')
+    // The point's own status survives — the reader still learns what is running.
+    expect(out).toContain('läuft')
+    expect(out.match(/<details class="now"/g)).toHaveLength(2)
+  })
+
+  it('DISAPPEARS again when there is no state to report — no hand edit needed', () => {
+    const paused = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const cleared = applyDerivedStateCard(paused, null, { stamp: '15:20' })
+    expect(cleared).not.toContain('Batch pausiert')
+    expect(cleared).not.toContain('data-state="derived"')
+    expect(cleared.match(/<details class="now"/g)).toHaveLength(1)
+  })
+
+  it('is idempotent: two derivations leave ONE card, restamped', () => {
+    const once = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const twice = applyDerivedStateCard(once, derived, { stamp: '14:52' })
+    expect(twice.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(twice).toContain('Stand 14:52')
+  })
+
+  it('never puts the state under "Von dir zu klären"', () => {
+    const out = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const vdzk = out.slice(out.indexOf('Von dir zu klären'))
+    expect(vdzk).not.toContain('Batch pausiert')
+  })
+
+  it('leaves a NUMBERED card wearing the marker alone — a marker authorises no deletion', () => {
+    const impostor = running().replace('<details class="now">', '<details class="now" data-state="derived">')
+    expect(stripDerivedStateCard(impostor)).toContain('361')
   })
 })
 
@@ -454,6 +496,26 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     const cards = parseCards(sliceSections(out).sections['Von dir zu klären'])
     expect(cards[0].title).toBe('&lt;Titel der Frage&gt;')
     expect(cards[0].body).toContain('&amp;')
+  })
+
+  it('REFUSES an automated status report and names the section it belongs in (point 749)', () => {
+    const b = fullBoard({ vdzk: '' })
+    const report = 'Der Batch hat sich selbst pausiert, weil ein Alarm fünfmal unbeantwortet blieb.'
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/not a user decision/)
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/Woran ich gerade arbeite/)
+    // A session's own judgement is not second-guessed — the flag is what a SCRIPT
+    // declares about itself, and `decision-card-guard` holds sessions to the rule.
+    expect(addVdzk(b, 'Batch pausiert', report)).toContain('Batch pausiert')
+  })
+
+  it('admits an automated card that names a choice and its options', () => {
+    const out = addVdzk(
+      fullBoard({ vdzk: '' }),
+      'Rasterung der Höhenkarte',
+      'Deine Möglichkeiten: die Entscheidung stehen lassen, oder sie zurücknehmen — antworte „Veto Rasterung".',
+      { automated: true },
+    )
+    expect(out).toContain('Rasterung der Höhenkarte')
   })
 
   it('refuses a card with no title or no question — an empty card asks nothing', () => {

@@ -9,6 +9,12 @@
 // so the direction cannot become a cycle.
 import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
 import { namesFollowOnWork } from './handover-card-contract.mjs'
+// The derived state card's vocabulary lives beside the derivation itself, so the
+// renderer here and the module that decides WHAT to report cannot drift apart.
+import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './board-state-core.mjs'
+// The admissibility rule for a card written by a script, kept beside the guard's
+// own notion of "this asks the user" rather than restated here.
+import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
 
 export { namesFollowOnWork }
 
@@ -294,6 +300,11 @@ export function dropStrayNowCards(html) {
     const { chip, legacy } = summaryPoint(summary)
     if (chip || legacy) return card
     if (isStateCardTitle(title)) return card
+    // THE DERIVED CARD IS NOT STRAY (point 749). It carries no number by design
+    // and is replaced by the derivation on the very next edit, so sweeping it
+    // here would report a "lost" card on every command while removing nothing
+    // that was not about to be rewritten anyway.
+    if (isTrulyDerivedCard(card)) return card
     // A genuine state card that lost its chip is still replaceable by its own
     // command (`none`, `closing <N>`), so it is kept rather than swept.
     if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
@@ -898,6 +909,58 @@ export const STATE_KINDS = ['idle', 'closing']
 const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
 
 /**
+ * THE DERIVED STATE CARD (point 749). It is not a kind any session writes: it is
+ * re-derived from the pause marker, the alert ladder and the retry state on every
+ * board edit and every publish, so a condition that has passed disappears from
+ * the board on its own instead of having to be cleared by hand — which is the
+ * whole reason the machine's own status reports may leave "Von dir zu klären".
+ *
+ * It stands BESIDE the other voices rather than replacing them: a paused batch
+ * still has a running point, so this card is excluded from the one-kind rule and
+ * from `stripStateCards`.
+ */
+const derivedCardPattern = () =>
+  new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>[\\s\\S]*?</details>\\s*`, 'g')
+
+/**
+ * Is this really the derived card — unnumbered, and titled as one of its two
+ * states? A marker is hand-writable, so here as everywhere it never authorises a
+ * removal on its own.
+ */
+function isTrulyDerivedCard(card) {
+  const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
+  if (summaryPoint(summary).chip != null) return false
+  return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE
+}
+
+/**
+ * The document without the derived state card. Safe to call unconditionally: the
+ * card holds no information of its own, only a rendering of state kept elsewhere.
+ */
+export function stripDerivedStateCard(html) {
+  return withinNowSection(html, (scope) =>
+    scope.replace(derivedCardPattern(), (card) => (isTrulyDerivedCard(card) ? '' : card)),
+  )
+}
+
+/**
+ * Render the derived state card, or remove it when there is no state to report.
+ * IDEMPOTENT by construction — the strip runs either way — which is what makes
+ * calling it on every edit and every publish safe.
+ */
+export function applyDerivedStateCard(html, derived, { stamp = berlinStamp() } = {}) {
+  const stripped = stripDerivedStateCard(html)
+  if (!derived || !String(derived.body ?? '').trim()) return stripped
+  const card =
+    `<details class="now"${STATE_ATTR(DERIVED_STATE_KIND)}>\n  <summary>` +
+    `<span class="t">${escapeCardTitle(derived.title)}</span>` +
+    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardBody(derived.body, { stamp })}\n  </div>\n</details>\n`
+  return insertAsFirstNowCard(stripped, card)
+}
+
+/**
  * The UNNUMBERED state-card titles. The handover card owns no point chip by
  * design, but must name its follow-on point in prose, so rules written for a
  * numbered card — the topic guard's foreign-point complaint above all — have
@@ -1306,7 +1369,15 @@ export function parseClosingArgs(rest) {
  * name a command. The card carries a TITLE ONLY in its collapsed header, per the
  * board's binding structure, and the body says what is to be decided.
  */
-export function addVdzk(html, title, text) {
+export function addVdzk(html, title, text, { automated = false } = {}) {
+  // AN AUTOMATED CALLER IS HELD TO THE RULE, NOT REMINDED OF IT (point 749). A
+  // script has no judgement to apply, so the board asks for the two things that
+  // make a card a decision — it asks, and it names the options — and refuses
+  // anything else with the place its information does belong.
+  if (automated) {
+    const verdict = judgeAutomatedCard({ title, body: text })
+    if (!verdict.ok) throw new Error(verdict.reason)
+  }
   // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card

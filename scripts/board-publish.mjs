@@ -40,6 +40,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
+import { withDerivedState } from './board-state.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import { normaliseLineEndings, refreshFooter, upgradeNowCards } from './board-core.mjs'
 import { currentSetting, settingProblemLine } from './sol-share.mjs'
@@ -195,8 +196,16 @@ try {
   // number inside the title. `board.mjs` lifts them on every edit; doing it here
   // too means a board that was last written by an older version can still be
   // published — a strict gate must never be reachable without a way out.
+  // THE BATCH'S OWN STATE IS DERIVED HERE TOO (point 749). The board edit derives
+  // it as well, but a publish can be the only thing that runs — the watchdog
+  // republishes, the launcher checks the live page — and the whole promise of the
+  // derived card is that a condition which has passed stops being shown without
+  // anybody remembering to remove it. Deriving on the last write before the bytes
+  // go out is what makes that true for the page the user actually reads.
   const refreshed = normaliseLineEndings(
-    upgradeNowCards(applyFooterNote(refreshFooter(html, { openCount: open.length }), share)),
+    withDerivedState(
+      upgradeNowCards(applyFooterNote(refreshFooter(html, { openCount: open.length }), share)),
+    ),
   )
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the

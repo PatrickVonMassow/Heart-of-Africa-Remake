@@ -581,16 +581,92 @@ export function isProbeSessionId(sid) {
  * that announced itself in the open is not the covert second driver this detector
  * was written for.
  */
-export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclude = [] }) {
+const sessionRecord = (value) =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value : { seenAt: value }
+
+/** A claim/reservation generation suitable for equality, never authority. PURE. */
+export function claimGeneration(claim) {
+  if (!claim || typeof claim !== 'object') return 'none'
+  return [
+    claim.sessionId ?? '',
+    claim.pid ?? '',
+    claim.pidStartedAt ?? '',
+    claim.at ?? '',
+    claim.activityAt ?? '',
+    claim.releasedAt ?? '',
+    claim.releasedBy ?? '',
+  ].join('#')
+}
+
+function sameProcessIncarnation(record, lock) {
+  return (
+    typeof record?.pid === 'number' &&
+    record.pid > 0 &&
+    record.pid === lock?.pid &&
+    typeof record?.pidStartedAt === 'number' &&
+    typeof lock?.pidStartedAt === 'number' &&
+    Math.abs(record.pidStartedAt - lock.pidStartedAt) <= PID_START_TOLERANCE_MS
+  )
+}
+
+/** Does a SessionStart stand-down still describe this exact ownership episode? */
+export function standDownNoteCurrent({ record, owner, claim = null, writer = null } = {}) {
+  const note = record?.stoodDown
+  if (!note || typeof note !== 'object') return false
+  if (!sameProcessIncarnation(record, { pid: note.pid, pidStartedAt: note.pidStartedAt })) return false
+  if (!owner || note.ownerSession !== owner.sessionId || note.ownerGeneration !== owner.fence) return false
+  if (note.claimGeneration !== claimGeneration(claim)) return false
+  const currentWriterGeneration = Number.isSafeInteger(writer?.generation) ? writer.generation : null
+  const currentWriterAt = typeof writer?.batchWriterAt === 'number' ? writer.batchWriterAt : null
+  if (currentWriterGeneration !== note.writerGeneration) return false
+  if (currentWriterAt !== note.writerAt && (currentWriterAt === null || currentWriterAt > note.at)) return false
+  return true
+}
+
+export function classifyParallel({
+  sessionsSeen,
+  activity,
+  ownerSid,
+  owner = null,
+  processes = {},
+  claim = null,
+  now,
+  exclude = [],
+}) {
   const out = []
   const skip = new Set((exclude ?? []).filter(Boolean))
-  // A PROBE OWNER MEANS THE REAL OWNER IS UNKNOWN (point 434 (8)): every genuine
-  // session would then read as the second driver, which is the false alarm itself.
-  if (isProbeSessionId(ownerSid)) return out
+  // AN INVALID OWNER MEANS THE REAL OWNER IS UNKNOWN. Every genuine session
+  // would otherwise read as a second driver, which is precisely the placeholder
+  // incident (`owner=x plus <the one real session>`). Unknown is diagnosable;
+  // invented parallelism is not.
+  if (!validTransitionSessionId(ownerSid)) return out
   for (const [sid, lastToolAt] of Object.entries(activity ?? {})) {
     if (!sid || sid === ownerSid || skip.has(sid) || isProbeSessionId(sid)) continue
     if (!(sessionsSeen && Object.prototype.hasOwnProperty.call(sessionsSeen, sid))) continue
     if (typeof lastToolAt !== 'number' || now - lastToolAt > PARALLEL_FRESH_MS) continue
+    const seen = sessionRecord(sessionsSeen[sid])
+    const process = processes?.[sid] && typeof processes[sid] === 'object' ? processes[sid] : null
+    const identity = {
+      pid: seen.pid ?? process?.pid ?? null,
+      pidStartedAt: seen.pidStartedAt ?? process?.startedAt ?? null,
+      generation: seen.generation ?? process?.generation ?? null,
+      stoodDown: seen.stoodDown,
+    }
+    // A renamed/placeholder owner cannot turn its OWN process into a second
+    // session. PID equality alone is insufficient: both the process start time
+    // and this ownership fence must match, so PID reuse and a completed transfer
+    // remain visible.
+    if (
+      owner &&
+      sameProcessIncarnation(identity, owner) &&
+      Number.isSafeInteger(owner.fence) &&
+      identity.generation === owner.fence
+    ) continue
+    // A top-level window the singleton explicitly stood down may continue as an
+    // attended observer. Its note is tied to the current owner, claim/reservation
+    // and writer generation; any later transition or fenced mutation breaks the
+    // equality and restores the real parallel alarm.
+    if (standDownNoteCurrent({ record: identity, owner, claim, writer: process })) continue
     out.push({ sid, lastToolAt })
   }
   return out
@@ -1003,6 +1079,7 @@ export function acquire(sessionId, opts = {}) {
   // A PROBE IS NOT A SESSION (point 434 (8)): it may never own the batch. See
   // `isProbeSessionId` for the four nights of false alarms this cost.
   if (isProbeSessionId(sessionId)) return 'probe'
+  if (!validTransitionSessionId(sessionId)) return 'invalid'
   const lockPath = opts.lockPath ?? LOCK_PATH
   const mutexPath = `${lockPath}.reaping`
   const now = opts.now ?? Date.now()
@@ -1699,6 +1776,7 @@ export function validTransitionSessionId(sessionId) {
     sessionId.length <= 512 &&
     sessionId === sessionId.trim() &&
     !containsControlCharacter &&
+    !/^x$/i.test(sessionId) &&
     !isProbeSessionId(sessionId)
   )
 }
@@ -1776,9 +1854,35 @@ export function transitionOwnerSession(sessionId, opts = {}) {
       now: opts.now,
       reason: 'session-transition',
     })
+    emitLockActivity(ACTIVITY_EVENTS.OWNER_CLAIM, readOwnerLock(lockPath), {
+      lockPath,
+      at: opts.now ?? Date.now(),
+      cause: 'session-transition',
+      evidence: { sessionIdBefore: current.sessionId, generation },
+    })
     return { transitioned: true, reason: 'transitioned', sessionIdBefore: current.sessionId }
   } finally {
     exitReapMutex(mutexPath)
+  }
+}
+
+/** Diagnose the one torn owner identity batch-doctor may repair. PURE.
+ * The current session id must be valid and its exact process incarnation must
+ * own the current lock; an id mismatch alone never grants this verdict. */
+export function ownerSessionTear({ sessionId, lock, ancestor } = {}) {
+  if (!validTransitionSessionId(sessionId)) return { torn: false, reason: 'invalid-session-id' }
+  if (!lock) return { torn: false, reason: 'no-lock' }
+  if (lock.sessionId === sessionId) return { torn: false, reason: 'consistent' }
+  const permission = resolveOwnership({ lock, sessionId, ancestor })
+  if (!permission.mine || permission.via !== 'process') {
+    return { torn: false, reason: `not-owner:${permission.via}` }
+  }
+  if (ownerLockGeneration(lock) === null) return { torn: false, reason: 'lock-without-generation' }
+  return {
+    torn: true,
+    reason: 'owner-session-id-mismatch',
+    recordedSessionId: lock.sessionId,
+    sessionId,
   }
 }
 
@@ -2159,11 +2263,72 @@ export function noteTopLevelSession(sid, opts = {}) {
     const path = opts.path ?? SESSIONS_SEEN_PATH
     const now = opts.now ?? Date.now()
     const seen = readJson(path) ?? {}
-    seen[sid] = seen[sid] ?? now
-    for (const [k, v] of Object.entries(seen)) if (now - v > 7 * 24 * 3600 * 1000) delete seen[k]
+    const prior = sessionRecord(seen[sid])
+    const processIdentity = opts.processIdentity ?? null
+    const lock = opts.lock !== undefined ? opts.lock : readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    const generation = sameProcessIncarnation(
+      { pid: processIdentity?.pid, pidStartedAt: processIdentity?.startedAt },
+      lock,
+    ) && Number.isSafeInteger(lock?.fence)
+      ? lock.fence
+      : (Number.isSafeInteger(prior.generation) ? prior.generation : null)
+    seen[sid] = {
+      ...prior,
+      seenAt: typeof prior.seenAt === 'number' ? prior.seenAt : now,
+      pid: typeof processIdentity?.pid === 'number' ? processIdentity.pid : (prior.pid ?? null),
+      pidStartedAt:
+        typeof processIdentity?.startedAt === 'number' ? processIdentity.startedAt : (prior.pidStartedAt ?? null),
+      generation,
+    }
+    for (const [k, v] of Object.entries(seen)) {
+      const started = sessionRecord(v).seenAt
+      if (typeof started === 'number' && now - started > 7 * 24 * 3600 * 1000) delete seen[k]
+    }
     writeJsonAtomic(path, seen)
   } catch {
     /* best effort */
+  }
+}
+
+/** Persist the singleton's SessionStart stand-down as attended-observer evidence. */
+export function noteSessionStandDown(sid, opts = {}) {
+  if (!sid || !validTransitionSessionId(sid)) return false
+  try {
+    const path = opts.path ?? SESSIONS_SEEN_PATH
+    const seen = readJson(path) ?? {}
+    const prior = sessionRecord(seen[sid])
+    const processIdentity = opts.processIdentity ?? null
+    const owner = opts.lock !== undefined ? opts.lock : readOwnerLock(opts.lockPath ?? LOCK_PATH)
+    if (
+      !owner ||
+      !Number.isSafeInteger(owner.fence) ||
+      !(typeof processIdentity?.pid === 'number' && typeof processIdentity?.startedAt === 'number')
+    ) return false
+    const now = opts.now ?? Date.now()
+    const writer = opts.writer !== undefined
+      ? opts.writer
+      : readSessionProcesses({ path: opts.processesPath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath })[sid]
+    seen[sid] = {
+      ...prior,
+      seenAt: typeof prior.seenAt === 'number' ? prior.seenAt : now,
+      pid: processIdentity.pid,
+      pidStartedAt: processIdentity.startedAt,
+      generation: Number.isSafeInteger(prior.generation) ? prior.generation : null,
+      stoodDown: {
+        at: now,
+        pid: processIdentity.pid,
+        pidStartedAt: processIdentity.startedAt,
+        ownerSession: owner.sessionId,
+        ownerGeneration: owner.fence,
+        claimGeneration: claimGeneration(opts.claim),
+        writerGeneration: Number.isSafeInteger(writer?.generation) ? writer.generation : null,
+        writerAt: typeof writer?.batchWriterAt === 'number' ? writer.batchWriterAt : null,
+      },
+    }
+    writeJsonAtomic(path, seen)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -2195,10 +2360,16 @@ export function clearActivity(sid, opts = {}) {
 
 /** Live parallel sessions right now (excluding `ownerSid` and `opts.exclude`). */
 export function detectParallel(ownerSid, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const paths = statePathsFor(lockPath)
+  const owner = opts.owner !== undefined ? opts.owner : readOwnerLock(lockPath)
   return classifyParallel({
-    sessionsSeen: readJson(opts.sessionsPath ?? SESSIONS_SEEN_PATH) ?? {},
-    activity: readJson(opts.activityPath ?? SESSION_ACTIVITY_PATH) ?? {},
+    sessionsSeen: readJson(opts.sessionsPath ?? paths.sessionsSeenPath) ?? {},
+    activity: readJson(opts.activityPath ?? paths.activityPath) ?? {},
     ownerSid,
+    owner,
+    processes: opts.processes ?? readSessionProcesses({ path: opts.processesPath ?? paths.ancestorCachePath }),
+    claim: opts.claim !== undefined ? opts.claim : readJson(opts.claimPath ?? paths.claimPath),
     now: opts.now ?? Date.now(),
     exclude: opts.exclude ?? [],
   })

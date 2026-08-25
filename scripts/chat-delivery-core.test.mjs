@@ -181,8 +181,11 @@ describe('the stand-downs every guard in this repo shares', () => {
     expect(deliveryDecision({ ownsBatch: false, pending: [msg()] })).toMatchObject({ deliver: [], reason: 'not-owner' })
   })
 
-  it('delivers nothing while the batch is paused', () => {
-    expect(deliveryDecision({ ownsBatch: true, paused: true, pending: [msg()] })).toMatchObject({ deliver: [], reason: 'paused' })
+  it('delivers waiting user words while the owning batch is paused', () => {
+    expect(deliveryDecision({ ownsBatch: true, paused: true, pending: [msg()] })).toMatchObject({
+      deliver: [expect.objectContaining({ id: 'm1' })],
+      reason: 'deliver-paused',
+    })
   })
 
   it('delivers nothing on an empty spool', () => {

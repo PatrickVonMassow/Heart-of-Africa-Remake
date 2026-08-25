@@ -320,6 +320,10 @@ try {
       filePath,
       resolvedFilePath: resolvedWriteTarget(filePath, payload.cwd || REPO_ROOT),
       checkoutRoot: realpathSync(REPO_ROOT),
+      // The call's own directory, so a shell write can be located at all
+      // (point 749): without it a heredoc to the session memory directory is
+      // judged by intent alone and refused like a write to main.
+      cwd: payload.cwd || REPO_ROOT,
     })
     if (mainWrite.block) {
       process.stdout.write(

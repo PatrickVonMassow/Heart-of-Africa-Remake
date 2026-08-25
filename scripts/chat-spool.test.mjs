@@ -205,11 +205,11 @@ describe('THE HOOK DUTY: deliverPendingMessages', () => {
     expect(readPending(dir)).toHaveLength(1)
   })
 
-  it('stands down while the batch is paused — and consumes nothing', () => {
+  it('delivers and consumes while the owning batch is paused', () => {
     const dir = join(tmp(), 'spool')
     spoolMessage(msg(), dir)
-    expect(deliverPendingMessages({ dir, ownsBatch: true, paused: true })).toBe('')
-    expect(readPending(dir)).toHaveLength(1)
+    expect(deliverPendingMessages({ dir, ownsBatch: true, paused: true })).toContain('hallo')
+    expect(readPending(dir)).toHaveLength(0)
   })
 
   it('fails open and silent on a corrupt spool', () => {

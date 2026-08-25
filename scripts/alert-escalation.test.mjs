@@ -7,7 +7,6 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  boardCard,
   continuationCardBody,
   corruptionCardBody,
   escalate,
@@ -30,17 +29,25 @@ const T0 = Date.UTC(2026, 6, 30, 0, 0, 0)
 const MIN_MS = 60 * 1000
 
 let dir
-/** A ladder on real temp files, with the pause API and the board stubbed — so
- *  the REAL rung logic runs instead of falling through the fail-open catch. */
+/** A ladder on real temp files, with the pause API stubbed — so the REAL rung
+ *  logic runs instead of falling through the fail-open catch. The decision record
+ *  is no longer a board call to intercept (point 749): it is read back from the
+ *  ladder the commit wrote. */
 const harness = () => {
-  const cards = []
-  return {
+  const paths = {
     ladderPath: join(dir, 'ladder.json'),
     logPath: join(dir, 'ladder.log'),
-    board: (...args) => (cards.push(args), true),
+  }
+  return {
+    ...paths,
     pause: { isPaused: () => false, setPaused: () => {} },
     repair: () => ({ ok: true, exitCode: 0 }),
-    cards,
+    /** Every decision record standing in the ladder, as [title, body] pairs. */
+    get records() {
+      return Object.values(readLadder(paths.ladderPath).alerts ?? {})
+        .filter((entry) => entry?.record)
+        .map((entry) => [entry.record.title, entry.record.body])
+    },
   }
 }
 
@@ -116,7 +123,6 @@ describe('escalate — the off switch and the fail-open path', () => {
       env: {},
       ladderPath: h.ladderPath,
       logPath: h.logPath,
-      board: h.board,
       pause: {
         isPaused() {
           throw new Error('lock unreadable')
@@ -179,10 +185,10 @@ describe('escalate — the full climb, on real files', () => {
     expect(last.decision.nextAttemptAt).toBeGreaterThan(T0)
     expect(repair).toHaveBeenCalledOnce()
     expect(setPaused).not.toHaveBeenCalled()
-    expect(h.cards).toHaveLength(1)
-    expect(h.cards[0][0]).toBe(last.decision.decisionCard)
-    expect(h.cards[0][1]).toMatch(/Quarantäne- und Rescue-Nachweise/)
-    expect(h.cards[0][1]).toMatch(/Nächster Versuch:/)
+    expect(h.records).toHaveLength(1)
+    expect(h.records[0][0]).toBe(last.decision.decisionCard)
+    expect(h.records[0][1]).toMatch(/Quarantäne- und Rescue-Nachweise/)
+    expect(h.records[0][1]).toMatch(/Nächster Versuch:/)
     expect(readFileSync(h.logPath, 'utf8')).toMatch(/CORRUPTION REPAIR REMAINS/)
   })
 
@@ -207,7 +213,7 @@ describe('escalate — the full climb, on real files', () => {
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(setPaused).not.toHaveBeenCalled()
-    expect(h.cards).toHaveLength(0)
+    expect(h.records).toHaveLength(0)
   })
 
   it('CONTINUES a generic stalled alert and records the decision plus retroactive veto', async () => {
@@ -232,16 +238,20 @@ describe('escalate — the full climb, on real files', () => {
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(last.decision.action).toBe('continue-and-record')
-    expect(last.decisionRecorded).toBe(true)
+    expect(last.record?.body).toMatch(/Retroaktives Veto/)
     expect(setPaused).not.toHaveBeenCalled()
-    expect(h.cards).toHaveLength(1)
-    expect(h.cards[0][0]).toBe(last.decision.decisionCard)
-    expect(h.cards[0][1]).toMatch(/Retroaktives Veto/)
-    expect(h.cards[0][1]).toMatch(/letzten zulässigen Commit oder Zeitraum/)
-    expect(readFileSync(h.logPath, 'utf8')).toMatch(/CONTINUING THE BATCH — decision card recorded/)
+    // The record stands in the LADDER, not under "Von dir zu klären" (point 749).
+    expect(h.records).toHaveLength(1)
+    expect(h.records[0][0]).toBe(last.decision.decisionCard)
+    expect(h.records[0][1]).toMatch(/letzten zulässigen Commit oder Zeitraum/)
+    expect(readFileSync(h.logPath, 'utf8')).toMatch(/CONTINUING THE BATCH/)
   })
 
-  it('does not advance past the decision rung until the required card is recorded', async () => {
+  it('books the rung and its record in ONE write — the record cannot fail on its own', async () => {
+    // Point 749 removed the second write this case used to cover: the record went
+    // to the board through `vdzk-add`, and a failed board call held the ladder on
+    // its rung. The record rides with the rung now, so what is worth pinning is
+    // that one commit leaves BOTH in the ladder.
     const h = harness()
     const key = 'generic-stall'
     writeLadder({
@@ -262,12 +272,12 @@ describe('escalate — the full climb, on real files', () => {
       priority: 'urgent',
       now: T0,
       ...h,
-      board: () => false,
     })
     expect(v.decision.action).toBe('continue-and-record')
-    expect(v.decisionRecorded).toBe(false)
-    expect(v.commit()).toBe(false)
-    expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
+    expect(v.commit()).toBe(true)
+    const entry = readLadder(h.ladderPath).alerts[key]
+    expect(entry.rung).toBe(v.decision.nextRung)
+    expect(entry.record.body).toMatch(/Retroaktives Veto/)
   })
 
   it('keeps a recurring event on the ceiling without filing a decision card', async () => {
@@ -295,7 +305,7 @@ describe('escalate — the full climb, on real files', () => {
     })
     expect(v).toMatchObject({ deliver: true, priority: 'low' })
     expect(v.decision).toMatchObject({ action: 'send', nextRung: ALERT_PAUSE_RUNG })
-    expect(h.cards).toHaveLength(0)
+    expect(h.records).toHaveLength(0)
     expect(v.commit()).toBe(true)
     expect(readLadder(h.ladderPath).alerts[key].rung).toBe(ALERT_PAUSE_RUNG)
   })
@@ -357,11 +367,12 @@ describe('the reason reaches the morning reader', () => {
     expect(() => logLine('x', join(dir, 'no-dir', 'a.log'))).not.toThrow()
   })
 
-  it('boardCard reports failure instead of throwing when the board cannot be written', () => {
-    // Would have prevented: the whole pause path dying on a board error and
-    // leaving neither a card NOR a pause.
-    expect(boardCard('t', 'q', { cwd: dir })).toBe(false)
-    expect(existsSync(join(dir, '.batch-dashboard.html'))).toBe(false)
+  it('NO CALL SITE reaches the board any more (point 749)', async () => {
+    // The user cleared three machine-written cards from "Von dir zu klären" by
+    // hand. This asserts the source of them is gone: the module exports no board
+    // writer, and a full climb to the decision rung spawns no process at all.
+    const module = await import('./alert-escalation.mjs')
+    expect(Object.keys(module).filter((name) => /^board/.test(name))).toEqual([])
   })
 })
 

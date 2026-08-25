@@ -14,7 +14,8 @@
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
 //   node scripts/board.mjs closing <point> "<reason>"  # …still owed: its closing duties
-//   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
+//   node scripts/board.mjs vdzk-add ["--automated"] "<title>" "<question>"
+//                                                     # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
@@ -67,6 +68,7 @@ import {
   mergeDoneDuplicates,
 } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
+import { withDerivedState } from './board-state.mjs'
 import { recordDecisionCardKeep } from './decision-card-guard.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
@@ -152,6 +154,7 @@ function applyEdit(fn, done) {
     write: (html) => writeTextAtomic(BOARD, html),
     rotate: () => run(['scripts/board-archive-rotate.mjs']),
     publish: () => run([PUBLISH_SCRIPT]),
+    derive: (html) => withDerivedState(html),
     stdout: (line) => console.log(line),
     stderr: (line) => console.error(line),
   })
@@ -167,6 +170,18 @@ try {
     if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"|--text-stdin')
     const at = berlinStamp()
     edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
+  } else if (cmd === 'paused') {
+    // THERE IS NOTHING TO COMMAND HERE ANY MORE (point 749). A pause used to be
+    // written — first as a user-decision card, then briefly onto the running
+    // point's own status line, which overwrote the status the reader needed. It
+    // is DERIVED now, from `.claude/batch-paused`, on every edit and every
+    // publish, so a paused batch shows up without being told and stops showing
+    // up when the marker goes.
+    throw new Error(
+      'board: the pause is not written, it is derived. Pause the batch itself — ' +
+        'node scripts/batch-pause.mjs "<Grund>" — and the board reports it on the next edit; ' +
+        'clearing the pause marker removes the card again with no board command at all.',
+    )
   } else if (cmd === 'title') {
     // RETITLING HAD NO COMMAND AT ALL for a now-card (point 439), so the three
     // current-work cards of 30.07.2026 were fixed by hand-editing the HTML — the
@@ -282,11 +297,16 @@ try {
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
     // turn whose reply asks for a decision with no card standing for it, and this
     // is the command its remedy names.
-    const [title, ...words] = rest
+    // A SCRIPT DECLARES ITSELF WITH --automated (point 749). Four of them used to
+    // file status reports here; the flag routes the card through the
+    // admissibility rule, which refuses anything that is not a named choice and
+    // says where batch state belongs instead.
+    const automated = rest.includes('--automated')
+    const [title, ...words] = rest.filter((arg) => arg !== '--automated')
     if (!title || (words.length === 0 && !stdinText.trim())) {
-      throw new Error('usage: board.mjs vdzk-add "<title>" "<question>"|--text-stdin')
+      throw new Error('usage: board.mjs vdzk-add [--automated] "<title>" "<question>"|--text-stdin')
     }
-    edit((html) => addVdzk(html, title, textOf(words)), `open question added: ${title}`)
+    edit((html) => addVdzk(html, title, textOf(words), { automated }), `open question added: ${title}`)
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
@@ -338,7 +358,7 @@ try {
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
-        'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
+        'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,

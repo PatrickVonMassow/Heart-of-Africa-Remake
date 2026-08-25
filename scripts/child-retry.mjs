@@ -150,23 +150,20 @@ function berlinStamp(now = new Date()) {
   }).format(now)
 }
 
-/** The board card for an outage pause — best effort. A card that cannot be
- *  written must not stop the pause; the log and the notification still carry
- *  the reason. */
-export function boardCard(title, question, { cwd = REPO_ROOT } = {}) {
-  try {
-    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', title, question], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    })
-    return true
-  } catch (error) {
-    if (/open question .* already stands under/i.test(String(error?.stderr ?? ''))) return true
-    return false
-  }
-}
+// NO BOARD CARD IS WRITTEN HERE ANY MORE (point 749).
+//
+// An outage pause and a scheduled child recovery used to be posted under "Von dir
+// zu klären" — "Batch pausiert: Umgebungsausfall", closing with an instruction
+// the user could not carry out, and resolving by itself once the restart clock
+// expired, so the card outlived the condition it described. He cleared such a
+// card three times and ruled that these are the machine's own problems.
+//
+// The record already lives where it belongs: the pause marker carries the reason,
+// and `recordRecovery` keeps the decision record with the point's retry state.
+// The board DERIVES its state card from both (scripts/board-state-core.mjs), so
+// the state shows up without a board call and disappears when the marker goes and
+// the retry clock runs out. The ntfy notification below is untouched — that is
+// the channel built for reaching the user.
 
 /**
  * The pause marker is read through batch-lock.mjs, LAZILY. That module resolves
@@ -307,15 +304,15 @@ async function main() {
   if (decision.verdict === 'outage-probe') {
     const reason = outageProbeReason(decision, berlinStamp())
     if (!isPaused()) setPaused(reason, { cause: 'outage', retryAfter: decision.retryAt })
-    const recorded = boardCard(decision.decisionRecord.title, decision.decisionRecord.body)
     // AWAITED, not fired and forgotten: process.exit() below would kill the
-    // pending POST and the pause would happen with nobody told about it.
-    await notify('Umgebungsausfall — Probe eingeplant', `${reason} Entscheidungsprotokoll ${recorded ? 'geschrieben' : 'noch nicht auf dem Board'}.`, 'urgent', { key: 'child-retry-outage' })
+    // pending POST and the pause would happen with nobody told about it. The
+    // pause marker written above is what the board derives its state card from
+    // (point 749), so no board call belongs in this path.
+    await notify('Umgebungsausfall — Probe eingeplant', `${reason} Der Batchzustand steht auf dem Board.`, 'urgent', { key: 'child-retry-outage' })
   } else if (decision.verdict === 'recover') {
-    const recorded = boardCard(decision.decisionRecord.title, decision.decisionRecord.body)
     await notify(
       `Punkt ${point}: ${decision.recoveryAction} eingeplant`,
-      `${decision.reason} Nächster Versuch ${new Date(decision.retryAt).toISOString()}; Entscheidungsprotokoll ${recorded ? 'geschrieben' : 'im Retry-State erhalten'}.`,
+      `${decision.reason} Nächster Versuch ${new Date(decision.retryAt).toISOString()}; das Entscheidungsprotokoll liegt im Retry-State und steht bis dahin auf dem Board.`,
       'default',
       { key: `child-retry-recovery-${point}`, recurring: true },
     )
@@ -339,8 +336,9 @@ if (isCli) {
       briefRevision: flag('--brief-revision'),
       error: e?.message ?? e,
     })
-    try { writeState(recordRecovery(readState(), decision)) } catch { /* the board/log still retain the same decision */ }
-    boardCard(decision.decisionRecord.title, decision.decisionRecord.body)
+    // The retry state IS the record (point 749): the board derives its state card
+    // from it, so this path writes the decision once and nothing else.
+    try { writeState(recordRecovery(readState(), decision)) } catch { /* the log still retains the same decision */ }
     console.log(describeDecision(decision))
     logLine(`internal error → exchange; next attempt ${new Date(decision.retryAt).toISOString()}: ${e?.message ?? e}`)
     code = 0

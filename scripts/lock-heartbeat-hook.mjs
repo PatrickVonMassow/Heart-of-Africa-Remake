@@ -225,8 +225,9 @@ try {
 
 // (6) the user's message — the ONLY duty that speaks. `deliverPendingMessages`
 // claims each message before it renders it and returns '' for every reason not
-// to speak (not the owner, batch paused, empty spool, any error at all), and ''
-// is written as nothing whatsoever.
+// to speak (not the owner, empty spool, any error at all), and '' is written as
+// nothing whatsoever. Pause is NOT a stand-down: that is when a corrective user
+// instruction matters most.
 const paused = (() => {
   try {
     return existsSync(repoPath('.claude', 'batch-paused'))

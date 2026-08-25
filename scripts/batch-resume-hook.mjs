@@ -31,6 +31,7 @@ import {
   convertPendingSpawn,
   readOwnerLock,
   noteTopLevelSession,
+  noteSessionStandDown,
   findClaudeAncestor,
   probePid,
   transitionOwnerSession,
@@ -179,8 +180,11 @@ try {
   // no/!JSON stdin — keep the random fallback
 }
 
-// Record this top-level session for the parallel-session detector.
-noteTopLevelSession(sessionId)
+// Record this top-level session WITH its process incarnation. The detector needs
+// all three parts — pid, start time and ownership generation — before it may
+// recognise a placeholder-renamed owner as this same process.
+const sessionProcess = findClaudeAncestor()
+noteTopLevelSession(sessionId, { processIdentity: sessionProcess })
 
 // RE-ARM A DEAD LAUNCHER (point 859). A container rebuild kills the daemon and
 // nothing inside the container survives to restart it — a session starting is
@@ -319,7 +323,7 @@ try {
       // Resolved ONCE and reused: the stand-down below needs the same identity
       // to tell "I am the responder the watcher woke" from "some responder is
       // running", and the ancestor walk is the expensive half of this branch.
-      const ancestor = claim ? findClaudeAncestor() : null
+      const ancestor = claim ? sessionProcess : null
       // The lock is read BEFORE the claim is judged: whether a LIVE SESSION owner
       // still holds it decides whether the claim ages at all (point 434 (6a)) —
       // with somebody to wait for it does not, with nobody it is bounded by the
@@ -436,6 +440,12 @@ try {
           claimHonoured: reservationDecision({ assessment: reservation }).acquire === false,
           ancestorPid: ancestor?.pid ?? null,
           takeUpMs: maxAgeMs(),
+          now,
+        })
+        noteSessionStandDown(sessionId, {
+          processIdentity: sessionProcess,
+          lock: readOwnerLock(),
+          claim,
           now,
         })
         console.log(`${header} ${stand.text}`)

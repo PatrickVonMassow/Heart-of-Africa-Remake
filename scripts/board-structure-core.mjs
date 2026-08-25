@@ -34,6 +34,7 @@ import {
   stageOnlyTitle,
   summaryPoint,
 } from './board-core.mjs'
+import { DERIVED_STATE_KIND } from './board-state-core.mjs'
 
 /** The four sections, in the order the user's mandate fixes them. */
 export const REQUIRED_SECTIONS = [
@@ -146,7 +147,11 @@ export function structureViolations(html) {
   // read on 30.07.2026. Every sanctioned writer already clears the others, so a
   // mixture can only come from a hand edit — which is also how three idle cards
   // came to stand stacked. Both shapes are caught here, before the bytes leave.
-  const kinds = nowCardKinds(m)
+  // THE DERIVED STATE CARD IS NOT ONE OF THE THREE VOICES (point 749). It says
+  // what the BATCH is doing — paused, repairing, waiting on a probe — which is
+  // true beside a running point rather than instead of it, so counting it here
+  // would make every paused batch an unpublishable board.
+  const kinds = nowCardKinds(m).filter((kind) => kind !== DERIVED_STATE_KIND)
   const present = [...new Set(kinds)]
   if (present.length > 1) {
     out.push({
@@ -203,6 +208,10 @@ export function cardNamingViolations(html) {
     m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
   )
   nowCards(doc).forEach((card, i) => {
+    // The derived card names no point because it belongs to none (point 749);
+    // its title and body are composed by the derivation, never by hand, so the
+    // naming rules for authored cards have nothing to correct here.
+    if (card.kind === DERIVED_STATE_KIND) return
     const named = card.title ? `"${card.title.slice(0, 60)}"` : '<untitled>'
     // The remedy depends on what the card HAS: a card with no chip is a state
     // card and is replaced by writing one; only a numbered card can be retitled
@@ -347,7 +356,12 @@ export function nowCards(html) {
     const { chip: num, legacy: legacyNum } = summaryPoint(hit[2])
     const legacy = title === NO_CURRENT_WORK_TITLE ? 'idle' : title === CLOSING_WORK_TITLE ? 'closing' : 'point'
     cards.push({
-      kind: marked === 'idle' || marked === 'closing' ? marked : legacy,
+      // THE DERIVED CARD IS ITS OWN VOICE (point 749): it reports machine state
+      // beside whatever is running, so it is neither a point card nor one of the
+      // two exclusive state cards, and the rules written for those must not
+      // reach it.
+      kind:
+        marked === 'idle' || marked === 'closing' || marked === DERIVED_STATE_KIND ? marked : legacy,
       // `chip` is the number as the READER sees it; `point` also accepts the
       // leading number of a card written before the chip, which every parser
       // outside the gate still has to understand. The gate itself asks for the

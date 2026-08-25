@@ -104,6 +104,58 @@ describe('launcher start liveness — fenced or advancing writer authority', () 
     expect(decision.veto).toMatchObject({ sessionId: 'window-session', generation: 17, pid: 4242, writerAgeMs: 1_000 })
   })
 
+  it('vetoes a no-lock spawn when a registered feature checkout advanced inside agent-check grace', () => {
+    const featureWriterRegister = {
+      readable: true,
+      reason: 'measured',
+      writers: [{
+        branch: 'feat/515-detector',
+        worktree: '/repo/.claude/worktrees/point-515',
+        recognized: false,
+        output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 },
+      }],
+    }
+    const decision = launcherStartDecision({
+      lock: null,
+      assessment: { alive: false, reason: 'no-lock' },
+      featureWriterRegister,
+      now: NOW,
+    })
+    expect(decision).toMatchObject({
+      start: false,
+      code: 'registered-writer-live',
+      veto: { branch: 'feat/515-detector' },
+    })
+    expect(decision.reason).toContain('recent registered feature-writer activity')
+  })
+
+  it('allows quiet feature work and a live agent explicitly recognised for boundary transfer', () => {
+    const quiet = { branch: 'feat/old', worktree: '/repo/old', recognized: false, output: { verdict: 'quiet' } }
+    const transferred = { branch: 'feat/transferred', worktree: '/repo/live', recognized: true, output: { verdict: 'alive' } }
+    expect(launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      featureWriterRegister: { readable: true, writers: [quiet, transferred] },
+      now: NOW,
+    }).start).toBe(true)
+  })
+
+  it('does not turn an unreadable worktree register into permission to spawn', () => {
+    expect(launcherStartDecision({
+      assessment: { alive: false, reason: 'no-lock' },
+      featureWriterRegister: { readable: false, writers: [], reason: 'git-failed' },
+      now: NOW,
+    })).toMatchObject({ start: false, code: 'writer-register-unreadable' })
+  })
+
+  it('does not need the secondary register to outvote an already-live owner lock', () => {
+    expect(launcherStartDecision({
+      lock: { sessionId: 'owner', pid: 42 },
+      assessment: { alive: true, reason: 'pid-alive' },
+      featureWriterRegister: { readable: false, writers: [], reason: 'git-failed' },
+      now: NOW,
+    })).toMatchObject({ start: false, reason: expect.stringContaining('owner lock conservatively assessed alive') })
+  })
+
   it('does not turn an old write into a fixed historical veto', () => {
     const oldWriter = { ...writer, generation: 16, batchWriterAt: NOW - 24 * 60 * 60 * 1000 }
     const decision = launcherStartDecision({
@@ -444,6 +496,24 @@ describe('the immediate successor decision — one door for every transport', ()
     })
     expect(live).toMatchObject({ start: false, code: 'owner-live' })
     expect(live.evidence.ownership.lock).toMatchObject({ sessionId: 'owner', assessmentReason: 'pid-alive' })
+  })
+
+  it('makes recent registered feature output a named successor veto', () => {
+    const decision = start({
+      featureWriterRegister: {
+        readable: true,
+        writers: [{
+          branch: 'feat/515-detector',
+          worktree: '/repo/.claude/worktrees/point-515',
+          output: { verdict: 'alive', judgedOn: 'git', ageMs: 1_000 },
+        }],
+      },
+    })
+    expect(decision).toMatchObject({
+      start: false,
+      code: 'registered-writer-live',
+      evidence: { ownership: { featureWriterRegister: { readable: true } } },
+    })
   })
 
   it('rejects a duplicate boundary and stale child/CI notifications by generation or spawn token', () => {
