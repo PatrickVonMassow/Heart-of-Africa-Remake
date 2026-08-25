@@ -207,13 +207,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
-  statt deinen Code, oder lesen eine projektweite Angabe aus dem zufälligen Arbeitsverzeichnis —
-  und sind nur dort richtig, wo sie zufällig liefen. Von Hand nachgeprüft bestätigt sich der
-  Fehler dann selbst, denn dein Aufruf erbt dasselbe Verzeichnis.
+  statt deinen Code und stimmen nur dort, wo sie zufällig liefen; von Hand nachgeprüft bestätigt
+  sich der Fehler selbst, denn dein Aufruf erbt dasselbe Verzeichnis.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Meldet deine
-  Nachprüfung grün, während der Haken ablehnt, ist die **Nachprüfung** verdächtig: lass die
-  Bedingung aus **beiden** Wurzeln nebeneinander laufen."
+  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
+  und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -341,18 +339,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Schritt? Liegt sie außerhalb, nenn den **echten Griff** dort."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
-  verliert mit dem Fehlschlag die nächste Reparatur mit.
-  → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern."
-
-- **Die Aufräumung setzt voraus, dass der Aufräumende überlebt.** Ein Programm räumt seine
-  Nebenprodukte am Ende auf — Prozesse, Ordner, Sperren. Genau dann läuft das nicht, wenn es
-  selbst abgebrochen wird, und am tückischsten ist es dort, wo es *um* das Sterben von
-  Prozessen geht: Der Probelauf für „überlebt der Dienst den Tod seiner Sitzung?" lässt beim
-  eigenen Abbruch genau diesen Dienst am Leben zurück, stundenlang und unbemerkt.
-  → *Prompt:* „Frag zu jeder Aufräumung: **Wer räumt auf, wenn der Aufräumende nicht mehr da
-  ist?** Was ein Lauf hinterlässt, gehört an eine Stelle, die ein **späterer** Prozess findet —
-  und eine spätere Prüfung soll den Rest **melden**, statt null zu zählen."
+  verliert die nächste Reparatur mit — und ein abgebrochener Lauf räumt nicht weg, was er
+  hinterlässt, am schlimmsten beim Prüfen von Prozesstod.
+  → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
+  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag zu jeder Aufräumung: **Wer
+  räumt auf, wenn der Aufräumende nicht mehr da ist?**"
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
@@ -403,11 +394,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
   selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt. Ein Tor kann
   aber auch zu Recht sperren und trotzdem unlösbar sein: liest es seinen Nachweis nur auf **einem**
-  von mehreren erlaubten Arbeitswegen ab, kommt der andere Weg nie durch, egal wie gründlich er war.
+  von mehreren erlaubten Arbeitswegen ab, kommt der andere nie durch.
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
   es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Und bevor ein Tor
   scharf geht: **zähl alle Wege auf, auf denen die geprüfte Arbeit entstehen darf**, und weise für
-  jeden nach, dass sein Nachweis wirklich entsteht."
+  jeden Nachweis nach."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
   Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
