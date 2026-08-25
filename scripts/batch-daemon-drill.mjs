@@ -104,8 +104,15 @@ async function parentSession({ repo, worktree, readyPath }) {
     },
   })
   if (!attempt.ok) throw new Error(`parent: start-attempt refused: ${attempt.reason}`)
+  // THE READY FILE CARRIES ONLY WHAT DIES WITH THIS SESSION: the fence its
+  // acquisition minted, which the stale probes must later present as the dead
+  // credential. Daemon record and worker identity are deliberately NOT exported
+  // — a drill handed them out-of-band would prove adoption of a takeover it was
+  // given, not of one it found. The observer and the successor read both where
+  // a real fresh session reads them: the durable state the daemon wrote
+  // (cross-vendor review of point 834, B1).
   const tmp = `${readyPath}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify({ record: started.record, attempt: attempt.result, fence: parentFence }))
+  writeFileSync(tmp, JSON.stringify({ fence: parentFence }))
   renameSync(tmp, readyPath)
   // Mid-authoring, like the session of 21.08.2026: awaiting a tool call that
   // will never return. The observer kills this whole group without warning.
@@ -150,7 +157,6 @@ async function parentDeathScenario({ keep }) {
     if (!check('parent session reached mid-authoring', Boolean(ready), ready ? '' : readFileSync(logPath, 'utf8').slice(-1500))) {
       return { ok: false, scenario: 'parent-death', checks }
     }
-    const record = ready.record
     // The fence the DEAD session held, as its own acquisition minted it — not a
     // constant the drill assumes. Everything below that must be refused is
     // refused against this number.
@@ -158,6 +164,24 @@ async function parentDeathScenario({ keep }) {
     if (!check('the parent reported the fence its acquisition minted', Number.isInteger(deadFence), String(deadFence))) {
       return { ok: false, scenario: 'parent-death', checks }
     }
+    // THE DAEMON'S IDENTITY COMES FROM DURABLE STATE, read before the kill so
+    // survival can be judged against what stood WHILE THE PARENT LIVED — the
+    // parent hands nothing over. This is the same file a fresh session's
+    // reconciliation reads, and the baseline the discovery check below must
+    // independently rediscover.
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    const recordBefore = readJsonIfAny(store.daemonRecordPath)
+    if (
+      !check(
+        'the state store names the daemon before the kill',
+        Number.isInteger(recordBefore?.pid) && Number.isFinite(recordBefore?.pidStartedAt) && typeof recordBefore?.generation === 'string',
+        JSON.stringify(recordBefore),
+      )
+    ) {
+      return { ok: false, scenario: 'parent-death', checks }
+    }
+    const sameDaemonIdentity = (r) =>
+      r?.pid === recordBefore.pid && r?.pidStartedAt === recordBefore.pidStartedAt && r?.generation === recordBefore.generation
 
     // Let the worker prove it works BEFORE the kill, so survival is of a running
     // authoring process, not of an idle one. The baseline is the tip the SETUP
@@ -173,10 +197,19 @@ async function parentDeathScenario({ keep }) {
     await sleep(500)
     check('the parent group is dead', probePid(parent.pid)?.exists !== true)
 
-    const daemonProbe = probePid(record.pid)
+    const daemonProbe = probePid(recordBefore.pid)
     check(
       'the daemon survived under its recorded pid and start time',
-      daemonProbe?.exists === true && Math.abs((daemonProbe.startedAt ?? 0) - record.pidStartedAt) <= PROCESS_START_TOLERANCE_MS,
+      daemonProbe?.exists === true && Math.abs((daemonProbe.startedAt ?? 0) - recordBefore.pidStartedAt) <= PROCESS_START_TOLERANCE_MS,
+    )
+    // A daemon that DIED with the parent and was replaced would answer the probe
+    // at a fresh pid and rewrite the record; the record still carrying the
+    // pre-kill identity is what pins survival to the same process the parent
+    // started — and it is the identity discovery must independently find.
+    check(
+      'the durable record after the kill still names that same daemon',
+      sameDaemonIdentity(readJsonIfAny(store.daemonRecordPath)),
+      JSON.stringify(readJsonIfAny(store.daemonRecordPath)),
     )
 
     const shaAfterKill = await waitForNewSha({ originDir, since: shaBeforeKill, timeoutMs: 20_000 })
@@ -222,10 +255,37 @@ async function parentDeathScenario({ keep }) {
       Number.isInteger(newFence) && newFence > deadFence,
       `fence ${JSON.stringify(newFence)} against ${deadFence}`,
     )
-    // Acquisition writes the lock; the daemon copy is the owner's own second
-    // write, through the same mutex a live session uses.
-    const copiedBySuccessor = writeLockCopy({ repoDir: repo, record, sessionId: successorSid, fence: newFence })
-    check('the successor recorded the surviving daemon in its own lock', copiedBySuccessor.ok === true, copiedBySuccessor.reason ?? '')
+    // DISCOVERY IS THE SUCCESSOR'S OWN WORK. Acquisition hands over a bare lock
+    // — proven bare here, because a lock that already named the daemon would
+    // make the discovery below a no-op and this drill a simulation again. The
+    // record then reaches the lock only the way it reaches a real fresh
+    // session's: reconciliation reads the store, classifies the pair as
+    // unadopted, and writes the copy FROM THE RECORD under the reap mutex
+    // (write-copy-from-record). Nothing the dead parent knew flows in.
+    check(
+      'acquisition handed the successor no daemon identity — discovery must find it',
+      successorLock?.daemon === undefined,
+      JSON.stringify(successorLock?.daemon),
+    )
+    const resumed = await resumeBatch({ repoDir: repo, batchId: BATCH, sessionId: successorSid })
+    check(
+      'the fresh session DISCOVERED the surviving daemon in durable state',
+      resumed.pair?.reading === 'unadopted' && sameDaemonIdentity(resumed.pair?.record),
+      `reading ${resumed.pair?.reading}, record ${JSON.stringify(resumed.pair?.record)}`,
+    )
+    const lockAfterDiscovery = readJsonIfAny(lockPath)
+    check(
+      'discovery wrote the daemon copy from the record, through the pair resolution',
+      resumed.applied?.ok === true && sameDaemonIdentity(lockAfterDiscovery?.daemon),
+      JSON.stringify({ applied: resumed.applied ?? null, daemon: lockAfterDiscovery?.daemon ?? null }),
+    )
+    // ADOPTION AFTER RECONCILIATION, in that order: the successor gathers the
+    // durable evidence first (step 8), and only a lane that reconciliation
+    // reads as running is adopted — through the fenced daemon mutation.
+    const lane = resumed.lanes.find((l) => l.attemptId === 'a-drill')
+    check('reconciliation read the surviving lane as running before any adoption', lane?.reading === 'running', lane?.reason ?? '')
+    const adopted = resumed.adoptions.find((a) => a.attemptId === 'a-drill')
+    check('the fresh session adopted the attempt under the new fence, after reconciliation', adopted?.ok === true, adopted?.reason ?? '')
     const successorRequest = (cmd, payload) =>
       controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd, sessionId: successorSid, fence: newFence, payload: { batchId: BATCH, ...payload } } })
 
@@ -262,15 +322,6 @@ async function parentDeathScenario({ keep }) {
       staleFence.ok !== true && staleRefusal.test(staleFence.reason ?? ''),
       staleFence.ok ? 'accepted' : `refusal reason: ${staleFence.reason ?? '(none)'}`,
     )
-
-    // ADOPTION AFTER RECONCILIATION, in that order: the successor gathers the
-    // durable evidence first (step 8), and only a lane that reconciliation
-    // reads as running is adopted — through the fenced daemon mutation.
-    const resumed = await resumeBatch({ repoDir: repo, batchId: BATCH, sessionId: successorSid })
-    const lane = resumed.lanes.find((l) => l.attemptId === 'a-drill')
-    check('reconciliation read the surviving lane as running before any adoption', lane?.reading === 'running', lane?.reason ?? '')
-    const adopted = resumed.adoptions.find((a) => a.attemptId === 'a-drill')
-    check('the fresh session adopted the attempt under the new fence, after reconciliation', adopted?.ok === true, adopted?.reason ?? '')
 
     const checkpoint = await successorRequest('request-checkpoint', { requestId: 'succ-cp-1', waitMs: 15_000 })
     const answer = checkpoint.ok ? checkpoint.result.answers.find((a) => a.attemptId === 'a-drill') : null
