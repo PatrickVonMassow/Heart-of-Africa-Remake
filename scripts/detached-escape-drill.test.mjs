@@ -222,11 +222,22 @@ describe('readOutcome', () => {
     })
     expect(died.escaped).toBe(false)
     expect(died.why).toMatch(/pipe whose reader went with the parent/)
+    expect(died.pipeCause).toBe(true)
   })
 
   it('does not invent a cause it was not given', () => {
     const died = readOutcome({ shape: 'pipes', alive: false, ...healthy, beatTimes: BASELINE, lastLine: 'beat 17' })
     expect(died.why).toMatch(/cause not recorded/)
+    expect(died.pipeCause).toBe(false)
+  })
+
+  it('never attributes the pipe to a worker that is not even dead', () => {
+    // `pipeCause` is a fact about a DEATH: an EPIPE string in the log of a
+    // live or unprobeable worker attributes nothing.
+    const alive = readOutcome({ shape: 'pipes', alive: true, ...healthy, lastLine: 'raised: EPIPE' })
+    expect(alive.pipeCause).toBe(false)
+    const unknown = readOutcome({ shape: 'pipes', alive: false, unknownLiveness: true, ...healthy, lastLine: 'raised: EPIPE' })
+    expect(unknown.pipeCause).toBe(false)
   })
 })
 
@@ -521,6 +532,28 @@ describe('verdict', () => {
     const proved = verdict([outcome('pipes', false), outcome('files', true)])
     expect(proved.ok).toBe(true)
     expect(proved.note).toMatch(/the pipe is the binding/)
+  })
+
+  it('refuses a pipes death that did not record EPIPE — an unexplained death names no cause', () => {
+    // The pipes worker dying of anything unrelated (OOM, a crash, an operator)
+    // beside an escaped files worker would otherwise still yield "the pipe is
+    // the binding" — a verdict built on a death readOutcome itself says it
+    // cannot explain.
+    const unexplained = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      beatsBefore: 9,
+      killedAt: KILL,
+      observedUntil: WINDOW,
+      startedObserving: -1600,
+      beatTimes: BASELINE,
+      lastLine: 'beat 17',
+    })
+    expect(unexplained.dead).toBe(true)
+    expect(unexplained.pipeCause).toBe(false)
+    const refused = verdict([unexplained, outcome('files', true)])
+    expect(refused.ok).toBe(false)
+    expect(refused.note).toMatch(/cannot be attributed to the pipe/)
   })
 
   it('refuses to conclude when both shapes survived', () => {

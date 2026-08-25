@@ -118,6 +118,12 @@ export function readOutcome({
   // verdict needs a baseline, so an unmeasurable window blocks "escaped" and
   // never overrides "died" — the reading of a corpse does not depend on jitter.
   const dead = !alive && !unknownLiveness
+  // DEATH AND ITS CAUSE ARE SEPARATE FACTS. The worker's own uncaughtException
+  // handler records what killed it before rethrowing; only that recorded EPIPE
+  // ties the death to the pipe. A pipes worker dead of anything else — OOM, a
+  // crash, an operator — is a death this run cannot attribute, and `verdict`
+  // must not build "the pipe is the binding" on it.
+  const pipeCause = dead && /EPIPE/i.test(lastLine)
   const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness
   // ONE PRECEDENCE, NOT TWO. The reason used to encode the same order as the
   // command's labelling, independently, so the two could drift apart — and had
@@ -146,6 +152,7 @@ export function readOutcome({
     escaped,
     progressed,
     dead,
+    pipeCause,
     unknownLiveness: Boolean(unknownLiveness),
     unmeasurable,
     alive: Boolean(alive),
@@ -185,14 +192,23 @@ export function verdict(outcomes) {
   // survivor all fail `escaped` while proving nothing about the cause, and
   // reading any of them as the dead half would turn an unreadable probe
   // beside an escaped files worker into a passed drill.
-  const ok = Boolean(pipes && files && pipes.dead === true && files.escaped === true)
+  //
+  // AND PROVEN DEAD OF THE PIPE: the worker records the exception that killed
+  // it before rethrowing, so a death the pipe caused carries EPIPE in its own
+  // log. A pipes worker dead of an unrelated cause beside an escaped files
+  // worker is a difference this run cannot attribute to stdio — readOutcome
+  // itself says "cause not recorded" — and attributing it anyway is exactly
+  // the guessed explanation this drill exists to replace.
+  const ok = Boolean(pipes && files && pipes.dead === true && pipes.pipeCause === true && files.escaped === true)
   return {
     ok,
     // A drill in which both shapes survive proves NOTHING about the cause, and
     // saying so is the difference between evidence and a green light.
     note: ok
       ? 'the pipe is the binding: same detachment, opposite outcome'
-      : 'inconclusive — both shapes behaved alike, so this run identifies no cause',
+      : pipes?.dead === true && pipes?.pipeCause !== true && files?.escaped === true
+        ? 'inconclusive — the pipes worker died without recording EPIPE, so this death cannot be attributed to the pipe'
+        : 'inconclusive — both shapes behaved alike, so this run identifies no cause',
     outcomes,
   }
 }
