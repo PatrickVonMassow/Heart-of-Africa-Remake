@@ -62,6 +62,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.08. nachts | Die Vier-Augen-Regel sperrte sich selbst ein: Punkt 834 war fertig und grün, aber seine Prüfrunde liess sich auf keiner Basis beauftragen — ein Merge ohne Autor-Trailer nahm sieben Dateien den beweisbaren Gegenleser, und der Planer verweigerte darauf die ganze Runde statt dieser Dateien, obwohl die Ledger die Ausnahme-Satzart dafür längst führt (§3.169); derselbe Blick fand einen Auftragspunkt, der ohne Zeilenumbruch an den vorigen geklebt war und deshalb für jeden Leser der Datei nicht existierte |
 | 24.08. früh | Die Vorschau widersprach dem Tor: `guard-preflight` meldete den Mechanismus-Wächter als blockierend, während der Wächter selbst die Spanne gegen das Rundenbudget maß, eine Lesbarkeitslücke urteilte und den Zug durchließ — eine geplante 64-Pässe-Runde über 13,8 M Zeichen, die niemand verlangt (Punkt 873) |
 | 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
+| 26.08. | Der einzige ungeordnete Punkt der Sitzungseröffnung war eine Dublette: derselbe Vorschau-gegen-Tor-Widerspruch stand seit zwei Tagen als Punkt 873, 273 Positionen tiefer — gefunden wieder nur durch die Bündelpflicht, nicht beim Anlegen (§3.168-Nachtrag, Punkt 923 in 873 gefaltet) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1353,7 +1354,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 23:32 · Quellen-Fingerprint: `881f092c7e32…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 00:50 · Quellen-Fingerprint: `0cd2048c1c2d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1454,8 +1455,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 881f092c7e323182be9b85a0dea910d91ddec78b5e0a9dc9dbc211f7085d464f -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T21:32:37.179Z -->
+<!-- RETRO-FINGERPRINT: 0cd2048c1c2dc782303151173bda38fcc21eaadec3045f6dddc19019eb602193 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T22:50:02.667Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3179,6 +3180,22 @@ der ein Widerspruch zwischen ihnen auffallen kann, bevor er Code wird. Prüffrag
 Anlegen eines Punktes: *Wenn es das schon gibt — wäre der bestehende Zielzustand für
 meinen Fall richtig, oder erklärt er ihn zum Fehler?* Ein Befund, der einen bestehenden
 Punkt WIDERLEGT, gehört zwingend in diesen Punkt und nicht daneben.
+
+**Nachtrag 26.08.2026 — dieselbe Route, dasselbe Ergebnis, zwei Tage später.** Die Eröffnung dieser
+Sitzung fand als einzigen ungeordneten Punkt 923: die Vorschau meldet die Vier-Augen-Schranke als
+blockierend, während der Hook-Pfad desselben Wächters über demselben HEAD die Lückenklausel zieht.
+Sichtbar wurde die Dublette wieder nicht beim Anlegen, sondern erst durch die Bündelpflicht, die den
+Punkt namentlich einforderte — und der Vergleich fand Punkt 873, der denselben Defekt seit dem
+24.08.2026 trägt, 273 Positionen tiefer in der Warteschlange. Diesmal widersprachen sich die beiden
+Fassungen nicht, aber sie ergänzten sich: 873 verlangt Gleichlauf der Entscheidung, 923 zusätzlich
+Gleichlauf des BEFUNDTYPS. Beide getrennt gebaut hätten zwei Runden über denselben Mechanismus
+gekostet, von denen die zweite die erste hätte anfassen müssen. Der Befund ist in 873 eingetragen,
+923 ist dorthin gefaltet.
+
+**Lehre, ergänzt:** Der Dublettencheck darf nicht am Bündel-Wächter hängen. Er greift dort erst,
+wenn der Punkt schon steht, und er greift nur, weil dieser Wächter zufällig jeden offenen Punkt
+namentlich aufzählt — er ist ein Nebenprodukt, kein Mechanismus. Die Stelle, an der zwei
+Beschreibungen desselben Mechanismus verglichen werden, gehört an das ANLEGEN eines Punktes.
 
 ### 3.169 Die Vier-Augen-Regel hat sich selbst eingesperrt
 
