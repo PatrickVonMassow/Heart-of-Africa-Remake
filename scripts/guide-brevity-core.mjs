@@ -292,7 +292,14 @@ export const LIMITS = {
   // paid for it by dropping clauses the retrospective carries in full (§3.179).
   // The guide measures 470 / 4195 afterwards, so the word ceiling RATCHETS DOWN
   // by seven more. The line ceiling stays 470 because the file does.
-  maxWords: 4195,
+  // 25.08.2026, later the same day: the retroactive-rule pitfall went in — a
+  // tightened check reading an existing stock condemns records that were correct
+  // when they were written, so the duty says from WHEN it applies. Three
+  // neighbouring entries paid for it by dropping clauses the retrospective now
+  // carries in full (§3.120), and the new tip is three lines. The guide measures
+  // 470 / 4180 afterwards, so the word ceiling RATCHETS DOWN by fifteen more; the
+  // line ceiling stays 470 because the file does.
+  maxWords: 4180,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

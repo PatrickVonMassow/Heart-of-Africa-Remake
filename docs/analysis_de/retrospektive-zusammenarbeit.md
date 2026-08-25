@@ -1351,7 +1351,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 20:47 · Quellen-Fingerprint: `09369b5dd2b1…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 21:57 · Quellen-Fingerprint: `4b6ff196397a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1452,8 +1452,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
 
-<!-- RETRO-FINGERPRINT: 09369b5dd2b12ace47fa332cc8eff105b80c4a138c2a42953f262cfda4c64215 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T18:47:33.169Z -->
+<!-- RETRO-FINGERPRINT: 4b6ff196397a6ebcc3fb7cd289d263f8913bfaa955e46c5ec1b964d32d0f143c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T19:57:13.148Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3626,3 +3626,27 @@ Der Arbeitsauftrag ist nicht nach Nummern sortiert, und die freie Nummer ist das
 Reparatur kostete eine Umnummerierung und eine überschriebene Board-Karte. Für das *Ende*
 eines Punktes gibt es Befehle, für seinen *Anfang* keinen — und wo kein Befehl steht, steht
 Handarbeit gegen eine 12 000-Zeilen-Datei. Gebucht als Punkt 920.
+
+### 3.120 Eine Regel verurteilt ihre eigene Vorgeschichte
+
+Am 25.08.2026 hielt der Vier-Augen-Wächter an der Punktgrenze jeden Zug an. Seine Begründung
+war für ein Dutzend Commits dieselbe: „ein aufgezeichnetes do-not-merge ist fehlerhaft — es
+kann nur von Hand gekommen sein." Die genannten Zeilen waren nicht von Hand gekommen. Der
+Rekorder selbst hatte sie geschrieben, korrekt, Wochen zuvor — nur eben bevor es das Feld
+gab, das die Prüfung heute verlangt: einen Identitätsnachweis des Prüfmodells. Die
+Wohlgeformtheitsprüfung kennt keine Zeitgrenze, und so greift eine spätere Regel rückwärts
+und erklärt die eigene Vorgeschichte für gefälscht.
+
+Das Muster ist nicht der Tippfehler, sondern die Richtung. Wir verschärfen Regeln laufend,
+und das ist richtig; jede Verschärfung sitzt aber in einem Prüfer, der über einen *Bestand*
+läuft, nicht nur über den nächsten Eintrag. Für das Modus-Feld hatte dieselbe Datei diese
+Einsicht schon — `MODE_REQUIRED_SINCE` zieht genau die Grenze, die dem Identitätsfeld fehlt.
+Die Lehre ist deshalb konkret: **Wer eine Pflicht in einen Prüfer einbaut, der Altbestände
+liest, schreibt im selben Commit hin, ab wann sie gilt.** Sonst wächst die Strenge nicht nach
+vorn, sondern nach hinten.
+
+Verschärft wurde es durch die zweite Hälfte: Die Meldung nennt eine Reparatur — „die Zeile
+korrigieren oder entfernen, auf dem Protokoll" —, für die es keinen Befehl gibt, und
+Handeditieren des Ledgers ist genau das, was sie anprangert. Ein Tor, dessen einziger
+Ausgang die Handlung ist, die es verbietet, ist kein Tor, sondern eine Wand. Gebucht als
+Punkt 921.

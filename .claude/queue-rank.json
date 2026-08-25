@@ -250,12 +250,6 @@
       "origin": "user",
       "place": "last"
     },
-    "752": {
-      "at": "2026-08-21T16:05:59.447Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174); kept in front for SPEED: the paradigm case the user named, 43 measured handovers with a median of 12.7 and a p90 of 47.8 minutes of dead time.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "754": {
       "at": "2026-08-19T19:59:31.708Z",
       "why": "Rangfolge bleibt hinter der Deckenprogramm-Kette; Gruppe A ist zwar hoch kritisch, aber der Modell-Verstoss wird von model-guard nachtraeglich gefangen — die Sitzung ist am Kontext-Zaun und darf den Work Order nicht mehr umschichten (Punkt 751), deshalb ordnet der Nachfolger die Gruppe A gegebenenfalls vor",
@@ -715,12 +709,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "918": {
-      "at": "2026-08-25T17:30:18.314Z",
-      "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen; 918 ist die Naht, auf der 676 aufsetzt",
-      "origin": "user",
-      "place": "ahead"
-    },
     "919": {
       "at": "2026-08-25T18:43:13.130Z",
       "why": "Last is right: the phantom red costs a session's opening, never correctness — no code is wrong, no player-visible defect, and the guard still catches every genuine red. It waits behind the release work like the other CI-guard defects of its class.",
@@ -732,6 +720,12 @@
       "why": "Last is right: the duplicate number is caught by the pre-push fast gate before it can reach main, so the damage is a repair, not a defect that ships. The command is convenience over a rule that already holds.",
       "origin": "machine",
       "place": "last"
+    },
+    "921": {
+      "at": "2026-08-25T19:56:46.074Z",
+      "why": "Der Vier-Augen-Waechter haelt jeden Zug an, der auf main endet, und die Reparatur, die er nennt, gibt es als Befehl nicht — die Veroeffentlichung wird auf main geschnitten und kaeme an diesem Wall nicht vorbei.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -767,7 +761,6 @@
       746,
       747,
       750,
-      752,
       759,
       760,
       762,
@@ -776,7 +769,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T18:43:13.236Z",
+    "at": "2026-08-25T19:56:46.081Z",
     "points": [
       174,
       184,
@@ -968,7 +961,6 @@
       746,
       747,
       750,
-      752,
       754,
       755,
       756,
@@ -1064,9 +1056,9 @@
       915,
       916,
       917,
-      918,
       919,
-      920
+      920,
+      921
     ]
   }
 }

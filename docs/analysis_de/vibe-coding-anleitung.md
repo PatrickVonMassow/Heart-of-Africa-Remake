@@ -175,12 +175,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   während der Umfang bleibt, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes
   Stück für sich ab**."
 
-- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
-  das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor urteilt richtig,
-  nur fährt es kein Weg des Projekts.
-  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
-  **vergleiche Ausgeführtes mit dem Repository.** Nenn zu jedem Tor, auf das du dich berufst, den
-  **Weg, der es fährt** — und wann es dort zuletzt rot war."
+- **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei,
+  die das Werkzeug liest; oder das Tor urteilt richtig, nur fährt es kein Weg des Projekts.
+  → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest. Nenn zu
+  jedem Tor den **Weg, der es fährt** — und wann es dort zuletzt rot war."
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -338,11 +336,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   eine **Behauptung** — nachmessen, nicht reparieren."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
-  verliert die nächste Reparatur mit — und ein abgebrochener Lauf räumt nicht weg, was er
-  hinterlässt, am schlimmsten beim Prüfen von Prozesstod.
+  verliert die nächste Reparatur mit; ein abgebrochener Lauf räumt nicht weg, was er hinterlässt.
   → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag zu jeder Aufräumung: **Wer
-  räumt auf, wenn der Aufräumende nicht mehr da ist?**"
+  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag: **Wer räumt auf, wenn der
+  Aufräumende nicht mehr da ist?**"
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
@@ -390,12 +387,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Grenze verwehrt die **erste** Handlung nach dem Überschreiten, nicht die
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
-- **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
-  selbst sperrt. Ein Tor kann zu Recht sperren und trotzdem unlösbar sein: es kennt nur einen der
-  erlaubten Wege, oder seine Abhilfe liegt außer Reichweite des Gesperrten.
-  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere es
-  nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Bevor ein Tor scharf
-  geht: **zähl alle Wege auf** und prüfe, dass seine Abhilfe **erreichbar** ist."
+- **Die KI repariert den Wächter, der sie gerade sperrt.** Ein Tor kann zu Recht sperren und
+  trotzdem unlösbar sein: es kennt nur einen erlaubten Weg, oder seine Abhilfe liegt außer
+  Reichweite.
+  → *Prompt:* „Sperrt ein Tor dich, ändere es nie allein: **leg dein Eigeninteresse offen**, nimm
+  das zweite Urteil. Bevor ein Tor scharf geht: **zähl alle Wege auf** und prüfe seine Abhilfe."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
   statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
@@ -422,6 +418,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   nach, geht eine zweite Sitzung neben der laufenden auf — beide haben beim Start ehrlich gefragt.
   → *Prompt:* „Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist**,
   und stell die Besitzfrage **vor jedem Schreibvorgang** neu — nicht nur beim Start."
+
+- **Die neue Pflicht verurteilt die alten Einträge.** Der verschärfte Prüfer liest den ganzen
+  Bestand und erklärt korrekt entstandene Altdaten für gefälscht.
+  → *Prompt:* „Eine Pflicht in einer Prüfung, die Altbestände liest, sagt **ab wann** sie gilt."
 
 - **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
   darf, antwortet auf die Frage nach dem Zustand nur noch mit dem Grund, nichts zu tun — und ist
@@ -467,4 +467,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 09369b5dd2b12ace47fa332cc8eff105b80c4a138c2a42953f262cfda4c64215 -->
+<!-- GUIDE-FINGERPRINT: 4b6ff196397a6ebcc3fb7cd289d263f8913bfaa955e46c5ec1b964d32d0f143c -->
