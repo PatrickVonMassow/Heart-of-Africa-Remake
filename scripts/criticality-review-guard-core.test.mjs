@@ -326,6 +326,27 @@ describe('evaluateCriticalityReview', () => {
     expect(formatCriticalityReviewVerdict(missing)).toContain('scripts/original.mjs')
   })
 
+  it('clears a self-authored HIGH point when its Git-measured files are all covered', () => {
+    const measured = record({
+      pointFiles: ['scripts/guard.mjs', 'scripts/guard.test.mjs'],
+      pass: { index: 1, total: 1, files: ['scripts/guard.mjs', 'scripts/guard.test.mjs'] },
+    })
+
+    const covered = evaluateCriticalityReview({ baseline: 'b', ticks: [tick()], records: [measured] })
+    expect(covered).toMatchObject({ block: false, clear: true })
+
+    const missing = evaluateCriticalityReview({
+      baseline: 'b',
+      ticks: [tick()],
+      records: [{ ...measured, pass: { index: 1, total: 1, files: ['scripts/guard.mjs'] } }],
+    })
+    expect(missing).toMatchObject({
+      block: true,
+      findings: [{ kind: 'uncovered-files', coverageUnknown: false, uncovered: ['scripts/guard.test.mjs'] }],
+    })
+    expect(formatCriticalityReviewVerdict(missing)).toContain('scripts/guard.test.mjs')
+  })
+
   it('keeps a 1/1 refusal standing even when its files cover the point', () => {
     const refused = evaluateCriticalityReview({
       baseline: 'b',
@@ -398,7 +419,7 @@ describe('evaluateCriticalityReview', () => {
     expect(unanswered.findings[0].kind).toBe('unanswered')
   })
 
-  it('names unknown point coverage instead of clearing on pass indices alone', () => {
+  it('names every unavailable Git route instead of promising a commission will appear', () => {
     const unknown = evaluateCriticalityReview({
       baseline: 'b',
       ticks: [tick()],
@@ -406,7 +427,11 @@ describe('evaluateCriticalityReview', () => {
     })
     expect(unknown.block).toBe(true)
     expect(unknown.findings[0]).toMatchObject({ kind: 'uncovered-files', coverageUnknown: true })
-    expect(formatCriticalityReviewVerdict(unknown)).toContain('coverage is unknown')
+    const message = formatCriticalityReviewVerdict(unknown)
+    expect(message).toContain("Git cannot measure this point's file set from any available route")
+    expect(message).toContain('landing merge')
+    expect(message).toContain('feat/<point>-… lane')
+    expect(message).not.toContain('Re-run after the authoring commission')
   })
 
   it('a carried row clears only with the wrapper’s verification stamp (delta rounds)', () => {
