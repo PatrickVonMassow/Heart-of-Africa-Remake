@@ -12019,3 +12019,31 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the four-eyes gate itself, it currently blocks every landing session,
   and its stated reason is measurably not the real one.
   Bundle: Modell & Wächter.
+
+- [ ] 917. A closed point's branch and worktree outlived its merge, and the guard that should
+  see it stood down instead. MEASURED 25.08.2026 on `main` at `8f158f91`: point 834 stands in
+  `docs/tasks-archive.md`, so it is closed — yet `/workspace/hoa/.claude/worktrees/point-834`
+  is still a registered worktree and `feat/834-durable-authoring-lane` is 122 commits ahead of
+  `main`, i.e. it is NOT an ancestor of `main`. CLAUDE.md §6 is explicit that the merge ends the
+  branch: local branch, remote branch and worktree all go.
+  WHICH OF THE TWO IT IS MATTERS. Either the point landed through a different branch and those
+  122 commits are spent rubbish holding a worktree open, or closed work is sitting outside
+  `main` and the archive entry is a lie. Nothing may be deleted before that is decided.
+  NOT THE SAME THING, and deliberately out of scope: the other eight worktrees (581, 595/598,
+  686, 687 twice, 713, 734, 752, 847) belong to points still OPEN in `TASKS.md`. That is parked
+  work, not a hygiene fault, and this point does not touch it.
+  THE BACKSTOP DID NOT MEASURE. `node scripts/branch-hygiene-guard.mjs --status` answered only
+  "steht zurück — another live session owns the batch lock" and reported no state at all. A
+  stand-down is right for ACTING on another owner's tree; refusing to REPORT means the one
+  command built to find this class of leftover cannot be used to find it.
+  FINAL STATE: point 834's branch is decided on evidence — its content is either shown to be
+  contained in `main` and branch plus worktree are removed with `scripts/worktree-cleanup.mjs`,
+  or the gap is named and filed as its own point. And `branch-hygiene-guard --status` reports
+  the measured state even under another owner's lock, marking clearly that it will not act.
+  VERIFIABLE: Vitest over the guard's pure decision — a status request under a foreign live lock
+  yields a full report with `mayAct: false`, while an ACTING request under the same lock still
+  stands down; plus a case that a worktree whose point is archived and whose branch is not an
+  ancestor of `main` is reported as a leftover, and one whose point is still open is not.
+  Criticality: med — no player-visible defect, but it is the one command that answers whether
+  closed work is really in `main`.
+  Bundle: Modell & Wächter.
