@@ -23429,3 +23429,37 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — no product behaviour, but it intermittently reds the gate every landing
   runs and devalues the drill's verdict.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 885. A delegated agent swallows the user's chat message, and the backstop cannot see that it
+  happened. MEASURED 24.08.2026: the message `e433e59a` (ntfy `jiZfW5f6qkQi`, "Was soll ich mit der
+  Karte Entscheidungsprotokoll…", received 05:54:01.371Z) was consumed from `.claude/chat-spool`
+  between 05:54:01.4Z and 05:54:32.5Z and reached NO model. No transcript under
+  `~/.claude/projects` carries the text or the "MESSAGE FROM THE USER (board chat" header — the one
+  hit is the interactive session where the user re-pasted it by hand at 08:29, more than an hour
+  later, because nobody had answered.
+  THE SEQUENCE: `chat-watcher` logged skip/owner-live at 05:54:01.4, correctly — the owner was live
+  and working. The owner had just launched three background review subagents (05:54:00.5,
+  05:54:11.8, 05:54:26.2). A subagent's tool calls run the SAME PostToolUse lock-heartbeat hook, and
+  the hook payload's `session_id` is the PARENT's, so `heartbeat(sid)` reads "owner" and
+  `deliverPendingMessages` CLAIMS the message inside the subagent. Subagent hook stdout is never
+  persisted or injected: all three subagent transcripts under
+  `0c6df110-…/subagents/agent-*.jsonl` contain ZERO hook attachments, while the owner's top-level
+  transcript shows the same hook's findings-carrier bell arriving normally at 05:53:36 and 05:56:26
+  — and that 05:56:26 bell carries `chatOut=''`, which proves the spool was already empty and the
+  owner's own heartbeat never saw the message at all.
+  THE BACKSTOP IS DEFEATED TOO: the defer-sweep of point 424 re-reads only PENDING messages, and the
+  claim had already removed this one from pending. So the loss is silent in both layers.
+  WHAT IT COSTS: the user asked a question, the board kept showing the card it was about, and the
+  answer never came. Nothing in the batch reported anything wrong. Every delegated round is exposed:
+  the more the owner delegates — which is the standing instruction — the wider the window.
+  FINAL STATE: the heartbeat hook does not claim chat messages when it runs for a SUBAGENT tool
+  call. The discriminator is in the payload itself: a subagent's `transcript_path` contains
+  `/subagents/` (`agent-*.jsonl`), the top-level owner's does not. Alternatively, or in addition,
+  delivery becomes deliver-THEN-consume — a message moves to `consumed/` only after the harness has
+  accepted the injection — so a dropped delivery retries instead of vanishing.
+  VERIFIABLE: Vitest over the pure decision — a payload whose `transcript_path` names a subagents
+  directory claims nothing and leaves the pending set untouched; a top-level payload still claims;
+  and the defer-sweep still fires for a message a subagent refused. Plus a case that a claimed-but-
+  undelivered message returns to pending.
+  Criticality: high — it loses the user's own words, silently, on the path built to reach them.
+  Bundle: Chat & Tafel.
