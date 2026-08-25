@@ -467,7 +467,12 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
     const cancelled = await successorRequest('cancel-attempt', { attemptId: 'a-drill', requestId: 'succ-cx-1', reason: 'drill complete' })
     check('one post-adoption lifecycle operation completed: cancellation', cancelled.ok === true, cancelled.reason ?? '')
     await sleep(300)
-    check('the cancellation preserved the branch', git(['rev-parse', 'feat/drill'], originDir) === tipBeforeCancel)
+    const tipAfterCancel = git(['rev-parse', 'feat/drill'], originDir)
+    check(
+      'the cancellation preserved the branch',
+      tipAfterCancel === tipBeforeCancel,
+      tipAfterCancel === tipBeforeCancel ? '' : `tip moved ${tipBeforeCancel} -> ${tipAfterCancel}`,
+    )
 
     const down = await successorRequest('shutdown', { drain: true })
     check('the daemon drained on request', down.ok === true)
