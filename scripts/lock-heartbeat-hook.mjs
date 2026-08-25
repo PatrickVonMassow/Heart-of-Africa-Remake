@@ -241,9 +241,10 @@ try {
     ownsBatch,
     paused,
     hookInput: data,
-    // A synchronous fd write gives delivery a success/failure boundary. A
-    // rejected write restores every claim to pending before another duty can
-    // speak, so the owner or defer sweep can retry the user's words.
+    // A successful synchronous write proves only that fd 1 accepted the bytes,
+    // not that the harness injected them. The subagent discriminator covers
+    // the known divergence before claiming; if the harness discards an accepted
+    // owner write, this hook cannot observe it and the message is still lost.
     emit: (text) => writeFileSync(1, text, 'utf8'),
   })
   if (out) {
