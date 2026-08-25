@@ -23113,3 +23113,70 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   as `git log | grep push`, and a here-document into `cat`, which must stay a read.
   Criticality: high — a lockless session may move main.
   Bundle: Session- & Repo-Hygiene.
+
+- [x] 880. The four-eyes duty can be cleared without an independent review, six measured ways.
+  MEASURED 24.08.2026 by the cross-vendor review of `1862687` and `e0ebcff` (both recorded
+  `do-not-merge`), each route executed against `evaluateMechanismReview`/`validateRecord`:
+  (1) `scripts/mechanism-review-core.mjs:1270-1272` (and `validateRecord` at `:1081`) — the
+  ordinary, PASS-LESS path, which is the one the guard's own refusal text tells you to run, checks
+  only `sameModel(record.model, commit.authorModel)`: no vendor rule, only the FIRST co-author, no
+  unknown-authorship rule. So `--model "GPT-5.6"` clears a commit trailed `GPT-5.6 Sol` (different
+  `family`, same vendor); a commit with two model trailers is cleared by its SECOND author; and an
+  unrecognised author designation is cleared by anyone. The strict file-scoped path at `:1285`
+  applies the full test — the legacy path simply does not consult it.
+  (2) `:1285` — `(commit.authorModels ?? [commit.authorModel]).filter(Boolean)` yields `[]` for a
+  commit whose trailers name no model (an empty array is not nullish), so the vendor set is EMPTY
+  and both guards pass: any model, including the author, clears it. The concrete case is the evil
+  merge CLAUDE.md §6 warns about — merges carry no model trailer. `mechanism-review-range-core.mjs:221`
+  gets this right and maps an empty author list to `unknown`, so `--status` prints the file as
+  UNREVIEWABLE while the Stop hook clears it.
+  (3) `:1300-1305` — on the file-scoped path a recorded `do-not-merge` is answered by the newest
+  timestamp alone, with no descent requirement. A `merge` re-recorded at the SAME sha retires the
+  refusal, which contradicts the rule written forty lines below (`:1452-1461`, user decision
+  18.08.2026: a same-sha re-record fixes nothing).
+  (4) `:1279-1314` — every record this CLI writes carries `pass.endState`
+  (`mechanism-review.mjs:372`), and `fileClaim` rows are excluded from both `legacyCovering` and
+  `legacySound`. So the split-completeness demand and the pass-less-beside-a-split poison can no
+  longer fire for ANY new record: one `pass 1/3` row clears the commit while passes 2 and 3 are
+  never recorded. About twenty tests still pin a shape nothing writes.
+  (5) All three era cutoffs key on `record.at` (`:1108`, `:1134-1141`), a field the recording hand
+  controls, and nothing requires a record to postdate the commit it clears — a row dated before
+  `AUTHORSHIP_CHECK_SINCE` clears a commit made today.
+  (6) `:1270-1272` — a BLIND-PARALLEL FOLD ROW enters `sound` and stands as a covering review of
+  the commit it is recorded on, although it attests to a COUNTED FOLD of two lists and to no
+  reading of that commit's code. MEASURED 24.08.2026 on `feat/889-fold-record-merger-check`:
+  recording Fable 5's fold of the 676 halves against a commit trailed `Claude Opus 5`, with
+  `--model "GPT-5.6 Sol"` as the row's model, turned `mechanism-review-guard --status` from
+  `0 covering review(s)` and a refusal into `1 covering review(s)` and `GATE CLEAR` — in the same
+  output that listed FOUR outstanding review passes over that commit's own files. The carve-out
+  for `--spec-examination` sits on the line above and rests on exactly this argument: a record
+  that read something other than this code cannot stand for a review of it.
+  Plus the baseline: `.claude/mechanism-review-baseline.json` is gitignored (`.gitignore:177`), so a
+  fresh clone, a fresh worktree or a `git clean -xfd` removes it; `bootstrapBase`
+  (`scripts/mechanism-review-guard.mjs:139-155`) then takes `merge-base(main, HEAD)`, which ON MAIN
+  is HEAD — the pending set is empty, the turn clears, and `:630` writes the new baseline at HEAD.
+  All outstanding mechanism debt is grandfathered in one turn, unreported.
+  WHAT IT COSTS: this is the gate the whole model policy rests on. Every route above turns a
+  four-eyes duty into a formality without anybody noticing, and route (4) applies to every record
+  written from now on.
+  FINAL STATE: one identity test, applied on every clearance path — vendor-based, over ALL co-author
+  trailers, treating a commit with no named author as `unknown` and therefore unreviewable. Only a
+  record that attests to a READING OF THIS CODE joins the covering set: a spec examination and a
+  blind-parallel fold are both kept out of it, by the same rule rather than by one carve-out. A
+  refusal is answered only by a record whose sha DESCENDS from the refused one. A split records its
+  own completeness. A record may not predate the commit it clears. The baseline is either tracked or
+  its absence is reported and refuses to clear rather than bootstrapping at HEAD.
+  VERIFIABLE: unit cases for each of the six measured routes and for the baseline bootstrap on
+  main; and the file-scoped branch gets tests at all — the suite currently contains no occurrence of
+  `endState`.
+  Criticality: high — it is the gate that makes every other model rule enforceable.
+  RESIDUALS FILED BY POINT 889 (24.08.2026), all of the same identity class, each named at its
+  code site: (a) a backdated COMMIT moves both era readings at once — the commit-era keying in
+  `reviewRecordWellFormed` closes row backdating, not commit backdating; a non-author-controlled
+  era marker is this point's to design. (b) A recorded reviewer `agreement` whose transcript has
+  expired keeps its standing (`reverifyReviewerAgreement`) — a forged claim naming a transcript
+  that never existed is indistinguishable from honest expiry; closing it needs an attestation
+  that outlives the transcript. (c) An OpenAI reviewer's `unverified` claim authenticates its
+  stated reason, not its claimant — closing it needs a receipt-backed attestation from the
+  review-sol run itself (its printed RECEIPT hash is the natural anchor).
+  Bundle: Modell & Wächter.
