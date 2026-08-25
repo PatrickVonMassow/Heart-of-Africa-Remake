@@ -10,6 +10,7 @@
 //   node scripts/batch-daemon.mjs start  --repo <dir> --batch <id> --session <sid> [--drill]
 //   node scripts/batch-daemon.mjs status --repo <dir> --batch <id>
 //   node scripts/batch-daemon.mjs stop   --repo <dir> --batch <id> [--drain]
+//   node scripts/batch-daemon.mjs drill  --scenario parent-death [--keep]
 //
 // PRODUCTION START IS INTERLOCKED: `start` without --drill consults the
 // activation flag AND the step manifest, and both refuse while steps 8 and 9
@@ -1084,7 +1085,7 @@ function parseArgs(argv) {
   for (let i = 1; i < argv.length; i += 1) {
     const flag = argv[i]
     if (!flag.startsWith('--')) continue
-    const bare = ['--drill', '--drain']
+    const bare = ['--drill', '--drain', '--keep']
     if (bare.includes(flag)) args[flag.slice(2)] = true
     else {
       args[flag.slice(2)] = argv[i + 1]
@@ -1143,7 +1144,17 @@ async function main() {
     console.log(JSON.stringify(reply))
     process.exit(reply.ok ? 0 : 1)
   }
-  console.error('usage: node scripts/batch-daemon.mjs start|status|stop --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain]')
+  if (args._ === 'drill') {
+    // The documented drill entrypoint (docs/handover-architecture.md, "The drill
+    // that reproduces the real regression"). Imported lazily: the drill imports
+    // this module, and a static edge back would be a cycle — and the serving
+    // process has no business loading drill code at all.
+    const { runDrill } = await import('./batch-daemon-drill.mjs')
+    const result = await runDrill({ scenario: args.scenario ?? 'parent-death', keep: args.keep === true })
+    console.log(JSON.stringify(result, null, 2))
+    process.exit(result.ok ? 0 : 1)
+  }
+  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep]')
   process.exit(2)
 }
 

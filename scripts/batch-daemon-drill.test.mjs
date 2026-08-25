@@ -2,8 +2,22 @@
 // reproduces the run lost on 21.08.2026 — the spawning session's process group
 // SIGKILLed mid-authoring — must keep passing, and an unknown scenario must be
 // refused rather than reported as a passed nothing.
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { describe, it, expect } from 'vitest'
 import { runDrill, staleProbeRefused, STALE_REFUSAL } from './batch-daemon-drill.mjs'
+
+// THE DOCUMENTED ENTRYPOINT IS THE ONE UNDER TEST. The architecture promises
+// `node scripts/batch-daemon.mjs drill --scenario parent-death`; a suite that
+// calls runDrill() directly would stay green while that command is absent or
+// broken (cross-vendor review of point 834, B1). Exit code and JSON come from
+// the same run, so the drill itself is exercised exactly once.
+const exec = promisify(execFile)
+const drillCli = (...flags) =>
+  exec(process.execPath, ['scripts/batch-daemon.mjs', 'drill', ...flags], { maxBuffer: 16 * 1024 * 1024 }).then(
+    (r) => ({ ...r, code: 0 }),
+    (err) => ({ stdout: err.stdout ?? '', stderr: err.stderr ?? '', code: err.code ?? -1 }),
+  )
 
 // EVERY check the drill performs, IN ORDER — the complete takeover contract,
 // not a sample of it. An earlier version pinned four names and left real
@@ -42,18 +56,27 @@ const REQUIRED_CHECKS = [
   'the shutdown was journalled under the successor fence',
 ]
 
-describe('runDrill', () => {
+describe('the documented drill entrypoint', () => {
   it('refuses an unknown scenario instead of passing it silently', async () => {
     const res = await runDrill({ scenario: 'made-up' })
     expect(res.ok).toBe(false)
     expect(res.reason).toMatch(/unknown scenario/)
   })
 
+  it('refuses an unknown scenario THROUGH THE CLI, with exit code 1 and the reason in its JSON', async () => {
+    const ran = await drillCli('--scenario', 'made-up')
+    expect(ran.code, ran.stderr).toBe(1)
+    expect(JSON.parse(ran.stdout).reason).toMatch(/unknown scenario/)
+  })
+
   it('parent-death: daemon and worker survive the killed session and a fresh session adopts them', async () => {
-    const result = await runDrill({ scenario: 'parent-death' })
+    const ran = await drillCli('--scenario', 'parent-death')
+    expect(ran.stdout, ran.stderr).not.toBe('')
+    const result = JSON.parse(ran.stdout)
     const failed = (result.checks ?? []).filter((c) => !c.ok)
     expect(failed, JSON.stringify(failed, null, 2)).toEqual([])
     expect(result.ok).toBe(true)
+    expect(ran.code, ran.stderr).toBe(0)
     // The drill's evidence is its named checks, and ALL of them are
     // load-bearing: the exact ordered list, so no rewrite can quietly drop
     // discovery, the fence mint, a stale refusal or the identity pins and
