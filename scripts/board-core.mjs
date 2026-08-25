@@ -1305,7 +1305,11 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(new RegExp(`<span class="num">${point}</span><span class="t">${TITLE_TEXT}</span>`))
+  const chip = doc.match(
+    new RegExp(
+      `<span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">${TITLE_TEXT}</span>`,
+    ),
+  )
   const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
@@ -1553,7 +1557,8 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*<span class="t">)` +
+    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*` +
+      `(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">)` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(now.text)) {
@@ -1576,7 +1581,8 @@ export function setCardTitle(html, point, title) {
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(
-    `(<summary><span class="num">${point}</span><span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+    `(<summary><span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?` +
+      `<span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   try {
     const { from, end } = sectionBounds(html, 'queue')

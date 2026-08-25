@@ -22,12 +22,14 @@ import { resolve } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { toClosingWork, toNoCurrentWork, toNow } from './board-core.mjs'
+import { renderCardCriticalities, toClosingWork, toNoCurrentWork, toNow } from './board-core.mjs'
 import { REQUIRED_SECTIONS } from './board-structure-core.mjs'
 
 const PHONE_WIDTH = 390 // an iPhone-class viewport, well under the 460 px break
 /** The living board. Git-ignored, so the stylesheet half is SKIPPED where it is absent. */
 const BOARD_FILE = resolve(REPO_ROOT, '.batch-dashboard.html')
+const TASKS = '- [ ] 655. Card metadata\n  Criticality: high — visible.'
+const render = (html) => renderCardCriticalities(html, TASKS)
 
 const sect = (title, body) => `<details class="sect"><summary><h2>${title}</h2></summary>\n${body}\n</details>`
 const queueCard = (n, title) =>
@@ -56,16 +58,17 @@ function summaryShape(html, selector) {
 
 describe('the numbered chip renders on a now-card as it does in the queue', () => {
   it('gives the now-card the SAME summary structure as the queue card', () => {
-    const promoted = toNow(board(), 655, 'Läuft.', { stamp: '09:00' })
+    const promoted = render(toNow(board(), 655, 'Läuft.', { stamp: '09:00' }))
     const nowShape = summaryShape(promoted, 'details.now')
     expect(nowShape[0]).toBe('span.num')
-    expect(nowShape[1]).toBe('span.t')
+    expect(nowShape[1]).toBe('span.criticality criticality-high')
+    expect(nowShape[2]).toBe('span.t')
     // Element for element the shape the phone already renders every day.
-    expect(nowShape).toEqual(summaryShape(board(), 'details.sect:nth-of-type(3) details'))
+    expect(nowShape).toEqual(summaryShape(render(board()), 'details.sect:nth-of-type(3) details'))
   })
 
   it('shows the number and the subject as separate, non-empty nodes', () => {
-    const promoted = toNow(board(), 655, 'Läuft.', { stamp: '09:00' })
+    const promoted = render(toNow(board(), 655, 'Läuft.', { stamp: '09:00' }))
     const dom = new JSDOM(`<!doctype html><html><body>${promoted}</body></html>`)
     const summary = dom.window.document.querySelector('details.now > summary')
     expect(summary.querySelector('span.num').textContent.trim()).toBe('655')
@@ -76,13 +79,13 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
   })
 
   it('carries the chip on the closing card too, and none on the handover card', () => {
-    const closing = toClosingWork(board(), 655, { reason: 'Vier-Augen fehlt.', stamp: '23:40' })
+    const closing = render(toClosingWork(board(), 655, { reason: 'Vier-Augen fehlt.', stamp: '23:40' }))
     const dom = new JSDOM(`<!doctype html><html><body>${closing}</body></html>`)
     const summary = dom.window.document.querySelector('details.now > summary')
     expect(summary.querySelector('span.num').textContent.trim()).toBe('655')
     expect(summary.querySelector('span.t').textContent).toContain('Abschlussarbeiten')
 
-    const handover = toNoCurrentWork(board(), 'Der Nachfolger nimmt Punkt 656.', { stamp: '23:55' })
+    const handover = render(toNoCurrentWork(board(), 'Der Nachfolger nimmt Punkt 656.', { stamp: '23:55' }))
     const idle = new JSDOM(`<!doctype html><html><body>${handover}</body></html>`)
     const head = idle.window.document.querySelector('details.now > summary')
     expect(head.querySelector('span.num')).toBeNull()

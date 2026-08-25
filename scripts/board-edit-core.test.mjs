@@ -31,6 +31,18 @@ function harness(initialHtml, tasksText, publish = () => 'board PUBLISHED') {
 }
 
 describe('runBoardEdit — publish preflight and honest partial failure', () => {
+  it('renders criticality from open and archived point sources before writing', () => {
+    const allTasks =
+      tasks(210, 211, 204) +
+      '\n  Criticality: low — current.\n- [x] 209. Closed\n  Criticality: high — historical.'
+    const { state, edit } = harness(boardHtml(), allTasks)
+
+    edit((html) => html, 'metadata refreshed')
+
+    expect(state.html).toContain('criticality-low">niedrig</span><span class="t">Task 204</span>')
+    expect(state.html).toContain('criticality-high">hoch</span><span class="t">Done 209</span>')
+  })
+
   it('refuses a knowably incomplete board before writing or publishing', () => {
     const { state, edit } = harness(boardHtml(), tasks(210, 211, 204, 703))
 

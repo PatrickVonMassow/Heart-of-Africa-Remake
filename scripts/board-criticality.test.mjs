@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
-import { renderCardCriticalities, summaryPoint } from './board-core.mjs'
+import { renderCardCriticalities, setCardTitle, summaryPoint } from './board-core.mjs'
 
 const card = (point, title, extra = '') =>
   `<details><summary><span class="num">${point}</span>${extra}<span class="t">${title}</span></summary>` +
@@ -66,5 +66,13 @@ describe('derived card criticality badges', () => {
     expect(summaryPoint('<span class="num">11</span><span class="t">Elf</span>')).toEqual({ chip: '11', legacy: null })
     expect(summaryPoint(summaryFor(once, 11).innerHTML)).toEqual({ chip: '11', legacy: null })
     expect(new JSDOM(once).window.document.querySelectorAll('#board-criticality-style')).toHaveLength(1)
+  })
+
+  it('keeps an already-decorated current-work card replaceable', () => {
+    const now = renderCardCriticalities(card(11, 'Elf').replace('<details>', '<details class="now">'), tasks)
+    const renamed = setCardTitle(now, 11, 'Elf neu')
+
+    expect(summaryFor(renamed, 11).querySelector(':scope > .t').textContent).toBe('Elf neu')
+    expect(summaryFor(renamed, 11).querySelector(':scope > .criticality').textContent).toBe('niedrig')
   })
 })
