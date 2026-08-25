@@ -12102,3 +12102,48 @@ to land than a mechanism that needs a review.
   Criticality: medium — it loses no work, but it blinds the remote for the rest of a run and its
   report sends the reader looking for work that was never lost.
   Bundle: Session- & Repo-Hygiene.
+- [ ] 908. The parallel-session detector counts the session's OWN declared authoring
+  child, so every turn of every delegated build pays a doctor gate (measured
+  25.08.2026, 09:11–09:14). `author-fable.mjs` and `review-sol.mjs` start their model as
+  a separate top-level Claude session; it runs tools in this repository because that is
+  the work it was dispatched to do. `otherSessionsIn`
+  (`scripts/batch-doctor-core.mjs:531-543`) subtracts only the READER's and the OWNER's
+  session id from the alert, and `classifyParallel` (`scripts/batch-singleton.mjs:577-590`)
+  flags every other top-level sid with fresh tool activity. A dispatched worker matches
+  that description exactly, so the owner is warned about its own employee.
+  THE EVIDENCE THAT WAS NEVER CONSULTED: `.claude/batch-in-flight.json` already names the
+  worker — pid, `pidStartedAt`, branch `refs/heads/feat/834-takeover-drills`, worktree and
+  output log — and `batch-in-flight.mjs --agent-check` re-measures all four on demand. The
+  declaration is the owner's own signed statement that this session is its worker. The
+  detector reads none of it.
+  MEASURED: with Fable 5 authoring point 834 as pid 1815345, the Stop hook fired
+  `PARALLEL SESSION DETECTED (a52fbd84-…)` on FOUR consecutive turns. Two full
+  `batch-doctor --gate` runs were ordered and completed; the first returned
+  `parallelNow=1`, `repo state CONSISTENT`, three green gates and `VERDICT: consistent`,
+  and explicitly recorded `gate demand satisfied … beside [a52fbd84-…, e20f38a4-…]`. The
+  worker kept working, so the alert re-raised on the next turn regardless.
+  WHAT IT COSTS: a doctor gate is roughly two and a half minutes of three suites, and it
+  is owed AGAIN on every turn for as long as the agent builds — which is the whole point
+  of delegating. The batch is halted by the presence of its own throughput. Worse, under
+  agent load the unit gate contends with the worker's own suites, so it is slower still
+  and buys no information: the answer is `consistent` by construction, because the second
+  session is the one the owner started.
+  NOT ALREADY COVERED, AND NAMED AGAINST ALL FOUR NEIGHBOURS. Point 515 is the placeholder
+  owner id: this child has a real, distinct id. Point 823 drops a session whose PROCESS IS
+  GONE: this one is alive and measured alive. Point 841 asks whether a session WORKS ON THE
+  BATCH and drops the stood-down chat session: this one works on the batch — that is
+  precisely why it is running. Point 849 is the RETIRED PREDECESSOR and its orphaned child:
+  this one is neither retired nor orphaned, it is the current owner's live, declared
+  worker. All four tests pass, and the alert still fires.
+  FINAL STATE: a session declared as this owner's worker in `.claude/batch-in-flight.json`
+  is not a parallel session. The detector subtracts the declared workers — verified the way
+  `--agent-check` verifies them, so a declaration whose pid is dead or whose evidence has
+  gone quiet stops shielding anything and the alert fires as it should. An UNDECLARED live
+  writer still raises the alarm unchanged; the fix must not widen into "any child is fine".
+  VERIFIABLE: a unit case per neighbour class (declared-and-alive → no alert;
+  declared-but-dead → alert; undeclared-and-alive → alert; owner and reader ids → no
+  alert, unchanged); a case pinning that the shield reads the declaration's measured
+  evidence rather than its mere existence; `npm run test:unit`, lint, build.
+  Criticality: medium — it does not corrupt state, but it taxes every delegated build and
+  trains the batch to ignore the one alert that will one day be real.
+  Bundle: Session- & Repo-Hygiene.
