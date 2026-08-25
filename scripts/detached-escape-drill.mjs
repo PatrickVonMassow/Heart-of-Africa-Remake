@@ -453,6 +453,11 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // signal would hit a stranger. So the identity is re-checked at the moment of
   // the kill, and anything it cannot vouch for is left alone and reported.
   outcome.leftAlone = reap(pid, startedAt)
+  // The capture itself is evidence: a run whose pid or spawn-time identity was
+  // never read is one probeAlive answered UNKNOWN for, and the integration
+  // test asserts the capture rather than trusting the label alone.
+  outcome.pid = pid
+  outcome.identityCaptured = startedAt > 0
   return outcome
 }
 

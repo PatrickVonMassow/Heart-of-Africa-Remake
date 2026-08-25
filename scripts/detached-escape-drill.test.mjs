@@ -1,10 +1,14 @@
-// THE DRILL'S READING, without spawning anything.
+// THE DRILL'S READING — and, at the end, THE DRILL ITSELF.
 //
-// The measurement itself takes five seconds and real processes; what has to be
-// pinned is how its evidence is READ, because that is where a drill turns into
-// a false green. A cross-vendor reading of the first version found two of them:
-// a single post-kill beat counted as "still working", and a zombie counted as a
-// live process. Both are cases below.
+// Most cases pin how the evidence is READ, without spawning anything, because
+// the reading is where a drill turns into a false green: a cross-vendor
+// reading of the first version found a single post-kill beat counted as
+// "still working" and a zombie counted as a live process. But a reading-only
+// suite lets the MEASUREMENT rot while every case stays green — the group
+// kill, the pipe's EPIPE, the descriptor escape, the pid capture and the
+// cleanup are process behaviour no fixture exercises (cross-vendor review of
+// point 834, H6) — so the last case runs the real drill, processes, kill and
+// all.
 import { describe, it, expect } from 'vitest'
 import {
   BEAT_MS,
@@ -15,6 +19,7 @@ import {
   MIN_BASELINE_BEATS,
   probeAlive,
   reap,
+  runDrill,
   signalState,
   readOutcome,
   SHAPES,
@@ -591,4 +596,32 @@ describe('verdict', () => {
     // The affirmative pair still proves the cause.
     expect(verdict([outcome('pipes', false), escapedFiles]).ok).toBe(true)
   })
+})
+
+describe('runDrill — the real processes, the real kill', () => {
+  it('pipes dies of the pipe, files escapes, identities captured, nothing left running', async () => {
+    const result = await runDrill()
+    const detail = JSON.stringify(result, null, 2)
+    const by = Object.fromEntries(result.outcomes.map((o) => [o.shape, o]))
+    for (const shape of SHAPES) {
+      // The pid and its spawn-time identity were really captured — the probes
+      // above prove an uncaptured identity blocks the verdict, so a green run
+      // must have read both.
+      expect(by[shape]?.pid, detail).toBeGreaterThan(1)
+      expect(by[shape]?.identityCaptured, detail).toBe(true)
+      // Cleanup left nothing it has to report: no survivor, no failed signal,
+      // no unreadable state (reap's contract — undefined means nothing left).
+      expect(by[shape]?.leftAlone, detail).toBeUndefined()
+    }
+    // The measured mechanism itself: the same SIGKILL of the parent's group,
+    // and only stdio differing — the pipes child died OF THE PIPE (its own log
+    // recorded the EPIPE the closed reader raised), the files child survived
+    // and kept working.
+    expect(by.pipes.dead, detail).toBe(true)
+    expect(by.pipes.pipeCause, detail).toBe(true)
+    expect(by.pipes.why, detail).toMatch(/pipe whose reader went with the parent/)
+    expect(by.files.escaped, detail).toBe(true)
+    expect(result.ok, detail).toBe(true)
+    expect(result.note).toMatch(/the pipe is the binding/)
+  }, 60_000)
 })
