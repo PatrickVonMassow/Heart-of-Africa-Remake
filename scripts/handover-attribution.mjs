@@ -132,6 +132,7 @@ export function noteHandoverAttributionCommit(input = {}, io = {}) {
 export function noteHandoverAttributionSuccessorStart(input = {}, {
   read = readHandoverAttributionState,
   readAutostart = () => readJson(AUTOSTART_LAST_PATH),
+  readTokens = reading,
   ...io
 } = {}) {
   try {
@@ -146,6 +147,8 @@ export function noteHandoverAttributionSuccessorStart(input = {}, {
 
     const at = typeof input.at === 'number' && Number.isFinite(input.at) ? input.at : Date.now()
     const fresh = state.destination === 'fresh-session'
+    const transcriptPath = String(input.transcript ?? input.transcriptPath ?? '')
+    const measured = fresh ? (readTokens({ sessionId: sid, transcriptPath }) ?? {}) : {}
     const launch = fresh ? (input.launch ?? readAutostart()) : null
     const spawnAt =
       typeof launch?.at === 'number' && launch.at >= state.committedAt && launch.at <= at
@@ -172,10 +175,10 @@ export function noteHandoverAttributionSuccessorStart(input = {}, {
       sessionId: sid,
       side: 'ramp',
       stage: 'ramp.session-start',
-      tokens: fresh ? 0 : null,
+      tokens: fresh ? measured.tokens : null,
       baseline: fresh,
       at,
-      transcript: String(input.transcript ?? ''),
+      transcript: measured.transcript ?? transcriptPath,
       status: HANDOVER_ATTRIBUTION_STATUS.RAMPING,
       metadata: { freshSession: fresh },
     })
@@ -268,7 +271,7 @@ export function observeHandoverAttributionCall(hookInput = {}, {
       sessionId: sid,
       side: 'ramp',
       stage: 'ramp.session-start',
-      tokens: fresh ? 0 : null,
+      tokens: fresh ? reading.tokens : null,
       baseline: fresh,
       at: spawnAt ?? now,
       transcript: reading.transcript ?? transcriptPath,

@@ -172,11 +172,13 @@ function clearAuthorized() {
 let sessionId = randomUUID()
 let assertedSessionId = ''
 let sessionSource = ''
+let sessionTranscriptPath = ''
 try {
   const parsed = JSON.parse(readFileSync(0, 'utf8'))
   if (typeof parsed.session_id === 'string') assertedSessionId = parsed.session_id
   if (assertedSessionId) sessionId = assertedSessionId
   if (typeof parsed.source === 'string') sessionSource = parsed.source
+  if (typeof parsed.transcript_path === 'string') sessionTranscriptPath = parsed.transcript_path
 } catch {
   // no/!JSON stdin — keep the random fallback
 }
@@ -390,6 +392,7 @@ try {
         noteHandoverAttributionSuccessorStart({
           sessionId,
           at: Date.now(),
+          transcript: sessionTranscriptPath,
           launch: auth ? { at: auth.at, spawnToken: auth.spawnToken ?? null } : null,
         }, { say: () => {} })
       }

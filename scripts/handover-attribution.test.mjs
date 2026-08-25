@@ -52,7 +52,7 @@ describe('live handover attribution', () => {
     )
     noteHandoverAttributionSuccessorStart(
       { sessionId: NEXT, at: 6_500, launch: { at: 6_000, spawnToken: 'spawn-1' } },
-      memory.io,
+      { ...memory.io, readTokens: () => ({ tokens: 3_000, transcript: '/next.jsonl' }) },
     )
 
     const observeRamp = (command, tokens, now) => observeHandoverAttributionCall(
@@ -82,9 +82,11 @@ describe('live handover attribution', () => {
       metadata: { spawnAt: 6_000, spawnReading: 'measured', spawnToken: 'spawn-1' },
     })
     expect(memory.lines.find((line) => line.stage === 'ramp.orientation')).toMatchObject({
-      elapsedMs: 500, tokens: 8_000, tokenDelta: 8_000, reading: 'measured',
+      elapsedMs: 500, tokens: 8_000, tokenDelta: 5_000, reading: 'measured',
     })
-    expect(memory.lines.find((line) => line.stage === 'ramp.session-start')).toMatchObject({ elapsedMs: 500 })
+    expect(memory.lines.find((line) => line.stage === 'ramp.session-start')).toMatchObject({
+      elapsedMs: 500, tokens: 3_000, reading: 'baseline', transcript: '/next.jsonl',
+    })
     expect(memory.state).toMatchObject({ status: 'complete', successorSessionId: NEXT })
   })
 
@@ -101,6 +103,59 @@ describe('live handover attribution', () => {
     expect(boundary.match(/at: committedMarker\.at/g)).toHaveLength(2)
     expect(heartbeat).toMatch(/observeHandoverAttributionCall\(data, \{ ownsBatch: ownsBatch && !attributionPaused/)
     expect(resume).toMatch(/ownsBatch\(ownership\)[\s\S]*noteHandoverAttributionSuccessorStart/)
+    expect(resume).toMatch(/noteHandoverAttributionSuccessorStart\([\s\S]*transcript: sessionTranscriptPath/)
+  })
+
+  it('records a real fresh-session startup baseline, or missing when no reading exists yet', () => {
+    const measured = memoryIo()
+    noteHandoverAttributionDemand({ sessionId: OLD, tokens: 100, at: 1 }, measured.io)
+    noteHandoverAttributionPrepare({ sessionId: OLD, tokens: 110, at: 2 }, measured.io)
+    noteHandoverAttributionCommit(
+      { sessionId: OLD, tokens: 120, at: 3, destination: 'fresh-session' },
+      measured.io,
+    )
+    const readTokens = vi.fn(() => ({ tokens: 4_321, transcript: '/fresh.jsonl' }))
+    noteHandoverAttributionSuccessorStart(
+      { sessionId: NEXT, at: 5, transcript: '/fresh.jsonl' },
+      { ...measured.io, readTokens },
+    )
+    expect(readTokens).toHaveBeenCalledWith({ sessionId: NEXT, transcriptPath: '/fresh.jsonl' })
+    expect(measured.lines.at(-1)).toMatchObject({
+      stage: 'ramp.session-start', tokens: 4_321, reading: 'baseline', transcript: '/fresh.jsonl',
+    })
+
+    const missing = memoryIo()
+    noteHandoverAttributionDemand({ sessionId: OLD, tokens: 100, at: 1 }, missing.io)
+    noteHandoverAttributionPrepare({ sessionId: OLD, tokens: 110, at: 2 }, missing.io)
+    noteHandoverAttributionCommit(
+      { sessionId: OLD, tokens: 120, at: 3, destination: 'fresh-session' },
+      missing.io,
+    )
+    noteHandoverAttributionSuccessorStart(
+      { sessionId: NEXT, at: 5, transcript: '/fresh.jsonl' },
+      { ...missing.io, readTokens: () => ({ tokens: null, transcript: '/fresh.jsonl' }) },
+    )
+    expect(missing.lines.at(-1)).toMatchObject({
+      stage: 'ramp.session-start', tokens: null, reading: 'missing', missingReading: 'stage-token-reading',
+    })
+  })
+
+  it('uses the first observed reading as the fresh-session fallback baseline', () => {
+    const memory = memoryIo()
+    noteHandoverAttributionDemand({ sessionId: OLD, tokens: 100, at: 1 }, memory.io)
+    noteHandoverAttributionPrepare({ sessionId: OLD, tokens: 110, at: 2 }, memory.io)
+    noteHandoverAttributionCommit(
+      { sessionId: OLD, tokens: 120, at: 3, destination: 'fresh-session' },
+      memory.io,
+    )
+    observeHandoverAttributionCall(
+      { session_id: NEXT, transcript_path: '/fresh.jsonl', tool_name: 'Bash', tool_input: { command: 'git status' } },
+      { ...memory.io, ownsBatch: true, now: 10, readTokens: () => ({ tokens: 5_000, transcript: '/fresh.jsonl' }) },
+    )
+    expect(memory.lines.slice(-2)).toMatchObject([
+      { stage: 'ramp.session-start', tokens: 5_000, reading: 'baseline' },
+      { stage: 'ramp.orientation', tokens: 5_000, tokenDelta: 0, reading: 'measured' },
+    ])
   })
 
   it('reports an unavailable claim-window baseline rather than inventing its token cost', () => {
