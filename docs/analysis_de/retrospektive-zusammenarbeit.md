@@ -1334,7 +1334,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 13:09 · Quellen-Fingerprint: `e5959aca16dc…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 14:11 · Quellen-Fingerprint: `3d48080c7b0c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1372,7 +1372,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 23 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 24 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1388,7 +1388,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and file the decision as a card the user can retroactively veto | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1434,8 +1434,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 99 Prozess-/Meta-TASKS-Punkte (davon 40 offen).
 
-<!-- RETRO-FINGERPRINT: e5959aca16dc6906c59764f2798e60f253070cd129e0d7132fbb02ae3360a7b2 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T11:09:41.805Z -->
+<!-- RETRO-FINGERPRINT: 3d48080c7b0c1e3e6934634792f3b7a7b31528cbc99fffafdcd1fc38bcefb6fc -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T12:11:02.276Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3484,3 +3484,32 @@ Was die Regel rettet, ist die Reihenfolge: erst die Last MESSEN, dann urteilen. 
 vermutlich Last", sondern Last und Laufzeit im selben Zug ablesen wie den roten Fall. Wo die
 Maschine ruhig war, ist das Rot ein Befund und wird gebucht, auch wenn der nächste Lauf grün ist.
 Gebucht als Punkt 913.
+
+### 3.178 Die Regel war da, der Mechanismus nicht — und dann wiederholt sie sich
+
+Am 23.08.2026 kam die Anordnung, dass ein dauerhafter Stillstand nie eintreten darf: lieber
+selbst entscheiden als auf eine Antwort warten. Ihr dritter Schritt lautete damals: entscheiden,
+weiterarbeiten, und die Entscheidung als Karte ablegen, die der Benutzer im Nachhinein kippen
+kann. Das klang nach der freundlichen Lösung — die Arbeit läuft weiter, der Mensch behält das
+letzte Wort.
+
+Was daraus wurde, hat er am 19.08., am 24.08. und wieder am 25.08.2026 zurückgewiesen, jedes Mal
+mit demselben Satz: „Das sind interne Probleme, die du selbst lösen musst." Auf seinem Telefon
+landete eine Entscheidungskarte über zwei gleichzeitig laufende Sitzungen — ein Vorgang, der
+diagnostiziert, harmlos und längst vorbei war. Die Karte war formal genau das, was Schritt 3
+vorschrieb, und trotzdem falsch: Ein Protokolleintrag ist keine Frage, und die Rubrik „Von dir zu
+klären" ist für Fragen da.
+
+Die Klasse ist nicht „falsche Rubrik gewählt", sondern: **Eine Regel, die niemand durchsetzt,
+wird so oft gebrochen, wie sie bequem ist — und jede Wiederholung kostet den Benutzer erneut die
+Aufmerksamkeit, die die Regel ihm sparen sollte.** Dreimal derselbe Einspruch heißt nicht, dass
+die Botschaft nicht angekommen ist; es heißt, dass sie nur im Text stand. Zwischen der ersten
+Anordnung und heute liegen sechs Tage, in denen der Mechanismus als Punkt in der Warteschlange
+wartete, während die Karten weiter entstanden.
+
+Was daraus folgt, ist unbequem: Eine Anordnung, die sich wiederholt, ist kein
+Verständnisproblem, sondern ein fehlender Wächter — und der gehört an die Spitze der
+Warteschlange, nicht in ihre Mitte. Genau dorthin ist Punkt 749 an diesem Tag gerückt. Und der
+zweite Teil ist billiger, als er klingt: Die Erkennung sollte eine ordnungsgemäß
+zurückgetretene, mitlesende Zweitsitzung gar nicht erst als Alarm werten — dann steigt die Leiter
+nie bis zur Karte.
