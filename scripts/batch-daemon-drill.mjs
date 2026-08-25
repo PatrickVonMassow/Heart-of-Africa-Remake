@@ -32,7 +32,7 @@ import { PROCESS_START_TOLERANCE_MS } from './batch-schema-core.mjs'
 import { IDLE_WINDOW_MS } from './batch-ownership-core.mjs'
 import { LEASE_MS } from './batch-lease-core.mjs'
 import { openStateStore, readJournal } from './batch-state.mjs'
-import { readJsonIfAny } from './detached-agent.mjs'
+import { attemptPaths, readJsonIfAny } from './detached-agent.mjs'
 import { controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
 import { resumeBatch } from './resume-batch.mjs'
 
@@ -182,6 +182,24 @@ async function parentDeathScenario({ keep }) {
     }
     const sameDaemonIdentity = (r) =>
       r?.pid === recordBefore.pid && r?.pidStartedAt === recordBefore.pidStartedAt && r?.generation === recordBefore.generation
+    // THE WORKER'S IDENTITY, pinned the same way: pid AND start time, from the
+    // lease the daemon granted at spawn — durable state, not a handover. A new
+    // pushed SHA alone cannot tell a SURVIVING worker from a REPLACED one: a
+    // daemon that let its worker die with the parent and quietly spawned a
+    // fresh one would keep pushing too (cross-vendor review of point 834, B2).
+    // Survival means THIS process, checked against this identity on both sides
+    // of the kill.
+    const workerHolder = readJsonIfAny(attemptPaths(join(store.dir, 'attempts', 'a-drill')).leasePath)?.lease?.holder
+    if (
+      !check(
+        'the durable lease names the worker the daemon spawned',
+        Number.isInteger(workerHolder?.pid) && Number.isFinite(workerHolder?.pidStartedAt),
+        JSON.stringify(workerHolder),
+      )
+    ) {
+      return { ok: false, scenario: 'parent-death', checks }
+    }
+    check('the worker is alive under its lease identity before the kill', sameRecordedProcess(workerHolder.pid, workerHolder.pidStartedAt))
 
     // Let the worker prove it works BEFORE the kill, so survival is of a running
     // authoring process, not of an idle one. The baseline is the tip the SETUP
@@ -214,6 +232,14 @@ async function parentDeathScenario({ keep }) {
 
     const shaAfterKill = await waitForNewSha({ originDir, since: shaBeforeKill, timeoutMs: 20_000 })
     check('the worker pushed a SHA that did not exist at the kill', Boolean(shaAfterKill) && shaAfterKill !== shaBeforeKill)
+    // Checked AFTER the post-kill push was observed: the process at the lease's
+    // pid still carries the lease's start time, so the worker that pushed is
+    // the one spawned before the kill — continued output from a replacement
+    // cannot satisfy this.
+    check(
+      'the pushing worker is the same process the daemon spawned before the kill',
+      sameRecordedProcess(workerHolder.pid, workerHolder.pidStartedAt),
+    )
 
     // THE FRESH SESSION: acquires the lock through THE REAL ACQUISITION PATH, and
     // presents whatever fence that path mints. This used to be two hard-coded
