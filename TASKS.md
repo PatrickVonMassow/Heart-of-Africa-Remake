@@ -12011,7 +12011,7 @@ to land than a mechanism that needs a review.
   Bundle: Modell & Wächter.
 
 
-- [ ] 918. A sha whose ref has already moved on is reported as a red CI verdict, and
+- [ ] 919. A sha whose ref has already moved on is reported as a red CI verdict, and
   the successor session is sent down a repair path for code that is not broken. MEASURED
   25.08.2026 at this session's start: the CI-terminal handoff named
   `origin/main:19d0a59fa9934a58fd5867a783efb94be119fb2f:CI:32880517245` as "concluded RED" and
