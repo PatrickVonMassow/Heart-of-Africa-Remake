@@ -15,9 +15,13 @@
 //     e9407cae incident's second hole).
 // It also records this TOP-LEVEL session id for the parallel-session detector
 // (subagents never fire SessionStart, so they can never be flagged).
+//
+// The rule-echo stamp sits DOWN at the policy wording rather than up here, and
+// nothing but the stamp shares its block: a comment beside it would be quotable,
+// and quoting commentary is how a stamp gets cleared without reading the rule
+// (review rounds 7 and 8).
 import { readFileSync, rmSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import {
@@ -27,20 +31,38 @@ import {
   convertPendingSpawn,
   readOwnerLock,
   noteTopLevelSession,
+  noteSessionStandDown,
   findClaudeAncestor,
   probePid,
   transitionOwnerSession,
 } from './batch-singleton.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
+import { gatherSuccessorAgentOrientation } from './batch-in-flight.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
-import { allGatedMessage, openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
+import {
+  allGatedMessage,
+  openPointsHeadline,
+  ownerRunbookContext,
+  standDownMessage,
+} from './batch-resume-hook-core.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
+import { currentFableState } from './fable-switch.mjs'
+import { servingPolicyLine } from './fable-switch-core.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
+
+function readOwnerRunbook() {
+  try {
+    return readFileSync(OWNER_RUNBOOK_PATH, 'utf8')
+  } catch {
+    return ''
+  }
+}
 
 /** Where git stands: current branch + whether a merge is half-done. A resumed
  *  session must know this — a crash can leave a stale feature branch or a
@@ -97,7 +119,7 @@ function ownsBatch(ownership) {
  *  Never throws: an unrunnable doctor reports itself and `resumeRepairMandate` stays
  *  silent about it — the launcher's alert already carries that news, and a session
  *  cannot mend a broken doctor. */
-const MANDATE_PATH = fileURLToPath(new URL('../.claude/repo-mandate.json', import.meta.url))
+const MANDATE_PATH = repoPath('.claude', 'repo-mandate.json')
 
 function readRepoVerdict(nowMs = Date.now()) {
   // One-shot, expiring, junk-proof — and now UNDER TEST (point 443 (h)): the read
@@ -125,7 +147,7 @@ function readRepoVerdict(nowMs = Date.now()) {
 // a DEAD batch. It merely helps BIND the spawned session to the launcher's
 // pending-spawn lock — it never overrides a live lock (the atomic acquire
 // remains the only way to ownership).
-const AUTH_PATH = fileURLToPath(new URL('../.claude/autostart-authorized.json', import.meta.url))
+const AUTH_PATH = repoPath('.claude', 'autostart-authorized.json')
 function autostartAuthorization(nowMs) {
   try {
     const m = JSON.parse(readFileSync(AUTH_PATH, 'utf8'))
@@ -158,8 +180,31 @@ try {
   // no/!JSON stdin — keep the random fallback
 }
 
-// Record this top-level session for the parallel-session detector.
-noteTopLevelSession(sessionId)
+// Record this top-level session WITH its process incarnation. The detector needs
+// all three parts — pid, start time and ownership generation — before it may
+// recognise a placeholder-renamed owner as this same process.
+const sessionProcess = findClaudeAncestor()
+noteTopLevelSession(sessionId, { processIdentity: sessionProcess })
+
+// RE-ARM A DEAD LAUNCHER (point 859). A container rebuild kills the daemon and
+// nothing inside the container survives to restart it — a session starting is
+// the one event that reliably follows, so it happens here, for EVERY session
+// (a stood-down window heals the repo-global trigger just as well as the
+// owner). The decision is pure and never reverts a deliberate --stop; failures
+// stay silent because a hook that cannot arm must still orient the session.
+try {
+  const { armLauncherAtSessionStart } = await import('./batch-launcher.mjs')
+  const armed = await armLauncherAtSessionStart()
+  if (armed.attempted) {
+    console.log(
+      armed.armed
+        ? `[batch-resume] LAUNCHER RE-ARMED at session start (pid ${armed.pid}): ${armed.reason}.`
+        : `[batch-resume] LAUNCHER STILL NOT ARMED: ${armed.reason} — start it by hand: node scripts/batch-launcher.mjs --start`,
+    )
+  }
+} catch {
+  /* an unreadable or unstartable launcher must never block session orientation */
+}
 
 const RESUME_BODY =
   'Continue the batch autonomously per CLAUDE.md/TASKS.md — feature-branch workflow ' +
@@ -170,9 +215,10 @@ const RESUME_BODY =
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
   'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — under ' +
-  'the model policy stated above, so the mechanical and mid-difficulty points go to GPT-5.6 ' +
-  'Sol, the hard cases to Fable 5 from the start, and only a point whose verification is the ' +
-  'work stays with Opus 5 (each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
+  'the model policy stated above, so the points go to GPT-5.6 Sol — the hard and critical ' +
+  'ones included — while a point whose verification is the work stays with Opus 5 unless ' +
+  'its spec marks it hard ' +
+  '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
   'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
@@ -203,7 +249,7 @@ const RESUME_BODY =
   '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'
 
 try {
-  const tasks = readFileSync(new URL('../TASKS.md', import.meta.url), 'utf8')
+  const tasks = readFileSync(repoPath('TASKS.md'), 'utf8')
   // Unticked point lines, MINUS the ones the user explicitly deferred: a point
   // line carrying a `DEFERRED` marker is excluded from the batch and must never
   // auto-resume (2026-07-15 fix — the exclusion travels in TASKS.md itself).
@@ -223,26 +269,24 @@ try {
     if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
+    const fableState = currentFableState()
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the ALLOWLIST at every
     // session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     const header =
       openPointsHeadline(nums, { gated: gatedNums }) +
-      'MODEL POLICY (25.07.-13.08.2026, CLAUDE.md par.6): AUTHORING HAS THREE LANES. ' +
-      'GPT-5.6 Sol authors the MECHANICAL and MID-DIFFICULTY points via ' +
-      'scripts/author-sol.mjs; FABLE 5 authors the HARD cases — difficult, complex or ' +
-      'error-prone — from the start, and takes over Opus work once Sol still finds problems ' +
-      'after a re-work; OPUS 5 keeps what only the main session can finish, a point whose ' +
-      'VERIFICATION is the work. scripts/author-routing-core.mjs makes the cut, and ' +
+
+      // rule:model-policy@1758947b
+      'MODEL POLICY (CLAUDE.md §6): AUTHORING HAS THREE LANES. ' +
+      'CLAUDE.md §6 owns the authoring and escalation policy; scripts/author-routing-core.mjs ' +
+      'makes that cut from point text and recorded review history, while a point\'s own ' +
+      '`Author lane:` tag remains an operator decision (ordinary-lane tags yield only to a ' +
+      'reached §6 Fable escalation threshold). ' +
       'scripts/sol-share.mjs --status says what the switch routes right now. REVIEW is ' +
       'CROSS-VENDOR: Sol reads Anthropic-authored work (scripts/review-sol.mjs), Claude ' +
       'reads Sol-authored work, and no model reviews its own. ' +
-      'THE SERVING MODEL of this session — the one running the batch — is Opus 5, then ' +
-      'Fable 5, then Opus 4.8. Sonnet, Haiku and every other model are NOT acceptable: if ' +
-      'the serving model is not one of those three, do NOT work — create ' +
-      '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via ' +
-      'scripts/notify.mjs instead.'
+      (fableState.ok ? servingPolicyLine(fableState) : `FABLE SWITCH UNKNOWN: ${fableState.problem}`)
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()
@@ -279,7 +323,7 @@ try {
       // Resolved ONCE and reused: the stand-down below needs the same identity
       // to tell "I am the responder the watcher woke" from "some responder is
       // running", and the ancestor walk is the expensive half of this branch.
-      const ancestor = claim ? findClaudeAncestor() : null
+      const ancestor = claim ? sessionProcess : null
       // The lock is read BEFORE the claim is judged: whether a LIVE SESSION owner
       // still holds it decides whether the claim ages at all (point 434 (6a)) —
       // with somebody to wait for it does not, with nobody it is bounded by the
@@ -345,17 +389,38 @@ try {
       // so a stood-down window never starts mending a tree it may not touch.
       const mandate = ownsBatch(ownership) ? resumeRepairMandate(readRepoVerdict()) : null
       const repoLine = mandate ? ` ${mandate}` : ''
+      const ownerContext = ownsBatch(ownership)
+        ? ownerRunbookContext(ownership, readOwnerRunbook())
+        : ''
+      // A successor's lock says whether the PARENT process was inactive; it says
+      // nothing about that parent's delegated children. Ask the declaration
+      // through the exact `--agent-check` verdict before the orientation uses any
+      // death-shaped conclusion. Active output is named, unreadable output stays
+      // honestly UNKNOWN, and a transferred record hands over with --adopt.
+      let agentOrientation = ''
+      if (ownsBatch(ownership)) {
+        try {
+          agentOrientation = gatherSuccessorAgentOrientation(sessionId, { now })
+        } catch {
+          agentOrientation =
+            'PREDECESSOR CHILD STATE UNKNOWN: the in-flight declaration could not be read. Do not call an agent ' +
+            'dead from the lock alone; inspect `node scripts/batch-in-flight.mjs --status`, then probe each named ' +
+            'worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.'
+        }
+      }
+      const agentLine = agentOrientation ? ` ${agentOrientation}` : ''
       if (ownership === 'acquired-spawn') {
+        const measured = auth?.startReason || 'the launcher recorded no start evidence'
         console.log(
-          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher (the previous owner was ` +
-            `provably dead). ${RESUME_BODY} ` +
-            'Do NOT idle-stop (the batch-progress-guard enforces this).',
+          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher. ` +
+            `Launcher start evidence: ${measured}. ${RESUME_BODY} ` +
+            `Do NOT idle-stop (the batch-progress-guard enforces this).${agentLine}${ownerContext}`,
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {
         console.log(
           `${header} ${gitStanding()}${repoLine} Standing user instruction: continue the batch autonomously, ` +
             `point by point, then the Closing steps — without waiting for the user to say ` +
-            `"continue". ${RESUME_BODY}`,
+            `"continue". ${RESUME_BODY}${agentLine}${ownerContext}`,
         )
       } else {
         // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
@@ -375,6 +440,12 @@ try {
           claimHonoured: reservationDecision({ assessment: reservation }).acquire === false,
           ancestorPid: ancestor?.pid ?? null,
           takeUpMs: maxAgeMs(),
+          now,
+        })
+        noteSessionStandDown(sessionId, {
+          processIdentity: sessionProcess,
+          lock: readOwnerLock(),
+          claim,
           now,
         })
         console.log(`${header} ${stand.text}`)

@@ -8,6 +8,8 @@
 //                                     claim the batch — or take it, if it is free
 //   node scripts/batch-claim.mjs --status      who holds it, what is pending, how old
 //   node scripts/batch-claim.mjs --withdraw --session <id>   never mind
+//   node scripts/batch-claim.mjs --wait [--timeout <min>]     wait until release
+//   node scripts/batch-claim.mjs --take --session <id>       take, but never write a claim
 //
 // THE SESSION ID is the one thing this command cannot find out for itself: a CLI
 // has no hook payload. `scripts/batch-resume-hook.mjs` prints the whole command
@@ -31,6 +33,7 @@ import {
   probePid,
   readOwnerLock,
   release,
+  resolveOwnership,
   statePathsFor,
   assessOwner,
   bootTimeMs,
@@ -43,6 +46,7 @@ import {
   describeClaim,
   ownerIsHolding,
   releaseDecision,
+  waitForClaimEnd,
   CLAIM_MAX_AGE_MS,
   GIT_STATE_UNVERIFIABLE,
 } from './batch-claim-core.mjs'
@@ -72,6 +76,23 @@ export function writeClaim(claim, path = CLAIM_PATH) {
 export function clearClaim(path = CLAIM_PATH) {
   try {
     rmSync(path, { force: true })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Renew this window's own reservation from a real foreground hook. */
+export function renewOwnClaim(
+  sessionId,
+  { path = CLAIM_PATH, now = Date.now(), ancestor = undefined, lockPath = LOCK_PATH } = {},
+) {
+  try {
+    const claim = readClaim(path)
+    if (!claim || !sessionId) return false
+    const identity = ancestor === undefined ? ourClaudeProcess(sessionId, { lockPath }) : ancestor
+    if (!resolveOwnership({ lock: claim, sessionId, ancestor: identity }).mine) return false
+    writeJsonAtomic(path, { ...claim, activityAt: now })
     return true
   } catch {
     return false
@@ -141,12 +162,8 @@ export function gatherClaim(
         : ourClaudeProcess(sid, { lockPath })
   }
   const lock = ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock
-  // IS THERE ANYBODY TO WAIT FOR (point 434 (6a))? While a LIVE SESSION owner
-  // holds the lock the claim does not age out under that owner's own long turns;
-  // with nobody holding, the take-up window applies again so an untaken claim can
-  // never leave the batch ownerless. The predicate is `ownerIsHolding` — lock
-  // existence alone would also match the launcher's pending-spawn placeholder
-  // (four-eyes review, finding 1).
+  // Owner context suspends a human claim's pending clock. Lock existence alone
+  // must still not call a launcher's pending-spawn placeholder a live owner.
   const ownerHolding = ownerIsHolding({
     lock,
     claimantSid: claim.sessionId,
@@ -212,6 +229,30 @@ export function handBackToClaimant(
   return { released, stamped: released ? markClaimReleased(claim, { path, now, by: sid }) : false }
 }
 
+/** The exact gathered state printed by --status and consumed by --wait. */
+export function gatherClaimStatus(sid = '', { now = Date.now() } = {}) {
+  const lock = readOwnerLock()
+  const ownerAlive = lock
+    ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
+    : { alive: false, reason: 'no-lock' }
+  const claim = readClaim()
+  const ownerHolding = ownerIsHolding({
+    lock,
+    claimantSid: claim?.sessionId ?? '',
+    alive: ownerAlive.alive === true,
+  })
+  const assessment = assessClaim({
+    claim,
+    sid,
+    ownerSid: lock?.sessionId ?? '',
+    ownerHolding,
+    now,
+    maxAgeMs: maxAgeMs(),
+    probePid,
+  })
+  return { lock, ownerAlive, lockHeld: !!lock && ownerAlive.alive === true, ownerHolding, claim, assessment }
+}
+
 // --- CLI -----------------------------------------------------------------------
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
@@ -226,7 +267,8 @@ if (isMain) {
   const sid = flag('--session') ?? ''
   const now = Date.now()
   const usage =
-    'usage: node scripts/batch-claim.mjs --session <id> [--why "<text>"] | --status | --withdraw --session <id>'
+    'usage: node scripts/batch-claim.mjs --session <id> [--why "<text>"] | --wait [--timeout <min>] | ' +
+    '--take --session <id> | --status | --withdraw --session <id>'
   const fail = (msg) => {
     console.error(msg)
     process.exit(1)
@@ -240,30 +282,20 @@ if (isMain) {
     )
   }
 
-  const lock = readOwnerLock()
-  const ownerAlive = lock
-    ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
-    : { alive: false, reason: 'no-lock' }
+  const status = gatherClaimStatus(sid, { now })
+  const { lock, ownerAlive } = status
 
   const holdingFor = (other) =>
     ownerIsHolding({ lock, claimantSid: other?.sessionId ?? '', alive: ownerAlive.alive === true })
 
   if (has('--status')) {
-    const claim = readClaim()
-    const view = assessClaim({
-      claim,
-      sid,
-      ownerSid: lock?.sessionId ?? '',
-      ownerHolding: holdingFor(claim),
-      now,
-      maxAgeMs: maxAgeMs(),
-      probePid,
-    })
+    const { claim, assessment: view } = status
     console.log(
       JSON.stringify(
         {
           owner: lock ? { sessionId: lock.sessionId, pid: lock.pid ?? null, claimedAt: lock.claimedAt } : null,
           ownerAlive,
+          lockHeld: status.lockHeld,
           claim,
           assessment: view,
           gitOperation: gitOperationInProgress(),
@@ -306,6 +338,20 @@ if (isMain) {
       )
     } else console.log(`\nThe recorded claim is NOT honoured (${view.reason}) — it changes nothing.`)
     process.exit(0)
+  }
+
+  if (has('--wait')) {
+    const minutes = flag('--timeout') == null ? maxAgeMs() / 60_000 : Number(flag('--timeout'))
+    if (!Number.isFinite(minutes) || minutes < 0) fail(`--timeout must be a non-negative number of minutes.\n${usage}`)
+    const waited = await waitForClaimEnd({
+      readState: () => gatherClaimStatus(sid),
+      claimantSid: sid,
+      timeoutMs: minutes * 60_000,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    })
+    if (!waited.ok) fail(`timed out after ${minutes} min; the batch is still held.`)
+    console.log(waited.reason === 'spent' ? 'claim spent — the hand-over was released; run --take now.' : 'batch lock is free.')
+    if (!has('--take')) process.exit(0)
   }
 
   if (has('--withdraw')) {
@@ -352,6 +398,9 @@ if (isMain) {
     )
     process.exit(0)
   }
+  if (has('--take')) {
+    fail(`the batch is still held (${acq}); --take never writes or replaces a claim. Run --wait, then try --take again.`)
+  }
 
   // 2. Somebody live holds it → record the claim. The owner sees it at its next
   //    Stop hook and releases at the first clean moment.
@@ -377,9 +426,8 @@ if (isMain) {
   if (write.action === 'refuse') {
     fail(
       `session ${write.claimantSid} claimed the batch ${Math.round((write.ageMs ?? 0) / 60000)} min ago and that ` +
-        'claim is still live, so this one would be a second window pulling the batch two ways. Exactly one ' +
-        'session drives. Have that window run `--withdraw`, or close it — a live claimant\'s claim is bound ' +
-        'by its own process, not by a clock that runs out while it waits. Nothing recorded.',
+        'claim is still renewed, so this one would be a second window pulling the batch two ways. Exactly one ' +
+        'session drives. Have that window run `--withdraw`, close it, or let its activity window expire. Nothing recorded.',
     )
   }
   const claim = {
@@ -409,10 +457,9 @@ if (isMain) {
           : ` (A ${check.reason.replace(/^git-/, '')} is in progress in this checkout right now.)`
         : '') +
       ` Re-run \`node scripts/batch-claim.mjs --session ${sid}\` to take the batch once it is free — the same ` +
-      'command claims and takes. WHILE THAT OWNER LIVES the claim does NOT age out (point 434): it holds for as ' +
-      'long as THIS window is open and is ignored outright the moment it closes, so a long verification in the ' +
-      'other session can no longer let the takeover lapse unnoticed. WITH NO LIVE OWNER it is honoured for ' +
-      `${mins} min from NOW — the moment it was recorded — and then the ordinary handover takes over rather than ` +
+      `command claims and takes. The reservation lasts ${mins} min from this real claimant activity; re-running ` +
+      'the same command renews it, while a merely open editor window does not. A closed or recycled claimant ' +
+      'expires immediately. When the activity window runs out, the ordinary handover takes over rather than ' +
       'leaving the batch ownerless. And once the owner has RELEASED for it the claim is spent: the lock is free ' +
       'and the first window to acquire wins, so re-run this command AT ONCE when the release is reported; if the ' +
       'launcher got there first, claim again against the new owner.',

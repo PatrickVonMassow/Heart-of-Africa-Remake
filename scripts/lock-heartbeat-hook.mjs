@@ -56,7 +56,21 @@
 //     hand-written one and cannot go blind on it. It lives here for duty (5)'s
 //     reason — .claude/settings.json is a protected path an unattended session
 //     cannot edit — and with no verify run record on disk it costs one readdir.
-import { existsSync, readFileSync, statSync } from 'node:fs'
+// (9) THE HAND-BACK AND REPAIR-LOOP BOUNDS (point 772): on 20.08, at least seven
+//     response boundaries passed while a clean claim release in
+//     batch-progress-guard's Stop path did not run. The leading hypothesis is
+//     that the owner kept ending responses in `tool_use`, but its transcript was
+//     not identified. A stale board card stopping the Stop chain at
+//     dashboard-guard before batch-progress-guard remains an unexamined
+//     alternative. PostToolUse handles either cause: count unique assistant
+//     tool-response turns here, release at the bound, and surface a same-mechanism
+//     commit run once outside the measured ordinary range. Pure decisions live
+//     in handover-repair-loop-core.mjs.
+// (10) THE CONTEXT-PERMIT RESULT (point 745): a permit is consumed before one
+//      otherwise-refused call. This already-wired all-tools PostToolUse hook is
+//      where that call's actual result exists, so it appends the correlated,
+//      bounded result record without adding another settings entry.
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
 import { dispossessionNotice } from './batch-lease-core.mjs'
@@ -66,6 +80,10 @@ import { classifyPublishResponse, publishStatePatch } from './publish-outcome-co
 import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { armWaitMarker } from './wait-marker.mjs'
+import { observeOwnerLoops } from './handover-repair-loop.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
+import { recordContextPermitResult } from './context-fence-permit.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -93,6 +111,7 @@ const sid = data.session_id || ''
 // true exactly for the session named in the batch lock, and it is already paid
 // for here — no second lock read on the hot path.
 let ownsBatch = false
+let callAt = null
 try {
   if (sid) {
     const input = data.tool_input ?? data.toolInput ?? {}
@@ -107,10 +126,39 @@ try {
     // and it then cancelled the boundary 117 ms after it was written. Where the
     // payload carries the call's own time, `heartbeat` compares it; where it does
     // not, the settle window does the same job.
-    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives, callAt: hookCallTimestamp(data) }) === true
+    callAt = hookCallTimestamp(data)
+    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives, callAt }) === true
   }
 } catch {
   /* no lock dir / unreadable — nothing to do */
+}
+
+// A PostToolUse transition is foreground evidence only when both ends are
+// known. With no call timestamp the journal still records the event boundary,
+// but the classifier assigns no duration; the transcript may later pair it.
+try {
+  if (sid && ownsBatch) {
+    const lock = readJson(repoPath('.claude', 'batch-lock.json'))
+    const finishedAt = Date.now()
+    emitActivity({
+      event: ACTIVITY_EVENTS.FOREGROUND_ACTIVITY,
+      at: finishedAt,
+      session: sid,
+      point: null,
+      pid: lock?.pid ?? null,
+      pidStartedAt: lock?.pidStartedAt ?? null,
+      generation: lock?.fence ?? null,
+      cause: 'completed-tool-call',
+      evidence: {
+        tool: data.tool_name ?? data.toolName ?? null,
+        startedAt: callAt,
+        finishedAt,
+        transcript: data.transcript_path ?? data.transcriptPath ?? null,
+      },
+    })
+  }
+} catch {
+  /* journal telemetry never breaks a tool call */
 }
 
 // (2) per-session presence for the parallel-session detector
@@ -177,8 +225,9 @@ try {
 
 // (6) the user's message — the ONLY duty that speaks. `deliverPendingMessages`
 // claims each message before it renders it and returns '' for every reason not
-// to speak (not the owner, batch paused, empty spool, any error at all), and ''
-// is written as nothing whatsoever.
+// to speak (not the owner, empty spool, any error at all), and '' is written as
+// nothing whatsoever. Pause is NOT a stand-down: that is when a corrective user
+// instruction matters most.
 const paused = (() => {
   try {
     return existsSync(repoPath('.claude', 'batch-paused'))
@@ -188,9 +237,17 @@ const paused = (() => {
 })()
 let spoke = false
 try {
-  const out = deliverPendingMessages({ ownsBatch, paused })
+  const out = deliverPendingMessages({
+    ownsBatch,
+    paused,
+    hookInput: data,
+    // A successful synchronous write proves only that fd 1 accepted the bytes,
+    // not that the harness injected them. The subagent discriminator covers
+    // the known divergence before claiming; if the harness discards an accepted
+    // owner write, this hook cannot observe it and the message is still lost.
+    emit: (text) => writeFileSync(1, text, 'utf8'),
+  })
   if (out) {
-    process.stdout.write(out)
     spoke = true
   }
 } catch {
@@ -218,6 +275,7 @@ try {
       process.stdout.write(
         `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: notice.context } })}\n`,
       )
+      spoke = true
     }
   }
 } catch {
@@ -229,5 +287,40 @@ try {
 // paused-aware inside `armWaitMarker`, which also swallows every error, so this
 // call has no failure mode of its own.
 armWaitMarker({ sid, ownsBatch, paused })
+
+// (9) hand-back and repair-loop bounds — see the header. The observer uses the
+// dashboard state only as an ignored, atomic carrier; its decisions are pure.
+// If chat delivery or dispossession already spoke, the due report is left
+// unrecorded and emitted on the next call, preserving the one-JSON-envelope
+// contract of PostToolUse stdout.
+try {
+  const current = readJson(STATE_PATH) ?? {}
+  const observed = observeOwnerLoops({
+    sid,
+    ownsBatch,
+    paused,
+    transcriptPath: data.transcript_path ?? data.transcriptPath ?? '',
+    toolName: data.tool_name ?? data.toolName ?? '',
+    command: (data.tool_input ?? data.toolInput ?? {}).command ?? '',
+    state: current.ownerLoopWatch ?? {},
+    mayAct: !spoke,
+  })
+  mergeState({ ownerLoopWatch: observed.state })
+  if (observed.context) {
+    process.stdout.write(
+      `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: observed.context } })}\n`,
+    )
+  }
+} catch {
+  /* an observer may never break a tool call */
+}
+
+// (10) context permit result — silent and fail-open. Session/call matching is
+// performed against the pending consumed permit under the permit's own mutex.
+try {
+  recordContextPermitResult(data)
+} catch {
+  /* permit audit bookkeeping may never break a completed tool call */
+}
 
 process.exit(0)

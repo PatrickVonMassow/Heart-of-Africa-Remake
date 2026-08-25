@@ -11,15 +11,17 @@
 //   node scripts/verify-bringup.mjs          install what is missing, then report
 //   node scripts/verify-bringup.mjs --check  report only, install nothing
 //
-// Exit 0 when the WebGL 2 lane can run. The WebGPU lane needs a SYSTEM Chrome/Chromium,
-// which only a package manager (and root) can put there; this script reports its absence
-// with the command to fix it rather than pretending it can. What it reports PRESENT is
-// the exact executable the lane launches (scripts/verify/launch-args-core.mjs) — the
-// report and the launch are not allowed to name different browsers.
+// Exit 0 only when BOTH exact browsers expose their backend on a named hardware
+// renderer. Browser binaries alone are not readiness: the 19.08.2026 outage had both
+// executables and neither API. The bare-canvas probe asks Chrome's SystemInfo CDP domain
+// for the Graphics Feature Status, so a disabled GPU process is named before an app suite
+// can spend 180 seconds waiting for window.__renderer.
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { systemChromeCandidates } from './verify/launch-args-core.mjs'
+import { backendProbeDetail, gpuBackendVerdict } from './verify/gpu-backend-probe-core.mjs'
+import { probeGpuBackends } from './verify/gpu-backend-probe.mjs'
 // The SAME probe the lane launches through (scripts/verify/system-chrome.mjs), not a
 // second copy of the walk: a report and a launch that resolve differently is the very
 // defect this command exists to rule out.
@@ -91,13 +93,17 @@ if (systemChromeCandidates(process.platform).length === 0) {
       'downgraded to WebGL 2). Install it with:\n    ' +
       systemChromeHint(),
   )
+  ok = false
 }
 
 console.log(`\nVerify host bring-up (${process.platform}):`)
 for (const line of lines) console.log(`  - ${line}`)
-console.log(
-  ok
-    ? '\nWebGL 2 lane ready:  VERIFY_GL=webgl node scripts/verify/run-all.mjs flow'
-    : '\nWebGL 2 lane NOT ready — no browser suite can run on this host.',
-)
-process.exit(ok ? 0 : 1)
+const probe = gpuBackendVerdict(await probeGpuBackends())
+console.log(`\n${probe.summary}`)
+for (const result of probe.results) {
+  console.log(`  - ${result.lane}: ${backendProbeDetail(result)}`)
+}
+if (ok && probe.ok) {
+  console.log('\nBoth lanes ready: run the selected verification suite.')
+}
+process.exit(ok && probe.ok ? 0 : 1)

@@ -17,6 +17,7 @@ import {
   parseWorkablePoints,
   unrankedAppendProblem,
   evaluate,
+  openPointBodies,
 } from './queue-order-guard-core.mjs'
 
 /** Minimal dashboard in the real board's markup (queue cards + now-card + Erledigt). */
@@ -52,7 +53,15 @@ const tasksMd = (open, done = [209]) =>
  * is a state the gate speaks up about in its own right (point 590).
  */
 const ranks = (points, ranked = {}) =>
-  JSON.stringify({ ranked, settled: { at: '2026-08-10T09:00:00.000Z', points } })
+  JSON.stringify({
+    ranked,
+    settled: { at: '2026-08-10T09:00:00.000Z', points },
+    // ARMED, and grandfathering the whole order it is handed (point 789): these
+    // fixtures are about the other rules, and an unarmed release front is a
+    // state the guard speaks up about in its own right. Rule 1d's own block
+    // builds its record with the frozen front it wants to test.
+    boundary: { at: '2026-08-21T00:00:00.000Z', why: 'the order as it stood', points },
+  })
 
 describe('constants', () => {
   it('pin the finder set, the tag exemption and the claim tokens', () => {
@@ -79,14 +88,19 @@ describe('parseOpenPoints', () => {
 describe('parseWorkablePoints — open minus what waits on the user (point 450)', () => {
   const text = [
     '- [ ] 210. Fix',
-    '- [ ] 211. Fix AWAITING-USER(2026-07-29; needs a ruling)',
+    '- [ ] 211. Fix AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
     '- [ ] 212. Fix USER-ANSWERED(2026-08-07)',
+    // An OPEN untyped marker, whose prose would once have gated it. It owes
+    // migration and stays workable — the ticked leftover below cannot show that,
+    // because a ticked point is excluded either way (cross-vendor review,
+    // GPT-5.6 Sol, 23.08.2026).
+    '- [ ] 213. Fix AWAITING-USER(2026-01-02; push the version tag; safe prepared state: verified locally and no tag pushed)',
     '- [x] 209. Done AWAITING-USER(2026-01-01; leftover)',
   ].join('\n')
   it('drops the gated point but keeps the answered one and the plain one', () => {
-    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212])
+    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212, 213])
     // The full open set is unchanged — the done-claim rule still judges 211.
-    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212])
+    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212, 213])
   })
   it('is total on non-string input', () => {
     expect(parseWorkablePoints(null).size).toBe(0)
@@ -255,7 +269,7 @@ describe('evaluate — end to end on the two raw files', () => {
     // turn end for as long as the user is away.
     const tasks = [
       '- [ ] 203. Open point 203.',
-      '- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)',
+      '- [ ] 211. Open point 211. AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)',
       '- [x] 209. Done point 209.',
     ].join('\n')
     const r = evaluate({
@@ -282,7 +296,7 @@ describe('evaluate — end to end on the two raw files', () => {
   })
 
   it('a done-claim on a GATED point is still a false claim', () => {
-    const tasks = ['- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)'].join('\n')
+    const tasks = ['- [ ] 211. Open point 211. AWAITING-CONFIRMATION(2026-07-29; release-tag: push the version tag, safe prepared state: verified locally and no tag pushed)'].join('\n')
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 211, body: 'Behoben und verifiziert.' }] }),
       tasksMd: tasks,
@@ -610,5 +624,79 @@ describe('the APPEND GATE — a new point is ranked once, deliberately', () => {
     // Anything that is not the file's own bytes reads as TORN, which is quiet.
     expect(unrankedAppendProblem('- [ ] 1. A.', {})).toBe('')
     expect(unrankedAppendProblem('- [ ] 1. A.', ranks([1]))).toBe('')
+  })
+})
+
+describe('rule 1d — the release boundary (point 789)', () => {
+  /** A work order in which `point` stands in front of the release, or behind it. */
+  const order = (point, body, { ahead = true } = {}) =>
+    [
+      ...(ahead ? [`- [ ] ${point}. A finding the machine drained.`, `  ${body}`] : []),
+      `- [ ] ${RELEASE_TAG_POINT}. Tag the demo build and publish it.`,
+      ...(ahead ? [] : [`- [ ] ${point}. A finding the machine drained.`, `  ${body}`]),
+    ].join('\n')
+
+  const MEDIUM = 'Criticality: medium — no product defect.'
+  const HIGH = 'Criticality: high — it stops the batch until it is fixed.'
+  /** An ARMED record whose frozen front is EMPTY: nothing stood in front of the
+   *  release when the rule landed, so the point under test is on trial. */
+  const armed = (ranked = {}, front = []) =>
+    JSON.stringify({
+      ranked,
+      settled: { at: '2026-08-10T09:00:00.000Z', points: [RELEASE_TAG_POINT] },
+      boundary: { at: '2026-08-21T00:00:00.000Z', why: 'the order as it stood', points: front },
+    })
+  const baseline = armed()
+
+  it('blocks a machine-filed point that ranked itself in front of the release', () => {
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: baseline })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('MACHINE-FILED POINT IN FRONT OF THE RELEASE')
+    expect(r.reason).toContain(`MOVE the block inside TASKS.md to BEHIND point ${RELEASE_TAG_POINT}`)
+  })
+
+  it('says nothing once the same point stands behind the release', () => {
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM, { ahead: false }), rankRecordJson: baseline })
+    expect(r.reason).not.toContain('MACHINE-FILED POINT IN FRONT OF THE RELEASE')
+    // The APPEND gate still speaks — the point now stands last, which is where
+    // append-and-defer puts one — and that is the other rule doing its own job.
+    expect(r.reason).toContain('APPENDED POINT NOT RANKED')
+  })
+
+  it('lets a high-urgency point stand there once its reason is recorded', () => {
+    const recorded = armed({ 900: { at: '', why: 'It stops the batch.', origin: 'machine', place: 'ahead' } })
+    expect(evaluate({ dashboardHtml: '', tasksMd: order(900, HIGH), rankRecordJson: recorded }).block).toBe(false)
+    // …and the SAME point without the record is still refused, so the record is
+    // what the pass hangs on rather than the tag alone.
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, HIGH), rankRecordJson: baseline })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('nothing records why they cannot wait')
+  })
+
+  it('exempts a point the USER ranked there', () => {
+    const byUser = armed({ 900: { at: '', why: 'Der Nutzer will es zuerst.', origin: 'user', place: 'ahead' } })
+    expect(evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: byUser }).block).toBe(false)
+  })
+
+  it('asks for the arming where no front was ever frozen', () => {
+    const unarmed = JSON.stringify({
+      ranked: {},
+      settled: { at: '2026-08-10T09:00:00.000Z', points: [RELEASE_TAG_POINT] },
+    })
+    const r = evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: unarmed })
+    expect(r.block).toBe(true)
+    expect(r.reason).toContain('RELEASE BOUNDARY NOT ARMED')
+  })
+
+  it('grandfathers a point the FROZEN front names, and nothing else', () => {
+    expect(evaluate({ dashboardHtml: '', tasksMd: order(900, MEDIUM), rankRecordJson: armed({}, [900]) }).block).toBe(
+      false,
+    )
+  })
+
+  it('reads the bodies of OPEN points only', () => {
+    const bodies = openPointBodies(['- [ ] 900. Open.', '  Criticality: high', '- [x] 901. Done.'].join('\n'))
+    expect(Object.keys(bodies)).toEqual(['900'])
+    expect(bodies[900]).toContain('Criticality: high')
   })
 })

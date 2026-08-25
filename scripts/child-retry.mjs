@@ -1,6 +1,7 @@
 // LAYER 5 — RETRY A CHILD, NOT AN OUTAGE (point 434 part 3), the I/O half.
 // Every decision lives in scripts/child-retry-core.mjs; this file only reads the
-// state, runs the git probe, writes the log, pauses and notifies.
+// state, runs the git probe, writes the decision record, clocks shared outages
+// and notifies.
 //
 // WHO CALLS IT. The main session is the party that spawns children, so this is
 // not a hook — it is the command the MAIN SESSION runs the moment a delegated
@@ -13,21 +14,20 @@
 //
 //   node scripts/child-retry.mjs --status              what the state file holds
 //   node scripts/child-retry.mjs --complete --point N  the child reported a step done
-//   node scripts/child-retry.mjs --forget --point N    re-open a point's budget by hand
+//   node scripts/child-retry.mjs --forget --point N    explicitly re-open a point's budget
 //
 // It answers exactly one of RETRY (with the backoff to wait and a
-// continue-or-repeat prompt hint), NO-RETRY, OUTAGE-PAUSE or STAND-DOWN, and it
+// continue-or-repeat prompt hint), RECOVER, OUTAGE-PROBE, SCHEDULED or STAND-DOWN, and it
 // NEVER spawns anything itself — one spawner is enough (docs/batch-resilience.md
 // §5). The session reads the answer and acts.
 //
 // EXIT CODE IS ALWAYS 0 for a decision (usage errors exit 2): the verdict is the
 // output, not the status, and a non-zero exit here would make an ordinary
-// NO-RETRY look like a broken command in every log that reads exit codes.
+// scheduling decision look like a broken command in every log that reads exits.
 //
 // FAIL-OPEN, in the sense the other guards use: an internal error never traps
-// the session. It degrades to NO-RETRY-BY-HAND with the error named — it does
-// NOT degrade to "retry", because a retry taken on a decision the code could not
-// make is exactly the retry-into-an-outage this layer exists to prevent.
+// the session. It degrades to a clocked exchange record with the error named —
+// never to a person-only terminal and never to an immediate blind retry.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname } from 'node:path'
@@ -40,10 +40,12 @@ import {
   POINT_TOKEN_CAP,
   describeDecision,
   emptyState,
-  outagePauseReason,
+  fallbackRecoveryDecision,
+  outageProbeReason,
   recordCompletion,
   recordDeath,
   recordRetry,
+  recordRecovery,
   retryDecision,
 } from './child-retry-core.mjs'
 
@@ -54,7 +56,7 @@ export const STATE_PATH = repoPath('.claude/resilience/child-retry.json')
 export const LOG_PATH = repoPath('.claude/resilience/child-retry.log')
 
 /** The state directory is created on demand: a fresh checkout has no .claude/
- *  resilience/, and a layer that only works after somebody made a folder by hand
+ *  resilience/, and a layer that only works after somebody manually made a folder
  *  is not a layer. */
 function ensureDir(path) {
   try {
@@ -111,6 +113,22 @@ export function committedOnBranch(branch, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/** Durable branch evidence for a terminal child diagnosis. */
+export function diagnoseBranch(branch, { cwd = REPO_ROOT } = {}) {
+  if (!branch) return { exists: false, committedSinceSpawn: false, branch: null }
+  try {
+    execFileSync('git', ['rev-parse', '--verify', `${branch}^{commit}`], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      windowsHide: true,
+    })
+    return { exists: true, committedSinceSpawn: committedOnBranch(branch, { cwd }), branch }
+  } catch {
+    return { exists: false, committedSinceSpawn: false, branch }
+  }
+}
+
 /** One line per decision, where the morning reader finds it. */
 export function logLine(text, path = LOG_PATH) {
   try {
@@ -132,22 +150,20 @@ function berlinStamp(now = new Date()) {
   }).format(now)
 }
 
-/** The board card for an outage pause — best effort. A card that cannot be
- *  written must not stop the pause; the log and the notification still carry
- *  the reason. */
-export function boardCard(title, question, { cwd = REPO_ROOT } = {}) {
-  try {
-    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', title, question], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    })
-    return true
-  } catch {
-    return false
-  }
-}
+// NO BOARD CARD IS WRITTEN HERE ANY MORE (point 749).
+//
+// An outage pause and a scheduled child recovery used to be posted under "Von dir
+// zu klären" — "Batch pausiert: Umgebungsausfall", closing with an instruction
+// the user could not carry out, and resolving by itself once the restart clock
+// expired, so the card outlived the condition it described. He cleared such a
+// card three times and ruled that these are the machine's own problems.
+//
+// The record already lives where it belongs: the pause marker carries the reason,
+// and `recordRecovery` keeps the decision record with the point's retry state.
+// The board DERIVES its state card from both (scripts/board-state-core.mjs), so
+// the state shows up without a board call and disappears when the marker goes and
+// the retry clock runs out. The ntfy notification below is untouched — that is
+// the channel built for reaching the user.
 
 /**
  * The pause marker is read through batch-lock.mjs, LAZILY. That module resolves
@@ -179,7 +195,7 @@ const numFlag = (f) => {
 const USAGE = `usage:
   node scripts/child-retry.mjs --point <n> --branch <ref> --death "<what the harness said>"
         [--child <id>] [--brief-revision <sha>] [--reported-complete]
-        [--committed|--no-committed] [--tokens <n>] [--session <id>] [--json]
+        [--committed|--no-committed] [--critical] [--tokens <n>] [--session <id>] [--json]
   node scripts/child-retry.mjs --status
   node scripts/child-retry.mjs --complete --point <n>
   node scripts/child-retry.mjs --forget --point <n>`
@@ -197,7 +213,11 @@ async function main() {
     console.log(`child-retry state (${STATE_PATH})`)
     console.log(`  deaths on record: ${(state.deaths ?? []).length}`)
     for (const [p, rec] of points) {
-      console.log(`  point ${p}: ${rec.retries ?? 0} retries, ${rec.tokens ?? 0} tokens, branch ${rec.branch ?? '—'}, completed steps ${rec.completedSteps ?? 0}`)
+      console.log(
+        `  point ${p}: ${rec.retries ?? 0} retries, ${rec.tokens ?? 0} tokens, branch ${rec.branch ?? '—'}, ` +
+          `completed steps ${rec.completedSteps ?? 0}` +
+          `${rec.recovery ? `, ${rec.recovery.action} probe ${new Date(rec.recovery.nextAttemptAt).toISOString()}` : ''}`,
+      )
     }
     if (!points.length) console.log('  no point has spent a retry')
     return 0
@@ -220,7 +240,7 @@ async function main() {
     const next = { ...state, points: { ...(state.points ?? {}) } }
     delete next.points[String(point)]
     writeState(next)
-    logLine(`point ${point}: retry budget cleared by hand`)
+    logLine(`point ${point}: retry budget cleared by explicit command`)
     console.log(`point ${point}: retry budget and completion flag cleared.`)
     return 0
   }
@@ -243,7 +263,8 @@ async function main() {
     owns = true
   }
 
-  const committed = has('--committed') ? true : has('--no-committed') ? false : committedOnBranch(branch)
+  const branchEvidence = diagnoseBranch(branch)
+  const committed = has('--committed') ? true : has('--no-committed') ? false : branchEvidence.committedSinceSpawn
 
   const decision = retryDecision({
     point,
@@ -253,6 +274,8 @@ async function main() {
     death,
     reportedComplete: has('--reported-complete'),
     committedSinceSpawn: committed,
+    branchExists: branchEvidence.exists,
+    critical: has('--critical'),
     state,
     now: Date.now(),
     paused: isPaused(),
@@ -263,7 +286,7 @@ async function main() {
 
   // Stand-down changes nothing and records nothing: a session that may not act
   // must not leave footprints in the state either.
-  if (decision.verdict !== 'stand-down') {
+  if (!['stand-down', 'scheduled'].includes(decision.verdict)) {
     let next = recordDeath(state, { point, branch, childId, signature: decision.signature, verdict: decision.verdict, at: Date.now() })
     // A reported completion is PERSISTED here, not only used for this verdict
     // (four-eyes review): otherwise a later death of the same point would be
@@ -272,27 +295,26 @@ async function main() {
     // exactly one invocation.
     if (has('--reported-complete')) next = recordCompletion(next, { point, tokensUsed: tokensRaw })
     if (decision.verdict === 'retry') next = recordRetry(next, { point, branch, briefRevision, tokensUsed: Number.isFinite(tokensRaw) ? tokensRaw : undefined })
+    if (['recover', 'outage-probe'].includes(decision.verdict)) next = recordRecovery(next, decision)
     writeState(next)
   }
 
   logLine(`point ${point} (${branch ?? 'no branch'}) died: ${decision.signature} → ${decision.verdict} — ${decision.reason}`)
 
-  if (decision.verdict === 'outage-pause') {
-    const reason = outagePauseReason(decision, berlinStamp())
-    if (!isPaused()) setPaused(reason)
-    boardCard(
-      'Batch pausiert: Umgebungsausfall',
-      `${reason} Bitte bestätigen, wann wieder gestartet werden soll — oder die Pause selbst aufheben.`,
-    )
+  if (decision.verdict === 'outage-probe') {
+    const reason = outageProbeReason(decision, berlinStamp())
+    if (!isPaused()) setPaused(reason, { cause: 'outage', retryAfter: decision.retryAt })
     // AWAITED, not fired and forgotten: process.exit() below would kill the
-    // pending POST and the pause would happen with nobody told about it.
-    await notify('Batch pausiert — Umgebungsausfall', reason, 'urgent', { key: 'child-retry-outage' })
-  } else if (decision.verdict === 'no-retry') {
+    // pending POST and the pause would happen with nobody told about it. The
+    // pause marker written above is what the board derives its state card from
+    // (point 749), so no board call belongs in this path.
+    await notify('Umgebungsausfall — Probe eingeplant', `${reason} Der Batchzustand steht auf dem Board.`, 'urgent', { key: 'child-retry-outage' })
+  } else if (decision.verdict === 'recover') {
     await notify(
-      `Punkt ${point} gestoppt`,
-      `Der Agent für Punkt ${point} ist gestorben und wird NICHT automatisch neu gestartet: ${decision.reason}`,
+      `Punkt ${point}: ${decision.recoveryAction} eingeplant`,
+      `${decision.reason} Nächster Versuch ${new Date(decision.retryAt).toISOString()}; das Entscheidungsprotokoll liegt im Retry-State und steht bis dahin auf dem Board.`,
       'default',
-      { key: `child-retry-no-retry-${point}` },
+      { key: `child-retry-recovery-${point}`, recurring: true },
     )
   }
 
@@ -307,10 +329,18 @@ if (isCli) {
   try {
     code = await main()
   } catch (e) {
-    // FAIL-OPEN: never trap the session. Not a retry — an undecided death is
-    // decided by a person.
-    console.log(`NO-RETRY (by hand) — child-retry could not decide: ${e?.message ?? e}`)
-    logLine(`internal error, no automatic verdict: ${e?.message ?? e}`)
+    // FAIL-OPEN: never trap the session and never manufacture a human terminal.
+    const decision = fallbackRecoveryDecision({
+      point: Number(flag('--point')) || null,
+      branch: flag('--branch'),
+      briefRevision: flag('--brief-revision'),
+      error: e?.message ?? e,
+    })
+    // The retry state IS the record (point 749): the board derives its state card
+    // from it, so this path writes the decision once and nothing else.
+    try { writeState(recordRecovery(readState(), decision)) } catch { /* the log still retains the same decision */ }
+    console.log(describeDecision(decision))
+    logLine(`internal error → exchange; next attempt ${new Date(decision.retryAt).toISOString()}: ${e?.message ?? e}`)
     code = 0
   }
   process.exit(code)

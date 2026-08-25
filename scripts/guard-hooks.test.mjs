@@ -23,6 +23,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, write
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { AUTO_END, AUTO_START } from './retro-core.mjs'
+import { DOC_BUDGETS } from './doc-budget-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SESSION = 'hook-test-session'
@@ -110,7 +111,17 @@ beforeAll(() => {
   git('init', '-q')
   git('config', 'user.email', 'g@test.local')
   git('config', 'user.name', 'guard hooks test')
+  // Deliberately point the fixture config at this checkout's real hooks. The
+  // git helper's command-local override must still keep every fixture commit
+  // from executing them.
+  git('config', 'core.hooksPath', resolve(SOURCE_SCRIPTS, 'git-hooks'))
   commit('baseline')
+  // Every real reader fails loud when this shared decision is absent. Keep the
+  // guard fixture explicit too, so its model-trailer cases reach the rule they test.
+  write(
+    '.claude/fable-switch.json',
+    JSON.stringify({ state: 'on', reason: 'exercise the full fixture allowlist', setBy: 'test', changedAt: 1 }),
+  )
 })
 
 afterAll(() => {
@@ -129,6 +140,14 @@ describe('the harness itself', { timeout: 60_000 }, () => {
   it('runs against an isolated temp repo, never the real one', () => {
     expect(repo.startsWith(tmpdir())).toBe(true)
     expect(resolve(repo)).not.toBe(resolve(process.cwd()))
+    expect(git('rev-parse', '--show-toplevel').stdout.trim()).toBe(resolve(repo))
+  })
+
+  it('can commit without running the live hook path configured in the fixture', () => {
+    expect(git('config', '--local', 'core.hooksPath').stdout.trim()).toBe(resolve(SOURCE_SCRIPTS, 'git-hooks'))
+    write('fixture-hook-proof.txt', 'a fixture commit with no authoring trailer\n')
+    commit('fixture commit bypasses the live hooks')
+    expect(git('log', '-1', '--format=%s').stdout.trim()).toBe('fixture commit bypasses the live hooks')
   })
 
   it('has every registered guard reachable as a spawnable hook', () => {
@@ -254,6 +273,12 @@ describe('tasks-spec-guard', () => {
     expectHookAgrees('tasks-spec-guard.mjs', 'tasks-spec-guard', { blocks: false })
   })
 
+  it('BLOCKS on a newly written uppercase title and gives the replacement', () => {
+    write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. THIS TITLE SHOUTS\n  Final-state body.\n')
+    const hook = expectHookAgrees('tasks-spec-guard.mjs', 'tasks-spec-guard', { blocks: true })
+    expect(hook.decision.reason).toContain('2: "This title shouts"')
+  })
+
   it('stands down silently while the batch is paused', () => {
     write('TASKS.md', '# TASKS\n\n## Checklist\n\n- [ ] 2. This point was originally specified differently.\n')
     write('.claude/batch-paused', 'test')
@@ -292,7 +317,26 @@ describe('doc-budget-guard', () => {
   })
 
   it('ALLOWS documents within budget', () => {
-    write('CLAUDE.md', '# CLAUDE\n\n## 1. Goal\nText.\n')
+    // WITHIN BUDGET NOW MEANS BETWEEN THE CEILING AND ITS SLACK (point 768): a nearly
+    // empty file is no longer "within budget", it is a ceiling nobody lowered. So every
+    // budgeted file in the fixture is built FROM the shipped budget rather than typed,
+    // and it follows the ceilings down at the next cut instead of going stale.
+    const budgetFor = (path) => DOC_BUDGETS.find((b) => b.path === path)
+    /** `words` words over at most `maxLines` lines — the guard's own tokenizer counts both. */
+    const filler = (words, maxLines) => {
+      const rows = Math.max(1, Math.min(maxLines, Math.ceil(words / 12)))
+      const per = Math.floor(words / rows)
+      return Array.from({ length: rows }, (_, i) =>
+        Array.from({ length: i === rows - 1 ? words - per * (rows - 1) : per }, (_, k) => `w${i}x${k}`).join(' '),
+      ).join('\n')
+    }
+    const claude = budgetFor('CLAUDE.md')
+    write('CLAUDE.md', `${filler(claude.maxWords - 1, claude.maxLines - 1)}\n`)
+    const design = budgetFor('design.md')
+    write('design.md', `${filler(design.maxWords - 1, design.maxLines - 1)}\n`)
+    // Only the PREAMBLE is budgeted here, so the filler stops at the checklist marker.
+    const tasks = budgetFor('TASKS.md')
+    write('TASKS.md', `${filler(tasks.maxWords - 1, tasks.maxLines - 1)}\n## Checklist\n\n- [ ] 1. A point.\n`)
     expectHookAgrees('doc-budget-guard.mjs', 'doc-budget-guard', { blocks: false })
   })
 })
@@ -529,7 +573,6 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
   const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
   const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
   const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
-
   let base = ''
   let guardSha = ''
 
@@ -550,7 +593,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
   it('ALLOWS once a DIFFERENT model has recorded a review', () => {
     const r = review([
       '--record', guardSha,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'merge',
       '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
       '--mode', 'review',
@@ -569,13 +612,13 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--mode', 'review',
     ])
     expect(r.status).toBe(1)
-    expect(r.stderr).toMatch(/SELF-REVIEW is refused/)
+    expect(r.stderr).toMatch(/SAME-VENDOR REVIEW is refused/)
   })
 
   it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
     const r = review([
       '--record', guardSha,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'do-not-merge',
       '--evidence', 'the fast path waves through the files the unit layer measures',
       '--mode', 'review',
@@ -609,7 +652,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
 
     const r = review([
       '--record', branchHead,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'merge-with-fixes',
       '--evidence', 'reviewed both commits of the branch at its head',
       '--mode', 'review',
@@ -679,7 +722,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
 
     const r = review([
       '--record', sideHead,
-      '--model', 'Fable 5',
+      '--model', 'GPT-5.6 Sol',
       '--verdict', 'merge',
       '--evidence', 'reviewed the fourth demo guard on its branch before the merge',
       '--mode', 'review',
@@ -709,9 +752,96 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     rmSync(resolve(repo, BASELINE), { force: true })
     try {
       const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
-      expect(hook.decision.reason).toContain('scripts/demo5-guard.mjs')
+      expect(hook.decision.reason).toContain('local review baseline is missing')
+      expect(hook.decision.reason).toContain('cannot bootstrap at HEAD')
     } finally {
       git('checkout', '-q', trunk)
+    }
+  })
+
+  it('uses the feature merge-base for the gap ruling after main advances', () => {
+    // The stored fallback baseline follows main, but this feature branch forked
+    // earlier. Main-only bulk must not enter the gap measurement: pending
+    // detection and pass coverage both describe fork..feature, so measuring
+    // main-tip..feature would manufacture an uncoverable deletion and waive a
+    // small, reviewable guard change.
+    write(LEDGER, '')
+    const trunk = branch()
+    const fork = head()
+    const baselineBefore = existsSync(resolve(repo, BASELINE))
+      ? readFileSync(resolve(repo, BASELINE), 'utf8')
+      : null
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+
+    expect(git('checkout', '-q', '-b', 'feat/main-advanced-gap-range').status).toBe(0)
+    write('scripts/demo-gap-range-guard.mjs', '// small and reviewable\n')
+    commit(`add a reviewable range guard\n\n${AUTHOR}`)
+
+    expect(git('checkout', '-q', 'main').status).toBe(0)
+    write('main-only-bulk.txt', 'main-only material\n'.repeat(20_000))
+    commit(`advance main with unrelated bulk\n\n${AUTHOR}`)
+    const advancedMain = head()
+    expect(git('checkout', '-q', 'feat/main-advanced-gap-range').status).toBe(0)
+    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
+
+    try {
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(
+        hook.decision?.decision,
+        `stdout was ${JSON.stringify(hook.stdout)}; stderr was ${hook.stderr}`,
+      ).toBe('block')
+      expect(hook.decision.reason).toContain('scripts/demo-gap-range-guard.mjs')
+      expect(hook.stderr).not.toContain('REVIEW GAP')
+      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
+    } finally {
+      // Keep this isolated fixture's main-only bulk out of the serial cases
+      // below; all of these refs belong to the temporary test repository.
+      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
+      else write(BASELINE, baselineBefore)
+      expect(git('branch', '-f', 'main', fork).status).toBe(0)
+      expect(git('checkout', '-q', trunk).status).toBe(0)
+    }
+  })
+
+  it('does not hide branch bulk from the gap ruling when advanced main has identical content', () => {
+    // The reverse divergence: the feature range really is uncoverable, while
+    // main later acquires the same bulk independently. A raw main-tip..feature
+    // tree diff erases that file and would keep demanding an impossible review;
+    // the common merge-base range must still report the measured gap.
+    write(LEDGER, '')
+    const trunk = branch()
+    const fork = head()
+    const baselineBefore = existsSync(resolve(repo, BASELINE))
+      ? readFileSync(resolve(repo, BASELINE), 'utf8')
+      : null
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+    const bulk = 'shared but independently committed material\n'.repeat(12_000)
+
+    expect(git('checkout', '-q', '-b', 'feat/branch-bulk-gap-range').status).toBe(0)
+    write('scripts/demo-branch-bulk-guard.mjs', '// guard beside branch bulk\n')
+    write('shared-bulk.txt', bulk)
+    commit(`add a guard beside branch bulk\n\n${AUTHOR}`)
+
+    expect(git('checkout', '-q', 'main').status).toBe(0)
+    write('shared-bulk.txt', bulk)
+    commit(`advance main with matching bulk\n\n${AUTHOR}`)
+    const advancedMain = head()
+    expect(git('checkout', '-q', 'feat/branch-bulk-gap-range').status).toBe(0)
+    write(BASELINE, JSON.stringify({ baselines: { main: advancedMain } }))
+
+    try {
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(hook.stdout.trim()).toBe('')
+      expect(hook.stderr).toContain('REVIEW GAP')
+      expect(hook.stderr).toContain('shared-bulk.txt')
+      expect(git('merge-base', advancedMain, head()).stdout.trim()).toBe(fork)
+    } finally {
+      if (baselineBefore === null) rmSync(resolve(repo, BASELINE), { force: true })
+      else write(BASELINE, baselineBefore)
+      expect(git('branch', '-f', 'main', fork).status).toBe(0)
+      expect(git('checkout', '-q', trunk).status).toBe(0)
     }
   })
 
@@ -726,18 +856,14 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
     expect(readFileSync(resolve(repo, BASELINE), 'utf8')).toBe(before)
   })
 
-  it('grandfathers what predates the baseline, and arms itself at HEAD', () => {
-    // The unreviewed demo guard is still in history and the ledger is empty —
-    // exactly the state the twenty-odd existing guards are in. Nothing is owed,
-    // and the gate pins the baseline so it audits from here on.
+  it('refuses a missing baseline when the recovery anchor is unavailable', () => {
     write(LEDGER, '')
     rmSync(resolve(repo, BASELINE), { force: true })
-    const at = head()
     const hook = runHook('mechanism-review-guard.mjs')
     expect(hook.status, hook.stderr).toBe(0)
-    expect(hook.stdout.trim()).toBe('')
-    const state = JSON.parse(readFileSync(resolve(repo, BASELINE), 'utf8'))
-    expect(Object.values(state.baselines)).toContain(at)
+    expect(hook.decision?.decision).toBe('block')
+    expect(hook.decision.reason).toContain('local review baseline is missing')
+    expect(existsSync(resolve(repo, BASELINE))).toBe(false)
   })
 
   it('stands down silently while the batch is paused', () => {

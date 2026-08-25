@@ -38,9 +38,13 @@ const PAUSE = repoPath('.claude', 'batch-paused')
  * preflight runs, and a preflight has no transcript path to hand it. The `why`
  * says so rather than reading as a clean bill.
  */
-export function gatherContainerAskInputs({ sessionId = '', transcriptPath = '', lockPath } = {}) {
+export function gatherContainerAskInputs({ sessionId = '', transcriptPath = '', lockPath, ancestor } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId, lockPath ? { lockPath } : {})) {
+  const ownershipOpts = {
+    ...(lockPath ? { lockPath } : {}),
+    ...(ancestor !== undefined ? { ancestor } : {}),
+  }
+  if (heldByOtherLiveOwner(sessionId, ownershipOpts)) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
   if (!transcriptPath) {
@@ -82,13 +86,19 @@ if (isMainModule(import.meta.url)) {
     }
 
     // The subprocess regression must exercise THIS wrapper without reaching the
-    // live repository lock. The seam exists only under Vitest; production hook
-    // invocations cannot redirect the authority through their environment.
-    const testLockPath = process.env.VITEST === 'true' ? process.env.HOA_TEST_BATCH_LOCK_PATH : ''
+    // live repository lock or inheriting the test runner's process ancestry. The
+    // seam exists only under Vitest; production hook invocations cannot redirect
+    // either authority through their environment.
+    const underVitest = process.env.VITEST === 'true'
+    const testLockPath = underVitest ? process.env.HOA_TEST_BATCH_LOCK_PATH : ''
+    const testAncestor = underVitest && process.env.HOA_TEST_BATCH_ANCESTOR
+      ? JSON.parse(process.env.HOA_TEST_BATCH_ANCESTOR)
+      : undefined
     const gathered = gatherContainerAskInputs({
       sessionId: (payload && payload.session_id) || '',
       transcriptPath: (payload && payload.transcript_path) || '',
       ...(testLockPath ? { lockPath: testLockPath } : {}),
+      ...(testAncestor !== undefined ? { ancestor: testAncestor } : {}),
     })
     if (!gathered.applicable) process.exit(0)
 

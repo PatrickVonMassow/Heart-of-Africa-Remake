@@ -72,8 +72,11 @@ export function isWorktreeCheckout(path) {
   return /[/\\]\.claude[/\\]worktrees[/\\]/.test(String(path ?? ''))
 }
 
-/** Tools that change state by their nature — no command inspection needed. */
-export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
+/** Tools that change state by their nature — no command inspection needed.
+ *  `MultiEdit` is named although this harness does not offer it, for the same
+ *  reason as in path-scope-guard and the context fence: a write tool a set
+ *  forgets is a hole that opens silently the day the harness gains it. */
+export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Agent'])
 
 /** Tools whose payload is a shell command; mutation depends on the command. */
 export const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
@@ -131,7 +134,8 @@ export function classifyCall({ toolName, command, filePath, boardPaths = [] } = 
   const tool = String(toolName ?? '')
   if (MUTATING_TOOLS.has(tool)) {
     // An edit of the board itself is how the gate gets satisfied.
-    if ((tool === 'Edit' || tool === 'Write') && isBoardFile(filePath, boardPaths)) return { kind: 'escape', segment: '' }
+    if ((tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit') && isBoardFile(filePath, boardPaths))
+      return { kind: 'escape', segment: '' }
     return { kind: 'mutating', segment: '' }
   }
   if (!SHELL_TOOLS.has(tool)) return { kind: 'read-only', segment: '' }
@@ -152,6 +156,51 @@ export function classifyCall({ toolName, command, filePath, boardPaths = [] } = 
 /** The classification alone, for callers that do not need the segment. */
 export function classifyTool(call) {
   return classifyCall(call).kind
+}
+
+/**
+ * RE-CHECK BATCH OWNERSHIP BEFORE EVERY MUTATION. PURE.
+ *
+ * The ordinary guard stand-down remains exactly that for reads, paused batches,
+ * and isolated delegated worktrees: they receive no board duty and no denial.
+ * A top-level session which has lost the live owner lock, however, may not turn
+ * "this guard stood down" into permission for the mutation itself. The wrapper
+ * runs this decision on every PreToolUse call after measuring ownership again.
+ */
+export function ownershipStandDownDecision({
+  heldByOtherLiveOwner = false,
+  paused = false,
+  worktree = false,
+  ownerSession = '',
+  toolName,
+  command,
+  filePath,
+} = {}) {
+  try {
+    if (paused === true || worktree === true || heldByOtherLiveOwner !== true) {
+      return { block: false, reason: '', standDown: heldByOtherLiveOwner === true }
+    }
+    const call = classifyCall({ toolName, command, filePath })
+    if (call.kind !== 'mutating') return { block: false, reason: '', standDown: true }
+    const attempted = call.segment
+      ? `the state-changing segment \`${call.segment}\``
+      : filePath
+        ? `${String(toolName ?? 'write')} of \`${filePath}\``
+        : `the ${String(toolName ?? 'state-changing')} tool call`
+    const owner = typeof ownerSession === 'string' && ownerSession ? ` (${ownerSession})` : ''
+    return {
+      block: true,
+      standDown: true,
+      reason:
+        `BATCH OWNERSHIP STAND-DOWN — another live session${owner} owns the batch lock. ` +
+        `${attempted} was refused before it ran.\n` +
+        'STAND-DOWN PATH: stop all mutations in this top-level session; reads remain available so you can ' +
+        'inspect and report the state. The current owner continues the batch. To request ownership through ' +
+        'the sanctioned handoff, run `node scripts/batch-claim.mjs --session <this session id>`.',
+    }
+  } catch {
+    return { block: false, reason: '', standDown: false }
+  }
 }
 
 /**

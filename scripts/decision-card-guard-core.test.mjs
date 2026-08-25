@@ -8,15 +8,23 @@
 import { describe, expect, it } from 'vitest'
 import {
   DECISION_PHRASES,
+  ANSWER_DEADLINE_MS,
   MIN_WORD_LENGTH,
   REMEDY,
   addressesUser,
   asksForDecision,
   containsPhrase,
   contentWords,
+  dueCarriedAnswers,
   evaluate,
+  evaluateCardReviews,
+  evaluateCarriedAnswers,
   firingPhrase,
+  isRetrospective,
   matchingCard,
+  pendingCardReviews,
+  reconcileCarriedAnswers,
+  sharedDistinctiveTerms,
   startsWithPhrase,
   topicWords,
 } from './decision-card-guard-core.mjs'
@@ -417,5 +425,165 @@ describe('every live "Von dir zu klären" question still BLOCKS without its card
       expect(v.block, q).toBe(true)
       expect(v.reason).toContain(REMEDY)
     }
+  })
+})
+
+describe('an open card is reviewed against every user message', () => {
+  const cards = ['Kartenschrift für die Tafel', 'Freigabe für den Launcher']
+  const first = { id: 'user-10-08', text: 'Bei der Kartenschrift bitte 102 Wörter anderswo streichen.' }
+
+  it('blocks a user message with two unreviewed open cards', () => {
+    const v = evaluateCardReviews({ userMessage: first, cardsAtMessage: cards, currentTitles: cards })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('vdzk-remove')
+    expect(v.reason).toContain('vdzk-keep')
+    expect(v.reason).toContain('Kartenschrift für die Tafel')
+    expect(v.reason).toContain('Freigabe für den Launcher')
+  })
+
+  it('passes after one card was removed and the other explicitly kept', () => {
+    const v = evaluateCardReviews({
+      userMessage: first,
+      cardsAtMessage: cards,
+      currentTitles: [cards[1]],
+      review: { messageId: first.id, kept: { [cards[1]]: { why: '' } } },
+    })
+    expect(v).toEqual({ block: false, reason: null })
+  })
+
+  it('passes silently when this turn carries no user message', () => {
+    expect(evaluateCardReviews({ cardsAtMessage: cards, currentTitles: cards })).toEqual({ block: false, reason: null })
+  })
+
+  it('a new user-message UUID re-arms every standing card', () => {
+    const review = { messageId: first.id, kept: Object.fromEntries(cards.map((title) => [title, { why: 'not an answer' }])) }
+    const next = { id: 'user-next', text: 'Alles klar.' }
+    expect(pendingCardReviews({ userMessage: next, cardsAtMessage: cards, currentTitles: cards, review })).toHaveLength(2)
+  })
+
+  it('does not demand a card added after the message', () => {
+    expect(evaluateCardReviews({
+      userMessage: first,
+      cardsAtMessage: [cards[0]],
+      currentTitles: cards,
+      review: { messageId: first.id, kept: { [cards[0]]: { why: 'The words refer to typography generally.' } } },
+    })).toEqual({ block: false, reason: null })
+  })
+})
+
+describe('a suspected answer costs a written reason to keep', () => {
+  const title = 'Kartenschrift auf der Tafel festlegen'
+  const message = { id: 'shared-term', text: 'Die Kartenschrift bleibt wie gemessen.' }
+
+  it('requires --why for a shared distinctive term', () => {
+    expect(sharedDistinctiveTerms(message.text, title)).toEqual(['kartenschrift'])
+    const withoutWhy = evaluateCardReviews({
+      userMessage: message,
+      cardsAtMessage: [title],
+      currentTitles: [title],
+      review: { messageId: message.id, kept: { [title]: { why: '' } } },
+    })
+    expect(withoutWhy.block).toBe(true)
+    expect(withoutWhy.reason).toContain('--why')
+    expect(evaluateCardReviews({
+      userMessage: message,
+      cardsAtMessage: [title],
+      currentTitles: [title],
+      review: { messageId: message.id, kept: { [title]: { why: 'It reports the measured font, not the pending placement.' } } },
+    }).block).toBe(false)
+  })
+
+  it('does not treat the shared stop words nicht, board or punkt as a hit', () => {
+    expect(sharedDistinctiveTerms('Nicht dieser Board Punkt.', 'Board-Punkt nicht entschieden')).toEqual([])
+    const v = evaluateCardReviews({
+      userMessage: { id: 'stop-only', text: 'Nicht dieser Board Punkt.' },
+      cardsAtMessage: ['Board-Punkt nicht entschieden'],
+      currentTitles: ['Board-Punkt nicht entschieden'],
+    })
+    expect(v.reason).not.toContain('--why')
+  })
+})
+
+describe('the 10.08 answered card replay', () => {
+  it('blocks the real answer while the real card still stands', () => {
+    const title = 'design.md: 102 Wörter mehr, oder 102 anderswo streichen?'
+    const message = {
+      id: 'chat-10-08-2100',
+      text: 'Streiche die 102 Wörter anderswo; diese Entscheidung gilt künftig als feste Regel.',
+    }
+    const v = evaluateCardReviews({ userMessage: message, cardsAtMessage: [title], currentTitles: [title] })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('--why')
+  })
+})
+
+describe('a non-owner carries an answer and the owner applies it', () => {
+  const title = 'Freigabe-Reihenfolge nach dem Stau'
+  const userMessage = { id: 'chat-answer', text: 'Die Freigabe-Reihenfolge beginnt mit der Website.' }
+  const entry = {
+    cardTitle: title,
+    answer: 'Die Website landet zuerst.',
+    sourceMessageId: userMessage.id,
+    deadlineAt: 1000 + ANSWER_DEADLINE_MS,
+  }
+
+  it('the carried record satisfies the non-owner review but blocks the owner', () => {
+    expect(evaluateCardReviews({
+      userMessage,
+      cardsAtMessage: [title],
+      currentTitles: [title],
+      carriedAnswers: [entry],
+      nonOwner: true,
+    })).toEqual({ block: false, reason: null })
+    const owner = evaluateCarriedAnswers({ entries: [entry], currentTitles: [title], owner: true })
+    expect(owner.block).toBe(true)
+    expect(owner.reason).toContain(`node scripts/board.mjs vdzk-remove ${JSON.stringify(title)}`)
+    expect(owner.reason).toContain(`node scripts/vdzk-answer.mjs --applied ${JSON.stringify(title)}`)
+    expect(evaluateCarriedAnswers({ entries: [entry], currentTitles: [title], owner: false }).block).toBe(false)
+  })
+
+  it('an entry naming a vanished card self-clears', () => {
+    expect(reconcileCarriedAnswers([entry], [])).toEqual({ active: [], cleared: [entry] })
+    expect(evaluateCarriedAnswers({ entries: [entry], currentTitles: [], owner: true }).block).toBe(false)
+  })
+
+  it('uses the single deadline constant when selecting unattended work', () => {
+    expect(dueCarriedAnswers([entry], entry.deadlineAt - 1)).toEqual([])
+    expect(dueCarriedAnswers([entry], entry.deadlineAt)).toEqual([entry])
+  })
+})
+
+describe('answered-card state is fail-open', () => {
+  it('a throwing/unreadable state read allows the stop', () => {
+    expect(evaluateCardReviews({
+      userMessage: { id: 'x', text: 'Kartenschrift bleibt.' },
+      cardsAtMessage: ['Kartenschrift'],
+      currentTitles: ['Kartenschrift'],
+      stateReadable: false,
+    })).toEqual({ block: false, reason: null })
+    expect(evaluateCarriedAnswers({ entries: [{ cardTitle: 'Kartenschrift' }], currentTitles: ['Kartenschrift'], owner: true, stateReadable: false })).toEqual({ block: false, reason: null })
+  })
+})
+
+describe('retrospects and standing arrangements are statements, not requests', () => {
+  it('allows the measured look-back sentence', () => {
+    const sentence = 'Die beste Werbung für deine Entscheidung von heute Abend.'
+    expect(isRetrospective(sentence)).toBe(true)
+    expect(evaluate({ replyText: sentence, vdzkTitles: [] })).toEqual({ block: false, reason: null })
+  })
+
+  it('allows a past-tense statement but keeps a present request loud', () => {
+    expect(evaluate({ replyText: 'Das war gestern deine Entscheidung.', vdzkTitles: [] }).block).toBe(false)
+    expect(evaluate({ replyText: 'Deine Entscheidung: klein oder groß.', vdzkTitles: [] }).block).toBe(true)
+  })
+
+  it('allows statements that merely name the standing decision-maker', () => {
+    expect(evaluate({ replyText: 'POC bleibt deine Entscheidung.', vdzkTitles: [] }).block).toBe(false)
+    expect(evaluate({ replyText: 'Das Taggen liegt bei dir.', vdzkTitles: [] }).block).toBe(false)
+  })
+
+  it('a question mark or imperative stays loud even beside a backward marker', () => {
+    expect(evaluate({ replyText: 'War das deine Entscheidung von heute?', vdzkTitles: [] }).block).toBe(true)
+    expect(evaluate({ replyText: 'Bitte entscheide wie schon gestern.', vdzkTitles: [] }).block).toBe(true)
   })
 })

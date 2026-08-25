@@ -230,7 +230,9 @@ try {
     lastKey: state.lastKey ?? null,
     now,
   })
-  const sent = alert.notify && !quiet ? await notify(alert.title, alert.message, alert.priority) : false
+  const sent = alert.notify && !quiet
+    ? await notify(alert.title, alert.message, alert.priority, { recurring: alert.recurring === true })
+    : false
 
   writeJsonAtomic(STATE, {
     ...state,

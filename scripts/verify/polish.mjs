@@ -14,6 +14,7 @@ import {
   judgeTagStandpoint,
 } from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import { FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { READ_COUNT, READ_GAP_FRAMES, CONFIRM_READS, READ_GAP_NET_MS, READ_GAP_MS, SHOT_DRIFT_BAR, luminanceSamples, settleReading, shotDrift, shotReading } from './cropLuma.mjs'
 import {
   CHILD_MOTION,
@@ -432,18 +433,24 @@ if (section('panorama-wildlife')) {
   // the page makes the sample window the frame it actually is, and lets the
   // judgment demand an UNBROKEN stance across the whole interval, so a wrap is
   // not filtered out — it cannot occur. The judgment itself is the pure,
-  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
-  // removes the turning body's rigid leg swing through the interval's MEAN
-  // heading rather than the heading at its start (measured: a 0.4 rad turn cost
-  // 0.200 of spurious slip the old way and 0.006 this way).
+  // Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs). The
+  // renderer now keeps a stance contact in world space even as its body turns,
+  // so the judgment reads that world travel directly; compensating for a rigid
+  // body's yaw would manufacture movement for a contact whose coordinates did
+  // not change.
   //
-  // THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
-  // consecutive WebGL 2 runs on this host after the fix reported worst foot/body
-  // travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
-  // spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
-  // straddled the bar. The interval count came out 37, 43, 43 and 42, so the
-  // verdict rests on a comparable population each time rather than on whatever
-  // the host managed to draw.
+  // MEASURED SPREAD (19.08.2026, this section run six consecutive times on the
+  // branch state, three passes per backend, against the 0.25 bar and the
+  // eight-interval enough-gate). Settlement walker (goat), the lane that was
+  // red: WebGL 2 — 35/36/36 intervals, worst foot/body travel 0.000 in every
+  // pass, body turn up to 0.299/0.247/0.292 rad; WebGPU — 13/15/18 intervals,
+  // worst 0.000 in every pass, turn up to 0.433/0.815/0.595 rad. Panorama
+  // silhouette over the same runs: WebGL 2 48/50/49 intervals, worst
+  // 0.025/0.026/0.026; WebGPU 49/50/47 intervals, worst 0.023/0.023/0.025. The
+  // interval population therefore clears the gate on both backends with room
+  // (13 is the thinnest run), the goat's contact does not move at all while the
+  // body turns up to 0.8 rad over it, and the silhouette's tenth-of-the-bar
+  // residue is the only travel any pass measured.
   {
     /** Record the tracked walkers frame by frame, inside the page: one round trip
      *  for the whole series, so no sample window can be stretched by the host.
@@ -4670,7 +4677,10 @@ if (section('ctrl-actor-labels')) {
   )
   await waitForSceneBuilt(page).catch(() => {})
   // Stand back from the middle and look at it: that is where the village lives.
+  // The first entry just journaled itself and OPENED the journal panel — close
+  // it again, so the frame below shows the crowd, not the diary over half of it.
   await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
     const p = window.__placePlayer
     p.x = 0
     p.z = 14
@@ -4828,10 +4838,73 @@ if (section('ctrl-actor-labels')) {
     `${walking.named}/${walking.moved} moved figures named after ${walking.frames} frame(s) [${walking.kinds.join(', ')}]`,
   )
 
+  // NO TWO DRAWN BOXES FUSE IN THIS CROWD (point 628). Every check above asks
+  // the DOM whether a TEXT is present — which is exactly what let the evidence
+  // frame below read "Villager llager" while the whole suite was green: the
+  // defective frame had been written by ANOTHER revision's run (main, 14.08,
+  // before the declutter), and no assertion in THIS suite — the one that owns
+  // the frame — ever measured a rectangle. The only rect check lived in the
+  // sparse savanna half (enrichments.mjs). So the rects are measured HERE, in
+  // the dense scene the defect was reported in, at the very state the frame
+  // photographs — and SAMPLED over many frames rather than one instant, since
+  // the declutter decides at the layer's 10 Hz refresh while the subjects walk
+  // every frame (the verdict and its reasoning: scripts/verify/labelFusion.mjs).
+  // The shutter is BRACKETED: one window before the frame, one after, judged as
+  // one series — a sample that closed before the capture would certify a
+  // picture it never measured (the Sol-review gap, 17.08.).
+  const sampleFusion = (windowFrames) => page.evaluate(
+    ({ TOLERANCE, SAMPLES }) =>
+      new Promise((res) => {
+        let sampled = 0
+        let fusedFrames = 0
+        let worstDepth = 0
+        let worstPair = null
+        let labelsMin = Infinity
+        let labelsMax = 0
+        const read = () => {
+          const boxes = [...document.querySelectorAll('.actor-label')]
+            .map((el) => {
+              const r = el.getBoundingClientRect()
+              return { text: (el.textContent ?? '').trim(), left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+            })
+            .filter((b) => b.right > b.left && b.bottom > b.top)
+          labelsMin = Math.min(labelsMin, boxes.length)
+          labelsMax = Math.max(labelsMax, boxes.length)
+          let fusedHere = false
+          for (let i = 0; i < boxes.length; i++) {
+            for (let j = i + 1; j < boxes.length; j++) {
+              const a = boxes[i]
+              const b = boxes[j]
+              const across = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+              const down = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+              if (across > TOLERANCE && down > TOLERANCE) {
+                fusedHere = true
+                const depth = Math.min(across, down)
+                if (depth > worstDepth) {
+                  worstDepth = depth
+                  worstPair = `"${a.text}"×"${b.text}" ${across.toFixed(0)}×${down.toFixed(0)} px`
+                }
+              }
+            }
+          }
+          if (fusedHere) fusedFrames++
+          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax })
+          requestAnimationFrame(read)
+        }
+        requestAnimationFrame(read)
+      }),
+    { TOLERANCE: FUSE_TOLERANCE, SAMPLES: windowFrames },
+  )
+  const fusionPre = await sampleFusion(45)
+
   await frame('148-ctrl-actor-labels-village', {
     place: 'maasai-village',
     label: 'the Maasai village with the Ctrl labels over its inhabitants',
   })
+
+  const fusionPost = await sampleFusion(45)
+  const fusionVerdict = judgeLabelFusion(mergeFusionReadings(fusionPre, fusionPost))
+  check('no two Ctrl labels fuse in the village crowd (point 628)', fusionVerdict.ok, fusionVerdict.detail)
 
   await page.keyboard.up('Control')
   const cleared = await page

@@ -2,11 +2,21 @@
 // board guard accepts is pinned by tests rather than by the shape of one
 // regex written once. The wrapper does the I/O.
 //
-// The one import is the auditor's OWN name for "no estimate yet": a card this
-// module writes must satisfy the audit that reads it, and spelling that value a
-// second time here is how the two would drift apart. dashboard-guard-core
-// imports nothing, so the direction cannot become a cycle.
+// The imports are the auditor's OWN name for "no estimate yet" and the handover
+// card's shared destination predicate. A card this module writes must satisfy
+// the gates that read it, and spelling either value a second time here is how
+// the writer and readers would drift apart. Both imported modules are leaves,
+// so the direction cannot become a cycle.
 import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { namesFollowOnWork } from './handover-card-contract.mjs'
+// The derived state card's vocabulary lives beside the derivation itself, so the
+// renderer here and the module that decides WHAT to report cannot drift apart.
+import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './board-state-core.mjs'
+// The admissibility rule for a card written by a script, kept beside the guard's
+// own notion of "this asks the user" rather than restated here.
+import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
+
+export { namesFollowOnWork }
 
 /** The flag that takes a card's text from STDIN instead of the argv (point 410). */
 export const TEXT_STDIN_FLAG = '--text-stdin'
@@ -290,6 +300,11 @@ export function dropStrayNowCards(html) {
     const { chip, legacy } = summaryPoint(summary)
     if (chip || legacy) return card
     if (isStateCardTitle(title)) return card
+    // THE DERIVED CARD IS NOT STRAY (point 749). It carries no number by design
+    // and is replaced by the derivation on the very next edit, so sweeping it
+    // here would report a "lost" card on every command while removing nothing
+    // that was not about to be rewritten anyway.
+    if (isTrulyDerivedCard(card)) return card
     // A genuine state card that lost its chip is still replaceable by its own
     // command (`none`, `closing <N>`), so it is kept rather than swept.
     if (/data-state="closing"/.test(card) && looksLikeClosingTitle(title)) return card
@@ -504,16 +519,55 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
  */
 export function toQueue(html, point, { text, estimate } = {}) {
   const card = nowCard(html, point)
-  if (!card) throw new Error(`board: no current-work card for point ${point}`)
+  const renderEntry = (title, meta, body) =>
+    `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
+    `<span class="right"><span class="meta">${meta}</span></span>` +
+    `</summary>\n  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
+  // IDEMPOTENT AGAINST BOARD DRIFT (point 700, measured 17.08.2026): a board
+  // that already lists the point in the Warteschlange — however it came to —
+  // must not receive a SECOND card for it, because the resulting
+  // `dup-in-section` turns the unit layer red and the pre-push gate then
+  // refuses exactly the handover bookkeeping this move exists for. The
+  // standing queue entry keeps the place; only the now-card goes. Scoped to
+  // the queue SECTION, because an Erledigt card shares the bare markup shape.
+  let standing = null
+  try {
+    const { from, end } = sectionBounds(html, 'queue')
+    standing = queueCard(html.slice(from, end), point)
+  } catch {
+    /* no queue section — the insertion below reports it */
+  }
+  // A caller's UPDATE is honoured on the standing card, never swallowed
+  // (Sol review of d0aebb6, finding 5): text replaces its body, estimate its
+  // meta, and what was not given keeps the standing card's own value. The
+  // bare handover call (`queue <n>`) leaves it untouched.
+  const updateStanding = (doc) => {
+    if (!text?.trim() && estimate == null) return doc
+    const body = text?.trim() || statusOf(standing)
+    if (!body) throw new Error('board: refusing to queue a card with an empty body')
+    const meta = estimate ?? (metaOf(standing).trim() || QUEUE_STUB_META)
+    return doc.replace(standing, renderEntry(stripPointPrefix(titleOf(standing), point), meta, body))
+  }
+  if (!card) {
+    // A REPEATED move is a SUCCESS, not a typo (point 700; Sol review of
+    // 534c2ba, finding 5). Of the spec's two options — legitimise the
+    // handover state or demand a numbered now-card even then — this takes
+    // the first: with the point already standing in the queue and no
+    // now-card left, the desired end state HOLDS, and the spec says the last
+    // bookkeeping of a session must not be blocked by the session ending —
+    // which a throw here did, at the most expensive moment there is. The
+    // no-op still honours a caller's text/estimate, exactly as the drift
+    // path does. The throw is kept ONLY for a point nowhere on the board at
+    // all — the typo it was always protecting against.
+    if (standing) return updateStanding(html)
+    throw new Error(`board: point ${point} is nowhere on the board — no current-work card and no queue card`)
+  }
+  if (standing) return updateStanding(html.replace(card, ''))
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
   const hours = spanHours(metaOf(card))
   const meta = estimate ?? (hours == null ? QUEUE_STUB_META : hoursLabel(hours))
-  const title = stripPointPrefix(titleOf(card), point)
-  const entry =
-    `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
-    `<span class="right"><span class="meta">${meta}</span></span>` +
-    `</summary>\n  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
+  const entry = renderEntry(stripPointPrefix(titleOf(card), point), meta, body)
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'queue')
   return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
@@ -531,13 +585,177 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   if (!body) throw new Error('board: refusing to archive a card with an empty body')
   const start = (metaOf(card).match(/^\s*(\d{1,2}:\d{2})/) ?? [])[1] ?? end
   const title = stripPointPrefix(titleOf(card), point)
-  const entry =
+  const out = html.replace(card, '')
+  // ONE POINT, ONE ERLEDIGT CARD (user 18.08.2026, measured on point 700, which
+  // stood there FOUR times). A point comes back into current work whenever a
+  // session boundary or a follow-up reopens it, and every archiving appended
+  // another card, so the section read as four finished points. The EARLIEST
+  // start is kept — that is when the work began — the newest end and the newest
+  // closing text replace the old ones.
+  // The OLDEST card's start is the true one, and it is found by ORDER, not by
+  // comparing clock faces: the archive is newest-first and the stamps carry no
+  // date, so `21:17` from last night is EARLIER than `00:45` this morning while
+  // arithmetic says the opposite (measured on point 700's four cards).
+  const existing = doneCards(out, point)
+  const earliest = earliestStart(existing) || start
+  const entry = renderDoneEntry({ point, title, start: earliest, end, body })
+  const cleaned = dropDoneCards(out, point)
+  const { from } = sectionBounds(cleaned, 'done')
+  return `${cleaned.slice(0, from)}\n${entry}${cleaned.slice(from).replace(/^\n/, '')}`
+}
+
+/** One Erledigt entry, the single writer of that markup. */
+function renderDoneEntry({ point, title, start, end, body }) {
+  return (
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
-  const out = html.replace(card, '')
-  const { from } = sectionBounds(out, 'done')
-  return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
+  )
+}
+
+/**
+ * A card with its START field replaced, whatever shape the old one had.
+ *
+ * The field is everything between `class="meta">` and the range separator (or
+ * the closing tag when the card carries a single stamp), so a damaged start is
+ * REPLACED rather than partially overwritten (review rounds 3 and 5).
+ */
+export function withStart(card, start) {
+  return String(card ?? '').replace(/(class="meta">)([^<]*)/, (whole, lead, content) => {
+    const at = content.indexOf('·')
+    return at < 0 ? `${lead}${start}` : `${lead}${start} ${content.slice(at)}`
+  })
+}
+
+/** Remove every Erledigt card for `point`, INSIDE the section alone. */
+function dropDoneCards(html, point) {
+  const source = String(html ?? '')
+  const b = doneBounds(source)
+  if (!b) return source
+  const entries = doneEntries(source).filter((e) => e.point === String(point))
+  if (!entries.length) return source
+  const section = source.slice(b.from, b.end)
+  let out = ''
+  let cursor = 0
+  for (const e of entries) {
+    out += section.slice(cursor, e.at)
+    cursor = e.at + e.text.length
+  }
+  out += section.slice(cursor)
+  return `${source.slice(0, b.from)}${out}${source.slice(b.end)}`
+}
+
+/** Where the Erledigt section's cards sit, or null when there is no section. */
+function doneBounds(html) {
+  try {
+    return sectionBounds(String(html ?? ''), 'done')
+  } catch {
+    return null
+  }
+}
+
+/** An Erledigt card, matched inside the section alone. */
+const DONE_CARD_RE = /<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+
+/** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
+export function doneEntries(html) {
+  const b = doneBounds(html)
+  if (!b) return []
+  const section = String(html).slice(b.from, b.end)
+  return [...section.matchAll(DONE_CARD_RE)].map((m) => ({ point: m[1], text: m[0], at: m.index }))
+}
+
+/** Every Erledigt card for `point`, newest first — normally none or one. */
+export function doneCards(html, point) {
+  return doneEntries(html)
+    .filter((e) => e.point === String(point))
+    .map((e) => e.text)
+}
+
+/** The FIRST Erledigt card for `point`, or null. */
+export function doneCard(html, point) {
+  return doneCards(html, point)[0] ?? null
+}
+
+/**
+ * The start stamp an Erledigt card carries, or '' when it carries none that is
+ * a real time of day.
+ *
+ * `99:99` used to pass and then win the comparison it took part in
+ * (cross-vendor review 18.08.2026): a damaged card must not decide when the work
+ * began — it must simply not answer.
+ */
+export function doneStart(card) {
+  // The stamp must END where the markup says it does (review rounds 2 and 4):
+  // a bare digit boundary still read `12:34:56` and `12:34x` as `12:34`, so a
+  // damaged card could decide the merged start. What may follow is the range
+  // separator or the closing tag, nothing else.
+  const m = String(card ?? '').match(/class="meta">\s*(\d{1,2}):(\d{2})(?=\s*(?:·|<\/span>))/)
+  if (!m) return ''
+  const [, h, min] = m
+  if (Number(h) > 23 || Number(min) > 59) return ''
+  return `${h}:${min}`
+}
+
+/**
+ * The start of the OLDEST card that carries a usable one.
+ *
+ * By ORDER, not by comparing clock faces: the archive is newest-first and the
+ * stamps carry no date, so last night's `21:17` precedes this morning's `00:45`
+ * while arithmetic says the opposite. Scanning on past a malformed card matters
+ * for the same reason — one damaged stamp must not throw the answer back to the
+ * newest card (same review).
+ */
+export function earliestStart(cards = []) {
+  for (let i = cards.length - 1; i >= 0; i--) {
+    const s = doneStart(cards[i])
+    if (s) return s
+  }
+  return ''
+}
+
+/**
+ * Fold every duplicate Erledigt card into one, for a board that already carries
+ * them (point 700 stood there four times before `toDone` learned to merge).
+ *
+ * The NEWEST card keeps its POSITION and its text — the archive is ordered by
+ * when a point finished — and takes the earliest start it can find. The section
+ * is rebuilt from its own cards rather than string-replaced: two byte-identical
+ * duplicates made `replace` delete the FIRST occurrence, which is the survivor,
+ * and an identical card in another section could be deleted instead (same
+ * review).
+ */
+export function mergeDoneDuplicates(html) {
+  const source = String(html ?? '')
+  const b = doneBounds(source)
+  if (!b) return { html: source, merged: [] }
+  const entries = doneEntries(source)
+  const counts = new Map()
+  for (const e of entries) counts.set(e.point, (counts.get(e.point) ?? 0) + 1)
+  const merged = [...counts.entries()].filter(([, n]) => n > 1).map(([point]) => point)
+  if (!merged.length) return { html: source, merged: [] }
+
+  const section = source.slice(b.from, b.end)
+  let out = ''
+  let cursor = 0
+  const seen = new Set()
+  for (const e of entries) {
+    out += section.slice(cursor, e.at)
+    cursor = e.at + e.text.length
+    if (seen.has(e.point)) continue // an older duplicate: dropped
+    seen.add(e.point)
+    if (counts.get(e.point) > 1) {
+      const start = earliestStart(doneCards(source, e.point))
+      // The whole START FIELD is replaced, not the digits in it (review rounds 3
+      // and 5): a damaged newest stamp is not always numeric — `oops · 01:10`
+      // survived untouched and `12x:34` became `21:17x:34`.
+      out += start ? withStart(e.text, start) : e.text
+    } else {
+      out += e.text
+    }
+  }
+  out += section.slice(cursor)
+  return { html: `${source.slice(0, b.from)}${out}${source.slice(b.end)}`, merged }
 }
 
 // ═══ Point 416 — closing a point must not leave the board blank ═══
@@ -691,11 +909,63 @@ export const STATE_KINDS = ['idle', 'closing']
 const LEGACY_STATE_TITLE = { idle: NO_CURRENT_WORK_TITLE, closing: CLOSING_WORK_TITLE }
 
 /**
- * The UNNUMBERED state-card titles. The handover card owns no point number by
- * design, so every rule written for a numbered card — the topic guard's
- * foreign-point complaint above all — has to know it by name. The closing card
- * carries a number since point 655; its legacy title stays listed so a board
- * written earlier is still exempted.
+ * THE DERIVED STATE CARD (point 749). It is not a kind any session writes: it is
+ * re-derived from the pause marker, the alert ladder and the retry state on every
+ * board edit and every publish, so a condition that has passed disappears from
+ * the board on its own instead of having to be cleared by hand — which is the
+ * whole reason the machine's own status reports may leave "Von dir zu klären".
+ *
+ * It stands BESIDE the other voices rather than replacing them: a paused batch
+ * still has a running point, so this card is excluded from the one-kind rule and
+ * from `stripStateCards`.
+ */
+const derivedCardPattern = () =>
+  new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>[\\s\\S]*?</details>\\s*`, 'g')
+
+/**
+ * Is this really the derived card — unnumbered, and titled as one of its two
+ * states? A marker is hand-writable, so here as everywhere it never authorises a
+ * removal on its own.
+ */
+function isTrulyDerivedCard(card) {
+  const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
+  if (summaryPoint(summary).chip != null) return false
+  return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE
+}
+
+/**
+ * The document without the derived state card. Safe to call unconditionally: the
+ * card holds no information of its own, only a rendering of state kept elsewhere.
+ */
+export function stripDerivedStateCard(html) {
+  return withinNowSection(html, (scope) =>
+    scope.replace(derivedCardPattern(), (card) => (isTrulyDerivedCard(card) ? '' : card)),
+  )
+}
+
+/**
+ * Render the derived state card, or remove it when there is no state to report.
+ * IDEMPOTENT by construction — the strip runs either way — which is what makes
+ * calling it on every edit and every publish safe.
+ */
+export function applyDerivedStateCard(html, derived, { stamp = berlinStamp() } = {}) {
+  const stripped = stripDerivedStateCard(html)
+  if (!derived || !String(derived.body ?? '').trim()) return stripped
+  const card =
+    `<details class="now"${STATE_ATTR(DERIVED_STATE_KIND)}>\n  <summary>` +
+    `<span class="t">${escapeCardTitle(derived.title)}</span>` +
+    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardBody(derived.body, { stamp })}\n  </div>\n</details>\n`
+  return insertAsFirstNowCard(stripped, card)
+}
+
+/**
+ * The UNNUMBERED state-card titles. The handover card owns no point chip by
+ * design, but must name its follow-on point in prose, so rules written for a
+ * numbered card — the topic guard's foreign-point complaint above all — have
+ * to know it by name. The closing card carries a number since point 655; its
+ * legacy title stays listed so a board written earlier is still exempted.
  */
 export const STATE_CARD_TITLES = [NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE]
 
@@ -883,7 +1153,8 @@ function sectionStateCards(html, kind) {
  *
  * IT IS THE ONE UNNUMBERED CARD (point 655), so it owes the reader in prose what
  * the numbered cards give him in a chip: the reason must NAME the point the
- * successor picks up. The publish gate refuses a handover card that names none.
+ * successor picks up, or say canonically that the work order has none. The
+ * publish gate refuses a handover card that does neither.
  *
  * AND IT MUST BE TRUE WHEN IT IS WRITTEN. A numbered card standing in the
  * section is work the board itself says is running, so the claim would
@@ -907,8 +1178,8 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
       namesFollowOnWork(text)
         ? null
         : 'board: the handover card is the one card without a number, so its reason must NAME the ' +
-          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656"). The publish gate ' +
-          'refuses a handover card that names none.',
+          'point the batch picks up next ("… der Nachfolger nimmt Punkt 656") or use the dictated ' +
+          'no-open-point form. The publish gate refuses a handover card that does neither.',
   })
 }
 
@@ -967,18 +1238,6 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
     emptyReason: 'board: closing needs a reason — the reader must learn WHICH duties are still owed',
     claim: 'that only closing duties are left',
   })
-}
-
-/**
- * Does this text name a FOLLOW-ON point? It lives beside the writer that owes it,
- * and the publish gate imports it, so the two cannot ask it differently.
- *
- * KNOWN LIMIT: it asks that A point is named, not that it is the RIGHT one —
- * nothing here can know which point just ended. It catches the card that names
- * none at all, which is the reported defect.
- */
-export function namesFollowOnWork(text) {
-  return /\b(?:punkt|point)\s*(\d{1,6})\b/i.test(String(text ?? ''))
 }
 
 /**
@@ -1110,7 +1369,15 @@ export function parseClosingArgs(rest) {
  * name a command. The card carries a TITLE ONLY in its collapsed header, per the
  * board's binding structure, and the body says what is to be decided.
  */
-export function addVdzk(html, title, text) {
+export function addVdzk(html, title, text, { automated = false } = {}) {
+  // AN AUTOMATED CALLER IS HELD TO THE RULE, NOT REMINDED OF IT (point 749). A
+  // script has no judgement to apply, so the board asks for the two things that
+  // make a card a decision — it asks, and it names the options — and refuses
+  // anything else with the place its information does belong.
+  if (automated) {
+    const verdict = judgeAutomatedCard({ title, body: text })
+    if (!verdict.ok) throw new Error(verdict.reason)
+  }
   // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
@@ -1120,7 +1387,17 @@ export function addVdzk(html, title, text) {
   const body = renderCardBody(text, { escape: esc })
   if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
   if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
-  const { from } = sectionBounds(html, 'vdzk')
+  const { from, end } = sectionBounds(html, 'vdzk')
+  const section = html.slice(from, end)
+  const standing = [...section.matchAll(/<details>\s*<summary><span class="t">[\s\S]*?<\/details>\s*/g)]
+    .map((card) => titleOf(card[0]))
+    .find((standingTitle) => standingTitle === head)
+  if (standing) {
+    throw new Error(
+      `board: open question "${standing}" already stands under "Von dir zu klären" — ` +
+        'a genuinely new question needs a distinguishable title',
+    )
+  }
   const card =
     `<details>\n  <summary><span class="t">${head}</span></summary>\n` +
     `  <div class="body">\n${body}\n  </div>\n</details>\n`

@@ -33,14 +33,18 @@ const claudeDir = () => resolve(repo, '.claude')
 const lockPath = () => resolve(claudeDir(), 'batch-lock.json')
 const spoolDir = () => resolve(claudeDir(), 'chat-spool')
 const consumedDir = () => resolve(spoolDir(), 'consumed')
+const memoryDir = () => resolve(repo, 'memory')
+const carrierPath = () => resolve(memoryDir(), 'findings-carrier.md')
 
-const runHook = (sessionId = OWNER) =>
+const runHook = (sessionId = OWNER, transcriptPath = resolve(claudeDir(), 'projects', 'owner.jsonl')) =>
   spawnSync(process.execPath, [resolve(repo, 'scripts', 'lock-heartbeat-hook.mjs')], {
     windowsHide: true,
     encoding: 'utf8',
     cwd: repo,
+    env: { ...process.env, HOA_REPO_ROOT: repo, FINDINGS_MEMORY_DIR: memoryDir() },
     input: JSON.stringify({
       session_id: sessionId,
+      transcript_path: transcriptPath,
       hook_event_name: 'PostToolUse',
       tool_name: 'Read',
       tool_input: { file_path: 'x.ts' },
@@ -80,6 +84,8 @@ const pendingFiles = () => {
 beforeAll(() => {
   repo = mkdtempSync(resolve(tmpdir(), 'hoa-chat-hook-'))
   mkdirSync(claudeDir(), { recursive: true })
+  mkdirSync(memoryDir(), { recursive: true })
+  writeFileSync(carrierPath(), '# Findings carrier\n')
   cpSync(SOURCE_SCRIPTS, resolve(repo, 'scripts'), { recursive: true })
   // No TASKS.md: the due-mark duty then finds nothing, which is one of its own
   // documented states and keeps this suite about the chat alone.
@@ -109,6 +115,14 @@ describe('the user message at the next tool call', () => {
     expect(pendingFiles()).toEqual(['n1.json'])
   })
 
+  it('stands down for a subagent carrying the owner session id, consuming nothing', () => {
+    const transcript = resolve(claudeDir(), 'projects', 'owner', 'subagents', 'agent-a.jsonl')
+    const r = runHook(OWNER, transcript)
+    expect(r.status).toBe(0)
+    expect(r.stdout).toBe('')
+    expect(pendingFiles()).toEqual(['n1.json'])
+  })
+
   it('delivers the waiting message as the additionalContext JSON and consumes it', () => {
     const r = runHook()
     expect(r.status).toBe(0)
@@ -133,6 +147,24 @@ describe('the user message at the next tool call', () => {
     const r = runHook()
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
+  })
+
+  it('rings a waiting carrier as the exact additionalContext envelope', () => {
+    writeFileSync(
+      carrierPath(),
+      '# Findings carrier\n\n- [ ] 2026-08-18T13:00:00.000Z · window-1 · Process-level finding\n',
+    )
+    const r = runHook()
+    expect(r.status).toBe(0)
+    expect(JSON.parse(r.stdout)).toEqual({
+      hookSpecificOutput: {
+        hookEventName: 'PostToolUse',
+        additionalContext:
+          'FINDINGS CARRIER: 1 waiting; oldest [2026-08-18T13:00:00.000Z] "Process-level finding". ' +
+          'Drain: node scripts/finding.mjs --drain',
+      },
+    })
+    writeFileSync(carrierPath(), '# Findings carrier\n')
   })
 })
 

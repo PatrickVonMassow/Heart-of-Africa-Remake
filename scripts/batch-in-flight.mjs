@@ -7,8 +7,8 @@
 //                                    [--worktree PATH]… [--log PATH]…
 //   node scripts/batch-in-flight.mjs --status   what the Stop hook would decide
 //   node scripts/batch-in-flight.mjs --clear    the wait is over
-//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH] [--branch REF]
-//                                    [--log PATH]
+//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH]… [--branch REF]…
+//                                    [--log PATH]…
 //                                    may this delegated agent be REPLACED? Exit 0
 //                                    yes, exit 1 no. Run it IMMEDIATELY before
 //                                    the respawn (point 434 (5)).
@@ -49,9 +49,11 @@ import {
   assessTransfer,
   checkEvidence,
   combineWorktreeStamps,
+  worktreeStamp,
   describeInFlight,
   markTransferred,
   porcelainPaths,
+  registeredFeatureWorktrees,
   respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
@@ -59,18 +61,60 @@ import {
   statusVerdict,
   transferBlockMessage,
   closingFreezeActive,
+  declaredAgentProbe,
+  standDownBoundaryDecision,
+  successorAgentOrientation,
   declaredAgentCount,
   openPointSpecs,
   waitEtaRefusal,
+  openBranchSlots,
+  parseCommissionRecord,
+  COMMISSION_RECORD_PATH,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
   RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
+import { durableBlock } from './batch-adoption-core.mjs'
 import { boardFilePath } from './dashboard-state.mjs'
 import { berlinMinutes } from './dashboard-guard.mjs'
+import { emitActivity } from './batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 
 export { IN_FLIGHT_PATH }
+
+function delegatedPoint(declaration) {
+  for (const item of declaration?.evidence ?? []) {
+    const value = item?.ref ?? item?.path ?? ''
+    const match = String(value).match(/(?:^|[/\\-])(?:feat[/\\-])?(\d+)(?:[-/\\]|$)/)
+    if (match) return Number(match[1])
+  }
+  return null
+}
+
+function emitDelegated(event, declaration, { at = Date.now(), result = null } = {}) {
+  const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
+  if (!evidence.some((item) => item?.kind === 'branch' || item?.kind === 'worktree')) return false
+  const lock = readOwnerLock()
+  return emitActivity({
+    event,
+    at,
+    session: declaration.sessionId ?? lock?.sessionId ?? null,
+    point: delegatedPoint(declaration),
+    pid: declaration.pid ?? lock?.pid ?? null,
+    pidStartedAt: declaration.pidStartedAt ?? lock?.pidStartedAt ?? null,
+    generation: lock?.fence ?? null,
+    cause: 'declared-agent-work',
+    evidence: {
+      id: `delegated:${declaration.sessionId ?? 'unknown'}:${declaration.at ?? 'unknown'}`,
+      waitingOn: declaration.waitingOn ?? null,
+      items: evidence,
+      startedAt: declaration.at ?? null,
+      leaseUntil: (declaration.at ?? at) + maxAgeMs(),
+      result,
+    },
+  })
+}
 
 /** The calibratable maximum age, HOA_IN_FLIGHT_MAX_MIN in minutes. Reading it
  *  here (not in the core) keeps the decision function pure and testable. */
@@ -124,6 +168,122 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
     }).trim()
     const secs = Number(out)
     return Number.isFinite(secs) && secs > 0 ? secs * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * WHICH `feat/*` BRANCHES STAND OPEN (point 712)? `{ readable, branches }`, each
+ * branch `{ ref, tipAt, behind }`.
+ *
+ * "Open" is "not contained in `main`" — a merged branch is debris that
+ * `branch-hygiene-guard` sweeps, not a slot somebody is holding. Local and
+ * remote spellings are both asked for and folded into one by the pure core, so a
+ * branch pushed but not checked out here still counts.
+ *
+ * The behind-count costs one `rev-list` per branch and is only asked for where
+ * the refusal will print it; the Stop-hook path needs the COUNT alone. Any git
+ * failure answers `readable: false` — a branch list nobody could read is not
+ * evidence of anything, and the decision fails open on it.
+ */
+export function openFeatBranches({ cwd = REPO_ROOT, base = 'main', behind = false, behindProbe = commitsBehind } = {}) {
+  let out = ''
+  try {
+    out = execFileSync(
+      'git',
+      [
+        'for-each-ref',
+        '--no-merged',
+        base,
+        '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
+        'refs/heads/feat',
+        'refs/remotes/origin/feat',
+      ],
+      { windowsHide: true, cwd, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+  } catch {
+    return { readable: false, branches: [] }
+  }
+  const branches = []
+  for (const line of out.split(/\r?\n/)) {
+    const [ref, stamp, tip] = line.split('\t')
+    if (!ref || !ref.trim()) continue
+    const secs = Number(stamp)
+    const behindCount = behind ? behindProbe(ref.trim(), { cwd, base }) : null
+    // A requested behind-count is part of the census contract, not optional
+    // decoration. If one rev-list fails, returning `readable: true` would permit
+    // a refusal whose required branch detail cannot be printed.
+    if (behind && !Number.isFinite(behindCount)) return { readable: false, branches: [] }
+    branches.push({
+      ref: ref.trim(),
+      tipAt: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
+      // The TIP is what a park is measured against — the committer date is only
+      // the fallback, and it is a second coarse and forgeable by a rebase.
+      tip: String(tip ?? '').trim(),
+      behind: behindCount,
+    })
+  }
+  return { readable: true, branches }
+}
+
+/** The commit a branch points at right now, or '' where git cannot say. It is
+ *  the baseline a park is recorded with. */
+export function branchTip(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return ''
+  try {
+    return execFileSync('git', ['rev-parse', '--verify', '--quiet', `${name}^{commit}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return ''
+  }
+}
+
+/** Where the commissioning record lives, resolved once. */
+export const COMMISSION_RECORD_FILE = resolve(REPO_ROOT, COMMISSION_RECORD_PATH)
+
+/** The recorded overrides and parks. A missing file is an EMPTY record, not a
+ *  torn one — nothing recorded yet is the ordinary state.
+ *
+ *  A file that EXISTS and cannot be read is torn, though, and saying otherwise
+ *  is how a recorded override silently stops excusing its point (Sol, review of
+ *  3078d166): the two states looked identical, so a permissions fault or a
+ *  half-written file produced a refusal instead of the fail-open the rest of the
+ *  chain takes. `torn` is what the guard fails open on. */
+export function readCommissionRecord(path = COMMISSION_RECORD_FILE) {
+  try {
+    return parseCommissionRecord(readFileSync(path, 'utf8'))
+  } catch (e) {
+    return e && e.code === 'ENOENT' ? parseCommissionRecord('') : { overrides: {}, parked: {}, torn: true }
+  }
+}
+
+/** Store it back. Atomic, like every other state file this batch keeps. */
+export function writeCommissionRecord(record, path = COMMISSION_RECORD_FILE) {
+  writeJsonAtomic(path, { overrides: record?.overrides ?? {}, parked: record?.parked ?? {} })
+}
+
+/** How many commits `base` holds that this branch does not — the cost of not
+ *  landing it. Null where git cannot say. */
+export function commitsBehind(ref, { cwd = REPO_ROOT, base = 'main' } = {}) {
+  const name = String(ref ?? '').trim()
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
+  try {
+    const out = execFileSync('git', ['rev-list', '--count', `${name}..${base}`], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const n = Number(out)
+    return Number.isFinite(n) && n >= 0 ? n : null
   } catch {
     return null
   }
@@ -417,15 +577,39 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
  * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
  * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
  */
-export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PATH } = {}) {
+export function gatherSlots(
+  declaration,
+  { cwd = REPO_ROOT, tasksPath = TASKS_PATH, recordProbe = readCommissionRecord } = {},
+) {
   try {
+    const record = recordProbe()
+    // The parks are occupancy input. A torn record is not an empty set of
+    // parks; carry the unreadable state into the same pure decision that carries
+    // an unreadable branch census, so the status report and refusal path agree.
+    if (record?.torn === true) return slotReasonDecision({ recordReadable: false })
     const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
     const running = runningBranchFiles(evidence, { cwd })
     // No readable running-file set means the overlap question cannot be answered, and
     // an unanswerable question is not a reason to demand anything.
     if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
+    // What OCCUPIES a slot is the open branch (point 712). The demand and the
+    // commissioning refusal must read the same occupancy, or they trap the
+    // session between them: nine branches open and one agent running would
+    // otherwise demand a fourth point that the refusal denies.
+    //
+    // AND THE UNREADABLE CASE IS CARRIED, not dropped. Throwing `readable` away
+    // fed an EMPTY branch list into the decision, so a git that could not be
+    // questioned looked exactly like a repository with no open branch and could
+    // demand work for slots nobody had counted (Sol, review of 91d88f9a).
+    const branchProbe = openFeatBranches({ cwd })
     return slotReasonDecision({
       agents: declaredAgentCount(evidence),
+      openBranches: openBranchSlots({
+        branches: branchProbe.branches,
+        parked: record.parked,
+      }).count,
+      branchesReadable: branchProbe.readable,
+      recordReadable: record?.torn !== true,
       openPoints: openPointSpecs(readTasksOpen(tasksPath)),
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',
@@ -438,7 +622,10 @@ export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PA
   }
 }
 
-export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, env = process.env } = {}) {
+export function gatherInFlight(
+  sid,
+  { now = Date.now(), lockPath = LOCK_PATH, env = process.env, includeSlots = true } = {},
+) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) {
@@ -457,8 +644,10 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
   })
   // Only worth asking for a wait that would otherwise be allowed: a declaration that
   // is not live blocks anyway, and paying two git calls to explain a block nobody is
-  // getting would be waste on the Stop hook's path.
-  const slots = assessment.live ? gatherSlots(declaration) : null
+  // getting would be waste on the Stop hook's path. Callers that only need declaration
+  // liveness can omit the slot census too; that census walks the work order and branch
+  // diffs, none of which changes whether the declaration itself is live.
+  const slots = assessment.live && includeSlots ? gatherSlots(declaration) : null
   return { declaration, ...assessment, slots }
 }
 
@@ -472,15 +661,156 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
  * being run AGAIN in the seconds before the spawn: on 30.07.2026 the branch tip
  * moved one minute before the replacement was started.
  */
-export function checkAgentOutput({ worktree = null, branch = null, log = null, now = Date.now(), graceMs } = {}) {
+export function checkAgentOutput(
+  {
+    worktree = null,
+    branch = null,
+    log = null,
+    pids = [],
+    now = Date.now(),
+    graceMs,
+    worktreeProbe = worktreeActiveAt,
+    branchProbe = refTipAt,
+    logProbe = mtimeOf,
+    pidProbe = probePid,
+  } = {},
+) {
+  const many = (value) => (Array.isArray(value) ? value : value ? [value] : [])
+  const newestNumber = (values) => {
+    const nums = values.filter((value) => typeof value === 'number' && Number.isFinite(value))
+    return nums.length ? Math.max(...nums) : null
+  }
+  const worktreeStamps = many(worktree).map((path) => worktreeStamp(worktreeProbe(path))).filter(Boolean)
+  const newestWorktree = worktreeStamps.reduce((newest, stamp) => (!newest || stamp.at > newest.at ? stamp : newest), null)
+  const processEvidence = many(pids).map((item) => checkEvidence(item, { now, probePid: pidProbe }))
   const output = agentOutputVerdict({
-    worktreeAt: worktree ? worktreeActiveAt(worktree) : null,
-    branchTipAt: branch ? refTipAt(branch) : null,
-    logAt: log ? mtimeOf(log) : null,
+    worktreeAt: newestWorktree,
+    branchTipAt: newestNumber(many(branch).map((ref) => branchProbe(ref))),
+    logAt: newestNumber(many(log).map((path) => logProbe(path))),
+    processEvidence,
     now,
     ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
   })
   return { output, ...respawnDecision({ output }) }
+}
+
+/** Measure every OPEN feat/* checkout Git currently registers through the same
+ * branch/worktree grace decision as `--agent-check`. A declared boundary agent
+ * is marked recognised so a supported transfer can carry it into the successor;
+ * every other recently moving checkout is an independent writer veto. */
+export function registeredFeatureWriters({
+  cwd = REPO_ROOT,
+  now = Date.now(),
+  declaration = null,
+  exec = execFileSync,
+  check = checkAgentOutput,
+  openProbe = openFeatBranches,
+} = {}) {
+  let trees
+  try {
+    const porcelain = exec('git', ['worktree', 'list', '--porcelain'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    trees = registeredFeatureWorktrees(porcelain)
+  } catch {
+    return { readable: false, writers: [], reason: 'git-worktree-register-unreadable' }
+  }
+  const open = openProbe({ cwd })
+  if (!open.readable) return { readable: false, writers: [], reason: 'open-feature-branches-unreadable' }
+  const openRefs = new Set(open.branches.map((item) => item.ref).filter((ref) => ref.startsWith('feat/')))
+  const declared = declaredAgentProbe(declaration)
+  const declaredBranches = new Set(declared.branches.map((ref) => String(ref).replace(/^refs\/heads\//, '')))
+  const declaredPaths = new Set(declared.worktrees.map((path) => resolve(String(path))))
+  const writers = trees
+    .filter((tree) => openRefs.has(tree.branch))
+    .map((tree) => {
+      const measured = check({ worktree: tree.path, branch: tree.branch, now })
+      return {
+        branch: tree.branch,
+        worktree: tree.path,
+        recognized: declaredBranches.has(tree.branch) || declaredPaths.has(resolve(tree.path)),
+        output: measured.output ?? null,
+        reason: measured.reason ?? null,
+        detail: measured.detail ?? null,
+      }
+    })
+  if (writers.some((writer) => writer.output?.verdict === 'unmeasurable')) {
+    return { readable: false, writers, reason: 'registered-feature-output-unmeasurable' }
+  }
+  return { readable: true, writers, reason: 'measured' }
+}
+
+const commandValue = (value) => JSON.stringify(String(value))
+
+/** The exact combined `--agent-check` command for one declaration. */
+export function declaredAgentCheckCommand(declaration) {
+  const probe = declaredAgentProbe(declaration)
+  const args = [
+    ...probe.worktrees.flatMap((value) => ['--worktree', commandValue(value)]),
+    ...probe.branches.flatMap((value) => ['--branch', commandValue(value)]),
+    ...probe.logs.flatMap((value) => ['--log', commandValue(value)]),
+  ]
+  return args.length ? `node scripts/batch-in-flight.mjs --agent-check ${args.join(' ')}` : ''
+}
+
+/**
+ * The declaration is the source of truth for `--agent-check`. Explicit output
+ * addresses remain useful for one-off checks, but they augment the recorded
+ * addresses instead of replacing them. A recorded pid comes along only when
+ * every explicit address is already in that declaration: one combined verdict
+ * cannot truthfully apply agent A's pid refutation to foreign agent B output.
+ * We drop pids for that mixed probe instead of splitting the printed verdict,
+ * because its purpose is to answer all named output with one replacement
+ * decision; separate verdicts could again call one quiet address dead while
+ * another address in the same requested probe is moving.
+ */
+export function agentCheckDeclaration(declaration, { worktrees = [], branches = [], logs = [] } = {}) {
+  const base = declaration && typeof declaration === 'object' ? declaration : {}
+  const recordedEvidence = Array.isArray(base.evidence) ? base.evidence : []
+  const key = (item) => {
+    if (item?.kind === 'worktree' || item?.kind === 'log') return `${item.kind}:${String(item.path ?? '').trim()}`
+    if (item?.kind === 'branch') return `branch:${String(item.ref ?? '').trim()}`
+    return null
+  }
+  const explicitEvidence = [
+    ...worktrees.map((path) => ({ kind: 'worktree', path })),
+    ...branches.map((ref) => ({ kind: 'branch', ref })),
+    ...logs.map((path) => ({ kind: 'log', path })),
+  ]
+  const recordedAddresses = new Set(recordedEvidence.map(key).filter(Boolean))
+  const hasForeignAddress = explicitEvidence.some((item) => !recordedAddresses.has(key(item)))
+  const evidence = recordedEvidence.filter((item) => !hasForeignAddress || item?.kind !== 'pid')
+  const seen = new Set(evidence.map(key).filter(Boolean))
+  const add = (item) => {
+    const identity = key(item)
+    if (!identity || seen.has(identity)) return
+    seen.add(identity)
+    evidence.push(item)
+  }
+  for (const item of explicitEvidence) add(item)
+  return { ...base, evidence }
+}
+
+/** Ask every declared child output through the same verdict as `--agent-check`. */
+export function checkDeclaredAgentOutput(declaration, opts = {}) {
+  const probe = declaredAgentProbe(declaration)
+  const command = declaredAgentCheckCommand(declaration)
+  if (!probe.agent) return { checked: false, command, output: null, respawn: false, reason: 'no-declared-agent', detail: '' }
+  return {
+    checked: true,
+    command,
+    ...checkAgentOutput({
+      worktree: probe.worktrees,
+      branch: probe.branches,
+      log: probe.logs,
+      pids: probe.pids,
+      ...opts,
+    }),
+  }
 }
 
 // --- The transferable adoption record (point 675, defeat 2) ---------------------
@@ -528,6 +858,209 @@ export function isAncestor(ancestorSha, sha, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+/** The full command line of `pid`, or null when it cannot be read. Linux/WSL
+ *  reads /proc (NUL-separated argv); Windows asks CIM. Null means UNKNOWN,
+ *  never "not it" — the caller decides what unknown identity is worth.
+ *  MIRRORED by `selfCommandLine` in scripts/verify/run-record.mjs (the record
+ *  writer's own reading, kept as evidence beside the pid): the two must
+ *  present a process identically or the recorded evidence stops matching
+ *  what a live probe would see — change them together. A static
+ *  import either way is off the table: scripts/verify/ is deliberately absent
+ *  from the temp copies the spawned guard tests run in (see runRecordFor). */
+export function processCommandOf(pid) {
+  const n = Number(pid)
+  if (!Number.isInteger(n) || n <= 0) return null
+  if (process.platform !== 'win32') {
+    try {
+      const raw = readFileSync(`/proc/${n}/cmdline`, 'utf8')
+      const cmd = raw.split('\0').filter(Boolean).join(' ').trim()
+      return cmd || null
+    } catch {
+      return null
+    }
+  }
+  try {
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${n}").CommandLine`],
+      { windowsHide: true, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Does this command line say it IS the process a run record describes? PURE,
+ * so the identity rule is pinned without a process table.
+ *
+ * A wrapper NAME identifies only the program, never the RUN: a recycled pid
+ * running `run-logged.mjs polish` satisfied a record for `world`, and `node
+ * unrelated.mjs run-logged.mjs` passed because every argv word was scanned
+ * (Sol round 3, finding 2). Identity is therefore the RECORD's own, in two
+ * gates:
+ *   1. Cheap first gate: the INVOKED script must be run-logged.mjs — the
+ *      first non-flag word after the interpreter, or the program word itself
+ *      when the script runs directly. A process merely HANDED the name as a
+ *      later argument is not the wrapper. Program names are CASE-FOLDED here
+ *      (a Windows spelling is still the program).
+ *   2. The RECORDED LOG PATH must stand as the VALUE of `--log-file` —
+ *      detached (`--log-file <path>`) or attached (`--log-file=<path>`).
+ *      Every RUNNING wrapper's argv carries it there: a `--log-file` launch
+ *      by hand, the default launch by RE-EXEC (run-logged.mjs). Anywhere
+ *      else in argv the path is an OPERAND, not the run — `run-logged.mjs
+ *      --show <log>` is a READER of the recorded log, and gate 1 alone only
+ *      proves "some run-logged.mjs process" (Sol round 5; a plain
+ *      any-word scan stood here and read the reader as alive). A verbatim
+ *      command-line equality stood here even earlier and was an accepted
+ *      break (Sol round 4): a bare default argv is not an identity.
+ *      The path compare is CASE-SENSITIVE: on POSIX `x.log` and `X.log` are
+ *      two files, and folding them conflated two runs (Sol round 5). Only
+ *      separators are normalised (`\` → `/`), matching the record's own
+ *      display form.
+ * ARGV BOUNDARIES: the probed command line is read space-joined from /proc,
+ * so a log path CONTAINING whitespace has no recoverable spelling here. Such
+ * a candidate DENIES outright rather than being matched piecewise (Sol round
+ * 5) — the repo's own log paths carry no spaces, and the false-DENY side is
+ * the rule this whole function follows: one refused transfer and a re-run,
+ * never a mis-read identity.
+ * A caller that can supply NO identity gets false, never a lenient true: the
+ * false-DENY side costs one refused transfer and a re-run, while a stranger
+ * process adopted as the run costs a receipt that never arrives.
+ */
+export function commandNamesRun(command, { logPaths = [] } = {}) {
+  const words = String(command ?? '')
+    .replace(/\\/g, '/')
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return false
+  const isScript = (w) => {
+    const l = w.toLowerCase()
+    return l === 'run-logged.mjs' || l.endsWith('/run-logged.mjs')
+  }
+  const w0 = words[0].toLowerCase()
+  const prog = w0.slice(w0.lastIndexOf('/') + 1).replace(/\.(exe|cmd|bat)$/, '')
+  if (['node', 'nodejs', 'bun', 'deno', 'tsx'].includes(prog)) {
+    // The invoked script is the first non-flag word. A detached interpreter
+    // flag value (`node -r esm run-logged.mjs`) would misread here — that
+    // launch shape does not exist for the wrapper, and the miss DENIES.
+    const invoked = words.slice(1).find((w) => !w.startsWith('-'))
+    if (!invoked || !isScript(invoked)) return false
+  } else if (!isScript(words[0])) {
+    return false
+  }
+  const candidates = (Array.isArray(logPaths) ? logPaths : [logPaths])
+    .map((p) => String(p ?? '').replace(/\\/g, '/').trim())
+    .filter(Boolean)
+  if (candidates.length === 0 || candidates.some((c) => /\s/.test(c))) return false
+  for (let i = 0; i < words.length; i++) {
+    if (words[i] === '--log-file' && words[i + 1] !== undefined && candidates.includes(words[i + 1])) return true
+    if (words[i].startsWith('--log-file=') && candidates.includes(words[i].slice('--log-file='.length))) return true
+  }
+  return false
+}
+
+/**
+ * THE RUN RECORD BESIDE A DECLARED LOG (point 700), reduced to what a successor
+ * needs to adopt the run: what it is (suites, backends), what it covers (HEAD),
+ * what proves it (pid, log) and where its receipt lands (`recordPath` — the
+ * same file, stamped `finished` with the receipt by run-logged.mjs). Null when
+ * no record can be read: a bare log proves nothing and stays non-transferable.
+ * `read` is injectable so the reduction is pinned without a disk.
+ *
+ * The `<log>.run.json` pairing repeats run-record.mjs's `recordPathFor` rather
+ * than importing it: scripts/verify/ is deliberately absent from the temp
+ * copies the spawned guard tests run in, and batch-progress-guard imports this
+ * module — a static import would take every one of those guards down.
+ *
+ * `alive` and `hasReceipt` ride along because the transfer bar demands them
+ * (Sol review of d0aebb6, finding 2): the pid is PROBED here, not believed,
+ * and the receipt's existence is read off the record itself.
+ *
+ * EXISTENCE IS NOT IDENTITY (Sol review of 534c2ba): a signal-0 probe alone
+ * would read a RECYCLED pid — any stranger process that inherited the number
+ * after the wrapper died — as a live run, and the successor would await a
+ * receipt that never arrives. Identity is judged on the process's COMMAND
+ * LINE against the RECORD's own LOG PATH standing as the `--log-file` VALUE
+ * (`commandNamesRun`, Sol rounds 3/5): every RUNNING wrapper's argv carries
+ * it there — a `--log-file` launch by hand, the default launch by RE-EXEC
+ * (run-logged.mjs) — while a `--show` READER of the same log does not, and
+ * must not read as the run. NOT a verbatim command-line
+ * equality: that stood here and broke (Sol round 4) — a recycled pid
+ * re-running the identical bare default invocation compared equal, and an
+ * unrelated run read as alive. A probe that cannot show the recorded path —
+ * a record from before the re-exec existed among them — reads NOT alive:
+ * the false-deny side, one re-run, never a stranger adopted as the run.
+ * DELIBERATELY NOT a start-time compare: the measured 04.08.2026 incident
+ * (findings carrier) showed the derived start time DRIFTS against a recorded
+ * one in this WSL2 container, growing with process age (~3 s at 30 min), and
+ * a fixed-tolerance equality declared LIVE batch owners "pid-reused" and
+ * double-spawned sessions. The probe's start time is at most corroboration
+ * and never the discriminator here. An unreadable command line answers
+ * UNKNOWN (null), which the transfer bar refuses as not-live.
+ */
+export function runRecordFor(logPath, { read, probe = probePid, commandOf = processCommandOf } = {}) {
+  try {
+    const declared = absPath(logPath)
+    if (!declared) return null
+    const path = `${declared}.run.json`
+    const readOne = read ?? ((p) => JSON.parse(readFileSync(p, 'utf8')))
+    const r = readOne(path)
+    if (!r || typeof r !== 'object') return null
+    const pid = typeof r.pid === 'number' ? r.pid : null
+    let alive = null
+    if (pid !== null && pid > 0) {
+      try {
+        if (probe(pid).exists !== true) {
+          alive = false
+        } else {
+          const cmd = commandOf(pid)
+          alive =
+            cmd == null
+              ? null
+              : commandNamesRun(cmd, {
+                  logPaths: [typeof r.log === 'string' ? r.log : '', declared],
+                })
+        }
+      } catch {
+        alive = null // an unprobeable pid is UNKNOWN, which the bar reads as not-live
+      }
+    }
+    return {
+      recordPath: path,
+      suites: Array.isArray(r.suites) ? r.suites : [],
+      backends: Array.isArray(r.backends) ? r.backends : [],
+      head: typeof r.head === 'string' ? r.head : null,
+      pid,
+      alive,
+      log: typeof r.log === 'string' ? r.log : null,
+      status: typeof r.status === 'string' ? r.status : null,
+      hasReceipt: r.receipt != null && typeof r.receipt === 'object',
+    }
+  } catch {
+    return null
+  }
+}
+
+/** The short HEAD of this checkout, or null — what a handed-over run must
+ *  cover. Any git failure answers null, which the transfer bar refuses as
+ *  unverifiable rather than waving through. */
+export function currentHeadOf({ cwd = REPO_ROOT } = {}) {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
 /** The declaration's evidence, annotated with checkpoints for `assessTransfer`. */
 export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
   const out = []
@@ -541,6 +1074,9 @@ export function transferItems(declaration, { cwd = REPO_ROOT } = {}) {
         describe: `worktree ${e.path}`,
         checkpoint: ref ? checkpointOf(ref, { cwd }) : null,
       })
+    } else if (e?.kind === 'log') {
+      // A declared run is adoptable through its run record (point 700).
+      out.push({ kind: 'log', describe: `log ${e.path}`, checkpoint: null, run: runRecordFor(e.path) })
     } else {
       out.push({ kind: String(e?.kind ?? ''), describe: `${e?.kind ?? '?'} ${e?.pid ?? e?.path ?? ''}`.trim(), checkpoint: null })
     }
@@ -561,8 +1097,17 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration) return { blocked: false, note: '', commit: null }
-  const summarise = (checkpoints) =>
-    (checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  const summarise = (checkpoints, runs) =>
+    [
+      ...(checkpoints ?? []).map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`),
+      // A handed-over RUN is named by what it is and where its receipt lands
+      // (point 700), so the successor's first command is a read, not a restart.
+      ...(runs ?? []).map(
+        (r) =>
+          `run ${(r.suites ?? []).join('+') || '?'}${(r.backends ?? []).length ? `@${r.backends.join('/')}` : ''} ` +
+          `(receipt ${r.recordPath})`,
+      ),
+    ].join(', ') || 'no checkpoints'
   // IDEMPOTENT (Sol review of 807c2bf, finding 6): a declaration already
   // transferred and not yet adopted is not re-judged and not re-transferred —
   // the record awaiting adoption IS the handover's state, and `commit` only
@@ -570,8 +1115,8 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
   if (declaration.transfer && !declaration.adopted) {
     return {
       blocked: false,
-      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints)})`,
-      commit: () => summarise(declaration.transfer.checkpoints),
+      note: `a transferred declaration already awaits adoption (${summarise(declaration.transfer.checkpoints, declaration.transfer.runs)})`,
+      commit: () => summarise(declaration.transfer.checkpoints, declaration.transfer.runs),
     }
   }
   // SESSION-BOUND (same finding): a declaration this owner cannot be resolved
@@ -594,20 +1139,96 @@ export function gatherHandoverTransfer(sid, { cwd = REPO_ROOT, lockPath = LOCK_P
       commit: null,
     }
   }
-  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }) })
+  const assessment = assessTransfer({ items: transferItems(declaration, { cwd }), headNow: currentHeadOf({ cwd }) })
   if (!assessment.transferable) {
     return { blocked: true, message: transferBlockMessage(assessment), note: '', commit: null }
   }
-  const summary =
-    assessment.checkpoints.map((c) => `${c.ref ?? '?'}@${String(c.sha).slice(0, 8)}`).join(', ') || 'no checkpoints'
+  const summary = summarise(assessment.checkpoints, assessment.runs)
   return {
     blocked: false,
-    note: `the declared in-flight work is transferable (pushed checkpoints: ${summary})`,
+    note: `the declared in-flight work is transferable (${summary})`,
     commit: () => {
-      writeDeclaration(markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints }), path)
+      writeDeclaration(
+        markTransferred({ declaration, bySid: sid, now, checkpoints: assessment.checkpoints, runs: assessment.runs }),
+        path,
+      )
       return summary
     },
   }
+}
+
+/**
+ * TURN A NON-OWNER STOP INTO THE OLD OWNER'S BOUNDARY (point 716).
+ *
+ * The pure decision distinguishes a plain stand-down from a live/unknown child.
+ * This wrapper asks the existing agent-output verdict and the existing transfer
+ * gatherer, then commits only the declaration that still names `sid`. A failed
+ * or uncheckpointed transfer is returned as a block: ending the parent there is
+ * the work-loss path this boundary closes.
+ */
+export function gatherStandDownBoundary(
+  sid,
+  { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {},
+) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return {
+      action: 'block',
+      reason: 'declaration-unreadable',
+      declaration: null,
+      agentCheck: { reason: 'output-unmeasurable', detail: 'the in-flight declaration could not be read' },
+      command: 'node scripts/batch-in-flight.mjs --status',
+      message: 'the in-flight declaration exists but could not be read',
+    }
+  }
+  const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
+  const transfer = gatherHandoverTransfer(sid, { cwd, lockPath, now })
+  const decision = standDownBoundaryDecision({
+    sid,
+    declaration,
+    agentCheck,
+    transfer: { available: typeof transfer.commit === 'function', blocked: transfer.blocked === true },
+  })
+  if (decision.action !== 'transfer') {
+    return { ...decision, declaration, agentCheck, command: agentCheck.command, message: transfer.message ?? '' }
+  }
+  try {
+    const summary = transfer.commit()
+    return {
+      action: 'transferred',
+      reason: decision.reason,
+      declaration: readDeclaration(path),
+      agentCheck,
+      command: agentCheck.command,
+      summary,
+      message: '',
+    }
+  } catch (error) {
+    return {
+      action: 'block',
+      reason: 'transfer-write-failed',
+      declaration,
+      agentCheck,
+      command: agentCheck.command,
+      message: String(error?.message ?? error),
+    }
+  }
+}
+
+/** Child-aware orientation for a session that now owns the batch. */
+export function gatherSuccessorAgentOrientation(sid, { lockPath = LOCK_PATH, now = Date.now(), agentProbes = {} } = {}) {
+  const path = statePathsFor(lockPath).inFlightPath
+  const declaration = readDeclaration(path)
+  if (!declaration && existsSync(path)) {
+    return (
+      'PREDECESSOR CHILD STATE UNKNOWN: the in-flight declaration exists but could not be read. The lock does not ' +
+      'answer for children, so do not call an agent dead. Inspect `node scripts/batch-in-flight.mjs --status`, then ' +
+      'probe each named worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.'
+    )
+  }
+  const agentCheck = checkDeclaredAgentOutput(declaration, { now, ...agentProbes })
+  return successorAgentOrientation({ declaration, sid, agentCheck, command: agentCheck.command })
 }
 
 /**
@@ -682,14 +1303,17 @@ export function selfAdoptionRefusal({ declaration, marker, sid, now = Date.now()
  * under the adopting session's own identity, so every existing probe
  * (`gatherInFlight`, the launcher) keeps working on it unchanged.
  */
-export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now() } = {}) {
+export function adoptTransferred(
+  sid,
+  { cwd = REPO_ROOT, lockPath = LOCK_PATH, now = Date.now(), probeSet = probes } = {},
+) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
   if (!declaration || !declaration.transfer) return { adopted: false, reason: 'no-transferred-declaration', alerts: [] }
   const self = selfAdoptionRefusal({ declaration, marker: readBoundaryMarker(lockPath), sid, now })
   if (self) return { adopted: false, reason: self.reason, alerts: [self.alert] }
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
-  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probeSet }))
   const checkpointStates = (declaration.transfer.checkpoints ?? []).map((c) => {
     const cp = c?.ref ? checkpointOf(c.ref, { cwd }) : null
     return {
@@ -702,18 +1326,17 @@ export function adoptTransferred(sid, { cwd = REPO_ROOT, lockPath = LOCK_PATH, n
   const assessment = adoptionAssessment({ items, checkpointStates })
   if (!assessment.adopt) return { adopted: false, reason: 'refused', alerts: assessment.alerts }
   const lock = readOwnerLock(lockPath)
-  writeDeclaration(
-    {
-      ...declaration,
-      sessionId: sid,
-      pid: typeof lock?.pid === 'number' ? lock.pid : null,
-      pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
-      at: now,
-      evidence: evidence.filter((_, i) => items[i]?.ok === true),
-      adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
-    },
-    path,
-  )
+  const adopted = {
+    ...declaration,
+    sessionId: sid,
+    pid: typeof lock?.pid === 'number' ? lock.pid : null,
+    pidStartedAt: typeof lock?.pidStartedAt === 'number' ? lock.pidStartedAt : null,
+    at: now,
+    evidence: evidence.filter((_, i) => items[i]?.ok === true),
+    adopted: { from: declaration.transfer.by || declaration.sessionId || null, at: now },
+  }
+  writeDeclaration(adopted, path)
+  emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, adopted, { at: now })
   return {
     adopted: true,
     reason: 'adopted',
@@ -779,8 +1402,9 @@ if (isMain) {
   }
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
-    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
-    '--agent-check [--worktree PATH] [--branch REF] [--log PATH] | --handover-check | --adopt'
+    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] ' +
+    '[--durable-batch ID --durable-point ID --durable-attempt ID [--transferable]] | --status | --clear | ' +
+    '--agent-check [--worktree PATH]… [--branch REF]… [--log PATH]… | --handover-check | --adopt'
 
   if (argv[0] === '--handover-check') {
     // May the boundary hand the declared work to a successor (point 675)?
@@ -825,21 +1449,35 @@ if (isMain) {
     )
     process.exit(0)
   } else if (argv[0] === '--agent-check') {
-    const opt = (name) => {
-      const i = argv.indexOf(name)
-      return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null
-    }
-    const worktree = opt('--worktree')
-    const branch = opt('--branch')
-    const log = opt('--log')
-    if (!worktree && !branch && !log) {
+    const opts = (name) =>
+      argv.flatMap((value, i) => (value === name && i + 1 < argv.length ? [argv[i + 1]] : []))
+    const worktrees = opts('--worktree')
+    const branches = opts('--branch')
+    const logs = opts('--log')
+    const declaration = agentCheckDeclaration(readDeclaration(), { worktrees, branches, logs })
+    const recorded = declaredAgentProbe(declaration)
+    if (!recorded.agent) {
       fail(
-        'nothing to check. Name what the agent PRODUCES — its worktree (--worktree PATH) and/or its branch ' +
-          `(--branch REF); --log PATH may ride along but never decides.\n${usage}`,
+        'nothing to check. Record what the agent produces in the in-flight declaration, or name its worktree ' +
+          '(--worktree PATH) and/or branch (--branch REF); --log PATH may ride along but never decides.\n' +
+          usage,
       )
     }
-    const r = checkAgentOutput({ worktree, branch, log })
-    console.log(JSON.stringify({ worktree, branch, log, graceMs: RESPAWN_GRACE_MS, ...r }, null, 2))
+    const r = checkDeclaredAgentOutput(declaration)
+    console.log(
+      JSON.stringify(
+        {
+          worktrees: recorded.worktrees,
+          branches: recorded.branches,
+          logs: recorded.logs,
+          pids: recorded.pids.map(({ pid, startedAt, label }) => ({ pid, startedAt, ...(label ? { label } : {}) })),
+          graceMs: RESPAWN_GRACE_MS,
+          ...r,
+        },
+        null,
+        2,
+      ),
+    )
     if (r.respawn) {
       console.log(
         `\nA REPLACEMENT IS PERMITTED: ${r.detail} (judged on ${r.judgedOn}). Re-run this exact command in the ` +
@@ -857,7 +1495,8 @@ if (isMain) {
     )
     process.exit(1)
   } else if (argv[0] === '--clear') {
-    const refusal = transferredMutationRefusal({ declaration: readDeclaration(), marker: readBoundaryMarker() })
+    const prior = readDeclaration()
+    const refusal = transferredMutationRefusal({ declaration: prior, marker: readBoundaryMarker() })
     if (refusal) fail(refusal)
     clearDeclaration()
     // …and the lease extension the declaration bought (point 556). The lock must
@@ -866,6 +1505,7 @@ if (isMain) {
     // to condition it on is just a stale field. The lease ITSELF is left where it
     // stands — pulling it back would shorten a window the owner is entitled to.
     clearDeclaredWait(sid)
+    emitDelegated(ACTIVITY_EVENTS.DELEGATED_FINISH, prior, { result: 'cleared' })
     console.log('in-flight declaration cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
@@ -893,10 +1533,25 @@ if (isMain) {
     if (commitRefusal) fail(commitRefusal)
     const evidence = []
     let slotsFreeReason = ''
+    // The durable-lane adoption record (point 834, union M17): stable batch,
+    // point and attempt identities plus an explicit transferable flag. The
+    // block is all-or-nothing; batch-adoption-core refuses half of one.
+    const durableFields = {}
+    let transferableFlag = null
     for (let i = 2; i < argv.length; i += 2) {
       const flag = argv[i]
+      if (flag === '--transferable') {
+        // A bare flag: it consumes no value, so step back by one.
+        transferableFlag = true
+        i -= 1
+        continue
+      }
       const value = argv[i + 1]
       if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+      if (flag === '--durable-batch' || flag === '--durable-point' || flag === '--durable-attempt') {
+        durableFields[flag.slice('--durable-'.length)] = String(value).trim()
+        continue
+      }
       if (flag === '--slots-free') {
         // Point 427: not evidence, a REASON. It answers "why do the free pool slots
         // stay free", and the guard demands it only when they demonstrably could not.
@@ -968,6 +1623,30 @@ if (isMain) {
           'batch. Nothing recorded.',
       )
     }
+    // The all-or-nothing durable block: its process identity is the declared
+    // --pid evidence, because a successor adopts by pid AND start time (M17) —
+    // naming an attempt without its process would leave exactly the guess this
+    // record exists to remove.
+    let durable = null
+    if (transferableFlag !== null || Object.keys(durableFields).length > 0) {
+      const pidEvidence = evidence.find((e) => e.kind === 'pid')
+      if (!pidEvidence) {
+        fail(
+          'a durable adoption record identifies its worker process: declare --pid <worker pid> beside ' +
+            '--durable-batch/--durable-point/--durable-attempt. Nothing recorded.',
+        )
+      }
+      const built = durableBlock({
+        batchId: durableFields.batch,
+        pointId: durableFields.point,
+        attemptId: durableFields.attempt,
+        pid: pidEvidence.pid,
+        pidStartedAt: pidEvidence.startedAt,
+        transferable: transferableFlag === true,
+      })
+      if (!built.ok) fail(`${built.reason}. Nothing recorded.`)
+      durable = built.durable
+    }
     const now = Date.now()
     const declaration = {
       v: 1,
@@ -982,6 +1661,10 @@ if (isMain) {
       // Empty string when not given, so the decision sees "no reason" rather than
       // an absent field it has to interpret (point 427).
       slotsFree: slotsFreeReason,
+      // Absent for today's declarations; present only where a daemon-owned run
+      // was declared adoptable (point 834). Nothing below reads it yet — the
+      // successor tooling of step 8 does.
+      ...(durable ? { durable } : {}),
     }
     // Verify NOW, so a typo is caught here and not at a turn end that then blocks
     // with a reason nobody expected.
@@ -1013,6 +1696,7 @@ if (isMain) {
     const etaRefusal = waitEtaRefusal({ html: boardHtml, nowMinutes: berlinMinutes() })
     if (etaRefusal) fail(etaRefusal)
     writeDeclaration(declaration)
+    emitDelegated(ACTIVITY_EVENTS.DELEGATED_START, declaration, { at: now })
     // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
     // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a
     // longer lease when work is declared"). This is the answer to the incident of
@@ -1042,6 +1726,13 @@ if (isMain) {
         'must still be moving), so re-declare after every change and clear it with --clear when the ' +
         'wait is over. The batch lock stays HELD: no successor is spawned, this session is still the batch.',
     )
+    // A declared wait is visible to the launcher but left no trace on the board.
+    // OPTIONAL bookkeeping, imported lazily and swallowed whole: this command
+    // must still run where the board stack is absent — the CLI fixtures build a
+    // minimal repo — and a board that cannot follow must never fail the work.
+    await import('./board-heartbeat.mjs')
+      .then((m) => m.heartbeat({ trigger: m.TRIGGERS.IN_FLIGHT, detail: `Wartestellung: ${waitingOn}` }))
+      .catch(() => {})
   } else {
     fail(`unknown option "${argv[0]}".\n${usage}`)
   }

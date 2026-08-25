@@ -23,6 +23,10 @@ export interface LabelledActor {
   dead?: boolean
   /** Deliberately hidden right now (§19.16) — collected, but not named. */
   concealed?: boolean
+  /** Carries a permanent label of its own — collected, but not named twice. */
+  permanentLabel?: boolean
+  /** The traveller's own canoe — collected, but not named (see the predicate). */
+  ownedByPlayer?: boolean
   x: number
   /** Where the label floats: at the top of the thing, not at its feet. */
   y: number
@@ -56,6 +60,12 @@ export interface ActorMark {
   kind: ActorKind
   age?: ActorAge
   height: number
+  /** This object draws a label of its own at all times (a pitched camp). It
+   *  stays a collected candidate — the layer simply does not name it a second
+   *  time (`qualifiesAsActor`). */
+  permanentLabel?: boolean
+  /** The player's own vehicle — the ridden or dragged canoe. Same treatment. */
+  ownedByPlayer?: boolean
 }
 
 /** Tag an object as an actor: `<group userData={markActor({ … })}>`. */
@@ -85,7 +95,15 @@ export function pushMarkedActors(root: MarkedNode | null | undefined, out: Label
     // Uniform world scale as the length of the first basis column — the same
     // reading recordDrawnBody takes for the wildlife colliders.
     const scale = Math.hypot(m[0], m[1], m[2])
-    out.push({ kind: mark.kind, age: mark.age, x: m[12], y: m[13] + mark.height * scale, z: m[14] })
+    out.push({
+      kind: mark.kind,
+      age: mark.age,
+      permanentLabel: mark.permanentLabel,
+      ownedByPlayer: mark.ownedByPlayer,
+      x: m[12],
+      y: m[13] + mark.height * scale,
+      z: m[14],
+    })
   }
   const children = root.children
   if (children === undefined) return

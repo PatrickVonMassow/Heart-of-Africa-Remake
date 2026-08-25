@@ -10,7 +10,7 @@
 // allow, so a guard bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
-import { evaluate } from './queue-order-guard-core.mjs'
+import { evaluate, releaseBoundaryProblem } from './queue-order-guard-core.mjs'
 import { closedPointsOf, openPointsOf } from './board-queue-core.mjs'
 import { ARCHIVE_PATH } from './tasks-source.mjs'
 import { RANK_RECORD_PATH, parseRankRecord, settleRecord } from './queue-rank-core.mjs'
@@ -98,7 +98,12 @@ function settleBaseline({ tasksMd, rankRecordJson }, path = RANKS) {
     // reading the 1.3 MB archive for, and it is the case that never happens on
     // an ordinary turn.
     const closed = open.length ? [] : closedPointsOf(`${tasksMd}\n${readIfPresent(ARCHIVE_PATH)}`)
-    const settled = settleRecord(open, record, { at: new Date().toISOString(), closed })
+    // AND THE RELEASE BOUNDARY FREEZES IT TOO (point 789). A breaching point is
+    // new only as long as the baseline does not remember it, so settling the
+    // order at the turn end that first saw the breach would answer the question
+    // by forgetting it. `settleRecord` shrinks either way; it only stops growing.
+    const blocked = releaseBoundaryProblem(tasksMd, rankRecordJson).breaches.map((b) => b.point)
+    const settled = settleRecord(open, record, { at: new Date().toISOString(), closed, blocked })
     if (settled.changed) writeTextAtomic(path, `${JSON.stringify(settled.record, null, 2)}\n`)
   } catch (e) {
     console.error(`queue-order-guard: could not settle the rank baseline (continuing): ${e && e.message}`)

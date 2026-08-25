@@ -199,6 +199,60 @@ describe('every kind the roster can name is really drawn by some scene', () => {
     for (const kind of markedLiterals()) expect(known.has(kind), `markActor kind ${kind}`).toBe(true)
   })
 
+  // --- Named ONCE, and never the player's own boat (point 628) ---------------
+  //
+  // Both halves are about what the layer PROMISES, so both are asked of the
+  // real call sites as well as of the rule: a flag dropped at the figure is
+  // exactly how the doubling came back.
+
+  const travelSource = () => {
+    const travel = SOURCES.find((s) => s.path.endsWith('TravelScene.tsx'))
+    expect(travel, 'TravelScene.tsx').toBeDefined()
+    return travel!.text
+  }
+
+  it('a pitched camp offers exactly one label — the permanent one it draws itself', () => {
+    const out: LabelledActor[] = []
+    pushMarkedActors(node(3, 0, -4, { userData: markActor({ kind: 'camp', height: 2.2, permanentLabel: true }) }), out)
+    // Still a candidate — the camp stays in the roster (point 342) …
+    expect(out).toHaveLength(1)
+    expect(out[0].kind).toBe('camp')
+    // … it is simply not named a SECOND time over the name already standing.
+    expect(qualifiesAsActor(out[0])).toBe(false)
+  })
+
+  it('the travel scene really flags the camp whose name it already draws', () => {
+    const text = travelSource()
+    const camp = /markActor\(\{[^}]*kind: 'camp'[^}]*\}\)/.exec(text)
+    expect(camp?.[0]).toContain('permanentLabel: true')
+    expect(text, 'the permanent camp label the flag refers to').toContain('{t.labels.camp}')
+  })
+
+  it('the canoe the traveller rides or drags is not named at all', () => {
+    for (const height of [0.9, 0.7]) {
+      const out: LabelledActor[] = []
+      pushMarkedActors(node(0, 0, 0, { userData: markActor({ kind: 'canoe', height, ownedByPlayer: true }) }), out)
+      expect(out).toHaveLength(1)
+      expect(qualifiesAsActor(out[0]), `canoe at height ${height}`).toBe(false)
+    }
+  })
+
+  it('a canoe set down in the world keeps its own name', () => {
+    const out: LabelledActor[] = []
+    pushMarkedActors(node(2, 0, 2, { userData: markActor({ kind: 'canoe', height: 0.7 }) }), out)
+    expect(out).toHaveLength(1)
+    expect(qualifiesAsActor(out[0])).toBe(true)
+    expect(actorLabelText(en, { kind: 'canoe' })).toBe('Canoe')
+    expect(actorLabelText(de, { kind: 'canoe' })).toBe('Kanu')
+  })
+
+  it('both canoes the travel scene draws are flagged as the player\'s own', () => {
+    const canoes = [...travelSource().matchAll(/markActor\(\{[^}]*kind: 'canoe'[^}]*\}\)/g)].map((m) => m[0])
+    // The ridden hull and the dragged trailer — both are his.
+    expect(canoes).toHaveLength(2)
+    for (const canoe of canoes) expect(canoe).toContain('ownedByPlayer: true')
+  })
+
   it('the Giza plateau really draws all six of the kinds it can name', () => {
     expect(new Set(GIZA_AMBIENT.map((a) => a.role))).toEqual(
       new Set(['guide', 'cameleer', 'donkeyboy', 'tourist', 'camel', 'donkey']),

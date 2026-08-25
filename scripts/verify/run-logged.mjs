@@ -38,39 +38,46 @@
 //   --keep N        the structured-line budget of the end digest (default 120)
 //   --tail N        raw tail lines on a failure (default 40)
 //   --log-file P    write the log here instead of local/verify-logs/<stamp>.log
+//                   (a launch WITHOUT it re-execs itself with the resolved path
+//                   appended — the record writer's argv must name its log; see
+//                   `commandNamesRun` in scripts/batch-in-flight.mjs)
 import { spawn } from 'node:child_process'
 import { createWriteStream, mkdirSync, readFileSync } from 'node:fs'
+import { constants as osConstants } from 'node:os'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
+import { buildDigest, createSelector, failureSurface, showWindow } from './run-digest-core.mjs'
 import { backendsFrom, buildReceipt, formatReceipt, planRun } from './run-wait-core.mjs'
-import { framesWrittenSince, gitPosition, readRecord, recordPathFor, writeRecord } from './run-record.mjs'
+import { framesWrittenSince, gitPosition, readRecord, recordPathFor, selfCommandLine, writeRecord } from './run-record.mjs'
+import { emitActivity } from '../batch-activity-journal.mjs'
+import { ACTIVITY_EVENTS } from '../batch-activity-journal-core.mjs'
+import { budgetToolOutput } from '../tool-output-budget-core.mjs'
+import { parseRunLoggedArgs } from './run-logged-args.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
+const PROGRESS_LEASE_MS = 15 * 60_000
+const PROGRESS_EMIT_MS = 60_000
+const RUNNER_STARTED_AT = Date.now() - Math.round(process.uptime() * 1000)
 
-/** Split our own flags out of the argv; everything else goes to run-all. */
-function parseOwnArgs(argv) {
-  const own = { show: null, grep: null, tail: DEFAULTS.tailLines, max: 400, keep: DEFAULTS.maxKeptLines, stream: false, quiet: false, logFile: null }
-  const forward = []
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]
-    const value = () => argv[++i]
-    if (a === '--show') own.show = value()
-    else if (a === '--grep') own.grep = value()
-    else if (a === '--tail') own.tail = Number(value())
-    else if (a === '--max') own.max = Number(value())
-    else if (a === '--keep') own.keep = Number(value())
-    else if (a === '--log-file') own.logFile = value()
-    else if (a === '--stream') own.stream = true
-    else if (a === '--quiet') own.quiet = true
-    else forward.push(a)
-  }
-  if (!Number.isFinite(own.tail)) own.tail = DEFAULTS.tailLines
-  if (!Number.isFinite(own.max)) own.max = 400
-  if (!Number.isFinite(own.keep)) own.keep = DEFAULTS.maxKeptLines
-  return { own, forward }
+function emitRunActivity(event, { at = Date.now(), recordPath, command, startedAt, leaseUntil = null, result = null } = {}) {
+  emitActivity({
+    event,
+    at,
+    session: process.env.CLAUDE_SESSION_ID ?? process.env.HOA_SESSION_ID ?? null,
+    pid: process.pid,
+    pidStartedAt: RUNNER_STARTED_AT,
+    generation: null,
+    cause: 'named-verification-run',
+    evidence: { id: recordPath, recordPath, command, startedAt, leaseUntil, result },
+  })
 }
+
+/** The termination signals both layers FORWARD to their child rather than
+ *  dying around it — SIGHUP/SIGQUIT beside the classic two (Sol round 5), so
+ *  a hangup reaches the runner instead of killing a middle layer and
+ *  orphaning it. */
+const FORWARDED_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
 
 /** `2026-08-07T14-31-09-large.log` — sortable, and it says what it ran. */
 function logPathFor(args, own) {
@@ -101,11 +108,27 @@ function showLog(path) {
     return 1
   }
   const all = text.split(/\r?\n/)
-  const win = showWindow(all, { grep: own.grep, tail: own.tail, max: own.max })
-  const what = own.grep ? `${win.matched} line(s) matching /${own.grep}/i of ${all.length}` : `${all.length} line(s)`
-  console.log(`── ${forDisplay(full)} — ${what}; showing the last ${win.lines.length}${win.truncated > 0 ? ` (${win.truncated} not shown)` : ''}`)
-  for (const l of win.lines) console.log(l)
-  return 0
+  const shown = forDisplay(full)
+  try {
+    const win = showWindow(all, { grep: own.grep, tail: own.tail, max: own.max })
+    const what = own.grep ? `${win.matched} line(s) matching /${own.grep}/i of ${all.length}` : `${all.length} line(s)`
+    const selected = [
+      `── ${shown} — ${what}; showing the last ${win.lines.length}${win.truncated > 0 ? ` (${win.truncated} not shown)` : ''}`,
+      ...win.lines,
+    ].join('\n')
+    process.stdout.write(budgetToolOutput({ text: selected, exitCode: 0, logPath: shown, command: 'run-logged --show' }).text)
+    return 0
+  } catch (error) {
+    process.stdout.write(
+      budgetToolOutput({
+        text: `ERROR: could not select a log window: ${error?.message ?? String(error)}`,
+        exitCode: 1,
+        logPath: shown,
+        command: 'run-logged --show',
+      }).text,
+    )
+    return 1
+  }
 }
 
 /**
@@ -149,6 +172,20 @@ function closeRecord({ lines, exitCode, started, recordPath, baseRecord }) {
       framesWritten,
       receipt,
     })
+    emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_FINISH, {
+      at: receipt.finishedAt,
+      recordPath,
+      command: baseRecord.command,
+      startedAt: baseRecord.startedAt,
+      result: {
+        exitCode,
+        status: exitCode === 0 ? 'green' : 'red',
+        head: receipt.head,
+        branch: receipt.branch,
+        framesExpected: receipt.framesExpected,
+        framesWritten: receipt.framesWritten,
+      },
+    })
     return formatReceipt(receipt)
   } catch (err) {
     return [`── verify receipt ── unavailable (${err?.message ?? err}); the digest above and the log still stand.`]
@@ -189,12 +226,25 @@ function runVerify() {
     polls: 0,
     status: 'running',
     pid: process.pid,
+    // The writer's own argv, recorded as EVIDENCE. The identity the transfer
+    // probe matches is the LOG PATH inside it — guaranteed present because a
+    // launch without --log-file re-execs itself with the path appended (a bare
+    // argv is no identity: a recycled pid re-running the identical default
+    // invocation must not read as this run — Sol round 4).
+    cmdline: selfCommandLine(),
     finishedAt: null,
     exitCode: null,
     framesWritten: null,
     receipt: null,
   }
   writeRecord(recordPath, baseRecord)
+  emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_START, {
+    at: started,
+    recordPath,
+    command,
+    startedAt: started,
+    leaseUntil: started + PROGRESS_LEASE_MS,
+  })
 
   const child = spawn(process.execPath, [join(HERE, 'run-all.mjs'), ...forward], {
     windowsHide: true,
@@ -209,11 +259,23 @@ function runVerify() {
   const select = createSelector()
   let rawChars = 0
   let pending = ''
+  let lastProgressEmittedAt = started
 
   function consume(chunk) {
     const text = String(chunk)
     rawChars += text.length
     log.write(text)
+    const progressAt = Date.now()
+    if (text.length > 0 && progressAt - lastProgressEmittedAt >= PROGRESS_EMIT_MS) {
+      lastProgressEmittedAt = progressAt
+      emitRunActivity(ACTIVITY_EVENTS.VERIFICATION_PROGRESS, {
+        at: progressAt,
+        recordPath,
+        command,
+        startedAt: started,
+        leaseUntil: progressAt + PROGRESS_LEASE_MS,
+      })
+    }
     pending += text
     const parts = pending.split(/\r?\n/)
     pending = parts.pop() ?? ''
@@ -228,7 +290,7 @@ function runVerify() {
   child.stdout.on('data', consume)
   child.stderr.on('data', consume)
 
-  for (const sig of ['SIGINT', 'SIGTERM']) {
+  for (const sig of FORWARDED_SIGNALS) {
     process.on(sig, () => {
       try {
         child.kill(sig)
@@ -259,8 +321,16 @@ function runVerify() {
       maxKeptLines: own.keep,
       tailLines: own.tail,
     })
-    console.log(digest.text)
-    for (const line of closeRecord({ lines, exitCode, started, recordPath, baseRecord })) console.log(line)
+    const receipt = closeRecord({ lines, exitCode, started, recordPath, baseRecord })
+    const endBlock = `${[digest.text, ...receipt].join('\n')}\n`
+    process.stdout.write(
+      budgetToolOutput({
+        text: endBlock,
+        exitCode,
+        logPath: shown,
+        command: 'run-logged verify digest',
+      }).text,
+    )
     // NOT process.exit(): stdout may be a pipe, and an explicit exit can drop
     // what is still buffered in it — which is the digest itself. Setting the code
     // and letting the loop drain keeps the caller's copy complete.
@@ -283,6 +353,68 @@ function runVerify() {
   })
 }
 
-const { own, forward } = parseOwnArgs(process.argv.slice(2))
+// ── The default launch RE-EXECS itself with the log path in argv ────────────
+// (point 700, Sol round 4). The run record's liveness probe identifies the
+// wrapper by the RECORDED LOG PATH standing in the probed process's own argv
+// (`commandNamesRun` in scripts/batch-in-flight.mjs) — a bare argv is not an
+// identity: a recycled pid re-running the identical default command line would
+// read as THIS run. So a launch that names no `--log-file` computes the path
+// once and re-execs itself with it appended; the record writer's argv then
+// always names its log. Costs one idle shim process for the run's duration —
+// Node has no in-place exec — which is nothing beside a browser regression.
+// The shim WAITS for the child however long it runs — a child that ignores a
+// forwarded signal included. Sol round 5 read that as "can remain alive
+// indefinitely"; it is INTENDED: waiting for the child IS the shim's job, its
+// exit status is the run's verdict, and the handlers below only forward —
+// they never end the shim while the child lives. What round 5 did find real
+// is the exit SHAPE: `code === null ? 1` flattened a signal-killed child into
+// an ordinary exit-1 failure, so an interrupted run recorded as a red one.
+// The termination is now REPRODUCED instead — see the close handler.
+function reexecWithLogPath() {
+  const logPath = logPathFor(forward, own)
+  // The DISPLAY form (ROOT-relative where possible): it is what the record's
+  // `log` field will carry, so argv word and recorded path compare equal.
+  const child = spawn(process.execPath, [...process.argv.slice(1), '--log-file', forDisplay(logPath)], {
+    windowsHide: true,
+    stdio: 'inherit',
+    env: process.env,
+  })
+  for (const sig of FORWARDED_SIGNALS) {
+    process.on(sig, () => {
+      try {
+        child.kill(sig)
+      } catch {
+        /* already gone */
+      }
+    })
+  }
+  child.on('close', (code, signal) => {
+    if (signal) {
+      // A signal-killed child is reproduced, not flattened to exit 1 (Sol
+      // round 5). Our own forwarders come off first, so the re-raise reaches
+      // the default disposition instead of a handler whose child is already
+      // gone.
+      for (const sig of FORWARDED_SIGNALS) process.removeAllListeners(sig)
+      try {
+        process.kill(process.pid, signal)
+      } catch {
+        /* a signal this platform cannot re-raise — fall through */
+      }
+      // Reached when the signal could not be re-raised (or until it lands):
+      // 128+n is the shell's own spelling of a death by that signal.
+      const num = osConstants.signals[signal]
+      process.exitCode = typeof num === 'number' ? 128 + num : 1
+      return
+    }
+    process.exitCode = code === null ? 1 : code
+  })
+  child.on('error', (err) => {
+    console.log(`FAIL  run-logged   could not re-exec with the log path: ${err.message}`)
+    process.exitCode = 1
+  })
+}
+
+const { own, forward } = parseRunLoggedArgs(process.argv.slice(2))
 if (own.show) process.exitCode = showLog(own.show)
-else runVerify()
+else if (own.logFile) runVerify()
+else reexecWithLogPath()

@@ -15,12 +15,15 @@ import {
   commandHead,
   gitSubcommand,
   segmentIntent,
+  directSegmentIntent,
   isMutatingSegment,
   firstMutatingSegment,
   segmentInvokesScript,
+  segmentInvokesPathWhere,
   segmentMentionsFile,
   nestedCommands,
   expandSegments,
+  posixNormalizePath,
 } from './command-classify-core.mjs'
 
 describe('the lexer', () => {
@@ -45,6 +48,18 @@ describe('the lexer', () => {
     const [seg] = parseSegments('node x.mjs 2>&1')
     expect(seg.words.map((w) => w.text)).toEqual(['node', 'x.mjs'])
     expect(seg.redirects).toEqual([{ fd: '2', op: '>&', target: '1' }])
+  })
+
+  it('does not turn here-document bodies into commands', () => {
+    const command = ["cat <<'REPORT'", 'git push origin main', 'REPORT'].join('\n')
+    expect(shellSegments(command)).toEqual(["cat <<'REPORT'"])
+    expect(isMutatingSegment(command)).toBe(false)
+  })
+
+  it('resumes command lexing after a here-document terminator', () => {
+    const command = ['cat <<-REPORT', '\tquoted git push origin main', '\tREPORT', 'git push origin main'].join('\n')
+    expect(shellSegments(command)).toEqual(['cat <<-REPORT', 'git push origin main'])
+    expect(isMutatingSegment(command)).toBe(true)
   })
 
   it('leaves a backslash alone — half this project\'s paths are Windows paths', () => {
@@ -121,6 +136,8 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git diff --stat',
     'git branch -a',
     'git branch --contains main',
+    'git submodule status',
+    'git symbolic-ref HEAD',
     'git worktree list', // THE measured regression of 30.07.2026
     'git worktree list --porcelain',
     'git stash list',
@@ -135,6 +152,7 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git rev-parse HEAD',
     'git describe --tags',
     'git commit --help',
+    'git fetch --help',
   ]
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
 
@@ -165,6 +183,14 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git branch -m old new',
     'git remote add origin url',
     'git config user.name "someone"',
+    'git pull --rebase origin main',
+    'git fetch --prune',
+    'git update-ref refs/heads/main abc123',
+    'git branch feat/x',
+    'git branch -f main abc123',
+    'git gc --prune=now',
+    'git submodule update --init',
+    'git symbolic-ref HEAD refs/heads/x',
   ]
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
 
@@ -181,6 +207,68 @@ describe('package managers — `ls` reads, `run` writes', () => {
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
   const writes = ['npm run build', 'npm install', 'npm test', 'npm ci', 'npm audit', 'npx vitest run', 'npm config set x y', 'yarn add x', 'pnpm install']
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
+})
+
+describe('direct segment intent', () => {
+  it('leaves carried commands for expandSegments callers to judge at their leaf', () => {
+    expect(segmentIntent('bash -lc "npm run build"')).toBe('write')
+    expect(directSegmentIntent('bash -lc "npm run build"')).toBe('read')
+    expect(directSegmentIntent('npm run build')).toBe('write')
+    expect(directSegmentIntent('bash -lc "npm run build" > report.txt')).toBe('write')
+  })
+})
+
+describe('interpreters that execute code from stdin', () => {
+  it('takes the safe side for shell code supplied by a here-document or pipe', () => {
+    expect(isMutatingSegment(['bash <<EOF', 'git push', 'EOF'].join('\n'))).toBe(true)
+    expect(isMutatingSegment("echo 'git push' | bash")).toBe(true)
+    expect(isMutatingSegment('printf "git status\\n" | sh')).toBe(true)
+  })
+
+  it('takes the same side for node and python stdin-code modes', () => {
+    expect(isMutatingSegment('printf "process.exit()" | node -')).toBe(true)
+    expect(isMutatingSegment('printf "process.exit()" | node')).toBe(true)
+    expect(isMutatingSegment(['python - <<PY', 'print("ok")', 'PY'].join('\n'))).toBe(true)
+    expect(isMutatingSegment('printf "print(1)" | python3')).toBe(true)
+  })
+
+  it('takes the safe side for interpreter code supplied by a here-string', () => {
+    expect(isMutatingSegment('bash <<< "git push"')).toBe(true)
+    expect(isMutatingSegment('sh <<< "git push"')).toBe(true)
+    expect(isMutatingSegment('zsh <<<"git push"')).toBe(true)
+    expect(isMutatingSegment('node - <<< "x"')).toBe(true)
+    expect(isMutatingSegment('python3 <<< "import os"')).toBe(true)
+  })
+
+  it('preserves non-interpreters and explicit shell commands fed by a here-string', () => {
+    expect(isMutatingSegment('cat <<< "git push"')).toBe(false)
+    expect(isMutatingSegment('grep push <<< "text"')).toBe(false)
+    expect(isMutatingSegment("sh -c 'git status' <<< \"x\"")).toBe(false)
+  })
+
+  it('keeps explicit commands, named scripts, and non-interpreters at their existing intent', () => {
+    expect(isMutatingSegment("sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment("echo input | sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment("echo input | node -pe 'input'")).toBe(false)
+    expect(isMutatingSegment('echo input | python -c "print(1)"')).toBe(false)
+    expect(isMutatingSegment('printf input | bash scripts/report.sh')).toBe(false)
+    expect(isMutatingSegment(['node scripts/report.mjs <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment(['python report.py <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment('git log | grep push')).toBe(false)
+    expect(isMutatingSegment(['cat <<EOF', 'git push', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment('printf input | node --help')).toBe(false)
+  })
+
+  it('distinguishes a pipe (including a continued one) from boolean OR', () => {
+    expect(isMutatingSegment('printf code |\n  zsh')).toBe(true)
+    expect(isMutatingSegment('printf code || zsh')).toBe(false)
+  })
+
+  it('does not change a bare interpreter without attached stdin', () => {
+    expect(isMutatingSegment('bash')).toBe(false)
+    expect(isMutatingSegment('node -')).toBe(false)
+    expect(isMutatingSegment('python -')).toBe(false)
+  })
 })
 
 describe('gh — the action decides', () => {
@@ -206,6 +294,7 @@ describe('file mutation and redirection', () => {
     'echo hi > note.txt',
     'node gen.mjs >> log.txt',
     'node gen.mjs &> all.log',
+    'node gen.mjs >& all.log',
     'node gen.mjs | tee run.log',
   ]
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
@@ -274,6 +363,12 @@ describe('file mutation and redirection', () => {
     expect(isMutatingSegment(`grep "\\${bt}git push\\${bt}" file`)).toBe(false)
     // An UNescaped backtick inside double quotes IS live, and stays a write.
     expect(isMutatingSegment(`grep "${bt}git push${bt}" file`)).toBe(true)
+  })
+
+  it('carries the intent of process substitution without trusting quoted text', () => {
+    expect(isMutatingSegment('diff <(git push) x')).toBe(true)
+    expect(isMutatingSegment('diff <(git status) x')).toBe(false)
+    expect(isMutatingSegment("grep '<(git push)' notes.md")).toBe(false)
   })
 
   it('survives an unbalanced or absurdly deep wrapper without hanging', () => {
@@ -351,6 +446,75 @@ describe('segmentInvokesScript', () => {
   })
 })
 
+describe('posixNormalizePath', () => {
+  it('resolves dot and parent segments, on both separators', () => {
+    expect(posixNormalizePath('scripts/./verify/world.mjs')).toBe('scripts/verify/world.mjs')
+    expect(posixNormalizePath('scripts/verify/../board-publish.mjs')).toBe('scripts/board-publish.mjs')
+    expect(posixNormalizePath('scripts\\foo\\..\\verify\\x.mjs')).toBe('scripts/verify/x.mjs')
+    expect(posixNormalizePath('/a//b/./c')).toBe('/a/b/c')
+  })
+  it('keeps a leading parent segment of a relative path, and clamps at an absolute root', () => {
+    expect(posixNormalizePath('../scripts/verify/x.mjs')).toBe('../scripts/verify/x.mjs')
+    expect(posixNormalizePath('/../a')).toBe('/a')
+    expect(posixNormalizePath('')).toBe('')
+  })
+})
+
+describe('segmentInvokesPathWhere — the INVOKED path, normalised', () => {
+  const underVerify = (p) => /(?:^|\/)scripts\/verify\//.test(p)
+  it('judges the script an interpreter runs, and the program word itself', () => {
+    expect(segmentInvokesPathWhere('node scripts/verify/world.mjs', underVerify)).toBe(true)
+    expect(segmentInvokesPathWhere('./scripts/verify/world.mjs --frames', underVerify)).toBe(true)
+  })
+  it('sees through a dot spelling, and through a `..` that leaves the tree', () => {
+    expect(segmentInvokesPathWhere('node scripts/./verify/world.mjs', underVerify)).toBe(true)
+    // …resolves to scripts/board-publish.mjs, which is NOT under the prefix.
+    expect(segmentInvokesPathWhere('node scripts/verify/../board-publish.mjs', underVerify)).toBe(false)
+  })
+  it('a matching path standing LATER is data, not an invocation', () => {
+    expect(segmentInvokesPathWhere('node tools/report.mjs scripts/verify/world.mjs', underVerify)).toBe(false)
+    expect(segmentInvokesPathWhere('grep -rn scripts/verify/world.mjs docs/', underVerify)).toBe(false)
+  })
+  it('flags before the script make it undecidable — then every word is judged (false-deny side)', () => {
+    expect(segmentInvokesPathWhere('node -r esm scripts/verify/world.mjs', underVerify)).toBe(true)
+    expect(segmentInvokesPathWhere('node --experimental-vm-modules tools/x.mjs', underVerify)).toBe(false)
+    // Sol round 4 re-found the ambiguous case as a defect — a matching path
+    // that IS data, denied because a flag stands before the script. Ruled
+    // INTENDED: without every interpreter's option table the invoked word is
+    // undecidable, and the false-deny side is the fence's chosen direction.
+    expect(
+      segmentInvokesPathWhere('node --experimental-vm-modules tools/report.mjs scripts/verify/world.mjs', underVerify),
+    ).toBe(true)
+  })
+  it('judges a SYMLINK spelling on its resolved target — resolver injected, no disk in this core', () => {
+    // `verify-link -> scripts/verify`: lexically outside the prefix, really
+    // the fenced work itself (Sol round 4).
+    const viaLink = (p) => (p.startsWith('verify-link/') ? `/repo/scripts/verify/${p.slice('verify-link/'.length)}` : null)
+    expect(segmentInvokesPathWhere('node verify-link/world.mjs', underVerify, { resolvePath: viaLink })).toBe(true)
+    // A word resolving OUTSIDE the prefix does not match…
+    expect(
+      segmentInvokesPathWhere('node data-link/world.mjs', underVerify, { resolvePath: () => '/repo/tools/world.mjs' }),
+    ).toBe(false)
+    // …and an UNRESOLVABLE word is judged on its lexical shape — a null or a
+    // throwing resolver must never turn a matching path into an accept.
+    expect(segmentInvokesPathWhere('node scripts/verify/world.mjs', underVerify, { resolvePath: () => null })).toBe(true)
+    expect(
+      segmentInvokesPathWhere('node scripts/verify/world.mjs', underVerify, {
+        resolvePath: () => {
+          throw new Error('ENOENT')
+        },
+      }),
+    ).toBe(true)
+    // Without a resolver the lexical rule stands as before.
+    expect(segmentInvokesPathWhere('node verify-link/world.mjs', underVerify)).toBe(false)
+  })
+  it('is total on junk', () => {
+    expect(segmentInvokesPathWhere('', underVerify)).toBe(false)
+    expect(segmentInvokesPathWhere('node', underVerify)).toBe(false)
+    expect(segmentInvokesPathWhere('node x.mjs', null)).toBe(false)
+  })
+})
+
 describe('segmentMentionsFile', () => {
   it('sees the file as an argument and as a redirection target', () => {
     expect(segmentMentionsFile('sed -i s/a/b/ TASKS.md', ['TASKS.md'])).toBe(true)
@@ -378,10 +542,12 @@ describe('scripts whose whole job is to change shared state', () => {
     }
   })
 
-  it('judges it by NAME, not by flags — a dry run counts too', () => {
+  it('judges it by NAME, not by flags — dry and generic help flags count too', () => {
     // Same reasoning as the fallback: flags are not decidable from outside.
     // Over-blocking here costs a board publish that was due anyway.
     expect(isMutatingSegment('node scripts/land-point.mjs 594 --dry')).toBe(true)
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --model "GPT-5.6 Sol" --help')).toBe(true)
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --version')).toBe(true)
   })
 
   it('leaves every OTHER script on the read-only fallback', () => {

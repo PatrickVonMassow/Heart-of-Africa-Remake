@@ -14,6 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
+import { FUSE_TOLERANCE, judgeLabelFusion, mergeFusionReadings } from './labelFusion.mjs'
 import { frameShutter, captureFrame, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { sectionGate } from './sections.mjs'
@@ -8454,9 +8455,10 @@ if (section('ctrl-actor-labels')) {
         requestAnimationFrame(step)
       }),
   )
-  // What must be named is something ALIVE. The traveller's canoe and a pitched
-  // camp are usable objects and qualify too, so they are excluded here: a check
-  // that counted them would go green on an empty plain.
+  // What must be named is something ALIVE. Usable objects are on the roster too
+  // and are excluded here — a check that counted them would go green on an empty
+  // plain — even though point 628 now keeps the two that stand at the traveller
+  // himself (his own canoe, a camp already carrying its name) out of the layer.
   const alive = held ? held.labels.filter((l) => l.kind !== 'canoe' && l.kind !== 'camp') : []
   check(
     'holding Ctrl names the animals in view (point 342)',
@@ -8542,10 +8544,11 @@ if (section('ctrl-actor-labels')) {
   )
 
   // The roster's USABLE OBJECTS, not only its animals (point 342's roster in
-  // point 600's states): a camp pitched where the traveller stands is one key
-  // away for the player, and it must name itself like anything that moves. The
-  // camp is taken back out before the frame, so the picture and every later
-  // section see the state they expect.
+  // point 600's states): a camp pitched where the traveller stands must reach
+  // the layer like anything that moves — and then be named EXACTLY ONCE, because
+  // it draws a standing name of its own and holding Ctrl put a second, identical
+  // box over it (point 628). The camp is taken back out before the frame, so the
+  // picture and every later section see the state they expect.
   const camped = await page.evaluate(async () => {
     const before = window.__game.getState().freeCamps
     window.__game.getState().pitchOrOpenCamp()
@@ -8553,26 +8556,128 @@ if (section('ctrl-actor-labels')) {
     const seen = await new Promise((res) => {
       let frames = 0
       const step = () => {
-        const camp = (window.__actorLabels?.() ?? []).find((l) => l.kind === 'camp') ?? null
+        const camp = (window.__actorCandidates?.() ?? []).find((c) => c.kind === 'camp') ?? null
         if (camp !== null || ++frames > 240) res(camp)
         else requestAnimationFrame(step)
       }
       requestAnimationFrame(step)
     })
-    const texts = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+    // Every box in the scene reading the camp's word, in either language — the
+    // permanent one and any the Ctrl layer added on top of it.
+    const boxes = [...document.querySelectorAll('.map-label')]
+      .map((el) => (el.textContent ?? '').trim())
+      .filter((text) => text === 'Camp' || text === 'Lager')
+    const named = (window.__actorLabels?.() ?? []).filter((l) => l.kind === 'camp')
     window.__game.setState({ freeCamps: before })
-    return { camp: seen, drawn: seen !== null && texts.includes(seen.text) }
+    return { candidate: seen !== null, boxes: boxes.length, named: named.length }
   })
   check(
-    'a pitched camp names itself under Ctrl (points 342/600)',
-    camped.camp !== null && camped.drawn,
-    camped.camp ? `"${camped.camp.text}" drawn at the camp` : 'the pitched camp carried no Ctrl label',
+    'a pitched camp still reaches the label layer (points 342/600)',
+    camped.candidate,
+    camped.candidate ? 'the camp is offered as a candidate' : 'the pitched camp reached the layer at all',
   )
+  check(
+    'a pitched camp carries exactly ONE name under Ctrl (point 628)',
+    camped.candidate && camped.boxes === 1 && camped.named === 0,
+    `${camped.boxes} box(es) read the camp's word, ${camped.named} of them from the Ctrl layer`,
+  )
+
+  // The player's OWN boat is not something to travel to (point 628): the canoe
+  // he rides or drags reaches the layer — the point-600 hooks tell "never
+  // collected" from "collected and excluded" apart — and is never named.
+  const ownBoat = await page.evaluate(async () => {
+    const before = window.__game.getState().equipment.canoe ?? 0
+    window.__game.setState({ equipment: { ...window.__game.getState().equipment, canoe: 1 } })
+    const seen = await new Promise((res) => {
+      let frames = 0
+      const step = () => {
+        const canoe = (window.__actorCandidates?.() ?? []).find((c) => c.kind === 'canoe') ?? null
+        if (canoe !== null || ++frames > 240) res(canoe)
+        else requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
+    const named = (window.__actorLabels?.() ?? []).filter((l) => l.kind === 'canoe').length
+    const boxes = [...document.querySelectorAll('.actor-label')].filter((el) => {
+      const text = (el.textContent ?? '').trim()
+      return text === 'Canoe' || text === 'Kanu'
+    }).length
+    window.__game.setState({ equipment: { ...window.__game.getState().equipment, canoe: before } })
+    return { reached: seen !== null, flagged: seen?.ownedByPlayer === true, named, boxes }
+  })
+  check(
+    "the traveller's own canoe is offered but never named (point 628)",
+    ownBoat.reached && ownBoat.flagged && ownBoat.named === 0 && ownBoat.boxes === 0,
+    `reached=${ownBoat.reached} ownedByPlayer=${ownBoat.flagged} labels=${ownBoat.named} boxes=${ownBoat.boxes}`,
+  )
+
+  // NO TWO LABELS FUSE INTO ONE BOX (point 628). Every earlier check asks the
+  // DOM whether a text is PRESENT, which is exactly what let "Villager llager"
+  // through: two correct labels printed into each other. This one asks where
+  // the boxes really stand — the rectangles the browser laid out — SAMPLED
+  // over many frames rather than one instant: the declutter decides at the
+  // layer's 10 Hz refresh while the subjects walk every frame, and the single
+  // moment a converged poll returns is the one least able to catch a stale
+  // decision. The dense-crowd twin of this check lives in polish.mjs at the
+  // village frame; the verdict and its bar are scripts/verify/labelFusion.mjs.
+  // The shot is BRACKETED between two windows judged as one series — a sample
+  // that closed before the capture would certify a picture it never measured
+  // (the Sol-review gap, 17.08.).
+  const sampleFusion = (windowFrames) => page.evaluate(
+    ({ TOLERANCE, SAMPLES }) =>
+      new Promise((res) => {
+        let sampled = 0
+        let fusedFrames = 0
+        let worstDepth = 0
+        let worstPair = null
+        let labelsMin = Infinity
+        let labelsMax = 0
+        const read = () => {
+          const boxes = [...document.querySelectorAll('.actor-label')]
+            .map((el) => {
+              const r = el.getBoundingClientRect()
+              return { text: (el.textContent ?? '').trim(), left: r.left, right: r.right, top: r.top, bottom: r.bottom }
+            })
+            .filter((b) => b.right > b.left && b.bottom > b.top)
+          labelsMin = Math.min(labelsMin, boxes.length)
+          labelsMax = Math.max(labelsMax, boxes.length)
+          let fusedHere = false
+          for (let i = 0; i < boxes.length; i++) {
+            for (let j = i + 1; j < boxes.length; j++) {
+              const a = boxes[i]
+              const b = boxes[j]
+              const across = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+              const down = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+              if (across > TOLERANCE && down > TOLERANCE) {
+                fusedHere = true
+                const depth = Math.min(across, down)
+                if (depth > worstDepth) {
+                  worstDepth = depth
+                  worstPair = `"${a.text}"×"${b.text}" ${across.toFixed(0)}×${down.toFixed(0)} px`
+                }
+              }
+            }
+          }
+          if (fusedHere) fusedFrames++
+          if (++sampled >= SAMPLES) return res({ samples: sampled, fusedFrames, worstDepth, worstPair, labelsMin, labelsMax })
+          requestAnimationFrame(read)
+        }
+        requestAnimationFrame(read)
+      }),
+    { TOLERANCE: FUSE_TOLERANCE, SAMPLES: windowFrames },
+  )
+  const overlapsPre = await sampleFusion(45)
 
   await shot('147-ctrl-actor-labels', {
     world: { lat: -2.6, lon: 35.2 },
     label: 'the savanna with the Ctrl labels over its animals',
   })
+
+  const overlapsPost = await sampleFusion(45)
+  // minLabels 1: a lone animal is a legitimate savanna (its presence bar is the
+  // 'holding Ctrl names the animals' check above); the village twin demands 2.
+  const overlapVerdict = judgeLabelFusion(mergeFusionReadings(overlapsPre, overlapsPost), { minLabels: 1 })
+  check('no two Ctrl labels print into each other (point 628)', overlapVerdict.ok, overlapVerdict.detail)
 
   await page.keyboard.up('Control')
   const cleared = await page

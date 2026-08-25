@@ -5,7 +5,7 @@
 // the camera, whose clip w is negative and which folds back into the frame if
 // the sign is ignored.
 import { describe, it, expect } from 'vitest'
-import { pointOnScreen, isOnScreen, setFrameVisibilityTest, FRAME_EDGE_MARGIN } from './frameVisibility'
+import { pointOnScreen, projectPoint, isOnScreen, setFrameVisibilityTest, FRAME_EDGE_MARGIN } from './frameVisibility'
 
 /** A camera at the origin looking down −z, with a 90° vertical field of view
  *  and a square aspect: at z = −d the frame spans ±d in x and y. */
@@ -55,6 +55,42 @@ describe('pointOnScreen', () => {
     // Just outside the right edge at z = −10.
     expect(pointOnScreen(cam, 10.9, 0, -10)).toBe(false)
     expect(pointOnScreen(cam, 10.9, 0, -10, FRAME_EDGE_MARGIN)).toBe(true)
+  })
+})
+
+describe('projectPoint (the coordinates the label layout needs)', () => {
+  const cam = camera()
+
+  it('puts the centre of the frame at the origin of NDC', () => {
+    const p = projectPoint(cam, 0, 0, -10)
+    expect(p.x).toBeCloseTo(0)
+    expect(p.y).toBeCloseTo(0)
+    expect(p.onScreen).toBe(true)
+  })
+
+  it('reads left of centre as negative x and above it as positive y', () => {
+    const left = projectPoint(cam, -5, 0, -10)
+    const up = projectPoint(cam, 0, 5, -10)
+    expect(left.x).toBeCloseTo(-0.5)
+    expect(up.y).toBeCloseTo(0.5)
+  })
+
+  it('reports a point behind the camera as nowhere, not as folded back in', () => {
+    const p = projectPoint(cam, 5, 5, 10)
+    expect(p.onScreen).toBe(false)
+    expect([p.x, p.y]).toEqual([0, 0])
+  })
+
+  it('fills the caller\'s object, so a per-frame sweep allocates nothing', () => {
+    const out = { x: 0, y: 0, onScreen: false }
+    expect(projectPoint(cam, 5, 0, -10, 0, out)).toBe(out)
+    expect(out.x).toBeCloseTo(0.5)
+  })
+
+  it('agrees with pointOnScreen wherever the point stands', () => {
+    for (const [x, y, z] of [[0, 0, -10], [30, 0, -10], [0, 0, 10], [0, 0, -1000], [10.9, 0, -10]]) {
+      expect(projectPoint(cam, x, y, z).onScreen, `${x},${y},${z}`).toBe(pointOnScreen(cam, x, y, z))
+    }
   })
 })
 

@@ -62,6 +62,13 @@ export function needsDevServer(suites) {
   return (suites ?? []).some((s) => !SERVERLESS_SUITES.includes(s))
 }
 
+/** Does this selection need the fast GPU-backend preflight? Pure Node suites and
+ *  build/lint/unit selections do not; every Chromium suite and the production preview
+ *  do. Kept pure so the runner cannot silently move the probe onto every command. */
+export function needsGpuBackendProbe(suites, { preview = false } = {}) {
+  return preview || needsDevServer(suites)
+}
+
 /** The renderer backend a VERIFY_GL value selects (mirrored from _browser.mjs).
  *  UNSET means the everyday lane, DEFAULT_BACKEND; any other value than 'webgpu'
  *  (including an empty string, which a shell writes for `VERIFY_GL=`) is the

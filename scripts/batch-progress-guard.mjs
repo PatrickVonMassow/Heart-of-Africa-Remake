@@ -43,24 +43,29 @@
 // THE USER TAKES THE BATCH BACK (28.07.2026, point 395): the night belongs to
 // fresh sessions, but the way BACK was missing. A window the user returns to
 // records a CLAIM (scripts/batch-claim.mjs); this guard is where the owner SEES
-// it, and — at the first CLEAN turn end, never mid-merge and never with a
-// delegated agent or a verification still running — RELEASES the lock and says so
-// in its own transcript. It is the boundary's sibling: there the batch goes to
-// the launcher, here it goes to the window the user is sitting at, which is why
-// the claim is honoured ahead of a valid boundary.
+// it, and — at the first SAFE turn end, never mid-merge and never with
+// uncheckpointed work — RELEASES the lock and says so in its own transcript.
+// Pushed delegated work crosses that boundary in the adoption record. It is the
+// point boundary's sibling: there the batch goes to the launcher, here it goes to
+// the window the user is sitting at, which is why the claim is honoured ahead of
+// a valid point boundary.
 // Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
 // instead of silently reading "complete". Fail-open on any error.
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import {
   acquire,
+  assessOwner,
+  bootTimeMs,
   detectParallel,
   markHandover,
   raiseParallelAlert,
   readUnhandledAlert,
   progressGuardDecision,
+  probePid,
   readOwnerLock,
+  ownsLock,
+  LOCK_PATH,
   BOUNDARY_LOG_PATH,
   DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
@@ -69,13 +74,15 @@ import { gatherBoundary, probeLauncherState } from './batch-boundary.mjs'
 import { gatherWatermark } from './context-watermark.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
-import { gatherInFlight, gatherHandoverTransfer } from './batch-in-flight.mjs'
+import { gatherInFlight, gatherHandoverTransfer, gatherStandDownBoundary } from './batch-in-flight.mjs'
 import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.mjs'
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
+import { isMainModule } from './is-main.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
+const TASKS = repoPath('TASKS.md')
 // One source of truth with the withdrawal that cancels these lines (finding 3):
 // both sit beside the lock, so a redirected lock redirects the log with it.
 const BOUNDARY_LOG = BOUNDARY_LOG_PATH
@@ -90,19 +97,6 @@ const record = (line) => {
   }
 }
 
-let sid = ''
-let transcriptPath = ''
-try {
-  const payload = JSON.parse(readFileSync(0, 'utf8'))
-  sid = payload.session_id || ''
-  // The hook's own transcript path is the context watermark's measuring point
-  // (point 675, defeat 3) — the one file that records what this session's
-  // context actually measures.
-  transcriptPath = payload.transcript_path || ''
-} catch {
-  /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
-}
-
 /**
  * Has a doctor run already cleared THIS state — this HEAD beside these sessions
  * (point 431, second half)? The decision is pure (`gateDemandSatisfied`); this
@@ -113,7 +107,7 @@ function gateAlreadySatisfied(otherSids) {
   try {
     const state = JSON.parse(readFileSync(DOCTOR_STATE_PATH, 'utf8'))
     const head = execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      cwd: REPO_ROOT,
       encoding: 'utf8',
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'ignore'],
@@ -121,6 +115,188 @@ function gateAlreadySatisfied(otherSids) {
     return gateDemandSatisfied({ state, head, parallelSids: otherSids })
   } catch {
     return false
+  }
+}
+
+function taskProgress(text) {
+  const open = []
+  let sawCheckbox = false
+  let sawDone = false
+  for (const line of String(text ?? '').split('\n')) {
+    if (/^- \[/.test(line)) sawCheckbox = true
+    if (/^- \[x\] \d+\./.test(line)) sawDone = true
+    const match = line.match(/^- \[ \] (\d+)\./)
+    if (match && !/\bDEFERRED\b/.test(line)) open.push(Number(match[1]))
+  }
+  return { open, formatSuspect: open.length === 0 && sawCheckbox && !sawDone }
+}
+
+/** Predict acquisition without creating, refreshing, replacing or handing over
+ * the lock. The real atomic acquire remains authoritative; every probe here is
+ * read-only, which is the preflight's contract. */
+function readOnlyOwnership(sessionId, {
+  lockPath = LOCK_PATH,
+  lock: suppliedLock,
+  now = Date.now(),
+  ownerWork,
+  readLock = readOwnerLock,
+} = {}) {
+  if (!sessionId) return 'none'
+  const lock = suppliedLock === undefined ? readLock(lockPath) : suppliedLock
+  if (!lock) {
+    // A present-but-unreadable lock cannot safely be predicted as acquirable.
+    if (existsSync(lockPath)) return 'held'
+    try {
+      if (!reservationDecision({ assessment: gatherClaim(sessionId) }).acquire) return 'held'
+    } catch {
+      /* an unreadable claim reserves nothing, matching the real guard */
+    }
+    return 'acquired'
+  }
+  if (ownsLock(sessionId, { lockPath, lock, now }).mine) return 'mine'
+  const probe = lock.pid ? probePid(lock.pid) : null
+  const work = ownerWork ?? gatherOwnerWork(lock, { now })
+  return assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work }).alive ? 'held' : 'acquired'
+}
+
+/** Read-only batch-progress variant for guard-preflight. It answers whether a
+ * boundary stop would be permitted from the same pure decision as the Stop hook,
+ * but performs none of that hook's writes: no acquire/heartbeat, alert, claim
+ * clear, release, handover or boundary-log entry. */
+export function gatherBatchProgressInputs({
+  sessionId = '',
+  transcriptPath = '',
+  tasksText,
+  paused: suppliedPaused,
+  lockPath = LOCK_PATH,
+  lock,
+  now = Date.now(),
+  probes = {},
+} = {}) {
+  const paused = suppliedPaused ?? isPaused()
+  if (paused) return { applicable: false, why: 'the batch is paused' }
+
+  const ownership = readOnlyOwnership(sessionId, { lockPath, lock, now })
+  if (ownership !== 'mine' && ownership !== 'acquired') {
+    return {
+      applicable: false,
+      why: sessionId ? 'another live session owns the batch lock' : 'no session id identifies the batch owner',
+      cause: 'not-lock-owner',
+    }
+  }
+
+  const { open, formatSuspect } = taskProgress(tasksText ?? readFileSync(TASKS, 'utf8'))
+  if (open.length === 0 || formatSuspect) {
+    return {
+      applicable: true,
+      inputs: { sid: sessionId, paused, openCount: open.length, formatSuspect, ownership, open },
+    }
+  }
+
+  let claimInfo = { claim: null, honour: false, reason: 'not-gathered', claimantSid: null, mine: false }
+  try {
+    claimInfo = (probes.gatherClaim ?? gatherClaim)(sessionId, { ownerLock: lock ?? readOwnerLock(lockPath) })
+  } catch {
+    /* no readable claim */
+  }
+
+  let unhandledAlert = false
+  try {
+    const parallel = (probes.detectParallel ?? detectParallel)(sessionId, {
+      exclude: (claimInfo.honour || claimInfo.reserve) && claimInfo.claimantSid ? [claimInfo.claimantSid] : [],
+    })
+    const alert = (probes.readUnhandledAlert ?? readUnhandledAlert)()
+    const others = alert ? otherSessionsIn({ alert, readerSid: sessionId, ownerSid: sessionId }) : []
+    unhandledAlert = parallel.length > 0 || (others.length > 0 && !(probes.gateAlreadySatisfied ?? gateAlreadySatisfied)(others))
+  } catch {
+    /* unreadable alert state invents no block */
+  }
+
+  let bound = { marker: null, boundary: null, launcher: 'unknown', due: null }
+  try {
+    bound = (probes.gatherBoundary ?? gatherBoundary)(sessionId, { now })
+  } catch {
+    /* ordinary continue verdict */
+  }
+  let inFlight = { live: false, reason: 'not-gathered', summary: '', declaration: null }
+  try {
+    inFlight = (probes.gatherInFlight ?? gatherInFlight)(sessionId)
+  } catch {
+    /* ordinary continue verdict */
+  }
+  let watermarkDemand = false
+  try {
+    const watermark = (probes.gatherWatermark ?? gatherWatermark)({ transcriptPath, sid: sessionId })
+    if (watermark.state === 'past' && !(bound.boundary && bound.boundary.valid)) {
+      watermarkDemand =
+        (bound.launcher === 'armed' ? 'armed' : (probes.probeLauncherState ?? probeLauncherState)()) === 'armed'
+    }
+  } catch {
+    /* an unreadable watermark cannot invent a handover demand */
+  }
+  let inFlightTransferable = true
+  if (inFlight.live === true && (bound.due || watermarkDemand || claimInfo.honour)) {
+    try {
+      const transfer = (probes.gatherHandoverTransfer ?? gatherHandoverTransfer)(sessionId)
+      inFlightTransferable = transfer.blocked !== true && typeof transfer.commit === 'function'
+    } catch {
+      inFlightTransferable = false
+    }
+  }
+  let claimVerdict = { verdict: 'none', reason: claimInfo.reason }
+  if (claimInfo.honour) {
+    try {
+      claimVerdict = releaseDecision({
+        assessment: claimInfo,
+        inFlightLive: inFlight.live === true,
+        inFlightTransferable,
+        gitOperation: (probes.gitOperationInProgress ?? gitOperationInProgress)(),
+      })
+    } catch {
+      claimVerdict = { verdict: 'wait', reason: 'cleanliness-unverifiable' }
+    }
+  }
+  return {
+    applicable: true,
+    inputs: {
+      sid: sessionId,
+      paused,
+      openCount: open.length,
+      formatSuspect,
+      ownership,
+      unhandledAlert,
+      boundary: bound.boundary,
+      launcher: bound.launcher,
+      boundaryDue: bound.due,
+      inFlight: inFlight.live === true,
+      inFlightTransferable,
+      slotsNeedReason: inFlight.slots?.needsReason === true,
+      claim: claimVerdict.verdict,
+      contextPastWatermark: watermarkDemand,
+      open,
+    },
+  }
+}
+
+const PROGRESS_SETTLEMENT = {
+  'block-format': 'Inspect and repair the work-order checkbox format before ending the turn.',
+  'block-remediate': 'Run `node scripts/batch-doctor.mjs --gate` in this turn.',
+  'block-launcher': 'Run `node scripts/batch-boundary.mjs --status` and restore the launcher it names.',
+  'block-take-boundary': 'Take the boundary with `node scripts/batch-boundary.mjs --prepare <point>`, its bookkeeping, then `--commit <point>`.',
+  'block-context-handover': 'Take a context boundary with `node scripts/batch-boundary.mjs --prepare --context`, its bookkeeping, then `--commit --context`.',
+  'block-slots-free': 'Run `node scripts/batch-in-flight.mjs --status` and fill or explain every free slot.',
+  'block-continue': 'Continue the next open point, or record a provable wait/pause/boundary in this turn.',
+}
+
+export function decideBatchProgress(inputs = {}) {
+  const decision = progressGuardDecision(inputs)
+  const block = decision.startsWith('block-')
+  return {
+    block,
+    reason: block
+      ? `batch-progress-guard would return ${decision}. ${PROGRESS_SETTLEMENT[decision] ?? 'Settle that condition in this turn.'}`
+      : `read-only boundary-stop verdict: ${decision}; the batch lock was not acquired, refreshed, released or handed over`,
+    decision,
   }
 }
 
@@ -146,20 +322,25 @@ const warn = (message) => {
   }
 }
 
+export function runBatchProgressGuard() {
+let sid = ''
+let transcriptPath = ''
+try {
+  const payload = JSON.parse(readFileSync(0, 'utf8'))
+  sid = payload.session_id || ''
+  // The hook's own transcript path is the context watermark's measuring point
+  // (point 675, defeat 3) — the one file that records what this session's
+  // context actually measures.
+  transcriptPath = payload.transcript_path || ''
+} catch {
+  /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
+}
+
 try {
   const paused = isPaused()
 
   const text = readFileSync(TASKS, 'utf8')
-  const open = []
-  let sawCheckbox = false
-  let sawDone = false
-  for (const l of text.split('\n')) {
-    if (/^- \[/.test(l)) sawCheckbox = true
-    if (/^- \[x\] \d+\./.test(l)) sawDone = true
-    const m = l.match(/^- \[ \] (\d+)\./)
-    if (m && !/\bDEFERRED\b/.test(l)) open.push(Number(m[1]))
-  }
-  const formatSuspect = open.length === 0 && sawCheckbox && !sawDone
+  const { open, formatSuspect } = taskProgress(text)
 
   // Ownership through the atomic acquire ONLY (it refuses while a live other
   // owner exists, resolves races to one winner, and refreshes when it is ours).
@@ -302,24 +483,27 @@ try {
   // (drain-before-boundary); the other direction would demand a handover whose
   // commit the CLI then refuses — a loop.
   let inFlightTransferable = true
-  if (inFlight.live === true && (bound.due || watermarkDemand)) {
+  let handoverTransfer = null
+  if (inFlight.live === true && (bound.due || watermarkDemand || claimInfo.honour)) {
     try {
-      inFlightTransferable = gatherHandoverTransfer(sid).blocked !== true
+      handoverTransfer = gatherHandoverTransfer(sid)
+      inFlightTransferable = handoverTransfer.blocked !== true && typeof handoverTransfer.commit === 'function'
     } catch {
       inFlightTransferable = false
     }
   }
 
-  // IS THIS A CLEAN MOMENT TO HAND THE BATCH BACK? Only asked when a claim is
+  // IS THIS A SAFE MOMENT TO HAND THE BATCH BACK? Only asked when a claim is
   // actually honoured, so the git probe costs an ordinary turn end nothing. A
-  // merge, a building agent and a running verification all make it 'wait' — the
-  // claim then simply stays pending and is honoured at the next turn end.
+  // merge and uncheckpointed work make it 'wait'; pushed agent work transfers to
+  // the claimant. A waiting claim stays pending to the next turn end.
   let claimVerdict = { verdict: 'none', reason: claimInfo.reason }
   if (claimInfo.honour) {
     try {
       claimVerdict = releaseDecision({
         assessment: claimInfo,
         inFlightLive: inFlight.live === true,
+        inFlightTransferable,
         gitOperation: gitOperationInProgress(),
       })
     } catch {
@@ -378,6 +562,30 @@ try {
     // that the batch was handed over, so it is never written on the word of a session
     // that freed nothing. Both lines live in handBackToClaimant so the pairing is
     // testable.
+    let transferred = ''
+    if (inFlight.live === true) {
+      // Phase one was the owner's declaration; phase two is the transfer stamp.
+      // It MUST land before the lock is released, because the claimant can take
+      // ownership immediately and `--adopt` needs a record that already belongs
+      // to it. `releaseDecision` reaches this branch only for a verified pushed
+      // checkpoint, but re-check the callable here so an I/O race cannot turn a
+      // missing transfer into a release.
+      if (!handoverTransfer || typeof handoverTransfer.commit !== 'function') {
+        block(
+          'STAND-DOWN BOUNDARY REFUSED: delegated work is still live but its transfer could not be prepared. ' +
+            'The lock was NOT released. Re-run `node scripts/batch-in-flight.mjs --handover-check`; checkpoint ' +
+            'and push the named branch, then end the turn again.',
+        )
+      }
+      try {
+        transferred = handoverTransfer.commit()
+      } catch (error) {
+        block(
+          `STAND-DOWN BOUNDARY REFUSED: the transfer record could not be written (${String(error?.message ?? error)}). ` +
+            'The lock was NOT released. Retry this turn end; do not abandon the running agent.',
+        )
+      }
+    }
     const who = describeClaim(claimInfo)
     const { released } = handBackToClaimant(sid, claimInfo.claim)
     record(
@@ -388,10 +596,13 @@ try {
     )
     warn(
       released
-        ? `YOU HAVE HANDED THE BATCH BACK. ${who} claimed it, this is a clean moment (nothing in flight, no ` +
-            `merge half-done), so the batch lock was RELEASED. You are no longer the batch worker: do not start ` +
+        ? `YOU HAVE HANDED THE BATCH BACK. ${who} claimed it, this is a safe boundary (no merge half-done${
+            transferred ? `; declared work transferred at ${transferred}` : '; nothing in flight'
+          }), so the batch lock was RELEASED. You are no longer the batch worker: do not start ` +
             `another point, do not merge to main, do not edit TASKS.md or the dashboard. The claiming window ` +
-            `takes it with \`node scripts/batch-claim.mjs --session <its id>\`. This turn may end.`
+            `takes it with \`node scripts/batch-claim.mjs --session <its id>\`` +
+            (transferred ? ' and adopts the transferred declaration with `node scripts/batch-in-flight.mjs --adopt`.' : '.') +
+            ' This turn may end.'
         : `NOTHING WAS RELEASED HERE. ${who} claimed the batch and this stop is allowed, but the lock does not ` +
             `name this session — it was already released, has been taken over, or is gone — so there was ` +
             `nothing for this session to hand back. Either way you are NOT the batch worker: do not start ` +
@@ -529,7 +740,48 @@ try {
     )
   }
 
-  if (decision === 'allow' || decision === 'stand-down') process.exit(0)
+  if (decision === 'stand-down') {
+    // LOSING THE LOCK IS A BOUNDARY, NOT A SILENT EXIT (point 716). The old
+    // parent may still own a delegated child even though it no longer owns the
+    // batch. Ask that child's worktree/branch through --agent-check; transfer a
+    // pushed checkpoint to the successor, or keep this parent alive until the
+    // checkpoint exists. With no declared child this remains today's cheap,
+    // silent stand-down.
+    let boundary
+    try {
+      boundary = gatherStandDownBoundary(sid)
+    } catch (error) {
+      block(
+        `STAND-DOWN CHILD STATE UNKNOWN: the declaration/transfer could not be measured (${String(error?.message ?? error)}). ` +
+          'Do not call the agent dead or end its parent from this reading. Inspect `node scripts/batch-in-flight.mjs ' +
+          '--status`, then probe every named worktree/branch with `node scripts/batch-in-flight.mjs --agent-check`.',
+      )
+    }
+    if (boundary.action === 'transferred') {
+      record(`STAND-DOWN TRANSFER by ${sid} — ${boundary.summary}; successor adopts the declaration.`)
+      warn(
+        `STAND-DOWN BOUNDARY COMPLETE: this session lost the batch while its declared agent still belonged to it. ` +
+          `The declaration and pushed checkpoint were TRANSFERRED (${boundary.summary}); the current owner takes ` +
+          `them with \`node scripts/batch-in-flight.mjs --adopt\`. Do not start or merge batch work here. This turn may end.`,
+      )
+      process.exit(0)
+    }
+    if (boundary.action === 'block') {
+      const measured = boundary.agentCheck?.reason === 'agent-alive'
+        ? `The child is MEASURED WORKING (${boundary.agentCheck.detail}).`
+        : 'The child state is UNKNOWN; unreadable output is not death.'
+      block(
+        `STAND-DOWN IS A BOUNDARY: ${measured} Ending its parent now could destroy uncommitted work, and no ` +
+          `transferable pushed checkpoint is available (${boundary.message || boundary.reason}). Keep this parent ` +
+          `alive, let the child commit and push its branch, then re-declare/refresh the wait and end the turn again. ` +
+          `Re-probe before any replacement with \`${boundary.command || 'node scripts/batch-in-flight.mjs --agent-check --worktree <path> --branch <ref>'}\`. ` +
+          'Do not drive the batch from this session; the current owner does that.',
+      )
+    }
+    process.exit(0)
+  }
+
+  if (decision === 'allow') process.exit(0)
 
   if (decision === 'block-format') {
     block(
@@ -572,7 +824,8 @@ try {
       `scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <agent branch> --worktree <its worktree> ` +
       `--pid <background run> --log <its log>\` and the stop is allowed while a probe still finds that work ` +
       `alive (it expires, and one dead item ends it — so act as soon as the work lands); ` +
-      `(b) the user asked you to stop — then create .claude/batch-paused and stop; (c) you have just ` +
+      `(b) the user asked you to stop — then run \`node scripts/batch-pause.mjs --user-stop ` +
+      `"<the user's instruction>"\` and stop; (c) you have just ` +
       `MERGED AND TICKED a point — that is a POINT BOUNDARY, so ` +
       `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +
       `dominant cost): \`node scripts/batch-boundary.mjs --prepare <the landed point>\`, its bookkeeping, then ` +
@@ -580,8 +833,9 @@ try {
       `batch-resume-hook re-orients it from TASKS.md. A delegated author still building is handed over WITH the ` +
       `boundary and adopted by the successor when its checkpoints are pushed (point 675); only unpushed, ` +
       `non-transferable work drains first — ending on it throws its work away. If you are blocked on a ` +
-      `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
-      `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
+      `user decision for EVERY open item, that is also a legitimate CLOCKED pause: run \`node ` +
+      `scripts/batch-pause.mjs --awaiting-user "<the decision every open item needs>"\`; its restart clock ` +
+      `is intentional. Add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
       claimNote +
       watermarkNote,
   )
@@ -600,3 +854,6 @@ try {
   )
   process.exit(0)
 }
+}
+
+if (isMainModule(import.meta.url)) runBatchProgressGuard()

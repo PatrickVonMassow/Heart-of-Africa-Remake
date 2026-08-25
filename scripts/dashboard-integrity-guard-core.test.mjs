@@ -17,6 +17,7 @@ import {
   specSnapshots,
   driftedCards,
   evaluate,
+  duplicateDonePoints,
 } from './dashboard-integrity-guard-core.mjs'
 
 /** Minimal dashboard in the real board's markup (mirrors the queue-order tests).
@@ -311,5 +312,54 @@ describe('evaluate — end to end', () => {
     expect(evaluate({ dashboardHtml: 42, tasksMd: {} }).block).toBe(false)
     expect(evaluate({ dashboardHtml: '<p>no sections</p>', tasksMd: SPECS }).block).toBe(false)
     expect(evaluate({ dashboardHtml: boardHtml({}), tasksMd: '- [x] 209. Done.' }).block).toBe(false)
+  })
+})
+
+describe('duplicateDonePoints — one point, one Erledigt card (user 18.08.2026)', () => {
+  const done = (point, meta) =>
+    `<details>\n  <summary><span class="num">${point}</span><span class="t">T</span>` +
+    `<span class="right"><span class="meta">${meta}</span></span></summary>\n  <div class="body">\n    <p>x</p>\n  </div>\n</details>\n`
+  const board = (inner) => `<main>\n<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${inner}</details>\n</main>`
+
+  it('names a point standing there more than once', () => {
+    expect(duplicateDonePoints(board(done(700, '01:04 · 01:10') + done(700, '21:17 · 00:44') + done(701, '09:00 · 09:30')))).toEqual(['700'])
+  })
+
+  it('says nothing when every point has one card', () => {
+    expect(duplicateDonePoints(board(done(700, '01:04 · 01:10') + done(701, '09:00 · 09:30')))).toEqual([])
+  })
+
+  it('reads the ERLEDIGT section only, so a queue or now card for the same point is fine', () => {
+    const html =
+      `<main>\n<details class="sect">\n<summary><h2>Warteschlange</h2></summary>\n${done(700, '~2 h')}</details>\n` +
+      `<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${done(700, '01:04 · 01:10')}</details>\n</main>`
+    expect(duplicateDonePoints(html)).toEqual([])
+  })
+
+  it('stops at the NEXT section, so a queue placed after Erledigt is not counted', () => {
+    const html =
+      `<main>\n<details class="sect">\n<summary><h2>Erledigt</h2></summary>\n${done(700, '01:04 · 01:10')}</details>\n` +
+      `<details class="sect">\n<summary><h2>Warteschlange</h2></summary>\n${done(700, '~2 h')}</details>\n</main>`
+    expect(duplicateDonePoints(html)).toEqual([])
+  })
+
+  it('never throws on a board without the section, or on nothing', () => {
+    expect(duplicateDonePoints('<main></main>')).toEqual([])
+    expect(duplicateDonePoints()).toEqual([])
+  })
+
+  it('BLOCKS through evaluate() even when the batch is complete or the board is bare', () => {
+    // Both early returns used to run first, so exactly the boards that consist of
+    // duplicated archive cards were waved through (cross-vendor review 18.08.).
+    const html = board(done(700, '01:04 · 01:10') + done(700, '21:17 · 00:44'))
+    const allTicked = '- [x] 700. Done.\n'
+    expect(evaluate({ dashboardHtml: html, tasksMd: allTicked }).block).toBe(true)
+    expect(evaluate({ dashboardHtml: html, tasksMd: allTicked }).reason).toMatch(/ERLEDIGT MORE THAN ONCE/)
+    // …and with an open point but no queue/now card at all.
+    const open = '- [ ] 701. Offen.\n'
+    expect(evaluate({ dashboardHtml: html, tasksMd: open }).block).toBe(true)
+    // A clean archive still passes both paths.
+    const clean = board(done(700, '01:04 · 01:10'))
+    expect(evaluate({ dashboardHtml: clean, tasksMd: allTicked }).block).toBe(false)
   })
 })

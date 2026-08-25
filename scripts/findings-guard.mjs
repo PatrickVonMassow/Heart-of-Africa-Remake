@@ -12,6 +12,7 @@ import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls, turn
 import { carrierPath, ownsBatch } from './findings-paths.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
+import { gatherGuardDutyContext } from './guard-duty.mjs'
 
 const STATE_PATH = repoPath('.claude/dashboard-state.json')
 const IN_FLIGHT_PATH = repoPath('.claude/batch-in-flight.json')
@@ -65,6 +66,7 @@ function gather(input) {
 export function gatherFindingsInputs({ sessionId = '', transcriptPath = null } = {}) {
   const resolved = gather({ session_id: sessionId, transcript_path: transcriptPath })
   const owner = ownsBatch(resolved.sessionId)
+  const fence = gatherGuardDutyContext({ sessionId: resolved.sessionId })
   const carrier = parseCarrier((() => {
     try {
       return readFileSync(carrierPath(), 'utf8')
@@ -100,6 +102,8 @@ export function gatherFindingsInputs({ sessionId = '', transcriptPath = null } =
     inputs: {
       tally,
       ownsBatch: owner,
+      sessionId: resolved.sessionId,
+      fence,
       carrierPending: carrier.pending.length,
       carrierRequests: carrier.requests.length,
       atBoundary,
@@ -142,6 +146,7 @@ function main() {
       `owns the batch : ${sessionId ? (owner ? 'yes' : 'no') : 'unbekannt — keine session_id (--session <id> nachreichen)'}`,
     )
     console.log(`at the boundary: ${atBoundary ? 'yes' : 'no'}`)
+    console.log(`context fence  : ${gathered.inputs.fence.closed ? 'closed — duties pass to successor' : 'open'}`)
     console.log(
       `carrier        : ${carrier.pending.length} waiting, ${carrier.requests.length} request(s), ${carrier.drained} landed`,
     )
@@ -152,6 +157,8 @@ function main() {
 
   if (!verdict.ok) {
     process.stdout.write(JSON.stringify({ decision: 'block', reason: formatFindings(verdict.violations) }) + '\n')
+  } else if (verdict.deferred.length) {
+    process.stdout.write(JSON.stringify({ systemMessage: verdict.deferred.map((d) => d.detail).join('\n') }) + '\n')
   }
 }
 

@@ -87,7 +87,7 @@ export function parseLauncherLog(text) {
     // broken-handover case entirely, which is the quiet kind of blindness this file
     // exists to prevent. The two lines above stay: old logs still hold them.
     else if (/^LEASE EXPIRED/.test(body)) kind = 'took-dead-lock'
-    else if (/^owner provably dead/.test(body)) kind = 'took-dead-lock'
+    else if (/^owner provably dead/.test(body) || /^owner process measured inactive/.test(body)) kind = 'took-dead-lock'
     else if (/^skip: a spawn /.test(body)) kind = 'skip-debounce'
     out.push({ at, kind, point, pid, reason, line: line.trim() })
   }

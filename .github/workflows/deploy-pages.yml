@@ -93,6 +93,11 @@ jobs:
   # `build` job above, and `needs: build` means a failing build never reaches
   # here. That split is what makes the retry safe: it can only ever repeat the
   # GitHub-side half, never re-run (and never mask) a build failure.
+  #
+  # RESIDUAL (run 32044141828, 17.08.2026): GitHub returned HTTP 429 while
+  # downloading actions/deploy-pages@v4 in `Set up job`, before any job step
+  # existed. No step in this file can retry that failure; only a job-level
+  # re-run can help.
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -135,8 +140,9 @@ jobs:
           timeout: 300000
 
       # A stall is cleared, not left behind: cancel whatever still holds the
-      # Pages queue and decide (in a pure, tested function) whether a retry is
-      # warranted. A failure that cleared nothing is not a queue stall.
+      # Pages queue and decide (in a pure, tested function) why the one retry is
+      # warranted. With nothing to clear, the failure may be a GitHub-side
+      # transient; repeating only this bounded API step is safe here.
       - name: Clear a stuck Pages deployment
         id: unblock
         if: steps.deployment.outcome == 'failure'
@@ -145,7 +151,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/pages-deploy-unblock.mjs --cancel
 
-      - name: Deploy to GitHub Pages (retry after clearing)
+      - name: Deploy to GitHub Pages (retry once)
         id: deployment_retry
         if: steps.unblock.outputs.retry == 'true'
         continue-on-error: true

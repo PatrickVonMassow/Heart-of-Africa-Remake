@@ -1097,6 +1097,18 @@ describe('the expected-end rule reaches the turn end', () => {
   })
 })
 
+describe('duplicate card titles', () => {
+  const codes = (html) => auditDashboard(html, { open: [210, 211, 204], done: [209] }).map((v) => v.code)
+
+  it('fails on a hand-built duplicate in any section and clears after repair', () => {
+    const duplicated = boardHtml({ klaerungExtra: ['Kartenschrift wählen', 'Kartenschrift wählen'] })
+    expect(codes(duplicated)).toContain('duplicate-card-title')
+
+    const repaired = duplicated.replace('Kartenschrift wählen', 'Kartenschrift für Überschriften wählen')
+    expect(codes(repaired)).not.toContain('duplicate-card-title')
+  })
+})
+
 describe('a queue of placeholders is a regression, not a valid board (point 419 d)', () => {
   // The failure this counts: when the queue became a projection, the prose was
   // never migrated — 79 of 81 cards carried the stub body and every existing

@@ -539,6 +539,30 @@ export function auditDashboard(html, input = {}) {
   const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '')
   const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '')
 
+  // DUPLICATE TITLE — a retry after a half-applied board command once put the
+  // same question on the board twice. Point-number checks cannot catch an
+  // unnumbered question, and a hand edit bypasses the add command entirely, so
+  // every section is audited by the title the reader actually sees.
+  for (const [name, cards] of [
+    [SECTION_TITLES[0], nowCards],
+    [SECTION_TITLES[1], vdzkCards],
+    [SECTION_TITLES[2], queueCards],
+    [SECTION_TITLES[3], erledigtCards],
+  ]) {
+    const seen = new Set()
+    const duplicateTitles = new Set()
+    for (const { title } of cards) {
+      if (!title) continue
+      ;(seen.has(title) ? duplicateTitles : seen).add(title)
+    }
+    if (duplicateTitles.size) {
+      v.push({
+        code: 'duplicate-card-title',
+        msg: `card title(s) ${[...duplicateTitles].map((title) => `"${title}"`).join(', ')} stand more than once in "${name}"`,
+      })
+    }
+  }
+
   // THE STATUS CARRIES ITS DATE (user 27.07.2026): a current-work card says WHEN
   // its status was written, so a reader can tell a fresh assessment from one
   // that has stood for hours. The collapsed header keeps only start/expected

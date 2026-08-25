@@ -46,6 +46,11 @@ const WORKFLOW_OR_OUTAGE_REMEDY =
   'the fault is in the workflow FILE — check what the recent commits changed under `.github/workflows/` ' +
   '(a `uses:` reference that resolves nowhere, or a `runs-on` label no runner matches) and fix it there.'
 
+function outageDeadline({ famineSince = 0, now = Date.now(), maxMs = OUTAGE_WAIVER_MAX_MS } = {}) {
+  const start = Number(famineSince) > 0 ? Number(famineSince) : Number(now)
+  return new Date(start + Number(maxMs)).toISOString()
+}
+
 /** The steps the RUNNER contributes to every job. A job that got no further than
  *  these executed nothing of ours, whatever the job is named. `Post <name>`
  *  wrappers are the runner's teardown half of an action and count the same. */
@@ -181,12 +186,20 @@ export function moreJobPages({ fetched = 0, totalCount = null, page = 1, perPage
  * `OUTAGE_WAIVER_MAX_MS` the waiver stops being credible and `escalate` is set,
  * so the alert names the retired-image / yanked-tag reading only a push can fix.
  *
- * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null, workflowsUntouched?:boolean, famineSince?:number, now?:number}} input
+ * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null, workflowsUntouched?:boolean, pagesBlockers?:object[]|null, famineSince?:number, now?:number}} input
  * @returns {{cause:'repository'|'external'|'unknown', actionable?:boolean, escalate?:boolean, failedJobs:string[], detail:string, remedy:string}}
  */
 export function classifyFailureCause(input) {
   try {
-    const { workflowName = '', conclusion = '', jobs = null, workflowsUntouched, famineSince = 0, now = Date.now() } = input ?? {}
+    const {
+      workflowName = '',
+      conclusion = '',
+      jobs = null,
+      workflowsUntouched,
+      pagesBlockers,
+      famineSince = 0,
+      now = Date.now(),
+    } = input ?? {}
     const workflow = String(workflowName ?? '')
     const isPages = workflow === PAGES_WORKFLOW
     const verdict = String(conclusion ?? '').toLowerCase()
@@ -255,6 +268,33 @@ export function classifyFailureCause(input) {
     if (failed.length > 0) {
       const outside = failed.filter((n) => !githubSide.includes(n))
       if (outside.length === 0) {
+        // A DEPLOY-JOB FAILURE IS EXTERNAL, BUT ITS OLD REMEDY WAS NOT ALWAYS
+        // EXECUTABLE (17.08.2026, runs 32054043421/32055125370/32055597148).
+        // Each run received HTTP 503 from the Pages API after the build passed;
+        // the advertised cancel command then proved there was no in-progress
+        // deployment to cancel. `pagesBlockers: []` is the caller's positive,
+        // read-only proof of that empty queue. Unknown (`null`/absent) retains
+        // the conservative old block; a real blocker retains its real handle.
+        if (isPages && Array.isArray(pagesBlockers) && pagesBlockers.length === 0) {
+          const w = waiverCredibility({ famineSince, now })
+          const deadlineAt = outageDeadline({ famineSince, now })
+          return {
+            cause: 'external',
+            actionable: false,
+            alertDetail: true,
+            escalate: w.credible ? undefined : true,
+            deadlineAt,
+            failedJobs: failed,
+            detail:
+              `the failing job is "${failed.join('", "')}", which only talks to the GitHub Pages API; ` +
+              'the build passed, and a read-only Pages API check found no in-progress deployment to cancel',
+            remedy: w.credible
+              ? `The guard holds no executable remedy: the cancel command would change nothing. Treat this as a ` +
+                `GitHub Pages outage until ${deadlineAt}; the hourly CI alert stays armed and a later green run clears it.`
+              : `The GitHub Pages outage deadline ${deadlineAt} has passed. The guard still will not hold the batch ` +
+                `on a red it cannot clear; inspect GitHub Status/support and re-run the deploy workflow when the service recovers.`,
+          }
+        }
         return {
           cause: 'external',
           failedJobs: failed,

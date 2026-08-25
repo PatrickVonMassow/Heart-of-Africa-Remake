@@ -12,6 +12,7 @@
 // witness — and it is safe precisely because the throw comes before the first side
 // effect, which is the property being pinned.
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -19,6 +20,29 @@ describe('batch-autostart is import-proof', () => {
   it('throws instead of spawning when it is imported rather than run', async () => {
     await expect(import('./batch-autostart.mjs')).rejects.toThrow(/CLI, not a module/)
   })
+
+  // AND ITS NAMED IMPORTS MUST RESOLVE UNDER REAL NODE, WHICH THE ASSERTION
+  // ABOVE CANNOT SEE (22.08.2026). Vitest's transform turns a named import of
+  // something the target does not export into `undefined`; real node refuses it
+  // at LINK time. The launcher imported `pidCorroboration` from the wrong module
+  // and the whole unit gate stayed green while `node scripts/batch-autostart.mjs`
+  // — the 900-second OS recovery tick — died before its first line.
+  //
+  // THE WITNESS NEVER LOADS THE LAUNCHER. `scripts/module-link-check.mjs` reads
+  // the launcher's import statements and links only their targets, so no CLI
+  // guard has to hold for this test to be free of side effects, and the scanner
+  // carries its own tests for every import form plus a fixture that really is
+  // broken. The child gets a hard timeout, which vitest cannot supply to a
+  // synchronous `spawnSync`.
+  it('has every named import really exported by its target, checked by a real node process', () => {
+    const run = spawnSync(
+      process.execPath,
+      ['scripts/module-link-check.mjs', 'scripts/batch-autostart.mjs'],
+      { cwd: process.cwd(), encoding: 'utf8', windowsHide: true, timeout: 60_000 },
+    )
+    expect(run.stdout.trim(), run.stderr).toBe('ALL-NAMED-IMPORTS-RESOLVE')
+    expect(run.status, run.stderr).toBe(0)
+  }, 90_000)
 })
 
 // ---------------------------------------------------------------------------
@@ -45,7 +69,7 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(imports[0]).toMatch(/\bbuildSpawnOptions\b/)
   })
 
-  it('CALLS them at the one spawn site — a re-inlined call would drop the env fix', () => {
+  it('CALLS them at the Claude spawn site — a re-inlined call would drop the env fix', () => {
     // Every statement that launches an executable BY PATH: an optional member
     // prefix, one of the launching functions, then an identifier argument. The
     // first version of this counted bare `spawn(` only, so `cp.spawn(…)` or
@@ -55,9 +79,16 @@ describe('the launcher uses the pure spawn builders', () => {
     // literal, so the legitimate git calls are not caught either.
     const LAUNCHES = /(?:^|[^\w.])(?:[A-Za-z_$][\w$]*\.)?(?:spawnSync|spawn|execFileSync|execFile|fork)\s*\(\s*[A-Za-z_$][\w$]*\s*,/
     const spawnSites = codeLines.filter((l) => LAUNCHES.test(l))
-    expect(spawnSites, 'the launcher must have exactly one process-launching site').toHaveLength(1)
-    expect(spawnSites[0]).toMatch(/buildSpawnArgs\(/)
-    expect(spawnSites[0]).toMatch(/buildSpawnOptions\(/)
+    const claudeSites = spawnSites.filter((line) => /buildSpawnArgs\(/.test(line) || /buildSpawnOptions\(/.test(line))
+    expect(claudeSites, 'the launcher must have exactly one Claude process-launching site').toHaveLength(1)
+    expect(claudeSites[0]).toMatch(/buildSpawnArgs\(/)
+    expect(claudeSites[0]).toMatch(/buildSpawnOptions\(/)
+  })
+
+  it('feeds a recorded serving-model handoff into the same spawn builder', () => {
+    expect(source).toMatch(/modelHandoffSpawn\(readJson\(C\('model-guard-handoff\.json'\)\), now\)/)
+    expect(code).toMatch(/model:\s*modelHandoff\.model, fallbackModel:\s*modelHandoff\.fallbackModel/)
+    expect(code).toMatch(/const prompt = modelHandoff\?\.prompt/)
   })
 
   it('never builds a spawn environment in CODE — the core owns that policy', () => {
@@ -76,6 +107,36 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/reapableSpawns\(/)
   })
 
+  it('attributes spawn progress to the recorded child identity', () => {
+    expect(source).toMatch(
+      /spawnProgressed\(\{[\s\S]{0,250}?batchWriters:\s*readSessionProcesses\(\)[\s\S]{0,180}?lastSpawn:\s*previousSpawn/,
+    )
+  })
+
+  it('wires process liveness into both persisted start records', () => {
+    expect(source).toMatch(
+      /successorStartDecision\(\{[\s\S]{0,500}?batchWriters[\s\S]{0,200}?previousBatchWriters[\s\S]{0,200}?fenceState[\s\S]{0,200}?probePid/,
+    )
+    const records = source.match(/launcherStartRecord\(\{/g) ?? []
+    expect(records, 'the refusal, pre-spawn and pid-bound records carry measured evidence').toHaveLength(3)
+    expect(source).toMatch(/autostart-authorized\.json[\s\S]{0,250}?startReason:[\s\S]{0,120}?measured:/)
+  })
+
+  it('recovers an inactive-lock writer veto after two unchanged decisions', () => {
+    const vetoBranch = source.match(/if \(!lock \|\| assessment\.alive !== true\) \{[\s\S]*?if \(!writerRecovered\) \{[\s\S]*?process\.exit\(0\)/)?.[0] ?? ''
+    expect(vetoBranch).toMatch(/writer-veto#/)
+    expect(vetoBranch).toMatch(/verdictRepeat\(/)
+    expect(vetoBranch).toMatch(/writerVetoSince/)
+    expect(vetoBranch).toMatch(/revokeWriterFence\(/)
+    expect(vetoBranch).toMatch(/retireBatchWriter\(/)
+    expect(vetoBranch).toMatch(/successorStartDecision\(/)
+    expect(vetoBranch).toMatch(/RECOVERED:/)
+    expect(vetoBranch).toMatch(/writer\.sessionId/)
+    expect(vetoBranch).toMatch(/writer\.pid/)
+    expect(vetoBranch).toMatch(/blockedMinutes/)
+    expect(vetoBranch).toMatch(/blockedUntil:\s*now \+ LAUNCHER_TICK_MS/)
+  })
+
   // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
   // `assessOwnerWork` defaults to the launcher's window, but the launcher names it
   // anyway — and this pins that it does, because the window is the one input that
@@ -87,6 +148,23 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(code, 'the guard’s 45-minute window makes the stall verdict unreachable').not.toMatch(
       /maxAgeMs:\s*IN_FLIGHT_MAX_AGE_MS/,
     )
+  })
+
+  it('assesses two decision intervals from real owner activity, not heartbeat freshness', () => {
+    expect(source).toMatch(/ownerActivityDecision\(\{[\s\S]{0,220}?records:\s*recentActivityRecords\(\)[\s\S]{0,160}?previous:\s*state\.ownerActivity/)
+    expect(source).toMatch(/state\.ownerActivity\s*=\s*ownerActivity\.state/)
+    expect(source).toMatch(/assessOwner\([^\n]+activity:\s*ownerActivity/)
+    expect(source).toMatch(/ACTIVITY_TAIL_BYTES/)
+    const reader = source.match(/const recentActivityRecords = \(\) => \{[\s\S]*?\n\}/)?.[0] ?? ''
+    expect(reader).toMatch(/bytesRead\s*!==\s*length[^\n]+return null/)
+    expect(reader).toMatch(/catch\s*\{\s*return null\s*\}/)
+  })
+
+  it('routes claim, handover and lease expiry through the shared destination', () => {
+    expect(code).toMatch(/ownerHolding:\s*ownerIsHolding\(\{[\s\S]{0,220}?lock,[\s\S]{0,220}?claimantSid:/)
+    expect(code).toMatch(/resolveBoundaryDestination\(\{[\s\S]{0,220}?assessment:\s*claimantAssessment,[\s\S]{0,220}?leaseExpired:/)
+    expect(code).toMatch(/destination\.action === 'reserve'[\s\S]{0,500}?handBackToClaimant\(/)
+    expect(code).toMatch(/destination\.action === 'renew'[\s\S]{0,300}?updateOwnLock\(/)
   })
 
   // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes
@@ -110,7 +188,7 @@ describe('the launcher uses the pure spawn builders', () => {
       [/batchParked/, 'the user-paused guard'],
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
-      [/takeover\.spawn/, 'the user claim that reserves the batch'],
+      [/destination\.action === 'reserve'/, 'the user claim that reserves the batch'],
     ]) {
       expect(sweep, `the sweep must run before ${what}`).toBeLessThan(lineOf(re, what))
     }
@@ -119,13 +197,66 @@ describe('the launcher uses the pure spawn builders', () => {
   it('…and every one of those exits persists the state the sweep just changed', () => {
     // A pruned ledger that is never written back is a sweep that half happened.
     const first = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
-    const claimEnd = codeLines.findIndex((l) => /takeover\.spawn/.test(l))
+    const claimEnd = codeLines.findIndex((l) => /destination\.action === 'reserve'/.test(l))
     const early = codeLines.slice(first, claimEnd + 12)
     expect(early.some((l) => /\bbail\(/.test(l)), 'the early guards must exit through bail()').toBe(true)
     for (const l of early) {
       expect(l, 'an early exit that skips the state write').not.toMatch(/process\.exit\(/)
     }
     expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
+  })
+})
+
+describe('immediate handover and supervised exit are runtime transports', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const code = source.split('\n').filter((line) => !line.trimStart().startsWith('//')).join('\n')
+
+  it('routes immediate, supervised-exit and watchdog starts through the one pure decision', () => {
+    expect(code).toMatch(/const immediate = argv\.includes\('--immediate'\)/)
+    expect(code).toMatch(/--cause', exitTrigger\.kind/)
+    expect(code).toMatch(/successorStartDecision\(\{[\s\S]*?trigger,[\s\S]*?spawnToken,[\s\S]*?lock,[\s\S]*?assessment,/)
+    expect(code).toMatch(/triggerKind[\s\S]*SUCCESSOR_TRIGGERS\.WATCHDOG/)
+  })
+
+  it('lets only the boundary cause bypass the spawn backoff', () => {
+    expect(code).toMatch(/shouldWaitForSpawnBackoff\(\{ triggerKind, lastSpawnAt: lastSpawn\?\.at, now, backoffMs \}\)/)
+    expect(code).not.toMatch(/if \(!immediate && lastSpawn/)
+  })
+
+  it('puts the generation and token reservation inside the atomic acquire', () => {
+    const acquire = code.match(/const acq = acquire\(launcherSid, \{[\s\S]*?\n\}\)\nif \(acq/)?.[0] ?? ''
+    expect(acquire).toMatch(/expected:/)
+    expect(acquire).toMatch(/fence: trigger\.generation/)
+    expect(acquire).toMatch(/\.\.\.startDecision\.reservation/)
+  })
+
+  it('supervises the exact child identity and requests immediately when it disappears', () => {
+    expect(code).toMatch(/if \(argv\[0\] === '--supervise'\)/)
+    expect(code).toMatch(/Math\.abs\(seen\.startedAt - childStartedAt\) <= 2000/)
+    expect(code).toMatch(/while \(sameChildAlive\(\)\)/)
+    expect(code).toMatch(/supervisedExitTrigger\(records, \{ childStartedAt \}\)/)
+    expect(code).toMatch(/'--immediate', '--cause', exitTrigger\.kind/)
+    expect(code).toMatch(/startChildSupervisor\(\{ pid: child\.pid, pidStartedAt: childStartedAt, token: spawnToken \}\)/)
+  })
+
+  it('lets a periodic watchdog replace a missing supervisor without starting a second owner', () => {
+    expect(code).toMatch(/supervisorRestartDecision\(\{ lastSpawn: last, lock, childProbe, supervisorProbe \}\)/)
+    expect(code).toMatch(/if \(repair\.restart\)/)
+    expect(code).toMatch(/supervisorRestartedAt: now/)
+  })
+
+  it('repairs a missing durable CI observer and routes its assessment into the start decision', () => {
+    expect(code).toMatch(/assessCiWait\(\{ wait: ciWait, now, probePid \}\)/)
+    expect(code).toMatch(/if \(!batchParked && ciWaitAssessment\.repair\)/)
+    expect(code).toMatch(/'\.\/ci-status-guard\.mjs'\), '--observe', ciWait\.wakeToken/)
+    expect(code).toMatch(/successorStartDecision\(\{[\s\S]*?ciWait: ciWaitAssessment/)
+  })
+
+  it('carries the persisted terminal result into the successor prompt', () => {
+    expect(code).toMatch(/ciTerminalPrompt\(ciWaitAssessment\)/)
+    expect(code).toMatch(/--wake-token/)
+    expect(code).toMatch(/--ci-result/)
+    expect(code).toMatch(/if \(ciWaitAssessment\.terminal\)[\s\S]*?acknowledgeCiWait\(ciWaitAssessment\.wakeToken\)/)
   })
 })
 
@@ -172,10 +303,18 @@ describe('the launcher runs the board watchdog', () => {
     for (const [re, what] of [
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
-      [/takeover\.spawn/, 'the user claim that reserves the batch'],
+      [/destination\.action === 'reserve'/, 'the user claim that reserves the batch'],
     ]) {
       expect(watch, `the watchdog must run before ${what}`).toBeLessThan(lineOf(re, what))
     }
+  })
+
+  it('redeems due carried answers before the watchdog and every owner no-spawn exit', () => {
+    const redeem = lineOf(/vdzk-answer\.mjs.*--redeem-due/, 'the carried-answer redemption')
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
+    expect(redeem).toBeLessThan(watch)
+    expect(watch).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+    expect(codeLines.slice(redeem, watch).join('\n')).toContain('answered-card redemption deferred')
   })
 
   it('cannot stop the launcher: the block is wrapped and fails open', () => {
@@ -198,7 +337,7 @@ describe('the board watchdog child', () => {
     expect(code).toMatch(/probe\(\(\) => liveCheckUrl\(BOARD_CONTENT_URL/)
     expect(code).toMatch(/liveBoardVerdict\(\{/)
     expect(code).toMatch(/watchdogDecision\(\{/)
-    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority, \{ recurring: d\.recurring === true \}\)/)
   })
 
   it('RETRIES a failed probe and corroborates it against the other transport (point 562)', () => {
@@ -244,7 +383,7 @@ describe('the board watchdog child', () => {
     // throws. Reporting the intention would let the launcher key a fault whose
     // alert never left the machine — and a keyed fault is never announced
     // again, so one transient POST failure would silence it for good.
-    expect(code).toMatch(/const sent = d\.notify && !quiet \? await notify\(/)
+    expect(code).toMatch(/const sent = d\.notify && !quiet\s*\? await notify\(/)
     expect(code).toMatch(/notified: !!sent/)
   })
 })
@@ -487,11 +626,31 @@ describe('the launcher acts on the pause record', () => {
     )
   })
 
+  it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
+    const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
+    const block = codeLines.slice(recovery, recovery + 18).join('\n')
+    // Point 749: NO board call at all — the pause marker is the record and the
+    // board derives its state card from it, so the recovery clock is written
+    // unconditionally rather than behind a successful board write.
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
+    expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
+    expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
+  })
+
+  it('records the runaway self-pause in the pause marker and creates no card at all', () => {
+    const start = lineOf(/state\.failCount >= RUNAWAY_FAIL_LIMIT/, 'the runaway pause')
+    const block = codeLines.slice(start, start + 40).join('\n')
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
+    expect(block).toMatch(/formatPauseRecord\(\{/)
+  })
+
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
     const brake = lineOf(/state\.failCount\s*>=\s*RUNAWAY_FAIL_LIMIT/, 'the runaway brake')
-    const block = codeLines.slice(brake, brake + 20).join('\n')
-    expect(block).toMatch(/planPause\(\{/)
+    const block = codeLines.slice(brake, brake + 32).join('\n')
+    expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
+    expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 
   it('the --pause-report drill exits before the tick’s first side effect', () => {
@@ -499,5 +658,47 @@ describe('the launcher acts on the pause record', () => {
     const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
     expect(drill, 'no --pause-report hook').toBeGreaterThanOrEqual(0)
     expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
+  })
+})
+
+describe('the launcher uses the canonical repository for batch-global state', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('takes REPO from repo-paths while retaining source-relative script lookup', () => {
+    expect(source).toMatch(/import \{ REPO_ROOT \} from '\.\/repo-paths\.mjs'/)
+    expect(source).toMatch(/const R = \(p\) => fileURLToPath/)
+    expect(source).toMatch(/const REPO = REPO_ROOT/)
+    expect(source).not.toMatch(/const REPO = R\('\.\.'\)/)
+    expect(source).toMatch(/const C = \(n\) => join\(REPO, '\.claude', n\)/)
+  })
+})
+
+describe('the launcher consults registered feature writers before spawning', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it('passes the measured register through both the initial and recovery decisions', () => {
+    expect(source).toMatch(/const featureWriterRegister = registeredFeatureWriters\(/)
+    expect(source.match(/featureWriterRegister[:,]/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(source).toMatch(/registeredFeatureWriters\(\{[\s\S]{0,180}?SUCCESSOR_TRIGGERS\.BOUNDARY/)
+  })
+})
+
+// Recurring healthy-flow and remediation notices are EVENTS: another identical
+// occurrence is new information, not evidence that a request went unanswered.
+// The launcher itself cannot be imported, so this source contract pins the
+// declaration at each otherwise-unreachable call site.
+describe('the launcher declares recurring event notifications', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+
+  it.each([
+    'Leaked worker reaped',
+    'Batch resumed itself',
+    'Rogue spawn killed',
+    'Batch lease expired',
+    'Resurrected',
+  ])('%s stays on the event ceiling', (title) => {
+    const start = source.indexOf(`'${title}'`)
+    expect(start, `notification ${title} is missing`).toBeGreaterThanOrEqual(0)
+    expect(source.slice(start, start + 1_000)).toMatch(/\{\s*(?:key:\s*'[^']+',\s*)?recurring:\s*true\s*\}/)
   })
 })

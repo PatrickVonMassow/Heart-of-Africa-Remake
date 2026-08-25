@@ -18,7 +18,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import {
   buildInventory,
   formatInventory,
@@ -27,8 +27,6 @@ import {
   memoryReport,
 } from './guard-inventory-core.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO_ROOT = R('..')
 const argv = process.argv.slice(2)
 const has = (f) => argv.includes(f)
 
@@ -84,8 +82,8 @@ function memoryDirs(now) {
 
 try {
   const now = Date.now()
-  const settings = JSON.parse(readFileSync(R('../.claude/settings.json'), 'utf8'))
-  const scriptFiles = readdirSync(R('.'))
+  const settings = JSON.parse(readFileSync(repoPath('.claude', 'settings.json'), 'utf8'))
+  const scriptFiles = readdirSync(repoPath('scripts'))
   const inv = buildInventory({ settings, scriptFiles, gitHookTexts: gitHookTexts() })
   const dirs = memoryDirs(now)
 

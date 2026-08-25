@@ -22,6 +22,7 @@ import {
   renewalDecision,
   normaliseFence,
   nextFence,
+  fenceClaimDecision,
   grantedFenceState,
   fenceHeldBy,
   fenceStatus,
@@ -33,6 +34,9 @@ import {
   inDeclaredWaitWindow,
   declaredWaitStale,
   dispossessionNotice,
+  mainWritingAction,
+  mainWriteFenceDecision,
+  resolvedTargetInCheckout,
 } from './batch-lease-core.mjs'
 import { LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 
@@ -154,6 +158,33 @@ describe('the fence — monotonic, max-wins, in its own file', () => {
     expect(backwards.fence).toBe(FENCE_HOLDER_HISTORY + 5)
   })
 
+  it('refuses an explicit claim at or below the durable high-water mark', () => {
+    const state = { fence: 690, holder: 'current' }
+    expect(fenceClaimDecision({ fenceState: state, requestedFence: 3 })).toEqual({
+      accept: false,
+      reason: 'stale-fence',
+      fence: null,
+      highWater: 690,
+    })
+    expect(fenceClaimDecision({ fenceState: state, requestedFence: 690 }).accept).toBe(false)
+    expect(fenceClaimDecision({ fenceState: state, requestedFence: 691 })).toMatchObject({
+      accept: true,
+      fence: 691,
+      highWater: 690,
+    })
+  })
+
+  it('includes the outgoing lock copy in admission and allocates the next claim when none is proposed', () => {
+    expect(fenceClaimDecision({ fenceState: { fence: 3 }, priorFence: 690 })).toEqual({
+      accept: true,
+      reason: 'accepted',
+      fence: 691,
+      highWater: 690,
+    })
+    expect(fenceClaimDecision({ fenceState: { fence: 3 }, priorFence: 690, requestedFence: 690 }).accept).toBe(false)
+    expect(fenceClaimDecision({ fenceState: { fence: Number.MAX_SAFE_INTEGER } }).reason).toBe('fence-exhausted')
+  })
+
   it('one session re-acquiring keeps only its newest grant', () => {
     const a = grantedFenceState({ fenceState: null, sessionId: 's1', fence: 1, now: T0 })
     const b = grantedFenceState({ fenceState: a, sessionId: 's2', fence: 2, now: T0 + 1 })
@@ -249,6 +280,27 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(ok({ toolName: 'Edit', filePath: 'TASKS.md' }).block).toBe(false)
     expect(ok({ toolName: 'Bash', command: 'node scripts/board-publish.mjs' }).block).toBe(false)
     expect(ok({ toolName: 'Write', filePath: '.claude/dashboard-state.json' }).block).toBe(false)
+  })
+
+  it('§8 chokepoint: a MultiEdit of the guarded files is the write it is, not a read', () => {
+    // Point 542, four-eyes round 3 (Sol): `MultiEdit` was added to the write-tool
+    // set here without a case of its own, which is the same hole the round found
+    // twice already — a write tool a set forgets passes silently the day the
+    // harness gains it. The asymmetry the whole chokepoint keeps still holds:
+    // the ACTION is refused, never the READ that would tell the session why.
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: 'TASKS.md' })).toMatchObject({ kind: 'tasks' })
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: 'docs/tasks-archive.md' })).toMatchObject({
+      kind: 'tasks',
+    })
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: '.claude/dashboard-state.json' })).toMatchObject({
+      kind: 'dashboard-state',
+    })
+    expect(call({ toolName: 'MultiEdit', filePath: 'TASKS.md' })).toMatchObject({ block: true, kind: 'tasks' })
+    // and the current-fence owner keeps doing all of it
+    expect(fenceDecision({ fenceState: stale, sessionId: 's-new', toolName: 'MultiEdit', filePath: 'TASKS.md' }).block).toBe(false)
+    // a path alone is still not an action
+    expect(fenceGuardedAction({ toolName: 'Read', filePath: 'TASKS.md' })).toBe(null)
+    expect(fenceGuardedAction({ toolName: 'MultiEdit', filePath: 'src/world/world.ts' })).toBe(null)
   })
 
   it('leaves everything OUTSIDE the four families alone, even for a fenced-out session', () => {
@@ -408,6 +460,127 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(fenceDecision({ fenceState: 'x', sessionId: 3, toolName: null }).block).toBe(false)
     expect(fenceGuardedAction()).toBe(null)
     expect(fenceGuardedAction({ toolName: 'Bash', command: null })).toBe(null)
+  })
+})
+
+describe('the main-write ownership fence', () => {
+  const decide = (over = {}) =>
+    mainWriteFenceDecision({ branch: 'main', toolName: 'Bash', command: 'git commit -m x', ...over })
+
+  it('refuses a main-writing action from a session that holds no lock, in words', () => {
+    const decision = decide({ ownsBatchLock: false })
+    expect(decision).toMatchObject({ block: true, registerWriter: false })
+    expect(decision.reason).toContain('MAIN WRITE REFUSED')
+    expect(decision.reason).toContain('holds no batch lock')
+    expect(decision.reason).toContain('Nothing was acquired silently')
+    expect(decision.reason).toContain('batch-claim.mjs')
+  })
+
+  it('allows and registers an owner before its main write', () => {
+    expect(decide({ ownsBatchLock: true })).toEqual({ block: false, registerWriter: true, reason: '' })
+  })
+
+  it('stands down for a paused batch and an isolated worktree', () => {
+    expect(decide({ paused: true })).toEqual({ block: false, registerWriter: false, reason: '' })
+    expect(decide({ worktree: true })).toEqual({ block: false, registerWriter: false, reason: '' })
+  })
+
+  it('does not conscript reads or mutations on a feature branch', () => {
+    expect(decide({ branch: 'feat/x' })).toEqual({ block: false, registerWriter: false, reason: '' })
+    expect(decide({ toolName: 'Bash', command: 'git status --short' })).toEqual({
+      block: false,
+      registerWriter: false,
+      reason: '',
+    })
+    expect(mainWritingAction({ toolName: 'Edit' }).writes).toBe(true)
+  })
+
+  it('lets a SHELL write outside the checkout through, like the Edit tool already does', () => {
+    // MEASURED 25.08.2026 (point 749): a session correcting one of its own memory
+    // files under /home/node/.claude/projects/…/memory — not TASKS.md, not the
+    // dashboard, not the repository — was refused, because a Bash segment was
+    // judged by intent alone. The Edit tool had the exemption; a heredoc did not.
+    const checkoutRoot = '/workspace/hoa'
+    const shell = (command) =>
+      mainWritingAction({ toolName: 'Bash', command, checkoutRoot, cwd: '/workspace/hoa' })
+    const memory = '/home/node/.claude/projects/-workspace-hoa/memory/x.md'
+    expect(shell(`cat > ${memory} <<'EOF'`).writes).toBe(false)
+    expect(shell(`rm ${memory}`).writes).toBe(false)
+    // A SOURCE inside the checkout disqualifies too — strictness is the safe side.
+    expect(shell(`cp docs/a.md ${memory}`).writes).toBe(true)
+    // A path inside the checkout removes the exemption for the whole segment…
+    expect(shell(`cp ${memory} TASKS.md`).writes).toBe(true)
+    expect(shell('cat > TASKS.md').writes).toBe(true)
+    // …and a command with no path at all is judged exactly as before.
+    expect(shell('git push origin main').writes).toBe(true)
+    expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
+  })
+
+  it('judges file writes by their resolved target, not by the main session', () => {
+    const checkoutRoot = '/workspace/hoa'
+    const write = (filePath, resolvedFilePath) =>
+      decide({
+        ownsBatchLock: false,
+        toolName: 'Write',
+        command: undefined,
+        filePath,
+        resolvedFilePath,
+        checkoutRoot,
+      })
+
+    expect(write('/workspace/hoa/src/world.ts', '/workspace/hoa/src/world.ts').block).toBe(true)
+    expect(write('/tmp/claude-1000/session/scratchpad/note.mjs', '/tmp/claude-1000/session/scratchpad/note.mjs')).toEqual({
+      block: false,
+      registerWriter: false,
+      reason: '',
+    })
+    expect(write('/home/user/.claude/projects/hoa/memory/MEMORY.md', '/home/user/.claude/projects/hoa/memory/MEMORY.md').block).toBe(false)
+
+    // Both raw spellings look external. Their canonical destination is inside
+    // the checkout, whether reached through `..` or an outside symlink.
+    expect(write('/workspace/hoa/../hoa/TASKS.md', '/workspace/hoa/TASKS.md').block).toBe(true)
+    expect(write('/tmp/repo-link/TASKS.md', '/workspace/hoa/TASKS.md').block).toBe(true)
+  })
+
+  it('keeps containment total and conservative when path evidence is absent', () => {
+    expect(resolvedTargetInCheckout()).toBe(true)
+    expect(resolvedTargetInCheckout({ resolvedFilePath: '/tmp/note', checkoutRoot: '' })).toBe(true)
+    expect(resolvedTargetInCheckout({ resolvedFilePath: '/workspace/hoa', checkoutRoot: '/workspace/hoa' })).toBe(true)
+    expect(resolvedTargetInCheckout({ resolvedFilePath: '/workspace/hoax/note', checkoutRoot: '/workspace/hoa' })).toBe(false)
+    expect(decide({ ownsBatchLock: false, toolName: 'Write', command: undefined, filePath: '' }).block).toBe(true)
+  })
+
+  it('allows build and test gates that only write ignored outputs', () => {
+    for (const command of [
+      'npm run build',
+      'npm run lint',
+      'npm run test:unit',
+      'npm test',
+      'npx vitest run scripts/batch-lease-core.test.mjs',
+      'timeout 30 npm run test:unit 2>&1',
+      'bash -lc "npm run build"',
+    ]) {
+      expect(mainWritingAction({ toolName: 'Bash', command }), command).toEqual({ writes: false, what: '' })
+      expect(decide({ ownsBatchLock: false, command }), command).toEqual({
+        block: false,
+        registerWriter: false,
+        reason: '',
+      })
+    }
+  })
+
+  it('still refuses tracked-state operations and gate output redirected to a checkout file', () => {
+    for (const command of [
+      'git commit -m x',
+      'git push',
+      'node scripts/land-point.mjs 795 --model "Opus 5"',
+      'npm run build > build-report.txt',
+      'bash -lc "git commit -m x"',
+    ]) {
+      expect(mainWritingAction({ toolName: 'Bash', command }).writes, command).toBe(true)
+      expect(decide({ ownsBatchLock: false, command }).block, command).toBe(true)
+    }
+    expect(mainWritingAction({ toolName: 'Bash', command: 'npm run build > /dev/null' }).writes).toBe(false)
   })
 })
 

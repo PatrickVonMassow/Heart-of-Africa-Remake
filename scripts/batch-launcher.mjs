@@ -46,6 +46,9 @@ import {
   ownershipSignal,
   releaseSpawnDecision,
 } from './batch-launcher-core.mjs'
+import { initialStallState, judgeSleep, judgeTick, markAlertDelivered } from './launcher-stall-core.mjs'
+import { resumeArmDecision } from './batch-launcher-core.mjs'
+import { notify } from './notify.mjs'
 import { LOCK_PATH, assessOwner, bootTimeMs, readOwnerLock } from './batch-singleton.mjs'
 
 export const LAUNCHER_RECORD_PATH = repoPath('.claude/batch-launcher.json')
@@ -61,15 +64,28 @@ export const TICK_TIMEOUT_MS = LAUNCHER_TICK_MS
  *  what it sees. Node's own startup, not the tick's. */
 const START_SETTLE_MS = 8000
 
+/** How long one stall alert send may take before the daemon moves on. The
+ *  loop is what this alarm protects; it must never hang on its own voice. A
+ *  send that settles later is harmless — the outcome is only logged. */
+export const ALERT_SEND_TIMEOUT_MS = 30_000
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** `.git` is a DIRECTORY in the real checkout and a FILE inside a worktree. */
-export function inWorktree(root = REPO_ROOT) {
+/** `.git` is a DIRECTORY in the real checkout and a FILE inside a worktree.
+ *  Three answers, because an UNREADABLE `.git` is neither (Sol review,
+ *  finding 5): true, false, or null for "could not be verified". */
+export function worktreeVerdict(root = REPO_ROOT) {
   try {
     return !statSync(join(root, '.git')).isDirectory()
   } catch {
-    return false
+    return null
   }
+}
+
+/** The CLI's coarse form: an unverifiable checkout refuses like a worktree —
+ *  a launcher must never be armed from a tree nobody could even read. */
+export function inWorktree(root = REPO_ROOT) {
+  return worktreeVerdict(root) !== false
 }
 
 export function readLauncherRecord(path = LAUNCHER_RECORD_PATH) {
@@ -223,6 +239,17 @@ export async function runDaemon({
   isPaused = () => pauseState().state !== 'none',
   pollMs = WAKE_POLL_MS,
   wakeGapMs = WAKE_MIN_GAP_MS,
+  // THE DAEMON'S OWN VOICE (point 859). A dead tick used to be a log line and
+  // nothing else — but on 23.08.2026 the container sickened, every child spawn
+  // timed out for 3.5 hours, and every alert path lived in exactly such a
+  // child. This is the one alert that must not need a child process, so it is
+  // sent from THIS process: notify() is an HTTPS POST, judged by the pure core
+  // and throttled by the escalation ladder. Injected so a test alerts a fake.
+  sendAlert = notify,
+  // The send gets a BUDGET, not trust (Sol review, finding 1): notify bounds
+  // its own fetch, but the ladder import and any injected channel do not, and
+  // an unbounded await here would stall the very loop this alarm watches over.
+  alertTimeoutMs = ALERT_SEND_TIMEOUT_MS,
 } = {}) {
   const existing = launcherState({ recordPath, tickMs })
   if ((existing.state === 'ready' || existing.state === 'running') && Number(existing.record?.pid) !== process.pid) {
@@ -298,6 +325,32 @@ export async function runDaemon({
   if (!publish()) return leave()
   appendLog(logPath, `launcher up (pid ${process.pid}, every ${Math.round(tickMs / 1000)} s)`)
 
+  /** The stall watch's running state (point 859), threaded through the pure
+   *  core. Speaks through `sendAlert`; a failed or refused send never takes
+   *  the launcher down, and the core re-demands it on the next dead tick. */
+  let stall = initialStallState()
+  const speak = async (kind, { title, message, priority, key }) => {
+    let ok = false
+    try {
+      // Race, not trust: a hung send loses to the budget and the loop moves on.
+      // The losing promise may settle later; its result is only a log line.
+      ok = await Promise.race([
+        Promise.resolve(sendAlert(title, message, priority, key ? { key } : { escalate: false })).then(
+          (r) => r === true,
+          () => false,
+        ),
+        sleep(alertTimeoutMs).then(() => false),
+      ])
+    } catch {
+      /* a broken alert channel must never take the launcher down */
+    }
+    appendLog(
+      logPath,
+      `stall-watch: ${kind} ${ok ? 'sent' : 'not sent (no topic, held back by the ladder, send failed, or timed out)'}`,
+    )
+    return ok
+  }
+
   while (!stopping) {
     // Checked again right here, before the tick rather than after it: a daemon
     // that lost the record must not spend an interval running the batch first.
@@ -319,11 +372,24 @@ export async function runDaemon({
     // late. Reading here closes it: anything that ends ownership from the tick's
     // start onward is a CHANGE.
     lastSignal = observeOwnership() ?? lastSignal
+    let tickCode = null
     try {
-      const code = await tick({ logPath })
-      appendLog(logPath, `tick finished (exit ${code === null ? 'killed' : code})`)
+      tickCode = await tick({ logPath })
+      appendLog(logPath, `tick finished (exit ${tickCode === null ? 'killed' : tickCode})`)
     } catch (e) {
       appendLog(logPath, `tick threw: ${(e && e.message) || e}`)
+    }
+    // The stall watch (point 859): a NUMBER means a child ran to an exit — the
+    // container can spawn, the ordinary machinery has its voice back. NULL is
+    // the voiceless state: spawn failed, child errored, or hung and was killed.
+    {
+      const verdict = judgeTick({ state: stall, alive: tickCode !== null, now: Date.now() })
+      stall = verdict.state
+      if (verdict.log) appendLog(logPath, `stall-watch: ${verdict.log}`)
+      // Only a CONFIRMED delivery arms the recovery notice — "alerted" means
+      // the user actually got one, not that one was demanded.
+      if (verdict.alert && (await speak('alert', verdict.alert))) stall = markAlertDelivered(stall)
+      if (verdict.recovery) await speak('recovery notice', verdict.recovery)
     }
     lastTickAt = Date.now()
     if (!publish({ tickInFlight: false })) return leave()
@@ -332,6 +398,7 @@ export async function runDaemon({
     // interval, and neither must a release. The poll only ever shortens this
     // sleep — the tick it brings forward is the same child as always, so the hard
     // singleton below it is untouched and no second owner can come of it.
+    const sleepStartedAt = Date.now()
     await new Promise((resolve) => {
       const deadline = Date.now() + tickMs
       let timer = null
@@ -376,6 +443,14 @@ export async function runDaemon({
       timer = setTimeout(poll, Math.max(1, Math.min(pollMs, tickMs)))
     })
     wake = null
+    // A sleep that overshot by a whole interval was slept THROUGH — the host
+    // suspended or froze (point 859: the incident's timers fired hours late).
+    // The mark only lowers the alert threshold; a healthy first tick clears it.
+    {
+      const verdict = judgeSleep({ state: stall, plannedMs: tickMs, actualMs: Date.now() - sleepStartedAt, tickMs })
+      stall = verdict.state
+      if (verdict.log) appendLog(logPath, `stall-watch: ${verdict.log}`)
+    }
   }
 
   publish({ stopped: true, stoppedAt: Date.now() })
@@ -383,25 +458,70 @@ export async function runDaemon({
   return 'stopped'
 }
 
-/** Start the daemon detached, so it outlives the session that started it. */
-export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = LAUNCHER_TICK_MS } = {}) {
+/** Start the daemon detached, so it outlives the session that started it.
+ *  `spawner` is injected so the asynchronous spawn-error path is TESTED with a
+ *  child that really emits 'error', not with a pre-formed failure result. */
+export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = LAUNCHER_TICK_MS, spawner = spawn } = {}) {
   const before = launcherState({ recordPath, tickMs })
   if (before.state === 'ready' || before.state === 'running') {
     return { started: false, ...before, reason: 'already running' }
   }
-  const child = spawn(process.execPath, [SELF_PATH, '--daemon'], {
+  const child = spawner(process.execPath, [SELF_PATH, '--daemon'], {
     cwd: REPO_ROOT,
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
   })
+  // An ASYNCHRONOUS spawn failure (EAGAIN under pressure — the incident's exact
+  // weather) emits 'error' later; without a listener that is an uncaught event
+  // that crashes the CALLER, which since point 859 includes the SessionStart
+  // hook. Recorded here, reported below (Sol review, finding 2).
+  let spawnError = null
+  child.on('error', (e) => {
+    spawnError = e
+  })
   child.unref()
   const deadline = Date.now() + START_SETTLE_MS
   for (;;) {
     const now = launcherState({ recordPath, tickMs })
+    if (spawnError) {
+      return { started: false, ...now, reason: `the daemon could not be spawned: ${spawnError.message || spawnError}` }
+    }
     if (now.state === 'ready' || now.state === 'running') return { started: true, ...now }
     if (Date.now() >= deadline) return { started: false, ...now, reason: 'the daemon published no record' }
     await sleep(200)
+  }
+}
+
+/**
+ * THE SESSION-START ARMING, as one injectable seam (point 859, Sol review
+ * finding 6). The hook calls exactly this; a test drives it with fakes —
+ * including a spawn that fails asynchronously — and proves it NEVER throws:
+ * a hook that cannot arm must still orient its session.
+ *
+ * Returns { armed, attempted, reason, pid }:
+ *   attempted=false — the decision refused (already armed, stopped, win32,
+ *                     worktree/unverifiable checkout); nothing was spawned.
+ *   attempted=true  — a start ran; `armed` says whether it took.
+ */
+export async function armLauncherAtSessionStart({
+  platform = process.platform,
+  worktree = worktreeVerdict(),
+  readState = launcherState,
+  start = startDaemon,
+} = {}) {
+  try {
+    const decision = resumeArmDecision({ state: readState().state, platform, worktree })
+    if (!decision.arm) return { armed: false, attempted: false, reason: decision.reason, pid: null }
+    const r = await start()
+    return {
+      armed: r.started === true,
+      attempted: true,
+      reason: r.started === true ? decision.reason : r.reason || 'the daemon published no record',
+      pid: r.record?.pid ?? null,
+    }
+  } catch (e) {
+    return { armed: false, attempted: true, reason: `arming failed: ${(e && e.message) || e}`, pid: null }
   }
 }
 

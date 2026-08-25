@@ -1459,8 +1459,9 @@ textarea {
   padding: 1px 6px;
   pointer-events: none;
   /* One size at every distance (no drei distanceFactor): a reading aid must
-     stay small and legible, not swell into the frame as the camera nears. */
-  transform: translateY(-4px);
+     stay small and legible, not swell into the frame as the camera nears. The
+     rise above the subject is set inline by ActorLabels.tsx, because the
+     declutter lifts a label that would otherwise fuse with its neighbour. */
 }
 
 /* Natural landmarks (lakes, mountains, waterfalls): subtler atlas-style label. */

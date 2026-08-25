@@ -12,19 +12,66 @@
 // distance scaling: a place name may swell as the camera nears it, but a
 // reading aid that did so filled half the bird's-eye frame with one word (the
 // first probe frame). These stay one small size, whatever the distance.
+//
+// What it does add is a DECLUTTER: two subjects standing close printed two
+// boxes into the same pixels, and the picture read "Villager llager" while every
+// DOM check saw two perfectly correct labels (point 628). So the boxes are
+// measured and laid out — the nearer name keeps its place, a further one rises a
+// line or, with no room left, says nothing.
 
 import { useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { balance } from '../config/balance'
 import { useStrings } from '../i18n'
-import { actorLabelText, nearestActors, qualifiesAsActor } from '../systems/actorLabels'
+import { actorLabelText, declutterLabels, nearestActors, qualifiesAsActor, type ScreenLabel } from '../systems/actorLabels'
 import { useCtrlHeld } from '../ui/ctrlHold'
 import { collectActors, pushMarkedActors, type LabelledActor } from './actorLabelSource'
-import { pointOnScreen } from './travel/frameVisibility'
+import { pointOnScreen, projectPoint } from './travel/frameVisibility'
 
 /** How often the labels re-read the scene while the key is held (seconds). */
 const REFRESH_SECONDS = 0.1
+
+/** How far a label floats above the point it names, in CSS pixels, before the
+ *  declutter lifts it any further. Set here rather than in the stylesheet
+ *  because the rise VARIES per label now. */
+const LABEL_RISE = 4
+
+/** Box size for a label whose width cannot be measured (no DOM: the unit
+ *  layer). Roughly the real proportions of the 12 px label, so a test still
+ *  exercises overlaps rather than a degenerate zero-size box. */
+const ESTIMATED_CHAR_WIDTH = 7
+const ESTIMATED_PADDING = 14
+const ESTIMATED_HEIGHT = 18
+
+/** Measured box sizes per label text — a closed, small set of words, measured
+ *  once each in the label's own style, so the declutter decides on the box the
+ *  player really sees rather than on a guess at a proportional font. */
+const boxSizes = new Map<string, { width: number; height: number }>()
+
+function labelBox(text: string): { width: number; height: number } {
+  const known = boxSizes.get(text)
+  if (known !== undefined) return known
+  let box = {
+    width: text.length * ESTIMATED_CHAR_WIDTH + ESTIMATED_PADDING,
+    height: ESTIMATED_HEIGHT,
+  }
+  if (typeof document !== 'undefined') {
+    const probe = document.createElement('div')
+    probe.className = 'map-label actor-label'
+    probe.textContent = text
+    probe.style.position = 'absolute'
+    probe.style.left = '-9999px'
+    probe.style.top = '0'
+    probe.style.visibility = 'hidden'
+    document.body.appendChild(probe)
+    const rect = probe.getBoundingClientRect()
+    probe.remove()
+    if (rect.width > 0 && rect.height > 0) box = { width: rect.width, height: rect.height }
+  }
+  boxSizes.set(text, box)
+  return box
+}
 
 interface DrawnLabel {
   key: string
@@ -34,12 +81,15 @@ interface DrawnLabel {
   x: number
   y: number
   z: number
+  /** Extra rise in CSS pixels the declutter gave it (0 for most). */
+  lift: number
 }
 
 function ActorLabelLayer() {
   const strings = useStrings()
   const camera = useThree((s) => s.camera)
   const scene = useThree((s) => s.scene)
+  const size = useThree((s) => s.size)
   const [labels, setLabels] = useState<DrawnLabel[]>([])
   const scratch = useRef<LabelledActor[]>([])
   const onScreen = useRef<LabelledActor[]>([])
@@ -66,20 +116,41 @@ function ActorLabelLayer() {
       visible.push(actor)
     }
     const kept = nearestActors(visible, camera.position, balance.labelOverlay.maxLabels)
-    setLabels(
-      kept.map((actor, i) => ({
+    // Where each of them would stand IN THE PICTURE, so overlapping boxes can be
+    // resolved in the pixels the player reads them in rather than in world
+    // units, where two figures at different depths can share one screen spot.
+    const texts = kept.map((actor) => actorLabelText(strings, actor))
+    const boxes: ScreenLabel[] = kept.map((actor, i) => {
+      const p = projectPoint(camera, actor.x, actor.y, actor.z)
+      const box = labelBox(texts[i])
+      return {
+        x: (p.x * 0.5 + 0.5) * size.width,
+        y: (0.5 - p.y * 0.5) * size.height - LABEL_RISE,
+        width: box.width,
+        height: box.height,
+        depth: Math.hypot(actor.x - camera.position.x, actor.y - camera.position.y, actor.z - camera.position.z),
+      }
+    })
+    const lifts = declutterLabels(boxes)
+    const drawnLabels: DrawnLabel[] = []
+    kept.forEach((actor, i) => {
+      const lift = lifts[i]
+      if (lift === null) return // no clear place left: the nearer name keeps it
+      drawnLabels.push({
         // Keyed by SLOT, not by what fills it: the list is re-sorted by distance
         // every refresh, and a key that moved with the subject unmounted and
         // remounted drei's portals — two labels for one elder stood in the same
         // frame while the old one was still being torn down.
-        key: String(i),
+        key: String(drawnLabels.length),
         kind: actor.kind,
-        text: actorLabelText(strings, actor),
+        text: texts[i],
         x: actor.x,
         y: actor.y,
         z: actor.z,
-      })),
-    )
+        lift,
+      })
+    })
+    setLabels(drawnLabels)
   })
 
   // Dev hook for the headless verification (CLAUDE.md §7.2): what stands right
@@ -113,7 +184,9 @@ function ActorLabelLayer() {
     <>
       {labels.map((label) => (
         <Html key={label.key} center position={[label.x, label.y, label.z]}>
-          <div className="map-label actor-label">{label.text}</div>
+          <div className="map-label actor-label" style={{ transform: `translateY(${-(LABEL_RISE + label.lift)}px)` }}>
+            {label.text}
+          </div>
         </Html>
       ))}
     </>

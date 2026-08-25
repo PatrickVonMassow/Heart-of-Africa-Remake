@@ -1,22 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import { judgeStanceSlip } from './stanceSlip.mjs'
 
-// A synthetic walker built the way the rig really works (src/scenes/place/PlaceLife.tsx):
-// the body advances along its own heading, and the stance foot sweeps BACK through the
-// body frame by the distance travelled — which is exactly what keeps its world spot.
-// `sweep` scales that sweep, so sweep = 1 is a correct cadence and sweep = 1.5 is the
-// over-driven one point 300 was opened for.
+// A synthetic planted walker built to the renderer's contract: the stance foot
+// owns a world contact, while the body advances and turns over it. `sweep`
+// introduces cadence error as foot travel opposite the body step, so sweep = 1
+// is planted and sweep = 1.5 is the over-driven defect point 300 was opened for.
 //
 // Forward is (sin yaw, cos yaw) throughout this codebase; local x is the lateral
 // direction (cos yaw, -sin yaw), which is why a leg sits off the centre line at all
 // and why a turning body swings it.
-function walker({ frames = 60, v = 0.01, omega = 0, lat = 0.2, sweep = 1, stride = 0.8, stance = () => true } = {}) {
+function walker({ frames = 60, v = 0.01, omega = 0, sweep = 1, stride = 0.8, stance = () => true, rigidTurn = false } = {}) {
   const out = []
   let x = 1
   let z = 2
   let y = 0.3
   let fwd = 0.15
+  let footX = x + 0.2 * Math.cos(y) + fwd * Math.sin(y)
+  let footZ = z - 0.2 * Math.sin(y) + fwd * Math.cos(y)
   for (let k = 0; k < frames; k++) {
+    const foot = rigidTurn
+      ? { x: x + 0.2 * Math.cos(y) + fwd * Math.sin(y), z: z - 0.2 * Math.sin(y) + fwd * Math.cos(y) }
+      : { x: footX, z: footZ }
     out.push({
       g: {
         x,
@@ -24,14 +28,18 @@ function walker({ frames = 60, v = 0.01, omega = 0, lat = 0.2, sweep = 1, stride
         yaw: y,
         stride,
         stance: stance(k),
-        foot: { x: x + lat * Math.cos(y) + fwd * Math.sin(y), z: z - lat * Math.sin(y) + fwd * Math.cos(y) },
+        foot,
       },
     })
     const ym = y + omega / 2 // step along the interval's MEAN heading
-    x += v * Math.sin(ym)
-    z += v * Math.cos(ym)
+    const dx = v * Math.sin(ym)
+    const dz = v * Math.cos(ym)
+    x += dx
+    z += dz
+    footX += (1 - sweep) * dx
+    footZ += (1 - sweep) * dz
     y += omega
-    fwd -= sweep * v
+    fwd -= v
   }
   return out
 }
@@ -49,15 +57,17 @@ describe('judgeStanceSlip', () => {
     expect(r.worst).toBeGreaterThan(0.4)
   })
 
-  // The point-549 regression. A body that turns swings its rigid legs about its
-  // centre; removing that with the heading at interval START leaves a slip of
-  // about half the turn — 0.2 of pure geometry at 0.4 rad, against a bar of 0.25.
-  // Through the interval's MEAN heading the same walk reads as what it is.
-  it('does not charge a turning walk with a slip it did not skate', () => {
+  it('reads a world-planted foot as still while the body turns over it', () => {
     const r = judgeStanceSlip(walker({ omega: 0.1 }))
     expect(r.enough).toBe(true)
     expect(r.turnMax).toBeGreaterThan(0.3) // the windows really do carry a turn
-    expect(r.worst).toBeLessThan(0.05)
+    expect(r.worst).toBeLessThan(1e-9)
+  })
+
+  it('catches the old rigid foot following a turning body', () => {
+    const r = judgeStanceSlip(walker({ omega: 0.1, rigidTurn: true }))
+    expect(r.enough).toBe(true)
+    expect(r.worst).toBeGreaterThan(0.25)
   })
 
   it('still catches a skate on a turning walk', () => {

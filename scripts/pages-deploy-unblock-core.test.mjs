@@ -1,6 +1,6 @@
 // Vitest coverage for the pure Pages-unblock logic (pages-deploy-unblock-core.mjs):
 // which deployment counts as blocking, which listing entries are worth asking
-// about, when the deploy is retried (and when it stays red at once), and that a
+// about, when the deploy is retried (and when it is not), and that a
 // stall report NAMES what blocks it.
 import { describe, it, expect } from 'vitest'
 import {
@@ -150,24 +150,42 @@ describe('blockingDeployments', () => {
 
 describe('shouldRetryDeploy', () => {
   it('retries once when a stuck deployment was actually cleared', () => {
-    const d = shouldRetryDeploy({ deployFailed: true, cancelled: [{ sha: 'cde5aee6' }] })
-    expect(d.retry).toBe(true)
-    expect(d.reason).toContain('cde5aee')
+    const d = shouldRetryDeploy({
+      deployFailed: true,
+      cancelled: [{ sha: 'cde5aee6' }, { sha: 'abc123456' }],
+    })
+    expect(d).toEqual({
+      retry: true,
+      reason: 'cleared 2 stuck Pages deployment(s) (cde5aee, abc1234) — deploying again',
+    })
   })
 
-  it('stays red at once when the failure cleared nothing — not a queue stall', () => {
+  it('retries a possible GitHub-side transient when there was no stall to clear', () => {
     const d = shouldRetryDeploy({ deployFailed: true, cancelled: [] })
-    expect(d.retry).toBe(false)
-    expect(d.reason).toContain('not a queue stall')
+    expect(d).toEqual({
+      retry: true,
+      reason:
+        'the deploy failed with no stuck Pages deployment to clear — this may be a GitHub-side transient, and repeating the deploy step once is safe because the build already succeeded',
+    })
   })
 
   it('never retries a deploy that succeeded', () => {
-    expect(shouldRetryDeploy({ deployFailed: false, cancelled: [{ sha: 'abc1234' }] }).retry).toBe(false)
+    expect(shouldRetryDeploy({ deployFailed: false, cancelled: [{ sha: 'abc1234' }] })).toEqual({
+      retry: false,
+      reason: 'the deployment succeeded — nothing to retry',
+    })
   })
 
   it('survives junk input', () => {
-    expect(shouldRetryDeploy().retry).toBe(false)
-    expect(shouldRetryDeploy({ deployFailed: true, cancelled: 'nope' }).retry).toBe(false)
+    expect(shouldRetryDeploy()).toEqual({
+      retry: false,
+      reason: 'the deployment succeeded — nothing to retry',
+    })
+    expect(shouldRetryDeploy({ deployFailed: true, cancelled: 'nope' })).toEqual({
+      retry: true,
+      reason:
+        'the deploy failed with no stuck Pages deployment to clear — this may be a GitHub-side transient, and repeating the deploy step once is safe because the build already succeeded',
+    })
   })
 })
 
