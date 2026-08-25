@@ -22,8 +22,8 @@ beforeAll(() => {
   // the live batch state.
   sandbox = mkdtempSync(join(tmpdir(), 'doctor-cli-'))
   mkdirSync(join(sandbox, '.claude'), { recursive: true })
-  execFileSync('git', ['init', '-q', '-b', 'main', sandbox], { stdio: 'ignore' })
-  const git = (...args) => execFileSync('git', ['-C', sandbox, ...args], { stdio: 'ignore' })
+  execFileSync('git', ['init', '-q', '-b', 'main', sandbox], { stdio: 'ignore', windowsHide: true })
+  const git = (...args) => execFileSync('git', ['-C', sandbox, ...args], { stdio: 'ignore', windowsHide: true })
   git('config', 'user.email', 'doctor@test')
   git('config', 'user.name', 'doctor')
   writeFileSync(join(sandbox, 'TASKS.md'), '# Work order\n')
@@ -42,6 +42,7 @@ const runGate = () => {
       cwd: sandbox,
       env: { ...process.env, HOA_REPO_ROOT: sandbox },
       stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
     })
   } catch (error) {
     return `${error.stdout ?? ''}${error.stderr ?? ''}`
