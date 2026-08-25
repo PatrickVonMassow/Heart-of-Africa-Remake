@@ -141,6 +141,14 @@ put it is the mistake this line exists to stop.
   failure mode is the measured one: a session that can neither hand over nor stop; every
   change here is fail-open or it is wrong.
   Bundle: Session- & Repo-Hygiene.
+  THE GAP CARD MUST NOT CLAIM AN IDLE BATCH WHILE WORK IS BEING ADOPTED (measured 25.08.2026,
+  18:20): `--prepare --context` reported the in-flight work as TRANSFERABLE
+  (`feat/744-measured-exit@7ac27a0c`, an author still running on it) and in the same output
+  printed the verbatim card ending "Hier läuft nichts weiter." Both cannot be true, and the card
+  is the first thing the successor reads — it says the batch is idle at the moment an agent is
+  handed over. The template gets a transferable-work variant that NAMES the adopted branch, or
+  that sentence is dropped whenever `--adopt` has something to adopt. Same failure class as the
+  two contradicting gates above: a printed sequence that does not survive its own facts.
 
 - [ ] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
   (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
