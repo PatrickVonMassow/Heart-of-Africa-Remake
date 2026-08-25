@@ -339,8 +339,32 @@ describe('probeAlive', () => {
     expect(probeAlive(4242, { startedAt: startTicksOf(spawned), readProc: () => spawned }).alive).toBe(true)
   })
 
-  it('is total on a missing pid', () => {
-    expect(probeAlive(NaN, { readProc: () => null, signal: () => 'exists' }).alive).toBe(false)
+  it('reads a missing pid as UNKNOWN, never as a corpse', () => {
+    // `{ alive: false }` without `unknown` flows through readOutcome into
+    // `dead: true` — a definite death verdict for a worker that was never even
+    // identified, and one half of a passed drill. Nothing observed, no verdict.
+    for (const pid of [NaN, 0, -5, undefined]) {
+      const nothing = probeAlive(pid, { readProc: () => null, signal: () => 'gone' })
+      expect(nothing.alive, `pid ${pid}`).toBe(false)
+      expect(nothing.unknown, `pid ${pid}`).toBe(true)
+      expect(nothing.how).toMatch(/nothing was ever observed/)
+    }
+  })
+
+  it('calls a captured pid nothing answers for DEAD even without spawn-time identity', () => {
+    // The identity requirement is ONE-DIRECTIONAL: it stops a live stranger at
+    // a recycled number being read as the live worker. It cannot rescue a death
+    // verdict — a captured pid that is absent entails the spawned process
+    // exited, because recycling itself requires the original to exit first.
+    const gone = probeAlive(4242, { requireIdentity: true, startedAt: 0, readProc: () => null, signal: () => 'gone' })
+    expect(gone.alive).toBe(false)
+    expect(gone.unknown).toBeUndefined()
+    expect(gone.how).toMatch(/no such process/)
+    // …while the same missing identity keeps a pid that still ANSWERS undecided:
+    // that is the direction a recycled number can lie in.
+    const answers = probeAlive(4242, { requireIdentity: true, startedAt: 0, readProc: () => null, signal: () => 'exists' })
+    expect(answers.alive).toBe(false)
+    expect(answers.unknown).toBe(true)
   })
 })
 

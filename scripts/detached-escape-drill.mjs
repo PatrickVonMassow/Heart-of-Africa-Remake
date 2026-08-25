@@ -260,7 +260,14 @@ const sleepBriefly = () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4))
  * limitation travels with the answer rather than being silently assumed away.
  */
 export function probeAlive(pid, { startedAt = 0, requireIdentity = false, readProc = defaultReadProc, signal = defaultSignal } = {}) {
-  if (!Number.isFinite(pid)) return { alive: false, how: 'no pid' }
+  // AN UNOBSERVED WORKER IS NEVER A CORPSE. Without a captured pid there is
+  // nothing to probe, and a bare `alive: false` here would flow through
+  // `readOutcome` into `dead: true` — a DEFINITE death verdict for a process
+  // this drill never even identified, and one half of a passed drill. Marked
+  // UNKNOWN instead, which blocks every verdict. (pid 0 and negatives are the
+  // same case: 0 is what a failed capture leaves behind, and `kill(0, …)`
+  // would probe the caller's own group.)
+  if (!Number.isFinite(pid) || pid <= 0) return { alive: false, unknown: true, how: 'UNKNOWN — no pid was captured, nothing was ever observed' }
   const stat = readProc(pid)
   if (stat != null) {
     // A BARE PID IS NOT AN IDENTITY. Between the kill and the probe the number
@@ -303,6 +310,15 @@ export function probeAlive(pid, { startedAt = 0, requireIdentity = false, readPr
   // ONLY ESRCH ESTABLISHES "GONE". A pid that exists but refuses the signal, or
   // an error we cannot classify, leaves the question open — and open is not an
   // escape. Only a pid nothing answers for is reported dead outright.
+  //
+  // "GONE" NEEDS NO SPAWN-TIME IDENTITY, deliberately — the requirement is
+  // one-directional. Identity exists to stop a LIVE stranger at a recycled
+  // number being read as the live worker; it can never rescue a death verdict,
+  // because every way a captured pid ends up absent entails the spawned
+  // process exited: either it was still that process (now dead), or the number
+  // was recycled — which itself requires the original to have exited first.
+  // So ESRCH at a captured pid is definite death with or without `startedAt`,
+  // while "alive" without identity stays UNKNOWN above.
   const state = signal(pid)
   if (state === 'gone') return { alive: false, how: 'no such process' }
   return {
