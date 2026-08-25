@@ -105,6 +105,73 @@ function git(args, cwd) {
   return { ok: res.status === 0, out: (res.stdout || '').trim(), err: (res.stderr || '').trim() }
 }
 
+/** Push one exact local head under a lease on the observed remote tip. A failed
+ *  CAS is not itself the checkpoint verdict: the runner may have won the race
+ *  by pushing the same work. Re-observe through the SAME lease-gated path and
+ *  accept when the remote now contains the captured head. A remote descendant
+ *  proves transfer even though this process's push lost; a local descendant of
+ *  the remote is genuinely unpushed; histories that moved apart fence the
+ *  worker rather than letting it overwrite a successor on a later iteration. */
+export function pushBranchCheckpoint({ branch, worktree, mayPush, runGit = git } = {}) {
+  const observeRemote = () => {
+    const gate = mayPush?.()
+    if (gate?.verdict !== 'write') return { ok: false, fenced: true, why: gate?.reason ?? 'the checkpoint has no affirmative lease verdict' }
+    const remote = runGit(['ls-remote', 'origin', `refs/heads/${branch}`], worktree)
+    if (!remote.ok) return { ok: false, fenced: false, why: `the remote tip could not be observed: ${remote.err}` }
+    return { ok: true, sha: remote.out ? remote.out.split(/\s+/)[0] : '' }
+  }
+  const head = runGit(['rev-parse', 'HEAD'], worktree).out || null
+  if (!head) return { ok: false, fenced: false, why: 'no local HEAD to push', sha: null }
+  const before = observeRemote()
+  if (!before.ok) return { ...before, sha: head }
+  const pushed = runGit(
+    ['push', `--force-with-lease=refs/heads/${branch}:${before.sha}`, 'origin', `${head}:refs/heads/${branch}`],
+    worktree,
+  )
+  if (pushed.ok) return { ok: true, fenced: false, why: pushed.err, sha: head, remoteSha: head }
+
+  // The CAS raced. This is deliberately not a naked ls-remote: loss of the
+  // attempt lease between the push and this proof fences the worker here.
+  const after = observeRemote()
+  if (!after.ok) return { ...after, sha: head }
+  const remotelyContained = after.sha === head || (after.sha && runGit(['merge-base', '--is-ancestor', head, after.sha], worktree).ok)
+  if (remotelyContained) {
+    return {
+      ok: true,
+      fenced: false,
+      why: 'the leased push raced, but the re-observed remote contains the checkpoint',
+      sha: head,
+      remoteSha: after.sha,
+    }
+  }
+  const remoteIsLocalAncestor = after.sha && runGit(['merge-base', '--is-ancestor', after.sha, head], worktree).ok
+  if (after.sha && !remoteIsLocalAncestor) {
+    return { ok: false, fenced: true, why: 'the remote branch moved outside the local checkpoint history', sha: head, remoteSha: after.sha }
+  }
+  return { ok: false, fenced: false, why: pushed.err || 'the checkpoint head is not on the remote branch', sha: head, remoteSha: after.sha }
+}
+
+/** Build exactly the record the daemon consumes. `pushedOk` means the captured
+ *  SHA is proven contained by the remote branch, whether the wrapper or its
+ *  runner performed the push. */
+export function checkpointAcknowledgment({ requestId, branch, worktree, mayPush, runGit = git, now = Date.now } = {}) {
+  const pushed = pushBranchCheckpoint({ branch, worktree, mayPush, runGit })
+  if (pushed.fenced) return { fenced: true, reason: pushed.why }
+  const dirty = runGit(['status', '--porcelain'], worktree).out !== ''
+  const headAtAck = runGit(['rev-parse', 'HEAD'], worktree).out || null
+  return {
+    fenced: false,
+    ack: {
+      requestId,
+      at: now(),
+      sha: pushed.sha ?? null,
+      pushedOk: pushed.ok,
+      dirty,
+      aheadOfPush: pushed.ok === true && headAtAck !== pushed.sha,
+    },
+  }
+}
+
 /** Installs the worktree's pre-push lease gate: a hook that re-runs
  *  leaseAllowsWrite for the WRAPPER's identity on every `git push` from this
  *  worktree, whoever performs it — the runner included. JSON.stringify is the
@@ -210,49 +277,35 @@ async function runWorker(argv) {
    *  the hook returns but before the remote ref moves — and the CAS is what
    *  bounds it: a successor that has moved the branch rejects this push, and a
    *  stale push that does land moves the ref only from the tip a lease-valid
-   *  observation saw, where the successor's own CAS then detects it. The sha
-   *  the CAS pushed is returned so the acknowledgment claims exactly it. */
-  const push = () => {
-    const gate = mayPush()
-    if (gate.verdict !== 'write') return { ok: false, fenced: true, why: gate.reason }
-    const head = tip()
-    if (!head) return { ok: false, fenced: false, why: 'no local HEAD to push' }
-    const remote = git(['ls-remote', 'origin', `refs/heads/${args.branch}`], args.worktree)
-    if (!remote.ok) return { ok: false, fenced: false, why: `the remote tip could not be observed: ${remote.err}` }
-    const expected = remote.out ? remote.out.split(/\s+/)[0] : ''
-    const res = git(['push', `--force-with-lease=refs/heads/${args.branch}:${expected}`, 'origin', `${head}:refs/heads/${args.branch}`], args.worktree)
-    return { ok: res.ok, fenced: false, why: res.err, sha: head }
-  }
+   *  observation saw, where the successor's own CAS then detects it. The exact
+   *  captured sha is returned; if the runner wins the race, the helper above
+   *  proves that sha is contained before reporting success. */
+  const push = () => pushBranchCheckpoint({ branch: args.branch, worktree: args.worktree, mayPush })
 
-  /** A checkpoint acknowledgment is honest about what it proves: the pushed SHA,
-   *  and whether uncommitted work remains — a wrapper cannot commit on the
+  /** A checkpoint acknowledgment is honest about what it proves: the remotely
+   *  contained SHA and whether uncommitted work remains — a wrapper cannot commit on the
    *  runner's behalf, so `dirty: true` is what makes the daemon mark the attempt
    *  non-transferable (M20) instead of this file lying. */
   let lastAckedRequest = null
   const answerCheckpoint = () => {
     const request = readJsonIfAny(paths.checkpointRequestPath)
     if (!request?.requestId || request.requestId === lastAckedRequest) return
-    const pushed = push()
-    if (pushed.fenced) return fencedExit(pushed.why)
-    // THE ACK CLAIMS THE SHA THE PUSH CARRIED, never a tip taken afterwards:
+    const answer = checkpointAcknowledgment({
+      requestId: request.requestId,
+      branch: args.branch,
+      worktree: args.worktree,
+      mayPush,
+    })
+    if (answer.fenced) return fencedExit(answer.reason)
+    // THE ACK CLAIMS THE SHA THE CHECKPOINT CAPTURED, never a tip taken afterwards:
     // the wrapper cannot pause its runner, so a commit can land between the
-    // push and any later read — and an ack pairing pushedOk with a NEWER,
+    // containment proof and any later read — and an ack pairing pushedOk with a NEWER,
     // unpushed sha would let reconciliation treat that commit as transferred
     // and lose it. A head that moved past the pushed sha, like a dirty tree,
     // marks the checkpoint incomplete.
-    const dirty = git(['status', '--porcelain'], args.worktree).out !== ''
-    const headAtAck = tip()
-    const aheadOfPush = pushed.ok === true && headAtAck !== pushed.sha
-    writeJsonAtomic(paths.checkpointAckPath, {
-      requestId: request.requestId,
-      at: Date.now(),
-      sha: pushed.sha ?? null,
-      pushedOk: pushed.ok,
-      dirty,
-      aheadOfPush,
-    })
+    writeJsonAtomic(paths.checkpointAckPath, answer.ack)
     lastAckedRequest = request.requestId
-    log(`checkpoint ${request.requestId}: pushedOk=${pushed.ok} dirty=${dirty} aheadOfPush=${aheadOfPush}`)
+    log(`checkpoint ${request.requestId}: pushedOk=${answer.ack.pushedOk} dirty=${answer.ack.dirty} aheadOfPush=${answer.ack.aheadOfPush}`)
   }
 
   const fencedExit = (why) => {

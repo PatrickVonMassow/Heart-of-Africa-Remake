@@ -4,11 +4,11 @@
 // lease and a re-granted lease id all refuse at git level, and only the
 // standing lease of the recorded holder lets a push through.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { attemptPaths, installPrePushHook, leaseGateVerdict, writeFileNoFollow } from './detached-agent.mjs'
+import { attemptPaths, checkpointAcknowledgment, installPrePushHook, leaseGateVerdict, pushBranchCheckpoint, writeFileNoFollow } from './detached-agent.mjs'
 
 let sandbox, originDir, worktree, attemptDir, paths
 
@@ -137,6 +137,121 @@ describe('writeFileNoFollow — the heartbeat write refuses planted links', () =
       expect(readFileSync(target, 'utf8')).toBe('untouched\n')
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('checkpoint acknowledgment — runner and wrapper pushes may race', () => {
+  const fixture = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'checkpoint-race-'))
+    const remote = join(dir, 'origin.git')
+    const worktree = join(dir, 'wt')
+    execFileSync('git', ['init', '-q', '--bare', remote], { windowsHide: true })
+    execFileSync('git', ['clone', '-q', remote, worktree], { windowsHide: true })
+    git(['checkout', '-q', '-b', 'feat/race'], worktree)
+    writeFileSync(join(worktree, 'work.txt'), 'seed\n')
+    git(['add', '.'], worktree)
+    git(['commit', '-q', '-m', 'seed'], worktree)
+    git(['push', '-q', 'origin', 'feat/race'], worktree)
+    writeFileSync(join(worktree, 'work.txt'), 'checkpoint\n')
+    git(['add', '.'], worktree)
+    git(['commit', '-q', '-m', 'checkpoint'], worktree)
+    const head = git(['rev-parse', 'HEAD'], worktree)
+    const runGit = (args, cwd) => {
+      const res = spawnSync('git', args, { windowsHide: true, cwd, encoding: 'utf8' })
+      return { ok: res.status === 0, out: (res.stdout || '').trim(), err: (res.stderr || '').trim() }
+    }
+    return { dir, remote, worktree, head, runGit }
+  }
+
+  it('reports complete when the runner advances and pushes after the wrapper observes but before its CAS', () => {
+    const f = fixture()
+    try {
+      let gates = 0
+      let raced = false
+      const runGit = (args, cwd) => {
+        if (args[0] === 'push' && !raced) {
+          raced = true
+          // Make a runner commit whose parent is the wrapper's captured head,
+          // without moving the wrapper checkout's HEAD, then land it first.
+          const runnerHead = git(['commit-tree', `${f.head}^{tree}`, '-p', f.head, '-m', 'runner advance'], f.worktree)
+          git(['push', '-q', 'origin', `${runnerHead}:refs/heads/feat/race`], f.worktree)
+        }
+        return f.runGit(args, cwd)
+      }
+      const answer = checkpointAcknowledgment({
+        requestId: 'race-complete',
+        branch: 'feat/race',
+        worktree: f.worktree,
+        mayPush: () => {
+          gates += 1
+          return { verdict: 'write' }
+        },
+        runGit,
+        now: () => 123,
+      })
+      expect(raced).toBe(true)
+      expect(gates).toBe(2) // initial observation and fenced re-observation
+      expect(answer).toEqual({
+        fenced: false,
+        ack: { requestId: 'race-complete', at: 123, sha: f.head, pushedOk: true, dirty: false, aheadOfPush: false },
+      })
+      expect(git(['merge-base', '--is-ancestor', f.head, 'refs/remotes/origin/feat/race'], f.worktree)).toBe('')
+    } finally {
+      rmSync(f.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports incomplete when a rejected push leaves the local head genuinely unpushed', () => {
+    const f = fixture()
+    try {
+      let rejected = false
+      const answer = checkpointAcknowledgment({
+        requestId: 'still-local',
+        branch: 'feat/race',
+        worktree: f.worktree,
+        mayPush: () => ({ verdict: 'write' }),
+        runGit: (args, cwd) => {
+          if (args[0] === 'push' && !rejected) {
+            rejected = true
+            return { ok: false, out: '', err: 'simulated CAS rejection' }
+          }
+          return f.runGit(args, cwd)
+        },
+        now: () => 456,
+      })
+      expect(answer).toEqual({
+        fenced: false,
+        ack: { requestId: 'still-local', at: 456, sha: f.head, pushedOk: false, dirty: false, aheadOfPush: false },
+      })
+      expect(git(['rev-parse', 'refs/heads/feat/race'], f.remote)).not.toBe(f.head)
+    } finally {
+      rmSync(f.dir, { recursive: true, force: true })
+    }
+  })
+
+  it('fences when the remote moves to a history unrelated to the local checkpoint', () => {
+    const f = fixture()
+    try {
+      let raced = false
+      const result = pushBranchCheckpoint({
+        branch: 'feat/race',
+        worktree: f.worktree,
+        mayPush: () => ({ verdict: 'write' }),
+        runGit: (args, cwd) => {
+          if (args[0] === 'push' && !raced) {
+            raced = true
+            const parent = git(['rev-parse', `${f.head}^`], f.worktree)
+            const divergent = git(['commit-tree', `${parent}^{tree}`, '-p', parent, '-m', 'successor history'], f.worktree)
+            git(['push', '-q', '--force', 'origin', `${divergent}:refs/heads/feat/race`], f.worktree)
+          }
+          return f.runGit(args, cwd)
+        },
+      })
+      expect(result).toMatchObject({ ok: false, fenced: true, sha: f.head })
+      expect(result.why).toMatch(/outside the local checkpoint history/)
+    } finally {
+      rmSync(f.dir, { recursive: true, force: true })
     }
   })
 })
