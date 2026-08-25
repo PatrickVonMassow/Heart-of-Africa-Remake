@@ -12006,3 +12006,36 @@ to land than a mechanism that needs a review.
   Criticality: med — no player-visible defect, but it puts a red gate in front of the routine
   act of recording a finding, which is exactly where the batch must not be slowed.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 924. The pre-push fast gate calls `test:unit` red where the same command, in the same tree
+  and on the same machine, is green — and its two-reds rule turns that into a refusal no operator
+  can clear. MEASURED 26.08.2026, 01:05-01:30: four blocked pushes of `main` carrying only
+  work-order and documentation commits. Each push ran the gate's unit suite twice (its own retry
+  included) and every run exited non-zero while its summary named NO failing test; the gate itself
+  prints the diagnosis — "a `[vitest-worker]: Timeout calling \"onTaskUpdate\"` has this exact
+  signature, and the machine may be loaded" — and then blocks anyway, because
+  `scripts/pre-push-gate.mjs` treats two reds as conclusive regardless of what the load probe says.
+  A hand run of `npm run test:unit`, started while the same parallel authoring run held eight
+  vitest processes on the host, finished in 164.48s: 417/417 files, 13778 passed, 1 skipped,
+  exit 0. The push then went through with nothing changed.
+  WHY IT MATTERS: the gate's own message already distinguishes "a runner that did not finish" from
+  "a test that failed", and then discards that distinction in the verdict. The only route out is
+  the one this session took — prove the suite green by hand, then push into the same red gate and
+  hope the timing differs — which is exactly the unearned work a gate exists to prevent. It also
+  contradicts CLAUDE.md §7.2, which says to fail soft for environment transients and loud for
+  product defects: an unfinished runner is the environment, and a second unfinished runner is not
+  evidence of a defect. Point 296 (load produces false reds, never false greens) is the rule the
+  gate cites, and the gate applies its first half without its second.
+  FINAL STATE: a gate run whose summary names NO failing test is UNMEASURED, never red — it is
+  retried when the machine is quiet, and it refuses the push only on a run that named a failing
+  test or on a measured-quiet machine. The gate's own invocation gets the same reporter and
+  teardown budget the plain `npm run test:unit` gets, so the two cannot disagree about the same
+  suite in the same minute.
+  VERIFIABLE: Vitest over the pure part — a non-zero exit with zero named failures yields
+  UNMEASURED rather than red; two such runs still yield UNMEASURED; a run naming one failing test
+  yields red on the first; and a red on a probe-quiet machine still blocks. Plus a case that pins
+  the gate's runner options against the package script's, so a divergence reddens a test rather
+  than a push. Plus `npm run test:unit`, lint, build.
+  Criticality: med — it loses no work, but it blocks the one action the house rule demands after
+  every commit, and its refusal cannot be cleared by doing what it asks.
+  Bundle: Session- & Repo-Hygiene.
