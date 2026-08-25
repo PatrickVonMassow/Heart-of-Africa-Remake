@@ -2,10 +2,13 @@
 // reproduces the run lost on 21.08.2026 — the spawning session's process group
 // SIGKILLed mid-authoring — must keep passing, and an unknown scenario must be
 // refused rather than reported as a passed nothing.
-import { execFile } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, it, expect } from 'vitest'
-import { runDrill, staleProbeRefused, expectedStaleRefusal } from './batch-daemon-drill.mjs'
+import { runDrill, staleProbeRefused, expectedStaleRefusal, branchPreserved } from './batch-daemon-drill.mjs'
 import { startDaemon } from './batch-daemon.mjs'
 import { validateMutation } from './batch-schema-core.mjs'
 
@@ -289,5 +292,110 @@ describe('staleProbeRefused', () => {
       expect(refused.ok, reason).toBe(true)
       expect(refused.why).toContain(reason)
     }
+  })
+})
+
+describe('branchPreserved', () => {
+  // THE CHECK THAT WAS A COIN FLIP. `feat/drill` moves on its own while the
+  // drill reads it — the stub worker pushes on its own cadence, and an accepted
+  // checkpoint pushes too — so the old equality test charged the cancellation
+  // with moves it did not cause. It fired in the negative control above all,
+  // where the neutered daemon accepts both stale probes and spends their
+  // two-second waits inside this very window, and it made every gate reading
+  // this drill unreliable. These cases pin the question the check NAMES:
+  // deletion and rewind are the breaches; extension is not.
+  const A = 'a'.repeat(40)
+  const B = 'b'.repeat(40)
+
+  it('passes an unmoved branch', () => {
+    expect(branchPreserved({ tipBefore: A, tipAfter: A })).toEqual({ ok: true, why: '' })
+  })
+
+  it('PASSES a push that landed AFTER the cancellation — the intermittent red itself', () => {
+    // The exact shape of the failure: the tip has moved on, and the earlier tip
+    // is still reachable from it. That is an extended branch, not a harmed one.
+    const verdict = branchPreserved({ tipBefore: A, tipAfter: B, beforeIsAncestorOfAfter: true })
+    expect(verdict.ok).toBe(true)
+    expect(verdict.why).toMatch(/ADVANCED/)
+  })
+
+  it('FAILS a deleted branch — the breach the check exists to catch', () => {
+    const verdict = branchPreserved({ tipBefore: A, tipAfter: null })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.why).toMatch(/GONE/)
+  })
+
+  it('FAILS a rewound or rewritten branch, where the earlier tip is unreachable', () => {
+    const verdict = branchPreserved({ tipBefore: A, tipAfter: B, beforeIsAncestorOfAfter: false })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.why).toMatch(/REWRITTEN/)
+  })
+
+  it('FAILS CLOSED on an unknown ancestry rather than reading it as preservation', () => {
+    // An unanswerable `merge-base` must never be the same verdict as a proven
+    // descendant: that would restore exactly the blindness being removed.
+    for (const unknown of [null, undefined, 'yes', 1]) {
+      expect(branchPreserved({ tipBefore: A, tipAfter: B, beforeIsAncestorOfAfter: unknown }).ok).toBe(false)
+    }
+  })
+
+  it('is GREEN over a real push that lands after the cancel, with git answering the ancestry', () => {
+    // The unit cases above hand the verdict a boolean. This one makes git
+    // produce it, over a real repository in the shape the race leaves behind:
+    // the tip is read, and only THEN does a checkpoint's push land. A mocked
+    // ancestry cannot catch a helper that asks git the wrong question.
+    const dir = mkdtempSync(join(tmpdir(), 'branch-preserved-'))
+    try {
+      const g = (...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', windowsHide: true }).trim()
+      execFileSync('git', ['init', '-q', '-b', 'feat/drill', dir], { stdio: 'ignore', windowsHide: true })
+      g('config', 'user.email', 'drill@test')
+      g('config', 'user.name', 'drill')
+      writeFileSync(join(dir, 'stub-progress.txt'), '1\n')
+      g('add', '-A')
+      g('commit', '-qm', 'stub step')
+      const tipBefore = g('rev-parse', 'feat/drill')
+
+      // …the cancel happens here, and the in-flight push lands only now.
+      writeFileSync(join(dir, 'stub-progress.txt'), '1\n2\n')
+      g('add', '-A')
+      g('commit', '-qm', 'stub step that was still in flight')
+      const tipAfter = g('rev-parse', 'feat/drill')
+      expect(tipAfter).not.toBe(tipBefore)
+
+      let ancestor
+      try {
+        g('merge-base', '--is-ancestor', tipBefore, tipAfter)
+        ancestor = true
+      } catch {
+        ancestor = false
+      }
+      expect(branchPreserved({ tipBefore, tipAfter, beforeIsAncestorOfAfter: ancestor }).ok).toBe(true)
+
+      // And the same repository still FAILS the check once the branch is
+      // actually harmed — otherwise this case would prove only that git runs.
+      g('reset', '-q', '--hard', tipBefore)
+      g('commit', '-q', '--allow-empty', '-m', 'a rewritten history')
+      const rewritten = g('rev-parse', 'feat/drill')
+      let stillAncestor
+      try {
+        g('merge-base', '--is-ancestor', tipAfter, rewritten)
+        stillAncestor = true
+      } catch {
+        stillAncestor = false
+      }
+      expect(branchPreserved({ tipBefore: tipAfter, tipAfter: rewritten, beforeIsAncestorOfAfter: stillAncestor }).ok).toBe(false)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses to judge when no tip was read before the cancellation', () => {
+    const verdict = branchPreserved({ tipBefore: null, tipAfter: A })
+    expect(verdict.ok).toBe(false)
+    expect(verdict.why).toMatch(/cannot be judged/)
+  })
+
+  it('calls a missing branch GONE rather than unjudgeable when a before-tip exists', () => {
+    expect(branchPreserved({ tipBefore: A, tipAfter: null }).why).not.toMatch(/cannot be judged/)
   })
 })

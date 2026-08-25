@@ -134,6 +134,71 @@ const git = (args, cwd) =>
     env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' },
   }).trim()
 
+/** `git` throws on a ref that is gone — which is exactly one of the answers the
+ *  branch check needs — so ref reads go through this instead. */
+const refTip = (ref, cwd) => {
+  try {
+    return git(['rev-parse', '--verify', `${ref}^{commit}`], cwd) || null
+  } catch {
+    return null
+  }
+}
+
+const isAncestor = (ancestor, descendant, cwd) => {
+  try {
+    git(['merge-base', '--is-ancestor', ancestor, descendant], cwd)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** THE REF, ONCE NOTHING IS WRITING IT ANY MORE — read rather than timed.
+ *
+ *  A cancellation that returned `ok` has already PROVEN its worker dead, so the
+ *  ref is settled by then; this only bounds a push that was already in flight
+ *  when the signal arrived. Two consecutive agreeing reads is the quiescence
+ *  condition, and it is a condition on the STATE, which a fixed sleep never was.
+ */
+async function settledTip(ref, cwd, { stableForMs = 250, timeoutMs = 10_000 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  let last = refTip(ref, cwd)
+  for (;;) {
+    await sleep(stableForMs)
+    const next = refTip(ref, cwd)
+    if (next === last) return { tip: next, settled: true }
+    last = next
+    if (Date.now() > deadline) return { tip: next, settled: false }
+  }
+}
+
+/** DID THE CANCELLATION HARM THE BRANCH? — the question this check names, and
+ *  the only one it may answer.
+ *
+ *  Equality was the wrong test, because `feat/drill` moves on its own while the
+ *  drill reads it: the stub worker commits and pushes on its own cadence, and an
+ *  ACCEPTED checkpoint pushes as well. That is why this surfaced in the NEGATIVE
+ *  CONTROL first — the neutered daemon takes both stale probes and spends their
+ *  two-second waits inside exactly this window — and it made every gate reading
+ *  the drill a coin flip. The 300 ms sleep that stood here bounded none of it:
+ *  it timed an interval instead of waiting on the state being judged.
+ *
+ *  What cancellation must never do is DELETE the branch or REWIND it (M43,
+ *  "cancellation preserves the branch"). Preservation is therefore ANCESTRY: the
+ *  ref still resolves, and everything reachable before is still reachable now. A
+ *  push that lands afterwards EXTENDS the branch, which is preservation rather
+ *  than a breach of it. Anything unknown fails closed.
+ */
+export function branchPreserved({ tipBefore = null, tipAfter = null, beforeIsAncestorOfAfter = null } = {}) {
+  if (!tipBefore) return { ok: false, why: 'no tip was read before the cancellation, so preservation cannot be judged' }
+  if (!tipAfter) return { ok: false, why: `the branch is GONE after the cancellation (it was ${tipBefore})` }
+  if (tipAfter === tipBefore) return { ok: true, why: '' }
+  if (beforeIsAncestorOfAfter === true) {
+    return { ok: true, why: `the branch ADVANCED ${tipBefore} -> ${tipAfter}; every earlier commit is still reachable` }
+  }
+  return { ok: false, why: `the branch was REWRITTEN ${tipBefore} -> ${tipAfter}; the earlier tip is no longer reachable from it` }
+}
+
 function buildSandbox() {
   const sandbox = mkdtempSync(join(tmpdir(), 'parent-death-'))
   const originDir = join(sandbox, 'origin.git')
@@ -463,15 +528,22 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
     check('a new checkpoint request was ACKNOWLEDGED by that daemon', answer?.acknowledged === true, checkpoint.reason ?? '')
     check('the acknowledged checkpoint was pushed and clean', answer?.pushedOk === true && answer?.dirty === false)
 
-    const tipBeforeCancel = git(['rev-parse', 'feat/drill'], originDir)
+    const tipBeforeCancel = refTip('feat/drill', originDir)
     const cancelled = await successorRequest('cancel-attempt', { attemptId: 'a-drill', requestId: 'succ-cx-1', reason: 'drill complete' })
     check('one post-adoption lifecycle operation completed: cancellation', cancelled.ok === true, cancelled.reason ?? '')
-    await sleep(300)
-    const tipAfterCancel = git(['rev-parse', 'feat/drill'], originDir)
+    // Wait on the ref settling, not on a clock: a cancellation that answered
+    // `ok` has proven its worker dead, and this bounds only a push already in
+    // flight when the signal reached it.
+    const settled = await settledTip('feat/drill', originDir)
+    const preserved = branchPreserved({
+      tipBefore: tipBeforeCancel,
+      tipAfter: settled.tip,
+      beforeIsAncestorOfAfter: tipBeforeCancel && settled.tip ? isAncestor(tipBeforeCancel, settled.tip, originDir) : null,
+    })
     check(
       'the cancellation preserved the branch',
-      tipAfterCancel === tipBeforeCancel,
-      tipAfterCancel === tipBeforeCancel ? '' : `tip moved ${tipBeforeCancel} -> ${tipAfterCancel}`,
+      preserved.ok && settled.settled,
+      settled.settled ? preserved.why : `the branch never stopped moving after the cancellation (last seen ${settled.tip})`,
     )
 
     const down = await successorRequest('shutdown', { drain: true })
