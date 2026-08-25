@@ -8,12 +8,15 @@ import { POOL_CAP } from './batch-in-flight-core.mjs'
 import {
   DAEMON_POOL_CAP,
   DRAIN_STEPS,
+  OPEN_ADMISSION,
   RETAIN_BULK_MS,
   SLOT_OCCUPYING_STATES,
   WORKER_ADAPTERS,
   activeAttemptCount,
+  admissionFromJournal,
   buildDaemonRecord,
   controlAuthorized,
+  closeAdmission,
   mayCreateDaemonRecord,
   mayStartAttempt,
   mintLaunchNonce,
@@ -25,6 +28,47 @@ import {
 } from './batch-daemon-core.mjs'
 
 const at = (state) => ({ state: { state } })
+
+describe('worker admission', () => {
+  it('closes with a reason before worker counting and refuses every later spawn', () => {
+    const closed = closeAdmission({ reason: 'planned session boundary' })
+    expect(closed).toMatchObject({ ok: true, admission: { open: false, reason: 'planned session boundary' } })
+    expect(mayStartAttempt({ admission: closed.admission, attempts: [] })).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/closed: planned session boundary.*no new worker/),
+    })
+    expect(closeAdmission({ admission: closed.admission, reason: 'another boundary' }).ok).toBe(false)
+    expect(closeAdmission({ reason: '   ' }).ok).toBe(false)
+  })
+
+  it('replays the journalled close and its reason after a daemon restart', () => {
+    const key = 'close-admission:batch-1:boundary-1'
+    const entries = [{
+      kind: 'command',
+      name: 'close-admission',
+      key,
+      payload: { batchId: 'batch-1', requestId: 'boundary-1', reason: 'handover at session boundary' },
+      seq: 4,
+    }]
+    const restarted = admissionFromJournal(entries)
+    expect(restarted).toEqual({ open: false, reason: 'handover at session boundary' })
+    expect(mayStartAttempt({ admission: restarted }).reason).toContain('handover at session boundary')
+
+    expect(admissionFromJournal([...entries, {
+      kind: 'command',
+      name: 'close-admission:compensated',
+      key: `${key}:comp`,
+      payload: { reason: 'the lock moved' },
+      seq: 5,
+    }])).toBe(OPEN_ADMISSION)
+  })
+
+  it('fails closed when durable closure evidence carries no readable reason', () => {
+    const admission = admissionFromJournal([{ kind: 'command', name: 'close-admission', key: 'close-1', payload: {}, seq: 1 }])
+    expect(admission.open).toBe(false)
+    expect(mayStartAttempt({ admission }).reason).toMatch(/reason is unreadable/)
+  })
+})
 
 describe('the global cap (M9)', () => {
   it('mirrors the pool cap the session side already enforces', () => {

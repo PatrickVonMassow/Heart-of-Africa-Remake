@@ -50,7 +50,9 @@ import { appliedKeys, deriveSnapshot } from './batch-state-core.mjs'
 import { appendJournalEntry, ensureFenceStore, openStateStore, readJournal, writeFileAtomic, writeSnapshot } from './batch-state.mjs'
 import {
   DRAIN_STEPS,
+  admissionFromJournal,
   buildDaemonRecord,
+  closeAdmission,
   controlAuthorized,
   mayCreateDaemonRecord,
   mayStartAttempt,
@@ -316,6 +318,7 @@ async function serve(args) {
   let leases = new Map() // attemptId -> lease
   let worktreeClaims = {}
   const attemptsState = new Map() // attemptId -> last attempt snapshot row
+  let admission = admissionFromJournal(journal.entries)
   let draining = false
   // Drill-only (refused above outside --drill): with epoch enforcement OFF the
   // daemon accepts any (sessionId, fence) — the broken daemon the drill's stale
@@ -431,15 +434,36 @@ async function serve(args) {
       journalVerdict: journal.verdict,
       attempts: [...attemptsState.values()],
       workers: [...workers.keys()],
+      admission,
       draining,
     }),
+
+    'close-admission': (request) => {
+      const admissionBeforeClose = admission
+      return mutate(
+        request,
+        () => {
+          const closed = closeAdmission({ admission, reason: request.payload?.reason })
+          if (!closed.ok) return closed
+          // This assignment closes the spawn door before the worker count is
+          // observed. The socket queue serializes this whole handler against
+          // start-attempt, so no spawn can interleave between these two lines.
+          admission = closed.admission
+          return { ok: true, admission, remainingWorkers: workers.size }
+        },
+        () => {
+          admission = admissionBeforeClose
+          return { compensation: 'restore-admission-state' }
+        },
+      )
+    },
 
     'start-attempt': (request) =>
       mutate(
         request,
         async () => {
           const { pointId, attemptId, branch, adapter } = request.payload ?? {}
-          const cap = mayStartAttempt({ attempts: [...attemptsState.values()] })
+          const cap = mayStartAttempt({ attempts: [...attemptsState.values()], admission })
           if (!cap.ok) return { ok: false, reason: cap.reason }
           // Realpath BEFORE claiming, so a symlink alias of a claimed worktree
           // collides with it instead of slipping past the raw-string key.

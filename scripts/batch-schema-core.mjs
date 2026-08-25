@@ -711,6 +711,10 @@ export const DAEMON_COMMANDS = Object.freeze({
     compensation: 'stop-worker-preserve-branch',
     keyFields: Object.freeze(['batchId', 'pointId', 'attemptId']),
   }),
+  'close-admission': Object.freeze({
+    compensation: 'restore-admission-state',
+    keyFields: Object.freeze(['batchId', 'requestId']),
+  }),
   'grant-lease': Object.freeze({
     compensation: 'revoke-lease',
     keyFields: Object.freeze(['batchId', 'attemptId', 'requestId']),
