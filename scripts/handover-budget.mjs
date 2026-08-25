@@ -1,3 +1,4 @@
+// Fail-open runtime evidence for the measured handover cap and its overruns.
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { writeJsonAtomic } from './atomic-write.mjs'
