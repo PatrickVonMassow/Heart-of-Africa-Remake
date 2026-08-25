@@ -362,6 +362,29 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(leaseFile.revokedAt).toBeGreaterThan(0)
   }, 20_000)
 
+  it('atomically closes admission before counting workers and journals the refusal reason', async () => {
+    const reason = 'planned handover boundary'
+    const closed = await request('close-admission', { requestId: 'boundary-1', reason })
+    expect(closed.ok, closed.reason).toBe(true)
+    expect(closed.result).toMatchObject({ admission: { open: false, reason } })
+    expect(closed.result.remainingWorkers).toBeGreaterThanOrEqual(0)
+
+    const refused = await request('start-attempt', {
+      pointId: 'p4',
+      attemptId: 'after-boundary',
+      branch: 'feat/after-boundary',
+      worktree: worktree2,
+      adapter: 'stub',
+    })
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/worker admission is closed: planned handover boundary/)
+
+    const store = openStateStore({ repoDir: repo, batchId: BATCH })
+    const closure = readJournal(store).entries.find((entry) => entry.kind === 'command' && entry.name === 'close-admission')
+    expect(closure?.payload).toMatchObject({ batchId: BATCH, requestId: 'boundary-1', reason })
+    expect((await request('status')).admission).toEqual({ open: false, reason })
+  })
+
   it('drains: seals the snapshot, releases the record, and the journal replays clean', async () => {
     const store = openStateStore({ repoDir: repo, batchId: BATCH })
     const reply = await request('shutdown', { drain: true })
@@ -377,11 +400,15 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(JSON.parse(readFileSync(join(repo, '.claude', 'batch-lock.json'), 'utf8')).daemon).toBeUndefined()
   }, 15_000)
 
-  it('restarts against the same journal and still refuses the replayed start-attempt key', async () => {
+  it('restarts against the same journal, preserving idempotency and closed admission', async () => {
     const restarted = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
     expect(restarted.ok, restarted.reason).toBe(true)
     const replayed = await request('start-attempt', { pointId: 'p1', attemptId: 'a1', branch: 'feat/stub', worktree, adapter: 'stub' })
     expect(replayed).toMatchObject({ ok: true, alreadyApplied: true })
+    const refused = await request('start-attempt', { pointId: 'p5', attemptId: 'after-restart', branch: 'feat/after-restart', worktree, adapter: 'stub' })
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/worker admission is closed: planned handover boundary/)
+    expect((await request('status')).admission).toEqual({ open: false, reason: 'planned handover boundary' })
     const down = await request('shutdown', {})
     expect(down.ok).toBe(true)
     await sleep(500)

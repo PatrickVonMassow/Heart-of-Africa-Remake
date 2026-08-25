@@ -664,6 +664,7 @@ describe('the daemon command table', () => {
   const payloads = {
     'queue-job': { batchId: 'b1', pointId: 834, requestId: 'r1' },
     'start-attempt': { batchId: 'b1', pointId: 834, attemptId: 'a1' },
+    'close-admission': { batchId: 'b1', requestId: 'boundary-1' },
     'grant-lease': { batchId: 'b1', attemptId: 'a1', requestId: 'r2' },
     'request-checkpoint': { batchId: 'b1', requestId: 'r3' },
     'adopt-attempt': { batchId: 'b1', attemptId: 'a1', fence: 605 },
