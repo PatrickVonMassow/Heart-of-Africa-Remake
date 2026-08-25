@@ -1276,17 +1276,25 @@ export function reviewRecordWellFormed(record = {}, { commitAt = 0 } = {}) {
   // A review cannot happen before the commit it claims to have read.  This is a
   // direct ordering invariant, not an era selector controlled by either clock.
   if (Number(commitAt) > 0 && at < Number(commitAt)) return false
-  // Identity evidence is required by the code evaluating the row, not by a
-  // timestamp supplied by the row or its author.  Backdating either object can
-  // therefore select no weaker version of the rule.
+  // Identity evidence became part of the recorder's row shape at a known
+  // ledger boundary. Rows written before that boundary cannot acquire evidence
+  // the recorder did not yet emit, and remain usable for commits they could
+  // actually have reviewed (the ordering invariant above still prevents an old
+  // row from clearing newer code). Missing identity on a modern row remains a
+  // malformed hand-written claim.
   const authorship = record.reviewerAuthorship
-  if (!authorship || typeof authorship !== 'object') return false
+  if (!authorship || typeof authorship !== 'object') {
+    return at < AUTHORSHIP_CHECK_SINCE && (record.carried === undefined || record.carriedVerified === true)
+  }
   if (authorship.status !== 'agreement' && authorship.status !== 'unverified') return false
   if (!sameModel(authorship.claimedModel, record.model)) return false
   if (authorship.status === 'agreement' && !sameModel(authorship.actualModel, record.model)) return false
   const vendor = modelVendor(record.model)
   if (vendor === 'unknown') return false
-  if (vendor === 'anthropic' && authorship.status !== 'agreement') return false
+  // Anthropic agreement became provable only at the later transcript boundary.
+  // Preserve earlier reasoned unverified rows; after it, anything short of the
+  // recorder's agreement stamp is malformed.
+  if (vendor === 'anthropic' && authorship.status !== 'agreement' && at >= VERIFIED_REVIEWER_SINCE) return false
   if (vendor === 'openai') {
     if (authorship.status !== 'unverified') return false
     if (typeof authorship.reason !== 'string' || !authorship.reason.trim()) return false
