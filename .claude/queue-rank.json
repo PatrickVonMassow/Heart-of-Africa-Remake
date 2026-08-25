@@ -672,12 +672,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "894": {
-      "at": "2026-08-24T12:37:18.205Z",
-      "why": "Seam of point 834, which the user ordered to the front on 22.08.2026 after a second authoring lane died with its session; the cut into seven points is his rule of 24.08.2026, not a machine filing.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "895": {
       "at": "2026-08-24T12:37:18.287Z",
       "why": "Seam of point 834, which the user ordered to the front on 22.08.2026 after a second authoring lane died with its session; the cut into seven points is his rule of 24.08.2026, not a machine filing.",
@@ -754,7 +748,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T01:20:33.741Z",
+    "at": "2026-08-25T02:39:19.892Z",
     "points": [
       174,
       184,
@@ -1031,7 +1025,6 @@
       886,
       887,
       888,
-      894,
       895,
       896,
       898,
