@@ -221,19 +221,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Satz, oder weiter, und sperrt Unbeteiligte.
   → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
 
-- **Die Verweigerung nennt eine Abhilfe, die den Schaden erst anrichtet.** Wer ihr folgt, steht
-  schlechter da als vorher.
-  → *Prompt:* „Prüf jede Verweigerung an dem Ort, an dem sie feuern kann: **Führt ihre eigene
-  Abhilfe dort zum guten Zustand?**"
-
-- **Die Verweigerung nennt eine Abhilfe, auf die niemand warten kann.** Der Wächter misst nur den
-  einen Weg, auf dem die Arbeit üblicherweise entsteht, und behandelt den anderen als
-  unmöglich statt als Normalfall. Seine Meldung rät dann zum Abwarten auf einen Nachweis, den
-  dieser Weg nie erzeugt — und weil das Tor erst nach dem Räumen weiterzählt, sperrt ein
-  einziger solcher Fall **jedes** folgende Zugende, nicht nur seinen eigenen.
-  → *Prompt:* „Zähl zu jedem Wächter die Wege auf, auf denen sein Gegenstand entstehen kann, und
-  prüf ihn an **jedem** davon. Kann er einen nicht messen, muss seine Verweigerung **das** sagen
-  — nie ein Warten auf etwas empfehlen, das auf diesem Weg gar nicht entsteht."
+- **Die Verweigerung nennt eine Abhilfe, die schadet — oder nie eintritt.** Wer ihr folgt, steht
+  schlechter da oder wartet vergeblich.
+  → *Prompt:* „Prüf jede Verweigerung dort, wo sie feuert: **Führt ihre Abhilfe zum Guten — und
+  kann sie eintreten?**"
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
