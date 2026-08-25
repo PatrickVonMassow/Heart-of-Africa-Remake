@@ -77,42 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 918. The durable lane's activation interlock takes the drain's word for it, and the drain
-  itself has an admission window. FOUND 25.08.2026 by a cross-vendor audit (GPT-5.6 Sol via
-  `ask-sol`, kind audit) of a proposed pull-forward of 676's activation slice; the audit REJECTED
-  the pull-forward and its findings are recorded here so they survive the conversation. The two
-  code-level gaps, verified against the sources:
-  (1) EVIDENCE GAP: `activationDecision` in `scripts/durable-lane-flag-core.mjs` demands
-  commit-visible evidence for every required STEP, but for the boundary mode it verifies only the
-  literal string `drain-before-boundary`. The same reviewed change can therefore declare the mode,
-  mark the steps green, and open the flag without the manifest ever carrying evidence that the
-  drain ENFORCEMENT exists as code. The interlock's own header says a hand-edited flag may not
-  silently advertise a boundary mode the mechanisms cannot perform — today it can.
-  (2) ADMISSION RACE: refusing a planned boundary while a daemon-owned worker is OBSERVED active
-  is not a drain. The flag is not consulted per call and gates only daemon startup, so a live
-  daemon can admit a new worker between the boundary's active-worker check and the handover.
-  Draining must atomically CLOSE ADMISSION first (a fenced refusal the daemon enforces), then
-  empty, then hand over.
-  CONTEXT THE AUDIT ALSO SETTLED, recorded for the planner rather than as work of this point:
-  step 9 (crash-recoverable serial landing) is NOT landed — 895 delivered only the journal
-  vocabulary and successor decision (`scripts/batch-landing-core.mjs` says the landing inside
-  `land-point.mjs` is 676's remainder); ten of the eleven step-12 drills do not exist yet
-  (`scripts/batch-daemon-drill.mjs` carries only `parent-death`); and 676's measured baseline
-  trial is the acceptance and may not slip past activation. An activation shortcut around 676's
-  order is therefore off the table.
-  FINAL STATE: the activation decision requires, beside the step manifest, a boundary-mechanism
-  entry with the same green-plus-evidence shape, refusing while it is absent; and the daemon's
-  control plane exposes an atomic close-admission operation the boundary path uses before it
-  counts workers, so the drain 676 builds has the seam it needs. Both land with unit cases; the
-  behavior of an already-open flag is unchanged.
-  VERIFIABLE: Vitest over `activationDecision` — a manifest with all steps green but no evidenced
-  boundary mechanism refuses and names it; over the daemon core — after close-admission a spawn
-  request is refused with a journalled reason, and the refusal survives a daemon restart; and the
-  existing flag tests stay green.
-  Criticality: med — the flag opens only through a reviewed change, but a wrongly opened lane
-  loses work, and this is the recorded reason the shortcut was rejected.
-  Bundle: unbundled (batch autonomy).
-
 - [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
   the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
   the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
