@@ -214,7 +214,11 @@ export function observeHandoverAttributionCall(hookInput = {}, {
     command: toolInput.command ?? '',
     filePath: toolInput.file_path ?? toolInput.notebook_path ?? '',
   }
-  const measured = readTokens({ sessionId: sid, transcriptPath }) ?? {}
+  let measured = null
+  const measure = () => {
+    if (measured === null) measured = readTokens({ sessionId: sid, transcriptPath }) ?? {}
+    return measured
+  }
   const records = []
   const save = (input) => {
     const result = persist(addHandoverAttributionCheckpoint({ state, ...input }), io)
@@ -229,19 +233,21 @@ export function observeHandoverAttributionCall(hookInput = {}, {
     }
     const stage = exitStageForCall(call)
     if (!stage) return { written: false, reason: 'cli-recorded-prepare', records: [] }
+    const reading = measure()
     const result = save({
       sessionId: sid,
       side: 'exit',
       stage,
-      tokens: measured.tokens,
+      tokens: reading.tokens,
       at: now,
-      transcript: measured.transcript ?? transcriptPath,
+      transcript: reading.transcript ?? transcriptPath,
       metadata: { tool: call.toolName || null, command: call.command || null },
     })
     return { written: result.written, reason: result.reason, records }
   }
 
   if (state.status === HANDOVER_ATTRIBUTION_STATUS.COMMITTED) {
+    const reading = measure()
     const fresh = state.destination === 'fresh-session'
     const launch = fresh ? readAutostart() : null
     const spawnAt =
@@ -265,7 +271,7 @@ export function observeHandoverAttributionCall(hookInput = {}, {
       tokens: fresh ? 0 : null,
       baseline: fresh,
       at: spawnAt ?? now,
-      transcript: measured.transcript ?? transcriptPath,
+      transcript: reading.transcript ?? transcriptPath,
       status: HANDOVER_ATTRIBUTION_STATUS.RAMPING,
       metadata: { freshSession: fresh },
     })
@@ -274,14 +280,15 @@ export function observeHandoverAttributionCall(hookInput = {}, {
   if (state.status !== HANDOVER_ATTRIBUTION_STATUS.RAMPING || state.successorSessionId !== sid) {
     return { written: records.length > 0, reason: 'successor-not-ramping', records }
   }
+  const reading = measure()
   const stage = rampStageForCall(call)
   const result = save({
     sessionId: sid,
     side: 'ramp',
     stage,
-    tokens: measured.tokens,
+    tokens: reading.tokens,
     at: now,
-    transcript: measured.transcript ?? transcriptPath,
+    transcript: reading.transcript ?? transcriptPath,
     status: stage === 'ramp.first-work-call' ? HANDOVER_ATTRIBUTION_STATUS.COMPLETE : HANDOVER_ATTRIBUTION_STATUS.RAMPING,
     metadata: { tool: call.toolName || null, command: call.command || null },
   })

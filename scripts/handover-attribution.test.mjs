@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   noteHandoverAttributionCommit,
   noteHandoverAttributionDemand,
@@ -134,6 +134,22 @@ describe('live handover attribution', () => {
       { stage: 'exit.prepare', reading: 'missing', missingReading: 'stage-token-baseline' },
     ])
     expect(memory.state).toMatchObject({ status: 'prepared', cause: 'point', point: 752 })
+  })
+
+  it('does not parse a transcript before the exit or successor ramp is eligible', () => {
+    const memory = memoryIo()
+    const readTokens = vi.fn(() => ({ tokens: 999, transcript: '/unused.jsonl' }))
+    noteHandoverAttributionDemand({ sessionId: OLD, tokens: 100, at: 1 }, memory.io)
+
+    expect(observeHandoverAttributionCall(
+      { session_id: OLD, transcript_path: '/old.jsonl', tool_name: 'Bash', tool_input: { command: 'git status' } },
+      { ...memory.io, ownsBatch: true, readTokens },
+    )).toMatchObject({ written: false, reason: 'exit-not-prepared' })
+    expect(observeHandoverAttributionCall(
+      { session_id: NEXT, transcript_path: '/next.jsonl', tool_name: 'Bash', tool_input: { command: 'git status' } },
+      { ...memory.io, ownsBatch: true, readTokens },
+    )).toMatchObject({ written: false, reason: 'successor-not-ramping' })
+    expect(readTokens).not.toHaveBeenCalled()
   })
 
   it('stands down for a non-owner and never lets an unwritable series break the boundary', () => {
