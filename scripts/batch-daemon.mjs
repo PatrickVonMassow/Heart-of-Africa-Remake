@@ -716,6 +716,15 @@ async function serve(args) {
         return { ok: true }
       }),
 
+    'record-metric': (request) =>
+      mutate(request, () => {
+        const event = request.payload?.event
+        if (!event || typeof event !== 'object' || typeof event.kind !== 'string' || !event.kind || !Number.isFinite(event.at)) {
+          return { ok: false, reason: 'a metric event has a kind and finite event time' }
+        }
+        return { ok: true, eventId: request.payload.eventId }
+      }),
+
     shutdown: (request) => {
       // Shutdown drains workers and releases the identity record — a mutation
       // like any other, so it is fenced like any other: batch identity, the

@@ -668,6 +668,7 @@ describe('the daemon command table', () => {
     'grant-lease': { batchId: 'b1', attemptId: 'a1', requestId: 'r2' },
     'request-checkpoint': { batchId: 'b1', requestId: 'r3' },
     'seal-boundary': { batchId: 'b1', requestId: 'boundary-r3' },
+    'record-metric': { batchId: 'b1', eventId: 'metric-1' },
     'adopt-attempt': { batchId: 'b1', attemptId: 'a1', fence: 605 },
     'cancel-attempt': { batchId: 'b1', attemptId: 'a1', requestId: 'r4' },
     'record-state': { batchId: 'b1', attemptId: 'a1', state: 'running', at: NOW },

@@ -727,6 +727,10 @@ export const DAEMON_COMMANDS = Object.freeze({
     compensation: 'restore-admission-state',
     keyFields: Object.freeze(['batchId', 'requestId']),
   }),
+  'record-metric': Object.freeze({
+    compensation: 'record-superseding-metric',
+    keyFields: Object.freeze(['batchId', 'eventId']),
+  }),
   'adopt-attempt': Object.freeze({
     compensation: 'release-adoption',
     keyFields: Object.freeze(['batchId', 'attemptId', 'fence']),
