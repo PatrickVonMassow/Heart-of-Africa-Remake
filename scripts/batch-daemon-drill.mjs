@@ -40,9 +40,13 @@ const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** The two refusal reasons the daemon's validation produces for STALENESS —
- *  and nothing else. Kept beside the judge below, which is the only consumer. */
-export const STALE_REFUSAL = /names another session|stale fence/
+/** The two refusal reasons validateMutation produces for STALENESS — and
+ *  nothing else, so the regex is ANCHORED to the whole message: an unanchored
+ *  substring match accepted any reply that merely CONTAINED one of the phrases
+ *  ("internal error while checking stale fence", a compensation wrapping the
+ *  session reason) as proof of epoch enforcement (cross-vendor review of point
+ *  834, H3). Kept beside the judge below, which is the only consumer. */
+export const STALE_REFUSAL = /^(?:the lock names another session|stale fence: presented \d+, the lock carries \d+)$/
 
 /**
  * JUDGES a stale probe's reply: passed only when the daemon REFUSED FOR

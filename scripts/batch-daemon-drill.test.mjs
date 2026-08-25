@@ -145,4 +145,23 @@ describe('staleProbeRefused', () => {
       expect(refused.why).toContain(reason)
     }
   })
+
+  it('refuses a message that merely CONTAINS a staleness phrase', () => {
+    // The contract beside STALE_REFUSAL says "and nothing else": a reply whose
+    // text embeds one of the phrases in a larger sentence is some OTHER failure
+    // — an internal error, a compensation, a wrapped reason — and proves
+    // nothing about the fence. The unanchored regex accepted all of these.
+    for (const reason of [
+      'internal error while checking stale fence',
+      'compensated: the lock names another session',
+      'the lock names another session, probably',
+      'stale fence',
+      'not a stale fence: presented 7, the lock carries 7',
+    ]) {
+      expect(STALE_REFUSAL.test(reason), reason).toBe(false)
+      const failed = staleProbeRefused({ ok: false, reason })
+      expect(failed.ok, reason).toBe(false)
+      expect(failed.why).toMatch(/not for staleness/)
+    }
+  })
 })
