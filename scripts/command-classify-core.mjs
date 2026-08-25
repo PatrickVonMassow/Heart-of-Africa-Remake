@@ -551,6 +551,10 @@ function directIntentOfParsed(seg) {
   if (redirectWrites(seg.redirects)) return 'write'
   const head = commandHead(seg)
   if (!head) return 'read'
+  // A script whose job is mutation stays a write under EVERY flag. In
+  // particular, land-point.mjs does not implement a help/version exit path;
+  // those words are merely ignored arguments before it merges and pushes.
+  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
   // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
@@ -567,9 +571,6 @@ function directIntentOfParsed(seg) {
     return argsOf(seg).some((a) => !a.quoted && /^-[A-Za-z]*i/.test(a.text)) ? 'write' : 'read'
   }
   if (WRITING_HEADS.has(head)) return 'write'
-  // A script of THIS repository that we can NAME is decidable, and the fallback's
-  // reasoning does not cover it.
-  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // Everything else — `node scripts/x.mjs --status`, `grep`, `cat`, an unknown
   // tool — reads. A script's own flags are not decidable from outside, and this
   // gate under-blocks by design.

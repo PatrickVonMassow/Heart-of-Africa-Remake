@@ -459,10 +459,12 @@ describe('scripts whose whole job is to change shared state', () => {
     }
   })
 
-  it('judges it by NAME, not by flags — a dry run counts too', () => {
+  it('judges it by NAME, not by flags — dry and generic help flags count too', () => {
     // Same reasoning as the fallback: flags are not decidable from outside.
     // Over-blocking here costs a board publish that was due anyway.
     expect(isMutatingSegment('node scripts/land-point.mjs 594 --dry')).toBe(true)
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --model "GPT-5.6 Sol" --help')).toBe(true)
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --version')).toBe(true)
   })
 
   it('leaves every OTHER script on the read-only fallback', () => {
