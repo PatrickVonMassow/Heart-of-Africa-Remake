@@ -10,6 +10,7 @@
 // point 834, H6) — so the last case runs the real drill, processes, kill and
 // all.
 import { describe, it, expect } from 'vitest'
+import { readdirSync, readlinkSync } from 'node:fs'
 import {
   BEAT_MS,
   DEAD_STATES,
@@ -775,5 +776,30 @@ describe('runDrill — the real processes, the real kill', () => {
     expect(by.files.escaped, detail).toBe(true)
     expect(result.ok, detail).toBe(true)
     expect(result.note).toMatch(/the pipe is the binding/)
+  }, 60_000)
+
+  it('holds no start-log descriptor after the run, however often it is called', async () => {
+    // ROUND-13 FINDING 2: runShape opened startFd and never closed the
+    // observer's copy — removing the temporary directory does not close an
+    // open descriptor, so every runDrill() leaked two, an eventual EMFILE for
+    // any caller that keeps invoking the exported function. The check reads
+    // this process's own descriptor table for links into a drill directory,
+    // so unrelated descriptor churn elsewhere in the process cannot blur it —
+    // against the pre-fix code the leaked entries stay visible here as
+    // '…/start-<shape>.log (deleted)'. Three short-window runs, so
+    // accumulation across repeated use is measured, not argued; their verdict
+    // is inconclusive by design and not what this case asserts.
+    const startLogFds = () =>
+      readdirSync('/proc/self/fd').filter((fd) => {
+        try {
+          return /hoa-escape-.*start-/.test(readlinkSync(`/proc/self/fd/${fd}`))
+        } catch {
+          return false
+        }
+      })
+    for (let round = 0; round < 3; round += 1) {
+      await runDrill({ settleMs: 250, observeMs: 250 })
+      expect(startLogFds(), `after run ${round + 1}`).toEqual([])
+    }
   }, 60_000)
 })
