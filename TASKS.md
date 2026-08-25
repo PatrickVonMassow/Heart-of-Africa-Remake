@@ -77,116 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 895. Fenced discovery, adoption, reconciliation, and the slice of landing they need. CUT OUT
-  OF POINT 834 (see 890 for the cut and its reason). Step 8 with the part of step 9 that step 8
-  requires — and it is what makes SURVIVABILITY claimable at all: without it a worker merely is
-  not killed, while no transferable declaration, fenced adoption, reconciliation or plan-native
-  landing exists, so a successor can neither prove nor land its work.
-  HOW THE BRANCH IS CUT: `feat/895-<slug>` off main, carrying `scripts/batch-adoption-core.mjs`
-  and its test, `scripts/batch-landing-core.mjs`, `scripts/batch-reconcile-core.mjs` and its test,
-  `scripts/batch-reconcile.mjs` and its test, `scripts/resume-batch.mjs` and the durable-block
-  flags added to `scripts/batch-in-flight.mjs` from `feat/834-durable-authoring-lane`, plus
-  `docs/command-index.md` regenerated.
-  LANDS AFTER 894 — `batch-reconcile.mjs` and `resume-batch.mjs` import the daemon, the store and
-  the detached worker contract.
-  WHAT MUST HOLD: the adoption record is all-or-nothing and binds the attempt to a process
-  identity — pid AND start time — because naming an attempt without its process leaves exactly the
-  guess the record exists to remove; a successor's recovery verdict is UNKNOWN, never ABANDONED,
-  where a lost publication trailer and an unrelated successor leave the same graph evidence
-  (890 item (iii)); and `--commit` never advances the fence (890 item (iv)).
-  FINAL STATE: a fresh session can DISCOVER a running attempt, adopt it under a fence, reconcile
-  what it finds and land it — all still dark behind the flag of 891, with today's path untouched.
-  VERIFIABLE: the union's unit cases for steps 8 and 9; the reconciliation evidence cases;
-  `npm run test:unit`, lint, build; the cross-vendor review of this file set recorded green
-  before the merge.
-  Criticality: high — this is the half that lets a successor prove and land another session's work.
-  Bundle: unbundled (batch autonomy).
-
-- [ ] 834. The drills prove the takeover on the real path, and only then may the dark lane be
-  switched on. THIS POINT WAS CUT ON 24.08.2026 (user rule, general procedure: a large point that
-  stops converging is cut into standalone points and each is worked on its own, no confirmation
-  needed). It had reached authoring round 27 with four recorded `do-not-merge` passes behind it,
-  and what remained was not building but CROSS-VENDOR REVIEW of ~12,000 lines that no single round
-  can hold. The seams became points 889 (the four-eyes ledger repair), 890 (the architecture
-  document), 891 (schemas, invariants and the activation flag), 892 (the durable state store),
-  893 (attempt leases and epoch fencing), 894 (the daemon and the detached worker contract) and
-  895 (fenced discovery, adoption, reconciliation and the landing slice). THIS NUMBER KEEPS THE
-  CLAIM ITSELF: the authoring lane survives the session that spawned it — which may only be
-  claimed once a drill has demonstrated it.
-  WHAT IT COSTS TODAY, measured: on 21.08.2026 an authoring run for point 597 died with its parent
-  session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost. The lane the seven
-  points above build is the cure; this point is the proof and the switch.
-  HOW THE BRANCH IS CUT: `feat/834-<slug>` off main, carrying `scripts/batch-daemon-drill.mjs` and
-  its test and `scripts/detached-escape-drill.mjs` and its test from
-  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated. LANDS LAST, after
-  895 — the drill imports the daemon, the store, the singleton and the resume path.
-  THE DRILL MUST CALL THE THING IT CLAIMS TO PROVE. It kills the SPAWNING PARENT SESSION mid-
-  authoring and then shows that daemon and worker survive it and that a FRESH session discovers,
-  adopts and reconciles them. A launcher-client exit, a daemon restart and a normal handover are
-  NOT equivalent, and the worst finding of the four review rounds behind this point was that the
-  drill had been simulating the takeover it claimed to prove — 091f66b5 gave the lane its own
-  fence store so the drill runs through the REAL acquisition path, and that commit has never been
-  read by a reviewer.
-  THE SWITCH IS THE LAST ACT, AND IT IS RECORDED: the flag of 891 refuses to enable while 895 and
-  this point are not green. AND IT IS FLIPPED ONLY WITH ITS CONDITION (cross-vendor read of 890,
-  24.08.2026): what an enabled lane delivers is survival of a session DEATH, not a planned
-  handover, so while the checkpoint barrier and the two-phase boundary stand unbuilt in 676 the
-  boundary must DRAIN, and this point switches nothing on until that enforcement is in place. Enabling it is a separate, deliberate step taken after this drill
-  passes on main, and it is what first makes the surviving lane something the board, the brief and
-  the handover may advertise.
-  THE RESIDUALS ARE ADMITTED, NOT SOLVED, and stay recorded as limits in
-  `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the very
-  defect this lane removes, so it is worst before it lands); work begun on the old path gains
-  nothing from this design; one push of publishing authority survives local dispossession, by
-  design, so that exactly one publisher exists at all times; and the drill's check-to-signal
-  interval has one branch it cannot observe.
-  WHAT FOLLOWS: the remainder of 676 keeps its number and its rank and begins after this point —
-  bounded dispatch, the checkpoint barrier, the two-phase boundary, successor reconciliation
-  beyond the slice claimed here, crash-recoverable landing, board projection, metrics, staged
-  failure trials and the measured baseline trial. It must not codify an answer about transferring
-  a live Agent-tool child that contradicts the one the landed point 716 carries.
-  FINAL STATE: the parent-death drill and the escape drill run on main, the drill's takeover is
-  the real one, and the lane may be switched on.
-  VERIFIABLE: the parent-session-death drill end to end; the escape drill's measurement; the
-  interlock proven by turning the flag on only after 895 is green; `npm run test:unit`, lint,
-  build; the cross-vendor review of this file set recorded green before the merge.
-  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
-  here loses work rather than merely slowing it.
-  Bundle: unbundled (batch autonomy).
-
-- [ ] 879. `--help` and eight git subcommands walk straight through the main-write fence. MEASURED
-  24.08.2026 by the cross-vendor review of `fc64b34` (recorded `do-not-merge`), every case run
-  through the pure classifier:
-  (1) `scripts/command-classify-core.mjs:555` returns `read` for any segment carrying `--help`,
-  BEFORE the `MUTATING_SCRIPTS` check at `:572` — and `scripts/land-point.mjs:587-594` parses only
-  the numeric argument and its named flags, ignoring `--help` entirely. So
-  `node scripts/land-point.mjs 594 --model "…" --help` classifies as read-only while performing the
-  real merge, tick and push: `board-first-core.mjs:151` demands no board for it and
-  `batch-lease-core.mjs:783` reports `writes:false`, so a session holding NO batch lock passes the
-  fence. The module's own invariant at `:607` says the judgement is by NAME, not by flags; the test
-  at `command-classify-core.test.mjs:462` pins that for `--dry` alone.
-  (2) `:462-465` `GIT_WRITES` omits every ref-moving subcommand. Measured as NOT mutating:
-  `git pull --rebase origin main`, `git fetch --prune`, `git update-ref refs/heads/main <sha>`,
-  `git branch feat/x`, `git branch -f main <sha>` (the flag list at `:490` has no `-f/--force`),
-  `git gc --prune=now`, `git submodule update --init`, `git symbolic-ref HEAD refs/heads/x`. A
-  lockless session may therefore move `refs/heads/main` in the main checkout — the exact class the
-  rule exists for, which its own test proves only for `git commit`.
-  (3) Three lexer gaps: `:539-546` rejects any redirection operator ending in `&`, so
-  `node gen.mjs >& all.log` is a read while `&> all.log` is a write; process substitution is not
-  unwrapped, so `diff <(git push) x` hides a push; and a here-document BODY is lexed as commands,
-  so a board or chat text that quotes `git push origin main` inside a heredoc denies the call —
-  the over-block direction the header forbids at `:22`.
-  WHAT IT COSTS: this module answers "does this call write" for the fence, the board gate and the
-  context fence at once. (1) and (2) are holes in the lockless-main rule; (3) costs turns on quoted
-  text, which is what that rule was written to stop.
-  FINAL STATE: the mutating-script rule outranks `--help`, or `--help` is judged only for scripts
-  that actually implement it. `GIT_WRITES` covers every subcommand that can move a ref or rewrite
-  the object store. Redirection with `&`, process substitution and here-document bodies are lexed
-  correctly, with quoted text never deciding.
-  VERIFIABLE: unit cases for each measured string above, in both directions.
-  Criticality: high — a lockless session may move main.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 880. The four-eyes duty can be cleared without an independent review, six measured ways.
   MEASURED 24.08.2026 by the cross-vendor review of `1862687` and `e0ebcff` (both recorded
   `do-not-merge`), each route executed against `evaluateMechanismReview`/`validateRecord`:
@@ -11620,16 +11510,29 @@ to land than a mechanism that needs a review.
   sources, so the preflight can block where the guard allows for any cause, and its remedy text is
   chosen from the source it did not consult. 849 is worked first; this point is what remains after
   it and must not be worked beside it, because both edit the same liveness reading.
+  THE CLASS IS NOT SPECIFIC TO THAT GUARD, measured a second time 25.08.2026 on `main` at
+  `bfe8dbc5` while landing point 834: `guard-preflight --for merge` and `--for answer` both render
+  `mechanism-review-guard would-block: FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE`, while that
+  guard's OWN run path — its hook invocation with the session id on stdin — exits 0, because the
+  run path honours the assembly gap (16,384,795 characters of outstanding material against a
+  200,000-character round budget, so the demand is SUSPENDED for material) and the preflight gather
+  does not. Same shape, different guard, and the same practical cost: the preflight names a
+  remediation — assemble a cross-vendor review of the whole range — that provably cannot be
+  performed and that the guard does not actually demand. So the repair belongs to the SHARED
+  judgment, not to the one liveness probe.
   WHY IT MATTERS: the named remediation cannot clear the condition it is offered for. Only the
   ageing-out of the stale liveness window clears it, and a session that believes the advice pays a
   full unit/build/lint gate — measured ~140 s — for every repetition. A preflight that disagrees
   with its own guard also teaches sessions to discount it, which is the opposite of what it is for.
-  FINAL STATE: both paths judge the alert from ONE source, so the preflight verdict and the guard
-  verdict cannot disagree. Where a live parallel detection is genuinely a reason to block, the
-  preflight names THAT cause and its actual remedy instead of the doctor gate.
+  FINAL STATE: a guard's preflight verdict and its own run verdict come from ONE judgment, so they
+  cannot disagree — for the parallel-session alert and for the mechanism-review assembly gap alike.
+  Where a live parallel detection is genuinely a reason to block, the preflight names THAT cause
+  and its actual remedy instead of the doctor gate.
   VERIFIABLE: unit cases over the gather — a handled alert plus a live `detectParallel` hit yields
-  the same verdict as the guard's own path; a genuinely unhandled alert still blocks; and the
-  block text for a live-parallel cause names that cause rather than the doctor gate.
+  the same verdict as the guard's own path; a genuinely unhandled alert still blocks; the block
+  text for a live-parallel cause names that cause rather than the doctor gate; and a
+  mechanism-review range whose material cannot be assembled preflights as clean, exactly as the
+  guard's own path judges it.
   Criticality: low — no product behaviour; the cost is repeated full gates and a preflight whose
   verdicts a session learns to ignore.
   Bundle: Session- & Repo-Hygiene.
@@ -12121,7 +12024,11 @@ to land than a mechanism that needs a review.
   is committed but only local`, which is true of the local ref and misleading about the work: the
   content was already on the remote. This is the same class as the 24.08.2026 entry in the
   retrospective timeline, but that one ended at the misleading report; this one adds that the run
-  cannot get out of the state on its own.
+  cannot get out of the state on its own. SEEN AGAIN 25.08.2026 on `feat/907-interpreter-stdin-write`:
+  the run pushed `669b14e8`/`1430a855`/`a5293c31`, then rewrote the same three commits locally as
+  `8e0a2341`/`c6988d8c`/`293ae43d` with a `Rescue:` body, and `git diff HEAD origin/…` was EMPTY —
+  identical trees, different parents. The closing report again said the work was local-only, and the
+  main session recovered it by resetting the local branch onto the remote tip it already matched.
   FINAL STATE: the interim push reconciles a rewritten branch through the same lease-gated
   compare-and-swap the wrapper already uses for checkpoints — a rejected push is re-observed, an
   already-contained head is accepted, and a head that legitimately supersedes the remote is pushed
@@ -12134,4 +12041,193 @@ to land than a mechanism that needs a review.
   `undefined` and names either the commits or its own inability to name them.
   Criticality: medium — it loses no work, but it blinds the remote for the rest of a run and its
   report sends the reader looking for work that was never lost.
+  Bundle: Session- & Repo-Hygiene.
+- [ ] 908. The parallel-session detector counts the session's OWN declared authoring
+  child, so every turn of every delegated build pays a doctor gate (measured
+  25.08.2026, 09:11–09:14). `author-fable.mjs` and `review-sol.mjs` start their model as
+  a separate top-level Claude session; it runs tools in this repository because that is
+  the work it was dispatched to do. `otherSessionsIn`
+  (`scripts/batch-doctor-core.mjs:531-543`) subtracts only the READER's and the OWNER's
+  session id from the alert, and `classifyParallel` (`scripts/batch-singleton.mjs:577-590`)
+  flags every other top-level sid with fresh tool activity. A dispatched worker matches
+  that description exactly, so the owner is warned about its own employee.
+  THE EVIDENCE THAT WAS NEVER CONSULTED: `.claude/batch-in-flight.json` already names the
+  worker — pid, `pidStartedAt`, branch `refs/heads/feat/834-takeover-drills`, worktree and
+  output log — and `batch-in-flight.mjs --agent-check` re-measures all four on demand. The
+  declaration is the owner's own signed statement that this session is its worker. The
+  detector reads none of it.
+  MEASURED: with Fable 5 authoring point 834 as pid 1815345, the Stop hook fired
+  `PARALLEL SESSION DETECTED (a52fbd84-…)` on FOUR consecutive turns. Two full
+  `batch-doctor --gate` runs were ordered and completed; the first returned
+  `parallelNow=1`, `repo state CONSISTENT`, three green gates and `VERDICT: consistent`,
+  and explicitly recorded `gate demand satisfied … beside [a52fbd84-…, e20f38a4-…]`. The
+  worker kept working, so the alert re-raised on the next turn regardless.
+  WHAT IT COSTS: a doctor gate is roughly two and a half minutes of three suites, and it
+  is owed AGAIN on every turn for as long as the agent builds — which is the whole point
+  of delegating. The batch is halted by the presence of its own throughput. Worse, under
+  agent load the unit gate contends with the worker's own suites, so it is slower still
+  and buys no information: the answer is `consistent` by construction, because the second
+  session is the one the owner started.
+  NOT ALREADY COVERED, AND NAMED AGAINST ALL FOUR NEIGHBOURS. Point 515 is the placeholder
+  owner id: this child has a real, distinct id. Point 823 drops a session whose PROCESS IS
+  GONE: this one is alive and measured alive. Point 841 asks whether a session WORKS ON THE
+  BATCH and drops the stood-down chat session: this one works on the batch — that is
+  precisely why it is running. Point 849 is the RETIRED PREDECESSOR and its orphaned child:
+  this one is neither retired nor orphaned, it is the current owner's live, declared
+  worker. All four tests pass, and the alert still fires.
+  FINAL STATE: a session declared as this owner's worker in `.claude/batch-in-flight.json`
+  is not a parallel session. The detector subtracts the declared workers — verified the way
+  `--agent-check` verifies them, so a declaration whose pid is dead or whose evidence has
+  gone quiet stops shielding anything and the alert fires as it should. An UNDECLARED live
+  writer still raises the alarm unchanged; the fix must not widen into "any child is fine".
+  VERIFIABLE: a unit case per neighbour class (declared-and-alive → no alert;
+  declared-but-dead → alert; undeclared-and-alive → alert; owner and reader ids → no
+  alert, unchanged); a case pinning that the shield reads the declaration's measured
+  evidence rather than its mere existence; `npm run test:unit`, lint, build.
+  Criticality: medium — it does not corrupt state, but it taxes every delegated build and
+  trains the batch to ignore the one alert that will one day be real.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 909. The test type-check has been red on main for a week, and no gate that runs says
+  so. MEASURED 25.08.2026 on main at 745fb37b: `npx tsc -p tsconfig.vitest.json --noEmit`
+  fails with three errors. `src/render/fauna.test.ts(803)` is a real type error — the loop
+  initialiser `firstBody = { x: 0, z: 0, yaw: 0 }` lacks the `y` that commit 6cf23dea added
+  to `FootPlantBodyPose`, so the inferred type no longer satisfies `footPlantPose`. The
+  other two are TS7016 for `.ts` tests importing project `.mjs` with no declarations
+  (`fauna.test.ts` → `scripts/verify/stanceSlip.mjs`, arrived 17.08.2026;
+  `fableEscalationDoc.test.ts` → `scripts/author-routing-core.mjs`, arrived 19.08.2026).
+  `tsconfig.vitest.json` extends `tsconfig.app.json` and re-includes the tests with
+  `exclude: []` but sets no `allowJs`, so a `.ts` test importing a `.mjs` script is an
+  error by construction.
+  WHY IT WAS INVISIBLE, and this is the larger half: `test-types` runs ONLY in the local
+  verify runner (`scripts/verify/run-all.mjs:379`). The GitHub workflow does not run it, so
+  CI reported GREEN on main throughout; the landing fast gate (build, lint, unit) does not
+  run it either, so no landing was ever stopped. A gate nothing routinely runs is not a
+  gate, and a week is how long that took to notice.
+  FINAL STATE: `tsc -p tsconfig.vitest.json --noEmit` is green on main, and a gate that
+  actually runs would have caught it — either CI runs `test-types`, or the landing gate
+  does, and whichever is chosen is the one the red is proven against.
+  VERIFIABLE: the type-check green on main; a deliberately reintroduced type error in a
+  test file measured RED by the chosen gate, not merely by a manual `tsc`; `npm run
+  test:unit`, lint, build.
+  Criticality: medium — it breaks no shipped behaviour, but it is a dark gate, and the
+  three errors it hid are the evidence of what a dark gate costs.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 910. A session working in a worktree is blocked by `dashboard-guard` with a repair
+  that cannot work. MEASURED 25.08.2026. The guard resolves the registered dashboard
+  against ITS OWN repo root (`scripts/dashboard-guard.mjs:111`,
+  `resolve(REPO_ROOT, marker.dashboardPath)`). A git worktree has no
+  `.batch-dashboard.html` at its root, so `markerFileExists` is false and
+  `dashboard-guard-core.mjs:832` blocks the turn with "BATCH DASHBOARD NOT REGISTERED".
+  Reproduced side by side with the same session id on stdin: exit 0 and silent from
+  `/workspace/hoa`, a block decision from `.claude/worktrees/point-834-drills`.
+  THE TRAP IS THE PRESCRIBED REPAIR. The message says to publish, set focus and run
+  `dashboard-guard.mjs --synced <path>`. Done from the main tree all three SUCCEED, and the
+  guard run by hand from the main tree then exits 0 — so every diagnostic reads
+  "registered" — while the Stop hook, which inherits the session's cwd, keeps running the
+  WORKTREE copy and keeps refusing. The full sequence was run twice, verified green each
+  time, and refused both times; only reproducing the guard from both roots showed why.
+  This is the NORMAL case, not an exotic one: the feature-branch workflow of CLAUDE.md §6
+  puts the session in a worktree.
+  FINAL STATE: the guard resolves the dashboard and its marker against the MAIN worktree
+  (`git rev-parse --path-format=absolute --git-common-dir`), not the checkout it happens to
+  run from; and where it still blocks from a non-main checkout it SAYS so and names the
+  main tree, instead of prescribing a repair that provably cannot satisfy it. The same
+  REPO_ROOT question is asked of every other Stop-chain guard, since they all inherit the
+  session's cwd.
+  VERIFIABLE: a case per root — the same marker judged registered from the main tree and
+  from a linked worktree; a case pinning that a genuinely unregistered dashboard still
+  blocks from both; the audit of the other Stop-chain guards recorded with its result;
+  `npm run test:unit`, lint, build.
+  Criticality: medium — it blocks turns rather than corrupting state, but it wastes them at
+  the point where the session is least able to tell a real refusal from a phantom.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 911. The escape drill's "launcher's shape" is a comment, not a coupling, and the
+  drill's claims outrun its instrument. FOUND 25.08.2026 answering the round-15 and
+  round-16 cross-vendor reads of point 834. `scripts/detached-escape-drill.mjs` measures two
+  stdio shapes against the same group SIGKILL, and its header labels one of them
+  "files stdio: [ignore, fd, fd] + unref — the launcher's shape". That label is accurate
+  today — `scripts/batch-autostart.mjs:220` and `:265` spawn with
+  `{ detached: true, stdio: ['ignore', out, out] }` over an `openSync` descriptor — but
+  NOTHING FAILS if it stops being true. Should the launcher move its worker back to `pipe`,
+  the drill keeps measuring the obsolete shape, keeps reporting "the pipe is the binding",
+  and keeps passing, while production loses its children exactly as on 21.08.2026.
+  WHAT WAS SETTLED, so this point does not relitigate it: the reviewer's stronger claim —
+  that the drill could pass on a runtime providing no escape — was refuted by measurement
+  and is pinned by a test, because `verdict()` requires `files.escaped`. Round 16 accepted
+  that, and accepted both repairs of round 15, while holding that the drill's CLAIMS still
+  reach further than a built-in fixture proves. It named the route this point takes.
+  FINAL STATE: the drill's stated claims are narrowed to what its instrument proves — a
+  causal claim about stdio under this runtime, not a claim about the production launcher —
+  and the production launch path is covered by its own conformance check, so that a
+  launcher which stops using the surviving shape turns something red.
+  VERIFIABLE: the narrowed claims read against the drill's own header; the conformance
+  check measured RED against a launcher shape that would not survive, and green against the
+  current one; `npm run test:unit`, lint, build.
+  Criticality: medium — the measurement it guards is sound today, and the risk is drift
+  rather than a present defect.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 912. An interrupted takeover drill leaves its daemon and its sandbox behind, and the
+  doctor does not see it. MEASURED 25.08.2026, 11:27: pid 1798048 had been running since
+  08:48:35 — 2 h 39 min — as `node scripts/batch-daemon.mjs serve --repo
+  /tmp/parent-death-mNzy0a/repo --batch parent-death-drill --nonce 859bbb59… --drill`, with
+  the whole sandbox still in place (`origin.git`, `repo`, `wt`, `parent-ready.json`), while
+  no drill process was alive any more. The cleanup in `scripts/batch-daemon-drill.mjs`
+  (the `finally` at :486–:508) kills the parent group and the daemon recorded in the state
+  store and removes the sandbox unless `--keep` was given — so it runs exactly when the
+  DRILL PROCESS ITSELF survives to run it. For a drill whose subject is survival of process
+  death, that is not an edge case: the session that started it is the one designed to die.
+  AND THE DOCTOR DOES NOT SEE IT: `node scripts/batch-doctor.mjs --gate`, run on the same
+  machine at 11:20 while that daemon was serving, reported `strayProcesses=0` and
+  "repo state CONSISTENT". Its stray detector does not know the drill daemons.
+  WHAT IT COSTS: a process that believes itself the serving daemon of a batch keeps running
+  unnoticed, and the state the doctor certifies as consistent is not. The evidence of this
+  measurement was reaped by hand, which is precisely the manual step this point removes.
+  FINAL STATE: the drill records its sandbox path and its daemon identity where a LATER
+  process finds them — not only in the sandbox it is about to lose — and a reaper clears a
+  drill daemon whose recorded run is over; the doctor's stray-process detector knows
+  `--batch parent-death-drill` as reapable and reports it rather than counting zero.
+  VERIFIABLE: a case that kills the drill process mid-run and then shows the reaper removing
+  daemon and sandbox; a case pinning that a drill daemon of a LIVE run is never reaped; a
+  doctor case that reports a stray drill daemon instead of `strayProcesses=0`; `npm run
+  test:unit`, lint, build.
+  Criticality: medium — no product behaviour, but it leaks live processes and makes the
+  doctor's consistency verdict untrue in the one place the batch relies on it.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 913. The takeover drill's negative control intermittently reports a THIRD failed check, and
+  the gate that reads it becomes a coin flip. MEASURED 25.08.2026, 12:24 on `main` at the merge
+  of point 907 (`1f167499`), on a quiet host (load 2.4 over 16 cores, run 149 s): `npm run
+  test:unit` went red in `scripts/batch-daemon-drill.test.mjs > goes RED — at exactly the two
+  stale probes`. The control pins EXACTLY two failures; it reported three. The extra one is
+  `the cancellation preserved the branch` (`scripts/batch-daemon-drill.mjs:466-475`), which
+  compares `git rev-parse feat/drill` in the sandbox origin before the post-adoption
+  `cancel-attempt` and 300 ms after it.
+  NOT the merged change, and not a loaded machine: main had gained only TASKS/docs commits since
+  the branch point, the drill touches no part of `command-classify-core.mjs`, and the host was
+  quiet. NOT reproducible on demand either — measured the same day, the drill CLI standalone
+  three times (two failures each), once under 14 busy cores (two failures), the test file alone
+  twice (green), the file beside `batch-daemon.test.mjs` and `batch-reconcile.test.mjs` (green),
+  and the FULL suite a second time on a quiet host (green, 150 s). It needs the full-suite
+  fan-out at `maxWorkers: 4` to appear, and then only sometimes.
+  WHAT IT COSTS: this drill is the NEGATIVE CONTROL that certifies the takeover fence still goes
+  red when the daemon stops enforcing it. An intermittent extra failure makes every gate reading
+  it a coin flip — it stopped the landing of point 907 — and it teaches the reader to treat a red
+  drill as noise, which is the one verdict this drill must never lose.
+  THE LEAD: the neutered daemon ACCEPTS both stale checkpoint requests, so the run performs two
+  checkpoint cycles the honest run refuses. A push still in flight from one of them lands after
+  `tipBeforeCancel` was read, and the check then charges the cancellation with a branch move it
+  did not cause. The 300 ms sleep bounds nothing.
+  FINAL STATE: the branch-preservation check waits on the state it is judging instead of on a
+  fixed sleep — the attempt quiescent, no push outstanding — so it answers the question it names
+  and cannot be moved by an earlier accepted checkpoint. The negative control keeps pinning
+  exactly the two stale probes.
+  VERIFIABLE: a case that drives an accepted checkpoint's push to land AFTER the cancel and shows
+  the check still green; the negative control unchanged in what it pins; a repeated full-suite run
+  (`npm run test:unit`) with the drill file in the fan-out; lint, build.
+  Criticality: medium — no product behaviour, but it intermittently reds the gate every landing
+  runs and devalues the drill's verdict.
   Bundle: Session- & Repo-Hygiene.

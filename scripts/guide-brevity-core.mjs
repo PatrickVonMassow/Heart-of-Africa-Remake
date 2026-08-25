@@ -120,8 +120,21 @@
 // judging the target state rather than the attempt; the merged entry names both directions and
 // its prompt carries both. That paid back 5 lines and 53 words, and the ceilings move by exactly
 // what is left, with zero slack. No existing claim was dropped.
+// RAISED AGAIN 25.08.2026, +6 lines / +82 words, for the two gate lessons of that morning
+// (retrospective §3.175 and §3.176, points 909 and 910). First: a gate can be correctly built and
+// judge correctly and still be documentation, because NO path the project actually walks runs it —
+// `test-types` sat red on main for a week while CI and the landing gate both reported green, since
+// neither executes it. Second: the diagnosis of such a fault can share the fault's own assumption —
+// a guard resolving its board path against the working directory it inherits confirms the wrong
+// answer when you run it by hand from the same place, which cost three turns before the condition
+// was compared from two roots side by side. SHORTEN-BEFORE-RAISE was applied to both: drafted as
+// two new entries at +20 lines / +231 words, they were instead FOLDED into "Gebaut — und nie in
+// Betrieb genommen" (which already carries built-but-not-in-operation) and into "Test und Waechter
+// hingen an ihrer Umgebung" (which already carries the accidental working directory). That paid
+// back 14 lines and 149 words at no extra entry, and the ceilings move by exactly what is left,
+// with zero slack. No existing claim was dropped, and the long form stays in the retrospective.
 export const LIMITS = {
-  maxLines: 465,
+  maxLines: 471,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -269,7 +282,7 @@ export const LIMITS = {
   // retrospective already carries in full (§3.171, §3.172). The guide measures
   // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
   // ceiling stays 444 because the file does.
-  maxWords: 4131,
+  maxWords: 4213,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

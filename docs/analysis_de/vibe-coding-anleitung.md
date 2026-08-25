@@ -177,9 +177,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Stück für sich ab**."
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
-  das Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
+  das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor ist richtig gebaut
+  und urteilt richtig — nur fährt es kein Weg, den das Projekt wirklich geht, und sein Rot sieht
+  wochenlang niemand.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
-  **vergleiche Ausgeführtes mit dem Repository.**"
+  **vergleiche Ausgeführtes mit dem Repository.** Nenn zu jedem Tor, auf das du dich berufst, den
+  **Weg, der es fährt** — und wann es dort zuletzt rot war."
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -204,10 +207,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
-  statt deinen Code, oder lesen eine projektweite Angabe aus dem zufälligen Arbeitsverzeichnis —
-  und sind nur dort richtig, wo sie zufällig liefen.
+  statt deinen Code und stimmen nur dort, wo sie zufällig liefen; von Hand nachgeprüft bestätigt
+  sich der Fehler selbst, denn dein Aufruf erbt dasselbe Verzeichnis.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts."
+  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
+  und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -335,9 +339,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Schritt? Liegt sie außerhalb, nenn den **echten Griff** dort."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
-  verliert mit dem Fehlschlag die nächste Reparatur mit.
-  → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
-  **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern."
+  verliert die nächste Reparatur mit — und ein abgebrochener Lauf räumt nicht weg, was er
+  hinterlässt, am schlimmsten beim Prüfen von Prozesstod.
+  → *Prompt:* „Änderst du deine eigene Umgebung: Gibt es eine **kleinere Handlung**, die nur
+  **ergänzt**? Lass jeden Neuaufbau nach **offen** scheitern — und frag zu jeder Aufräumung: **Wer
+  räumt auf, wenn der Aufräumende nicht mehr da ist?**"
 
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
@@ -388,11 +394,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
   selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt. Ein Tor kann
   aber auch zu Recht sperren und trotzdem unlösbar sein: liest es seinen Nachweis nur auf **einem**
-  von mehreren erlaubten Arbeitswegen ab, kommt der andere Weg nie durch, egal wie gründlich er war.
+  von mehreren erlaubten Arbeitswegen ab, kommt der andere nie durch.
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
   es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Und bevor ein Tor
   scharf geht: **zähl alle Wege auf, auf denen die geprüfte Arbeit entstehen darf**, und weise für
-  jeden nach, dass sein Nachweis wirklich entsteht."
+  jeden Nachweis nach."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
   Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
@@ -462,4 +468,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 13ebdef63faeef9505b18b8f879584fc4706604abcd2cda3050bcbc00b5482ee -->
+<!-- GUIDE-FINGERPRINT: efaadebc93c34d7368d9d7f9de5eee600f1c6a37dd03e74cafef095e580b2f90 -->

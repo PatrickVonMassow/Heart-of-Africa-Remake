@@ -22978,3 +22978,138 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   lint, build; the cross-vendor review of this file set recorded green before the merge.
   Criticality: high — it is the process that must survive, and an unfenced one is worse than none.
   Bundle: unbundled (batch autonomy).
+
+- [x] 895. Fenced discovery, adoption, reconciliation, and the slice of landing they need. CUT OUT
+  OF POINT 834 (see 890 for the cut and its reason). Step 8 with the part of step 9 that step 8
+  requires — and it is what makes SURVIVABILITY claimable at all: without it a worker merely is
+  not killed, while no transferable declaration, fenced adoption, reconciliation or plan-native
+  landing exists, so a successor can neither prove nor land its work.
+  HOW THE BRANCH IS CUT: `feat/895-<slug>` off main, carrying `scripts/batch-adoption-core.mjs`
+  and its test, `scripts/batch-landing-core.mjs`, `scripts/batch-reconcile-core.mjs` and its test,
+  `scripts/batch-reconcile.mjs` and its test, `scripts/resume-batch.mjs` and the durable-block
+  flags added to `scripts/batch-in-flight.mjs` from `feat/834-durable-authoring-lane`, plus
+  `docs/command-index.md` regenerated.
+  LANDS AFTER 894 — `batch-reconcile.mjs` and `resume-batch.mjs` import the daemon, the store and
+  the detached worker contract.
+  WHAT MUST HOLD: the adoption record is all-or-nothing and binds the attempt to a process
+  identity — pid AND start time — because naming an attempt without its process leaves exactly the
+  guess the record exists to remove; a successor's recovery verdict is UNKNOWN, never ABANDONED,
+  where a lost publication trailer and an unrelated successor leave the same graph evidence
+  (890 item (iii)); and `--commit` never advances the fence (890 item (iv)).
+  FINAL STATE: a fresh session can DISCOVER a running attempt, adopt it under a fence, reconcile
+  what it finds and land it — all still dark behind the flag of 891, with today's path untouched.
+  VERIFIABLE: the union's unit cases for steps 8 and 9; the reconciliation evidence cases;
+  `npm run test:unit`, lint, build; the cross-vendor review of this file set recorded green
+  before the merge.
+  Criticality: high — this is the half that lets a successor prove and land another session's work.
+  Bundle: unbundled (batch autonomy).
+
+- [x] 879. `--help` and eight git subcommands walk straight through the main-write fence. MEASURED
+  24.08.2026 by the cross-vendor review of `fc64b34` (recorded `do-not-merge`), every case run
+  through the pure classifier:
+  (1) `scripts/command-classify-core.mjs:555` returns `read` for any segment carrying `--help`,
+  BEFORE the `MUTATING_SCRIPTS` check at `:572` — and `scripts/land-point.mjs:587-594` parses only
+  the numeric argument and its named flags, ignoring `--help` entirely. So
+  `node scripts/land-point.mjs 594 --model "…" --help` classifies as read-only while performing the
+  real merge, tick and push: `board-first-core.mjs:151` demands no board for it and
+  `batch-lease-core.mjs:783` reports `writes:false`, so a session holding NO batch lock passes the
+  fence. The module's own invariant at `:607` says the judgement is by NAME, not by flags; the test
+  at `command-classify-core.test.mjs:462` pins that for `--dry` alone.
+  (2) `:462-465` `GIT_WRITES` omits every ref-moving subcommand. Measured as NOT mutating:
+  `git pull --rebase origin main`, `git fetch --prune`, `git update-ref refs/heads/main <sha>`,
+  `git branch feat/x`, `git branch -f main <sha>` (the flag list at `:490` has no `-f/--force`),
+  `git gc --prune=now`, `git submodule update --init`, `git symbolic-ref HEAD refs/heads/x`. A
+  lockless session may therefore move `refs/heads/main` in the main checkout — the exact class the
+  rule exists for, which its own test proves only for `git commit`.
+  (3) Three lexer gaps: `:539-546` rejects any redirection operator ending in `&`, so
+  `node gen.mjs >& all.log` is a read while `&> all.log` is a write; process substitution is not
+  unwrapped, so `diff <(git push) x` hides a push; and a here-document BODY is lexed as commands,
+  so a board or chat text that quotes `git push origin main` inside a heredoc denies the call —
+  the over-block direction the header forbids at `:22`.
+  WHAT IT COSTS: this module answers "does this call write" for the fence, the board gate and the
+  context fence at once. (1) and (2) are holes in the lockless-main rule; (3) costs turns on quoted
+  text, which is what that rule was written to stop.
+  FINAL STATE: the mutating-script rule outranks `--help`, or `--help` is judged only for scripts
+  that actually implement it. `GIT_WRITES` covers every subcommand that can move a ref or rewrite
+  the object store. Redirection with `&`, process substitution and here-document bodies are lexed
+  correctly, with quoted text never deciding.
+  VERIFIABLE: unit cases for each measured string above, in both directions.
+  Criticality: high — a lockless session may move main.
+  Bundle: Session- & Repo-Hygiene.
+
+- [x] 834. The drills prove the takeover on the real path, and only then may the dark lane be
+  switched on. THIS POINT WAS CUT ON 24.08.2026 (user rule, general procedure: a large point that
+  stops converging is cut into standalone points and each is worked on its own, no confirmation
+  needed). It had reached authoring round 27 with four recorded `do-not-merge` passes behind it,
+  and what remained was not building but CROSS-VENDOR REVIEW of ~12,000 lines that no single round
+  can hold. The seams became points 889 (the four-eyes ledger repair), 890 (the architecture
+  document), 891 (schemas, invariants and the activation flag), 892 (the durable state store),
+  893 (attempt leases and epoch fencing), 894 (the daemon and the detached worker contract) and
+  895 (fenced discovery, adoption, reconciliation and the landing slice). THIS NUMBER KEEPS THE
+  CLAIM ITSELF: the authoring lane survives the session that spawned it — which may only be
+  claimed once a drill has demonstrated it.
+  WHAT IT COSTS TODAY, measured: on 21.08.2026 an authoring run for point 597 died with its parent
+  session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost. The lane the seven
+  points above build is the cure; this point is the proof and the switch.
+  HOW THE BRANCH IS CUT: `feat/834-<slug>` off main, carrying `scripts/batch-daemon-drill.mjs` and
+  its test and `scripts/detached-escape-drill.mjs` and its test from
+  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated. LANDS LAST, after
+  895 — the drill imports the daemon, the store, the singleton and the resume path.
+  THE DRILL MUST CALL THE THING IT CLAIMS TO PROVE. It kills the SPAWNING PARENT SESSION mid-
+  authoring and then shows that daemon and worker survive it and that a FRESH session discovers,
+  adopts and reconciles them. A launcher-client exit, a daemon restart and a normal handover are
+  NOT equivalent, and the worst finding of the four review rounds behind this point was that the
+  drill had been simulating the takeover it claimed to prove — 091f66b5 gave the lane its own
+  fence store so the drill runs through the REAL acquisition path, and that commit has never been
+  read by a reviewer.
+  THE SWITCH IS THE LAST ACT, AND IT IS RECORDED: the flag of 891 refuses to enable while 895 and
+  this point are not green. AND IT IS FLIPPED ONLY WITH ITS CONDITION (cross-vendor read of 890,
+  24.08.2026): what an enabled lane delivers is survival of a session DEATH, not a planned
+  handover, so while the checkpoint barrier and the two-phase boundary stand unbuilt in 676 the
+  boundary must DRAIN, and this point switches nothing on until that enforcement is in place. Enabling it is a separate, deliberate step taken after this drill
+  passes on main, and it is what first makes the surviving lane something the board, the brief and
+  the handover may advertise.
+  THE RESIDUALS ARE ADMITTED, NOT SOLVED, and stay recorded as limits in
+  `docs/handover-architecture.md`: an undeclared old-path child evades every start check (the very
+  defect this lane removes, so it is worst before it lands); work begun on the old path gains
+  nothing from this design; one push of publishing authority survives local dispossession, by
+  design, so that exactly one publisher exists at all times; and the drill's check-to-signal
+  interval has one branch it cannot observe.
+  WHAT FOLLOWS: the remainder of 676 keeps its number and its rank and begins after this point —
+  bounded dispatch, the checkpoint barrier, the two-phase boundary, successor reconciliation
+  beyond the slice claimed here, crash-recoverable landing, board projection, metrics, staged
+  failure trials and the measured baseline trial. It must not codify an answer about transferring
+  a live Agent-tool child that contradicts the one the landed point 716 carries.
+  FINAL STATE: the parent-death drill and the escape drill run on main, the drill's takeover is
+  the real one, and the lane may be switched on.
+  VERIFIABLE: the parent-session-death drill end to end; the escape drill's measurement; the
+  interlock proven by turning the flag on only after 895 is green; `npm run test:unit`, lint,
+  build; the cross-vendor review of this file set recorded green before the merge.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
+  Bundle: unbundled (batch autonomy).
+
+- [x] 907. An interpreter fed from a here-document or a pipe hides its writes from the main-write
+  fence. MEASURED 25.08.2026 on `feat/879-help-and-git-write-fence` at `d853edbb`, against the live
+  module: `isMutatingSegment('bash <<EOF\ngit push\nEOF')` is `false`, and so is
+  `isMutatingSegment("echo 'git push' | bash")`. Point 879 was right to stop lexing here-document
+  BODIES as commands — that over-block cost real turns on quoted board and chat text, and its own
+  header at `command-classify-core.mjs:22` forbids it — but the same step opens the interpreter
+  case: any head that EXECUTES ITS STANDARD INPUT (`bash`, `sh`, `zsh`, `node -`, `python -`) turns
+  text the classifier deliberately skipped back into commands it never sees. The pipe half is older
+  than 879 and equally unblocked, so this is ONE gap with two mouths rather than a regression that
+  point introduced.
+  WHAT IT COSTS: `command-classify-core.mjs` answers "does this call write" for the lockless-main
+  fence, the board gate and the context fence at once, so a session holding no batch lock can move
+  `refs/heads/main` by handing the push to an interpreter instead of running it — the same class
+  point 879 closed for `--help` and the ref-moving git subcommands, reached by a different door.
+  FINAL STATE: a head whose stdin is executable code counts as a WRITE whenever it receives a
+  here-document or a pipe, on the same reasoning `MUTATING_SCRIPTS` already uses — what an
+  interpreter will do with input is not decidable from outside, so the fence takes the safe side.
+  A bare interpreter with no stdin attached, and one reading a NAMED script file, keep whatever
+  they classify as today; the change is about input the classifier cannot read.
+  VERIFIABLE: unit cases in both directions over the measured strings above — `bash <<EOF … git
+  push … EOF`, `echo 'git push' | bash`, `sh -c 'git status'`, a pipe into a non-interpreter such
+  as `git log | grep push`, and a here-document into `cat`, which must stay a read.
+  Criticality: high — a lockless session may move main.
+  Bundle: Session- & Repo-Hygiene.
