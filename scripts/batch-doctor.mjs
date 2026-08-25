@@ -56,9 +56,12 @@ import {
   DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
 import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
-import { CHECKOUT_ROOT, REPO_ROOT } from './repo-paths.mjs'
+import { COMMON_REPO_ROOT, REPO_ROOT } from './repo-paths.mjs'
 
-const REPO = REPO_ROOT || fileURLToPath(new URL('..', import.meta.url))
+// Batch authority state lives in the one checkout every linked worktree shares.
+const REPO = COMMON_REPO_ROOT() || fileURLToPath(new URL('..', import.meta.url))
+// The checkout this process was invoked from; evidence only, never authority.
+const CHECKOUT_ROOT = REPO_ROOT
 const LOG = join(REPO, '.claude', 'doctor.log')
 const repair = process.argv.includes('--repair')
 const gate = process.argv.includes('--gate')
