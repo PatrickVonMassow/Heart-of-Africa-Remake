@@ -21,9 +21,13 @@ import {
   baselineFor,
   bootstrapBase,
   buildUnavailableReceipt,
+  measurePointFilesWithoutCommission,
   parseUnavailableReceiptArgs,
   pointAuthorshipLogCommand,
   pointFilesCommand,
+  pointLandingLogCommand,
+  pointLaneCommitsCommand,
+  pointLaneRefsCommand,
   readWorkOrder,
   showAt,
 } from './criticality-review-guard.mjs'
@@ -112,6 +116,104 @@ describe('point file-set measurement', () => {
       '-z',
       'base..review',
     ])
+  })
+
+  it('measures a self-authored point from the merge that landed its named lane', () => {
+    const reviewed = 'c'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const calls = []
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: () => false,
+      run: (args) => {
+        calls.push(args)
+        if (args[0] === 'log') {
+          return `\x1e${landing}\x1f${'a'.repeat(40)} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'diff') return 'scripts/lease.mjs\0scripts/lease.test.mjs\0scripts/lease.mjs\0'
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(calls).toEqual([pointLandingLogCommand(), ['diff', '--name-only', '-z', `${landing}^1`, landing]])
+    expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
+  })
+
+  it('uses a landing merge to recover the lane base for an earlier branch review', () => {
+    const first = 'a'.repeat(40)
+    const reviewed = 'b'.repeat(40)
+    const landing = 'c'.repeat(40)
+    const side = 'd'.repeat(40)
+    const mainParent = 'e'.repeat(40)
+    const base = 'f'.repeat(40)
+    const calls = []
+    const files = measurePointFilesWithoutCommission(893, reviewed, {
+      isAncestor: (a, b) => (a === reviewed && b === side) || (a === first && b === reviewed),
+      run: (args) => {
+        calls.push(args)
+        if (args.includes('--merges')) {
+          return `\x1e${landing}\x1f${mainParent} ${side}\x1fMerge branch 'feat/893-attempt-lease-fencing'\n`
+        }
+        if (args[0] === 'rev-list') return `${first}\n${reviewed}\n${side}\n`
+        if (args[0] === 'rev-parse') return `${base}\n`
+        if (args[0] === 'log') return 'scripts/lease.mjs\0scripts/lease.test.mjs\0'
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(calls).toContainEqual(pointLaneCommitsCommand(side, `${landing}^1`))
+    expect(calls.at(-1)).toEqual(pointFilesCommand(base, reviewed))
+    expect(files).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
+  })
+
+  it('falls back to the parent of the first retained lane commit before landing', () => {
+    const first = 'a'.repeat(40)
+    const reviewed = 'b'.repeat(40)
+    const tip = 'c'.repeat(40)
+    const base = 'd'.repeat(40)
+    const ref = 'refs/heads/feat/903-measurable-point-file-set'
+    const calls = []
+    const files = measurePointFilesWithoutCommission(903, reviewed, {
+      isAncestor: (a, b) => (a === reviewed && b === tip) || (a === first && b === reviewed),
+      run: (args) => {
+        calls.push(args)
+        if (args.includes('--merges')) return ''
+        if (args[0] === 'for-each-ref') return `${ref}\t${tip}\n`
+        if (args[0] === 'rev-list') return `${first}\n${reviewed}\n${tip}\n`
+        if (args[0] === 'rev-parse') return `${base}\n`
+        if (args[0] === 'log') return 'scripts/guard.mjs\0scripts/guard.test.mjs\0'
+        throw new Error(`unexpected command: ${args.join(' ')}`)
+      },
+    })
+
+    expect(pointLaneRefsCommand(903)).toContain('refs/heads/feat/903-*')
+    expect(pointLaneCommitsCommand(ref)).toEqual(['rev-list', '--first-parent', '--reverse', ref, '--not', 'main'])
+    expect(calls.at(-1)).toEqual(pointFilesCommand(base, reviewed))
+    expect(files).toEqual(['scripts/guard.mjs', 'scripts/guard.test.mjs'])
+  })
+
+  it('attaches a Git fallback file set when no commission row exists', () => {
+    const review = {
+      point: 893,
+      sha: 'b'.repeat(40),
+      verdict: 'merge',
+      pointFiles: ['forged.mjs'],
+      reachable: true,
+    }
+    const calls = []
+    const rows = attachPointFileSets(
+      [review],
+      () => {
+        throw new Error('commission measurement must not run')
+      },
+      (point, sha) => {
+        calls.push([point, sha])
+        return ['scripts/lease.mjs', 'scripts/lease.test.mjs']
+      },
+    )
+
+    expect(calls).toEqual([[893, review.sha]])
+    expect(rows[0].pointFiles).toEqual(['scripts/lease.mjs', 'scripts/lease.test.mjs'])
   })
 
   it('includes only first-parent work plus cc-only merge resolutions in unavailable measurement', () => {

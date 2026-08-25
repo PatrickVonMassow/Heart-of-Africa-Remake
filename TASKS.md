@@ -12044,3 +12044,88 @@ to land than a mechanism that needs a review.
   that fails when only one budget excludes the comment.
   Criticality: low — one fuse dated at point 1000, one half-covered assertion.
   Bundle: Chat & Tafel.
+
+- [ ] 902. A stated recommendation on a board card is a decision I may carry out. MEASURED
+  24.08.2026: the rule corpus a session loads says the opposite by omission. The memory
+  `no-standstill-decide-and-record` licenses deciding by own judgment only where NO card is
+  pending; `dashboard-vdzk-only-decisions` makes every decision request a card and says nothing
+  about who may close one; `CLAUDE.md` §6 says "unless durably authorized" without naming this
+  authorization. Result: the Zeiterfassung card, whose recommendation was already stated, waited
+  for a yes that only restated it, and its point 559 is still open.
+  USER RULING 24.08.2026, on the card "Zeiterfassung in der Arbeitsordnung: abschaffen oder
+  wiederbeleben?", quoting their own earlier answer "Mach es so, wie du es empfohlen hast": "Ja,
+  das sollst du künftig dürfen."
+  FINAL STATE: the standing authorization stands where a session reads it, with its scope drawn.
+  IN SCOPE: a "Von dir zu klären" card on which I have STATED a recommendation may be decided BY
+  that recommendation, carried out, and closed with the decision recorded — what, why, and what a
+  veto would change — the shape rung 3 of `no-standstill-decide-and-record` already prescribes for
+  doubt without a card. OUT OF SCOPE and unchanged: outward-facing or irreversible steps (tags,
+  publishes, force-pushes, deletions of user data) keep their own confirmation per the memories
+  `tags-only-on-request` and `version-release-process`; a card posing a genuine choice I did NOT
+  recommend on stays the user's.
+  (a) `CLAUDE.md` §6 carries ONE sentence naming this authorization at the existing "unless durably
+  authorized" clause of the "Act on settled judgment" bullet, naming scope AND boundary in the same
+  breath so no reading of it reaches a tag, a publish or a deletion.
+  (b) `docs/rule-corpus-audit.md` records the ruling dated 24.08.2026 with the user's wording, in
+  the row style the file uses for decided entries.
+  (c) The memory entry `recommendation-is-a-decision` is verified against the corpus after (a) and
+  (b) and linked from `no-standstill-decide-and-record`; write it if it is absent, with its
+  `MEMORY.md` index line.
+  VERIFIABLE: a repository search finds the authorization sentence in `CLAUDE.md` §6 and the dated
+  row in `docs/rule-corpus-audit.md`; the doc-budget guard and `npm run test:unit` stay green; and
+  the boundary clause stands in the same sentence as the grant.
+  Criticality: low — process hygiene, but it is what keeps a decided card from idling.
+  Bundle: Chat & Tafel.
+
+- [ ] 904. Three findings the whole-range review found in the landed attempt lease. MEASURED
+  25.08.2026 by the cross-vendor whole-range review of `cfcf276` (GPT-5.6 Sol, recorded
+  `do-not-merge`, receipt `ef56a7ed1736542f`), which read the complete lease core, all 772 test
+  lines and the regenerated command index. The earlier rounds judged the same two source files and
+  cleared them; this round read them as one landed artefact and found three things they missed.
+  (1) BLOCKING — `scripts/batch-attempt-lease-core.mjs` has no attempt-lease RELEASE at all.
+  `grantAttemptLease` is followed straight by `leaseAllowsWrite`, and `releaseWorktree` only drops a
+  worktree claim: it never checks the standing lease id or the holder's process identity. Normal
+  completion therefore cannot hand a lease back through this core — it can only be outlived. The
+  test file contains no release case either, which is why thirteen rounds did not see it.
+  (2) BLOCKING ON WINDOWS — `worktreeClaimKey`, at `let key = normalize(worktree)`, uses
+  `node:path.normalize`, which is platform-native, while the function itself demands `/`-prefixed
+  paths. On Windows `/wt/a` becomes `\wt\a`, and the very next `readClaims` rejects the key the
+  function just generated as non-absolute; a native `C:\…` path is rejected outright. Every case
+  covers POSIX paths only. The user's own machine is Windows, so this is not a hypothetical target.
+  (3) `grantAttemptLease` snapshots `deathVerdict` without validating its shape, then interpolates
+  `deathVerdict.pid` into the refusal reason. A malformed pid whose string conversion throws turns
+  the fail-closed refusal path into a throw. The cases cover booleans and numeric mismatches, not
+  malformed field values — the same class the point's own rounds closed everywhere else.
+  FINAL STATE: the core carries a release operation that verifies the standing lease id and the
+  holder's identity before it releases, and refuses otherwise; the claim key is normalised with the
+  POSIX rules the function documents, on every platform; and every refusal path stays a refusal when
+  the value it names cannot be converted.
+  VERIFIABLE: unit cases — a release by the standing holder succeeds and a release under a stale
+  lease id or a foreign identity is refused; a Windows-shaped path and a `C:\…` path both produce a
+  usable key that `readClaims` accepts; and a death verdict whose pid throws on conversion yields
+  the refusal, not an exception.
+  Criticality: high — it is the lease that keeps two writers apart, and a lease nobody can hand back
+  is one that only expiry ends.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 905. The Git-only point-file fallback re-lists every merge on main once per review row.
+  MEASURED 25.08.2026 on `main` at `6715d078`, by the cross-vendor review of point 903.
+  `scripts/criticality-review-guard.mjs:measurePointFilesWithoutCommission` runs the full
+  `git log --first-parent --merges --reverse HEAD` — 354 merges on main today — and, on a miss, the
+  `for-each-ref` lane listing as well, ONCE PER uncommissioned review row, because
+  `attachPointFileSets` calls it per row with no shared state. The criticality gate's Stop-hook run
+  went from 0.22 s to 0.65 s with the two HIGH points ticked at that HEAD (~22 rows), and the same
+  routine over all 829 uncommissioned ledger rows costs 16.2 s — roughly 20 ms per invocation,
+  dominated by re-reading the merge list. The cost is (ticked HIGH points × their review rows) ×
+  main's merge count, and the merge count only grows; a stretch where the gate blocks several
+  self-authored HIGH points at once pays it on EVERY turn end. This is not a correctness defect: the
+  measurement point 903 introduced is right, and the blocking condition it was written for is
+  genuinely fixed.
+  FINAL STATE: the landing listing and the lane-ref listing are read ONCE per assessment and passed
+  into the per-row measurement, so the guard's cost stops scaling with the number of review rows.
+  VERIFIABLE: unit cases over the wrapper — measuring several rows of the same point issues the
+  landing listing once, not once per row, and the file sets measured are identical to those the
+  per-row route produced; the guard's `--status` on a repository with the ledger's uncommissioned
+  rows stays under the runtime it had before the listing was hoisted.
+  Criticality: low — it costs time on every turn end, it loses nothing.
+  Bundle: Modell & Wächter.

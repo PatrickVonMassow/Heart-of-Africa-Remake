@@ -51,6 +51,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 20.08. | Der Dokumentschnitt strich Regeln als »von einem Wächter abgedeckt«, ohne einen einzigen Wächter darauf zu prüfen — die Kontextanzeige verschwand, der Nutzer fand es (§3.134); eine vom Nutzer gesetzte Rangfolge wurde in einer Nacht zweimal maschinell überholt, ohne dass irgendwo ein Grund stand (Punkt 614); zwei Werkzeuge derselben Bauart am falschen Ort gemessen — im Hauptbaum gebaut und geprüft, während der Prozess die Arbeit in den isolierten Bereich schickt (§3.137) |
 | 21.08. | Ein Tor verlangte eine Freigabe, die seine eigenen Werkzeuge nicht herstellen können — der HIGH-Punkt war gemergt, geprüft und freigegeben, und der Zugausgang wies ihn trotzdem ab (§3.153) |
 | 24.08. | Ein Rot, das die Wiederholung heilt: eine Netzprobe im Testfall überlebt dessen Timeout — deterministisch rot nach jedem Push, grün beim zweiten Lauf (§3.171); zehn Prüfrunden mit zehn echten Befunden neben einem Punkt bei Runde 27 ohne Konvergenz — die Rundenzahl sagt nichts, die Bewegung des Urteils alles (§3.172) |
+| 25.08. nachts | Dieselbe Tür, zweiter Rückfall: Das Kritikalitätstor kann den Dateisatz eines selbst verfassten Punktes nicht messen, weil sein Anker nur beim delegierten Autorenlauf entsteht — ein gemergter, abgehakter und dreizehnmal geprüfter HIGH-Punkt sperrte jedes Zugende, bis eine überflüssige Ganzbereichsrunde ihn räumte (§3.153, Punkt 903) |
 | 24.08. mittags | Zwei Batch-Sitzungen arbeiteten fünf Minuten am selben Punkt: zwei CI-Übergaben für verschiedene Refs starteten beide, die zweite nahm die Sperre mit einem Zaunwert weit unter dem Stand, und die unterlegene erfuhr es nur durch eine beiläufige Wächter-Vorschau (§3.173, Punkt 897); dieselbe Sitzung fand, dass ein unbekanntes Flag an der Gegenlese-Kommandozeile stillschweigend geschluckt wird und trotzdem eine bezahlte Runde startet (Punkt 896) |
 | 23.08. | Zwei Mechanismen standen, ihre Eingaben fehlten: Die Board-Aktualität greift nur am Turn-Ende und war während der längsten Sitzung der Nacht blind — 15 Prüfrunden liefen unsichtbar hinter einer 2,5 h alten Karte (§3.163, Punkt 848); und die §6-Eskalationsschwelle zählte 0 statt 14 erfolgloser Runden, weil kein erzwungener Pfad die Verdicts ins Ledger schrieb — die Eskalation nach Fable zündete erst, als eine Nachfolge-Sitzung die Logs von Hand nachtrug (§3.163) |
 | 23.08. früh | Der Parallel-Alarm feuerte auf jedem Zug auf den Vorgänger, der gerade übergeben hatte — das Feld `retired` stand im selben Datensatz, den die Sonde las, und jeder Fehlalarm kostete drei Minuten Torlauf ohne Urteil (§3.164) |
@@ -1332,7 +1333,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 24.08.2026, 23:46 · Quellen-Fingerprint: `5088348fe2b9…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 03:17 · Quellen-Fingerprint: `b36ec74d953f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1370,7 +1371,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 21 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 22 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1432,8 +1433,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 98 Prozess-/Meta-TASKS-Punkte (davon 39 offen).
 
-<!-- RETRO-FINGERPRINT: 5088348fe2b9d8c212e66f8d6b86665b7d5479d647c838bd31afa1a38f108155 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-24T21:46:08.115Z -->
+<!-- RETRO-FINGERPRINT: b36ec74d953fa4b6f88e1fa5010e3f2e9afa836c7ca2b2968b20197b2d308b7e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T01:17:31.782Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -2632,6 +2633,18 @@ kleinsten; der einzige verlässliche Umgang ist, das Eigeninteresse dem zweiten 
 und sein Nein zu nehmen. Drittens: Vier-Augen über einen Bereich, an dem beide Anbieter geschrieben
 haben, braucht eine ausdrücklich benannte Form — sonst entsteht eine Bedingung, die nur deshalb
 unerfüllbar ist, weil niemand sie je gegen diesen Fall gedacht hat.
+
+**Rückfall am 25.08.2026, durch eine andere Tür.** Dieselbe Klasse, dieselbe Stelle, ein neuer
+Grund: Das Kritikalitätstor misst inzwischen, ob die Freigabe wirklich jede geänderte Datei gelesen
+hat — und leitet den Dateisatz eines Punktes aus der Beauftragungszeile ab, die eine delegierte
+Autorenspur ins Prüfverzeichnis schreibt. Verfasst die dienende Sitzung den Punkt selbst, gibt es
+diese Zeile nicht. Der Dateisatz bleibt dann unmessbar, keine Freigabe kann ihn abdecken, und weil
+die Grundlinie erst vorrückt, wenn das Tor frei ist, blockiert ein einziger solcher Punkt jedes
+weitere Zugende — nicht nur seine eigene Landung. Gefunden an Punkt 893, der gemergt, abgehakt und
+über dreizehn Runden bis `merge` geprüft war; geräumt hat ihn nur eine frische Ganzbereichsrunde,
+die niemand gebraucht hätte. Die Lehre von damals steht unverändert und wurde ein zweites Mal
+verletzt: Ein Tor ist gegen die Formen zu prüfen, die im Betrieb tatsächlich entstehen — und dazu
+gehört der Punkt, den die Sitzung selbst schreibt, ebenso wie der delegierte. Gebucht als Punkt 903.
 
 ### 3.120 Der Statussatz wurde angehängt, nicht aus dem gemessenen Zustand abgeleitet
 

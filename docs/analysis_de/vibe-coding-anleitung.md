@@ -221,10 +221,10 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Satz, oder weiter, und sperrt Unbeteiligte.
   → *Prompt:* „Leg Satz und Code periodisch **nebeneinander**, zieh **den Code auf den Satz**."
 
-- **Die Verweigerung nennt eine Abhilfe, die den Schaden erst anrichtet.** Wer ihr folgt, steht
-  schlechter da als vorher.
-  → *Prompt:* „Prüf jede Verweigerung an dem Ort, an dem sie feuern kann: **Führt ihre eigene
-  Abhilfe dort zum guten Zustand?**"
+- **Die Verweigerung nennt eine Abhilfe, die schadet — oder nie eintritt.** Wer ihr folgt, steht
+  schlechter da oder wartet vergeblich.
+  → *Prompt:* „Prüf jede Verweigerung dort, wo sie feuert: **Führt ihre Abhilfe zum Guten — und
+  kann sie eintreten?**"
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht gefährlich.
   → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
@@ -383,9 +383,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
 - **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
-  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt.
+  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt. Ein Tor kann
+  aber auch zu Recht sperren und trotzdem unlösbar sein: liest es seinen Nachweis nur auf **einem**
+  von mehreren erlaubten Arbeitswegen ab, kommt der andere Weg nie durch, egal wie gründlich er war.
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
-  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
+  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Und bevor ein Tor
+  scharf geht: **zähl alle Wege auf, auf denen die geprüfte Arbeit entstehen darf**, und weise für
+  jeden nach, dass sein Nachweis wirklich entsteht."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
   Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
@@ -455,4 +459,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 5088348fe2b9d8c212e66f8d6b86665b7d5479d647c838bd31afa1a38f108155 -->
+<!-- GUIDE-FINGERPRINT: b36ec74d953fa4b6f88e1fa5010e3f2e9afa836c7ca2b2968b20197b2d308b7e -->

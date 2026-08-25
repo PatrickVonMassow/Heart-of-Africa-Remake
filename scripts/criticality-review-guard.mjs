@@ -111,14 +111,107 @@ export const pointFilesCommand = (commissionSha, reviewSha) => [
   `${commissionSha}..${reviewSha}`,
 ]
 
+/** Named point landings on main, oldest first so a later rework cannot claim an
+ * older review from the same point. */
+export const pointLandingLogCommand = () => [
+  'log',
+  '--first-parent',
+  '--merges',
+  '--reverse',
+  '--format=%x1e%H%x1f%P%x1f%s',
+  'HEAD',
+]
+
+/** Live local/remote lane refs are the second Git-owned route before landing. */
+export const pointLaneRefsCommand = (point) => [
+  'for-each-ref',
+  '--format=%(refname)%09%(objectname)',
+  `refs/heads/feat/${Number(point)}-*`,
+  `refs/remotes/origin/feat/${Number(point)}-*`,
+]
+
+/** Commits authored on a lane, excluding everything already on main. */
+export const pointLaneCommitsCommand = (ref, exclude = TICK_BRANCH) => [
+  'rev-list',
+  '--first-parent',
+  '--reverse',
+  String(ref),
+  '--not',
+  String(exclude),
+]
+
+const uniqueFiles = (raw) => [...new Set(String(raw).split('\0').filter(Boolean))]
+
+const ancestorOrEqual = (a, b, isAncestor) => Boolean(a && b && (a === b || isAncestor(a, b)))
+
+/**
+ * Measure a point that has no authoring-commission row from Git alone.
+ *
+ * A named landing merge is the strongest fallback: its first-parent tree diff
+ * is exactly what the point brought to main, including merge resolutions. If
+ * the point has not landed yet, a retained feat/<point>-… ref proves the lane;
+ * the parent of that lane's first commit is the range base, so the first commit
+ * itself is not accidentally omitted.
+ */
+export function measurePointFilesWithoutCommission(
+  point,
+  reviewSha,
+  { run = gitRawFile, isAncestor = gitIsStrictAncestor } = {},
+) {
+  const number = Number(point)
+  const reviewed = String(reviewSha ?? '').trim()
+  if (!Number.isInteger(number) || number <= 0 || !reviewed) throw new Error('point and reviewed commit are required')
+
+  const mergePattern = new RegExp(`^Merge branch '(?:origin/)?feat/${number}-`)
+  const landings = String(run(pointLandingLogCommand()))
+    .split('\x1e')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [sha = '', parents = '', subject = ''] = entry.split('\x1f')
+      return { sha, parents: parents.trim().split(/\s+/).filter(Boolean), subject }
+    })
+  for (const landing of landings) {
+    if (!mergePattern.test(landing.subject) || landing.parents.length < 2) continue
+    if (reviewed !== landing.sha && !ancestorOrEqual(reviewed, landing.parents[1], isAncestor)) continue
+    if (reviewed === landing.sha) {
+      return uniqueFiles(run(['diff', '--name-only', '-z', `${landing.sha}^1`, landing.sha]))
+    }
+    const first = String(run(pointLaneCommitsCommand(landing.parents[1], `${landing.sha}^1`)))
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)[0]
+    if (!first || !ancestorOrEqual(first, reviewed, isAncestor)) continue
+    const base = String(run(['rev-parse', '--verify', `${first}^`])).trim()
+    if (!base) continue
+    return uniqueFiles(run(pointFilesCommand(base, reviewed)))
+  }
+
+  const refs = String(run(pointLaneRefsCommand(number)))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split('\t'))
+  for (const [ref, tip] of refs) {
+    if (!ref || !tip || !ancestorOrEqual(reviewed, tip, isAncestor)) continue
+    const first = String(run(pointLaneCommitsCommand(ref))).trim().split(/\s+/).filter(Boolean)[0]
+    if (!first || !ancestorOrEqual(first, reviewed, isAncestor)) continue
+    const base = String(run(['rev-parse', '--verify', `${first}^`])).trim()
+    if (!base) continue
+    return uniqueFiles(run(pointFilesCommand(base, reviewed)))
+  }
+  throw new Error(`Git has no landing merge or feat/${number}-… lane for the reviewed commit`)
+}
+
 /**
  * Replace any ledger-supplied `pointFiles` with Git's measurement. Each review
- * is anchored at the latest authoring commission for its point that it contains.
- * A missing/failed measurement stays absent, which the pure core reads as
- * unknown coverage and refuses for pass compositions.
+ * prefers the latest authoring commission for its point that it contains, then
+ * falls back to a named landing merge or retained point lane. A failed
+ * measurement stays absent, which the pure core reads as unknown coverage and
+ * refuses for pass compositions.
  */
 export function attachPointFileSets(records = [], measure = (base, sha) =>
-  gitRawFile(pointFilesCommand(base, sha)).split('\0').filter(Boolean)) {
+  uniqueFiles(gitRawFile(pointFilesCommand(base, sha))), fallbackMeasure = measurePointFilesWithoutCommission) {
   const rows = records ?? []
   for (const row of rows) delete row.pointFiles
   const commissions = rows.filter((row) => row?.kind === AUTHORING_COMMISSION_KIND && row.reachable !== false)
@@ -129,13 +222,22 @@ export function attachPointFileSets(records = [], measure = (base, sha) =>
         Number(commission.point) === Number(row.point) &&
         (commission.sha === row.sha || (row.descendsFrom ?? []).includes(commission.sha)),
     )
-    if (!bases.length) continue
-    const commission = bases.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
-    try {
-      const files = measure(commission.sha, row.sha)
-      if (Array.isArray(files)) row.pointFiles = [...new Set(files.map(String).filter(Boolean))]
-    } catch {
-      /* unknown coverage is intentionally represented by absence */
+    if (bases.length) {
+      const commission = bases.reduce((a, b) => (Number(b.at ?? 0) >= Number(a.at ?? 0) ? b : a))
+      try {
+        const files = measure(commission.sha, row.sha)
+        if (Array.isArray(files)) row.pointFiles = [...new Set(files.map(String).filter(Boolean))]
+      } catch {
+        /* try the Git-only routes below */
+      }
+    }
+    if (!Array.isArray(row.pointFiles)) {
+      try {
+        const files = fallbackMeasure(row.point, row.sha)
+        if (Array.isArray(files)) row.pointFiles = [...new Set(files.map(String).filter(Boolean))]
+      } catch {
+        /* unknown coverage is intentionally represented by absence */
+      }
     }
   }
   return rows

@@ -672,18 +672,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "892": {
-      "at": "2026-08-24T12:37:18.057Z",
-      "why": "Seam of point 834, which the user ordered to the front on 22.08.2026 after a second authoring lane died with its session; the cut into seven points is his rule of 24.08.2026, not a machine filing.",
-      "origin": "user",
-      "place": "ahead"
-    },
-    "893": {
-      "at": "2026-08-24T12:37:18.131Z",
-      "why": "Seam of point 834, which the user ordered to the front on 22.08.2026 after a second authoring lane died with its session; the cut into seven points is his rule of 24.08.2026, not a machine filing.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "894": {
       "at": "2026-08-24T12:37:18.205Z",
       "why": "Seam of point 834, which the user ordered to the front on 22.08.2026 after a second authoring lane died with its session; the cut into seven points is his rule of 24.08.2026, not a machine filing.",
@@ -699,6 +687,24 @@
     "898": {
       "at": "2026-08-24T14:37:17.169Z",
       "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
+      "origin": "machine",
+      "place": "last"
+    },
+    "902": {
+      "at": "2026-08-25T00:02:37.526Z",
+      "why": "Prozesshygiene mit niedriger Kritikalität: der Eintrag ändert nur Regeltext und einen Auditeintrag, blockiert nichts und hat keinen Vorläufer, der ihn nach vorn zieht",
+      "origin": "machine",
+      "place": "last"
+    },
+    "904": {
+      "at": "2026-08-25T00:23:39.794Z",
+      "why": "Letzter Platz ist richtig: die drei Befunde liegen in bereits gelandetem Code, blockieren keine offene Spur und keinen Release-Schritt",
+      "origin": "machine",
+      "place": "last"
+    },
+    "905": {
+      "at": "2026-08-25T01:13:13.978Z",
+      "why": "Reine Effizienzbereinigung ohne Korrektheitsverlust; sie kann erst nach 903 gearbeitet werden, dessen Code sie ändert — hinten ist der richtige Platz",
       "origin": "machine",
       "place": "last"
     }
@@ -748,7 +754,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T21:54:35.947Z",
+    "at": "2026-08-25T01:20:33.741Z",
     "points": [
       174,
       184,
@@ -1025,14 +1031,16 @@
       886,
       887,
       888,
-      892,
-      893,
       894,
       895,
       896,
       898,
       899,
-      900
+      900,
+      901,
+      902,
+      904,
+      905
     ]
   }
 }
