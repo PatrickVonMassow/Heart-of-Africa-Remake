@@ -1351,7 +1351,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 19:54 · Quellen-Fingerprint: `55d434472fe1…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 20:47 · Quellen-Fingerprint: `09369b5dd2b1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1452,8 +1452,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
 
-<!-- RETRO-FINGERPRINT: 55d434472fe1e7806385bfe6aa1d83ea9ebcca790263c5408d53d5afe0296f15 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T17:54:38.004Z -->
+<!-- RETRO-FINGERPRINT: 09369b5dd2b12ace47fa332cc8eff105b80c4a138c2a42953f262cfda4c64215 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T18:47:33.169Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3584,3 +3584,45 @@ Zustandswechsel braucht es eine Anweisung, die ihn wirklich ausspricht.** Im Zwe
 der Default (der Batch läuft), und die offene Frage wird als Karte gestellt statt als
 Anweisung erfunden. Festgehalten als Memory `no-invented-user-instructions`; die Pause
 wurde im selben Zug aufgehoben und der Batch fortgesetzt.
+
+### 3.181 Ein falsches Urteil in der Übergabe kapert die ganze nächste Sitzung
+
+Am 25.08.2026 startete eine frische Sitzung mit einem Auftrag, der keinen Widerspruch
+duldete: Der CI-Terminal-Handoff nannte einen Lauf auf `main` als „concluded RED" und
+erklärte die neue Sitzung zum Reparaturpfad — erst den Fehlschlag untersuchen, reparieren,
+Gates fahren, den heilenden Commit pushen, und *dann* erst einen Punkt aufnehmen. Der Lauf
+war abgebrochen, nicht fehlgeschlagen: Der nächste Push auf `main` folgte zwei Minuten
+später, und `cancel-in-progress` stoppte den älteren. Sein Geschwister-Job war schon grün.
+Es gab keinen Defekt und es gab keinen möglichen heilenden Push, denn die sha war nicht
+mehr die Spitze.
+
+Der Mechanismus dahinter ist sauber gebaut und trotzdem zu kurz: Die Verwerfungsregel für
+abgebrochene Läufe verwirft einen Abbruch nur, wenn ein *anderer* Lauf desselben Workflows
+auf *derselben* sha zu Ende kam. Genau das kann eine sha, an der der Ref weitergezogen ist,
+nie bekommen. Die Regel trifft also präzise den Fall, für den sie geschrieben wurde (zwei
+Läufe auf einer sha), und verfehlt den benachbarten (zwei shas auf einem Ref) — und der
+zweite ist der Landerhythmus des Batches: Merge-Commit, Abhak-Commit, Board-Commit.
+
+Was diese Klasse von einem gewöhnlichen Fehlalarm unterscheidet, ist der **Transport**. Ein
+Fehlalarm innerhalb eines Zuges kostet einen Torlauf; ein falsches Urteil in der Übergabe
+wird zur *Geburtsurkunde* der nächsten Sitzung. Sie erbt es als Auftrag, nicht als
+Beobachtung, und sie kann die Prämisse nicht billig prüfen, weil der Vorgänger weg ist und
+nur seine Behauptung dasteht. Die naheliegende, gehorsame Reaktion — „einen Reparatur-Commit
+bauen" — hätte hier Code verändert, an dem nichts falsch war.
+
+Zwei Lehren. Erstens: **Ein Urteil, das eine Sitzungsgrenze überquert, muss seine Belege
+mitnehmen, nicht nur sein Ergebnis.** „RED" ist kein Beleg; `conclusion=cancelled`,
+`workflow`, `sha` und ob die sha noch die Spitze ihres Refs ist, sind welche — der
+Nachfolger muss die Behauptung nachrechnen können, ohne den Vorgänger zu haben. Zweitens,
+und das ist die eigentliche Gefahr: Ein Handoff, der oft genug grundlos „rot" ruft, wird
+irgendwann überlesen — und dann ist genau der Kanal taub, der gebaut wurde, damit ein echtes
+Rot nie wieder unbemerkt bleibt. Gebucht als Punkt 919.
+
+Ein Nachspiel desselben Abends gehört dazu, weil es dieselbe Wurzel hat und sofort zubiss:
+Der Fund wurde als Punkt abgelegt, seine Nummer aus dem *Ende* des Arbeitsauftrags
+abgeleitet — dort stand 917 — und damit doppelt vergeben, denn 918 stand längst weiter oben.
+Der Arbeitsauftrag ist nicht nach Nummern sortiert, und die freie Nummer ist das Maximum
+über die Datei *und* das Archiv. Das Pre-Push-Tor fing es ab und machte drei Suiten rot; die
+Reparatur kostete eine Umnummerierung und eine überschriebene Board-Karte. Für das *Ende*
+eines Punktes gibt es Befehle, für seinen *Anfang* keinen — und wo kein Befehl steht, steht
+Handarbeit gegen eine 12 000-Zeilen-Datei. Gebucht als Punkt 920.

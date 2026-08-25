@@ -177,7 +177,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
   das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor urteilt richtig,
-  nur fährt es kein Weg, den das Projekt wirklich geht.
+  nur fährt es kein Weg des Projekts.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
   **vergleiche Ausgeführtes mit dem Repository.** Nenn zu jedem Tor, auf das du dich berufst, den
   **Weg, der es fährt** — und wann es dort zuletzt rot war."
@@ -205,19 +205,19 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
-  statt deinen Code und stimmen nur dort, wo sie zufällig liefen; von Hand nachgeprüft bestätigt
-  sich der Fehler selbst, denn dein Aufruf erbt dasselbe Verzeichnis.
+  statt deinen Code; von Hand nachgeprüft bestätigt sich der Fehler selbst, denn dein Aufruf erbt
+  dasselbe Verzeichnis.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
   wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
   und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
 
-- **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
+- **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
   miss auf einer ruhigen Maschine."
 
 - **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich" heißt nicht
   „angekommen" — und „gescheitert" nicht „nicht angekommen": ein fehlgeschlagener Push nennt
-  Arbeit „nur lokal", die längst drüben liegt, und schickt dich Verlorenes suchen.
+  Arbeit „nur lokal", die längst drüben liegt.
   → *Prompt:* „Beleg nach jeder Fernwirkung den **Zielzustand** statt des Versuchs, nenne im
   Fehlerfall die betroffenen Änderungen einzeln, und melde beim Start, was **lokal fertig, aber
   nirgends angekommen** ist."
@@ -331,10 +331,11 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir; **miss** erst, ob er trägt. Fehlt eine
   Fähigkeit, bitte **einmal um sie** — nie um ihre Ausführung."
 
-- **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
-  Ausfälle deinem Code zu.
+- **Nicht jedes Rot ist deins — und manches war nie eines.** Eine Prüfung, die nur „rot" und
+  „grün" kennt, schiebt Fremdes dir zu; ein *geerbtes* Rot kann ein Abbruch auf altem Stand sein.
   → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — lief überhaupt ein eigener
-  Schritt? Liegt sie außerhalb, nenn den **echten Griff** dort."
+  Schritt? Liegt sie außerhalb, nenn den **echten Griff**. Was du nicht selbst gemessen hast, ist
+  eine **Behauptung** — nachmessen, nicht reparieren."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er sitzt,
   verliert die nächste Reparatur mit — und ein abgebrochener Lauf räumt nicht weg, was er
@@ -390,15 +391,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
 - **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
-  selbst sperrt. Ein Tor kann auch zu Recht sperren und unlösbar sein: wenn es nur einen der
-  erlaubten Arbeitswege abliest, oder wenn seine Abhilfe außerhalb der Reichweite des Gesperrten
-  liegt — dann bleibt nur die Ausnahmegenehmigung.
+  selbst sperrt. Ein Tor kann zu Recht sperren und trotzdem unlösbar sein: es kennt nur einen der
+  erlaubten Wege, oder seine Abhilfe liegt außer Reichweite des Gesperrten.
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere es
   nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Bevor ein Tor scharf
   geht: **zähl alle Wege auf** und prüfe, dass seine Abhilfe **erreichbar** ist."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
-  statt der Testumgebung ableitet, schreibt Zweige um und bleibt grün.
+  statt der Testumgebung nimmt, schreibt Zweige um und bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
 - **Grün über einem Programm, das nicht startet.** Der Testlader ist milder als der echte.
@@ -467,4 +467,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 23a059a9dfebed941d14809eda927e12d649431f34e25d5751400b68b50124c2 -->
+<!-- GUIDE-FINGERPRINT: 09369b5dd2b12ace47fa332cc8eff105b80c4a138c2a42953f262cfda4c64215 -->
