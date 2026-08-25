@@ -279,6 +279,12 @@ put it is the mistake this line exists to stop.
   README merge.
   THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
   redo it — and open point 596 must not be pulled into this landing.
+  THE ABORT-AT-FIRST-FAILURE SENTENCE IS A RULE FOR AGENTS, NOT A MECHANISM (decided
+  25.08.2026 from the delegated author's escalation): the opening sentence says the expensive
+  browser suites abort at the FIRST failure during iteration, but the scope list (a)/(b)/(c)
+  does not carry it and no shared check helper spans the suites — each defines its own `check`,
+  so enforcing it would be a cross-suite build. It ships as ladder text. If it is ever wanted as
+  a mechanism, it needs its own point, because that is what it costs.
 
 - [ ] 598. The brief orients in the code, not only in the spec (point 572's measure 8).
   The delegation brief carries a GENERATED orientation: the paths the specification itself
@@ -313,6 +319,11 @@ put it is the mistake this line exists to stop.
   touched `scripts/point-brief.mjs` since the branch tip, and a brief generated today carries
   neither an orientation nor a planned-check section — so this deliverable is NOT superseded. The
   merge surface and the owed both-backend picture proof are described once, under point 595.
+  WHICH DIFF THE ORIENTATION READS IS NAMED HERE, because the TIMING correction left it open
+  and a different base yields a different check set (decided 25.08.2026): the fork point to
+  HEAD, plus uncommitted work — not the working tree alone and not the point's own commits.
+  The delegated author chose this base and documented it in the code; this line makes the
+  choice the spec's rather than the author's.
 
 - [ ] 844. The board never shows how risky a point is (user request 22.08.2026, 21:19: "Reihe ein
   neues Ticket nach 598 ein: Im Header jeder Dashboard-Karte soll auch die Kritikalität angezeigt

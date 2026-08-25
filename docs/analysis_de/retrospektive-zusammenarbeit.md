@@ -1351,7 +1351,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 17:45 · Quellen-Fingerprint: `a6976bf45d4c…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 18:14 · Quellen-Fingerprint: `7fde556f8349…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1451,8 +1451,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
 
-<!-- RETRO-FINGERPRINT: a6976bf45d4cdbb60e485470f0fd26e388f2acac0af46d4a501904ee350fc96d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T15:45:35.358Z -->
+<!-- RETRO-FINGERPRINT: 7fde556f834961b8ce0bd689ada107d35cac9612c2f0324dfb3ef629c9ce08a4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T16:14:24.800Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3473,6 +3473,21 @@ genug statt für falsch informiert.
 Prüffrage: *Kann meine Diagnose diesen Fehler überhaupt sehen — oder steht sie in derselben
 Annahme wie er?* Wo eine Prüfung grün meldet, obwohl der Haken ablehnt, ist die Prüfung verdächtig,
 nicht der Haken. Gebucht als Punkt 910.
+
+Am 25.08.2026 traf es dieselbe Klasse ein zweites Mal, obwohl die Memory dazu längst existierte —
+und sie half nicht, weil eine Zeile darin falsch war. Sie riet, mit einem blanken `cd` in den
+Hauptbaum zurückzugehen, behauptete aber, ein `cd` innerhalb einer `&&`-Kette halte ebenfalls.
+Gemessen hält es nicht: Die Sitzung fiel beim nächsten Aufruf in den Arbeitsbaum zurück. Wer der
+Zeile folgt, repariert genau einen Befehl und hält die Drift danach für behoben. Zweitens ist der
+Dashboard-Wächter nicht das einzige Opfer — `mechanism-review-guard` sucht seine Review-Grundlinie
+in derselben falschen Wurzel, findet keine und verweigert den Zug mit „the local review baseline is
+missing", dessen eigener Rat (`origin/main` hereinmergen) in dieser Lage nichts ausrichten kann,
+weil im Hauptbaum nichts fehlt. Zwei Haken, ein Wurzelverzeichnis, zwei Fehlermeldungen, die beide
+woanders hinzeigen.
+
+Das schärft die Lehre: **Eine Memory, die eine Falle beschreibt, schützt nur so weit, wie ihr
+letzter Satz gemessen ist.** Der beschreibende Teil war richtig und hat trotzdem nicht getragen,
+weil der handelnde Teil geraten war.
 
 ### 3.177 Die Regel gegen den Fehlalarm wurde zur Regel gegen den Befund
 
