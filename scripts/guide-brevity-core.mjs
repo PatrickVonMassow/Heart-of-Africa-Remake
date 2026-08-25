@@ -112,8 +112,16 @@
 // no extra entry. That paid back 6 lines and 60 words, and the ceilings move by exactly what is
 // left, with zero slack. No existing claim was dropped, and the long form stays in the
 // retrospective and the work order.
+// 25.08.2026: the mirror of the arrival lesson went in — a tool that reports a FAILED push
+// and calls its work "only local" while the content is already on the remote, measured on the
+// daemon control-plane branch (retrospective §3.174, point 906). SHORTEN-BEFORE-RAISE was
+// applied: drafted as its own entry at +8 lines / +84 words, it was instead FOLDED INTO the
+// existing "Erfolgreich heisst nicht angekommen" entry, whose two halves are one lesson about
+// judging the target state rather than the attempt; the merged entry names both directions and
+// its prompt carries both. That paid back 5 lines and 53 words, and the ceilings move by exactly
+// what is left, with zero slack. No existing claim was dropped.
 export const LIMITS = {
-  maxLines: 462,
+  maxLines: 465,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -261,7 +269,7 @@ export const LIMITS = {
   // retrospective already carries in full (§3.171, §3.172). The guide measures
   // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
   // ceiling stays 444 because the file does.
-  maxWords: 4100,
+  maxWords: 4131,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

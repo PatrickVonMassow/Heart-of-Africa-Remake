@@ -213,9 +213,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
   miss auf einer ruhigen Maschine."
 
-- **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist nicht passiert.
-  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand**, und melde beim Start,
-  was **lokal fertig, aber nirgends angekommen** ist."
+- **Der Bericht urteilt über den Versuch, nicht über die Wirkung.** „Erfolgreich" heißt nicht
+  „angekommen" — und „gescheitert" nicht „nicht angekommen": ein fehlgeschlagener Push nennt
+  Arbeit „nur lokal", die längst drüben liegt, und schickt dich Verlorenes suchen.
+  → *Prompt:* „Beleg nach jeder Fernwirkung den **Zielzustand** statt des Versuchs, nenne im
+  Fehlerfall die betroffenen Änderungen einzeln, und melde beim Start, was **lokal fertig, aber
+  nirgends angekommen** ist."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Eine Absicherung greift enger als ihr
   Satz, oder weiter, und sperrt Unbeteiligte.
@@ -459,4 +462,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: b36ec74d953fa4b6f88e1fa5010e3f2e9afa836c7ca2b2968b20197b2d308b7e -->
+<!-- GUIDE-FINGERPRINT: 13ebdef63faeef9505b18b8f879584fc4706604abcd2cda3050bcbc00b5482ee -->
