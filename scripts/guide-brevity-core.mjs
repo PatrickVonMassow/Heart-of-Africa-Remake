@@ -287,7 +287,12 @@ export const LIMITS = {
   // retrospective already carries in full (§3.171, §3.172). The guide measures
   // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
   // ceiling stays 444 because the file does.
-  maxWords: 4202,
+  // 25.08.2026: the stand-down pitfall went in — a check that may not touch a
+  // foreign tree still owes its measured state — and seven neighbouring entries
+  // paid for it by dropping clauses the retrospective carries in full (§3.179).
+  // The guide measures 470 / 4195 afterwards, so the word ceiling RATCHETS DOWN
+  // by seven more. The line ceiling stays 470 because the file does.
+  maxWords: 4195,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

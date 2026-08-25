@@ -149,8 +149,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Er prüfte einen Hilfswert, einen unerreichbaren Zustand — oder
-  das Bild entstand vor der fertigen Szene. Schlimmster Fall: Er *stellt her*, was die Handlung
-  bewirkt hätte, statt sie aufzurufen, und ist dadurch für immer grün.
+  er *stellt her*, was die Handlung bewirkt hätte, statt sie aufzurufen, und ist für immer grün.
   → *Prompt:* „Eine sichtbare Änderung ist erst fertig, wenn sie am **echten gerenderten Bild**
   unter einer erreichbaren Bedingung geprüft wurde. Zu jeder Prüfung: **Welche Zeile ruft die
   Sache auf — und was bliebe grün, wenn sie völlig kaputt wäre?** Vergehende Zeit darf ein Test
@@ -161,7 +160,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die im
   Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
-- **Angeblich behoben — und im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
+- **Angeblich behoben, im Präsens behauptet.** Der Fix gilt als fertig, das Symptom bleibt.
   → *Prompt:* „Fertig ist ein Fix, wenn das **Symptom am Ort des Symptoms** weg ist **und** der
   gleiche Versuch am **alten Stand** noch durchgeht. Was du im **Präsens** behauptest, sieh vorher
   nach. Zweimal festgebissen: wechsle das Modell."
@@ -170,16 +169,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   schlägt sie auch nicht mehr an, wenn sie sollte.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**." *(≈ 1,3x)*
 
-- **Runde um Runde, ohne näher zu kommen.** Das Gegenlesen findet jedes Mal etwas, nur schließt
-  sich der Abstand nie.
+- **Runde um Runde, ohne näher zu kommen.** Das Gegenlesen findet jedes Mal etwas, der Abstand
+  schließt sich nie.
   → *Prompt:* „Frag vor jeder Runde: **Hat sich etwas bewegt außer der Zählung?** Steht das Urteil,
   während der Umfang bleibt, ist der Gegenstand zu groß — **teile das Ticket und arbeite jedes
   Stück für sich ab**."
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
-  das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor ist richtig gebaut
-  und urteilt richtig — nur fährt es kein Weg, den das Projekt wirklich geht, und sein Rot sieht
-  wochenlang niemand.
+  das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor urteilt richtig,
+  nur fährt es kein Weg, den das Projekt wirklich geht.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
   **vergleiche Ausgeführtes mit dem Repository.** Nenn zu jedem Tor, auf das du dich berufst, den
   **Weg, der es fährt** — und wann es dort zuletzt rot war."
@@ -190,7 +188,7 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   **Ziel-Hardware**; was altern kann, erhebe neu."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Kontextgröße,
-  nicht an den Stunden: lange Sitzungen, Helfer, die ihren Auftrag erst *suchen*.
+  nicht an den Stunden.
   → *Prompt:* „Nenne mir die **gemessenen** Treiber, gib jedem Helfer einen Kurzbrief und fang je
   Aufgabe einen **frischen Kontext** an. Vor einem Deckel miss den **Startboden**."
 
@@ -399,35 +397,37 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Bevor ein Tor scharf
   geht: **zähl alle Wege auf** und prüfe, dass seine Abhilfe **erreichbar** ist."
 
-- **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
-  Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
+- **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem Quellort
+  statt der Testumgebung ableitet, schreibt Zweige um und bleibt grün.
   → *Prompt:* „Etabliere einen Mechanismus, der einen Prüflauf rot färbt, sobald er das Projekt verändert hat, in dem er läuft".
 
 - **Grün über einem Programm, das nicht startet.** Der Testlader ist milder als der echte.
-  → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen
-  Zeugen — der seine Sicherheit nicht von dem borgt, was er prüft."
+  → *Prompt:* „Laden Prüfstand und Betrieb **verschieden**, gib dem Betrieb einen eigenen Zeugen."
 
 - **Der Test vergleicht den Erzeuger mit sich selbst.** Trägt der Erzeuger den Fehler, trägt ihn
-  die Erwartung mit, und Grün heißt nur „nicht veraltet".
+  die Erwartung mit; Grün heißt nur „nicht veraltet".
   → *Prompt:* „Frag bei jedem Test über einem **erzeugten** Artefakt, **woher die Erwartung kommt**.
   Richtigkeit braucht eine Aussage, die der Erzeuger **nicht selbst herstellt**."
 
 - **Ein Auftrag, den du einer laufenden Sitzung nur zurufst, stirbt mit ihr.**
-  → *Prompt:* „Jeder Auftrag, der eine Sitzung überdauern soll, gehört in eine Datei, die dein
-  Werkzeug beim nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
+  → *Prompt:* „Was eine Sitzung überdauern soll, gehört in eine Datei, die dein Werkzeug beim
+  nächsten Start selbst liest. Ein Zuruf ist ein Hinweis, nie ein Auftrag."
 
 - **Die Ausnahme existiert nur in der Verweigerung.** Ein Mechanismus verspricht einen Sonderweg,
   baut aber weder Zustand noch Befehl dafür.
   → *Prompt:* „Baue jede zugesagte Ausnahme als eigenen Zustand und Befehl. Prüffrage: Kann der
   ehrlichste Wortlaut der Ausnahme meine eigene Prüfung bestehen?"
 
-- **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet irgendetwas dein Werkzeug
-  automatisch nach (Zeitplan, Wachhund, „mach weiter"-Automatik), kann eine zweite Sitzung neben
-  einer laufenden aufgehen — beide haben beim Start ehrlich gefragt, nur zu verschiedenen
-  Zeitpunkten. Wer einmal beim Betreten prüft, erfährt einen Besitzwechsel nie.
-  → *Prompt:* „Wenn zwei Läufe von dir gleichzeitig möglich sind, reicht eine Prüfung beim Start
-  nicht: Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist** statt
-  ihn zu überschreiben, und stell die Besitzfrage **vor jedem Schreibvorgang** neu."
+- **Zwei Helfer, ein Projekt — und der zweite merkt es nie.** Startet dein Werkzeug automatisch
+  nach, geht eine zweite Sitzung neben der laufenden auf — beide haben beim Start ehrlich gefragt.
+  → *Prompt:* „Nimm eine **Sperre mit laufender Nummer**, die einen kleineren Anspruch **abweist**,
+  und stell die Besitzfrage **vor jedem Schreibvorgang** neu — nicht nur beim Start."
+
+- **Der Wächter tritt zurück — und hört dabei auf zu messen.** Wer fremde Arbeit nicht anfassen
+  darf, antwortet auf die Frage nach dem Zustand nur noch mit dem Grund, nichts zu tun — und ist
+  im Normalbetrieb, wo die Sperre immer belegt ist, blind.
+  → *Prompt:* „Zurücktreten heißt **nicht handeln**, nie **nicht wissen**. Berichte den gemessenen
+  Zustand auch dann, wenn du nichts ändern darfst. Lesen kollidiert mit nichts."
 
 ---
 
@@ -467,4 +467,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 619cdc716415a2aff454c23ec41b93de24d624921812a3f30213e32c33731f81 -->
+<!-- GUIDE-FINGERPRINT: aed8689a1e8831e020713ff6408557f9672abc96dfd1a0740036299b615f8324 -->
