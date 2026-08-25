@@ -12044,3 +12044,28 @@ to land than a mechanism that needs a review.
   Criticality: med — no player-visible defect, but it spends whole sessions on phantom repairs and
   erodes the one signal that guarantees a red CI is noticed.
   Bundle: Modell & Wächter.
+
+- [ ] 920. Appending a work-order point is hand work, so it can take a number that is already
+  taken and turn `main` red. MEASURED 25.08.2026: a finding was filed as point 918 after reading
+  the tail of `TASKS.md`, where the highest visible number was 917. Point 918 already stood at
+  line 151. The push was refused by the pre-push fast gate with three red suites —
+  `tasks-archive-guard-core.test.mjs` ("duplicate-within-file: point(s) 918"),
+  `point-brief-core.test.mjs` ("918: brief does not carry the body") and the dashboard queue
+  render — and the repair cost a renumbering, a rebuilt queue card, and a restored board card
+  whose body a `board.mjs queue 918` call had overwritten in passing.
+  WHY IT RECURS: the number must be the maximum across BOTH `TASKS.md` and
+  `docs/tasks-archive.md`, and the work order is not sorted by number — reading its tail is the
+  obvious move and it is wrong. `scripts/` has `land-point.mjs` and `fold-point.mjs` for the
+  other end of a point's life and nothing at all for its start, so every append is done by hand
+  against a 12 000-line file.
+  FINAL STATE: one command opens a point — it derives the next free number from both files,
+  appends the block, and creates the queue card in the same step, so the number, the work order
+  and the board can no longer disagree. It refuses an append whose number is taken rather than
+  writing it, and it names the number it chose.
+  VERIFIABLE: Vitest over the pure part — the next number is the maximum over both files plus
+  one and skips no gap-filling; a fixture whose archive holds the highest number still yields a
+  free number; an explicit number that is already taken is refused with the file and line that
+  holds it; plus `npm run test:unit`, lint, build.
+  Criticality: med — no player-visible defect, but it puts a red gate in front of the routine
+  act of recording a finding, which is exactly where the batch must not be slowed.
+  Bundle: Session- & Repo-Hygiene.
