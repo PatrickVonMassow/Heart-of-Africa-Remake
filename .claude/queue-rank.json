@@ -6,12 +6,6 @@
       "origin": "user",
       "place": "last"
     },
-    "515": {
-      "at": "2026-08-22T16:44:06.898Z",
-      "why": "User 22.08.2026 18:41: pull forward, place after 720",
-      "origin": "user",
-      "place": "ahead"
-    },
     "553": {
       "at": "2026-08-21T16:06:01.436Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It states the weekly-volume diagnosis correctly but overlaps 745 and 746 and is the largest build in the block.",
@@ -254,12 +248,6 @@
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It moves a number and needs a series the points before it must first produce.",
       "origin": "user",
       "place": "last"
-    },
-    "749": {
-      "at": "2026-08-25T11:48:52.032Z",
-      "why": "The user repeated the ruling a third time on 25.08.2026, 13:44 (after 19.08. 18:59 and 24.08. 07:54): internal machine incidents may never reach him as decision cards, and this point is the mechanism that stops them.",
-      "origin": "user",
-      "place": "ahead"
     },
     "750": {
       "at": "2026-08-21T16:06:01.118Z",
@@ -731,13 +719,18 @@
       "why": "It stands behind the release: the gate still closes on an honest route — the bounded 1/1 scope — and only a range planned into several authorship groups meets the refusal.",
       "origin": "machine",
       "place": "last"
+    },
+    "916": {
+      "at": "2026-08-25T13:28:45.006Z",
+      "why": "Machine-filed at the point-749 boundary, so it stands behind the release under the user's 20.08.2026 ruling — last in the order, however urgent the block it describes.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
     "at": "2026-08-21T00:55:14.962Z",
     "points": [
       336,
-      515,
       553,
       581,
       595,
@@ -767,7 +760,6 @@
       744,
       746,
       747,
-      749,
       750,
       752,
       759,
@@ -778,7 +770,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T12:09:42.931Z",
+    "at": "2026-08-25T13:28:45.015Z",
     "points": [
       174,
       184,
@@ -855,7 +847,6 @@
       510,
       511,
       514,
-      515,
       518,
       519,
       520,
@@ -971,7 +962,6 @@
       744,
       746,
       747,
-      749,
       750,
       752,
       754,
@@ -1068,7 +1058,8 @@
       912,
       913,
       914,
-      915
+      915,
+      916
     ]
   }
 }

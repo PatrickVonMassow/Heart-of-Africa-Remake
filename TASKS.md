@@ -12022,3 +12022,37 @@ to land than a mechanism that needs a review.
   for each planned pass validates against `validateRecord`.
   Criticality: high — it is the four-eyes gate's own recording path, and its two halves disagree.
   Bundle: Modell & Wächter.
+- [ ] 916. A tightened ledger row contract was applied to the whole PAST, so 216 recorded reviews
+  read as hand-forged and the entire main line counts as unreviewed. MEASURED 25.08.2026 at the
+  point-749 boundary, by running the guard's own predicate over the ledger
+  (`reviewRecordWellFormed` from `scripts/mechanism-review-core.mjs`, applied to every
+  `do-not-merge` row): 216 of them are judged malformed, and NOT for any of the reasons the guard
+  names. Their `at`, `model`, `mode` and `evidence` are all sound. They fail on
+  `record.reviewerAuthorship` — 208 rows do not carry the field at all, because they were written
+  before it existed, and 8 more carry `status: "unverified"` where an Anthropic-vendor row now
+  requires `"agreement"`.
+  WHAT IT COSTS TWICE. First, every landing session meets a four-eyes refusal whose remedy lies
+  outside its reach: the missing evidence is about other commits, so the only reachable key is a
+  waiver — and a gate that can only be waived is a gate that teaches sessions to waive it.
+  Second, and worse, the guard MISNAMES the cause: it reports "the recorder never writes such a
+  row, so it can only have arrived by hand", which sends every reader looking for a forgery that
+  is not there. A rule tightened after the fact is not a forgery, and a guard that cannot tell the
+  two apart spends the reader's trust on the wrong hypothesis.
+  ALSO MEASURED, and separate: the review of `8d69529` (`scripts/doc-budget-core.mjs`) was split
+  into 2 passes over the file set and only pass 1 is on record, so a whole-range claim beside it
+  would cover files nobody read. That one is a genuine gap and closes with
+  `node scripts/review-sol.mjs --sha 8d69529 --pass 2`.
+  FINAL STATE: a row is judged against the contract that was IN FORCE when it was written — the
+  identity requirement applies from the commit that introduced it forward, and an older row
+  without `reviewerAuthorship` is sound-but-unverified rather than malformed. A row that really
+  could not have been produced by the recorder is still refused, and its message says which FIELD
+  failed instead of listing every possible cause. The 8 `unverified` Anthropic rows are decided
+  explicitly — re-verified against their session transcripts where those still exist, and recorded
+  as unverified-with-reason where they do not.
+  VERIFIABLE: Vitest over `reviewRecordWellFormed` — a pre-contract row without
+  `reviewerAuthorship` is SOUND, a post-contract row without it is REFUSED, and the refusal names
+  the failing field; a case that the range verdict over the current ledger is clean once the era
+  boundary is in force; and a case that pass 2 of a split review is still demanded.
+  Criticality: high — it is the four-eyes gate itself, it currently blocks every landing session,
+  and its stated reason is measurably not the real one.
+  Bundle: Modell & Wächter.

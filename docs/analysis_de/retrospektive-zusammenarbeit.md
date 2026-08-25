@@ -1327,6 +1327,23 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ---
 
+### 3.179 Ein Tor, dessen Abhilfe außerhalb der Reichweite liegt
+
+Punkt 749 landete am 25.08.2026 grün: 13 703 Tests, Bild-Prüfung nicht fällig, Zweig beendet.
+Direkt danach verweigerte das Vier-Augen-Tor die Antwort — nicht wegen dieser Arbeit, sondern
+weil auf der Hauptlinie mehrere handgeschriebene Zeilen im Prüf-Register liegen, deren Zeitstempel
+sich nicht einordnen lässt, und weil eine geteilte Durchsicht nur zur Hälfte aufgezeichnet ist.
+Beides betrifft fremde Commits.
+
+Die Klasse: **Ein Wächter, dessen Abhilfe außerhalb der Reichweite der blockierten Sitzung liegt,
+erzieht zur Ausnahmegenehmigung.** Wer landet, kann fremde Register-Zeilen nicht reparieren, ohne
+seine eigene Punktgrenze zu verlassen — und die einzige verbleibende Taste heißt „waive". Damit
+verliert das Tor genau dort seine Kraft, wo es sie beweisen müsste.
+
+Die Antwort ist nicht ein weicheres Tor, sondern ein früheres: Eine Zeile, die der Aufzeichner nie
+so geschrieben hätte, muss beim **Schreiben** auffallen, nicht Wochen später an einer fremden
+Punktgrenze. Gebucht als Punkt 916.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.
@@ -1334,7 +1351,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 14:11 · Quellen-Fingerprint: `3d48080c7b0c…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 15:25 · Quellen-Fingerprint: `619cdc716415…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1434,8 +1451,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 99 Prozess-/Meta-TASKS-Punkte (davon 40 offen).
 
-<!-- RETRO-FINGERPRINT: 3d48080c7b0c1e3e6934634792f3b7a7b31528cbc99fffafdcd1fc38bcefb6fc -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T12:11:02.276Z -->
+<!-- RETRO-FINGERPRINT: 619cdc716415a2aff454c23ec41b93de24d624921812a3f30213e32c33731f81 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T13:25:00.201Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam

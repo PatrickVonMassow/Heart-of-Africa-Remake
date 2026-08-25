@@ -134,7 +134,12 @@
 // back 14 lines and 149 words at no extra entry, and the ceilings move by exactly what is left,
 // with zero slack. No existing claim was dropped, and the long form stays in the retrospective.
 export const LIMITS = {
-  maxLines: 471,
+  // RATCHETED DOWN 25.08.2026 (point 749's boundary): the new lesson §3.179 — a gate whose remedy
+  // lies outside the blocked session's reach — was FOLDED into "Die KI repariert den Wächter, den
+  // sie gerade gebaut hat", which already carries the self-unblocking gate, and the fold paid for
+  // itself: the entry came back under its own 4-line risk budget and the file is one line and
+  // eleven words SHORTER than before. The ceilings follow the measurement down, as the rule says.
+  maxLines: 470,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -282,7 +287,7 @@ export const LIMITS = {
   // retrospective already carries in full (§3.171, §3.172). The guide measures
   // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
   // ceiling stays 444 because the file does.
-  maxWords: 4213,
+  maxWords: 4202,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

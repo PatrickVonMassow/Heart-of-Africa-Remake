@@ -392,13 +392,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
 - **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
-  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt. Ein Tor kann
-  aber auch zu Recht sperren und trotzdem unlösbar sein: liest es seinen Nachweis nur auf **einem**
-  von mehreren erlaubten Arbeitswegen ab, kommt der andere nie durch.
-  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
-  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Und bevor ein Tor
-  scharf geht: **zähl alle Wege auf, auf denen die geprüfte Arbeit entstehen darf**, und weise für
-  jeden Nachweis nach."
+  selbst sperrt. Ein Tor kann auch zu Recht sperren und unlösbar sein: wenn es nur einen der
+  erlaubten Arbeitswege abliest, oder wenn seine Abhilfe außerhalb der Reichweite des Gesperrten
+  liegt — dann bleibt nur die Ausnahmegenehmigung.
+  → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere es
+  nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Bevor ein Tor scharf
+  geht: **zähl alle Wege auf** und prüfe, dass seine Abhilfe **erreichbar** ist."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
   Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
@@ -468,4 +467,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 3d48080c7b0c1e3e6934634792f3b7a7b31528cbc99fffafdcd1fc38bcefb6fc -->
+<!-- GUIDE-FINGERPRINT: 619cdc716415a2aff454c23ec41b93de24d624921812a3f30213e32c33731f81 -->
