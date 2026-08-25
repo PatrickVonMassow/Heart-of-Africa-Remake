@@ -88,7 +88,7 @@ describe('the dark pin', () => {
   it('refuses a production start while the steps are not green', async () => {
     const refused = await startDaemon({ repoDir: repo, batchId: BATCH, drill: false })
     expect(refused.ok).toBe(false)
-    expect(refused.reason).toMatch(/not green/)
+    expect(refused.reason).toMatch(/durable lane is off/)
   })
 
   it('refuses a drill daemon against this checkout', async () => {
@@ -128,7 +128,7 @@ describe('the dark pin', () => {
       production = { status: error.status, out: `${error.stdout}${error.stderr}` }
     }
     expect(production.status).not.toBe(0)
-    expect(production.out).toMatch(/not green/)
+    expect(production.out).toMatch(/durable lane is off/)
     // Drill serve against this checkout: refused by serve itself.
     let drill
     try {
