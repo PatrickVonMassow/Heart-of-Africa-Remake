@@ -28,7 +28,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { acquire, probePid, processStartTime } from './batch-singleton.mjs'
-import { PROCESS_START_TOLERANCE_MS } from './batch-schema-core.mjs'
+import { PROCESS_START_TOLERANCE_MS, validateMutation } from './batch-schema-core.mjs'
 import { IDLE_WINDOW_MS } from './batch-ownership-core.mjs'
 import { LEASE_MS } from './batch-lease-core.mjs'
 import { openStateStore, readJournal } from './batch-state.mjs'
@@ -42,23 +42,51 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** THE EXACT reason `validateMutation` emits for the staleness described by
  *  `expectation` — or null when that expectation does not describe a stale
- *  credential at all. Built from the REAL fence values the drill minted, not
- *  matched by pattern: the anchored regex it replaces accepted
- *  `stale fence: presented <any>, the lock carries <any>`, so a daemon
- *  validating against the WRONG epoch could answer with a stale-SHAPED reason
- *  carrying unrelated, equal or leading-zero numbers and satisfy the check
- *  (round-15 review). An exact string cannot be satisfied by the wrong numbers,
- *  and it also ends the anchoring question for good — the round-14 finding that
- *  `$` matches before a final newline cannot recur against `===`. */
+ *  credential at all.
+ *
+ *  ASKED OF THE VALIDATOR, NOT RE-TYPED. This function used to spell both
+ *  refusals out as literals, which made the drill's judge only as correct as a
+ *  copy that nothing keeps in step: reword `validateMutation` and every stale
+ *  probe fails for the wrong reason, or — worse — a judge left matching an
+ *  obsolete string certifies nothing while reporting green. It also cost a
+ *  round-16 reviewer its verdict, because confirming the copy character for
+ *  character meant reading a file outside the pass's file set. So the
+ *  expectation is now PRODUCED by calling the validator on a presentation that
+ *  differs from its lock in EXACTLY the named credential and in nothing else.
+ *  Both sides move together, and there is no copy left to drift. The wording
+ *  itself is pinned where a literal belongs — in the test.
+ *
+ *  The fence values are the REAL ones the drill minted, not a pattern: the
+ *  anchored regex this replaced accepted `stale fence: presented <any>, the
+ *  lock carries <any>`, so a daemon validating against the WRONG epoch could
+ *  answer with a stale-SHAPED reason carrying unrelated, equal or leading-zero
+ *  numbers and satisfy the check (round-15 review). An exact string cannot be
+ *  satisfied by the wrong numbers, and it also ends the anchoring question for
+ *  good — the round-14 finding that `$` matches before a final newline cannot
+ *  recur against `===`. */
 export function expectedStaleRefusal(expectation) {
   const { kind, presented, carried } = expectation ?? {}
-  if (kind === 'session') return 'the lock names another session'
+  // Every field the validator inspects BEFORE the staleness in question is
+  // deliberately valid and identical on both sides, so the refusal that comes
+  // back can only be the one this expectation is about — never an earlier
+  // guard's answer wearing the same return shape.
+  const refusalFor = (presentation, lock) => {
+    const verdict = validateMutation({ presented: presentation, lock, now: 1 })
+    return verdict.ok ? null : verdict.reason
+  }
+  if (kind === 'session') {
+    return refusalFor({ sessionId: 'drill-presented-session', fence: 1 }, { sessionId: 'drill-lock-session', fence: 1 })
+  }
   if (kind !== 'fence') return null
   // A fence is stale only if it DIFFERS from the one the lock carries; equal
   // values describe a valid presentation, which validateMutation never refuses
-  // for staleness, so no expected reason exists.
-  if (!Number.isInteger(presented) || !Number.isInteger(carried) || presented === carried) return null
-  return `stale fence: presented ${presented}, the lock carries ${carried}`
+  // for staleness, so no expected reason exists. A fence below 1 is not a
+  // usable fence at all: the validator refuses it for its SHAPE, long before it
+  // compares anything, and expecting that refusal would let a probe pass on
+  // evidence about the wrong thing entirely.
+  if (!Number.isInteger(presented) || !Number.isInteger(carried)) return null
+  if (presented === carried || presented < 1 || carried < 1) return null
+  return refusalFor({ sessionId: 'drill-session', fence: presented }, { sessionId: 'drill-session', fence: carried })
 }
 
 /** What each probe's ONE stale credential is called in its verdict. */

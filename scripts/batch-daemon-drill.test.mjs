@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { describe, it, expect } from 'vitest'
 import { runDrill, staleProbeRefused, expectedStaleRefusal } from './batch-daemon-drill.mjs'
 import { startDaemon } from './batch-daemon.mjs'
+import { validateMutation } from './batch-schema-core.mjs'
 
 // THE DOCUMENTED ENTRYPOINT IS THE ONE UNDER TEST. The architecture promises
 // `node scripts/batch-daemon.mjs drill --scenario parent-death`; a suite that
@@ -232,6 +233,52 @@ describe('staleProbeRefused', () => {
     }
   })
 
+  // THE EXPECTATION IS DERIVED, NOT COPIED. The judge asks `validateMutation`
+  // for its refusal instead of repeating it, so an arbitrary fence pair — not
+  // just the one the drill happens to mint — must come back with that pair's
+  // own reason. A judge that had gone back to a literal would answer the same
+  // string for every pair and fail here.
+  it('expects the refusal for the fence pair it was actually given', () => {
+    for (const [presented, carried] of [
+      [1, 2],
+      [7, 9],
+      [41, 40],
+      [3, 300],
+    ]) {
+      const real = validateMutation({
+        presented: { sessionId: 's', fence: presented },
+        lock: { sessionId: 's', fence: carried },
+        now: 1,
+      })
+      expect(real.ok, `${presented}/${carried}`).toBe(false)
+      expect(expectedStaleRefusal({ kind: 'fence', presented, carried }), `${presented}/${carried}`).toBe(real.reason)
+    }
+  })
+
+  // A FENCE BELOW 1 IS REFUSED FOR ITS SHAPE, NOT FOR STALENESS. The validator
+  // answers "the mutation presents no usable fence" before it compares
+  // anything, so expecting that refusal would certify a probe on evidence about
+  // the wrong check entirely — the round-14 mistake in a different disguise.
+  it('has no expected refusal for a fence the validator never judges stale', () => {
+    for (const expectation of [
+      { kind: 'fence', presented: 0, carried: 9 },
+      { kind: 'fence', presented: 7, carried: 0 },
+      { kind: 'fence', presented: -1, carried: 9 },
+      { kind: 'fence', presented: 7, carried: -2 },
+    ]) {
+      expect(expectedStaleRefusal(expectation), JSON.stringify(expectation)).toBeNull()
+      const bogus = staleProbeRefused({ ok: false, reason: 'the mutation presents no usable fence' }, expectation)
+      expect(bogus.ok).toBe(false)
+      expect(bogus.why).toMatch(/no staleness is described by/)
+    }
+  })
+
+  // THE WORDING IS PINNED HERE, AND NOWHERE ELSE. The drill derives its
+  // expectation from `validateMutation`, so this is the only place the two
+  // wordings are compared — and it compares them by RUNNING the validator,
+  // which is why believing the judge no longer requires reading both files
+  // side by side (round-16 review, evidence gap). Reword a refusal and this
+  // turns red, deliberately.
   it('passes exactly the refusal validation produces for its own credential', () => {
     for (const [expectation, reason] of [
       [SESSION, 'the lock names another session'],
