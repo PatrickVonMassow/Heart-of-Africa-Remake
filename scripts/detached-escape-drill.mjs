@@ -137,14 +137,19 @@ export function readOutcome({
   // own clock, and an EPIPE counts only when the kill was measured as delivered
   // AND the raise came at or after it: a reader that died of anything earlier
   // — the independent parent exit above — produced its EPIPE before `killedAt`.
-  // `>=` rather than `>` because `killedAt` is stamped after the syscall
-  // returns, so a legitimate raise can share its millisecond; an independent
+  // `>=` rather than `>` because `killedAt` is stamped just BEFORE the syscall
+  // is made, so a legitimate raise can share its millisecond; an independent
   // death inside that same millisecond is what the parent-exit half of
   // `killDelivery` exists to catch. The line is matched WHOLE, not searched:
   // finding 3 of the same review showed what a substring match accepts.
   const raised = /^raised:\s+(\S+)(?:\s+(\d+))?$/.exec(String(lastLine).trim())
   const raisedAt = raised?.[2] ? Number(raised[2]) : null
-  const epipe = raised != null && /EPIPE/i.test(raised[1])
+  // EXACTLY EPIPE, not a token CONTAINING it. `/EPIPE/i` accepted NOT_EPIPE,
+  // FAKEEPIPE and any other code with those five letters inside, so a worker
+  // dead of an unrelated cause could be attributed to the pipe and — beside an
+  // escaped files worker — turn the whole drill green (round-15 review). The
+  // worker records `error.code`, which for a broken pipe is the exact string.
+  const epipe = raised != null && raised[1] === 'EPIPE'
   const pipeCause = dead && epipe && killDelivered && raisedAt !== null && raisedAt >= killedAt
   const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness && Boolean(killDelivered)
   // ONE PRECEDENCE, NOT TWO. The reason used to encode the same order as the
@@ -534,13 +539,19 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // recorded here and judged by `killDelivery`.
   const exitedBeforeKill = parentExit !== null
   let killError = null
-  let killedAt = 0
+  // STAMPED BEFORE THE SYSCALL, and this is the round-15 repair. Taken after
+  // `process.kill` returned, the stamp lost a real race: the parent can die,
+  // its pipe close, and the worker record its EPIPE before the observer gets
+  // back to `Date.now()`. That EPIPE then read as PREDATING the kill and a
+  // genuine result was thrown away as unattributable. The kill cannot cause an
+  // EPIPE before it is initiated, so the instant just before the syscall is the
+  // earliest sound lower bound — and it makes the `>=` below honest rather than
+  // a concession to the clock.
+  const killedAt = Date.now()
   try {
     process.kill(-parent.pid, 'SIGKILL')
   } catch (err) {
     killError = err?.code ?? String(err)
-  } finally {
-    killedAt = Date.now()
   }
   await sleep(observeMs)
   const after = lines(beat)

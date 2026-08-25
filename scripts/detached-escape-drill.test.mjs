@@ -298,6 +298,57 @@ describe('readOutcome', () => {
     expect(after.raisedAt).toBe(3100)
   })
 
+  // ROUND-15 REVIEW, finding 2: the attribution was `/EPIPE/i.test(code)`, a
+  // SUBSTRING match. Every token below contains those five letters and none of
+  // them is EPIPE, so each was read as a pipe death — and beside an escaped
+  // files worker that is a green drill over a worker that died of something
+  // else entirely. The whole point of this drill is that a death is attributed
+  // to the pipe only when the pipe is what killed it.
+  it('refuses a death whose recorded code merely CONTAINS the letters EPIPE', () => {
+    for (const code of ['NOT_EPIPE', 'FAKEEPIPE', 'EPIPES', 'XEPIPEX', 'epipe', 'ERR_EPIPE_CLOSED']) {
+      const near = readOutcome({
+        shape: 'pipes',
+        alive: false,
+        ...healthy,
+        beatTimes: BASELINE,
+        lastLine: `raised: ${code} 250`,
+        killDelivered: true,
+      })
+      expect(near.dead, code).toBe(true)
+      expect(near.pipeCause, code).toBe(false)
+    }
+    // …while the exact code still attributes, so the tightening did not simply
+    // break attribution altogether.
+    const exact = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      ...healthy,
+      beatTimes: BASELINE,
+      lastLine: 'raised: EPIPE 250',
+      killDelivered: true,
+    })
+    expect(exact.pipeCause).toBe(true)
+  })
+
+  // ROUND-15 REVIEW, finding 3: `killedAt` was stamped AFTER process.kill
+  // returned, so a worker that recorded its EPIPE in the gap looked as if it
+  // had raised BEFORE the kill and a genuine result was discarded. The stamp is
+  // now taken before the syscall; a raise sharing that millisecond is the case
+  // the boundary must accept, since neither clock can resolve finer.
+  it('accepts an EPIPE raised in the SAME millisecond as the kill', () => {
+    const simultaneous = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      ...healthy,
+      beatTimes: BASELINE,
+      lastLine: 'raised: EPIPE 3000',
+      killedAt: 3000,
+      killDelivered: true,
+    })
+    expect(simultaneous.dead).toBe(true)
+    expect(simultaneous.pipeCause).toBe(true)
+  })
+
   it('refuses an EPIPE whose raise carries no clock to order against the kill', () => {
     const unclocked = readOutcome({ shape: 'pipes', alive: false, ...healthy, beatTimes: BASELINE, lastLine: 'raised: EPIPE' })
     expect(unclocked.dead).toBe(true)
