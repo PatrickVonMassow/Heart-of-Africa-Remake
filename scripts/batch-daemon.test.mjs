@@ -15,7 +15,7 @@ import { processStartTime } from './batch-singleton.mjs'
 import { markUnverifiedTail } from './batch-schema-core.mjs'
 import { ensureFenceStore, openStateStore, readJournal } from './batch-state.mjs'
 import { readJsonIfAny } from './detached-agent.mjs'
-import { canonicalWorktree, controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
+import { canonicalWorktree, clearLockCopy, controlRequest, startDaemon, writeLockCopy } from './batch-daemon.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
 
 const BATCH = 'drill-batch'
@@ -174,6 +174,7 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(record.generation).toMatch(/^[0-9a-f]{32}$/)
     expect(record.generation).toBe(JSON.parse(readFileSync(openStateStore({ repoDir: repo, batchId: BATCH }).fenceStorePath, 'utf8')).generation)
     expect(record.fence).toBe(FENCE)
+    expect(record.state).toBe('running')
     const second = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
     expect(second.ok).toBe(false)
     const copied = writeLockCopy({ repoDir: repo, record, sessionId: SID })
@@ -343,7 +344,8 @@ describe('the daemon lifecycle in the sandbox', () => {
     expect(snapshot.sealed).toBe(true)
     const journal = readJournal(store)
     expect(journal.verdict).toBe('ok')
-    expect(journal.entries.some((e) => e.kind === 'daemon-lifecycle' && e.event === 'stop')).toBe(true)
+    expect(journal.entries.some((e) => e.kind === 'daemon-lifecycle' && e.event === 'stop' && e.record?.state === 'stopping')).toBe(true)
+    expect(JSON.parse(readFileSync(join(repo, '.claude', 'batch-lock.json'), 'utf8')).daemon).toBeUndefined()
   }, 15_000)
 
   it('restarts against the same journal and still refuses the replayed start-attempt key', async () => {
@@ -463,6 +465,27 @@ describe('writeLockCopy against a planted symlink', () => {
       expect(res.reason).toMatch(/symlink/)
       // The planted target survived the refused write untouched.
       expect(JSON.parse(readFileSync(target, 'utf8')).daemon).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('clearLockCopy owns only the stopping daemon copy', () => {
+  it('clears its exact copy and refuses a copy naming another generation', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lock-copy-clear-'))
+    const lockPath = join(dir, '.claude', 'batch-lock.json')
+    const stopping = { pid: 10, pidStartedAt: 20, generation: 'generation-current', state: 'stopping' }
+    try {
+      mkdirSync(join(dir, '.claude'), { recursive: true })
+      writeFileSync(lockPath, JSON.stringify({ sessionId: SID, fence: FENCE, daemon: { pid: 10, pidStartedAt: 20, generation: 'generation-current' } }))
+      expect(clearLockCopy({ repoDir: dir, record: stopping, sessionId: SID, fence: FENCE }).ok).toBe(true)
+      expect(JSON.parse(readFileSync(lockPath, 'utf8')).daemon).toBeUndefined()
+
+      writeFileSync(lockPath, JSON.stringify({ sessionId: SID, fence: FENCE, daemon: { pid: 10, pidStartedAt: 20, generation: 'generation-successor' } }))
+      const refused = clearLockCopy({ repoDir: dir, record: stopping, sessionId: SID, fence: FENCE })
+      expect(refused.ok).toBe(false)
+      expect(JSON.parse(readFileSync(lockPath, 'utf8')).daemon.generation).toBe('generation-successor')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

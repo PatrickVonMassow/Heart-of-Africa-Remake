@@ -8,7 +8,13 @@
 // the global cap, the worker spawn plans, retention, drain, authorization and
 // the daemon's own identity record.
 import { randomBytes } from 'node:crypto'
-import { DAEMON_RECORD_FIELDS, SCHEMA_VERSION, sameProcess } from './batch-schema-core.mjs'
+import {
+  DAEMON_LIFECYCLE_STATES,
+  DAEMON_RECORD_FIELDS,
+  SCHEMA_VERSION,
+  daemonLifecycleTransition,
+  sameProcess,
+} from './batch-schema-core.mjs'
 
 // ---------------------------------------------------------------------------
 // 1. THE GLOBAL CAP (union M9)
@@ -145,8 +151,8 @@ export function mintLaunchNonce() {
 /** The record `start` waits for and every later session reads. Field set is
  *  step 1's DAEMON_RECORD_FIELDS, exactly — a record with more is not refused,
  *  but one with less is not a record. */
-export function buildDaemonRecord({ pid, pidStartedAt, generation, fence, launchNonce, startedAt } = {}) {
-  const record = { v: SCHEMA_VERSION, pid, pidStartedAt, generation, fence, launchNonce, startedAt }
+export function buildDaemonRecord({ pid, pidStartedAt, generation, fence, launchNonce, startedAt, state } = {}) {
+  const record = { v: SCHEMA_VERSION, pid, pidStartedAt, generation, fence, launchNonce, startedAt, state }
   const missing = DAEMON_RECORD_FIELDS.filter((f) => record[f] === undefined || record[f] === null)
   if (missing.length) return { ok: false, reason: `a daemon record misses: ${missing.join(', ')}` }
   if (!Number.isInteger(pid) || pid < 1 || !Number.isFinite(pidStartedAt)) {
@@ -154,7 +160,17 @@ export function buildDaemonRecord({ pid, pidStartedAt, generation, fence, launch
   }
   if (typeof generation !== 'string' || generation.length < 8) return { ok: false, reason: 'a daemon record names its generation' }
   if (!Number.isInteger(fence) || fence < 1) return { ok: false, reason: 'a daemon record names the fence it serves' }
+  if (!DAEMON_LIFECYCLE_STATES.includes(state)) return { ok: false, reason: `unknown daemon state: ${String(state)}` }
   return { ok: true, record: Object.freeze(record) }
+}
+
+/** Rebuilds the complete record only across one of the schema's forward-only
+ * lifecycle edges. A stopped or stopping daemon cannot be made running again;
+ * another start is a new exclusively-created record with a fresh nonce. */
+export function transitionDaemonRecord(record, state) {
+  const transition = daemonLifecycleTransition(record?.state, state)
+  if (!transition.ok) return transition
+  return buildDaemonRecord({ ...record, state })
 }
 
 /** The wait after spawn ends only on a record carrying THE nonce this launch
@@ -173,6 +189,7 @@ export function readinessSatisfied({ record = null, expectedNonce = null } = {})
   const rebuilt = buildDaemonRecord(record)
   if (!rebuilt.ok) return { ok: false, reason: `the record carries this launch's nonce but is not usable: ${rebuilt.reason}` }
   if (!Number.isFinite(record.startedAt)) return { ok: false, reason: 'the record carries no usable start time' }
+  if (record.state !== 'running') return { ok: false, reason: `this launch is ${record.state}, not ready` }
   return { ok: true }
 }
 

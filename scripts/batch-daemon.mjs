@@ -41,6 +41,7 @@ import {
   mayStartAttempt,
   mintLaunchNonce,
   readinessSatisfied,
+  transitionDaemonRecord,
   workerSpawnPlan,
 } from './batch-daemon-core.mjs'
 import { grantAttemptLease, claimWorktree, releaseWorktree } from './batch-attempt-lease-core.mjs'
@@ -179,6 +180,7 @@ async function serve(args) {
     fence,
     launchNonce: args.nonce,
     startedAt: nowMs(),
+    state: 'starting',
   })
   if (!built.ok) {
     console.error(`daemon: ${built.reason}`)
@@ -258,6 +260,8 @@ async function serve(args) {
       process.exit(1)
     }
   }
+
+  let daemonRecord = built.record
 
   const workers = new Map() // attemptId -> { attempt, pid, worktree, leaseId, dir }
   let leases = new Map() // attemptId -> lease
@@ -362,7 +366,7 @@ async function serve(args) {
   const handlers = {
     status: () => ({
       ok: true,
-      record: built.record,
+      record: daemonRecord,
       journalVerdict: journal.verdict,
       attempts: [...attemptsState.values()],
       workers: [...workers.keys()],
@@ -707,6 +711,22 @@ async function serve(args) {
       currentFence = validated.fence
     }
     draining = true
+    // STOP'S FIRST DURABLE WRITE. Until `stopping` stands, clearing the copy
+    // would open an adoption window in which this live daemon still reads as
+    // running. A failed transition leaves the old record in place and exits;
+    // proven death then routes the record through reconciliation.
+    const stopping = transitionDaemonRecord(daemonRecord, 'stopping')
+    if (!stopping.ok) {
+      console.error(`daemon: could not enter the stopping lifecycle state (${stopping.reason}); the identity record stays for reconciliation`)
+      process.exit(1)
+    }
+    try {
+      writeFileAtomic(store.daemonRecordPath, `${JSON.stringify(stopping.record)}\n`)
+      daemonRecord = stopping.record
+    } catch (error) {
+      console.error(`daemon: could not persist the stopping lifecycle state (${error.message}); the identity record stays for reconciliation`)
+      process.exit(1)
+    }
     if (!journalCorrupt) ensureFenceJournalled(currentFence)
     // Any worker this shutdown leaves behind — an undrained live worker, one
     // that survived its signals, or one whose lease revocation could not be
@@ -750,7 +770,7 @@ async function serve(args) {
       // reconciliation.
       unreleased = workers.size
     }
-    if (!journalCorrupt) journalEntry({ kind: 'daemon-lifecycle', event: 'stop', drained: drain, unreleased })
+    if (!journalCorrupt) journalEntry({ kind: 'daemon-lifecycle', event: 'stop', record: daemonRecord, drained: drain, unreleased })
     clearInterval(heartbeat)
     try {
       server.close()
@@ -764,7 +784,16 @@ async function serve(args) {
     // journal whose tail lies. A journal corrupt from BOOT is different: that
     // daemon never mutated anything, its shutdown changes no evidence, and its
     // release is what lets the operator act.
-    if (unreleased === 0 && !journalFailed) {
+    const copyCleared = clearLockCopy({
+      repoDir,
+      record: daemonRecord,
+      sessionId: presented?.sessionId ?? null,
+      fence: presented?.fence ?? null,
+    })
+    if (!copyCleared.ok) {
+      console.error(`daemon: ${copyCleared.reason}; the stopping record stays until reconciliation can clear the copy safely`)
+    }
+    if (unreleased === 0 && !journalFailed && copyCleared.ok) {
       try {
         unlinkSync(store.daemonRecordPath)
       } catch {
@@ -773,7 +802,9 @@ async function serve(args) {
     } else {
       const why = journalFailed
         ? 'the journal failed durably, so this shutdown is unwitnessed'
-        : `${unreleased} worker(s) survive this shutdown`
+        : !copyCleared.ok
+          ? 'the daemon copy could not be cleared safely'
+          : `${unreleased} worker(s) survive this shutdown`
       console.error(`daemon: ${why}; the identity record stays as a cold record until reconciliation (step 8) releases it`)
     }
     process.exit(0)
@@ -812,7 +843,25 @@ async function serve(args) {
     })
     connection.on('error', () => {})
   })
-  server.listen(socketPath, () => chmodSync(socketPath, 0o600))
+  server.listen(socketPath, () => {
+    chmodSync(socketPath, 0o600)
+    // START'S SECOND DURABLE WRITE: the exclusive create above publishes
+    // `starting`, which is never adoptable and never satisfies readiness. Only
+    // once the control socket is actually listening does the daemon atomically
+    // become `running`; a crash on either side leaves a named schema state.
+    const running = transitionDaemonRecord(daemonRecord, 'running')
+    if (!running.ok) {
+      console.error(`daemon: could not enter the running lifecycle state (${running.reason})`)
+      process.exit(1)
+    }
+    try {
+      writeFileAtomic(store.daemonRecordPath, `${JSON.stringify(running.record)}\n`)
+      daemonRecord = running.record
+    } catch (error) {
+      console.error(`daemon: could not persist the running lifecycle state (${error.message}); the starting record stays for reconciliation`)
+      process.exit(1)
+    }
+  })
   process.on('SIGTERM', () => performShutdown(true))
 }
 
@@ -937,6 +986,41 @@ export function writeLockCopy({ repoDir, record, sessionId, fence = null, mutexW
         writeFileAtomic(path, `${JSON.stringify(next)}\n`)
       } catch (error) {
         return { ok: false, reason: `the lock copy could not be written safely: ${error.message}` }
+      }
+      return { ok: true }
+    },
+    { waitMs: mutexWaitMs },
+  )
+  return held.ok ? held.result : { ok: false, reason: held.reason }
+}
+
+/** STOP'S SECOND DURABLE WRITE, serialized with takeover and every other lock
+ * update. The daemon removes only a copy of its own exact identity; a copy that
+ * names anything else is evidence it must not rewrite. Credential checks are
+ * repeated inside the mutex when shutdown came through the control socket.
+ * SIGTERM carries no session credential, but still cannot clear a foreign copy. */
+export function clearLockCopy({ repoDir, record, sessionId = null, fence = null, mutexWaitMs = 2000 }) {
+  const path = lockPathFor(repoDir)
+  const held = withLockWriteMutex(
+    path,
+    () => {
+      const lock = readJsonIfAny(path)
+      if (!lock?.daemon) return { ok: true, alreadyClear: true }
+      if (sessionId !== null && lock.sessionId !== sessionId) {
+        return { ok: false, reason: 'only the current lock owner clears the daemon copy' }
+      }
+      if (fence !== null && lock.fence !== fence) {
+        return { ok: false, reason: `the lock carries fence ${lock.fence}, not the stopping owner's ${fence}; a superseded owner clears nothing` }
+      }
+      const copy = lock.daemon
+      if (copy.pid !== record?.pid || copy.pidStartedAt !== record?.pidStartedAt || copy.generation !== record?.generation) {
+        return { ok: false, reason: 'the lock copy names another daemon; the stopping daemon clears nothing' }
+      }
+      const { daemon: _daemon, ...next } = lock
+      try {
+        writeFileAtomic(path, `${JSON.stringify(next)}\n`)
+      } catch (error) {
+        return { ok: false, reason: `the daemon copy could not be cleared safely: ${error.message}` }
       }
       return { ok: true }
     },

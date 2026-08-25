@@ -19,6 +19,7 @@ import {
   mintLaunchNonce,
   readinessSatisfied,
   retentionDecision,
+  transitionDaemonRecord,
   unknownStateAttempts,
   workerSpawnPlan,
 } from './batch-daemon-core.mjs'
@@ -133,7 +134,7 @@ describe('control authorization', () => {
 })
 
 describe('the daemon record and its readiness nonce', () => {
-  const fields = { pid: 10, pidStartedAt: 5000, generation: 'gen-12345678', fence: 7, launchNonce: 'n'.repeat(32), startedAt: 1000 }
+  const fields = { pid: 10, pidStartedAt: 5000, generation: 'gen-12345678', fence: 7, launchNonce: 'n'.repeat(32), startedAt: 1000, state: 'starting' }
 
   it('builds a complete record and refuses an incomplete or malformed one', () => {
     const built = buildDaemonRecord(fields)
@@ -142,12 +143,23 @@ describe('the daemon record and its readiness nonce', () => {
     expect(buildDaemonRecord({ ...fields, fence: undefined }).ok).toBe(false)
     expect(buildDaemonRecord({ ...fields, generation: 'short' }).ok).toBe(false)
     expect(buildDaemonRecord({ ...fields, pid: 0 }).ok).toBe(false)
+    expect(buildDaemonRecord({ ...fields, state: 'unknown' }).ok).toBe(false)
+  })
+
+  it('moves forward through the lifecycle and never returns to running', () => {
+    const starting = buildDaemonRecord(fields).record
+    const running = transitionDaemonRecord(starting, 'running')
+    expect(running).toMatchObject({ ok: true, record: { state: 'running' } })
+    const stopping = transitionDaemonRecord(running.record, 'stopping')
+    expect(stopping).toMatchObject({ ok: true, record: { state: 'stopping' } })
+    expect(transitionDaemonRecord(stopping.record, 'running').ok).toBe(false)
+    expect(transitionDaemonRecord(starting, 'stopping').ok).toBe(false)
   })
 
   it('mints distinct nonces and satisfies readiness only on its own', () => {
     const nonce = mintLaunchNonce()
     expect(nonce).not.toBe(mintLaunchNonce())
-    const record = buildDaemonRecord({ ...fields, launchNonce: nonce }).record
+    const record = transitionDaemonRecord(buildDaemonRecord({ ...fields, launchNonce: nonce }).record, 'running').record
     expect(readinessSatisfied({ record, expectedNonce: nonce }).ok).toBe(true)
     expect(readinessSatisfied({ record, expectedNonce: 'other' }).ok).toBe(false)
     expect(readinessSatisfied({ record: null, expectedNonce: nonce }).ok).toBe(false)
@@ -160,8 +172,10 @@ describe('the daemon record and its readiness nonce', () => {
     // wait, and the launcher served a daemon whose identity it had never read.
     const nonce = mintLaunchNonce()
     expect(readinessSatisfied({ record: { launchNonce: nonce }, expectedNonce: nonce }).ok).toBe(false)
-    const full = buildDaemonRecord({ ...fields, launchNonce: nonce }).record
-    for (const field of ['pid', 'pidStartedAt', 'generation', 'fence', 'startedAt']) {
+    const starting = buildDaemonRecord({ ...fields, launchNonce: nonce }).record
+    expect(readinessSatisfied({ record: starting, expectedNonce: nonce }).ok).toBe(false)
+    const full = transitionDaemonRecord(starting, 'running').record
+    for (const field of ['pid', 'pidStartedAt', 'generation', 'fence', 'startedAt', 'state']) {
       const { [field]: _dropped, ...truncated } = full
       expect(readinessSatisfied({ record: truncated, expectedNonce: nonce }).ok, field).toBe(false)
     }
