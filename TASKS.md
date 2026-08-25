@@ -77,43 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 921. An era rule turns correctly recorded do-not-merge rows into hand-written ones, and the
-  four-eyes gate then blocks every turn. FOUND 25.08.2026 at the point boundary after point 918
-  landed: `mechanism-review-guard` reports UNREVIEWABLE for a dozen pending commits, and for each
-  one the reason is "a recorded do-not-merge on <sha> is malformed … it can only have arrived by
-  hand". The rows it names are not hand-written. `reviewRecordWellFormed`
-  (`scripts/mechanism-review-core.mjs:1266`) demands a `reviewerAuthorship` object, and for an
-  Anthropic reviewer the status `agreement`; rows the recorder itself wrote BEFORE that field
-  existed carry none at all (`5ce597c`, `042ffbf`, `e1d242a`, `65022b1`) or carry `unverified`
-  beside an Anthropic model (`ece3757`). The check has no era boundary, so a later rule reaches
-  backwards and condemns its own history.
-  WHY IT MATTERS: the message names a repair — "fix or remove the row, on the record" — for which
-  no command exists, and editing the ledger by hand is precisely what the message treats as the
-  defect. The gate is therefore not merely wrong, it is unexitable, and it stands in front of
-  every turn that ends on `main`.
-  FINAL STATE: the well-formedness check gains an era boundary of the same shape
-  `MODE_REQUIRED_SINCE` already has for the mode field — a row recorded before the identity
-  requirement landed stays well formed without it, a row recorded after it does not — or, where
-  that is judged too weak, a migration command that stamps the historical rows verifiably instead
-  of a person editing them. Either way the recorded verdicts keep their meaning: a do-not-merge
-  stays a do-not-merge, and nothing becomes reviewable that was not.
-  VERIFIABLE: Vitest over `reviewRecordWellFormed` — a pre-era row without `reviewerAuthorship`
-  is well formed, the same row dated after the boundary is not, an Anthropic `unverified` row
-  from before the boundary is well formed and from after it is not; plus a case over the guard
-  showing the named commits no longer report UNREVIEWABLE for that reason; plus `npm run
-  test:unit`, lint, build.
-  MEASURED WHILE FILING IT, so the successor does not repeat the probe: ten distinct malformed
-  rows stand behind the refusal (`042ffbf`, `5ce597c`, `65022b1`, `7db99ea`, `80b96e6`,
-  `c3f5ad8`, `e0ebcff`, `e1d242a`, `ece3757`, `f999250`, `fe20777`), and beside them one debt of
-  a different kind that this point also owes an answer: five commits report "the review was split
-  into 2 passes over the FILE SET and only 1 are on record". A COMPLETE scoped one-round review
-  recorded on 25.08.2026 for `8d69529` (GPT-5.6 Sol, verdict merge, all four end-state files)
-  did NOT clear that entry, so a scoped 1/1 record and a recorded 2-pass split do not meet — say
-  which of the two the file debt is measured against, and make the other one say so.
-  Criticality: high — it blocks the batch at the turn end and its stated repair invites hand
-  edits of the very ledger that carries the four-eyes evidence.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
   the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
   the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
