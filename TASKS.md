@@ -77,31 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 895. Fenced discovery, adoption, reconciliation, and the slice of landing they need. CUT OUT
-  OF POINT 834 (see 890 for the cut and its reason). Step 8 with the part of step 9 that step 8
-  requires — and it is what makes SURVIVABILITY claimable at all: without it a worker merely is
-  not killed, while no transferable declaration, fenced adoption, reconciliation or plan-native
-  landing exists, so a successor can neither prove nor land its work.
-  HOW THE BRANCH IS CUT: `feat/895-<slug>` off main, carrying `scripts/batch-adoption-core.mjs`
-  and its test, `scripts/batch-landing-core.mjs`, `scripts/batch-reconcile-core.mjs` and its test,
-  `scripts/batch-reconcile.mjs` and its test, `scripts/resume-batch.mjs` and the durable-block
-  flags added to `scripts/batch-in-flight.mjs` from `feat/834-durable-authoring-lane`, plus
-  `docs/command-index.md` regenerated.
-  LANDS AFTER 894 — `batch-reconcile.mjs` and `resume-batch.mjs` import the daemon, the store and
-  the detached worker contract.
-  WHAT MUST HOLD: the adoption record is all-or-nothing and binds the attempt to a process
-  identity — pid AND start time — because naming an attempt without its process leaves exactly the
-  guess the record exists to remove; a successor's recovery verdict is UNKNOWN, never ABANDONED,
-  where a lost publication trailer and an unrelated successor leave the same graph evidence
-  (890 item (iii)); and `--commit` never advances the fence (890 item (iv)).
-  FINAL STATE: a fresh session can DISCOVER a running attempt, adopt it under a fence, reconcile
-  what it finds and land it — all still dark behind the flag of 891, with today's path untouched.
-  VERIFIABLE: the union's unit cases for steps 8 and 9; the reconciliation evidence cases;
-  `npm run test:unit`, lint, build; the cross-vendor review of this file set recorded green
-  before the merge.
-  Criticality: high — this is the half that lets a successor prove and land another session's work.
-  Bundle: unbundled (batch autonomy).
-
 - [ ] 834. The drills prove the takeover on the real path, and only then may the dark lane be
   switched on. THIS POINT WAS CUT ON 24.08.2026 (user rule, general procedure: a large point that
   stops converging is cut into standalone points and each is worked on its own, no confirmation
