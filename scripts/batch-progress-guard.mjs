@@ -73,6 +73,7 @@ import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
 import { gatherBoundary, probeLauncherState } from './batch-boundary.mjs'
 import { gatherWatermark } from './context-watermark.mjs'
 import { noteHandoverBudgetStart } from './handover-budget.mjs'
+import { noteHandoverAttributionDemand } from './handover-attribution.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
 import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { gatherInFlight, gatherHandoverTransfer, gatherStandDownBoundary } from './batch-in-flight.mjs'
@@ -696,6 +697,14 @@ try {
 
   if (decision === 'block-take-boundary') {
     noteHandoverBudgetStart({ sessionId: sid, tokens: watermark?.tokens, at: Date.now() })
+    noteHandoverAttributionDemand({
+      sessionId: sid,
+      tokens: watermark?.tokens,
+      at: Date.now(),
+      cause: 'point',
+      point: bound.due,
+      transcript: watermark?.transcript ?? transcriptPath,
+    })
     block(
       `TAKE THE POINT BOUNDARY — point ${bound.due} was LANDED in this session and no boundary is recorded, so ` +
         `ending here would leave the batch STANDING STILL: the session would sit alive on the batch lock and the ` +
@@ -715,6 +724,14 @@ try {
 
   if (decision === 'block-context-handover') {
     noteHandoverBudgetStart({ sessionId: sid, tokens: watermark?.tokens, at: Date.now() })
+    noteHandoverAttributionDemand({
+      sessionId: sid,
+      tokens: watermark?.tokens,
+      at: Date.now(),
+      cause: 'context',
+      point: null,
+      transcript: watermark?.transcript ?? transcriptPath,
+    })
     block(
       `HAND OVER — THE CONTEXT PASSED THE WATERMARK: this session's own transcript measures ` +
         `${watermark?.tokens ?? '?'} tokens of context against the ${watermark?.watermark ?? '?'} watermark, and ` +

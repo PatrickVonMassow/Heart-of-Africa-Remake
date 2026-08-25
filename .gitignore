@@ -166,6 +166,10 @@ scripts/.tile-cache
 .claude/handover-budget.json
 .claude/handover-budget.json.tmp-*
 .claude/handover-costs.jsonl
+# Per-stage exit/ramp attribution: active state plus append-only machine-local readings.
+.claude/handover-attribution.json
+.claude/handover-attribution.json.tmp-*
+.claude/handover-attribution.jsonl
 .claude/context-ceiling-notices/
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
