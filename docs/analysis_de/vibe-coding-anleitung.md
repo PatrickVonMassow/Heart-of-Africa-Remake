@@ -383,9 +383,13 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   letzte. Was den Schritt **abschließt**, bleibt erlaubt; was festhält, mach **übergebbar**."
 
 - **Die KI repariert den Wächter, den sie gerade gebaut hat** — am schlimmsten, wenn er sie
-  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt.
+  selbst sperrt: Aufweiten klingt dann vernünftig, weil der Nachweis ja vorliegt. Ein Tor kann
+  aber auch zu Recht sperren und trotzdem unlösbar sein: liest es seinen Nachweis nur auf **einem**
+  von mehreren erlaubten Arbeitswegen ab, kommt der andere Weg nie durch, egal wie gründlich er war.
   → *Prompt:* „Fasst du dieselbe Mechanik wieder an, **zähl mit**. Sperrt ein Tor dich, ändere
-  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil."
+  es nie allein: **leg dein Eigeninteresse offen**, nimm das zweite Urteil. Und bevor ein Tor
+  scharf geht: **zähl alle Wege auf, auf denen die geprüfte Arbeit entstehen darf**, und weise für
+  jeden nach, dass sein Nachweis wirklich entsteht."
 
 - **Der Prüflauf verändert sein eigenes Projekt.** Eine Suite, die ihren Zielpfad aus dem
   Quellort statt der Testumgebung ableitet, schreibt Zweige um, bleibt grün.
@@ -455,4 +459,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 5088348fe2b9d8c212e66f8d6b86665b7d5479d647c838bd31afa1a38f108155 -->
+<!-- GUIDE-FINGERPRINT: 15ad583b8d7252cd659d8bb8c4d86be54da63391c56aa2a57ad785d20106075e -->

@@ -107,8 +107,13 @@ put it is the mistake this line exists to stop.
   commission row yields a measured file set from its landing merge and clears on a covering pass;
   the same point with an uncovering pass still names the uncovered files; and a point whose file set
   cannot be measured by ANY route yields a refusal text that names that, not the re-run advice.
-  Criticality: medium — it does not lose work, but it stops every turn end until it is worked
-  around, and the workaround is a review round nobody needed.
+  BLOCKING CONDITION, measured 25.08.2026: it stops the batch. Point 893 stands merged, ticked and
+  cleared by a whole-range cross-vendor round, and the gate still refuses — its coverage cannot be
+  measured by any tool we have, and the receipt path reaches only the newest of fourteen ledger rows.
+  Every later landing runs into the same refusal, so this point stands ahead of the release and
+  ahead of point 894.
+  Criticality: high — it does not lose work, but it blocks every landing until it is fixed, and the
+  only workaround is a review round nobody needed.
   Bundle: Modell & Wächter.
 
 - [ ] 894. The daemon, its control plane, and how a worker escapes the session that spawned it.

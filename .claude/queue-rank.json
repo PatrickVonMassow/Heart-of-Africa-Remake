@@ -701,6 +701,12 @@
       "why": "Vor 894 gezogen: das Kritikalitaetstor laesst sich fuer den gelandeten Punkt 893 mit keinem vorhandenen Werkzeug ehrlich raeumen, also blockiert es jede weitere Landung — der Defekt muss vor der naechsten Landung weg",
       "origin": "machine",
       "place": "last"
+    },
+    "904": {
+      "at": "2026-08-25T00:23:39.794Z",
+      "why": "Letzter Platz ist richtig: die drei Befunde liegen in bereits gelandetem Code, blockieren keine offene Spur und keinen Release-Schritt",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "settled": {
