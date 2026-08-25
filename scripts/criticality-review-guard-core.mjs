@@ -565,8 +565,9 @@ export function formatCriticalityReviewVerdict(verdict) {
       lines.push(head)
       if (f.coverageUnknown) {
         lines.push(
-          '      the pass composition has no measured point file set, so its coverage is unknown.',
-          '      Re-run after the authoring commission and reviewed commit are available to Git.',
+          "      Git cannot measure this point's file set from any available route.",
+          '      No usable authoring commission, landing merge, or feat/<point>-… lane establishes',
+          '      the reviewed range; the pass composition therefore cannot prove coverage.',
         )
       } else {
         lines.push(
