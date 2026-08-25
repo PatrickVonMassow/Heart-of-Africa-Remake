@@ -22914,3 +22914,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   build; the cross-vendor review of this file set recorded green before the merge.
   Criticality: high — this is what keeps two coordinators off one batch.
   Bundle: unbundled (batch autonomy).
+
+- [x] 903. A point the serving session authored itself can never satisfy the criticality gate's
+  coverage check. MEASURED 25.08.2026, 02:0x, on `main` at `4873f15`, while resuming the batch after
+  point 893 had already merged and been ticked. The gate refuses on every turn end:
+  "✗ point 893 — the pass composition has no measured point file set, so its coverage is unknown.
+  Re-run after the authoring commission and reviewed commit are available to Git."
+  THE CHAIN: `scripts/criticality-review-guard.mjs:118` measures a point's file set as
+  `git log --first-parent --no-merges <commissionSha>..<reviewSha>`, anchored on an
+  `authoring-commission` row in `.claude/mechanism-reviews.jsonl` that the reviewed sha descends
+  from. That row is written by `scripts/author-sol.mjs` / `author-fable.mjs` when a lane is
+  commissioned — and by nothing else. Point 893 was authored by the serving Claude session in its
+  own worktree, so no such row exists (the ledger has commission rows for 891 and 892 and none for
+  893). With no anchor, `attachPointFileSets` leaves `pointFiles` absent, `criticality-review-guard-
+  core.mjs:429` sets `coverageUnknown: true`, `:428` can never set `compositionComplete`, and the
+  `uncovered-files` finding at `:493` stands for good. Thirteen recorded Sol rounds on 893 ending in
+  `merge` over the exact files it changed cannot clear it, because every one of them carries a
+  `pass` shape and the pass path is the only path that consults `pointFiles`.
+  WHY IT IS NOT A ONE-OFF: every HIGH-criticality point the serving session authors itself lands in
+  the same state, and the refusal is permanent — the baseline advances only when the gate is clear
+  (`criticality-review-guard.mjs:354`), so one such point blocks every later turn end, not just its
+  own landing. The measured cost here was one session-resume turn spent diagnosing it plus a fresh
+  whole-range review round to get out.
+  FINAL STATE: a point's file set is measurable without a commission row. The anchor falls back to
+  what Git can prove on its own — the merge that landed the point, or the first commit of its
+  `feat/<point>-…` lane — and where even that is missing, the gate says so in those words instead of
+  telling the reader to re-run once artefacts appear that will never appear. A self-authored point
+  is a normal case of `CLAUDE.md` §6, not an unrepresentable one.
+  VERIFIABLE: unit cases over the guard core and its Git wrapper — a HIGH point with reviews but no
+  commission row yields a measured file set from its landing merge and clears on a covering pass;
+  the same point with an uncovering pass still names the uncovered files; and a point whose file set
+  cannot be measured by ANY route yields a refusal text that names that, not the re-run advice.
+  BLOCKING CONDITION, measured 25.08.2026: it stops the batch. Point 893 stands merged, ticked and
+  cleared by a whole-range cross-vendor round, and the gate still refuses — its coverage cannot be
+  measured by any tool we have, and the receipt path reaches only the newest of fourteen ledger rows.
+  Every later landing runs into the same refusal, so this point stands ahead of the release and
+  ahead of point 894.
+  Criticality: high — it does not lose work, but it blocks every landing until it is fixed, and the
+  only workaround is a review round nobody needed.
+  Bundle: Modell & Wächter.
