@@ -12272,3 +12272,32 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the material the four-eyes gate judges on, and a reviewer that cannot
   place its material either refuses honest work or clears what it could not read.
   Bundle: Modell & Wächter.
+
+- [ ] 915. The review planner names a reviewer the recorder then refuses, so a multi-group pass
+  can never be completed. MEASURED 25.08.2026 while closing the criticality gate on point 907:
+  `review-sol.mjs` planned two passes over `ca6b81f..1af4456` and printed
+  `pass 2/2 → anthropic reviewer Opus 5; files scripts/command-classify-core.mjs,
+  scripts/command-classify-core.test.mjs` — the correct call, because GPT-5.6 Sol authored those
+  two files. Recording that pass at the planned end state is IMPOSSIBLE: `validateRecord`
+  (`scripts/mechanism-review-core.mjs`) judges reviewer identity against the RECORD'S SHA, and
+  `1af4456` is a ledger commit trailed `Claude Opus 5`, so every Claude model is refused as a
+  self-review. `--carried-from` is refused for the same reason. The only model the recorder would
+  accept at that sha is Sol — the author of the very files the pass covers.
+  WHAT IT COSTS: a range whose end-state sha was written by one vendor cannot receive ANY pass
+  from that vendor, whoever wrote the files the pass reads. The planner and the recorder answer
+  the same question from two sources, and the pass the planner prescribes is the one the recorder
+  rejects — so the composition stays incomplete and the point's coverage cannot close on the
+  route the tool itself printed. Point 907 was closed instead by re-recording the other group as
+  the bounded `1/1` scope it really was, which is honest but is not what the plan prescribed.
+  Note that point 880's identity rewrite does NOT close this: it makes the test vendor-based over
+  all co-authors of the record's commit, and stays keyed to that commit.
+  FINAL STATE: reviewer identity for a FILE-SCOPED pass is judged against the authors of the
+  FILES the pass covers, not against the author of the commit the pass is recorded at — the same
+  authorship grouping `planAuthorshipGroups` already computes, used by both the planner and the
+  recorder, so the command review-sol prints is always one the recorder accepts.
+  VERIFIABLE: a case where the record sha's author is vendor A, the pass files' authors are all
+  vendor B, and a vendor-A reviewer's pass is ACCEPTED; the mirror case where the pass files carry
+  a vendor-A author and the same pass is REFUSED; and a case that the command review-sol prints
+  for each planned pass validates against `validateRecord`.
+  Criticality: high — it is the four-eyes gate's own recording path, and its two halves disagree.
+  Bundle: Modell & Wächter.
