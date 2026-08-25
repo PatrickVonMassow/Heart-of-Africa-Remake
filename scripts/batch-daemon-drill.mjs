@@ -234,18 +234,34 @@ async function parentDeathScenario({ keep }) {
     // the superseded fence even under the live session id, must be REFUSED.
     // The acquisition above installed those credentials for real; these two
     // probes are what prove the daemon actually reads them.
+    //
+    // REFUSED MEANS REFUSED FOR STALENESS, not merely "did not succeed": a probe
+    // that timed out, or failed against a daemon that had already accepted the
+    // stale write, proves nothing about the fence — and `ok !== true` alone would
+    // have passed both. The reason is matched against the two staleness refusals
+    // validation produces, so an accepting daemon cannot hide behind any other
+    // failure of the probe itself.
+    const staleRefusal = /names another session|stale fence/
     const staleSession = await controlRequest({
       repoDir: repo,
       batchId: BATCH,
       request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
     })
-    check("the dead session's (sessionId, fence) is REFUSED after the takeover", staleSession.ok !== true, staleSession.ok ? 'accepted' : '')
+    check(
+      "the dead session's (sessionId, fence) is REFUSED after the takeover",
+      staleSession.ok !== true && staleRefusal.test(staleSession.reason ?? ''),
+      staleSession.ok ? 'accepted' : `refusal reason: ${staleSession.reason ?? '(none)'}`,
+    )
     const staleFence = await controlRequest({
       repoDir: repo,
       batchId: BATCH,
       request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
     })
-    check('the superseded fence is REFUSED even under the live session id', staleFence.ok !== true, staleFence.ok ? 'accepted' : '')
+    check(
+      'the superseded fence is REFUSED even under the live session id',
+      staleFence.ok !== true && staleRefusal.test(staleFence.reason ?? ''),
+      staleFence.ok ? 'accepted' : `refusal reason: ${staleFence.reason ?? '(none)'}`,
+    )
 
     // ADOPTION AFTER RECONCILIATION, in that order: the successor gathers the
     // durable evidence first (step 8), and only a lane that reconciliation
