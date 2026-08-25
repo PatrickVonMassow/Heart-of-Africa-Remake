@@ -50,6 +50,18 @@ describe('the lexer', () => {
     expect(seg.redirects).toEqual([{ fd: '2', op: '>&', target: '1' }])
   })
 
+  it('does not turn here-document bodies into commands', () => {
+    const command = ["cat <<'REPORT'", 'git push origin main', 'REPORT'].join('\n')
+    expect(shellSegments(command)).toEqual(["cat <<'REPORT'"])
+    expect(isMutatingSegment(command)).toBe(false)
+  })
+
+  it('resumes command lexing after a here-document terminator', () => {
+    const command = ['cat <<-REPORT', '\tquoted git push origin main', '\tREPORT', 'git push origin main'].join('\n')
+    expect(shellSegments(command)).toEqual(['cat <<-REPORT', 'git push origin main'])
+    expect(isMutatingSegment(command)).toBe(true)
+  })
+
   it('leaves a backslash alone — half this project\'s paths are Windows paths', () => {
     const [seg] = parseSegments('node scripts\\board.mjs now')
     expect(seg.words[1].text).toBe('scripts\\board.mjs')
@@ -124,6 +136,8 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git diff --stat',
     'git branch -a',
     'git branch --contains main',
+    'git submodule status',
+    'git symbolic-ref HEAD',
     'git worktree list', // THE measured regression of 30.07.2026
     'git worktree list --porcelain',
     'git stash list',
@@ -138,6 +152,7 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git rev-parse HEAD',
     'git describe --tags',
     'git commit --help',
+    'git fetch --help',
   ]
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
 
@@ -168,6 +183,14 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git branch -m old new',
     'git remote add origin url',
     'git config user.name "someone"',
+    'git pull --rebase origin main',
+    'git fetch --prune',
+    'git update-ref refs/heads/main abc123',
+    'git branch feat/x',
+    'git branch -f main abc123',
+    'git gc --prune=now',
+    'git submodule update --init',
+    'git symbolic-ref HEAD refs/heads/x',
   ]
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
 
@@ -218,6 +241,7 @@ describe('file mutation and redirection', () => {
     'echo hi > note.txt',
     'node gen.mjs >> log.txt',
     'node gen.mjs &> all.log',
+    'node gen.mjs >& all.log',
     'node gen.mjs | tee run.log',
   ]
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
@@ -286,6 +310,12 @@ describe('file mutation and redirection', () => {
     expect(isMutatingSegment(`grep "\\${bt}git push\\${bt}" file`)).toBe(false)
     // An UNescaped backtick inside double quotes IS live, and stays a write.
     expect(isMutatingSegment(`grep "${bt}git push${bt}" file`)).toBe(true)
+  })
+
+  it('carries the intent of process substitution without trusting quoted text', () => {
+    expect(isMutatingSegment('diff <(git push) x')).toBe(true)
+    expect(isMutatingSegment('diff <(git status) x')).toBe(false)
+    expect(isMutatingSegment("grep '<(git push)' notes.md")).toBe(false)
   })
 
   it('survives an unbalanced or absurdly deep wrapper without hanging', () => {
@@ -459,10 +489,12 @@ describe('scripts whose whole job is to change shared state', () => {
     }
   })
 
-  it('judges it by NAME, not by flags — a dry run counts too', () => {
+  it('judges it by NAME, not by flags — dry and generic help flags count too', () => {
     // Same reasoning as the fallback: flags are not decidable from outside.
     // Over-blocking here costs a board publish that was due anyway.
     expect(isMutatingSegment('node scripts/land-point.mjs 594 --dry')).toBe(true)
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --model "GPT-5.6 Sol" --help')).toBe(true)
+    expect(isMutatingSegment('node scripts/land-point.mjs 594 --version')).toBe(true)
   })
 
   it('leaves every OTHER script on the read-only fallback', () => {

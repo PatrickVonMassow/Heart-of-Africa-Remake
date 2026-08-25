@@ -35,8 +35,9 @@
 // ── 1. The lexer ─────────────────────────────────────────────────────────────
 //
 // Small on purpose: it recognises quoting, the control operators and the
-// redirections, and treats everything else as a word. It is a CLASSIFIER's
-// tokenizer, not a shell — no expansion, no substitution, no here-docs.
+// redirections, process substitutions and here-document extents, and treats
+// everything else as a word. It is a CLASSIFIER's tokenizer, not a shell — it
+// identifies executable text without performing expansion.
 //
 // One deliberate deviation from POSIX: a BACKSLASH IS AN ORDINARY CHARACTER
 // outside double quotes. Half of this project's commands are Windows paths
@@ -61,7 +62,28 @@ function readRedirectOp(src, i) {
     op += '&'
     j++
   }
+  if (op === '<<' && src[j] === '-') {
+    op += '-'
+    j++
+  }
   return { op, end: j }
+}
+
+/** Skip the data lines belonging to the here-documents queued on a command. */
+function afterHeredocBodies(src, start, heredocs) {
+  let i = start
+  for (const { delimiter, stripTabs } of heredocs) {
+    if (delimiter === null) continue
+    while (i < src.length) {
+      const newline = src.indexOf('\n', i)
+      const end = newline < 0 ? src.length : newline
+      const line = src.slice(i, end).replace(/\r$/, '')
+      const candidate = stripTabs ? line.replace(/^\t+/, '') : line
+      i = newline < 0 ? src.length : newline + 1
+      if (candidate === delimiter) break
+    }
+  }
+  return i
 }
 
 /**
@@ -74,13 +96,32 @@ export function lexCommand(command) {
   const tokens = []
   const n = src.length
   let i = 0
+  const heredocs = []
+  let awaitingHeredoc = null
+  const pushRedirect = (fd, op, start, end) => {
+    tokens.push({ type: 'redir', fd, op, start, end })
+    if (op === '<<' || op === '<<-') {
+      awaitingHeredoc = { delimiter: null, stripTabs: op === '<<-' }
+      heredocs.push(awaitingHeredoc)
+    }
+  }
   while (i < n) {
     const ch = src[i]
     if (isSpace(ch)) {
       i++
       continue
     }
-    if (ch === '\n' || ch === ';') {
+    if (ch === '\n') {
+      tokens.push({ type: 'sep', text: ch, start: i, end: i + 1 })
+      i++
+      if (heredocs.length) {
+        i = afterHeredocBodies(src, i, heredocs)
+        heredocs.length = 0
+        awaitingHeredoc = null
+      }
+      continue
+    }
+    if (ch === ';') {
       tokens.push({ type: 'sep', text: ch, start: i, end: i + 1 })
       i++
       continue
@@ -93,9 +134,12 @@ export function lexCommand(command) {
       i = j
       continue
     }
-    if (ch === '<' || ch === '>' || ch === '&') {
+    if ((ch === '<' || ch === '>') && src[i + 1] === '(') {
+      // Process substitution is a word whose body runs as a command, not a
+      // redirection. The word scanner preserves it for `substitutions` below.
+    } else if (ch === '<' || ch === '>' || ch === '&') {
       const { op, end } = readRedirectOp(src, i)
-      tokens.push({ type: 'redir', fd: '', op, start: i, end })
+      pushRedirect('', op, i, end)
       i = end
       continue
     }
@@ -141,11 +185,17 @@ export function lexCommand(command) {
       }
       if (isSpace(c) || c === '\n' || c === ';' || c === '&' || c === '|') break
       if (c === '<' || c === '>') {
+        if (src[i + 1] === '(') {
+          text += c
+          sub += c
+          i++
+          continue
+        }
         // `2>` — the digits in front of the operator are a file descriptor, not
         // an argument.
         if (!quoted && /^\d+$/.test(text)) {
           const { op, end } = readRedirectOp(src, i)
-          tokens.push({ type: 'redir', fd: text, op, start, end })
+          pushRedirect(text, op, start, end)
           i = end
           emittedRedirect = true
         }
@@ -155,7 +205,13 @@ export function lexCommand(command) {
       sub += c
       i++
     }
-    if (!emittedRedirect && (text || quoted)) tokens.push({ type: 'word', text, sub, quoted, quoteAt, start, end: i })
+    if (!emittedRedirect && (text || quoted)) {
+      tokens.push({ type: 'word', text, sub, quoted, quoteAt, start, end: i })
+      if (awaitingHeredoc?.delimiter === null) {
+        awaitingHeredoc.delimiter = text
+        awaitingHeredoc = null
+      }
+    }
   }
   return tokens
 }
@@ -375,9 +431,9 @@ export function nestedCommands(segment) {
   }
   // `eval` is the same case without a flag.
   if (head === 'eval') out.push(args.map((a) => a.text).join(' '))
-  // `$( … )` and backticks run BEFORE the outer command, so `echo $(git push)`
-  // pushes. Only the expandable text counts — inside single quotes both are
-  // inert, which is what keeps `grep '$(git push)' f` a search.
+  // Command and process substitutions run alongside the outer command, so
+  // `echo $(git push)` and `diff <(git push) x` both push. Only expandable text
+  // counts — inside single quotes they are inert.
   out.push(...substitutions(seg.words.map((w) => w.sub ?? '').join(' ')))
   return out.filter((c) => String(c ?? '').trim())
 }
@@ -387,7 +443,7 @@ function substitutions(text) {
   const s = String(text ?? '')
   const out = []
   for (let i = 0; i < s.length; i++) {
-    if (s[i] === '$' && s[i + 1] === '(') {
+    if ((s[i] === '$' || s[i] === '<' || s[i] === '>') && s[i + 1] === '(') {
       let depth = 1
       let j = i + 2
       for (; j < s.length && depth > 0; j++) {
@@ -458,10 +514,11 @@ export function gitSubcommand(segment) {
   return (positionals(argsOf(seg), { valueFlags: GIT_VALUE_FLAGS })[0] ?? '').toLowerCase()
 }
 
-/** git subcommands that write history, the index, the worktree or the remote. */
+/** git subcommands whose normal operation always writes repository state. */
 const GIT_WRITES = new Set([
   'commit', 'merge', 'push', 'rebase', 'reset', 'revert', 'cherry-pick', 'add', 'apply', 'am', 'clean',
-  'filter-branch', 'checkout', 'switch', 'restore', 'mv', 'rm',
+  'filter-branch', 'checkout', 'switch', 'restore', 'mv', 'rm', 'pull', 'fetch', 'update-ref', 'gc',
+  'pack-refs', 'prune', 'prune-packed', 'repack',
 ])
 
 /** `git worktree <sub>` — only `list` reads. */
@@ -487,9 +544,20 @@ function gitIntent(seg) {
     return hasFlag(args, ['-a', '-s', '-d', '-f', '-m', '--delete', '--force', '--annotate', '--sign']) ? 'write' : 'read'
   }
   if (sub === 'branch') {
-    return hasFlag(args, ['-d', '-D', '--delete', '-m', '-M', '--move', '-c', '-C', '--copy', '--set-upstream-to', '--unset-upstream', '-u'])
-      ? 'write'
-      : 'read'
+    if (hasFlag(args, ['-d', '-D', '--delete', '-m', '-M', '--move', '-c', '-C', '--copy', '-f', '--force', '--set-upstream-to', '--unset-upstream', '-u']))
+      return 'write'
+    // A positional name creates a branch unless a list-mode flag makes it a
+    // pattern or commit filter (`branch --contains main`, `branch -a topic*`).
+    const lists = ['-a', '--all', '-r', '--remotes', '-l', '--list', '--show-current', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format']
+    return rest.length && !hasFlag(args, lists) ? 'write' : 'read'
+  }
+  if (sub === 'submodule') {
+    // With no verb `submodule` is the status view. Update and every other
+    // action change the checkout, config, or nested repositories.
+    return !['', 'status', 'summary'].includes(rest[0] ?? '') ? 'write' : 'read'
+  }
+  if (sub === 'symbolic-ref') {
+    return hasFlag(args, ['-d', '--delete']) || rest.length >= 2 ? 'write' : 'read'
   }
   if (sub === 'remote') {
     return ['add', 'remove', 'rm', 'rename', 'set-url', 'set-head', 'set-branches', 'prune', 'update'].includes(rest[0] ?? '')
@@ -538,8 +606,8 @@ function ghIntent(seg) {
 function redirectWrites(redirects) {
   return redirects.some((r) => {
     if (!r.op.includes('>')) return false // `<` reads
-    if (r.op.endsWith('&')) return false // `2>&1` duplicates a descriptor
     if (!r.target) return false
+    if (r.op.endsWith('&') && /^(?:\d+|-)$/.test(r.target)) return false // `2>&1` duplicates/closes a descriptor
     if (NULL_SINKS.has(r.target.toLowerCase())) return false
     // stderr into a file is left to the fail-open side, as it always was here.
     return r.fd === '' || r.fd === '1'
@@ -551,6 +619,10 @@ function directIntentOfParsed(seg) {
   if (redirectWrites(seg.redirects)) return 'write'
   const head = commandHead(seg)
   if (!head) return 'read'
+  // A script whose job is mutation stays a write under EVERY flag. In
+  // particular, land-point.mjs does not implement a help/version exit path;
+  // those words are merely ignored arguments before it merges and pushes.
+  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
   // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
@@ -567,9 +639,6 @@ function directIntentOfParsed(seg) {
     return argsOf(seg).some((a) => !a.quoted && /^-[A-Za-z]*i/.test(a.text)) ? 'write' : 'read'
   }
   if (WRITING_HEADS.has(head)) return 'write'
-  // A script of THIS repository that we can NAME is decidable, and the fallback's
-  // reasoning does not cover it.
-  if (argsOf(seg).some((a) => MUTATING_SCRIPTS.has(baseOf(a.text)))) return 'write'
   // Everything else — `node scripts/x.mjs --status`, `grep`, `cat`, an unknown
   // tool — reads. A script's own flags are not decidable from outside, and this
   // gate under-blocks by design.
