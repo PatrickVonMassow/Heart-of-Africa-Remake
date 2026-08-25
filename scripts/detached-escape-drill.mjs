@@ -25,7 +25,7 @@
 // reparented to pid 1. That is the whole cause, and it is why the daemon takes
 // file descriptors rather than pipes (docs/handover-architecture.md, mechanism 1).
 import { spawn } from 'node:child_process'
-import { mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -79,6 +79,15 @@ export function readOutcome({
   killedAt = 0,
   observedUntil = 0,
   lastLine = '',
+  // THE KILL ITSELF IS AN INPUT, AND IT DEFAULTS TO UNPROVEN. Review round 13
+  // found the causal chain assumed rather than measured: a pipes parent that
+  // exits on its own closes the reader, its worker records EPIPE and dies, the
+  // observer's group kill fails and is swallowed — and the old reading still
+  // produced "died of the pipe" beside an escaped files worker, a passed drill
+  // that never measured the kill it names. So a caller that does not state the
+  // delivery was measured gets no positive verdict in either direction.
+  killDelivered = false,
+  killWhy = 'the group kill was never measured as delivered',
 } = {}) {
   const all = beatTimes.map(Number).filter(Number.isFinite).sort((a, b) => a - b)
   const after = all.filter((t) => t > killedAt)
@@ -123,29 +132,53 @@ export function readOutcome({
   // ties the death to the pipe. A pipes worker dead of anything else — OOM, a
   // crash, an operator — is a death this run cannot attribute, and `verdict`
   // must not build "the pipe is the binding" on it.
-  const pipeCause = dead && /EPIPE/i.test(lastLine)
-  const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness
+  //
+  // AND THE CAUSE MUST FOLLOW THE KILL. The raised line carries the worker's
+  // own clock, and an EPIPE counts only when the kill was measured as delivered
+  // AND the raise came at or after it: a reader that died of anything earlier
+  // — the independent parent exit above — produced its EPIPE before `killedAt`.
+  // `>=` rather than `>` because `killedAt` is stamped after the syscall
+  // returns, so a legitimate raise can share its millisecond; an independent
+  // death inside that same millisecond is what the parent-exit half of
+  // `killDelivery` exists to catch. The line is matched WHOLE, not searched:
+  // finding 3 of the same review showed what a substring match accepts.
+  const raised = /^raised:\s+(\S+)(?:\s+(\d+))?$/.exec(String(lastLine).trim())
+  const raisedAt = raised?.[2] ? Number(raised[2]) : null
+  const epipe = raised != null && /EPIPE/i.test(raised[1])
+  const pipeCause = dead && epipe && killDelivered && raisedAt !== null && raisedAt >= killedAt
+  const escaped = Boolean(alive) && progressed && !unmeasurable && !unknownLiveness && Boolean(killDelivered)
   // ONE PRECEDENCE, NOT TWO. The reason used to encode the same order as the
   // command's labelling, independently, so the two could drift apart — and had
   // already produced a run whose label and reason disagreed. The label is chosen
   // first, here, and the reason is chosen BY it.
-  const label = labelFor({ escaped, dead, unknownLiveness, unmeasurable })
+  const killUnmeasured = !killDelivered
+  const label = labelFor({ escaped, dead, unknownLiveness, killUnmeasured, unmeasurable })
   const why =
     label === 'ESCAPED'
       ? 'still running and still working after the kill'
       : label === 'DIED'
-        ? /EPIPE/i.test(lastLine)
+        ? pipeCause
           ? 'died writing to a pipe whose reader went with the parent'
-          : 'died with the parent, cause not recorded in its own log'
+          : epipe
+            ? `died recording EPIPE that this run cannot tie to its own kill — ${
+                killUnmeasured
+                  ? killWhy
+                  : raisedAt === null
+                    ? 'the raise carries no clock to order against the kill'
+                    : `the raise at ${raisedAt} predates the kill at ${killedAt}`
+              }`
+            : 'died with the parent, cause not recorded in its own log'
         : label === 'UNKNOWN'
           ? 'liveness could not be established, and an unreadable probe is not a survivor'
-          : label === 'INCONCLUSIVE'
-            ? enoughBaseline
-              ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
-              : `only ${before.length} beat(s) before the kill, too few for a baseline — this run measures nothing`
-            : gained === 0
-              ? 'still running but never beat again — a survivor that stopped is not a lane'
-              : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
+          : label === 'UNMEASURED'
+            ? `${killWhy} — whatever this worker did afterwards measures no kill`
+            : label === 'INCONCLUSIVE'
+              ? enoughBaseline
+                ? `the host could not hold the beat before the kill either (${jitter} ms of jitter) — this run measures nothing`
+                : `only ${before.length} beat(s) before the kill, too few for a baseline — this run measures nothing`
+              : gained === 0
+                ? 'still running but never beat again — a survivor that stopped is not a lane'
+                : `still running but silent for ${maxGap} ms inside the window, over the ${limit} ms a working lane may pause`
   return {
     label,
     shape,
@@ -153,6 +186,10 @@ export function readOutcome({
     progressed,
     dead,
     pipeCause,
+    killDelivered: Boolean(killDelivered),
+    killUnmeasured,
+    killedAt,
+    raisedAt,
     unknownLiveness: Boolean(unknownLiveness),
     unmeasurable,
     alive: Boolean(alive),
@@ -175,10 +212,50 @@ export function readOutcome({
  */
 export function labelFor(outcome = {}) {
   if (outcome.escaped) return 'ESCAPED'
+  // A death is a definite FACT even under an unmeasured kill — only its
+  // ATTRIBUTION needs the kill, and `pipeCause` carries that separately.
   if (outcome.dead) return 'DIED'
   if (outcome.unknownLiveness) return 'UNKNOWN'
+  if (outcome.killUnmeasured) return 'UNMEASURED'
   if (outcome.unmeasurable) return 'INCONCLUSIVE'
   return 'STALLED'
+}
+
+/**
+ * WAS THE GROUP KILL DELIVERED — measured, not assumed. Three facts, all from
+ * the observer's own vantage point, and all three must hold:
+ *
+ * - the parent had NOT already exited when the kill was sent. `kill(-pgid)`
+ *   SUCCEEDS against a group whose only member is a zombie — the signal is
+ *   accepted and discarded — so a successful syscall alone proves nothing
+ *   about a live target.
+ * - the syscall itself succeeded. ESRCH swallowed as "already gone" is exactly
+ *   the false positive of review round 13: the group was never signalled and
+ *   the verdict passed anyway.
+ * - the parent then died OF that SIGKILL: its exit event names the signal.
+ *   A parent that exited any other way between the check and the syscall was
+ *   not this drill's kill, whatever the syscall returned.
+ *
+ * RESIDUAL, stated rather than hidden: an EXTERNAL SIGKILL of the same group
+ * landing inside the check-to-syscall window is indistinguishable from ours.
+ * The mechanism measured — a group SIGKILL closing the reader — is then still
+ * the mechanism; only its sender is wrong, and no fourth fact available to a
+ * process outside the group can tell the two apart.
+ */
+export function killDelivery({ error = null, exitedBeforeKill = false, exitSignal = null } = {}) {
+  if (exitedBeforeKill) {
+    return { delivered: false, why: 'the parent was already gone before the kill, so its group was never a live target' }
+  }
+  if (error !== null) {
+    return { delivered: false, why: `the group kill failed (${error}) and was never delivered` }
+  }
+  if (exitSignal !== 'SIGKILL') {
+    return {
+      delivered: false,
+      why: `the parent did not die of the drill's SIGKILL — its exit recorded ${exitSignal == null ? 'no signal' : exitSignal}`,
+    }
+  }
+  return { delivered: true, why: "SIGKILL was sent to the live parent's group and the parent died of it" }
 }
 
 /** The verdict over both shapes: the drill proves its point only if they DIFFER. */
@@ -207,7 +284,7 @@ export function verdict(outcomes) {
     note: ok
       ? 'the pipe is the binding: same detachment, opposite outcome'
       : pipes?.dead === true && pipes?.pipeCause !== true && files?.escaped === true
-        ? 'inconclusive — the pipes worker died without recording EPIPE, so this death cannot be attributed to the pipe'
+        ? `inconclusive — the pipes worker died, but its death cannot be attributed to the pipe: ${pipes.why}`
         : 'inconclusive — both shapes behaved alike, so this run identifies no cause',
     outcomes,
   }
@@ -222,7 +299,9 @@ const WORKER = `
 import { openSync, writeSync } from 'node:fs'
 const fd = openSync(process.argv[2], 'a')
 process.on('uncaughtException', (e) => {
-  writeSync(fd, 'raised: ' + (e.code ?? e.message) + '\\n')
+  // The raise carries the worker's own clock, so the reading can order the
+  // EPIPE against the kill instead of assuming the sequence.
+  writeSync(fd, 'raised: ' + (e.code ?? e.message) + ' ' + Date.now() + '\\n')
   throw e
 })
 setInterval(() => {
@@ -258,7 +337,16 @@ try {
   ticks = Number(rest[19]) || 0
 } catch (e) { console.error('identity read failed: ' + (e && e.code ? e.code : e)) }
 console.log(String(child.pid) + ' ' + String(ticks))
-await new Promise(() => {})
+// THE PARENT MUST OUTLIVE THE SETTLE WINDOW BY ITS OWN MEANS. This line was
+// 'await new Promise(() => {})', which leaves the FILES parent with an empty
+// event loop — its worker is unref'd and its stdio plain descriptors — and
+// Node exits on an unsettled top-level await. That parent died BEFORE the
+// drill's kill, so the files worker "survived" a group kill that ESRCH'd into
+// a swallowed catch: the delivery receipt caught it the moment it existed
+// (round 13, finding 1). The pipes parent only stayed alive by accident, held
+// by its pipe handles. A live timer holds BOTH parents the same way, so the
+// drill's own SIGKILL is what ends them and stdio stays the only variable.
+setInterval(() => {}, 60000)
 `
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
@@ -399,12 +487,28 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   // a group leader, so util-linux forks, the real parent lands in a THIRD group,
   // and the kill hit an empty wrapper. Both shapes then "escaped" and the run
   // proved nothing — which is what the inconclusive verdict below is for.
-  const parent = spawn(process.execPath, [join(dir, 'parent.mjs'), join(dir, 'worker.mjs'), beat, log, shape], {
-    detached: true,
-    windowsHide: true,
-    stdio: ['ignore', startFd, startFd],
-  })
+  let parent
+  try {
+    parent = spawn(process.execPath, [join(dir, 'parent.mjs'), join(dir, 'worker.mjs'), beat, log, shape], {
+      detached: true,
+      windowsHide: true,
+      stdio: ['ignore', startFd, startFd],
+    })
+  } finally {
+    // THE OBSERVER'S COPY CLOSES HERE. `spawn` dup'd the descriptor into the
+    // child before returning, and removing the directory later does not close
+    // an open descriptor — review round 13 measured two of them leaked per
+    // run, an EMFILE for any caller that keeps invoking `runDrill`.
+    closeSync(startFd)
+  }
   parent.unref()
+  // The exit event is the kill's receipt: whether the parent was still there
+  // to kill, and whether SIGKILL is what ended it. Attached before any await,
+  // so an early independent death cannot slip past unobserved.
+  let parentExit = null
+  parent.on('exit', (code, signal) => {
+    parentExit = { code, signal, at: Date.now() }
+  })
   // The parent writes "<pid> <startTicks>" as one line, taken in the tick it
   // spawned the child, so the identity cannot belong to a replacement.
   let pid = 0
@@ -422,11 +526,19 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   await sleep(settleMs)
   const lines = (path) => readFileSync(path, 'utf8').split('\n').filter(Boolean)
   const beatsBefore = lines(beat).length
+  // THE KILL IS MEASURED, NOT ASSUMED. A swallowed `catch { /* already gone */ }`
+  // was review round 13's finding 1: the pipes parent could exit independently,
+  // its worker record EPIPE and die of THAT, the group kill fail unseen — and
+  // the verdict still pass. Whether the parent had already exited, whether the
+  // syscall succeeded, and whether the parent then died of this SIGKILL are
+  // recorded here and judged by `killDelivery`.
+  const exitedBeforeKill = parentExit !== null
+  let killError = null
   let killedAt = 0
   try {
     process.kill(-parent.pid, 'SIGKILL')
-  } catch {
-    /* already gone */
+  } catch (err) {
+    killError = err?.code ?? String(err)
   } finally {
     killedAt = Date.now()
   }
@@ -435,6 +547,7 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
   const observedUntil = Date.now()
   const beatTimes = after.filter((l) => l.startsWith('beat ')).map((l) => Number(l.slice('beat '.length)))
   const live = probeAlive(pid, { startedAt, requireIdentity: true })
+  const delivery = killDelivery({ error: killError, exitedBeforeKill, exitSignal: parentExit?.signal ?? null })
   const outcome = readOutcome({
     shape,
     alive: live.alive,
@@ -445,6 +558,8 @@ async function runShape(dir, shape, { settleMs = 2000, observeMs = 3000 } = {}) 
     killedAt,
     observedUntil,
     lastLine: after.at(-1) ?? '',
+    killDelivered: delivery.delivered,
+    killWhy: delivery.why,
   })
   // CLEANUP MAY ONLY KILL WHAT THIS DRILL SPAWNED. `Number.isFinite(pid)` was
   // true for the zero this function starts with, and `process.kill(0, …)`
@@ -549,7 +664,7 @@ export async function runDrill(opts = {}) {
 if (isMainModule(import.meta.url)) {
   const result = await runDrill()
   for (const o of result.outcomes) {
-    // FIVE OUTCOMES, NOT TWO, and the same precedence the reading used.
+    // SIX OUTCOMES, NOT TWO, and the same precedence the reading used.
     console.log(`${o.shape}: ${labelFor(o)} — ${o.why} (beats ${o.beatsBefore} → ${o.beatsAfter})`)
     if (o.leftAlone) console.log(`  ${o.leftAlone}`)
   }

@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest'
 import {
   BEAT_MS,
   DEAD_STATES,
+  killDelivery,
   LIVE_STATES,
   labelFor,
   MAX_GAP_BEATS,
@@ -45,6 +46,9 @@ const healthy = {
   observedUntil: WINDOW,
   beatTimes: [...BASELINE, ...beatsEvery(BEAT_MS)],
   beatsBefore: BASELINE.length,
+  // The fixtures state the kill was measured as delivered — the cases about a
+  // kill that was NOT override this, because the reading defaults to unproven.
+  killDelivered: true,
 }
 
 describe('readOutcome', () => {
@@ -131,6 +135,7 @@ describe('readOutcome', () => {
       // that pauses 900 ms — inside twice the baseline, outside the 600 ms floor.
       beatTimes: [500, 1000, 1500, 2000, 2500, 3400, 3900, 4400, 4900, 5400],
       beatsBefore: 5,
+      killDelivered: true,
     })
     expect(jittery.limit).toBe(1000)
     expect(jittery.escaped).toBe(true)
@@ -147,6 +152,7 @@ describe('readOutcome', () => {
       // already starving before the kill, so nothing after it can be attributed.
       beatTimes: [200, 400, 600, 800, 1000, 2800, 3200, 3600, 4000, 4400, 4800, 5200, 5600, 6000],
       beatsBefore: 6,
+      killDelivered: true,
     })
     expect(starved.unmeasurable).toBe(true)
     expect(starved.escaped).toBe(false)
@@ -195,7 +201,8 @@ describe('readOutcome', () => {
       observedUntil: 6000,
       beatTimes: [2900],
       beatsBefore: 1,
-      lastLine: 'raised: EPIPE',
+      lastLine: 'raised: EPIPE 3100',
+      killDelivered: true,
     })
     expect(deadOnBadHost.unmeasurable).toBe(true)
     expect(deadOnBadHost.dead).toBe(true)
@@ -211,6 +218,7 @@ describe('readOutcome', () => {
       beatTimes: [-200, ...beatsEvery(BEAT_MS)],
       observedUntil: WINDOW,
       beatsBefore: 1,
+      killDelivered: true,
     })
     expect(thin.unmeasurable).toBe(true)
     expect(thin.why).toMatch(/too few for a baseline/)
@@ -223,7 +231,7 @@ describe('readOutcome', () => {
       alive: false,
       ...healthy,
       beatTimes: [...BASELINE, BEAT_MS],
-      lastLine: 'raised: EPIPE',
+      lastLine: 'raised: EPIPE 250',
     })
     expect(died.escaped).toBe(false)
     expect(died.why).toMatch(/pipe whose reader went with the parent/)
@@ -239,10 +247,114 @@ describe('readOutcome', () => {
   it('never attributes the pipe to a worker that is not even dead', () => {
     // `pipeCause` is a fact about a DEATH: an EPIPE string in the log of a
     // live or unprobeable worker attributes nothing.
-    const alive = readOutcome({ shape: 'pipes', alive: true, ...healthy, lastLine: 'raised: EPIPE' })
+    const alive = readOutcome({ shape: 'pipes', alive: true, ...healthy, lastLine: 'raised: EPIPE 250' })
     expect(alive.pipeCause).toBe(false)
-    const unknown = readOutcome({ shape: 'pipes', alive: false, unknownLiveness: true, ...healthy, lastLine: 'raised: EPIPE' })
+    const unknown = readOutcome({ shape: 'pipes', alive: false, unknownLiveness: true, ...healthy, lastLine: 'raised: EPIPE 250' })
     expect(unknown.pipeCause).toBe(false)
+  })
+
+  // ROUND-13 FINDING 1, the reading half: the causal verdict must MEASURE the
+  // kill it names, not assume it. Each of these cases passed the pre-fix
+  // reading — that is what made the finding a defect and these tests RED.
+  it('refuses an escape when the kill was never measured as delivered', () => {
+    // A files worker that "survived" a kill nothing delivered survived nothing.
+    const unmeasured = readOutcome({ shape: 'files', alive: true, ...healthy, killDelivered: false })
+    expect(unmeasured.escaped).toBe(false)
+    expect(labelFor(unmeasured)).toBe('UNMEASURED')
+    expect(unmeasured.why).toMatch(/never measured as delivered/)
+  })
+
+  it('refuses to attribute an EPIPE that PREDATES the kill', () => {
+    // The false-positive sequence itself: the parent exits independently, the
+    // reader closes, the worker records EPIPE and dies — all BEFORE the kill.
+    const before = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      startedObserving: 0,
+      killedAt: 3000,
+      observedUntil: 6000,
+      beatTimes: beatsEvery(BEAT_MS, 200, 2800),
+      beatsBefore: 14,
+      lastLine: 'raised: EPIPE 2900',
+      killDelivered: true,
+    })
+    expect(before.dead).toBe(true)
+    expect(before.pipeCause).toBe(false)
+    expect(before.why).toMatch(/raise at 2900 predates the kill at 3000/)
+    // …while the same death with its raise AFTER the kill is the proven chain.
+    const after = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      startedObserving: 0,
+      killedAt: 3000,
+      observedUntil: 6000,
+      beatTimes: beatsEvery(BEAT_MS, 200, 2800),
+      beatsBefore: 14,
+      lastLine: 'raised: EPIPE 3100',
+      killDelivered: true,
+    })
+    expect(after.pipeCause).toBe(true)
+    expect(after.raisedAt).toBe(3100)
+  })
+
+  it('refuses an EPIPE whose raise carries no clock to order against the kill', () => {
+    const unclocked = readOutcome({ shape: 'pipes', alive: false, ...healthy, beatTimes: BASELINE, lastLine: 'raised: EPIPE' })
+    expect(unclocked.dead).toBe(true)
+    expect(unclocked.pipeCause).toBe(false)
+    expect(unclocked.why).toMatch(/no clock/)
+  })
+
+  it('refuses an EPIPE, however well ordered, under a kill that was not delivered', () => {
+    const undelivered = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      ...healthy,
+      beatTimes: BASELINE,
+      lastLine: 'raised: EPIPE 250',
+      killDelivered: false,
+      killWhy: 'the group kill failed (ESRCH) and was never delivered',
+    })
+    expect(undelivered.dead).toBe(true)
+    expect(undelivered.pipeCause).toBe(false)
+    expect(undelivered.why).toMatch(/ESRCH/)
+  })
+})
+
+describe('killDelivery', () => {
+  const delivered = { error: null, exitedBeforeKill: false, exitSignal: 'SIGKILL' }
+
+  it('accepts only the full measured chain: live target, successful syscall, death by SIGKILL', () => {
+    expect(killDelivery(delivered)).toEqual({ delivered: true, why: expect.stringMatching(/died of it/) })
+  })
+
+  it('refuses a parent that was already gone — a zombie group still accepts the signal', () => {
+    // `kill(-pgid)` SUCCEEDS against a group whose only member is a zombie, so
+    // a successful syscall after an independent parent death proves nothing.
+    const gone = killDelivery({ ...delivered, exitedBeforeKill: true })
+    expect(gone.delivered).toBe(false)
+    expect(gone.why).toMatch(/already gone before the kill/)
+  })
+
+  it('refuses a failed syscall instead of reading it as "already dead"', () => {
+    // The swallowed catch was the finding: ESRCH recorded as a kill.
+    const failed = killDelivery({ ...delivered, error: 'ESRCH' })
+    expect(failed.delivered).toBe(false)
+    expect(failed.why).toMatch(/failed \(ESRCH\)/)
+  })
+
+  it("refuses a parent that did not die of the drill's SIGKILL", () => {
+    const wrongSignal = killDelivery({ ...delivered, exitSignal: 'SIGTERM' })
+    expect(wrongSignal.delivered).toBe(false)
+    expect(wrongSignal.why).toMatch(/SIGTERM/)
+    // …including one that never exited inside the window at all: no receipt,
+    // no delivery — fail closed, exactly like the liveness probes above.
+    const noReceipt = killDelivery({ ...delivered, exitSignal: null })
+    expect(noReceipt.delivered).toBe(false)
+    expect(noReceipt.why).toMatch(/no signal/)
+  })
+
+  it('fails closed when called with nothing at all', () => {
+    expect(killDelivery().delivered).toBe(false)
   })
 })
 
@@ -492,6 +604,10 @@ describe('labelFor', () => {
     expect(labelFor({ escaped: true, dead: false })).toBe('ESCAPED')
     expect(labelFor({ dead: true, unmeasurable: true })).toBe('DIED')
     expect(labelFor({ unknownLiveness: true, unmeasurable: true })).toBe('UNKNOWN')
+    expect(labelFor({ killUnmeasured: true, unmeasurable: true })).toBe('UNMEASURED')
+    // A death is a fact even under an unmeasured kill; only its attribution
+    // needs the kill, and that lives in pipeCause, not in the label.
+    expect(labelFor({ dead: true, killUnmeasured: true })).toBe('DIED')
     expect(labelFor({ unmeasurable: true })).toBe('INCONCLUSIVE')
     expect(labelFor({})).toBe('STALLED')
   })
@@ -499,10 +615,11 @@ describe('labelFor', () => {
   it('agrees with the reason readOutcome gave, for every shape of run', () => {
     const cases = [
       [{ shape: 'files', alive: true, ...healthy }, 'ESCAPED', /still working/],
-      [{ shape: 'pipes', alive: false, ...healthy, lastLine: 'raised: EPIPE' }, 'DIED', /pipe whose reader/],
+      [{ shape: 'pipes', alive: false, ...healthy, lastLine: 'raised: EPIPE 250' }, 'DIED', /pipe whose reader/],
       [{ shape: 'files', alive: false, unknownLiveness: true, ...healthy }, 'UNKNOWN', /liveness could not be established/],
+      [{ shape: 'files', alive: true, ...healthy, killDelivered: false }, 'UNMEASURED', /never measured as delivered/],
       [
-        { shape: 'files', alive: true, startedObserving: 0, killedAt: 0, observedUntil: WINDOW, beatTimes: [100, 2000] },
+        { shape: 'files', alive: true, startedObserving: 0, killedAt: 0, observedUntil: WINDOW, beatTimes: [100, 2000], killDelivered: true },
         'INCONCLUSIVE',
         /measures nothing/,
       ],
@@ -530,7 +647,8 @@ describe('verdict', () => {
       observedUntil: WINDOW,
       startedObserving: -1600,
       beatTimes: escaped ? [...BASELINE, ...beatsEvery(BEAT_MS)] : BASELINE,
-      lastLine: 'raised: EPIPE',
+      lastLine: escaped ? '' : 'raised: EPIPE 250',
+      killDelivered: true,
     })
 
   it('proves the cause only when the two shapes DIFFER', () => {
@@ -553,12 +671,38 @@ describe('verdict', () => {
       startedObserving: -1600,
       beatTimes: BASELINE,
       lastLine: 'beat 17',
+      killDelivered: true,
     })
     expect(unexplained.dead).toBe(true)
     expect(unexplained.pipeCause).toBe(false)
     const refused = verdict([unexplained, outcome('files', true)])
     expect(refused.ok).toBe(false)
     expect(refused.note).toMatch(/cannot be attributed to the pipe/)
+  })
+
+  it("refuses round 13's false-positive sequence: independent parent death, swallowed kill, EPIPE anyway", () => {
+    // The pipes parent exits on its own before the intended kill; its worker
+    // records EPIPE (the reader really did vanish — just not by our hand) and
+    // dies; the group kill fails and used to be swallowed; the files worker
+    // escapes. The pre-fix verdict passed this without measuring any kill.
+    const independentDeath = readOutcome({
+      shape: 'pipes',
+      alive: false,
+      beatsBefore: 9,
+      killedAt: KILL,
+      observedUntil: WINDOW,
+      startedObserving: -1600,
+      beatTimes: BASELINE,
+      lastLine: 'raised: EPIPE 250',
+      killDelivered: false,
+      killWhy: 'the group kill failed (ESRCH) and was never delivered',
+    })
+    expect(independentDeath.dead).toBe(true)
+    expect(independentDeath.pipeCause).toBe(false)
+    const refused = verdict([independentDeath, outcome('files', true)])
+    expect(refused.ok).toBe(false)
+    expect(refused.note).toMatch(/cannot be attributed to the pipe/)
+    expect(refused.note).toMatch(/ESRCH/)
   })
 
   it('refuses to conclude when both shapes survived', () => {
@@ -584,12 +728,12 @@ describe('verdict', () => {
   it('a pipes worker NOT PROVEN DEAD proves nothing, however escaped the files worker is', () => {
     const escapedFiles = outcome('files', true)
     // An unreadable liveness probe: not escaped, but not a corpse either.
-    const unknown = readOutcome({ shape: 'pipes', alive: false, unknownLiveness: true, beatsBefore: 9, killedAt: KILL, observedUntil: WINDOW, startedObserving: -1600, beatTimes: BASELINE })
+    const unknown = readOutcome({ shape: 'pipes', alive: false, unknownLiveness: true, beatsBefore: 9, killedAt: KILL, observedUntil: WINDOW, startedObserving: -1600, beatTimes: BASELINE, killDelivered: true })
     expect(unknown.escaped).toBe(false)
     expect(unknown.dead).toBe(false)
     expect(verdict([unknown, escapedFiles]).ok).toBe(false)
     // A live pipes worker that merely stalled: alive, so not the dead half.
-    const stalled = readOutcome({ shape: 'pipes', alive: true, beatsBefore: 9, killedAt: KILL, observedUntil: WINDOW, startedObserving: -1600, beatTimes: BASELINE })
+    const stalled = readOutcome({ shape: 'pipes', alive: true, beatsBefore: 9, killedAt: KILL, observedUntil: WINDOW, startedObserving: -1600, beatTimes: BASELINE, killDelivered: true })
     expect(stalled.escaped).toBe(false)
     expect(stalled.dead).toBe(false)
     expect(verdict([stalled, escapedFiles]).ok).toBe(false)
@@ -612,6 +756,11 @@ describe('runDrill — the real processes, the real kill', () => {
       // Cleanup left nothing it has to report: no survivor, no failed signal,
       // no unreadable state (reap's contract — undefined means nothing left).
       expect(by[shape]?.leftAlone, detail).toBeUndefined()
+      // The kill was MEASURED as delivered for both shapes: the parent was
+      // still there, the syscall succeeded, and the parent died of the
+      // drill's own SIGKILL — round 13's finding 1 was a verdict that could
+      // pass without any of that being true.
+      expect(by[shape]?.killDelivered, detail).toBe(true)
     }
     // The measured mechanism itself: the same SIGKILL of the parent's group,
     // and only stdio differing — the pipes child died OF THE PIPE (its own log
@@ -619,6 +768,9 @@ describe('runDrill — the real processes, the real kill', () => {
     // and kept working.
     expect(by.pipes.dead, detail).toBe(true)
     expect(by.pipes.pipeCause, detail).toBe(true)
+    // …and the EPIPE it names as the cause came AFTER that delivery, by the
+    // worker's own clock.
+    expect(by.pipes.raisedAt, detail).toBeGreaterThanOrEqual(by.pipes.killedAt)
     expect(by.pipes.why, detail).toMatch(/pipe whose reader went with the parent/)
     expect(by.files.escaped, detail).toBe(true)
     expect(result.ok, detail).toBe(true)

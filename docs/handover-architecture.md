@@ -324,7 +324,12 @@ the pipe rather than for handling the error. The drill also refuses to conclude 
 two shapes behave alike, which is what it did when an earlier harness sent the kill to the wrong
 process group — and it names the pipe only for a death whose own log recorded the EPIPE: a pipes
 worker dead of an unrelated cause beside an escaped files worker is reported as unattributable,
-never as the proven mechanism.
+never as the proven mechanism. The kill itself is measured, not assumed: a verdict in either
+direction requires that the parent was still alive when its group was signalled, that the signal
+call succeeded, and that the parent then died of that SIGKILL — and the EPIPE the verdict names
+must carry the worker's own clock and come after that delivery. A run in which the parent exits
+on its own and the worker records EPIPE anyway is reported as unmeasured, because a group kill
+nothing delivered proves nothing about what a group kill does.
 
 That correction matters, because the two bindings the first draft blamed are not lifetime
 bindings at all:
