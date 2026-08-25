@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Read-only projection of durable batch state for the progress board.
 import { join, resolve } from 'node:path'
 import { isMainModule } from './is-main.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -28,7 +29,12 @@ if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
   const arg = (name) => argv.includes(name) ? argv[argv.indexOf(name) + 1] : null
   const batchId = arg('--batch')
-  if (!batchId) { console.error('usage: node scripts/batch-board.mjs --batch <id> [--repo <dir>] [--json]'); process.exit(2) }
+  if (!batchId) {
+    console.error(
+      'usage: node scripts/batch-board.mjs --batch <id> [--repo <dir>] [--json]',
+    )
+    process.exit(2)
+  }
   const projection = gatherBatchBoard({ repoDir: resolve(arg('--repo') ?? REPO_ROOT), batchId })
   console.log(argv.includes('--json') ? JSON.stringify(projection, null, 2) : batchBoardText(projection))
   process.exit(projection.ok && !projection.red ? 0 : 1)

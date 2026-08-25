@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Reconstruct unbiased durable-lane trial metrics from the sealed plan and journal.
 import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { isMainModule } from './is-main.mjs'
@@ -22,7 +23,12 @@ if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
   const arg = (name) => argv.includes(name) ? argv[argv.indexOf(name) + 1] : null
   const batchId = arg('--batch')
-  if (!batchId) { console.error('usage: node scripts/batch-metrics.mjs --batch <id> [--repo <dir>] [--context <samples.json>]'); process.exit(2) }
+  if (!batchId) {
+    console.error(
+      'usage: node scripts/batch-metrics.mjs --batch <id> [--repo <dir>] [--context <samples.json>]',
+    )
+    process.exit(2)
+  }
   const report = batchMetricsReport({ repoDir: resolve(arg('--repo') ?? REPO_ROOT), batchId, contextPath: arg('--context') })
   console.log(JSON.stringify(report, null, 2))
   process.exit(report.ok ? 0 : 1)
