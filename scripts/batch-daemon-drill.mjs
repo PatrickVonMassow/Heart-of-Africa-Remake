@@ -93,7 +93,7 @@ function buildSandbox() {
 
 /** THE PARENT SESSION half, run as its own process group: everything a spawning
  *  session does, then an endless mid-authoring sleep for the observer to kill. */
-async function parentSession({ repo, worktree, readyPath }) {
+async function parentSession({ repo, worktree, readyPath, neuterEpoch = false }) {
   const sid = 'doomed-session'
   // THE PARENT'S LOCK IS ACQUIRED, NOT WRITTEN. A hand-built lock is not the
   // shape acquisition produces — it carried no `claimedAt`, so every later
@@ -108,7 +108,7 @@ async function parentSession({ repo, worktree, readyPath }) {
   if (acquired !== 'acquired') throw new Error(`parent: could not acquire the drill lock: ${acquired}`)
   const parentFence = readJsonIfAny(join(repo, '.claude', 'batch-lock.json'))?.fence
   if (!Number.isInteger(parentFence)) throw new Error('parent: acquisition minted no fence')
-  const started = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true })
+  const started = await startDaemon({ repoDir: repo, batchId: BATCH, drill: true, neuterEpoch })
   if (!started.ok) throw new Error(`parent: daemon refused: ${started.reason}`)
   const copied = writeLockCopy({ repoDir: repo, record: started.record, sessionId: sid })
   if (!copied.ok) throw new Error(`parent: ${copied.reason}`)
@@ -138,7 +138,7 @@ async function parentSession({ repo, worktree, readyPath }) {
   for (;;) await sleep(1000)
 }
 
-async function parentDeathScenario({ keep }) {
+async function parentDeathScenario({ keep, neuterEpoch = false }) {
   const checks = []
   const check = (name, ok, detail = '') => {
     checks.push({ name, ok, detail })
@@ -150,7 +150,7 @@ async function parentDeathScenario({ keep }) {
   const out = openSync(logPath, 'a')
   // The parent is its own group leader, so the kill below reaches everything a
   // dying session takes — except what correctly escaped it.
-  const parent = spawn(process.execPath, ['scripts/batch-daemon-drill.mjs', '--parent-session', '--repo', repo, '--worktree', worktree, '--ready', readyPath], { windowsHide: true,
+  const parent = spawn(process.execPath, ['scripts/batch-daemon-drill.mjs', '--parent-session', '--repo', repo, '--worktree', worktree, '--ready', readyPath, ...(neuterEpoch ? ['--neuter-epoch'] : [])], { windowsHide: true,
     cwd: process.cwd(),
     detached: true,
     stdio: ['ignore', out, out],
@@ -429,8 +429,12 @@ async function waitForNewSha({ originDir, since, timeoutMs }) {
   }
 }
 
-export async function runDrill({ scenario, keep = false } = {}) {
-  if (scenario === 'parent-death') return parentDeathScenario({ keep })
+/** `neuterEpoch` is the NEGATIVE CONTROL: the same scenario against a real
+ *  daemon whose epoch enforcement is off (a drill-only startDaemon/serve flag).
+ *  Such a run must come back red at the two stale-refusal checks — a drill
+ *  that stays green over it does not call the thing it claims to prove. */
+export async function runDrill({ scenario, keep = false, neuterEpoch = false } = {}) {
+  if (scenario === 'parent-death') return parentDeathScenario({ keep, neuterEpoch })
   return { ok: false, reason: `unknown scenario: ${String(scenario)}; this slice carries parent-death (the later drills are 676's remainder)` }
 }
 
@@ -438,12 +442,16 @@ if (isMainModule(import.meta.url)) {
   const argv = process.argv.slice(2)
   if (argv[0] === '--parent-session') {
     const arg = (name) => argv[argv.indexOf(name) + 1]
-    parentSession({ repo: arg('--repo'), worktree: arg('--worktree'), readyPath: arg('--ready') }).catch((error) => {
+    parentSession({ repo: arg('--repo'), worktree: arg('--worktree'), readyPath: arg('--ready'), neuterEpoch: argv.includes('--neuter-epoch') }).catch((error) => {
       console.error(error?.stack || String(error))
       process.exit(1)
     })
   } else {
-    runDrill({ scenario: argv.includes('--scenario') ? argv[argv.indexOf('--scenario') + 1] : 'parent-death', keep: argv.includes('--keep') }).then((result) => {
+    runDrill({
+      scenario: argv.includes('--scenario') ? argv[argv.indexOf('--scenario') + 1] : 'parent-death',
+      keep: argv.includes('--keep'),
+      neuterEpoch: argv.includes('--neuter-epoch'),
+    }).then((result) => {
       console.log(JSON.stringify(result, null, 2))
       process.exit(result.ok ? 0 : 1)
     })

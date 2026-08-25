@@ -956,6 +956,11 @@ that preserves the branch, or a landing.
 
 It runs as `node scripts/batch-daemon.mjs drill --scenario parent-death` and is a precondition of
 activation itself — the steps-8-and-9 slice the flag's interlock waits for — not a later trial.
+Its negative control is `--neuter-epoch`: the same scenario against a real daemon whose epoch
+enforcement is switched off — a drill-only flag both the launcher and the serving process refuse
+outside a sandbox — and that run must end RED at exactly the two stale-refusal checks. The test
+suite pins both directions, so neither the probes nor the daemon's validation can be hollowed out
+while the drill stays green.
 
 
 ## The raw blind halves

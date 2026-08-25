@@ -10,7 +10,12 @@
 //   node scripts/batch-daemon.mjs start  --repo <dir> --batch <id> --session <sid> [--drill]
 //   node scripts/batch-daemon.mjs status --repo <dir> --batch <id>
 //   node scripts/batch-daemon.mjs stop   --repo <dir> --batch <id> [--drain]
-//   node scripts/batch-daemon.mjs drill  --scenario parent-death [--keep]
+//   node scripts/batch-daemon.mjs drill  --scenario parent-death [--keep] [--neuter-epoch]
+//
+// `drill --neuter-epoch` is the drill's NEGATIVE CONTROL: the same scenario
+// against a daemon whose epoch enforcement is switched off, which must end red
+// (exit 1) at the drill's two stale-refusal checks. The flag is drill-only:
+// startDaemon and the serving process both refuse it outside --drill.
 //
 // PRODUCTION START IS INTERLOCKED: `start` without --drill consults the
 // activation flag AND the step manifest, and both refuse while steps 8 and 9
@@ -160,6 +165,14 @@ function writeRecordExclusive(path, record) {
 
 async function serve(args) {
   const repoDir = resolve(args.repo)
+  // THE NEGATIVE CONTROL NEVER SERVES PRODUCTION: --neuter-epoch exists so the
+  // parent-death drill can prove its stale probes catch a daemon whose epoch
+  // enforcement was removed. Outside --drill it is refused here, in the serving
+  // process itself, for the same reason the sandbox interlock is.
+  if (args['neuter-epoch'] === true && args.drill !== true) {
+    console.error('daemon: --neuter-epoch is the drill\'s negative control and refuses to serve outside --drill')
+    process.exit(1)
+  }
   // THE INTERLOCK IS ENFORCED HERE, in the serving process itself — not only in
   // startDaemon: `node scripts/batch-daemon.mjs serve ...` is reachable
   // directly, and a gate that lives only in the launcher is a gate a direct
@@ -304,6 +317,10 @@ async function serve(args) {
   let worktreeClaims = {}
   const attemptsState = new Map() // attemptId -> last attempt snapshot row
   let draining = false
+  // Drill-only (refused above outside --drill): with epoch enforcement OFF the
+  // daemon accepts any (sessionId, fence) — the broken daemon the drill's stale
+  // probes exist to catch, run for real so the whole drill must go red on it.
+  const neutered = args['neuter-epoch'] === true
 
   const heartbeat = setInterval(() => {
     // O_NOFOLLOW, like every store write: a planted link must fail the write
@@ -333,7 +350,13 @@ async function serve(args) {
     if (journalFailed) return { ok: false, reason: `the journal failed durably (${journalFailed}); the daemon refuses every mutation and awaits the operator` }
     const lock = readLock(repoDir)
     const presented = { sessionId: request.sessionId, fence: request.fence }
-    const validated = validateMutation({ presented, lock, probe: lock ? probeOf(lock.pid) : null, now: nowMs() })
+    // Neutered: the presented credentials are never compared with the lock;
+    // journalling still runs under the lock's real fence so everything else
+    // keeps working — only the epoch is unenforced.
+    const validated =
+      neutered && Number.isInteger(lock?.fence)
+        ? { ok: true, fence: lock.fence }
+        : validateMutation({ presented, lock, probe: lock ? probeOf(lock.pid) : null, now: nowMs() })
     if (!validated.ok) return { ok: false, reason: validated.reason }
     currentFence = validated.fence
     // Every command's idempotency key includes the batch, so the payload must
@@ -390,7 +413,9 @@ async function serve(args) {
     // time, owner liveness — so a lease that expired or an owner that died
     // during the mutation compensates like a moved lock does.
     const lockAfter = readLock(repoDir)
-    const after = revalidateAfterWrite({ validated: presented, lock: lockAfter, probe: lockAfter ? probeOf(lockAfter.pid) : null, now: nowMs() })
+    const after = neutered
+      ? { verdict: 'stand' }
+      : revalidateAfterWrite({ validated: presented, lock: lockAfter, probe: lockAfter ? probeOf(lockAfter.pid) : null, now: nowMs() })
     if (after.verdict === 'compensate') {
       const compensated = compensateFn ? await compensateFn(result) : { note: 'no local effect to reverse' }
       journalEntry({ kind: 'command', name: `${request.cmd}:compensated`, key: `${keyed.key}:comp`, payload: { reason: after.reason, ...compensated } }, validated.fence)
@@ -948,7 +973,13 @@ export function controlRequest({ repoDir, batchId, request, timeoutMs = 15_000 }
 
 /** Starts the serving process with mechanism 1's escape and waits for the record
  *  carrying THIS launch's nonce. Exported for the drill and the tests. */
-export async function startDaemon({ repoDir, batchId, drill = false, waitMs = START_WAIT_MS }) {
+export async function startDaemon({ repoDir, batchId, drill = false, neuterEpoch = false, waitMs = START_WAIT_MS }) {
+  // Checked before anything else, so the refusal cannot depend on the target
+  // repository's state: epoch enforcement is only ever switched off for the
+  // drill's negative control, never for a daemon that could serve production.
+  if (neuterEpoch && !drill) {
+    return { ok: false, reason: "--neuter-epoch is the drill's negative control; a daemon outside a drill never runs with epoch enforcement off" }
+  }
   const resolved = resolve(repoDir)
   if (drill) {
     // Same rule as the serving process: REAL paths on both sides, so a symlink
@@ -979,7 +1010,7 @@ export async function startDaemon({ repoDir, batchId, drill = false, waitMs = ST
   const nonce = mintLaunchNonce()
   spawnDetached({
     cmd: process.execPath,
-    args: ['scripts/batch-daemon.mjs', 'serve', '--repo', resolved, '--batch', batchId, '--nonce', nonce, ...(drill ? ['--drill'] : [])],
+    args: ['scripts/batch-daemon.mjs', 'serve', '--repo', resolved, '--batch', batchId, '--nonce', nonce, ...(drill ? ['--drill'] : []), ...(neuterEpoch ? ['--neuter-epoch'] : [])],
     cwd: process.cwd(),
     logPath: join(store.dir, 'daemon.log'),
   })
@@ -1085,7 +1116,7 @@ function parseArgs(argv) {
   for (let i = 1; i < argv.length; i += 1) {
     const flag = argv[i]
     if (!flag.startsWith('--')) continue
-    const bare = ['--drill', '--drain', '--keep']
+    const bare = ['--drill', '--drain', '--keep', '--neuter-epoch']
     if (bare.includes(flag)) args[flag.slice(2)] = true
     else {
       args[flag.slice(2)] = argv[i + 1]
@@ -1150,11 +1181,11 @@ async function main() {
     // this module, and a static edge back would be a cycle — and the serving
     // process has no business loading drill code at all.
     const { runDrill } = await import('./batch-daemon-drill.mjs')
-    const result = await runDrill({ scenario: args.scenario ?? 'parent-death', keep: args.keep === true })
+    const result = await runDrill({ scenario: args.scenario ?? 'parent-death', keep: args.keep === true, neuterEpoch: args['neuter-epoch'] === true })
     console.log(JSON.stringify(result, null, 2))
     process.exit(result.ok ? 0 : 1)
   }
-  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep]')
+  console.error('usage: node scripts/batch-daemon.mjs start|status|stop|drill --repo <dir> --batch <id> [--session <sid>] [--fence <n>] [--drill] [--drain] [--scenario <name>] [--keep] [--neuter-epoch]')
   process.exit(2)
 }
 

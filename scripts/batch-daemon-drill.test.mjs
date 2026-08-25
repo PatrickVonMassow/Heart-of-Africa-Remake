@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { describe, it, expect } from 'vitest'
 import { runDrill, staleProbeRefused, STALE_REFUSAL } from './batch-daemon-drill.mjs'
+import { startDaemon } from './batch-daemon.mjs'
 
 // THE DOCUMENTED ENTRYPOINT IS THE ONE UNDER TEST. The architecture promises
 // `node scripts/batch-daemon.mjs drill --scenario parent-death`; a suite that
@@ -83,6 +84,31 @@ describe('the documented drill entrypoint', () => {
     // leave `failed` empty over a hollowed-out drill.
     expect(result.checks.map((c) => c.name)).toEqual(REQUIRED_CHECKS)
   }, 120_000)
+
+  it('goes RED — at exactly the two stale probes — against a real daemon with epoch enforcement OFF', async () => {
+    // THE NEGATIVE CONTROL RUNS THE REAL THING. Feeding a fabricated { ok: true }
+    // to staleProbeRefused proved only the judge (cross-vendor review of point
+    // 834, B2); this run neuters an actual daemon (the drill-only --neuter-epoch
+    // serve flag) and requires the COMPLETE drill to fail, through both real
+    // control requests. A rewrite that replaces the stale probes with
+    // unconditionally green checks turns this expectation red.
+    const result = await runDrill({ scenario: 'parent-death', neuterEpoch: true })
+    expect(result.ok).toBe(false)
+    const failed = (result.checks ?? []).filter((c) => !c.ok)
+    expect(failed.map((c) => c.name), JSON.stringify(failed, null, 2)).toEqual([
+      "the dead session's (sessionId, fence) is REFUSED after the takeover",
+      'the superseded fence is REFUSED even under the live session id',
+    ])
+    // …and each failure names ACCEPTANCE, so the red is the daemon ignoring the
+    // epoch, not some unrelated malfunction of the probe.
+    for (const c of failed) expect(c.detail).toMatch(/does not enforce the epoch/)
+  }, 120_000)
+
+  it('refuses to start a neutered daemon outside a drill, before reading any repository state', async () => {
+    const refused = await startDaemon({ repoDir: '/nonexistent-on-purpose', batchId: 'x', drill: false, neuterEpoch: true })
+    expect(refused.ok).toBe(false)
+    expect(refused.reason).toMatch(/negative control/)
+  })
 })
 
 describe('staleProbeRefused', () => {
