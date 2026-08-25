@@ -40,26 +40,51 @@ const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** The two refusal reasons validateMutation produces for STALENESS — and
- *  nothing else, so the regex is ANCHORED to the whole message: an unanchored
- *  substring match accepted any reply that merely CONTAINED one of the phrases
- *  ("internal error while checking stale fence", a compensation wrapping the
- *  session reason) as proof of epoch enforcement (cross-vendor review of point
- *  834, H3). Kept beside the judge below, which is the only consumer. */
-export const STALE_REFUSAL = /^(?:the lock names another session|stale fence: presented \d+, the lock carries \d+)$/
+/** The refusal reasons `validateMutation` produces for STALENESS, KEYED BY THE
+ *  CREDENTIAL each one proves — and nothing else, so every pattern is anchored
+ *  at BOTH ends: an unanchored substring match accepted any reply that merely
+ *  CONTAINED one of the phrases ("internal error while checking stale fence", a
+ *  compensation wrapping the session reason) as proof of enforcement
+ *  (cross-vendor review of point 834, H3). The tail anchor is `(?![\s\S])`, not
+ *  `$`: JavaScript's `$` also matches BEFORE a final line terminator, so a
+ *  reason ending in a newline violated "and nothing else" and still passed
+ *  (round-14 review, P2).
+ *
+ *  KEYED, because one refusal must never stand in for the other — see
+ *  `staleProbeRefused`. Kept beside that judge, its only consumer. */
+export const STALE_REFUSAL = {
+  session: /^the lock names another session(?![\s\S])/,
+  fence: /^stale fence: presented \d+, the lock carries \d+(?![\s\S])/,
+}
+
+/** What each probe's ONE stale credential is called in its verdict. */
+const CREDENTIAL = { session: 'the session identity', fence: 'the fence' }
 
 /**
- * JUDGES a stale probe's reply: passed only when the daemon REFUSED FOR
- * STALENESS. Pure and exported so the judge itself is testable against the
- * daemon this drill must catch — one that accepts the dead credentials. A
- * probe that was accepted proves the daemon ignores epochs; one that failed
- * for any OTHER reason (a timeout, a socket error, a different validation
- * failure) proves nothing about the fence and is refused as evidence too.
+ * JUDGES a stale probe's reply: passed only when the daemon REFUSED FOR THE
+ * STALENESS OF `kind` — the ONE credential that probe presents stale.
+ *
+ * THE KIND IS LOAD-BEARING, and this signature is the round-14 repair (P1).
+ * `validateMutation` checks the session id BEFORE the fence, so a probe that
+ * presents BOTH credentials stale is refused on the fence alone by a daemon
+ * that never looks at session ids — and an either-refusal judge passed it.
+ * Requiring the kind-specific reason makes each probe prove its own credential:
+ * a fence refusal can no longer answer for the session probe, nor the reverse.
+ *
+ * Pure and exported so the judge itself is testable against the daemon this
+ * drill must catch — one that accepts the dead credentials. A probe that was
+ * accepted proves the daemon ignores that credential; one that failed for any
+ * OTHER reason (a timeout, a socket error, a different validation failure)
+ * proves nothing and is refused as evidence too.
  */
-export function staleProbeRefused(reply) {
-  if (reply?.ok === true) return { ok: false, why: 'accepted — the daemon does not enforce the epoch' }
+export function staleProbeRefused(reply, kind) {
+  const pattern = STALE_REFUSAL[kind]
+  if (!pattern) return { ok: false, why: `no such staleness kind: ${String(kind)}` }
+  if (reply?.ok === true) return { ok: false, why: `accepted — the daemon does not enforce ${CREDENTIAL[kind]}` }
   const reason = reply?.reason ?? ''
-  if (!STALE_REFUSAL.test(reason)) return { ok: false, why: `failed, but not for staleness: ${reason || '(no reason)'}` }
+  if (!pattern.test(reason)) {
+    return { ok: false, why: `failed, but not for the staleness of ${CREDENTIAL[kind]}: ${reason || '(no reason)'}` }
+  }
   return { ok: true, why: `refusal reason: ${reason}` }
 }
 
@@ -339,31 +364,43 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
       controlRequest({ repoDir: repo, batchId: BATCH, request: { cmd, sessionId: successorSid, fence: newFence, payload: { batchId: BATCH, ...payload } } })
 
     // THE NEGATIVE HALF OF THE FENCE, without which this drill would pass on a
-    // daemon that ignores epochs entirely: the DEAD session's credentials, and
-    // the superseded fence even under the live session id, must be REFUSED.
+    // daemon that ignores the credentials entirely: the dead session's id, and
+    // the superseded fence, must EACH be refused on their own.
     // The acquisition above installed those credentials for real; these two
     // probes are what prove the daemon actually reads them.
     //
-    // REFUSED MEANS REFUSED FOR STALENESS, not merely "did not succeed": a probe
-    // that timed out, or failed against a daemon that had already accepted the
-    // stale write, proves nothing about the fence — and `ok !== true` alone would
-    // have passed both. `staleProbeRefused` (above, unit-tested against an
-    // accepting daemon's reply) is the judge, so an epoch-ignoring daemon
+    // ONE STALE CREDENTIAL PER PROBE, and this is the round-14 repair (P1). The
+    // dead-session probe used to present the dead fence TOO. `validateMutation`
+    // checks the session id first and the fence second, so a daemon that never
+    // looks at session ids still refused that probe — for the fence — and the
+    // drill passed the very defect it exists to catch. Each probe now presents
+    // exactly ONE stale credential beside a VALID one, and is judged against the
+    // refusal that credential alone produces.
+    //
+    // REFUSED MEANS REFUSED FOR THAT STALENESS, not merely "did not succeed": a
+    // probe that timed out, or failed against a daemon that had already accepted
+    // the stale write, proves nothing — and `ok !== true` alone would have
+    // passed both. `staleProbeRefused` (above, unit-tested against an accepting
+    // daemon's reply) is the judge, so a daemon ignoring either credential
     // cannot hide behind any other failure of the probe itself.
     const staleSession = staleProbeRefused(
       await controlRequest({
         repoDir: repo,
         batchId: BATCH,
-        request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
+        // The DEAD session id under the CURRENT fence: only the session check can refuse this.
+        request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: newFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
       }),
+      'session',
     )
-    check("the dead session's (sessionId, fence) is REFUSED after the takeover", staleSession.ok, staleSession.why)
+    check("the dead session's id is REFUSED after the takeover, under the LIVE fence", staleSession.ok, staleSession.why)
     const staleFence = staleProbeRefused(
       await controlRequest({
         repoDir: repo,
         batchId: BATCH,
+        // The SUPERSEDED fence under the LIVE session id: only the fence check can refuse this.
         request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
       }),
+      'fence',
     )
     check('the superseded fence is REFUSED even under the live session id', staleFence.ok, staleFence.why)
 

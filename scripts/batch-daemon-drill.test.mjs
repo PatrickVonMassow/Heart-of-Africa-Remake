@@ -46,7 +46,7 @@ const REQUIRED_CHECKS = [
   'discovery wrote the daemon copy from the record, through the pair resolution',
   'reconciliation read the surviving lane as running before any adoption',
   'the fresh session adopted the attempt under the new fence, after reconciliation',
-  "the dead session's (sessionId, fence) is REFUSED after the takeover",
+  "the dead session's id is REFUSED after the takeover, under the LIVE fence",
   'the superseded fence is REFUSED even under the live session id',
   'a new checkpoint request was ACKNOWLEDGED by that daemon',
   'the acknowledged checkpoint was pushed and clean',
@@ -86,22 +86,35 @@ describe('the documented drill entrypoint', () => {
   }, 120_000)
 
   it('goes RED — at exactly the two stale probes — against a real daemon with epoch enforcement OFF', async () => {
-    // THE NEGATIVE CONTROL RUNS THE REAL THING. Feeding a fabricated { ok: true }
-    // to staleProbeRefused proved only the judge (cross-vendor review of point
-    // 834, B2); this run neuters an actual daemon (the drill-only --neuter-epoch
-    // serve flag) and requires the COMPLETE drill to fail, through both real
-    // control requests. A rewrite that replaces the stale probes with
-    // unconditionally green checks turns this expectation red.
-    const result = await runDrill({ scenario: 'parent-death', neuterEpoch: true })
+    // THE NEGATIVE CONTROL RUNS THE REAL THING, THROUGH THE DOCUMENTED CLI.
+    // Feeding a fabricated { ok: true } to staleProbeRefused proved only the
+    // judge (cross-vendor review of point 834, B2); this run neuters an actual
+    // daemon (the drill-only --neuter-epoch serve flag) and requires the
+    // COMPLETE drill to fail, through both real control requests.
+    //
+    // VIA `drillCli`, not runDrill(), and that is the round-14 repair (P1 on the
+    // test): the in-process call bypassed the very entrypoint the positive case
+    // pins, so breaking the CLI's forwarding of --neuter-epoch would have left
+    // this control green — certifying as negative a drill that had quietly
+    // stopped being negative. Exit code and JSON now come from that one CLI run.
+    const ran = await drillCli('--scenario', 'parent-death', '--neuter-epoch')
+    expect(ran.stdout, ran.stderr).not.toBe('')
+    const result = JSON.parse(ran.stdout)
     expect(result.ok).toBe(false)
+    expect(ran.code, ran.stderr).toBe(1)
     const failed = (result.checks ?? []).filter((c) => !c.ok)
     expect(failed.map((c) => c.name), JSON.stringify(failed, null, 2)).toEqual([
-      "the dead session's (sessionId, fence) is REFUSED after the takeover",
+      "the dead session's id is REFUSED after the takeover, under the LIVE fence",
       'the superseded fence is REFUSED even under the live session id',
     ])
-    // …and each failure names ACCEPTANCE, so the red is the daemon ignoring the
-    // epoch, not some unrelated malfunction of the probe.
-    for (const c of failed) expect(c.detail).toMatch(/does not enforce the epoch/)
+    // …and each failure names ACCEPTANCE OF THE ONE CREDENTIAL that probe
+    // presents stale, so the red is the daemon ignoring THAT credential, not
+    // some unrelated malfunction of the probe — and not the other check's
+    // refusal standing in for it.
+    expect(failed.map((c) => c.detail)).toEqual([
+      'accepted — the daemon does not enforce the session identity',
+      'accepted — the daemon does not enforce the fence',
+    ])
   }, 120_000)
 
   it('refuses to start a neutered daemon outside a drill, before reading any repository state', async () => {
@@ -113,34 +126,68 @@ describe('the documented drill entrypoint', () => {
 
 describe('staleProbeRefused', () => {
   // THE NEGATIVE CONTROL FOR THE TWO STALE PROBES: the judge itself must catch
-  // a daemon whose epoch enforcement was removed. Such a daemon ANSWERS the
-  // stale request with ok:true — these are the replies the drill would then
-  // feed this judge, and each must come back red.
+  // a daemon whose enforcement was removed. Such a daemon ANSWERS the stale
+  // request with ok:true — these are the replies the drill would then feed this
+  // judge, and each must come back red, naming the credential it presented.
   it('fails an ACCEPTING daemon — the neutered case the probes exist to catch', () => {
-    const neutered = staleProbeRefused({ ok: true, result: { answers: [] }, fence: 7 })
-    expect(neutered.ok).toBe(false)
-    expect(neutered.why).toMatch(/does not enforce the epoch/)
+    for (const [kind, credential] of [
+      ['session', 'the session identity'],
+      ['fence', 'the fence'],
+    ]) {
+      const neutered = staleProbeRefused({ ok: true, result: { answers: [] }, fence: 7 }, kind)
+      expect(neutered.ok, kind).toBe(false)
+      expect(neutered.why).toBe(`accepted — the daemon does not enforce ${credential}`)
+    }
   })
 
-  it('fails a probe that failed for any reason OTHER than staleness', () => {
+  // THE ROUND-14 REPAIR (P1) AT ITS OWN LAYER: one credential's refusal must
+  // never certify the other's probe. `validateMutation` checks the session id
+  // BEFORE the fence, so a daemon that ignores session ids answers the
+  // dead-session probe with the FENCE reason — which the either-refusal judge
+  // accepted, passing the exact defect this drill exists to catch.
+  it('refuses the OTHER credential\'s refusal — each probe proves its own', () => {
+    const sessionReason = 'the lock names another session'
+    const fenceReason = 'stale fence: presented 7, the lock carries 9'
+    const crossed = staleProbeRefused({ ok: false, reason: fenceReason }, 'session')
+    expect(crossed.ok).toBe(false)
+    expect(crossed.why).toMatch(/not for the staleness of the session identity/)
+    const crossedBack = staleProbeRefused({ ok: false, reason: sessionReason }, 'fence')
+    expect(crossedBack.ok).toBe(false)
+    expect(crossedBack.why).toMatch(/not for the staleness of the fence/)
+  })
+
+  it('refuses a kind it has no pattern for, rather than passing it', () => {
+    for (const kind of ['epoch', '', undefined]) {
+      const bogus = staleProbeRefused({ ok: false, reason: 'the lock names another session' }, kind)
+      expect(bogus.ok, String(kind)).toBe(false)
+      expect(bogus.why).toMatch(/no such staleness kind/)
+    }
+  })
+
+  it('fails a probe that failed for any reason OTHER than that staleness', () => {
     // A timeout, a dead socket or an unrelated validation failure says nothing
-    // about the fence; `ok !== true` alone would have passed all of them.
+    // about the credential; `ok !== true` alone would have passed all of them.
     for (const reason of [
       'the daemon did not answer within 2000ms',
       'no control socket: connect ECONNREFUSED',
       'the lock owner was not probed live',
       undefined,
     ]) {
-      const failed = staleProbeRefused({ ok: false, reason })
-      expect(failed.ok, String(reason)).toBe(false)
-      expect(failed.why).toMatch(/not for staleness/)
+      for (const kind of ['session', 'fence']) {
+        const failed = staleProbeRefused({ ok: false, reason }, kind)
+        expect(failed.ok, `${kind}: ${reason}`).toBe(false)
+        expect(failed.why).toMatch(/not for the staleness of/)
+      }
     }
   })
 
-  it('passes exactly the two staleness refusals validation produces', () => {
-    for (const reason of ['the lock names another session', 'stale fence: presented 7, the lock carries 9']) {
-      expect(STALE_REFUSAL.test(reason)).toBe(true)
-      const refused = staleProbeRefused({ ok: false, reason })
+  it('passes exactly the staleness refusal validation produces for its own kind', () => {
+    for (const [kind, reason] of [
+      ['session', 'the lock names another session'],
+      ['fence', 'stale fence: presented 7, the lock carries 9'],
+    ]) {
+      expect(STALE_REFUSAL[kind].test(reason)).toBe(true)
+      const refused = staleProbeRefused({ ok: false, reason }, kind)
       expect(refused.ok, reason).toBe(true)
       expect(refused.why).toContain(reason)
     }
@@ -150,7 +197,7 @@ describe('staleProbeRefused', () => {
     // The contract beside STALE_REFUSAL says "and nothing else": a reply whose
     // text embeds one of the phrases in a larger sentence is some OTHER failure
     // — an internal error, a compensation, a wrapped reason — and proves
-    // nothing about the fence. The unanchored regex accepted all of these.
+    // nothing. The unanchored regex accepted all of these.
     for (const reason of [
       'internal error while checking stale fence',
       'compensated: the lock names another session',
@@ -158,10 +205,30 @@ describe('staleProbeRefused', () => {
       'stale fence',
       'not a stale fence: presented 7, the lock carries 7',
     ]) {
-      expect(STALE_REFUSAL.test(reason), reason).toBe(false)
-      const failed = staleProbeRefused({ ok: false, reason })
-      expect(failed.ok, reason).toBe(false)
-      expect(failed.why).toMatch(/not for staleness/)
+      for (const kind of ['session', 'fence']) {
+        expect(STALE_REFUSAL[kind].test(reason), `${kind}: ${reason}`).toBe(false)
+        const failed = staleProbeRefused({ ok: false, reason }, kind)
+        expect(failed.ok, reason).toBe(false)
+        expect(failed.why).toMatch(/not for the staleness of/)
+      }
+    }
+  })
+
+  // THE ROUND-14 REPAIR (P2): `$` also matches BEFORE a final line terminator,
+  // so every one of these ends the reason with something the contract forbids
+  // and used to pass anyway. The tail anchor is `(?![\s\S])`.
+  it('refuses a refusal with anything AFTER it, a bare newline included', () => {
+    for (const [kind, base] of [
+      ['session', 'the lock names another session'],
+      ['fence', 'stale fence: presented 7, the lock carries 9'],
+    ]) {
+      for (const suffix of ['\n', '\r\n', '\n ', '\nand the socket then died', ' ']) {
+        const reason = base + suffix
+        expect(STALE_REFUSAL[kind].test(reason), `${kind}: ${JSON.stringify(reason)}`).toBe(false)
+        const failed = staleProbeRefused({ ok: false, reason }, kind)
+        expect(failed.ok, JSON.stringify(reason)).toBe(false)
+        expect(failed.why).toMatch(/not for the staleness of/)
+      }
     }
   })
 })
