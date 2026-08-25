@@ -161,13 +161,14 @@ export function hookStdout(messages) {
 /**
  * A delegated agent receives the parent's session id in its hook payload, so
  * ownership alone cannot tell its PostToolUse call from the owner's. The
- * transcript path can: delegated transcripts live below a `subagents`
- * directory, while the top-level owner's transcript does not.
+ * transcript path can: delegated transcripts are `agent-*.jsonl` files below
+ * a `subagents` directory, while the top-level owner's transcript is not.
  */
 export function isSubagentHook(payload) {
   const path = payload?.transcript_path ?? payload?.transcriptPath
   if (typeof path !== 'string' || path === '') return false
-  return path.replaceAll('\\', '/').split('/').includes('subagents')
+  const segments = path.replaceAll('\\', '/').split('/')
+  return segments.includes('subagents') && /^agent-.*\.jsonl$/.test(segments.at(-1))
 }
 
 /**

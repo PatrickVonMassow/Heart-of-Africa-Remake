@@ -181,6 +181,7 @@ describe('the stand-downs every guard in this repo shares', () => {
   it('recognises a delegated hook by the transcript path, not the inherited session id', () => {
     expect(isSubagentHook({ transcript_path: '/projects/owner/subagents/agent-a.jsonl' })).toBe(true)
     expect(isSubagentHook({ transcriptPath: 'C:\\projects\\owner\\subagents\\agent-b.jsonl' })).toBe(true)
+    expect(isSubagentHook({ transcript_path: '/projects/owner/subagents/session.jsonl' })).toBe(false)
     expect(isSubagentHook({ transcript_path: '/projects/owner/session.jsonl' })).toBe(false)
   })
 
