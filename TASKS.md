@@ -144,6 +144,99 @@ put it is the mistake this line exists to stop.
   review-sol run itself (its printed RECEIPT hash is the natural anchor).
   Bundle: Modell & Wächter.
 
+- [ ] 749. The machine files its own status reports as user decisions, and the user keeps
+  having to clear them out (user 19.08.2026, 18:59, on the card "Batch pausiert: Alarm blieb
+  unbeantwortet": "Ich habe schon wieder so eine pathologische Karte unter 'Von dir zu klären'
+  … Das ist nicht meine Zuständigkeit. Da kann ich nichts machen. Löse das selbst."). The rule
+  is settled and enforced elsewhere: "Von dir zu klären" holds ONLY genuine user decisions.
+  Two scripts break it from the machine side — `scripts/alert-escalation.mjs:166` posts
+  "Batch pausiert: Alarm blieb unbeantwortet" and `scripts/child-retry.mjs:284` posts "Batch
+  pausiert: Umgebungsausfall", both through `board.mjs vdzk-add`. Neither asks the user to
+  DECIDE anything: the first reports that an ntfy alert went unanswered and the batch paused
+  itself, the second that the environment failed. Both close with an instruction the user
+  cannot carry out ("prüfen, was die Meldung ausgelöst hat"), and both resolve by themselves
+  when the restart clock expires — so the card outlives the condition it describes.
+  FINAL STATE:
+  - Neither script writes to the decision section. A paused batch and an environment outage
+    are STATE, and they are shown where the board already shows state; the ntfy alert stays
+    as it is, since that is the channel built for reaching the user.
+  - A decision card is admissible from an automated path only when it names a choice the user
+    alone can make, and it names the options. Where a script has no such choice to offer, the
+    board API refuses the card rather than accepting it — the same shape as the existing card
+    gates, so the rule is enforced instead of remembered.
+  - A card whose condition has resolved does not have to be removed by hand: a status the
+    board derives is re-derived, and the pause state disappears from the board when the pause
+    file does.
+  VERIFIABLE: Vitest over the refusal — an automated card without a named choice is rejected
+  and the message names the state section as the right place; a genuine decision card with
+  options is accepted; and a case over each of the two call sites asserting they no longer
+  reach `vdzk-add`. Plus a case that the board's rendered pause state disappears once
+  `.claude/batch-paused` is gone.
+  A THIRD CALL SITE, measured 24.08.2026 after the user repeated the ruling: the card he hit
+  ("Entscheidungsprotokoll: Batch läuft weiter — PARALLEL batch sessions") comes from neither
+  site above. It is the CONTINUE-AND-RECORD path — `scripts/alert-escalation.mjs` ~234,
+  `continuationDecisionCard`/`continuationCardBody` — and `corruptionDecisionCard`
+  (repair-and-probe) is the same shape. Both nominally offer a "retroactive veto", but the user
+  cannot evaluate a machine-side incident — this one was a phantom parallel-session alert about
+  an already retired predecessor — so the offer is not a genuine user choice under this point's
+  own admissibility rule. His words, 24.08.2026 07:54: "Diese Dinge liegen nicht in meiner Hand.
+  … Löse das selbst."
+  So the final state above covers all four sites: the continuation and corruption protocols are
+  RECORDS and belong in the board's state/protocol section, never `vdzk-add`; the retroactive
+  veto stays reachable as a chat or ntfy answer without a standing decision card; and the card
+  class resolves itself once its alert condition is diagnosed or gone.
+  RULED A THIRD TIME 25.08.2026, 13:44: the user hit the card ‚Entscheidungsprotokoll: Batch läuft
+  weiter — PARALLEL batch sessions‘ and repeated the order (after 19.08. 18:59 and 24.08. 07:54):
+  „Das sind interne Probleme, die du selbst lösen musst. Etabliere einen Mechanismus, der das
+  verhindert.“ The card was cleared by hand and its condition was benign — the second session was
+  the user’s own attended Q&A window, correctly stood down and read-only. TWO ADDITIONS THIS
+  MEASUREMENT NAMES: (a) the parallel-session detector should read a guard-stood-down attended
+  session as the designed coexistence case, so the ladder never climbs to a card at all; (b) the
+  batch stand-down guard refuses edits under the session MEMORY directory, which is not batch
+  state (not TASKS.md, not the dashboard, not the repo) — measured 25.08.2026, 13:48 on
+  `memory/no-standstill-decide-and-record.md`, whose step 3 still prescribed the vetoed card and
+  had to be corrected by the owner session instead of the one that found it.
+  Criticality: medium — it touches the alert path, which must keep reaching the user; the
+  change removes a board card, never a notification.
+  Bundle: Chat & Tafel.
+
+- [ ] 913. The takeover drill's negative control intermittently reports a THIRD failed check, and
+  the gate that reads it becomes a coin flip. MEASURED 25.08.2026, 12:24 on `main` at the merge
+  of point 907 (`1f167499`), on a quiet host (load 2.4 over 16 cores, run 149 s): `npm run
+  test:unit` went red in `scripts/batch-daemon-drill.test.mjs > goes RED — at exactly the two
+  stale probes`. The control pins EXACTLY two failures; it reported three. The extra one is
+  `the cancellation preserved the branch` (`scripts/batch-daemon-drill.mjs:466-475`), which
+  compares `git rev-parse feat/drill` in the sandbox origin before the post-adoption
+  `cancel-attempt` and 300 ms after it.
+  NOT the merged change, and not a loaded machine: main had gained only TASKS/docs commits since
+  the branch point, the drill touches no part of `command-classify-core.mjs`, and the host was
+  quiet. NOT reproducible on demand either — measured the same day, the drill CLI standalone
+  three times (two failures each), once under 14 busy cores (two failures), the test file alone
+  twice (green), the file beside `batch-daemon.test.mjs` and `batch-reconcile.test.mjs` (green),
+  and the FULL suite a second time on a quiet host (green, 150 s). It needs the full-suite
+  fan-out at `maxWorkers: 4` to appear, and then only sometimes.
+  WHAT IT COSTS: this drill is the NEGATIVE CONTROL that certifies the takeover fence still goes
+  red when the daemon stops enforcing it. An intermittent extra failure makes every gate reading
+  it a coin flip — it stopped the landing of point 907 — and it teaches the reader to treat a red
+  drill as noise, which is the one verdict this drill must never lose.
+  IT HOLDS A RED THAT CANNOT OTHERWISE CLOSE: under CLAUDE.md §7.2 a retry is SUSPECT and
+  covers nothing, so every occurrence has to be fixed or charged to its point rather than
+  re-run away; this one already stopped the landing of point 907.
+  THE LEAD: the neutered daemon ACCEPTS both stale checkpoint requests, so the run performs two
+  checkpoint cycles the honest run refuses. A push still in flight from one of them lands after
+  `tipBeforeCancel` was read, and the check then charges the cancellation with a branch move it
+  did not cause. The 300 ms sleep bounds nothing.
+  FINAL STATE: the branch-preservation check waits on the state it is judging instead of on a
+  fixed sleep — the attempt quiescent, no push outstanding — so it answers the question it names
+  and cannot be moved by an earlier accepted checkpoint. The negative control keeps pinning
+  exactly the two stale probes.
+  VERIFIABLE: a case that drives an accepted checkpoint's push to land AFTER the cancel and shows
+  the check still green; the negative control unchanged in what it pins; a repeated full-suite run
+  (`npm run test:unit`) with the drill file in the fan-out; lint, build.
+  Criticality: medium — no product behaviour, but it intermittently reds the gate every landing
+  runs and devalues the drill's verdict.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 885. A delegated agent swallows the user's chat message, and the backstop cannot see that it
   happened. MEASURED 24.08.2026: the message `e433e59a` (ntfy `jiZfW5f6qkQi`, "Was soll ich mit der
   Karte Entscheidungsprotokoll…", received 05:54:01.371Z) was consumed from `.claude/chat-spool`
@@ -403,51 +496,6 @@ put it is the mistake this line exists to stop.
   session with no mutating action since the note raises no parallel-session alert
   while a second WORKING session still does; and the pure core answers "paused
   plus a waiting message" with delivery rather than silence.
-
-- [ ] 749. The machine files its own status reports as user decisions, and the user keeps
-  having to clear them out (user 19.08.2026, 18:59, on the card "Batch pausiert: Alarm blieb
-  unbeantwortet": "Ich habe schon wieder so eine pathologische Karte unter 'Von dir zu klären'
-  … Das ist nicht meine Zuständigkeit. Da kann ich nichts machen. Löse das selbst."). The rule
-  is settled and enforced elsewhere: "Von dir zu klären" holds ONLY genuine user decisions.
-  Two scripts break it from the machine side — `scripts/alert-escalation.mjs:166` posts
-  "Batch pausiert: Alarm blieb unbeantwortet" and `scripts/child-retry.mjs:284` posts "Batch
-  pausiert: Umgebungsausfall", both through `board.mjs vdzk-add`. Neither asks the user to
-  DECIDE anything: the first reports that an ntfy alert went unanswered and the batch paused
-  itself, the second that the environment failed. Both close with an instruction the user
-  cannot carry out ("prüfen, was die Meldung ausgelöst hat"), and both resolve by themselves
-  when the restart clock expires — so the card outlives the condition it describes.
-  FINAL STATE:
-  - Neither script writes to the decision section. A paused batch and an environment outage
-    are STATE, and they are shown where the board already shows state; the ntfy alert stays
-    as it is, since that is the channel built for reaching the user.
-  - A decision card is admissible from an automated path only when it names a choice the user
-    alone can make, and it names the options. Where a script has no such choice to offer, the
-    board API refuses the card rather than accepting it — the same shape as the existing card
-    gates, so the rule is enforced instead of remembered.
-  - A card whose condition has resolved does not have to be removed by hand: a status the
-    board derives is re-derived, and the pause state disappears from the board when the pause
-    file does.
-  VERIFIABLE: Vitest over the refusal — an automated card without a named choice is rejected
-  and the message names the state section as the right place; a genuine decision card with
-  options is accepted; and a case over each of the two call sites asserting they no longer
-  reach `vdzk-add`. Plus a case that the board's rendered pause state disappears once
-  `.claude/batch-paused` is gone.
-  A THIRD CALL SITE, measured 24.08.2026 after the user repeated the ruling: the card he hit
-  ("Entscheidungsprotokoll: Batch läuft weiter — PARALLEL batch sessions") comes from neither
-  site above. It is the CONTINUE-AND-RECORD path — `scripts/alert-escalation.mjs` ~234,
-  `continuationDecisionCard`/`continuationCardBody` — and `corruptionDecisionCard`
-  (repair-and-probe) is the same shape. Both nominally offer a "retroactive veto", but the user
-  cannot evaluate a machine-side incident — this one was a phantom parallel-session alert about
-  an already retired predecessor — so the offer is not a genuine user choice under this point's
-  own admissibility rule. His words, 24.08.2026 07:54: "Diese Dinge liegen nicht in meiner Hand.
-  … Löse das selbst."
-  So the final state above covers all four sites: the continuation and corruption protocols are
-  RECORDS and belong in the board's state/protocol section, never `vdzk-add`; the retroactive
-  veto stays reachable as a chat or ntfy answer without a standing decision card; and the card
-  class resolves itself once its alert condition is diagnosed or gone.
-  Criticality: medium — it touches the alert path, which must keep reaching the user; the
-  change removes a board card, never a notification.
-  Bundle: Chat & Tafel.
 
 - [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
@@ -12198,36 +12246,58 @@ to land than a mechanism that needs a review.
   doctor's consistency verdict untrue in the one place the batch relies on it.
   Bundle: Session- & Repo-Hygiene.
 
-- [ ] 913. The takeover drill's negative control intermittently reports a THIRD failed check, and
-  the gate that reads it becomes a coin flip. MEASURED 25.08.2026, 12:24 on `main` at the merge
-  of point 907 (`1f167499`), on a quiet host (load 2.4 over 16 cores, run 149 s): `npm run
-  test:unit` went red in `scripts/batch-daemon-drill.test.mjs > goes RED — at exactly the two
-  stale probes`. The control pins EXACTLY two failures; it reported three. The extra one is
-  `the cancellation preserved the branch` (`scripts/batch-daemon-drill.mjs:466-475`), which
-  compares `git rev-parse feat/drill` in the sandbox origin before the post-adoption
-  `cancel-attempt` and 300 ms after it.
-  NOT the merged change, and not a loaded machine: main had gained only TASKS/docs commits since
-  the branch point, the drill touches no part of `command-classify-core.mjs`, and the host was
-  quiet. NOT reproducible on demand either — measured the same day, the drill CLI standalone
-  three times (two failures each), once under 14 busy cores (two failures), the test file alone
-  twice (green), the file beside `batch-daemon.test.mjs` and `batch-reconcile.test.mjs` (green),
-  and the FULL suite a second time on a quiet host (green, 150 s). It needs the full-suite
-  fan-out at `maxWorkers: 4` to appear, and then only sometimes.
-  WHAT IT COSTS: this drill is the NEGATIVE CONTROL that certifies the takeover fence still goes
-  red when the daemon stops enforcing it. An intermittent extra failure makes every gate reading
-  it a coin flip — it stopped the landing of point 907 — and it teaches the reader to treat a red
-  drill as noise, which is the one verdict this drill must never lose.
-  THE LEAD: the neutered daemon ACCEPTS both stale checkpoint requests, so the run performs two
-  checkpoint cycles the honest run refuses. A push still in flight from one of them lands after
-  `tipBeforeCancel` was read, and the check then charges the cancellation with a branch move it
-  did not cause. The 300 ms sleep bounds nothing.
-  FINAL STATE: the branch-preservation check waits on the state it is judging instead of on a
-  fixed sleep — the attempt quiescent, no push outstanding — so it answers the question it names
-  and cannot be moved by an earlier accepted checkpoint. The negative control keeps pinning
-  exactly the two stale probes.
-  VERIFIABLE: a case that drives an accepted checkpoint's push to land AFTER the cancel and shows
-  the check still green; the negative control unchanged in what it pins; a repeated full-suite run
-  (`npm run test:unit`) with the drill file in the fan-out; lint, build.
-  Criticality: medium — no product behaviour, but it intermittently reds the gate every landing
-  runs and devalues the drill's verdict.
-  Bundle: Session- & Repo-Hygiene.
+- [ ] 914. A multi-pass review's diffstat is pass-scoped while its manifest swears it is
+  whole-range, so the reviewer cannot place the material in its range. MEASURED 25.08.2026 by
+  GPT-5.6 Sol's pass 1/2 over point 907's range (`ca6b81f..1af4456`): the reviewer refused to
+  conclude because "the diffstat lists only the ledger — not the two scripts declared absent by
+  design", so the material could not establish that the four shas it carried belong to the stated
+  range. It is right. `formatPassManifest` (`scripts/review-material-core.mjs:111-112`) writes
+  "The DIFFSTAT below describes the WHOLE range for context: it names files this pass deliberately
+  omits", and `assemblePass` (`scripts/review-sol.mjs:529-534`) repeats the promise in its own
+  comment — but the range it is handed is `gatherRange(sha, base, group.files)`
+  (`scripts/review-sol.mjs:405`), whose stat is `git diff --stat <range> -- <group files>`
+  (`scripts/review-sol.mjs:325`). The diffstat is therefore scoped to the AUTHORSHIP GROUP and
+  never to the range.
+  WHAT IT COSTS: this is the same class the manifest exists to close, one level down. Its own
+  comment (`scripts/review-material-core.mjs:78-96`) records that three of four passes were
+  refused a conclusion because the material lied about its own shape; the file list was then made
+  honest and the diffstat beside it was not. Every multi-pass cross-vendor review is affected —
+  that is the four-eyes gate on every range too large for one round — and the reviewer's refusal
+  reads as a defect of the reviewed work rather than of the material.
+  FINAL STATE: the material's diffstat is the whole range's, or the manifest states the scope the
+  diffstat actually has. One statement, and the two cannot drift apart again.
+  VERIFIABLE: a unit case over a two-group plan that asserts the shipped DIFFSTAT names every
+  changed file of the range — or, if the scoped stat is kept, that the manifest sentence names
+  that scope; `npm run test:unit`, lint, build.
+  Criticality: high — it is the material the four-eyes gate judges on, and a reviewer that cannot
+  place its material either refuses honest work or clears what it could not read.
+  Bundle: Modell & Wächter.
+
+- [ ] 915. The review planner names a reviewer the recorder then refuses, so a multi-group pass
+  can never be completed. MEASURED 25.08.2026 while closing the criticality gate on point 907:
+  `review-sol.mjs` planned two passes over `ca6b81f..1af4456` and printed
+  `pass 2/2 → anthropic reviewer Opus 5; files scripts/command-classify-core.mjs,
+  scripts/command-classify-core.test.mjs` — the correct call, because GPT-5.6 Sol authored those
+  two files. Recording that pass at the planned end state is IMPOSSIBLE: `validateRecord`
+  (`scripts/mechanism-review-core.mjs`) judges reviewer identity against the RECORD'S SHA, and
+  `1af4456` is a ledger commit trailed `Claude Opus 5`, so every Claude model is refused as a
+  self-review. `--carried-from` is refused for the same reason. The only model the recorder would
+  accept at that sha is Sol — the author of the very files the pass covers.
+  WHAT IT COSTS: a range whose end-state sha was written by one vendor cannot receive ANY pass
+  from that vendor, whoever wrote the files the pass reads. The planner and the recorder answer
+  the same question from two sources, and the pass the planner prescribes is the one the recorder
+  rejects — so the composition stays incomplete and the point's coverage cannot close on the
+  route the tool itself printed. Point 907 was closed instead by re-recording the other group as
+  the bounded `1/1` scope it really was, which is honest but is not what the plan prescribed.
+  Note that point 880's identity rewrite does NOT close this: it makes the test vendor-based over
+  all co-authors of the record's commit, and stays keyed to that commit.
+  FINAL STATE: reviewer identity for a FILE-SCOPED pass is judged against the authors of the
+  FILES the pass covers, not against the author of the commit the pass is recorded at — the same
+  authorship grouping `planAuthorshipGroups` already computes, used by both the planner and the
+  recorder, so the command review-sol prints is always one the recorder accepts.
+  VERIFIABLE: a case where the record sha's author is vendor A, the pass files' authors are all
+  vendor B, and a vendor-A reviewer's pass is ACCEPTED; the mirror case where the pass files carry
+  a vendor-A author and the same pass is REFUSED; and a case that the command review-sol prints
+  for each planned pass validates against `validateRecord`.
+  Criticality: high — it is the four-eyes gate's own recording path, and its two halves disagree.
+  Bundle: Modell & Wächter.

@@ -1334,7 +1334,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 11:29 · Quellen-Fingerprint: `efaadebc93c3…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 13:09 · Quellen-Fingerprint: `e5959aca16dc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1423,7 +1423,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 3 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
+| Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 4 | hoch | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A VS Code restart restarts the devcontainer — every process inside dies, PPID 1 proves nothing | 2 | mittel | container-ask-guard.mjs | ✔ Mechanismus |
@@ -1434,8 +1434,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 99 Prozess-/Meta-TASKS-Punkte (davon 40 offen).
 
-<!-- RETRO-FINGERPRINT: efaadebc93c34d7368d9d7f9de5eee600f1c6a37dd03e74cafef095e580b2f90 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T09:29:18.485Z -->
+<!-- RETRO-FINGERPRINT: e5959aca16dc6906c59764f2798e60f253070cd129e0d7132fbb02ae3360a7b2 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T11:09:41.805Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3456,3 +3456,31 @@ genug statt für falsch informiert.
 Prüffrage: *Kann meine Diagnose diesen Fehler überhaupt sehen — oder steht sie in derselben
 Annahme wie er?* Wo eine Prüfung grün meldet, obwohl der Haken ablehnt, ist die Prüfung verdächtig,
 nicht der Haken. Gebucht als Punkt 910.
+
+### 3.177 Die Regel gegen den Fehlalarm wurde zur Regel gegen den Befund
+
+Seit vier Anläufen steht bei uns dieselbe Lehre: Ein rotierender Fehlschlag unter laufendem
+Agenten-Pool ist Last, kein Fehler — acht von zwölf Unit-Läufen waren einmal allein aus Last rot.
+Die Regel ist richtig, sie hat viel Reparaturarbeit an Phantomen gespart, und sie hat einen
+Wächter. Am 25.08.2026 hat sie zum ersten Mal in die andere Richtung gekostet.
+
+Das negative Kontrollstück des Übernahme-Probelaufs meldete beim Landen von Punkt 907 eine dritte
+fehlgeschlagene Prüfung statt der zwei, die es festnagelt. Der Reflex der Regel lautet: ruhige
+Maschine abwarten, neu laufen lassen. Genau das geschah — und es wurde grün. Die ehrliche Messung
+danach zeigte aber, dass die erste Meldung **auf einer ruhigen Maschine** entstanden war: Last 2,4
+auf 16 Kernen. Der Fehler ist echt, er braucht nur die Fächerung des vollen Laufs, und er ist ein
+Wettlauf im Probelauf selbst — ein angenommener Prüfpunkt schiebt seinen Push, der landet nach dem
+Ablesen des Zweigstands, und die Abbruch-Prüfung schreibt der Stornierung eine Bewegung zu, die sie
+nicht verursacht hat.
+
+Die Klasse ist nicht „die Last-Regel ist falsch", sondern: **Eine Heuristik, die eine ganze
+Fehlerform als Rauschen einordnet, macht genau diese Form unsichtbar, sobald sie einmal echt ist.**
+Sie schützt vor dem Fehlalarm und erzeugt dafür den Fehlschluss in der Gegenrichtung, und der ist
+teurer, weil er keine Spur hinterlässt: Ein Rot, das man wegwiederholt, meldet sich nicht noch
+einmal an. Die Wiederholung ist bei uns aus gutem Grund VERDÄCHTIG und deckt nichts ab — aber diese
+Regel wirkt nur, wenn jemand sie auch dann anwendet, wenn eine bequemere Erklärung bereitsteht.
+
+Was die Regel rettet, ist die Reihenfolge: erst die Last MESSEN, dann urteilen. Nicht „es war
+vermutlich Last", sondern Last und Laufzeit im selben Zug ablesen wie den roten Fall. Wo die
+Maschine ruhig war, ist das Rot ein Befund und wird gebucht, auch wenn der nächste Lauf grün ist.
+Gebucht als Punkt 913.
