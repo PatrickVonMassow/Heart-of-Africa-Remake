@@ -67,6 +67,7 @@ import {
 import { evaluateRuleReview } from './rule-review-core.mjs'
 import { evaluate as evaluateRenderVerify } from './render-verify-core.mjs'
 import { evaluateMechanismReview } from './mechanism-review-core.mjs'
+import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
 
 const NOW = 1_785_000_000_000
 const SID = 'session-abc'
@@ -1191,6 +1192,42 @@ describe('commitSealedBoundary — the marker and ownership handover are one com
     })
     expect(order).toEqual(['transfer', 'marker', 'handover'])
     expect(out).toBe('feat/x@abcd')
+  })
+
+  it('completes the boundary before recording an over-cap exit, and recorder failure cannot undo it', () => {
+    const order = []
+    const said = []
+    const records = []
+    expect(() => commitSealedBoundary({
+      marker: { v: 2, cause: 'context' },
+      write: () => order.push('marker'),
+      handover: () => (order.push('handover'), { handed: true }),
+      complete: () => {
+        order.push('overrun-record')
+        return recordHandoverBudgetCompletion(
+          { sessionId: SID, tokens: 150_001, cause: 'context', at: NOW },
+          {
+            read: () => ({ v: 1, sessionId: SID, startTokens: 111_000, startedAt: NOW - 1 }),
+            makeDir: () => {},
+            append: (_path, line) => records.push(JSON.parse(line)),
+            say: (line) => said.push(line),
+          },
+        )
+      },
+      warn: (line) => said.push(line),
+    })).not.toThrow()
+    expect(order).toEqual(['marker', 'handover', 'overrun-record'])
+    expect(records).toMatchObject([{ exceeded: true, overrunTokens: 1 }])
+    expect(said.join('\n')).toMatch(/HANDOVER CAP EXCEEDED.*boundary stands/s)
+
+    expect(() => commitSealedBoundary({
+      marker: { v: 2 },
+      write: () => {},
+      handover: () => ({ handed: true }),
+      complete: () => { throw new Error('series unavailable') },
+      warn: (line) => said.push(line),
+    })).not.toThrow()
+    expect(said.join('\n')).toMatch(/WARNING.*boundary stands/s)
   })
 
   it('a THROWING transfer leaves NO marker behind, and names its stage', () => {
