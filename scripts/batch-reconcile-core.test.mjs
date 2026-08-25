@@ -9,6 +9,7 @@ import {
   LANE_READINGS,
   LANE_STALL_MS,
   classifyLane,
+  daemonGenerationOrder,
   daemonPairResolution,
   landingRecovery,
   mayRefill,
@@ -240,19 +241,47 @@ describe('reconcileExitRed — green means resolved, nothing less', () => {
 })
 
 describe('daemonPairResolution — the table, applied', () => {
-  const record = { pid: 10, pidStartedAt: 5000, generation: 3 }
+  const record = { pid: 10, pidStartedAt: 5000, generation: 3, state: 'running' }
 
   it('resolves each reading to its idempotent action', () => {
     expect(daemonPairResolution({}).action).toBe('none')
     expect(daemonPairResolution({ record, probe: { live: true, pid: 10, startedAt: 5000 } }).action).toBe('write-copy-from-record')
-    expect(daemonPairResolution({ record, probe: { live: false } }).action).toBe('reconcile-workers-then-release-record')
-    expect(daemonPairResolution({ record, copy: { pid: 10, pidStartedAt: 5000, generation: 3 }, probe: { live: false } }).action).toBe('reconcile-workers-then-release-record-and-clear-copy')
+    expect(daemonPairResolution({ record, probe: { live: false, pid: 10, startedAt: 5000 } }).action).toBe('reconcile-workers-then-release-record')
+    expect(
+      daemonPairResolution({
+        record,
+        copy: { pid: 10, pidStartedAt: 5000, generation: 3 },
+        probe: { live: false, pid: 10, startedAt: 5000 },
+      }).action,
+    ).toBe('reconcile-workers-then-release-record-and-clear-copy')
     expect(daemonPairResolution({ copy: { pid: 10, pidStartedAt: 5000, generation: 3 } }).action).toBe('clear-copy')
   })
 
   it('the impossible row refuses and names the operator, never resolves', () => {
     const res = daemonPairResolution({ record, copy: { pid: 10, pidStartedAt: 5000, generation: 9 } })
     expect(res).toMatchObject({ action: 'refuse-and-alert', operator: true })
+  })
+
+  it('refuses transition and unknown-process rows instead of returning an actionless report', () => {
+    expect(daemonPairResolution({ record: { ...record, state: 'starting' }, probe: { live: true, pid: 10, startedAt: 5000 } })).toMatchObject({
+      reading: 'transitioning',
+      action: 'refuse-and-alert',
+      operator: true,
+    })
+    expect(daemonPairResolution({ record, probe: null })).toMatchObject({ reading: 'unknown', action: 'refuse-and-alert', operator: true })
+  })
+
+  it('derives generation order only from unique, unquarantined lifecycle identities', () => {
+    const copy = { pid: 9, pidStartedAt: 4000, generation: 2 }
+    const entries = [
+      { seq: 4, kind: 'daemon-lifecycle', event: 'start', record: { ...copy, state: 'starting' } },
+      { seq: 9, kind: 'daemon-lifecycle', event: 'start', record },
+    ]
+    expect(daemonGenerationOrder({ entries, record, copy })).toBe('copy-before-record')
+    expect(daemonGenerationOrder({ entries: [...entries].reverse(), record, copy })).toBe('copy-before-record')
+    expect(daemonGenerationOrder({ entries: entries.map((entry) => ({ ...entry, seq: 13 - entry.seq })), record, copy })).toBe('record-before-copy')
+    expect(daemonGenerationOrder({ entries: [{ ...entries[0], quarantine: 'wrong fence' }, entries[1]], record, copy })).toBeNull()
+    expect(daemonGenerationOrder({ entries: [...entries, { ...entries[0], seq: 10 }], record, copy })).toBeNull()
   })
 })
 

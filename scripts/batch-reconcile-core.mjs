@@ -208,15 +208,41 @@ export function resolvePublicationIntent({ intent = null, refProbes = {} } = {})
 /** Turns the pair table's reading into the idempotent action the successor
  *  performs. Every action is a write toward the record's own truth, and the
  *  impossible row acts by REFUSING — an operator act, never an automatic one. */
-export function daemonPairResolution({ record = null, copy = null, probe = null } = {}) {
+export function daemonGenerationOrder({ entries = [], record = null, copy = null } = {}) {
+  if (!record || !copy || record.generation === copy.generation) return null
+  const startSeqs = (identity) =>
+    entries
+      .filter(
+        (entry) =>
+          !entry.quarantine &&
+          entry.kind === 'daemon-lifecycle' &&
+          entry.event === 'start' &&
+          entry.record?.generation === identity.generation &&
+          sameProcess(entry.record, identity),
+      )
+      .map((entry) => entry.seq)
+      .filter(Number.isSafeInteger)
+  const recordStarts = startSeqs(record)
+  const copyStarts = startSeqs(copy)
+  // A duplicated or absent lifecycle identity is not ordering evidence. The
+  // pair table keeps differing random generations ambiguous in that case.
+  if (recordStarts.length !== 1 || copyStarts.length !== 1) return null
+  if (copyStarts[0] < recordStarts[0]) return 'copy-before-record'
+  if (recordStarts[0] < copyStarts[0]) return 'record-before-copy'
+  return null
+}
+
+export function daemonPairResolution({ record = null, copy = null, probe = null, generationOrder = null } = {}) {
   // Two probe shapes exist in this repository: batch-singleton's probePid answers
   // `startedAt`, the pair table compares `pidStartedAt`. Normalised HERE so a
   // caller cannot silently feed the table a probe it reads as "not asked".
   const normalized = probe ? { live: probe.live, pid: probe.pid, pidStartedAt: probe.pidStartedAt ?? probe.startedAt ?? null } : null
-  const classified = classifyDaemonPair({ record, copy, probe: normalized })
+  const classified = classifyDaemonPair({ record, copy, probe: normalized, generationOrder })
   const actions = {
     'no-daemon': { action: 'none' },
     healthy: { action: 'none' },
+    transitioning: { action: 'refuse-and-alert', operator: true },
+    unknown: { action: 'refuse-and-alert', operator: true },
     unadopted: { action: 'write-copy-from-record' },
     'cold-record': { action: 'reconcile-workers-then-release-record' },
     'stale-copy': { action: 'reconcile-workers-then-release-record-and-clear-copy' },
