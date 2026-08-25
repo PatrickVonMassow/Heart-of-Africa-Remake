@@ -849,6 +849,10 @@ async function serve(args) {
   if (existsSync(socketPath)) unlinkSync(socketPath) // ours by the exclusive record above
   let queue = Promise.resolve()
   const server = createServer((connection) => {
+    // Even a refused peer may reset before reading its reply. Install this
+    // before authorization so that reset cannot become an unhandled event that
+    // takes down the listening daemon.
+    connection.on('error', () => {})
     // AUTHORIZATION PRECEDES DATA AND DISPATCH. In particular, do not enqueue
     // an unauthorized request behind authorized work: no bytes from it become
     // a command, so no partially executed verb is possible.
@@ -884,7 +888,6 @@ async function serve(args) {
         }
       })
     })
-    connection.on('error', () => {})
   })
   server.listen(socketPath, () => {
     chmodSync(socketPath, 0o600)
