@@ -319,6 +319,14 @@ async function serve(args) {
   let worktreeClaims = {}
   const attemptsState = new Map() // attemptId -> last attempt snapshot row
   let admission = admissionFromJournal(journal.entries)
+  // A committed boundary fences that coordinator epoch without minting a new
+  // one. A successor arrives under a strictly higher lock fence; the sealed
+  // epoch can inspect status but every further mutation is refused.
+  let sealedFence = journal.entries.reduce(
+    (highest, entry) => entry.kind === 'command' && entry.name === 'seal-boundary' && !entry.quarantine
+      ? Math.max(highest, entry.fence ?? 0) : highest,
+    0,
+  )
   let draining = false
   // Drill-only (refused above outside --drill): with epoch enforcement OFF the
   // daemon accepts any (sessionId, fence) — the broken daemon the drill's stale
@@ -349,6 +357,9 @@ async function serve(args) {
    *  the lock, compensate if it moved. */
   const mutate = async (request, applyFn, compensateFn) => {
     if (draining) return { ok: false, reason: 'the daemon is draining and refuses new mutations' }
+    if (request?.cmd !== 'seal-boundary' && Number.isInteger(request?.fence) && request.fence <= sealedFence) {
+      return { ok: false, reason: `coordinator fence ${request.fence} was sealed at the committed boundary; only a successor epoch may mutate` }
+    }
     if (journalCorrupt) return { ok: false, reason: 'the journal is corrupt; the daemon refuses every mutation and awaits the operator' }
     if (journalFailed) return { ok: false, reason: `the journal failed durably (${journalFailed}); the daemon refuses every mutation and awaits the operator` }
     const lock = readLock(repoDir)
@@ -435,6 +446,7 @@ async function serve(args) {
       attempts: [...attemptsState.values()],
       workers: [...workers.keys()],
       admission,
+      sealedFence: sealedFence || null,
       draining,
     }),
 
@@ -575,6 +587,26 @@ async function serve(args) {
         }
         return { ok: true, requestId, answers }
       }),
+
+    'seal-boundary': (request) => {
+      const previousAdmission = admission
+      const previousSeal = sealedFence
+      return mutate(
+        request,
+        () => {
+          const closed = closeAdmission({ admission, reason: `boundary:${request.payload?.requestId}` })
+          if (!closed.ok) return closed
+          admission = closed.admission
+          sealedFence = request.fence
+          return { ok: true, requestId: request.payload?.requestId, fence: request.fence, daemonGeneration: daemonRecord.generation }
+        },
+        () => {
+          admission = previousAdmission
+          sealedFence = previousSeal
+          return { compensation: 'restore-admission-state-and-boundary-seal' }
+        },
+      )
+    },
 
     'cancel-attempt': (request) =>
       mutate(request, async () => {

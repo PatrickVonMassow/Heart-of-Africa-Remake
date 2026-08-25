@@ -723,6 +723,10 @@ export const DAEMON_COMMANDS = Object.freeze({
     compensation: 'withdraw-checkpoint-request',
     keyFields: Object.freeze(['batchId', 'requestId']),
   }),
+  'seal-boundary': Object.freeze({
+    compensation: 'restore-admission-state',
+    keyFields: Object.freeze(['batchId', 'requestId']),
+  }),
   'adopt-attempt': Object.freeze({
     compensation: 'release-adoption',
     keyFields: Object.freeze(['batchId', 'attemptId', 'fence']),

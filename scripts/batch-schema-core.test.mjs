@@ -667,6 +667,7 @@ describe('the daemon command table', () => {
     'close-admission': { batchId: 'b1', requestId: 'boundary-1' },
     'grant-lease': { batchId: 'b1', attemptId: 'a1', requestId: 'r2' },
     'request-checkpoint': { batchId: 'b1', requestId: 'r3' },
+    'seal-boundary': { batchId: 'b1', requestId: 'boundary-r3' },
     'adopt-attempt': { batchId: 'b1', attemptId: 'a1', fence: 605 },
     'cancel-attempt': { batchId: 'b1', attemptId: 'a1', requestId: 'r4' },
     'record-state': { batchId: 'b1', attemptId: 'a1', state: 'running', at: NOW },
