@@ -630,12 +630,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "879": {
-      "at": "2026-08-24T06:26:51.714Z",
-      "why": "A session holding no batch lock can move refs/heads/main today — the release is cut on main, so the fence has to hold before the cut, not after it.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "880": {
       "at": "2026-08-24T06:26:51.791Z",
       "why": "It is the gate the release's own four-eyes evidence rests on: every review recorded until it is fixed may be a self-review, so a release cut before it carries unprovable clearance.",
@@ -672,12 +666,6 @@
       "origin": "machine",
       "place": "ahead"
     },
-    "895": {
-      "at": "2026-08-24T12:37:18.287Z",
-      "why": "Seam of point 834, which the user ordered to the front on 22.08.2026 after a second authoring lane died with its session; the cut into seven points is his rule of 24.08.2026, not a machine filing.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "898": {
       "at": "2026-08-24T14:37:17.169Z",
       "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
@@ -707,6 +695,12 @@
       "why": "Machine-filed, loses no work: the run stays blind for its remainder but its commits survive, so it waits behind the release like the other reporting defects of its class",
       "origin": "machine",
       "place": "last"
+    },
+    "907": {
+      "at": "2026-08-25T05:10:52.230Z",
+      "why": "It is the second mouth of the very gap point 879 just closed one turn ago: an unlocked session can still move refs/heads/main by handing the push to an interpreter, and leaving that door open until after the release keeps the release itself unprotected.",
+      "origin": "machine",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -754,7 +748,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T02:50:59.237Z",
+    "at": "2026-08-25T05:10:52.237Z",
     "points": [
       174,
       184,
@@ -1021,7 +1015,6 @@
       876,
       877,
       878,
-      879,
       880,
       881,
       882,
@@ -1031,7 +1024,6 @@
       886,
       887,
       888,
-      895,
       896,
       898,
       899,
@@ -1040,7 +1032,8 @@
       902,
       904,
       905,
-      906
+      906,
+      907
     ]
   }
 }
