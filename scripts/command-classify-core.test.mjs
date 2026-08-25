@@ -232,6 +232,20 @@ describe('interpreters that execute code from stdin', () => {
     expect(isMutatingSegment('printf "print(1)" | python3')).toBe(true)
   })
 
+  it('takes the safe side for interpreter code supplied by a here-string', () => {
+    expect(isMutatingSegment('bash <<< "git push"')).toBe(true)
+    expect(isMutatingSegment('sh <<< "git push"')).toBe(true)
+    expect(isMutatingSegment('zsh <<<"git push"')).toBe(true)
+    expect(isMutatingSegment('node - <<< "x"')).toBe(true)
+    expect(isMutatingSegment('python3 <<< "import os"')).toBe(true)
+  })
+
+  it('preserves non-interpreters and explicit shell commands fed by a here-string', () => {
+    expect(isMutatingSegment('cat <<< "git push"')).toBe(false)
+    expect(isMutatingSegment('grep push <<< "text"')).toBe(false)
+    expect(isMutatingSegment("sh -c 'git status' <<< \"x\"")).toBe(false)
+  })
+
   it('keeps explicit commands, named scripts, and non-interpreters at their existing intent', () => {
     expect(isMutatingSegment("sh -c 'git status'")).toBe(false)
     expect(isMutatingSegment("echo input | sh -c 'git status'")).toBe(false)

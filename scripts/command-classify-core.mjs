@@ -464,7 +464,7 @@ function pythonExecutesStdin(args) {
 
 /** Does this segment feed opaque executable text to an interpreter? */
 function executesAttachedStdin(seg) {
-  const attached = seg.stdinSource === 'pipe' || seg.redirects.some((r) => r.op === '<<' || r.op === '<<-')
+  const attached = seg.stdinSource === 'pipe' || seg.redirects.some((r) => r.op === '<<' || r.op === '<<-' || r.op === '<<<')
   if (!attached) return false
   const head = commandHead(seg)
   const args = argsOf(seg)
