@@ -12049,7 +12049,11 @@ to land than a mechanism that needs a review.
   is committed but only local`, which is true of the local ref and misleading about the work: the
   content was already on the remote. This is the same class as the 24.08.2026 entry in the
   retrospective timeline, but that one ended at the misleading report; this one adds that the run
-  cannot get out of the state on its own.
+  cannot get out of the state on its own. SEEN AGAIN 25.08.2026 on `feat/907-interpreter-stdin-write`:
+  the run pushed `669b14e8`/`1430a855`/`a5293c31`, then rewrote the same three commits locally as
+  `8e0a2341`/`c6988d8c`/`293ae43d` with a `Rescue:` body, and `git diff HEAD origin/…` was EMPTY —
+  identical trees, different parents. The closing report again said the work was local-only, and the
+  main session recovered it by resetting the local branch onto the remote tip it already matched.
   FINAL STATE: the interim push reconciles a rewritten branch through the same lease-gated
   compare-and-swap the wrapper already uses for checkpoints — a rejected push is re-observed, an
   already-contained head is accepted, and a head that legitimately supersedes the remote is pushed
