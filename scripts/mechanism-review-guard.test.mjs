@@ -16,6 +16,7 @@ import {
   rangeFilesCommand,
 } from './mechanism-review-guard.mjs'
 import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
+import { evaluateMechanismReview, formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -50,9 +51,24 @@ describe('bootstrapBase', () => {
     expect(asked).toEqual([`--verify --quiet "${BASELINE_RECOVERY_ANCHOR}^{commit}"`])
   })
 
-  it('never falls back to HEAD when the anchor is absent or not an ancestor', () => {
+  it('never falls back to HEAD when the anchor is absent', () => {
     expect(bootstrapBase('headsha', () => '')).toBe(null)
-    expect(bootstrapBase('headsha', () => BASELINE_RECOVERY_ANCHOR, () => false)).toBe(null)
+  })
+
+  it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
+    const head = 'headsha'
+    const baseline = bootstrapBase(head, () => BASELINE_RECOVERY_ANCHOR, () => false)
+    expect(baseline).toBe(null)
+
+    const verdict = evaluateMechanismReview({
+      baseline,
+      baselineMissing: true,
+      head,
+      pendingCommits: [],
+      records: [],
+    })
+    expect(verdict).toMatchObject({ block: true, clear: false })
+    expect(formatMechanismReviewVerdict(verdict)).toContain('merge origin/main into this branch')
   })
 })
 

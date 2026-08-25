@@ -1693,8 +1693,9 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
       '',
       'Absence cannot bootstrap at HEAD: on main that would make the pending range empty and',
       'silently grandfather every outstanding mechanism review. This stop is refused. The guard',
-      'will seed its tracked-history recovery anchor when available; end the turn again to judge',
-      'the complete range from that anchor.',
+      'will seed its tracked-history recovery anchor when available. If this branch cannot reach',
+      'that anchor, merge origin/main into this branch. Then end the turn again so the guard can',
+      'seed the anchor and judge the complete range from it.',
     ].join('\n')
   }
   const groups = Array.isArray(authorshipPlan?.groups) ? authorshipPlan.groups : []
