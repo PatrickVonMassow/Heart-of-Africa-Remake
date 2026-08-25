@@ -696,12 +696,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "903": {
-      "at": "2026-08-25T00:49:04.062Z",
-      "why": "The criticality gate refuses every landing while it stands — measured today on main at bd0cd2d — so no point, the release included, can land until it is fixed.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "904": {
       "at": "2026-08-25T00:23:39.794Z",
       "why": "Letzter Platz ist richtig: die drei Befunde liegen in bereits gelandetem Code, blockieren keine offene Spur und keinen Release-Schritt",
@@ -760,7 +754,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T01:13:13.987Z",
+    "at": "2026-08-25T01:20:33.741Z",
     "points": [
       174,
       184,
@@ -1045,7 +1039,6 @@
       900,
       901,
       902,
-      903,
       904,
       905
     ]
