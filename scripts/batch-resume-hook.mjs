@@ -53,6 +53,7 @@ import { isPaused, pauseReason } from './batch-lock.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { servingPolicyLine } from './fable-switch-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
+import { noteHandoverAttributionSuccessorStart } from './handover-attribution.mjs'
 
 const OWNER_RUNBOOK_PATH = join(REPO_ROOT, 'docs', 'batch-owner-runbook.md')
 
@@ -381,6 +382,17 @@ try {
       if (auth) clearAuthorized()
       // The claim has done its job the moment its own window owns the batch.
       if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
+
+      // Attribute the real spawn-to-SessionStart interval only after this
+      // session has proved ownership. The PostToolUse observer remains the
+      // fail-open fallback when this evidence write is unavailable.
+      if (ownsBatch(ownership)) {
+        noteHandoverAttributionSuccessorStart({
+          sessionId,
+          at: Date.now(),
+          launch: auth ? { at: auth.at, spawnToken: auth.spawnToken ?? null } : null,
+        }, { say: () => {} })
+      }
 
       // Point 442, the other side of the seam: the launcher repairs before it
       // spawns, and the session it spawned checks the same thing on arrival. Two

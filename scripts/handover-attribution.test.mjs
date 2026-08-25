@@ -4,6 +4,7 @@ import {
   noteHandoverAttributionCommit,
   noteHandoverAttributionDemand,
   noteHandoverAttributionPrepare,
+  noteHandoverAttributionSuccessorStart,
   observeHandoverAttributionCall,
 } from './handover-attribution.mjs'
 
@@ -49,6 +50,10 @@ describe('live handover attribution', () => {
       { sessionId: OLD, tokens: 104_000, at: 5_000, transcript: '/old.jsonl', destination: 'fresh-session' },
       memory.io,
     )
+    noteHandoverAttributionSuccessorStart(
+      { sessionId: NEXT, at: 6_500, launch: { at: 6_000, spawnToken: 'spawn-1' } },
+      memory.io,
+    )
 
     const observeRamp = (command, tokens, now) => observeHandoverAttributionCall(
       { session_id: NEXT, transcript_path: '/next.jsonl', tool_name: 'Bash', tool_input: { command } },
@@ -57,7 +62,6 @@ describe('live handover attribution', () => {
         ownsBatch: true,
         now,
         readTokens: () => ({ tokens, transcript: '/next.jsonl' }),
-        readAutostart: () => ({ at: 6_000, spawnToken: 'spawn-1' }),
       },
     )
     observeRamp('git status --short --branch', 8_000, 7_000)
@@ -75,8 +79,9 @@ describe('live handover attribution', () => {
       metadata: { spawnAt: 6_000, spawnReading: 'measured', spawnToken: 'spawn-1' },
     })
     expect(memory.lines.find((line) => line.stage === 'ramp.orientation')).toMatchObject({
-      elapsedMs: 1_000, tokens: 8_000, tokenDelta: 8_000, reading: 'measured',
+      elapsedMs: 500, tokens: 8_000, tokenDelta: 8_000, reading: 'measured',
     })
+    expect(memory.lines.find((line) => line.stage === 'ramp.session-start')).toMatchObject({ elapsedMs: 500 })
     expect(memory.state).toMatchObject({ status: 'complete', successorSessionId: NEXT })
   })
 
@@ -85,12 +90,14 @@ describe('live handover attribution', () => {
     const progress = source('./batch-progress-guard.mjs')
     const boundary = source('./batch-boundary.mjs')
     const heartbeat = source('./lock-heartbeat-hook.mjs')
+    const resume = source('./batch-resume-hook.mjs')
     expect(progress).toMatch(/block-take-boundary[\s\S]*noteHandoverAttributionDemand/)
     expect(progress).toMatch(/block-context-handover[\s\S]*noteHandoverAttributionDemand/)
     expect(boundary.match(/noteHandoverAttributionPrepare\(/g)).toHaveLength(2)
     expect(boundary.match(/noteHandoverAttributionCommit\(/g)).toHaveLength(2)
     expect(boundary.match(/at: committedMarker\.at/g)).toHaveLength(2)
     expect(heartbeat).toMatch(/observeHandoverAttributionCall\(data, \{ ownsBatch: ownsBatch && !attributionPaused/)
+    expect(resume).toMatch(/ownsBatch\(ownership\)[\s\S]*noteHandoverAttributionSuccessorStart/)
   })
 
   it('reports an unavailable claim-window baseline rather than inventing its token cost', () => {

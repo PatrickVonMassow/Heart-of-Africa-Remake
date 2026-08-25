@@ -128,6 +128,64 @@ export function noteHandoverAttributionCommit(input = {}, io = {}) {
   }, io)
 }
 
+/** Timestamp the owning successor at SessionStart, after ownership is proven. */
+export function noteHandoverAttributionSuccessorStart(input = {}, {
+  read = readHandoverAttributionState,
+  readAutostart = () => readJson(AUTOSTART_LAST_PATH),
+  ...io
+} = {}) {
+  try {
+    let state = read(io.statePath)
+    const sid = String(input.sessionId ?? '').trim()
+    if (
+      !sid ||
+      !state ||
+      state.status !== HANDOVER_ATTRIBUTION_STATUS.COMMITTED ||
+      state.predecessorSessionId === sid
+    ) return { written: false, reason: 'no-committed-handover', records: [] }
+
+    const at = typeof input.at === 'number' && Number.isFinite(input.at) ? input.at : Date.now()
+    const fresh = state.destination === 'fresh-session'
+    const launch = fresh ? (input.launch ?? readAutostart()) : null
+    const spawnAt =
+      typeof launch?.at === 'number' && launch.at >= state.committedAt && launch.at <= at
+        ? launch.at
+        : null
+    const records = []
+    const save = (checkpoint) => {
+      const result = persist(addHandoverAttributionCheckpoint({ state, ...checkpoint }), io)
+      if (result.state) state = result.state
+      if (result.record) records.push(result.record)
+      return result
+    }
+    save({
+      sessionId: state.predecessorSessionId,
+      side: 'idle',
+      stage: fresh ? 'idle.launcher' : 'idle.claim-reservation',
+      at: spawnAt ?? at,
+      readingRequired: false,
+      metadata: fresh
+        ? { spawnAt, spawnToken: launch?.spawnToken ?? null, spawnReading: spawnAt === null ? 'missing' : 'measured' }
+        : { destination: state.destination ?? null },
+    })
+    const result = save({
+      sessionId: sid,
+      side: 'ramp',
+      stage: 'ramp.session-start',
+      tokens: fresh ? 0 : null,
+      baseline: fresh,
+      at,
+      transcript: String(input.transcript ?? ''),
+      status: HANDOVER_ATTRIBUTION_STATUS.RAMPING,
+      metadata: { freshSession: fresh },
+    })
+    return { written: result.written, reason: result.reason, records }
+  } catch (error) {
+    io.say?.(`WARNING: successor start could not be attributed (${error?.message ?? error}); the boundary stands.`)
+    return { written: false, reason: 'read-failed', records: [], error }
+  }
+}
+
 /**
  * Attribute one completed tool call. Before commit it is an exit checkpoint;
  * after commit another owning session begins the ramp and the first work call
