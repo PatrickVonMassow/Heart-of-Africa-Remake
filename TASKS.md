@@ -77,31 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 894. The daemon, its control plane, and how a worker escapes the session that spawned it.
-  CUT OUT OF POINT 834 (see 890 for the cut and its reason). Step 3, and the mechanism the
-  measured failure demands: on 21.08.2026 an authoring run for point 597 died with its parent
-  session — pid 2792258 gone, ~1.5 h and the run's whole token spend lost — because
-  `scripts/author-sol.mjs:337` spawns codex `detached` only so that a kill takes the whole group,
-  while `author-sol.mjs` itself is awaited inside the parent session's tool call and a Sol run has
-  no checkpoint to resume from.
-  HOW THE BRANCH IS CUT: `feat/894-<slug>` off main, carrying `scripts/batch-daemon.mjs` and its
-  test, `scripts/batch-daemon-core.mjs` and its test, `scripts/detached-agent.mjs` and its test,
-  and the `withLockWriteMutex` addition to `scripts/batch-singleton.mjs` from
-  `feat/834-durable-authoring-lane`, plus `docs/command-index.md` regenerated.
-  LANDS AFTER 891, 892 and 893 — it imports the schema core, the state store, the attempt lease
-  and the dark-lane flag.
-  WHAT THE EARLIER ROUNDS FORCED: the daemon's shutdown, fencing and identity races are closed;
-  every daemon-side state write takes the store's atomic discipline; stale credentials are
-  refused; and the lock's daemon copy is written under the SAME `.reaping` mutex that serializes
-  lock takeover, because a writer on any other mutex still races a takeover.
-  FINAL STATE: the daemon lands dark behind the flag of 891, which cannot be enabled until 895 and
-  834 are green; today's authoring path is the path that runs. The document of 890 states, in
-  mechanical terms, how the daemon outlives the tool call that started it.
-  VERIFIABLE: the union's unit cases for step 3; the control-plane cases; `npm run test:unit`,
-  lint, build; the cross-vendor review of this file set recorded green before the merge.
-  Criticality: high — it is the process that must survive, and an unfenced one is worse than none.
-  Bundle: unbundled (batch autonomy).
-
 - [ ] 895. Fenced discovery, adoption, reconciliation, and the slice of landing they need. CUT OUT
   OF POINT 834 (see 890 for the cut and its reason). Step 8 with the part of step 9 that step 8
   requires — and it is what makes SURVIVABILITY claimable at all: without it a worker merely is
