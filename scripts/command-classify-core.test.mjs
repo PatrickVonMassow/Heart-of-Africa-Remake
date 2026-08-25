@@ -227,15 +227,24 @@ describe('interpreters that execute code from stdin', () => {
 
   it('takes the same side for node and python stdin-code modes', () => {
     expect(isMutatingSegment('printf "process.exit()" | node -')).toBe(true)
+    expect(isMutatingSegment('printf "process.exit()" | node')).toBe(true)
     expect(isMutatingSegment(['python - <<PY', 'print("ok")', 'PY'].join('\n'))).toBe(true)
+    expect(isMutatingSegment('printf "print(1)" | python3')).toBe(true)
   })
 
   it('keeps explicit commands, named scripts, and non-interpreters at their existing intent', () => {
     expect(isMutatingSegment("sh -c 'git status'")).toBe(false)
     expect(isMutatingSegment("echo input | sh -c 'git status'")).toBe(false)
     expect(isMutatingSegment('printf input | bash scripts/report.sh')).toBe(false)
+    expect(isMutatingSegment(['node scripts/report.mjs <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment(['python report.py <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
     expect(isMutatingSegment('git log | grep push')).toBe(false)
     expect(isMutatingSegment(['cat <<EOF', 'git push', 'EOF'].join('\n'))).toBe(false)
+  })
+
+  it('distinguishes a pipe (including a continued one) from boolean OR', () => {
+    expect(isMutatingSegment('printf code |\n  zsh')).toBe(true)
+    expect(isMutatingSegment('printf code || zsh')).toBe(false)
   })
 
   it('does not change a bare interpreter without attached stdin', () => {
