@@ -221,6 +221,91 @@ put it is the mistake this line exists to stop.
   first stage depends on 744's corrected exit path.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 918. The durable lane's activation interlock takes the drain's word for it, and the drain
+  itself has an admission window. FOUND 25.08.2026 by a cross-vendor audit (GPT-5.6 Sol via
+  `ask-sol`, kind audit) of a proposed pull-forward of 676's activation slice; the audit REJECTED
+  the pull-forward and its findings are recorded here so they survive the conversation. The two
+  code-level gaps, verified against the sources:
+  (1) EVIDENCE GAP: `activationDecision` in `scripts/durable-lane-flag-core.mjs` demands
+  commit-visible evidence for every required STEP, but for the boundary mode it verifies only the
+  literal string `drain-before-boundary`. The same reviewed change can therefore declare the mode,
+  mark the steps green, and open the flag without the manifest ever carrying evidence that the
+  drain ENFORCEMENT exists as code. The interlock's own header says a hand-edited flag may not
+  silently advertise a boundary mode the mechanisms cannot perform — today it can.
+  (2) ADMISSION RACE: refusing a planned boundary while a daemon-owned worker is OBSERVED active
+  is not a drain. The flag is not consulted per call and gates only daemon startup, so a live
+  daemon can admit a new worker between the boundary's active-worker check and the handover.
+  Draining must atomically CLOSE ADMISSION first (a fenced refusal the daemon enforces), then
+  empty, then hand over.
+  CONTEXT THE AUDIT ALSO SETTLED, recorded for the planner rather than as work of this point:
+  step 9 (crash-recoverable serial landing) is NOT landed — 895 delivered only the journal
+  vocabulary and successor decision (`scripts/batch-landing-core.mjs` says the landing inside
+  `land-point.mjs` is 676's remainder); ten of the eleven step-12 drills do not exist yet
+  (`scripts/batch-daemon-drill.mjs` carries only `parent-death`); and 676's measured baseline
+  trial is the acceptance and may not slip past activation. An activation shortcut around 676's
+  order is therefore off the table.
+  FINAL STATE: the activation decision requires, beside the step manifest, a boundary-mechanism
+  entry with the same green-plus-evidence shape, refusing while it is absent; and the daemon's
+  control plane exposes an atomic close-admission operation the boundary path uses before it
+  counts workers, so the drain 676 builds has the seam it needs. Both land with unit cases; the
+  behavior of an already-open flag is unchanged.
+  VERIFIABLE: Vitest over `activationDecision` — a manifest with all steps green but no evidenced
+  boundary mechanism refuses and names it; over the daemon core — after close-admission a spawn
+  request is refused with a journalled reason, and the refusal survives a daemon restart; and the
+  existing flag tests stay green.
+  Criticality: med — the flag opens only through a reviewed change, but a wrongly opened lane
+  loses work, and this is the recorded reason the shortcut was rejected.
+  Bundle: unbundled (batch autonomy).
+
+- [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
+  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
+  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
+  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
+  over on context — but every lane a session spawned dies with that session, so a session that
+  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
+  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
+  underneath, so that a lane stops belonging to a session at all.
+  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
+  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
+  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
+  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
+  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
+  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
+  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
+  restated.
+  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
+  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
+  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
+  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
+  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
+  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
+  same batch. Coordination state is an append-only checksummed journal beside the repository with
+  an atomically replaced snapshot for fast resume, and every point carries an explicit state
+  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
+  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
+  reparenting, never by PID alone — after reconciling every recorded lane against journal,
+  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
+  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
+  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
+  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
+  main-session picture judgments are persisted as evidence a worker may never substitute.
+  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
+  transferable.
+  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
+  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
+  journal, board projection, metrics), each step green on the unit layer before the next, and roll
+  out with the Sol adapter ALONE until the failure drills pass.
+  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
+  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
+  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
+  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
+  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
+  boundary), a median handover context materially below baseline, and points landed per day no
+  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
+  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
+  here loses work rather than merely slowing it.
+
 - [ ] 595. The verification ladder (point 572's measure 5). While a render point is still
   being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
   full proof — both backends where they can differ, LARGE where the change warrants it —
@@ -9028,91 +9113,6 @@ to land than a mechanism that needs a review.
   first-attempt log naming the check that failed.
   Criticality: low — it costs a re-run, but it is the difference between closing a red by its
   cause and closing it by a green, which is exactly what point 640 forbids.
-
-- [ ] 918. The durable lane's activation interlock takes the drain's word for it, and the drain
-  itself has an admission window. FOUND 25.08.2026 by a cross-vendor audit (GPT-5.6 Sol via
-  `ask-sol`, kind audit) of a proposed pull-forward of 676's activation slice; the audit REJECTED
-  the pull-forward and its findings are recorded here so they survive the conversation. The two
-  code-level gaps, verified against the sources:
-  (1) EVIDENCE GAP: `activationDecision` in `scripts/durable-lane-flag-core.mjs` demands
-  commit-visible evidence for every required STEP, but for the boundary mode it verifies only the
-  literal string `drain-before-boundary`. The same reviewed change can therefore declare the mode,
-  mark the steps green, and open the flag without the manifest ever carrying evidence that the
-  drain ENFORCEMENT exists as code. The interlock's own header says a hand-edited flag may not
-  silently advertise a boundary mode the mechanisms cannot perform — today it can.
-  (2) ADMISSION RACE: refusing a planned boundary while a daemon-owned worker is OBSERVED active
-  is not a drain. The flag is not consulted per call and gates only daemon startup, so a live
-  daemon can admit a new worker between the boundary's active-worker check and the handover.
-  Draining must atomically CLOSE ADMISSION first (a fenced refusal the daemon enforces), then
-  empty, then hand over.
-  CONTEXT THE AUDIT ALSO SETTLED, recorded for the planner rather than as work of this point:
-  step 9 (crash-recoverable serial landing) is NOT landed — 895 delivered only the journal
-  vocabulary and successor decision (`scripts/batch-landing-core.mjs` says the landing inside
-  `land-point.mjs` is 676's remainder); ten of the eleven step-12 drills do not exist yet
-  (`scripts/batch-daemon-drill.mjs` carries only `parent-death`); and 676's measured baseline
-  trial is the acceptance and may not slip past activation. An activation shortcut around 676's
-  order is therefore off the table.
-  FINAL STATE: the activation decision requires, beside the step manifest, a boundary-mechanism
-  entry with the same green-plus-evidence shape, refusing while it is absent; and the daemon's
-  control plane exposes an atomic close-admission operation the boundary path uses before it
-  counts workers, so the drain 676 builds has the seam it needs. Both land with unit cases; the
-  behavior of an already-open flag is unchanged.
-  VERIFIABLE: Vitest over `activationDecision` — a manifest with all steps green but no evidenced
-  boundary mechanism refuses and names it; over the daemon core — after close-admission a spawn
-  request is refused with a journalled reason, and the refusal survives a daemon restart; and the
-  existing flag tests stay green.
-  Criticality: med — the flag opens only through a reviewed change, but a wrongly opened lane
-  loses work, and this is the recorded reason the shortcut was rejected.
-  Bundle: unbundled (batch autonomy).
-
-- [ ] 676. An authoring lane must survive the session that spawned it (specified 13.08.2026 by
-  the blind-parallel four-eyes stage of CLAUDE.md §6; the counted union, the final proposal and
-  the rejected alternatives are `docs/handover-architecture.md`). TWO RULES OF THIS HOUSE
-  CONTRADICT EACH OTHER TODAY: the pool runs up to three authoring lanes, and the session hands
-  over on context — but every lane a session spawned dies with that session, so a session that
-  keeps the pool busy can hand over only by throwing its own work away. Point 675 closes the
-  three MECHANICAL defeats of the handover on today's mechanics; this point builds the plane
-  underneath, so that a lane stops belonging to a session at all.
-  THIS POINT BEGINS AFTER POINT 834, its front stage, and the steps 834 carries are struck from
-  here rather than repeated: the neutral fold of the two blind lists by a model that wrote neither
-  half, the schemas and invariants, the durable state store, the daemon with the Sol adapter, the
-  transferable declarations with their fencing, and the slice of fenced discovery, adoption and
-  reconciliation a fresh session needs before it may prove and land what it adopted. What 834's
-  fold settles in the union is what this point builds on. An Agent-tool child stays NON-
-  transferable, and the stand-down and dead-owner rules are point 716's, inherited rather than
-  restated.
-  FINAL STATE, as the union settles it: authoring runs as DAEMON-OWNED detached workers under a
-  model-neutral adapter (`scripts/detached-agent.mjs`) whose reference implementation is the
-  already-detached `scripts/author-sol.mjs`; an Agent-tool child stays session-bound and is
-  declared NON-transferable, blocking a boundary until it finishes or is safely stopped. The
-  coordinator plane is short-lived and split into dispatcher and lander epochs, holding one
-  renewable batch lease whose epoch FENCES every mutation, so two sessions can never adopt the
-  same batch. Coordination state is an append-only checksummed journal beside the repository with
-  an atomically replaced snapshot for fast resume, and every point carries an explicit state
-  (queued, running, checkpointing, ready-for-review, landing, landed, failed, stalled,
-  cancelled). A successor adopts supervision by STABLE JOB IDENTITY — never by process
-  reparenting, never by PID alone — after reconciling every recorded lane against journal,
-  worktrees and local/remote SHAs, and quarantining what it cannot prove. Refill comes only from
-  a bounded, pre-authorized queue behind a global three-lane cap and a completed-review backlog
-  limit, with a journalled REASON whenever three eligible lanes exist and fewer run. Landing stays
-  serial behind a batch-wide landing lock with a crash-recoverable staged journal, and the
-  main-session picture judgments are persisted as evidence a worker may never substitute.
-  Drain-before-boundary REMAINS as the explicit degraded mode whenever any active lane is not
-  transferable.
-  BUILD THE REMAINDER IN THE UNION'S ORDER (bounded dispatch, checkpoint barrier, the two-phase
-  boundary, successor reconciliation beyond the slice 834 claims, the crash-recoverable landing
-  journal, board projection, metrics), each step green on the unit layer before the next, and roll
-  out with the Sol adapter ALONE until the failure drills pass.
-  VERIFIABLE: the unit cases the union names per step; the failure drills — worker crash, stall,
-  push failure, dirty worktree, marker deletion, daemon restart, corrupt snapshot, PID reuse,
-  duplicate coordinator, remote outage, checkpoint timeout — each run through the daemon's drill
-  command; and a measured trial against a recorded baseline day, whose success needs ZERO safety
-  incidents (no lost attempt, no duplicate writer, no overlapping lease, no silently missed
-  boundary), a median handover context materially below baseline, and points landed per day no
-  worse than baseline. Utilization is supporting evidence, never the acceptance test on its own.
-  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
-  Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
-  here loses work rather than merely slowing it.
 
 - [ ] 677. A guard run by hand hangs forever on its own stdin (measured 13.08.2026, 19:20). The
   house rule says to ASK THE GUARDS BEFORE THE ACTION (CLAUDE.md §7.2), and a session that does
