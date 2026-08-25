@@ -177,6 +177,41 @@ describe('THE HOOK DUTY: deliverPendingMessages', () => {
     expect(deliverPendingMessages({ dir, ownsBatch: true })).toBe('')
   })
 
+  it('returns a claimed message to pending when its hook envelope is not accepted', () => {
+    const dir = join(tmp(), 'spool')
+    spoolMessage(msg({ text: 'do not lose me' }), dir)
+    let attempted = ''
+
+    expect(
+      deliverPendingMessages({
+        dir,
+        ownsBatch: true,
+        emit: (out) => {
+          attempted = out
+          return false
+        },
+      }),
+    ).toBe('')
+    expect(attempted).toContain('do not lose me')
+    expect(readPending(dir).map((m) => m.text)).toEqual(['do not lose me'])
+    expect(readConsumed(dir)).toEqual([])
+
+    expect(
+      deliverPendingMessages({
+        dir,
+        ownsBatch: true,
+        emit: () => {
+          throw new Error('closed hook stdout')
+        },
+      }),
+    ).toBe('')
+    expect(readPending(dir).map((m) => m.text)).toEqual(['do not lose me'])
+
+    expect(deliverPendingMessages({ dir, ownsBatch: true, emit: () => true })).toContain('do not lose me')
+    expect(readPending(dir)).toEqual([])
+    expect(readConsumed(dir).map((m) => m.text)).toEqual(['do not lose me'])
+  })
+
   it('delivers a message that arrives BETWEEN two calls', () => {
     const dir = join(tmp(), 'spool')
     spoolMessage(msg(), dir)
@@ -203,6 +238,24 @@ describe('THE HOOK DUTY: deliverPendingMessages', () => {
     spoolMessage(msg(), dir)
     expect(deliverPendingMessages({ dir, ownsBatch: false })).toBe('')
     expect(readPending(dir)).toHaveLength(1)
+  })
+
+  it('leaves a subagent-refused message pending for the defer sweep', () => {
+    const dir = join(tmp(), 'spool')
+    const receivedAt = NOW - 4 * 60 * 1000
+    spoolMessage(msg({ receivedAt }), dir)
+
+    expect(
+      deliverPendingMessages({
+        dir,
+        ownsBatch: true,
+        hookInput: { transcript_path: '/projects/owner/subagents/agent-a.jsonl' },
+      }),
+    ).toBe('')
+    const pending = readPending(dir)
+    expect(pending).toHaveLength(1)
+    expect(readConsumed(dir)).toEqual([])
+    expect(sweepPlan({ pending, now: NOW }).overdue.map((m) => m.id)).toEqual(['m1'])
   })
 
   it('delivers and consumes while the owning batch is paused', () => {

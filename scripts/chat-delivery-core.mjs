@@ -159,6 +159,19 @@ export function hookStdout(messages) {
 }
 
 /**
+ * A delegated agent receives the parent's session id in its hook payload, so
+ * ownership alone cannot tell its PostToolUse call from the owner's. The
+ * transcript path can: delegated transcripts are `agent-*.jsonl` files below
+ * a `subagents` directory, while the top-level owner's transcript is not.
+ */
+export function isSubagentHook(payload) {
+  const path = payload?.transcript_path ?? payload?.transcriptPath
+  if (typeof path !== 'string' || path === '') return false
+  const segments = path.replaceAll('\\', '/').split('/')
+  return segments.includes('subagents') && /^agent-.*\.jsonl$/.test(segments.at(-1))
+}
+
+/**
  * WHICH WAITING MESSAGES THIS TOOL CALL MAY TAKE. PURE.
  *
  * A session that does NOT own the batch lock must not consume the batch's
@@ -167,7 +180,14 @@ export function hookStdout(messages) {
  * are most valuable while work is parked, so the owning session keeps receiving
  * them. The watcher supplies the ownerless paused case.
  */
-export function deliveryDecision({ ownsBatch = false, paused = false, pending = [], max = MAX_PER_CALL } = {}) {
+export function deliveryDecision({
+  ownsBatch = false,
+  paused = false,
+  pending = [],
+  max = MAX_PER_CALL,
+  hookInput = null,
+} = {}) {
+  if (isSubagentHook(hookInput)) return { deliver: [], reason: 'subagent-hook' }
   if (!ownsBatch) return { deliver: [], reason: 'not-owner' }
   const list = orderMessages(pending)
   if (list.length === 0) return { deliver: [], reason: 'empty' }

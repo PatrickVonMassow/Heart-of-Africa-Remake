@@ -70,7 +70,7 @@
 //      otherwise-refused call. This already-wired all-tools PostToolUse hook is
 //      where that call's actual result exists, so it appends the correlated,
 //      bounded result record without adding another settings entry.
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
 import { dispossessionNotice } from './batch-lease-core.mjs'
@@ -237,9 +237,17 @@ const paused = (() => {
 })()
 let spoke = false
 try {
-  const out = deliverPendingMessages({ ownsBatch, paused })
+  const out = deliverPendingMessages({
+    ownsBatch,
+    paused,
+    hookInput: data,
+    // A successful synchronous write proves only that fd 1 accepted the bytes,
+    // not that the harness injected them. The subagent discriminator covers
+    // the known divergence before claiming; if the harness discards an accepted
+    // owner write, this hook cannot observe it and the message is still lost.
+    emit: (text) => writeFileSync(1, text, 'utf8'),
+  })
   if (out) {
-    process.stdout.write(out)
     spoke = true
   }
 } catch {
