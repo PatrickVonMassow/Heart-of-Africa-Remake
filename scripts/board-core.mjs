@@ -12,6 +12,7 @@ import { namesFollowOnWork } from './handover-card-contract.mjs'
 // The derived state card's vocabulary lives beside the derivation itself, so the
 // renderer here and the module that decides WHAT to report cannot drift apart.
 import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './board-state-core.mjs'
+import { criticalityOf, parsePointBlocks } from './criticality-review-guard-core.mjs'
 // The admissibility rule for a card written by a script, kept beside the guard's
 // own notion of "this asks the user" rather than restated here.
 import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
@@ -192,6 +193,59 @@ export function refreshFooter(html, { openCount, now = new Date() } = {}) {
  */
 const numberChip = (point) => `<span class="num">${point}</span>`
 
+/** German board labels for the English criticality vocabulary used by code. */
+export const CRITICALITY_LABELS = Object.freeze({ low: 'niedrig', med: 'mittel', high: 'hoch' })
+
+const CRITICALITY_BADGE_RE =
+  /<span\s+class="criticality(?:\s+criticality-(?:low|med|high))?"[^>]*>[\s\S]*?<\/span>\s*/g
+const CRITICALITY_BADGE_SOURCE =
+  '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
+const CRITICALITY_STYLE_ID = 'board-criticality-style'
+const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
+.criticality{flex-shrink:0;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
+</style>`
+
+const criticalityBadge = (level) =>
+  level && CRITICALITY_LABELS[level]
+    ? `<span class="criticality criticality-${level}">${CRITICALITY_LABELS[level]}</span>`
+    : ''
+
+/**
+ * Derive every numbered card's criticality badge from the work order.
+ *
+ * This is deliberately a whole-document render pass rather than another field
+ * accepted by the card writers: a typed value could drift, while this pass also
+ * repairs already-published and hand-edited cards on the next edit or publish.
+ * Summaries without a pure numeric point chip are returned verbatim, including
+ * the handover card and the queue's non-point request card.
+ */
+export function renderCardCriticalities(html, tasksText) {
+  const levels = new Map(
+    parsePointBlocks(tasksText).map((point) => [String(point.n), criticalityOf(point.body).level]),
+  )
+  let badges = 0
+  let out = String(html ?? '').replace(/<summary>([\s\S]*?)<\/summary>/g, (whole, summary) => {
+    const { chip } = summaryPoint(summary)
+    if (chip == null) return whole
+    const clean = summary.replace(CRITICALITY_BADGE_RE, '')
+    const badge = criticalityBadge(levels.get(chip))
+    if (!badge) return `<summary>${clean}</summary>`
+    badges += 1
+    return `<summary>${clean.replace(
+      new RegExp(`^(\\s*<span class="num">\\s*${chip}\\s*</span>)`),
+      `$1${badge}`,
+    )}</summary>`
+  })
+
+  const styleRe = new RegExp(`<style id="${CRITICALITY_STYLE_ID}">[\\s\\S]*?</style>\\s*`, 'g')
+  out = out.replace(styleRe, '')
+  if (!badges) return out
+  if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
+  const main = out.indexOf('<main')
+  return main < 0 ? `${CRITICALITY_STYLE}\n${out}` : `${out.slice(0, main)}${CRITICALITY_STYLE}\n${out.slice(main)}`
+}
+
 /**
  * A card TITLE as markup-safe text (four-eyes review, 12.08.2026). Every reader
  * of a title — the gate, the finders, the retitle itself — matches `[^<]*`, so a
@@ -325,7 +379,11 @@ export function dropStrayNowCards(html) {
  */
 export function summaryPoint(summary) {
   const text = String(summary ?? '')
-  const chip = text.match(/^\s*<span class="num">\s*(\d+)\s*<\/span>\s*<span class="t">/)
+  const chip = text.match(
+    new RegExp(
+      `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
+    ),
+  )
   if (chip) return { chip: chip[1], legacy: null }
   const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
   return { chip: null, legacy: legacy ? legacy[1] : null }
