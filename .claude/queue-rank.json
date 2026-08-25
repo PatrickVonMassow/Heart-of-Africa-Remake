@@ -701,6 +701,12 @@
       "why": "It is the second mouth of the very gap point 879 just closed one turn ago: an unlocked session can still move refs/heads/main by handing the push to an interpreter, and leaving that door open until after the release keeps the release itself unprotected.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "908": {
+      "at": "2026-08-25T07:23:10.638Z",
+      "why": "Last is right: 849 repairs the neighbouring class in the same detector reading, so a fix written before it would be rewritten by it; the tax is recurring but costs no work and blocks nothing.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -748,7 +754,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T05:10:52.237Z",
+    "at": "2026-08-25T07:23:10.646Z",
     "points": [
       174,
       184,
@@ -1033,7 +1039,8 @@
       904,
       905,
       906,
-      907
+      907,
+      908
     ]
   }
 }
