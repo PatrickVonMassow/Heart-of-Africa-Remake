@@ -12147,3 +12147,85 @@ to land than a mechanism that needs a review.
   Criticality: medium — it does not corrupt state, but it taxes every delegated build and
   trains the batch to ignore the one alert that will one day be real.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 909. The test type-check has been red on main for a week, and no gate that runs says
+  so. MEASURED 25.08.2026 on main at 745fb37b: `npx tsc -p tsconfig.vitest.json --noEmit`
+  fails with three errors. `src/render/fauna.test.ts(803)` is a real type error — the loop
+  initialiser `firstBody = { x: 0, z: 0, yaw: 0 }` lacks the `y` that commit 6cf23dea added
+  to `FootPlantBodyPose`, so the inferred type no longer satisfies `footPlantPose`. The
+  other two are TS7016 for `.ts` tests importing project `.mjs` with no declarations
+  (`fauna.test.ts` → `scripts/verify/stanceSlip.mjs`, arrived 17.08.2026;
+  `fableEscalationDoc.test.ts` → `scripts/author-routing-core.mjs`, arrived 19.08.2026).
+  `tsconfig.vitest.json` extends `tsconfig.app.json` and re-includes the tests with
+  `exclude: []` but sets no `allowJs`, so a `.ts` test importing a `.mjs` script is an
+  error by construction.
+  WHY IT WAS INVISIBLE, and this is the larger half: `test-types` runs ONLY in the local
+  verify runner (`scripts/verify/run-all.mjs:379`). The GitHub workflow does not run it, so
+  CI reported GREEN on main throughout; the landing fast gate (build, lint, unit) does not
+  run it either, so no landing was ever stopped. A gate nothing routinely runs is not a
+  gate, and a week is how long that took to notice.
+  FINAL STATE: `tsc -p tsconfig.vitest.json --noEmit` is green on main, and a gate that
+  actually runs would have caught it — either CI runs `test-types`, or the landing gate
+  does, and whichever is chosen is the one the red is proven against.
+  VERIFIABLE: the type-check green on main; a deliberately reintroduced type error in a
+  test file measured RED by the chosen gate, not merely by a manual `tsc`; `npm run
+  test:unit`, lint, build.
+  Criticality: medium — it breaks no shipped behaviour, but it is a dark gate, and the
+  three errors it hid are the evidence of what a dark gate costs.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 910. A session working in a worktree is blocked by `dashboard-guard` with a repair
+  that cannot work. MEASURED 25.08.2026. The guard resolves the registered dashboard
+  against ITS OWN repo root (`scripts/dashboard-guard.mjs:111`,
+  `resolve(REPO_ROOT, marker.dashboardPath)`). A git worktree has no
+  `.batch-dashboard.html` at its root, so `markerFileExists` is false and
+  `dashboard-guard-core.mjs:832` blocks the turn with "BATCH DASHBOARD NOT REGISTERED".
+  Reproduced side by side with the same session id on stdin: exit 0 and silent from
+  `/workspace/hoa`, a block decision from `.claude/worktrees/point-834-drills`.
+  THE TRAP IS THE PRESCRIBED REPAIR. The message says to publish, set focus and run
+  `dashboard-guard.mjs --synced <path>`. Done from the main tree all three SUCCEED, and the
+  guard run by hand from the main tree then exits 0 — so every diagnostic reads
+  "registered" — while the Stop hook, which inherits the session's cwd, keeps running the
+  WORKTREE copy and keeps refusing. The full sequence was run twice, verified green each
+  time, and refused both times; only reproducing the guard from both roots showed why.
+  This is the NORMAL case, not an exotic one: the feature-branch workflow of CLAUDE.md §6
+  puts the session in a worktree.
+  FINAL STATE: the guard resolves the dashboard and its marker against the MAIN worktree
+  (`git rev-parse --path-format=absolute --git-common-dir`), not the checkout it happens to
+  run from; and where it still blocks from a non-main checkout it SAYS so and names the
+  main tree, instead of prescribing a repair that provably cannot satisfy it. The same
+  REPO_ROOT question is asked of every other Stop-chain guard, since they all inherit the
+  session's cwd.
+  VERIFIABLE: a case per root — the same marker judged registered from the main tree and
+  from a linked worktree; a case pinning that a genuinely unregistered dashboard still
+  blocks from both; the audit of the other Stop-chain guards recorded with its result;
+  `npm run test:unit`, lint, build.
+  Criticality: medium — it blocks turns rather than corrupting state, but it wastes them at
+  the point where the session is least able to tell a real refusal from a phantom.
+  Bundle: Session- & Repo-Hygiene.
+
+- [ ] 911. The escape drill's "launcher's shape" is a comment, not a coupling, and the
+  drill's claims outrun its instrument. FOUND 25.08.2026 answering the round-15 and
+  round-16 cross-vendor reads of point 834. `scripts/detached-escape-drill.mjs` measures two
+  stdio shapes against the same group SIGKILL, and its header labels one of them
+  "files stdio: [ignore, fd, fd] + unref — the launcher's shape". That label is accurate
+  today — `scripts/batch-autostart.mjs:220` and `:265` spawn with
+  `{ detached: true, stdio: ['ignore', out, out] }` over an `openSync` descriptor — but
+  NOTHING FAILS if it stops being true. Should the launcher move its worker back to `pipe`,
+  the drill keeps measuring the obsolete shape, keeps reporting "the pipe is the binding",
+  and keeps passing, while production loses its children exactly as on 21.08.2026.
+  WHAT WAS SETTLED, so this point does not relitigate it: the reviewer's stronger claim —
+  that the drill could pass on a runtime providing no escape — was refuted by measurement
+  and is pinned by a test, because `verdict()` requires `files.escaped`. Round 16 accepted
+  that, and accepted both repairs of round 15, while holding that the drill's CLAIMS still
+  reach further than a built-in fixture proves. It named the route this point takes.
+  FINAL STATE: the drill's stated claims are narrowed to what its instrument proves — a
+  causal claim about stdio under this runtime, not a claim about the production launcher —
+  and the production launch path is covered by its own conformance check, so that a
+  launcher which stops using the surviving shape turns something red.
+  VERIFIABLE: the narrowed claims read against the drill's own header; the conformance
+  check measured RED against a launcher shape that would not survive, and green against the
+  current one; `npm run test:unit`, lint, build.
+  Criticality: medium — the measurement it guards is sound today, and the risk is drift
+  rather than a present defect.
+  Bundle: Session- & Repo-Hygiene.
