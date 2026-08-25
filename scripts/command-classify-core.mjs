@@ -458,10 +458,11 @@ export function gitSubcommand(segment) {
   return (positionals(argsOf(seg), { valueFlags: GIT_VALUE_FLAGS })[0] ?? '').toLowerCase()
 }
 
-/** git subcommands that write history, the index, the worktree or the remote. */
+/** git subcommands whose normal operation always writes repository state. */
 const GIT_WRITES = new Set([
   'commit', 'merge', 'push', 'rebase', 'reset', 'revert', 'cherry-pick', 'add', 'apply', 'am', 'clean',
-  'filter-branch', 'checkout', 'switch', 'restore', 'mv', 'rm',
+  'filter-branch', 'checkout', 'switch', 'restore', 'mv', 'rm', 'pull', 'fetch', 'update-ref', 'gc',
+  'pack-refs', 'prune', 'prune-packed', 'repack',
 ])
 
 /** `git worktree <sub>` — only `list` reads. */
@@ -487,9 +488,20 @@ function gitIntent(seg) {
     return hasFlag(args, ['-a', '-s', '-d', '-f', '-m', '--delete', '--force', '--annotate', '--sign']) ? 'write' : 'read'
   }
   if (sub === 'branch') {
-    return hasFlag(args, ['-d', '-D', '--delete', '-m', '-M', '--move', '-c', '-C', '--copy', '--set-upstream-to', '--unset-upstream', '-u'])
-      ? 'write'
-      : 'read'
+    if (hasFlag(args, ['-d', '-D', '--delete', '-m', '-M', '--move', '-c', '-C', '--copy', '-f', '--force', '--set-upstream-to', '--unset-upstream', '-u']))
+      return 'write'
+    // A positional name creates a branch unless a list-mode flag makes it a
+    // pattern or commit filter (`branch --contains main`, `branch -a topic*`).
+    const lists = ['-a', '--all', '-r', '--remotes', '-l', '--list', '--show-current', '--contains', '--no-contains', '--merged', '--no-merged', '--points-at', '--sort', '--format']
+    return rest.length && !hasFlag(args, lists) ? 'write' : 'read'
+  }
+  if (sub === 'submodule') {
+    // With no verb `submodule` is the status view. Update and every other
+    // action change the checkout, config, or nested repositories.
+    return !['', 'status', 'summary'].includes(rest[0] ?? '') ? 'write' : 'read'
+  }
+  if (sub === 'symbolic-ref') {
+    return hasFlag(args, ['-d', '--delete']) || rest.length >= 2 ? 'write' : 'read'
   }
   if (sub === 'remote') {
     return ['add', 'remove', 'rm', 'rename', 'set-url', 'set-head', 'set-branches', 'prune', 'update'].includes(rest[0] ?? '')

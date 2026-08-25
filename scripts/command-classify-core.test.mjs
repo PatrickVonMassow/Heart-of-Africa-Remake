@@ -124,6 +124,8 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git diff --stat',
     'git branch -a',
     'git branch --contains main',
+    'git submodule status',
+    'git symbolic-ref HEAD',
     'git worktree list', // THE measured regression of 30.07.2026
     'git worktree list --porcelain',
     'git stash list',
@@ -138,6 +140,7 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git rev-parse HEAD',
     'git describe --tags',
     'git commit --help',
+    'git fetch --help',
   ]
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
 
@@ -168,6 +171,14 @@ describe('git — the SUBCOMMAND decides, never the word', () => {
     'git branch -m old new',
     'git remote add origin url',
     'git config user.name "someone"',
+    'git pull --rebase origin main',
+    'git fetch --prune',
+    'git update-ref refs/heads/main abc123',
+    'git branch feat/x',
+    'git branch -f main abc123',
+    'git gc --prune=now',
+    'git submodule update --init',
+    'git symbolic-ref HEAD refs/heads/x',
   ]
   for (const c of writes) it(`writes: ${c}`, () => expect(isMutatingSegment(c)).toBe(true))
 
