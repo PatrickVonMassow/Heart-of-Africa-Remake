@@ -7,8 +7,6 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  boardCard,
-  boardNowCard,
   continuationCardBody,
   corruptionCardBody,
   escalate,

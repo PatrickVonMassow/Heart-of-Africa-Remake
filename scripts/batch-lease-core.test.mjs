@@ -467,6 +467,27 @@ describe('the main-write ownership fence', () => {
     expect(mainWritingAction({ toolName: 'Edit' }).writes).toBe(true)
   })
 
+  it('lets a SHELL write outside the checkout through, like the Edit tool already does', () => {
+    // MEASURED 25.08.2026 (point 749): a session correcting one of its own memory
+    // files under /home/node/.claude/projects/…/memory — not TASKS.md, not the
+    // dashboard, not the repository — was refused, because a Bash segment was
+    // judged by intent alone. The Edit tool had the exemption; a heredoc did not.
+    const checkoutRoot = '/workspace/hoa'
+    const shell = (command) =>
+      mainWritingAction({ toolName: 'Bash', command, checkoutRoot, cwd: '/workspace/hoa' })
+    const memory = '/home/node/.claude/projects/-workspace-hoa/memory/x.md'
+    expect(shell(`cat > ${memory} <<'EOF'`).writes).toBe(false)
+    expect(shell(`rm ${memory}`).writes).toBe(false)
+    // A SOURCE inside the checkout disqualifies too — strictness is the safe side.
+    expect(shell(`cp docs/a.md ${memory}`).writes).toBe(true)
+    // A path inside the checkout removes the exemption for the whole segment…
+    expect(shell(`cp ${memory} TASKS.md`).writes).toBe(true)
+    expect(shell('cat > TASKS.md').writes).toBe(true)
+    // …and a command with no path at all is judged exactly as before.
+    expect(shell('git push origin main').writes).toBe(true)
+    expect(shell('git commit -F /tmp/message.txt').writes).toBe(true)
+  })
+
   it('judges file writes by their resolved target, not by the main session', () => {
     const checkoutRoot = '/workspace/hoa'
     const write = (filePath, resolvedFilePath) =>

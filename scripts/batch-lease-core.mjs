@@ -764,7 +764,56 @@ export function resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot } = {}
   return rel === '' || (!isAbsolute(rel) && rel !== '..' && !rel.startsWith(`..${sep}`))
 }
 
-export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot } = {}) {
+/**
+ * The plain file utilities whose whole effect IS the paths they are given. Only
+ * these can be judged by their arguments: `git commit -F /tmp/msg` writes the
+ * repository whatever its argument points at, and `npm` writes wherever its
+ * scripts do, so neither may ever reach the containment test below.
+ */
+const FILE_TOOLS = new Set([
+  'cat', 'tee', 'cp', 'mv', 'rm', 'rmdir', 'mkdir', 'touch', 'ln', 'chmod', 'sed', 'awk',
+  'printf', 'echo', 'head', 'tail', 'sort', 'dd',
+])
+
+/**
+ * Does this segment write ONLY outside the checkout? PURE (path resolution needs
+ * no filesystem).
+ *
+ * MEASURED 25.08.2026 (point 749). A session correcting one of its own MEMORY
+ * files — `/home/node/.claude/projects/…/memory/…md`, which is neither TASKS.md
+ * nor the dashboard nor the repository — was refused by the main-write fence,
+ * because a Bash segment is judged by its INTENT and nothing looked at where the
+ * bytes were going. The Edit tool already had this exemption; a heredoc to the
+ * same path did not, so the fix had to be handed to the owner session instead of
+ * being made by the one that found the defect.
+ *
+ * Conservative in both directions: a segment with no path argument at all is NOT
+ * exempted (that is the `git push` shape), and one path inside the checkout
+ * removes the exemption for the whole segment.
+ */
+export function segmentWritesOnlyOutsideCheckout(segment, { cwd = '', checkoutRoot = '' } = {}) {
+  if (!checkoutRoot) return false
+  const { head, args } = headAndArgs(segment)
+  if (!FILE_TOOLS.has(String(head))) return false
+  const candidates = [
+    ...(segment?.redirects ?? []).filter((r) => r.op?.includes('>')).map((r) => r.target),
+    ...args.map((arg) => arg.text).filter((text) => text && !text.startsWith('-') && text !== '--'),
+    // EVERY positional counts, bare filenames included (measured while building
+    // this: requiring a slash let `cp <outside> TASKS.md` pass as an outside-only
+    // write, because the target with no slash was not even a candidate). Counting
+    // sources as well only ever makes the test STRICTER, which is the safe side.
+  ].filter((text) => typeof text === 'string' && text.trim())
+  if (candidates.length === 0) return false
+  return candidates.every(
+    (target) =>
+      !resolvedTargetInCheckout({
+        resolvedFilePath: resolve(cwd || checkoutRoot, target),
+        checkoutRoot,
+      }),
+  )
+}
+
+export function mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd = '' } = {}) {
   const tool = String(toolName ?? '')
   if (['Edit', 'Write', 'MultiEdit', 'NotebookEdit'].includes(tool)) {
     if (filePath && !resolvedTargetInCheckout({ resolvedFilePath, checkoutRoot })) {
@@ -781,6 +830,9 @@ export function mainWritingAction({ toolName, command, filePath, resolvedFilePat
   // carrier before its build leaf can receive the narrow exception below.
   const segment = segments.find((candidate) => {
     if (directSegmentIntent(candidate) !== 'write') return false
+    // A write that lands entirely OUTSIDE this checkout is not a main write
+    // (point 749) — the session memory directory is the case that measured it.
+    if (segmentWritesOnlyOutsideCheckout(candidate, { cwd, checkoutRoot })) return false
     return !nonTrackedGateSegment(candidate) || writesOutputFile(candidate)
   })
   if (segment) return { writes: true, what: `the state-changing segment \`${segment.raw}\` on main` }
@@ -808,12 +860,13 @@ export function mainWriteFenceDecision({
   filePath,
   resolvedFilePath,
   checkoutRoot,
+  cwd = '',
 } = {}) {
   try {
     if (paused === true || worktree === true || branch !== 'main') {
       return { block: false, registerWriter: false, reason: '' }
     }
-    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot })
+    const action = mainWritingAction({ toolName, command, filePath, resolvedFilePath, checkoutRoot, cwd })
     if (!action.writes) return { block: false, registerWriter: false, reason: '' }
     if (ownsBatchLock === true) return { block: false, registerWriter: true, reason: '' }
     return {

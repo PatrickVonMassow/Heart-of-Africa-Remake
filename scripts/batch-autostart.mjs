@@ -31,7 +31,6 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import { notify } from './notify.mjs'
-import { boardNowCard } from './alert-escalation.mjs'
 import {
   acquire,
   updateOwnLock,
@@ -599,16 +598,16 @@ const pauseText = (() => { try { return readFileSync(C('batch-paused'), 'utf8') 
 let pause = classifyPause({ text: pauseText, now })
 if (pause.state === 'recover') {
   const recovery = pauseRecovery({ text: pauseText, now })
-  if (boardNowCard(recovery.title, recovery.body)) {
-    try {
-      writeTextAtomic(C('batch-paused'), recovery.record)
-      pause = classifyPause({ text: recovery.record, now })
-      log(`${describePause(classifyPause({ text: pauseText, now }))}; now-card updated; retry at ${new Date(recovery.retryAfter).toISOString()}`)
-    } catch (e) {
-      log(`AMBIGUOUS PAUSE snapshot recorded but its recovery clock could not be written (${e?.message ?? e})`)
-    }
-  } else {
-    log('AMBIGUOUS PAUSE recovery deferred — its now-card status could not be recorded')
+  // THE CLOCK IS WRITTEN UNCONDITIONALLY (point 749). It used to be written only
+  // if a board card could be recorded first, so a board that could not be written
+  // deferred the RECOVERY as well — a reporting failure holding up the repair. The
+  // pause marker is the record now, and the board derives its state card from it.
+  try {
+    writeTextAtomic(C('batch-paused'), recovery.record)
+    pause = classifyPause({ text: recovery.record, now })
+    log(`${describePause(classifyPause({ text: pauseText, now }))}; retry at ${new Date(recovery.retryAfter).toISOString()}`)
+  } catch (e) {
+    log(`AMBIGUOUS PAUSE recognised but its recovery clock could not be written (${e?.message ?? e})`)
   }
 }
 let batchParked = pause.state === 'hold' || pause.state === 'wait' || pause.state === 'recover'
@@ -1085,8 +1084,10 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   const when = `retry at ${new Date(plan.retryAfter).toISOString()}${plan.capped ? ' (capped probe)' : ''}`
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
   if (plan.decisionRecord) {
-    const recorded = boardNowCard(plan.decisionRecord.title, plan.decisionRecord.body)
-    log(`RUNAWAY capped scheduling decision ${recorded ? 'recorded' : 'FAILED to reach the board'} — next attempt ${new Date(plan.retryAfter).toISOString()}`)
+    // The pause record written just below IS this decision's durable form, and the
+    // board derives its state card from it (point 749) — so the log line is all
+    // that belongs here.
+    log(`RUNAWAY capped scheduling decision recorded with the pause — next attempt ${new Date(plan.retryAfter).toISOString()}`)
   }
   // ATOMICALLY (four-eyes finding 4): a torn record is the one corruption that
   // could flip this mechanism toward resuming — a half-written stamp read as a

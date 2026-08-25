@@ -629,17 +629,19 @@ describe('the launcher acts on the pause record', () => {
   it('records and atomically clocks an ambiguous pause before any spawn decision', () => {
     const recovery = lineOf(/pause\.state === 'recover'/, 'the ambiguous-pause recovery')
     const block = codeLines.slice(recovery, recovery + 18).join('\n')
-    expect(block).toMatch(/boardNowCard\(recovery\.title, recovery\.body\)/)
-    expect(block).not.toMatch(/boardCard\(/)
+    // Point 749: NO board call at all — the pause marker is the record and the
+    // board derives its state card from it, so the recovery clock is written
+    // unconditionally rather than behind a successful board write.
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
     expect(block).toMatch(/writeTextAtomic\(C\('batch-paused'\), recovery\.record\)/)
     expect(recovery).toBeLessThan(lineOf(/openPointCount\(\)/, 'the work-order read'))
   })
 
-  it('reports the runaway self-pause on the now-card and never creates a user question', () => {
+  it('records the runaway self-pause in the pause marker and creates no card at all', () => {
     const start = lineOf(/state\.failCount >= RUNAWAY_FAIL_LIMIT/, 'the runaway pause')
     const block = codeLines.slice(start, start + 40).join('\n')
-    expect(block).toMatch(/boardNowCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
-    expect(block).not.toMatch(/boardCard\(/)
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
+    expect(block).toMatch(/formatPauseRecord\(\{/)
   })
 
   it('writes its own runaway park with a planned clock, not a bare marker', () => {
@@ -647,8 +649,7 @@ describe('the launcher acts on the pause record', () => {
     const block = codeLines.slice(brake, brake + 32).join('\n')
     expect(block).toMatch(/runawayRecoveryDecision\(\{/)
     expect(block).toMatch(/formatPauseRecord\(\{/)
-    expect(block).toMatch(/boardNowCard\(plan\.decisionRecord\.title, plan\.decisionRecord\.body\)/)
-    expect(block).not.toMatch(/boardCard\(/)
+    expect(block).not.toMatch(/board(Card|NowCard)\(/)
     expect(block).not.toMatch(/no restart clock|a human is needed/)
   })
 
