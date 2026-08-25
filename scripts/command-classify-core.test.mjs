@@ -218,6 +218,33 @@ describe('direct segment intent', () => {
   })
 })
 
+describe('interpreters that execute code from stdin', () => {
+  it('takes the safe side for shell code supplied by a here-document or pipe', () => {
+    expect(isMutatingSegment(['bash <<EOF', 'git push', 'EOF'].join('\n'))).toBe(true)
+    expect(isMutatingSegment("echo 'git push' | bash")).toBe(true)
+    expect(isMutatingSegment('printf "git status\\n" | sh')).toBe(true)
+  })
+
+  it('takes the same side for node and python stdin-code modes', () => {
+    expect(isMutatingSegment('printf "process.exit()" | node -')).toBe(true)
+    expect(isMutatingSegment(['python - <<PY', 'print("ok")', 'PY'].join('\n'))).toBe(true)
+  })
+
+  it('keeps explicit commands, named scripts, and non-interpreters at their existing intent', () => {
+    expect(isMutatingSegment("sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment("echo input | sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment('printf input | bash scripts/report.sh')).toBe(false)
+    expect(isMutatingSegment('git log | grep push')).toBe(false)
+    expect(isMutatingSegment(['cat <<EOF', 'git push', 'EOF'].join('\n'))).toBe(false)
+  })
+
+  it('does not change a bare interpreter without attached stdin', () => {
+    expect(isMutatingSegment('bash')).toBe(false)
+    expect(isMutatingSegment('node -')).toBe(false)
+    expect(isMutatingSegment('python -')).toBe(false)
+  })
+})
+
 describe('gh — the action decides', () => {
   const reads = ['gh pr view 12', 'gh run list', 'gh api repos/o/r/commits', 'gh release list']
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
