@@ -709,6 +709,24 @@ describe('verdict', () => {
     expect(proved.note).toMatch(/the pipe is the binding/)
   })
 
+  // ROUND-15 REVIEW, finding 1 held that this drill "can pass unchanged against
+  // a production runtime that provides no escape". It cannot, and this is the
+  // measurement that says so: `ok` requires files.escaped, so a runtime where
+  // the fd-backed child dies with its parent — exactly "no escape" — produces a
+  // RED drill, whatever the pipes half did. The drill reports a cause only when
+  // the two shapes DIFFER; a world in which nothing escapes is a world in which
+  // they do not.
+  it('goes RED on a runtime where the files shape does not escape either', () => {
+    const noEscape = verdict([outcome('pipes', false), outcome('files', false)])
+    expect(noEscape.ok).toBe(false)
+    expect(noEscape.note).toMatch(/inconclusive/)
+    // …and it stays red even if the files worker looks healthiest of all, so
+    // the refusal is about ESCAPE, not about the pipes half being unreadable.
+    const bothSurvive = verdict([outcome('pipes', true), outcome('files', true)])
+    expect(bothSurvive.ok).toBe(false)
+    expect(bothSurvive.note).toMatch(/both shapes behaved alike/)
+  })
+
   it('refuses a pipes death that did not record EPIPE — an unexplained death names no cause', () => {
     // The pipes worker dying of anything unrelated (OOM, a crash, an operator)
     // beside an escaped files worker would otherwise still yield "the pipe is
