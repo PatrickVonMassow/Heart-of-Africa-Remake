@@ -6,8 +6,8 @@ const created = () => createLandingTransaction({ landingId: 'l1', batchId: 'batc
 const evidence = {
   'diff-review': { at: 2, complete: true, reviewer: 'reviewer', source: 'main-session' },
   gates: { at: 3, build: { verdict: 'green' }, lint: { verdict: 'green' }, 'test:unit': { verdict: 'green' } },
-  'picture-webgpu': { at: 4, backend: 'webgpu', verdict: 'pass', source: 'main-session', artifactPath: 'verification/a.png', artifactHash: hash },
-  'picture-webgl2': { at: 5, backend: 'webgl2', verdict: 'pass', source: 'main-session', artifactPath: 'verification/b.png', artifactHash: hash },
+  'picture-webgpu': { at: 4, backend: 'webgpu', verdict: 'pass', source: 'main-session', evidencePath: 'verification/a.png', evidenceHash: hash },
+  'picture-webgl2': { at: 5, backend: 'webgl2', verdict: 'pass', source: 'main-session', evidencePath: 'verification/b.png', evidenceHash: hash },
   merge: { at: 6, mergeSha: merge, publicationId: 'landing-l1' },
   bookkeeping: { at: 7, complete: true, commitSha: merge },
   board: { at: 8, published: true, boardHash: hash },

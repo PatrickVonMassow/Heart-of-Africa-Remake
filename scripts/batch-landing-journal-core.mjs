@@ -23,8 +23,8 @@ function evidenceVerdict(stage, evidence, transaction) {
     for (const gate of ['build', 'lint', 'test:unit']) if (evidence[gate]?.verdict !== 'green') return { ok: false, reason: `${gate} is not recorded green` }
   } else if (stage === 'picture-webgpu' || stage === 'picture-webgl2') {
     const backend = stage === 'picture-webgpu' ? 'webgpu' : 'webgl2'
-    if (evidence.backend !== backend || evidence.verdict !== 'pass' || evidence.source !== 'main-session' || !present(evidence.artifactPath) || !/^[0-9a-f]{64}$/.test(evidence.artifactHash ?? '')) {
-      return { ok: false, reason: `${backend} needs a main-session pass with artifact path and SHA-256 hash` }
+    if (evidence.backend !== backend || evidence.verdict !== 'pass' || evidence.source !== 'main-session' || !present(evidence.evidencePath) || !/^[0-9a-f]{64}$/.test(evidence.evidenceHash ?? '')) {
+      return { ok: false, reason: `${backend} needs a main-session pass with evidence path and SHA-256 hash` }
     }
   } else if (stage === 'merge') {
     if (!oid(evidence.mergeSha) || !present(evidence.publicationId)) return { ok: false, reason: 'merge records its SHA and publication id' }
