@@ -5,6 +5,7 @@
 // because controlling what the board advertises does not control what somebody
 // switches on. These cases are that refusal, pinned.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   DURABLE_LANE_BOUNDARY_MECHANISM,
   DURABLE_LANE_STEPS,
@@ -110,6 +111,11 @@ describe('the activation interlock', () => {
 })
 
 describe('the door the flag opens', () => {
+  it('ships the proved Sol-only mode dark until the representative trial exists', () => {
+    const flag = JSON.parse(readFileSync('.claude/durable-lane-flag.json', 'utf8'))
+    expect(flag).toMatchObject({ enabled: false, boundaryMode: REQUIRED_BOUNDARY_MODE, adapters: ['sol'] })
+  })
+
   it('refuses an enabled flag that omits the proved boundary mode', () => {
     const verdict = mayStartDaemon({ flag: { enabled: true } })
     expect(verdict.ok).toBe(false)
