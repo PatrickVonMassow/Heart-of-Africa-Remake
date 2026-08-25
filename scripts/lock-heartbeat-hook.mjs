@@ -70,7 +70,7 @@
 //      otherwise-refused call. This already-wired all-tools PostToolUse hook is
 //      where that call's actual result exists, so it appends the correlated,
 //      bounded result record without adding another settings entry.
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
 import { dispossessionNotice } from './batch-lease-core.mjs'
@@ -237,9 +237,16 @@ const paused = (() => {
 })()
 let spoke = false
 try {
-  const out = deliverPendingMessages({ ownsBatch, paused, hookInput: data })
+  const out = deliverPendingMessages({
+    ownsBatch,
+    paused,
+    hookInput: data,
+    // A synchronous fd write gives delivery a success/failure boundary. A
+    // rejected write restores every claim to pending before another duty can
+    // speak, so the owner or defer sweep can retry the user's words.
+    emit: (text) => writeFileSync(1, text, 'utf8'),
+  })
   if (out) {
-    process.stdout.write(out)
     spoke = true
   }
 } catch {

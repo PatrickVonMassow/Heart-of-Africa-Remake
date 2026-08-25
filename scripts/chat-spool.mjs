@@ -167,6 +167,24 @@ export function claimMessage(file, dir = SPOOL_DIR, opts = {}) {
   return moved.ok ? { ...message, file } : null
 }
 
+/**
+ * Put a delivery claim back when its hook envelope was not accepted. A pending
+ * copy wins over the claimed copy rather than being overwritten; either way,
+ * the user's words remain available to a later owner hook or defer sweep.
+ */
+export function restoreClaimedMessage(file, dir = SPOOL_DIR, opts = {}) {
+  const pending = join(dir, file)
+  const claimed = join(consumedDir(dir), file)
+  try {
+    ensureDir(dir)
+    if (existsSync(pending)) return { ok: true, reason: 'already-pending' }
+    const moved = renameWithRetry(claimed, pending, opts)
+    return { ok: moved.ok, reason: moved.ok ? 'restored' : 'restore-failed' }
+  } catch {
+    return { ok: false, reason: 'restore-failed' }
+  }
+}
+
 /** Claim the oldest `n` waiting messages (the `--ack` path). */
 export function claimOldest(n, dir = SPOOL_DIR, opts = {}) {
   const count = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
@@ -187,7 +205,9 @@ export function claimOldest(n, dir = SPOOL_DIR, opts = {}) {
  * The message is CLAIMED BEFORE IT IS EMITTED. Emitting first and claiming after
  * would re-inject the same message on every tool call for as long as the claim
  * kept failing — the leak this rule exists to prevent — so only what the rename
- * actually moved is rendered.
+ * actually moved is rendered. When an `emit` callback rejects or throws, every
+ * claim is moved back to pending before this call returns; production supplies
+ * a synchronous stdout write as that acceptance boundary.
  *
  * FAIL-OPEN AND SILENT, always: this runs inside a hook on EVERY tool call, and
  * no fault of the chat channel may ever break a tool call or print noise into a
@@ -202,7 +222,29 @@ export function deliverPendingMessages({
   carrierFile = carrierPath(),
   bellStatePath = CARRIER_BELL_STATE_PATH,
   now = Date.now(),
+  emit = null,
 } = {}) {
+  const claimed = []
+  const restoreClaims = () => {
+    for (const message of claimed) restoreClaimedMessage(message.file, dir)
+  }
+  const finish = (out) => {
+    if (claimed.length > 0 && !out) {
+      restoreClaims()
+      return ''
+    }
+    if (!out || typeof emit !== 'function') return out
+    try {
+      if (emit(out) === false) {
+        restoreClaims()
+        return ''
+      }
+      return out
+    } catch {
+      restoreClaims()
+      return ''
+    }
+  }
   try {
     // Ownership still binds; pause does not. A parked owner must hear the user
     // instruction that may diagnose, redirect or lift the pause.
@@ -219,7 +261,6 @@ export function deliverPendingMessages({
     // neither persisted nor injected. It may touch neither chat nor the
     // findings reminder state; the owner's own next hook remains responsible.
     if (plan.reason === 'subagent-hook') return ''
-    const claimed = []
     for (const m of plan.deliver) {
       const taken = claimMessage(m.file, dir)
       if (taken) claimed.push(taken)
@@ -232,7 +273,7 @@ export function deliverPendingMessages({
     } catch {
       // An unreadable carrier is not evidence that it is empty. Do not reset
       // reminder state or hide a chat message because this second source failed.
-      return chatOut
+      return finish(chatOut)
     }
 
     let previous = carrierBellState()
@@ -261,12 +302,13 @@ export function deliverPendingMessages({
         // is safer than injecting it on every tool call for the whole interval.
         writeJsonAtomic(bellStatePath, bell.state)
       } catch {
-        return chatOut
+        return finish(chatOut)
       }
     }
 
-    return chatOut || additionalContextStdout(bell.line)
+    return finish(chatOut || additionalContextStdout(bell.line))
   } catch {
+    restoreClaims()
     return ''
   }
 }
