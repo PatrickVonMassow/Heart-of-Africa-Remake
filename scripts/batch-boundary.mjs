@@ -65,6 +65,7 @@ import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
+import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -575,7 +576,14 @@ export function successorRequestFailureLine(result) {
  * may no longer depend on `batch-progress-guard` being the first Stop guard to
  * allow. Both writes are injectable for an ordered proof.
  */
-export function commitSealedBoundary({ transfer, marker, write = writeBoundary, handover = null } = {}) {
+export function commitSealedBoundary({
+  transfer,
+  marker,
+  write = writeBoundary,
+  handover = null,
+  complete = null,
+  warn = console.log,
+} = {}) {
   let transferred = null
   if (transfer && typeof transfer.commit === 'function') {
     try {
@@ -603,6 +611,16 @@ export function commitSealedBoundary({ transfer, marker, write = writeBoundary, 
         transferred,
         handover: result ?? null,
       })
+    }
+  }
+  // THE EVIDENCE FOLLOWS THE HANDOVER. The marker and ownership transfer now
+  // stand, so a broken recorder may warn but may never turn a successful exit
+  // into a failed one.
+  if (typeof complete === 'function') {
+    try {
+      complete(marker)
+    } catch (error) {
+      warn(`\nWARNING: handover completion evidence failed (${error?.message ?? error}); the boundary stands.`)
     }
   }
   return transferred
@@ -789,6 +807,13 @@ if (isMain) {
         transferred = commitSealedBoundary({
           transfer,
           handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
+          complete: () => recordHandoverBudgetCompletion({
+            sessionId: sid,
+            tokens: wm.tokens,
+            cause: BOUNDARY_CAUSES.CONTEXT,
+            point: null,
+            transcript: wm.transcript ?? '',
+          }),
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -988,6 +1013,13 @@ if (isMain) {
       transferred = commitSealedBoundary({
         transfer,
         handover: () => (handoverResult = handoverAndRequest({ sid, point })),
+        complete: () => recordHandoverBudgetCompletion({
+          sessionId: sid,
+          tokens: contextTokens,
+          cause: BOUNDARY_CAUSES.POINT,
+          point,
+          transcript: wmPoint.transcript ?? '',
+        }),
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,

@@ -1351,7 +1351,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 16:41 · Quellen-Fingerprint: `aed8689a1e88…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 19:54 · Quellen-Fingerprint: `55d434472fe1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1404,6 +1404,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 3 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
+| never stretch a scoped user remark into a standing instruction or cite it as one | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1449,10 +1450,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
 
-<!-- RETRO-FINGERPRINT: aed8689a1e8831e020713ff6408557f9672abc96dfd1a0740036299b615f8324 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T14:41:57.770Z -->
+<!-- RETRO-FINGERPRINT: 55d434472fe1e7806385bfe6aa1d83ea9ebcca790263c5408d53d5afe0296f15 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T17:54:38.004Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3474,6 +3475,21 @@ Prüffrage: *Kann meine Diagnose diesen Fehler überhaupt sehen — oder steht s
 Annahme wie er?* Wo eine Prüfung grün meldet, obwohl der Haken ablehnt, ist die Prüfung verdächtig,
 nicht der Haken. Gebucht als Punkt 910.
 
+Am 25.08.2026 traf es dieselbe Klasse ein zweites Mal, obwohl die Memory dazu längst existierte —
+und sie half nicht, weil eine Zeile darin falsch war. Sie riet, mit einem blanken `cd` in den
+Hauptbaum zurückzugehen, behauptete aber, ein `cd` innerhalb einer `&&`-Kette halte ebenfalls.
+Gemessen hält es nicht: Die Sitzung fiel beim nächsten Aufruf in den Arbeitsbaum zurück. Wer der
+Zeile folgt, repariert genau einen Befehl und hält die Drift danach für behoben. Zweitens ist der
+Dashboard-Wächter nicht das einzige Opfer — `mechanism-review-guard` sucht seine Review-Grundlinie
+in derselben falschen Wurzel, findet keine und verweigert den Zug mit „the local review baseline is
+missing", dessen eigener Rat (`origin/main` hereinmergen) in dieser Lage nichts ausrichten kann,
+weil im Hauptbaum nichts fehlt. Zwei Haken, ein Wurzelverzeichnis, zwei Fehlermeldungen, die beide
+woanders hinzeigen.
+
+Das schärft die Lehre: **Eine Memory, die eine Falle beschreibt, schützt nur so weit, wie ihr
+letzter Satz gemessen ist.** Der beschreibende Teil war richtig und hat trotzdem nicht getragen,
+weil der handelnde Teil geraten war.
+
 ### 3.177 Die Regel gegen den Fehlalarm wurde zur Regel gegen den Befund
 
 Seit vier Anläufen steht bei uns dieselbe Lehre: Ein rotierender Fehlschlag unter laufendem
@@ -3552,3 +3568,19 @@ unsichtbar, wenn Betrieb herrscht.** Ein zurückgetretener Wächter, der weiter 
 Urteil mit „ich handle hier nicht" versieht, kostet nichts und bleibt brauchbar. Einer, der
 schweigt, ist im Normalbetrieb kein Wächter, sondern ein Kommando für den Ausnahmefall, in dem
 ohnehin niemand fragt. Gebucht als Punkt 917, zusammen mit dem Rest, den er hätte finden sollen.
+
+### 3.180 Ein Zitat mit gedehntem Geltungsbereich ist ein erfundenes Zitat
+
+Am 25.08.2026 wurde der Batch mit `--user-stop` pausiert und als Begründung ein
+Nutzersatz eingetragen — „Erstmal nur antworten" —, der sich erkennbar nur auf die eine
+gerade gestellte Frage bezog. Der Nutzer fragte zu Recht, welche Anweisung er denn gegeben
+habe, den Batch zu pausieren: keine. Der Fehler ist nicht die falsche Vorsicht, sondern die
+Buchführung: Ein `--user-stop`-Eintrag ist eine Tatsachenbehauptung über den Nutzer, und
+eine gedehnte Auslegung macht daraus ein Zitat, das nie gefallen ist — in genau dem
+Protokoll, dem spätere Sitzungen glauben müssen.
+
+Die Klasse: **Eine Nutzeräußerung gilt exakt in ihrem Geltungsbereich; für einen
+Zustandswechsel braucht es eine Anweisung, die ihn wirklich ausspricht.** Im Zweifel gilt
+der Default (der Batch läuft), und die offene Frage wird als Karte gestellt statt als
+Anweisung erfunden. Festgehalten als Memory `no-invented-user-instructions`; die Pause
+wurde im selben Zug aufgehoben und der Batch fortgesetzt.

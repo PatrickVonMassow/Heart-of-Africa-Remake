@@ -84,9 +84,10 @@
       "place": "last"
     },
     "676": {
-      "at": "2026-08-13T17:13:15.401Z",
-      "why": "Grosse Infrastruktur, kein Bugfix: vor dem Demo-Checkpoint gilt Bugfixes zuerst, und 675 deckt die drei mechanischen Niederlagen der Uebergabe bereits ohne diese Ebene ab",
-      "place": "last"
+      "at": "2026-08-25T17:30:18.150Z",
+      "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen (Chat, nach Sol-Audit)",
+      "origin": "user",
+      "place": "ahead"
     },
     "677": {
       "at": "2026-08-13T17:13:15.449Z",
@@ -636,12 +637,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "885": {
-      "at": "2026-08-24T07:11:06.028Z",
-      "why": "It loses the user's own words with no trace on either layer, and it fires whenever the owner delegates — which is the standing instruction, so every remaining point before the release widens the window.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "898": {
       "at": "2026-08-24T14:37:17.169Z",
       "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
@@ -725,6 +720,12 @@
       "why": "Hygienebefund ohne Spielerwirkung — er wartet hinter allem, womit die Arbeitsordnung zuletzt geordnet wurde, weil er nichts blockiert.",
       "origin": "machine",
       "place": "last"
+    },
+    "918": {
+      "at": "2026-08-25T17:30:18.314Z",
+      "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen; 918 ist die Naht, auf der 676 aufsetzt",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -770,7 +771,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T14:41:41.521Z",
+    "at": "2026-08-25T17:30:18.329Z",
     "points": [
       174,
       184,
@@ -1038,7 +1039,6 @@
       882,
       883,
       884,
-      885,
       886,
       887,
       888,
@@ -1059,7 +1059,8 @@
       914,
       915,
       916,
-      917
+      917,
+      918
     ]
   }
 }
