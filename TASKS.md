@@ -12190,3 +12190,31 @@ to land than a mechanism that needs a review.
   Criticality: medium — the measurement it guards is sound today, and the risk is drift
   rather than a present defect.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 912. An interrupted takeover drill leaves its daemon and its sandbox behind, and the
+  doctor does not see it. MEASURED 25.08.2026, 11:27: pid 1798048 had been running since
+  08:48:35 — 2 h 39 min — as `node scripts/batch-daemon.mjs serve --repo
+  /tmp/parent-death-mNzy0a/repo --batch parent-death-drill --nonce 859bbb59… --drill`, with
+  the whole sandbox still in place (`origin.git`, `repo`, `wt`, `parent-ready.json`), while
+  no drill process was alive any more. The cleanup in `scripts/batch-daemon-drill.mjs`
+  (the `finally` at :486–:508) kills the parent group and the daemon recorded in the state
+  store and removes the sandbox unless `--keep` was given — so it runs exactly when the
+  DRILL PROCESS ITSELF survives to run it. For a drill whose subject is survival of process
+  death, that is not an edge case: the session that started it is the one designed to die.
+  AND THE DOCTOR DOES NOT SEE IT: `node scripts/batch-doctor.mjs --gate`, run on the same
+  machine at 11:20 while that daemon was serving, reported `strayProcesses=0` and
+  "repo state CONSISTENT". Its stray detector does not know the drill daemons.
+  WHAT IT COSTS: a process that believes itself the serving daemon of a batch keeps running
+  unnoticed, and the state the doctor certifies as consistent is not. The evidence of this
+  measurement was reaped by hand, which is precisely the manual step this point removes.
+  FINAL STATE: the drill records its sandbox path and its daemon identity where a LATER
+  process finds them — not only in the sandbox it is about to lose — and a reaper clears a
+  drill daemon whose recorded run is over; the doctor's stray-process detector knows
+  `--batch parent-death-drill` as reapable and reports it rather than counting zero.
+  VERIFIABLE: a case that kills the drill process mid-run and then shows the reaper removing
+  daemon and sandbox; a case pinning that a drill daemon of a LIVE run is never reaped; a
+  doctor case that reports a stray drill daemon instead of `strayProcesses=0`; `npm run
+  test:unit`, lint, build.
+  Criticality: medium — no product behaviour, but it leaks live processes and makes the
+  doctor's consistency verdict untrue in the one place the batch relies on it.
+  Bundle: Session- & Repo-Hygiene.
