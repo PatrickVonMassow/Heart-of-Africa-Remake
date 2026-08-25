@@ -11755,6 +11755,43 @@ to land than a mechanism that needs a review.
   the point where the session is least able to tell a real refusal from a phantom.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 922. A worktree working directory makes the four-eyes gate report a missing baseline it
+  cannot fix. MEASURED 25.08.2026 while resuming point 921: the Stop hooks are registered with
+  RELATIVE commands (`node scripts/mechanism-review-guard.mjs` in `.claude/settings.json`), so a
+  session whose shell working directory sits in a linked worktree runs THAT worktree's copy of
+  the guard. A worktree has no untracked `.claude/mechanism-review-baseline.json`, so
+  `baselineFor(state, 'main')` resolves to null, `evaluateMechanismReview` returns the
+  `missing-baseline` finding, and the refusal prescribes a repair that cannot work: "merge
+  origin/main into this branch" is a no-op when `main` and `origin/main` are already identical
+  (measured 0/0), and "end the turn again so the guard can seed the anchor" never seeds, because
+  `writeBaseline` then writes into the WORKTREE `.claude`. The same invocation with the same
+  stdin session id, run from the main checkout, reports instead the point-714 gap clause and
+  exits 0 (17 537 000 characters measured against the 200 000-character round budget). The same
+  working directory flips `dashboard-guard` to NOT REGISTERED.
+  WHY IT MATTERS: two turn ends were refused by a gate that had nothing to complain about, and
+  the refusal reads as a product defect while naming a repair that changes nothing — the same
+  unexitable shape point 921 is fixing one layer up. The session-side lesson is already carried
+  as an operator memory; a memory cannot enforce a working directory, and the next session that
+  spawns an author in a worktree meets it again.
+  FINAL STATE: the guard state files are resolved from the git COMMON directory rather than the
+  per-worktree top level, so a worktree checkout reads and writes the one baseline that exists;
+  where that is judged too broad, the guard instead DETECTS the linked-worktree working
+  directory and refuses with a message naming it as the cause, never prescribing a merge that
+  changes nothing. Either way a worktree working directory may no longer produce a
+  `missing-baseline` verdict on a repository whose baseline is present.
+  VERIFIABLE: Vitest over the resolution — a fixture whose top level is a linked worktree and
+  whose common directory holds the baseline resolves that baseline and reports no
+  `missing-baseline`; a repository whose baseline is genuinely absent still reports it; the
+  worktree-detection message, where that branch is chosen, names the working directory; plus
+  `npm run test:unit`, lint, build.
+  SIBLING: point 910 is the same defect in `dashboard-guard`, which resolves the board path
+  against whatever repository root it happens to run from. Both are the relative-command Stop
+  hook meeting a linked worktree, so the two are worked together and this one stands directly
+  behind it.
+  Criticality: high — it blocks every turn end from a working directory the batch's own
+  delegation model creates, and its stated repair is a no-op.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 911. The escape drill's "launcher's shape" is a comment, not a coupling, and the
   drill's claims outrun its instrument. FOUND 25.08.2026 answering the round-15 and
   round-16 cross-vendor reads of point 834. `scripts/detached-escape-drill.mjs` measures two
@@ -11998,37 +12035,4 @@ to land than a mechanism that needs a review.
   holds it; plus `npm run test:unit`, lint, build.
   Criticality: med — no player-visible defect, but it puts a red gate in front of the routine
   act of recording a finding, which is exactly where the batch must not be slowed.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 922. A worktree working directory makes the four-eyes gate report a missing baseline it
-  cannot fix. MEASURED 25.08.2026 while resuming point 921: the Stop hooks are registered with
-  RELATIVE commands (`node scripts/mechanism-review-guard.mjs` in `.claude/settings.json`), so a
-  session whose shell working directory sits in a linked worktree runs THAT worktree's copy of
-  the guard. A worktree has no untracked `.claude/mechanism-review-baseline.json`, so
-  `baselineFor(state, 'main')` resolves to null, `evaluateMechanismReview` returns the
-  `missing-baseline` finding, and the refusal prescribes a repair that cannot work: "merge
-  origin/main into this branch" is a no-op when `main` and `origin/main` are already identical
-  (measured 0/0), and "end the turn again so the guard can seed the anchor" never seeds, because
-  `writeBaseline` then writes into the WORKTREE `.claude`. The same invocation with the same
-  stdin session id, run from the main checkout, reports instead the point-714 gap clause and
-  exits 0 (17 537 000 characters measured against the 200 000-character round budget). The same
-  working directory flips `dashboard-guard` to NOT REGISTERED.
-  WHY IT MATTERS: two turn ends were refused by a gate that had nothing to complain about, and
-  the refusal reads as a product defect while naming a repair that changes nothing — the same
-  unexitable shape point 921 is fixing one layer up. The session-side lesson is already carried
-  as an operator memory; a memory cannot enforce a working directory, and the next session that
-  spawns an author in a worktree meets it again.
-  FINAL STATE: the guard state files are resolved from the git COMMON directory rather than the
-  per-worktree top level, so a worktree checkout reads and writes the one baseline that exists;
-  where that is judged too broad, the guard instead DETECTS the linked-worktree working
-  directory and refuses with a message naming it as the cause, never prescribing a merge that
-  changes nothing. Either way a worktree working directory may no longer produce a
-  `missing-baseline` verdict on a repository whose baseline is present.
-  VERIFIABLE: Vitest over the resolution — a fixture whose top level is a linked worktree and
-  whose common directory holds the baseline resolves that baseline and reports no
-  `missing-baseline`; a repository whose baseline is genuinely absent still reports it; the
-  worktree-detection message, where that branch is chosen, names the working directory; plus
-  `npm run test:unit`, lint, build.
-  Criticality: high — it blocks every turn end from a working directory the batch's own
-  delegation model creates, and its stated repair is a no-op.
   Bundle: Session- & Repo-Hygiene.

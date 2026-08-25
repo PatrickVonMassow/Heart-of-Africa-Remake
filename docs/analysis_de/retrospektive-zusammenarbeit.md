@@ -520,6 +520,8 @@ Am 21.08.2026 dieselbe Bauform in einem anderen Werkzeug: `fold-point` schließt
 
 Am 24.08.2026 zwei weitere Ausprägungen an einem Abend, und beide zeigen dieselbe Wurzel aus einer neuen Richtung: Der Ausweg ist nicht nur unbegehbar, er wird dem Falschen genannt. Der `board-first-guard` will delegierte Arbeitsbäume ausdrücklich ausnehmen — die Ausnahme fragt aber das Verzeichnis des HOOK-Prozesses und nicht das des geprüften Aufrufs, und das ist bei einem angehefteten Agenten die Haupt-Auscheckung. Der delegierte Autor wird also auf eine Tafelkarte verwiesen, die er in seinem Arbeitsbaum gar nicht schreiben kann; die Auskunft, die ihn befreien würde, liegt im Prozess-Nutzlastfeld, das der Riegel eine Zeile weiter unten für etwas anderes bereits liest. Und der Review-Rekorder weist eine Identitätsprüfung mit dem Rat ab, genau die zwei Flags zu setzen, die schon gesetzt waren: Der gemessene Grund — das Sitzungstranskript deckt den angegebenen Zeitpunkt nicht ab, weil die Harness es mit Verzögerung schreibt und „jetzt“ deshalb immer hinter der letzten modelltragenden Nachricht liegt — wird eine Schicht tiefer berechnet und dann verworfen. Beide Male ist die Information, die den Ausweg gangbar macht, im Werkzeug bereits vorhanden.
 
+**Nachtrag 25.08.2026 — dieselbe Wurzel, diesmal an der Vier-Augen-Schranke.** Die Stop-Riegel stehen mit RELATIVEN Befehlen in der Konfiguration, also laeuft aus einem Arbeitsbaum heraus dessen eigene Kopie des Riegels. Die ungetrackte Grundlinien-Datei liegt aber nur im Haupt-Checkout, und so meldete `mechanism-review-guard` eine fehlende Grundlinie, die es nicht gab. Der genannte Ausweg war zum zweiten Mal an einem Abend einer, den niemand gehen kann: „merge origin/main into this branch" bei zwei Refs, die nachweislich identisch sind (0/0), und „end the turn again so the guard can seed the anchor", wobei das Saatkorn wieder in den Arbeitsbaum faellt. Derselbe Aufruf mit derselben Sitzungskennung meldete aus dem Haupt-Checkout die Lueckenklausel und beendete den Zug gruen. Zwei Zugenden gingen dafuer verloren, und die Verweigerung las sich wie ein Produktdefekt, obwohl der Riegel nichts zu beanstanden hatte. Die Lehre ist nicht neu, aber sie hat jetzt eine zweite Adresse: Ein Riegel, der Zustand gegen die Wurzel aufloest, in der er zufaellig laeuft, ist im Delegationsmodell dieses Batches falsch — die Arbeitsbaeume sind der NORMALFALL, nicht die Ausnahme. Als Punkt 922 aufgenommen, direkt hinter Punkt 910, das denselben Defekt am Tafel-Riegel traegt.
+
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen aus dem 24.08.: Gilt der Weg auch für den, der die Meldung liest — ein delegierter Autor hat andere Rechte als der Besitzer? Und nennt die Absage den Grund, den sie gemessen hat, statt eine Handlung zu empfehlen, die der Aufrufer schon ausgeführt hat?
 
 ### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
@@ -1351,7 +1353,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 21:57 · Quellen-Fingerprint: `4b6ff196397a…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 23:32 · Quellen-Fingerprint: `881f092c7e32…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1450,10 +1452,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 4b6ff196397a6ebcc3fb7cd289d263f8913bfaa955e46c5ec1b964d32d0f143c -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T19:57:13.148Z -->
+<!-- RETRO-FINGERPRINT: 881f092c7e323182be9b85a0dea910d91ddec78b5e0a9dc9dbc211f7085d464f -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T21:32:37.179Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
