@@ -12110,3 +12110,34 @@ to land than a mechanism that needs a review.
   Criticality: medium — it does not lose work, but it stops every turn end until it is worked
   around, and the workaround is a review round nobody needed.
   Bundle: Modell & Wächter.
+
+- [ ] 904. Three findings the whole-range review found in the landed attempt lease. MEASURED
+  25.08.2026 by the cross-vendor whole-range review of `cfcf276` (GPT-5.6 Sol, recorded
+  `do-not-merge`, receipt `ef56a7ed1736542f`), which read the complete lease core, all 772 test
+  lines and the regenerated command index. The earlier rounds judged the same two source files and
+  cleared them; this round read them as one landed artefact and found three things they missed.
+  (1) BLOCKING — `scripts/batch-attempt-lease-core.mjs` has no attempt-lease RELEASE at all.
+  `grantAttemptLease` is followed straight by `leaseAllowsWrite`, and `releaseWorktree` only drops a
+  worktree claim: it never checks the standing lease id or the holder's process identity. Normal
+  completion therefore cannot hand a lease back through this core — it can only be outlived. The
+  test file contains no release case either, which is why thirteen rounds did not see it.
+  (2) BLOCKING ON WINDOWS — `worktreeClaimKey`, at `let key = normalize(worktree)`, uses
+  `node:path.normalize`, which is platform-native, while the function itself demands `/`-prefixed
+  paths. On Windows `/wt/a` becomes `\wt\a`, and the very next `readClaims` rejects the key the
+  function just generated as non-absolute; a native `C:\…` path is rejected outright. Every case
+  covers POSIX paths only. The user's own machine is Windows, so this is not a hypothetical target.
+  (3) `grantAttemptLease` snapshots `deathVerdict` without validating its shape, then interpolates
+  `deathVerdict.pid` into the refusal reason. A malformed pid whose string conversion throws turns
+  the fail-closed refusal path into a throw. The cases cover booleans and numeric mismatches, not
+  malformed field values — the same class the point's own rounds closed everywhere else.
+  FINAL STATE: the core carries a release operation that verifies the standing lease id and the
+  holder's identity before it releases, and refuses otherwise; the claim key is normalised with the
+  POSIX rules the function documents, on every platform; and every refusal path stays a refusal when
+  the value it names cannot be converted.
+  VERIFIABLE: unit cases — a release by the standing holder succeeds and a release under a stale
+  lease id or a foreign identity is refused; a Windows-shaped path and a `C:\…` path both produce a
+  usable key that `readClaims` accepts; and a death verdict whose pid throws on conversion yields
+  the refusal, not an exception.
+  Criticality: high — it is the lease that keeps two writers apart, and a lease nobody can hand back
+  is one that only expiry ends.
+  Bundle: unbundled (batch autonomy).
