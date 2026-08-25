@@ -1351,7 +1351,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 25.08.2026, 15:25 · Quellen-Fingerprint: `619cdc716415…`
+Zuletzt aktualisiert: Dienstag, 25.08.2026, 16:41 · Quellen-Fingerprint: `aed8689a1e88…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1449,10 +1449,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 99 Prozess-/Meta-TASKS-Punkte (davon 40 offen).
+Erfasste Quellen: 90 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 100 Prozess-/Meta-TASKS-Punkte (davon 41 offen).
 
-<!-- RETRO-FINGERPRINT: 619cdc716415a2aff454c23ec41b93de24d624921812a3f30213e32c33731f81 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T13:25:00.201Z -->
+<!-- RETRO-FINGERPRINT: aed8689a1e8831e020713ff6408557f9672abc96dfd1a0740036299b615f8324 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T14:41:57.770Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3530,3 +3530,25 @@ Warteschlange, nicht in ihre Mitte. Genau dorthin ist Punkt 749 an diesem Tag ge
 zweite Teil ist billiger, als er klingt: Die Erkennung sollte eine ordnungsgemäß
 zurückgetretene, mitlesende Zweitsitzung gar nicht erst als Alarm werten — dann steigt die Leiter
 nie bis zur Karte.
+
+### 3.179 Ein Wächter, der nicht handeln darf, hört auch auf zu messen
+
+Am 25.08.2026 sollte eine Routinefrage beantwortet werden: Sind die neun offenen Worktrees in
+diesem Repository Reste, die ein Merge hätte beseitigen müssen? Genau dafür gibt es
+`branch-hygiene-guard`. Sein `--status` antwortete: „steht zurück — another live session owns the
+batch lock." Kein Zustand, keine Liste, keine Zahl. Die Antwort auf eine Lesefrage war die
+Begründung, warum nicht geschrieben wird.
+
+Die Zurückhaltung selbst ist richtig und teuer erkauft: Ein Wächter, der in den Baum einer
+fremden Sitzung greift, richtet mehr an, als er repariert. Falsch ist nur, dass dieselbe Regel
+auch das Berichten erfasst hat. Lesen kollidiert mit nichts. Der Zustand wurde am Ende von Hand
+über `git worktree list` und `git merge-base --is-ancestor` ermittelt — mit dem Ergebnis, dass
+tatsächlich ein Rest existiert, den niemand gemeldet hatte, weil das eine Kommando, das ihn
+findet, sich in dem Moment für unzuständig erklärt, in dem der Batch läuft. Also praktisch immer.
+
+Die Klasse ist nicht „Wächter zu vorsichtig", sondern: **Stand-down ist eine Aussage über das
+Handeln, nie über das Wissen — wer beides zusammen abschaltet, macht den Zustand genau dann
+unsichtbar, wenn Betrieb herrscht.** Ein zurückgetretener Wächter, der weiter misst und sein
+Urteil mit „ich handle hier nicht" versieht, kostet nichts und bleibt brauchbar. Einer, der
+schweigt, ist im Normalbetrieb kein Wächter, sondern ein Kommando für den Ausnahmefall, in dem
+ohnehin niemand fragt. Gebucht als Punkt 917, zusammen mit dem Rest, den er hätte finden sollen.
