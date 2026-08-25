@@ -345,6 +345,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**, die nur
   **ergänzt**? Und lass jeden Neuaufbau nach **offen** scheitern."
 
+- **Die Aufräumung setzt voraus, dass der Aufräumende überlebt.** Ein Programm räumt seine
+  Nebenprodukte am Ende auf — Prozesse, Ordner, Sperren. Genau dann läuft das nicht, wenn es
+  selbst abgebrochen wird, und am tückischsten ist es dort, wo es *um* das Sterben von
+  Prozessen geht: Der Probelauf für „überlebt der Dienst den Tod seiner Sitzung?" lässt beim
+  eigenen Abbruch genau diesen Dienst am Leben zurück, stundenlang und unbemerkt.
+  → *Prompt:* „Frag zu jeder Aufräumung: **Wer räumt auf, wenn der Aufräumende nicht mehr da
+  ist?** Was ein Lauf hinterlässt, gehört an eine Stelle, die ein **späterer** Prozess findet —
+  und eine spätere Prüfung soll den Rest **melden**, statt null zu zählen."
+
 - **Verschlucken sieht aus wie Erfolg — ein nie gestartetes Werkzeug wie ein strenges.**
   → *Prompt:* „Ein Ersatzwert im `catch` gilt nur, wenn er zu **weniger** Aktion führt.
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
@@ -468,4 +477,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 651bf298800d6b2c20a5328b94a0e9e1f1640cef32002adfd8220d6c1eb3b923 -->
+<!-- GUIDE-FINGERPRINT: efaadebc93c34d7368d9d7f9de5eee600f1c6a37dd03e74cafef095e580b2f90 -->
