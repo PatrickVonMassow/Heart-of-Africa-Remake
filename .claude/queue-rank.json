@@ -232,12 +232,6 @@
       "why": "A carrier-quality fix with no dependency on the context-ceiling programme; it waits behind it deliberately.",
       "place": "last"
     },
-    "744": {
-      "at": "2026-08-21T16:06:00.216Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. Its handover-text half went to point 800; what is left prices the exit rather than shortening it.",
-      "origin": "user",
-      "place": "last"
-    },
     "746": {
       "at": "2026-08-21T16:06:00.699Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It only defers commissioning and rests on an estimator that does not exist yet.",
@@ -726,6 +720,18 @@
       "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen; 918 ist die Naht, auf der 676 aufsetzt",
       "origin": "user",
       "place": "ahead"
+    },
+    "919": {
+      "at": "2026-08-25T18:43:13.130Z",
+      "why": "Last is right: the phantom red costs a session's opening, never correctness — no code is wrong, no player-visible defect, and the guard still catches every genuine red. It waits behind the release work like the other CI-guard defects of its class.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "920": {
+      "at": "2026-08-25T18:43:13.227Z",
+      "why": "Last is right: the duplicate number is caught by the pre-push fast gate before it can reach main, so the damage is a repair, not a defect that ships. The command is convenience over a rule that already holds.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -758,7 +764,6 @@
       736,
       738,
       739,
-      744,
       746,
       747,
       750,
@@ -771,7 +776,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T17:30:18.329Z",
+    "at": "2026-08-25T18:43:13.236Z",
     "points": [
       174,
       184,
@@ -960,7 +965,6 @@
       738,
       739,
       741,
-      744,
       746,
       747,
       750,
@@ -1060,7 +1064,9 @@
       915,
       916,
       917,
-      918
+      918,
+      919,
+      920
     ]
   }
 }
