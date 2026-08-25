@@ -40,6 +40,25 @@ const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+/** The two refusal reasons the daemon's validation produces for STALENESS —
+ *  and nothing else. Kept beside the judge below, which is the only consumer. */
+export const STALE_REFUSAL = /names another session|stale fence/
+
+/**
+ * JUDGES a stale probe's reply: passed only when the daemon REFUSED FOR
+ * STALENESS. Pure and exported so the judge itself is testable against the
+ * daemon this drill must catch — one that accepts the dead credentials. A
+ * probe that was accepted proves the daemon ignores epochs; one that failed
+ * for any OTHER reason (a timeout, a socket error, a different validation
+ * failure) proves nothing about the fence and is refused as evidence too.
+ */
+export function staleProbeRefused(reply) {
+  if (reply?.ok === true) return { ok: false, why: 'accepted — the daemon does not enforce the epoch' }
+  const reason = reply?.reason ?? ''
+  if (!STALE_REFUSAL.test(reason)) return { ok: false, why: `failed, but not for staleness: ${reason || '(no reason)'}` }
+  return { ok: true, why: `refusal reason: ${reason}` }
+}
+
 const git = (args, cwd) =>
   execFileSync('git', args, { windowsHide: true,
     cwd,
@@ -324,30 +343,25 @@ async function parentDeathScenario({ keep }) {
     // REFUSED MEANS REFUSED FOR STALENESS, not merely "did not succeed": a probe
     // that timed out, or failed against a daemon that had already accepted the
     // stale write, proves nothing about the fence — and `ok !== true` alone would
-    // have passed both. The reason is matched against the two staleness refusals
-    // validation produces, so an accepting daemon cannot hide behind any other
-    // failure of the probe itself.
-    const staleRefusal = /names another session|stale fence/
-    const staleSession = await controlRequest({
-      repoDir: repo,
-      batchId: BATCH,
-      request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
-    })
-    check(
-      "the dead session's (sessionId, fence) is REFUSED after the takeover",
-      staleSession.ok !== true && staleRefusal.test(staleSession.reason ?? ''),
-      staleSession.ok ? 'accepted' : `refusal reason: ${staleSession.reason ?? '(none)'}`,
+    // have passed both. `staleProbeRefused` (above, unit-tested against an
+    // accepting daemon's reply) is the judge, so an epoch-ignoring daemon
+    // cannot hide behind any other failure of the probe itself.
+    const staleSession = staleProbeRefused(
+      await controlRequest({
+        repoDir: repo,
+        batchId: BATCH,
+        request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
+      }),
     )
-    const staleFence = await controlRequest({
-      repoDir: repo,
-      batchId: BATCH,
-      request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
-    })
-    check(
-      'the superseded fence is REFUSED even under the live session id',
-      staleFence.ok !== true && staleRefusal.test(staleFence.reason ?? ''),
-      staleFence.ok ? 'accepted' : `refusal reason: ${staleFence.reason ?? '(none)'}`,
+    check("the dead session's (sessionId, fence) is REFUSED after the takeover", staleSession.ok, staleSession.why)
+    const staleFence = staleProbeRefused(
+      await controlRequest({
+        repoDir: repo,
+        batchId: BATCH,
+        request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
+      }),
     )
+    check('the superseded fence is REFUSED even under the live session id', staleFence.ok, staleFence.why)
 
     const checkpoint = await successorRequest('request-checkpoint', { requestId: 'succ-cp-1', waitMs: 15_000 })
     const answer = checkpoint.ok ? checkpoint.result.answers.find((a) => a.attemptId === 'a-drill') : null
