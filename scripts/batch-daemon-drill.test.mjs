@@ -347,7 +347,7 @@ describe('branchPreserved', () => {
     const dir = mkdtempSync(join(tmpdir(), 'branch-preserved-'))
     try {
       const g = (...args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', windowsHide: true }).trim()
-      execFileSync('git', ['init', '-q', '-b', 'feat/drill', dir], { stdio: 'ignore' })
+      execFileSync('git', ['init', '-q', '-b', 'feat/drill', dir], { stdio: 'ignore', windowsHide: true })
       g('config', 'user.email', 'drill@test')
       g('config', 'user.name', 'drill')
       writeFileSync(join(dir, 'stub-progress.txt'), '1\n')
