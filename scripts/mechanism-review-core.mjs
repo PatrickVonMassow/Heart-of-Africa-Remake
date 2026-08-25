@@ -1341,9 +1341,9 @@ export const modelVendor = (model) => {
  * The gate itself.
  *
  * Inputs (plain data — the wrapper does the git work):
- *   baseline        sha the tree has already confirmed, or null (grandfathering:
- *                   with no baseline nothing is owed, which is how the twenty-odd
- *                   guards that predate this gate stay out of it)
+ *   baseline        sha the tree has already confirmed, or null. A missing
+ *                   baseline is a refusal: the wrapper may recover only from
+ *                   the immutable policy anchor, never from current HEAD.
  *   head            current HEAD
  *   pendingCommits  [{ sha, subject, at, authorModel, files, coveringRecordShas }]
  *                   — the commits in baseline..HEAD that touch a mechanism path;
@@ -1567,7 +1567,7 @@ export function evaluateMechanismReview({
     const passRow = (r) => r?.pass !== undefined && r?.pass !== null
     // THE SPLIT IS READ OFF EVERY RECORD AT EVERY COVERING SHA, sound or not
     // (fourth cross-vendor round, widened by the fifth): a pass row excluded as
-    // a self-review or a broken merge still WITNESSES that the offering tool
+    // a same-vendor review or a broken merge still WITNESSES that the offering tool
     // measured a range containing THIS COMMIT as too large for one round — the
     // measurement stands whether or not that row's verdict may count, and a
     // MALFORMED one (an index outside its total, no file list) witnesses it no
@@ -1796,7 +1796,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
         ? `      authored by ${author}; no review recorded`
         : blind
           ? mergeLine()
-          : `      the only review on record is by ${author}'s own model — a self-review is not a review`,
+          : `      the only review on record is from ${author}'s vendor — a same-vendor review is not independent`,
     )
   }
   if (unreviewable.length) {
@@ -1824,7 +1824,7 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     lines.push(
       '',
       'Ask the planner for the runnable pass commands; each recorded pass clears only its',
-      'listed files at their reviewed end state, so the two vendors accumulate coverage without self-review:',
+      'listed files at their reviewed end state, so the two vendors accumulate independent coverage:',
       '',
       `  node scripts/review-sol.mjs --sha ${short(verdict.head) || '<sha>'} --brief "<what to judge>"`,
       '',
@@ -1834,11 +1834,11 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
     lines.push(
       '',
       'A mechanism that is wrong is worse than none: the rule then COUNTS as enforced and',
-      'nobody looks again. Have the OTHER model review the change — plan and result — and',
+      'nobody looks again. Have the OTHER vendor review the change — plan and result — and',
       'record what it said:',
       '',
       '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
+      `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode review`,
       '',
       'One record covers every mechanism commit it contains, so reviewing the branch head is',
       'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',

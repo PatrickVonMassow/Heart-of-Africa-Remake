@@ -744,7 +744,7 @@ describe('evaluateMechanismReview', () => {
     })
     expect(v.block).toBe(true)
     expect(v.findings[0].kind).toBe('self-review')
-    expect(formatMechanismReviewVerdict(v)).toMatch(/a self-review is not a review/)
+    expect(formatMechanismReviewVerdict(v)).toMatch(/a same-vendor review is not independent/)
   })
 
   // ROUND-1 PASS-1 FINDING (18.08.2026): `wellFormed` asked only for a verdict
@@ -2289,7 +2289,7 @@ describe('the mode and reviewer identity are required on every clearance path', 
 })
 
 describe('the refusal teaches the command that actually works', () => {
-  it('names --mode in the record command it prints', () => {
+  it('offers only a code-reading review as the clearance remedy', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
@@ -2305,8 +2305,8 @@ describe('the refusal teaches the command that actually works', () => {
       records: [],
     })
     const text = formatMechanismReviewVerdict(v)
-    expect(text).toContain('--mode')
-    for (const m of MODES) expect(text).toContain(m)
+    expect(text).toContain('--mode review')
+    expect(text).not.toContain('--mode <review|blind-parallel>')
   })
 })
 

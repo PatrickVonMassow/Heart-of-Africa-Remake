@@ -352,6 +352,20 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       // is then judged for real — a recovery that reported "clear" without
       // looking would be the same silent pass in a new place.
       effective = bootstrapBase(head)
+      if (!effective) {
+        return {
+          applicable: true,
+          head,
+          branch,
+          baseline: null,
+          baselineMissing: true,
+          rangeBase: null,
+          inputs: { baseline: null, baselineMissing: true, head, pendingCommits: [], records: [], sessionId },
+          commits: [],
+          debt: { outstanding: [], invalidatedCoverage: [] },
+          authorshipPlan: { groups: [], unreviewable: [] },
+        }
+      }
       base = effective
       rangeBase = null
       try {

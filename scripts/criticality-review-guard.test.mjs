@@ -504,20 +504,11 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
       { windowsHide: true, cwd: repo, encoding: 'utf8' },
     )
     expect(r.status, 'a self-review must be refused at the record command').toBe(1)
-    expect(r.stderr).toMatch(/SELF-REVIEW/i)
+    expect(r.stderr).toMatch(/SAME-VENDOR REVIEW/i)
     expect(runHook().decision?.decision).toBe('block')
   })
 
-  const fableTranscript = () => {
-    const path = resolve(repo, 'fable-session.jsonl')
-    writeFileSync(
-      path,
-      `${JSON.stringify({ timestamp: '2026-08-24T16:20:00.000Z', type: 'assistant', isSidechain: false, message: { role: 'assistant', model: 'claude-fable-5', id: 'm1' } })}\n`,
-    )
-    return path
-  }
-
-  it('CLEARS once a different model records a merge naming the point', () => {
+  it('CLEARS once a different vendor records a merge naming the point', () => {
     const reviewed = git('rev-parse', 'HEAD').stdout.trim()
     const r = spawnSync(
       process.execPath,
@@ -525,13 +516,10 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         resolve(repo, 'scripts', 'mechanism-review.mjs'),
         '--record', reviewed,
         '--point', '900',
-        '--model', 'Fable 5',
+        '--model', 'GPT-5.6 Sol',
         '--verdict', 'merge',
         '--evidence', 'read the core, ran the gate against a synthetic tick, no side effects found',
         '--mode', 'review',
-        // Anthropic reviewer identity must be verified since point 889.
-        '--model-at', '2026-08-24T16:20:00.000Z',
-        '--model-transcript', fableTranscript(),
       ],
       { windowsHide: true, cwd: repo, encoding: 'utf8' },
     )
