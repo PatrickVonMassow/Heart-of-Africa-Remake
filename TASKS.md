@@ -144,6 +144,43 @@ put it is the mistake this line exists to stop.
   review-sol run itself (its printed RECEIPT hash is the natural anchor).
   Bundle: Modell & Wächter.
 
+- [ ] 913. The takeover drill's negative control intermittently reports a THIRD failed check, and
+  the gate that reads it becomes a coin flip. MEASURED 25.08.2026, 12:24 on `main` at the merge
+  of point 907 (`1f167499`), on a quiet host (load 2.4 over 16 cores, run 149 s): `npm run
+  test:unit` went red in `scripts/batch-daemon-drill.test.mjs > goes RED — at exactly the two
+  stale probes`. The control pins EXACTLY two failures; it reported three. The extra one is
+  `the cancellation preserved the branch` (`scripts/batch-daemon-drill.mjs:466-475`), which
+  compares `git rev-parse feat/drill` in the sandbox origin before the post-adoption
+  `cancel-attempt` and 300 ms after it.
+  NOT the merged change, and not a loaded machine: main had gained only TASKS/docs commits since
+  the branch point, the drill touches no part of `command-classify-core.mjs`, and the host was
+  quiet. NOT reproducible on demand either — measured the same day, the drill CLI standalone
+  three times (two failures each), once under 14 busy cores (two failures), the test file alone
+  twice (green), the file beside `batch-daemon.test.mjs` and `batch-reconcile.test.mjs` (green),
+  and the FULL suite a second time on a quiet host (green, 150 s). It needs the full-suite
+  fan-out at `maxWorkers: 4` to appear, and then only sometimes.
+  WHAT IT COSTS: this drill is the NEGATIVE CONTROL that certifies the takeover fence still goes
+  red when the daemon stops enforcing it. An intermittent extra failure makes every gate reading
+  it a coin flip — it stopped the landing of point 907 — and it teaches the reader to treat a red
+  drill as noise, which is the one verdict this drill must never lose.
+  IT HOLDS A RED THAT CANNOT OTHERWISE CLOSE: under CLAUDE.md §7.2 a retry is SUSPECT and
+  covers nothing, so every occurrence has to be fixed or charged to its point rather than
+  re-run away; this one already stopped the landing of point 907.
+  THE LEAD: the neutered daemon ACCEPTS both stale checkpoint requests, so the run performs two
+  checkpoint cycles the honest run refuses. A push still in flight from one of them lands after
+  `tipBeforeCancel` was read, and the check then charges the cancellation with a branch move it
+  did not cause. The 300 ms sleep bounds nothing.
+  FINAL STATE: the branch-preservation check waits on the state it is judging instead of on a
+  fixed sleep — the attempt quiescent, no push outstanding — so it answers the question it names
+  and cannot be moved by an earlier accepted checkpoint. The negative control keeps pinning
+  exactly the two stale probes.
+  VERIFIABLE: a case that drives an accepted checkpoint's push to land AFTER the cancel and shows
+  the check still green; the negative control unchanged in what it pins; a repeated full-suite run
+  (`npm run test:unit`) with the drill file in the fan-out; lint, build.
+  Criticality: medium — no product behaviour, but it intermittently reds the gate every landing
+  runs and devalues the drill's verdict.
+  Bundle: Session- & Repo-Hygiene.
+
 - [ ] 885. A delegated agent swallows the user's chat message, and the backstop cannot see that it
   happened. MEASURED 24.08.2026: the message `e433e59a` (ntfy `jiZfW5f6qkQi`, "Was soll ich mit der
   Karte Entscheidungsprotokoll…", received 05:54:01.371Z) was consumed from `.claude/chat-spool`
@@ -12196,38 +12233,4 @@ to land than a mechanism that needs a review.
   test:unit`, lint, build.
   Criticality: medium — no product behaviour, but it leaks live processes and makes the
   doctor's consistency verdict untrue in the one place the batch relies on it.
-  Bundle: Session- & Repo-Hygiene.
-
-- [ ] 913. The takeover drill's negative control intermittently reports a THIRD failed check, and
-  the gate that reads it becomes a coin flip. MEASURED 25.08.2026, 12:24 on `main` at the merge
-  of point 907 (`1f167499`), on a quiet host (load 2.4 over 16 cores, run 149 s): `npm run
-  test:unit` went red in `scripts/batch-daemon-drill.test.mjs > goes RED — at exactly the two
-  stale probes`. The control pins EXACTLY two failures; it reported three. The extra one is
-  `the cancellation preserved the branch` (`scripts/batch-daemon-drill.mjs:466-475`), which
-  compares `git rev-parse feat/drill` in the sandbox origin before the post-adoption
-  `cancel-attempt` and 300 ms after it.
-  NOT the merged change, and not a loaded machine: main had gained only TASKS/docs commits since
-  the branch point, the drill touches no part of `command-classify-core.mjs`, and the host was
-  quiet. NOT reproducible on demand either — measured the same day, the drill CLI standalone
-  three times (two failures each), once under 14 busy cores (two failures), the test file alone
-  twice (green), the file beside `batch-daemon.test.mjs` and `batch-reconcile.test.mjs` (green),
-  and the FULL suite a second time on a quiet host (green, 150 s). It needs the full-suite
-  fan-out at `maxWorkers: 4` to appear, and then only sometimes.
-  WHAT IT COSTS: this drill is the NEGATIVE CONTROL that certifies the takeover fence still goes
-  red when the daemon stops enforcing it. An intermittent extra failure makes every gate reading
-  it a coin flip — it stopped the landing of point 907 — and it teaches the reader to treat a red
-  drill as noise, which is the one verdict this drill must never lose.
-  THE LEAD: the neutered daemon ACCEPTS both stale checkpoint requests, so the run performs two
-  checkpoint cycles the honest run refuses. A push still in flight from one of them lands after
-  `tipBeforeCancel` was read, and the check then charges the cancellation with a branch move it
-  did not cause. The 300 ms sleep bounds nothing.
-  FINAL STATE: the branch-preservation check waits on the state it is judging instead of on a
-  fixed sleep — the attempt quiescent, no push outstanding — so it answers the question it names
-  and cannot be moved by an earlier accepted checkpoint. The negative control keeps pinning
-  exactly the two stale probes.
-  VERIFIABLE: a case that drives an accepted checkpoint's push to land AFTER the cancel and shows
-  the check still green; the negative control unchanged in what it pins; a repeated full-suite run
-  (`npm run test:unit`) with the drill file in the fan-out; lint, build.
-  Criticality: medium — no product behaviour, but it intermittently reds the gate every landing
-  runs and devalues the drill's verdict.
   Bundle: Session- & Repo-Hygiene.

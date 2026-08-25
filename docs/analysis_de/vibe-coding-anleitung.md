@@ -140,7 +140,8 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 > *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
 > flakender Test darf einmal wiederholt werden, gilt danach aber als **verdächtig** und trägt
 > keine Freigabe mehr. Erledigt ist ein Rot nur mit **benannter Ursache** — wiederholte Grüns
-> sind keine. Und einen, der feste Wartezeiten aufspürt."
+> sind keine, und „war wohl Last" gilt erst, wenn die Last im selben Zug **gemessen** ist. Und
+> einen, der feste Wartezeiten aufspürt."
 
 Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
@@ -468,4 +469,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: efaadebc93c34d7368d9d7f9de5eee600f1c6a37dd03e74cafef095e580b2f90 -->
+<!-- GUIDE-FINGERPRINT: e5959aca16dc6906c59764f2798e60f253070cd129e0d7132fbb02ae3360a7b2 -->
