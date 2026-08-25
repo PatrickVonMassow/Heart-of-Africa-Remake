@@ -697,8 +697,8 @@
       "place": "last"
     },
     "903": {
-      "at": "2026-08-25T00:06:42.200Z",
-      "why": "Letzter Platz ist richtig: der akute Block ist in derselben Sitzung durch eine frische Ganzbereichs-Pruefung geraeumt, danach kostet der Defekt nur eine Pruefrunde je selbst verfasstem HIGH-Punkt und blockiert nichts mehr",
+      "at": "2026-08-25T00:12:29.383Z",
+      "why": "Vor 894 gezogen: das Kritikalitaetstor laesst sich fuer den gelandeten Punkt 893 mit keinem vorhandenen Werkzeug ehrlich raeumen, also blockiert es jede weitere Landung — der Defekt muss vor der naechsten Landung weg",
       "origin": "machine",
       "place": "last"
     }
