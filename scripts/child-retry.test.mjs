@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { POINT_TOKEN_CAP } from './child-retry-core.mjs'
-import { readState, writeState, tokenCap, committedOnBranch, diagnoseBranch, logLine, boardCard } from './child-retry.mjs'
+import { readState, writeState, tokenCap, committedOnBranch, diagnoseBranch, logLine } from './child-retry.mjs'
 
 let dir
 beforeEach(() => {
@@ -116,18 +116,25 @@ describe('the reason reaches the morning reader', () => {
     expect(() => logLine('x', join(dir, 'no-such-dir', 'a.log'))).not.toThrow()
   })
 
-  it('boardCard reports failure instead of throwing when the board command cannot run', () => {
-    expect(boardCard('t', 'q', { cwd: dir })).toBe(false)
-    expect(existsSync(join(dir, '.batch-dashboard.html'))).toBe(false)
+  it('exports no board writer at all any more (point 749)', async () => {
+    // "Batch pausiert: Umgebungsausfall" used to be posted under "Von dir zu
+    // klären", where it asked the user to check a machine-side outage and then
+    // outlived the retry clock that cleared it. There is no writer left to call:
+    // the pause marker and the retry state are the record, and the board derives
+    // its state card from them.
+    const module = await import('./child-retry.mjs')
+    expect(Object.keys(module).filter((name) => /^board/.test(name))).toEqual([])
   })
 })
 
 describe('the CLI wires terminal decisions without a person-only exit', () => {
   const source = readFileSync(resolve(process.cwd(), 'scripts', 'child-retry.mjs'), 'utf8')
 
-  it('persists recovery state and its decision card', () => {
+  it('persists the recovery record in the retry state and reaches no decision section', () => {
     expect(source).toMatch(/recordRecovery\(next, decision\)/)
-    expect(source).toMatch(/boardCard\(decision\.decisionRecord\.title, decision\.decisionRecord\.body\)/)
+    // Point 749: NO call site here may reach the user's decision section.
+    expect(source).not.toMatch(/vdzk-add/)
+    expect(source).not.toMatch(/boardCard\(/)
   })
 
   it('writes the outage pause with the decision clock, never a clockless marker', () => {
@@ -138,6 +145,5 @@ describe('the CLI wires terminal decisions without a person-only exit', () => {
   it('turns an internal classifier error into a capped exchange record', () => {
     expect(source).toMatch(/fallbackRecoveryDecision\(\{/)
     expect(source).toMatch(/writeState\(recordRecovery\(readState\(\), decision\)\)/)
-    expect(source).toMatch(/boardCard\(decision\.decisionRecord\.title, decision\.decisionRecord\.body\)/)
   })
 })

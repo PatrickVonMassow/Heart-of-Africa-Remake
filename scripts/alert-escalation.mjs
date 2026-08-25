@@ -95,37 +95,23 @@ function berlinStamp(now = new Date()) {
   }).format(now)
 }
 
-/** The board card for the last rung. A duplicate title means the durable record
- *  already exists, so it is success for this idempotent caller. */
-export function boardCard(title, question, { cwd = REPO_ROOT } = {}) {
-  try {
-    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', title, question], {
-      cwd,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    })
-    return true
-  } catch (error) {
-    const stderr = String(error?.stderr ?? '')
-    if (/open question .* already stands under/i.test(stderr)) return true
-    return false
-  }
-}
-
-/** A self-pause belongs on the current-state card, never under VDZK. */
-export function boardNowCard(title, status, { cwd = REPO_ROOT, exec = execFileSync } = {}) {
-  try {
-    exec(
-      process.execPath,
-      ['scripts/board.mjs', 'paused', `${title}: ${status}`],
-      { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
-    )
-    return true
-  } catch {
-    return false
-  }
-}
+// THE LAST RUNG WRITES NO BOARD CARD AT ALL (point 749).
+//
+// It used to post "Batch pausiert: Alarm blieb unbeantwortet" and the
+// continuation/corruption protocols under "Von dir zu klären" — a section that
+// holds GENUINE user decisions only. None of them asked the user to decide
+// anything: they reported that an alert went unanswered, that the environment
+// failed, that the batch had continued on its own. He cleared three of them by
+// hand and ruled, the third time: "Das sind interne Probleme, die du selbst
+// lösen musst. Etabliere einen Mechanismus, der das verhindert."
+//
+// The mechanism is that the record travels with the LADDER, in the same atomic
+// write that books the rung, and the board DERIVES its state card from that
+// ladder (scripts/board-state-core.mjs). Two consequences fall out of it: the
+// record can no longer fail separately from the rung it belongs to, and the card
+// stops existing when the alert is cleared or ages out — nobody has to remove it.
+// The ntfy alert is untouched: that is the channel built for reaching the user,
+// and the retroactive veto is answered there or in the board chat.
 
 /** The durable record demanded by a generic alert's last rung. */
 export function continuationCardBody(title, message, decision, stamp) {
@@ -207,7 +193,6 @@ export async function escalate({
   // injection point every test would fall through the fail-open catch below and
   // prove only that failing open works.
   pause = null,
-  board = boardCard,
   repair = runCorruptionRepair,
   ladderPath = LADDER_PATH,
   logPath = LOG_PATH,
@@ -241,31 +226,29 @@ export async function escalate({
       return { deliver: false, priority: decision.priority, decision }
     }
 
-    let decisionRecorded = true
+    // THE RECORD RIDES WITH THE RUNG (point 749). It is composed here and
+    // persisted by `commit()` in the same atomic ladder write, so there is no
+    // second write that can fail on its own — and the board derives its state
+    // card from the ladder, so this record appears there without a board call and
+    // vanishes when the alert is cleared.
+    let record = null
     if (decision.action === 'continue-and-record') {
       const stamp = berlinStamp(new Date(now))
-      decisionRecorded = board(
-        decision.decisionCard,
-        continuationCardBody(title, message, decision, stamp),
-      ) === true
-      logLine(
-        `[${k}] CONTINUING THE BATCH — decision card ${decisionRecorded ? 'recorded' : 'FAILED'}: ` +
-          `${decision.decisionCard} — ${decision.reason}`,
-        logPath,
-      )
+      record = { title: decision.decisionCard, body: continuationCardBody(title, message, decision, stamp), at: now }
+      logLine(`[${k}] CONTINUING THE BATCH — ${decision.decisionCard} — ${decision.reason}`, logPath)
     }
 
     let repairResult = null
     if (decision.action === 'repair-and-probe') {
       const stamp = berlinStamp(new Date(now))
       repairResult = repair(decision)
-      decisionRecorded = board(
-        decision.decisionCard,
-        corruptionCardBody(title, message, decision, repairResult, stamp),
-      ) === true
+      record = {
+        title: decision.decisionCard,
+        body: corruptionCardBody(title, message, decision, repairResult, stamp),
+        at: now,
+      }
       logLine(
-        `[${k}] CORRUPTION REPAIR ${repairResult.ok ? 'CLEARED' : 'REMAINS'}; ` +
-          `decision card ${decisionRecorded ? 'recorded' : 'FAILED'}; next attempt ` +
+        `[${k}] CORRUPTION REPAIR ${repairResult.ok ? 'CLEARED' : 'REMAINS'}; next attempt ` +
           `${new Date(decision.nextAttemptAt).toISOString()} — ${decision.reason}`,
         logPath,
       )
@@ -279,17 +262,15 @@ export async function escalate({
     // re-decides at the same rung next time, so the alert keeps trying.
     const commit = () => {
       try {
-        // The continuation verdict is not complete without its durable decision
-        // card. Leave the ladder on the due rung when the board write failed so
-        // the next identical alert retries the record instead of losing it.
-        if (['continue-and-record', 'repair-and-probe'].includes(decision.action) && !decisionRecorded) {
-          logLine(`[${k}] delivered, but the required continuation decision card is still missing`, logPath)
-          return false
-        }
         // The DECISION's clock, not a fresh one: delivery follows the decision by
         // milliseconds, and re-reading the wall clock here would make the rung's
         // own timestamp disagree with the gap that was just measured against it.
-        writeLadder(advanceLadder(state, { key: k, decision, now }), ladderPath)
+        //
+        // The record goes in HERE, with the rung (point 749). It replaced a
+        // separate board write that could fail on its own and used to hold the
+        // ladder back — the rung and the reason it was reached are one fact and
+        // are now written once.
+        writeLadder(advanceLadder(state, { key: k, decision, now, record }), ladderPath)
         logLine(`[${k}] ${describeEscalation(decision)}`, logPath)
         return true
       } catch (e) {
@@ -301,7 +282,7 @@ export async function escalate({
       deliver: true,
       priority: higherPriority(priority, decision.priority),
       decision,
-      decisionRecorded,
+      record,
       repairResult,
       commit,
     }
