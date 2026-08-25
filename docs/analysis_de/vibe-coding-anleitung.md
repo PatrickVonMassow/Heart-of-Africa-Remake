@@ -177,9 +177,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   Stück für sich ab**."
 
 - **Gebaut — und nie in Betrieb genommen.** Die Ausnahme steht im Fließtext statt in der Datei, die
-  das Werkzeug liest; oder die Umgebung führt ihre **eigene Kopie** aus.
+  das Werkzeug liest; die Umgebung führt ihre **eigene Kopie** aus; oder das Tor ist richtig gebaut
+  und urteilt richtig — nur fährt es kein Weg, den das Projekt wirklich geht, und sein Rot sieht
+  wochenlang niemand.
   → *Prompt:* „Trag eine Ausnahme **im selben Zug** dort ein, wo der Mechanismus sie liest, und
-  **vergleiche Ausgeführtes mit dem Repository.**"
+  **vergleiche Ausgeführtes mit dem Repository.** Nenn zu jedem Tor, auf das du dich berufst, den
+  **Weg, der es fährt** — und wann es dort zuletzt rot war."
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -205,9 +208,12 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 - **Test und Wächter hingen an ihrer Umgebung, nicht am Verhalten.** Sie messen dein Repository
   statt deinen Code, oder lesen eine projektweite Angabe aus dem zufälligen Arbeitsverzeichnis —
-  und sind nur dort richtig, wo sie zufällig liefen.
+  und sind nur dort richtig, wo sie zufällig liefen. Von Hand nachgeprüft bestätigt sich der
+  Fehler dann selbst, denn dein Aufruf erbt dasselbe Verzeichnis.
   → *Prompt:* „Jede Prüfung bekommt ihre Pfade **eingespritzt**; was fürs **ganze Projekt** gilt,
-  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts."
+  wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Meldet deine
+  Nachprüfung grün, während der Haken ablehnt, ist die **Nachprüfung** verdächtig: lass die
+  Bedingung aus **beiden** Wurzeln nebeneinander laufen."
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
@@ -462,4 +468,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: ae2446f5f9410e59a9d5dea721d8c68f9738b18b6d43838f4989783c8f5bdb0a -->
+<!-- GUIDE-FINGERPRINT: 651bf298800d6b2c20a5328b94a0e9e1f1640cef32002adfd8220d6c1eb3b923 -->

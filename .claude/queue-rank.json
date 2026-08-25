@@ -468,12 +468,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "834": {
-      "at": "2026-08-22T10:35:33.222Z",
-      "why": "The user ordered it forward on 22.08.2026 after a second authoring run died with its session; each further lane death costs about 1.5 h and its whole token spend.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "836": {
       "at": "2026-08-22T12:10:43.694Z",
       "why": "Machine-filed from its own run; the user's 20.08.2026 ruling keeps such a point behind the release",
@@ -707,6 +701,24 @@
       "why": "Last is right: 849 repairs the neighbouring class in the same detector reading, so a fix written before it would be rewritten by it; the tax is recurring but costs no work and blocks nothing.",
       "origin": "machine",
       "place": "last"
+    },
+    "909": {
+      "at": "2026-08-25T08:53:59.782Z",
+      "why": "Der Fehler versteckt drei Testtyp-Fehler, keinen Spielfehler — nichts blockiert daran, also bleibt er hinter der gesetzten Reihenfolge.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "910": {
+      "at": "2026-08-25T08:53:59.860Z",
+      "why": "Kostet Zuege, keine Arbeit: der Umweg ueber den Hauptbaum steht als Regel und traegt, bis der Waechter repariert ist.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "911": {
+      "at": "2026-08-25T08:53:59.941Z",
+      "why": "Die Messung ist heute richtig; das Risiko ist Drift, und keine offene Arbeit haengt daran.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -754,7 +766,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T07:23:10.646Z",
+    "at": "2026-08-25T08:53:59.950Z",
     "points": [
       174,
       184,
@@ -992,7 +1004,6 @@
       831,
       832,
       833,
-      834,
       836,
       837,
       838,
@@ -1040,7 +1051,10 @@
       905,
       906,
       907,
-      908
+      908,
+      909,
+      910,
+      911
     ]
   }
 }
