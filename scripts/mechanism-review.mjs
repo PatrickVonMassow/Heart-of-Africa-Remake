@@ -860,6 +860,8 @@ export function buildRecord({
     verdict,
     evidence,
     authoredBy: commit.authoredBy,
+    commitAt: commit.at,
+    at: now,
     // EVERY model named in the trailers, not only the first: two co-authors mean
     // two list authors, and the merger has to be neither (four-eyes, point 634).
     authors: commit.authors,
@@ -902,8 +904,14 @@ export function buildRecord({
   // claim only clears for a reviewer no harness transcript can cover. Writing
   // the row anyway would report "recorded" for a review the gate then ignores —
   // silent debt the recording session believes settled.
-  if (now >= VERIFIED_REVIEWER_SINCE && !authorshipRefusesPermission(reviewerAuthorship)) {
+  if (!authorshipRefusesPermission(reviewerAuthorship)) {
     for (const problem of reviewerVendorProblems(model, reviewerAuthorship)) errors.push(problem)
+  }
+  if (Number(commit.at) > 0 && now < Number(commit.at)) {
+    errors.push(
+      `the review timestamp ${new Date(now).toISOString()} predates the reviewed commit ` +
+        `${new Date(commit.at).toISOString()} — a review cannot read code that did not yet exist`,
+    )
   }
   // Optional, but never sloppy: a mistyped point number would record a review
   // for a point nobody is closing, and the criticality gate would still block
@@ -1112,6 +1120,8 @@ export function buildCarriedRecord({
     verdict: src.verdict,
     evidence: copiedEvidence,
     authoredBy: commit.authoredBy,
+    commitAt: commit.at,
+    at: now,
     authors: commit.authors,
     mode: src.mode,
     pass,
@@ -1260,9 +1270,11 @@ export function resolveCommit(sha, { run = git } = {}) {
   const full = commits[0]
   const subject = run(['show', '-s', '--format=%s', full])
   const trailers = run(['show', '-s', '--format=%(trailers:key=Co-Authored-By,valueonly,separator=;)', full])
+  const committedAt = Number(run(['show', '-s', '--format=%ct', full])) * 1000
   return {
     sha: full,
     subject,
+    at: Number.isFinite(committedAt) ? committedAt : 0,
     authoredBy: modelFromTrailers(trailers),
     authors: modelsFromTrailers(trailers),
   }

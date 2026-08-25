@@ -24,12 +24,14 @@ import {
   mechanismPathsIn,
   mergeProblem,
   modelFromTrailers,
+  modelVendor,
   modelsFromTrailers,
   MODES,
   nearestFlag,
   parseArgs,
   parseModel,
   receiptBalances,
+  reviewIdentityProblem,
   resolveMergePolicy,
   sameModel,
   validateMode,
@@ -226,7 +228,7 @@ describe('model identity', () => {
     }
     const self = validateRecord({ ...record, model: 'GPT-5.6 Sol' })
     expect(self.ok).toBe(false)
-    expect(self.errors.join(' ')).toMatch(/SELF-REVIEW is refused/)
+    expect(self.errors.join(' ')).toMatch(/SAME-VENDOR REVIEW is refused/)
     expect(validateRecord({ ...record, model: 'Sol' }).ok).toBe(false)
     expect(validateRecord({ ...record, model: 'Opus 5' }).ok).toBe(true)
   })
@@ -235,14 +237,14 @@ describe('model identity', () => {
 describe('validateRecord', () => {
   const good = {
     sha: 'a'.repeat(40),
-    model: 'Fable 5',
+    model: 'GPT-5.6 Sol',
     verdict: 'merge',
     evidence: 'read the core and the wrapper, ran the spawned-hook cases',
     authoredBy: 'Claude Opus 5',
     mode: 'review',
   }
 
-  it('accepts a complete record by a different model', () => {
+  it('accepts a complete record by the other vendor', () => {
     expect(validateRecord(good)).toEqual({ ok: true, errors: [] })
   })
 
@@ -254,7 +256,7 @@ describe('validateRecord', () => {
   it('REFUSES a self-review rather than warning about it', () => {
     const r = validateRecord({ ...good, model: 'Claude Opus 5' })
     expect(r.ok).toBe(false)
-    expect(r.errors.join(' ')).toMatch(/SELF-REVIEW is refused/)
+    expect(r.errors.join(' ')).toMatch(/SAME-VENDOR REVIEW is refused/)
   })
 
   it('refuses an unknown verdict, a missing model and a token evidence line', () => {
@@ -345,13 +347,17 @@ describe('validateRecord', () => {
     expect(validateRecord({ ...good, evidence: 'the <core> was read against its spec' }).ok).toBe(true)
   })
 
-  it('accepts a record whose commit has no readable author model', () => {
-    // ACCEPTED RESIDUAL: an empty value read from the commit cannot be
-    // distinguished from a hand-typed empty value in a ledger row. Both remain
-    // unknown authorship; refusing would make an honestly unreadable merge
-    // commit unrecordable. This ambiguity fails away from a false self-review
-    // claim and is deliberately stated rather than claimed closed.
-    expect(validateRecord({ ...good, authoredBy: '' }).ok).toBe(true)
+  it('refuses a record whose commit has no readable author model', () => {
+    expect(validateRecord({ ...good, authoredBy: '' }).ok).toBe(false)
+  })
+
+  it('uses vendor identity over every co-author, including empty and unknown lists', () => {
+    expect(reviewIdentityProblem('GPT-5.6', { authorModels: ['GPT-5.6 Sol'] })).toBe('same-vendor')
+    expect(reviewIdentityProblem('GPT-5.6 Sol', { authorModels: ['Claude Opus 5', 'GPT-5.6 Sol'] })).toBe('same-vendor')
+    expect(reviewIdentityProblem('Opus 5', { authorModels: ['GPT-5.6 Sol', 'Claude Fable 5'] })).toBe('same-vendor')
+    expect(reviewIdentityProblem('GPT-5.6 Sol', { authorModels: [] })).toBe('unknown-author')
+    expect(reviewIdentityProblem('Opus 5', { authorModels: ['Mystery 9'] })).toBe('unknown-author')
+    expect(reviewIdentityProblem('Opus 5', { authorModels: ['GPT-5.6 Sol'] })).toBe('')
   })
 })
 
@@ -362,25 +368,29 @@ describe('evaluateMechanismReview', () => {
   const commit = (over = {}) => ({
     sha: 'c'.repeat(40),
     subject: 'Give the pre-push gate its fast path',
-    at: 1_787_000_000_000,
+    at: MERGE_ACCOUNTING_SINCE - 10_000,
     authorModel: 'Claude Opus 5',
     files: ['scripts/pre-push-gate-core.mjs'],
     coveringRecordShas: [],
     ...over,
   })
-  const record = (over = {}) => ({
-    sha: 'c'.repeat(40),
-    model: 'Fable 5',
-    verdict: 'merge',
-    evidence: 'checked the fast path against the unit layer',
-    // A row of the recorder's mode era owes its mode (MODE_REQUIRED_SINCE).
-    mode: 'review',
-    // Written since the merge rule landed, so a blind-parallel row here owes its
-    // merger and its count (the older rows are grandfathered by date).
-    at: MERGE_ACCOUNTING_SINCE + 2000,
-    authoredBy: 'Claude Opus 5',
-    ...over,
-  })
+  const record = (over = {}) => {
+    const model = over.model ?? 'GPT-5.6 Sol'
+    const reviewerAuthorship = modelVendor(model) === 'openai'
+      ? { status: 'unverified', claimedModel: model, reason: 'external CLI reviewer, no harness transcript' }
+      : { status: 'agreement', claimedModel: model, actualModel: model }
+    return {
+      sha: 'c'.repeat(40),
+      model,
+      verdict: 'merge',
+      evidence: 'checked the fast path against the unit layer',
+      mode: 'review',
+      at: 1_787_000_001_000,
+      authoredBy: 'Claude Opus 5',
+      reviewerAuthorship,
+      ...over,
+    }
+  }
 
   it('BLOCKS a changed mechanism with no record at all', () => {
     const v = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [commit()], records: [] })
@@ -394,12 +404,13 @@ describe('evaluateMechanismReview', () => {
 
   it('requires every new review row to record an agreement or explicit unverified authorship claim', () => {
     const base = record({ at: AUTHORSHIP_CHECK_SINCE + 1 })
+    delete base.reviewerAuthorship
     const covered = commit({ coveringRecordShas: ['c'.repeat(40)] })
     expect(evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [base] }).block).toBe(true)
 
     const unverified = {
       ...base,
-      reviewerAuthorship: { status: 'unverified', claimedModel: 'Fable 5', reason: 'transcript expired' },
+      reviewerAuthorship: { status: 'unverified', claimedModel: 'GPT-5.6 Sol', reason: 'external CLI reviewer' },
     }
     expect(
       evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered], records: [unverified] }).block,
@@ -409,7 +420,7 @@ describe('evaluateMechanismReview', () => {
       ...base,
       reviewerAuthorship: {
         status: 'disagreement',
-        claimedModel: 'Fable 5',
+        claimedModel: 'GPT-5.6 Sol',
         actualModel: 'Claude Opus 5',
       },
     }
@@ -459,18 +470,15 @@ describe('evaluateMechanismReview', () => {
     expect(
       judge(claim('GPT-5.6 Sol', { status: 'agreement', actualModel: 'GPT-5.6 Sol' }), 'Claude Opus 5'),
     ).toBe(true)
-    // The rows recorded under the older reading keep their standing.
+    // A row cannot select the superseded identity rule by backdating itself.
     const older = {
       ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
       reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
     }
-    expect(judge(older, 'GPT-5.6 Sol')).toBe(false)
+    expect(judge(older, 'GPT-5.6 Sol')).toBe(true)
   })
 
-  it('keys the reviewer-verification era on the COMMIT, so a backdated row buys nothing', () => {
-    // record.at is written by the recording hand; the commit timestamp is part
-    // of its sha. A hand-edited row claiming a pre-boundary `at` against a
-    // post-boundary commit answers to the new rule regardless.
+  it('has no author-controlled reviewer-verification era', () => {
     const backdated = {
       ...record({ at: VERIFIED_REVIEWER_SINCE - 1, model: 'Claude Opus 5' }),
       reviewerAuthorship: { status: 'unverified', claimedModel: 'Claude Opus 5', reason: 'transcript expired' },
@@ -483,13 +491,14 @@ describe('evaluateMechanismReview', () => {
         records: [backdated],
       }).block
     expect(judgeAt(VERIFIED_REVIEWER_SINCE + 1)).toBe(true)
-    expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(false)
+    expect(judgeAt(VERIFIED_REVIEWER_SINCE - 1)).toBe(true)
   })
 
   it('keys the AUTHORSHIP requirement itself on the commit, not only the narrowing', () => {
     // A row backdated past AUTHORSHIP_CHECK_SINCE used to omit reviewerAuthorship
     // entirely and clear a commit made today (re-review round 4).
     const bare = record({ at: AUTHORSHIP_CHECK_SINCE - 1, model: 'Fable 5' })
+    delete bare.reviewerAuthorship
     const judgeAt = (commitAt) =>
       evaluateMechanismReview({
         baseline: 'b',
@@ -498,10 +507,10 @@ describe('evaluateMechanismReview', () => {
         records: [bare],
       }).block
     expect(judgeAt(AUTHORSHIP_CHECK_SINCE + 1)).toBe(true)
-    expect(judgeAt(AUTHORSHIP_CHECK_SINCE - 2)).toBe(false)
+    expect(judgeAt(AUTHORSHIP_CHECK_SINCE - 2)).toBe(true)
   })
 
-  it('poisons a modern blind-parallel row that carries NO halves instead of reading the trailers', () => {
+  it('does not accept a blind-parallel fold as a code review', () => {
     // Dropping halfAuthors from a hand-edited row used to fall back to the
     // trailer proxy, which says nothing when the union commit does not name the
     // merger (re-review round 4). The merger here appears in no trailer, so the
@@ -519,7 +528,7 @@ describe('evaluateMechanismReview', () => {
       records: [row],
     })
     expect(v.block).toBe(true)
-    expect(formatMechanismReviewVerdict(v)).toMatch(/half authors the repository does not confirm/)
+    expect(v.findings[0].kind).toBe('no-review')
   })
 
   it('judges a mode wearing stray whitespace by its trimmed value on BOTH gates', () => {
@@ -538,7 +547,7 @@ describe('evaluateMechanismReview', () => {
     expect(v.block).toBe(true)
   })
 
-  it('names the unconfirmed-halves problem instead of calling it a self-merge', () => {
+  it('keeps an unconfirmed blind fold outside code coverage', () => {
     // mergeLine used to answer every problem beyond no-merger/no-count with
     // "which wrote one of the two lists" — a false self-merge diagnosis for a
     // row whose halves the repository simply did not confirm.
@@ -557,8 +566,7 @@ describe('evaluateMechanismReview', () => {
     })
     expect(v.block).toBe(true)
     const text = formatMechanismReviewVerdict(v)
-    expect(text).toMatch(/half authors the repository does not confirm/)
-    expect(text).not.toMatch(/wrote one of the two lists/)
+    expect(text).toMatch(/no review recorded/)
   })
 
   it('reports a zero-reviewer authorship group as UNREVIEWABLE with its reason', () => {
@@ -648,6 +656,85 @@ describe('evaluateMechanismReview', () => {
     expect(formatMechanismReviewVerdict(v)).toBe('')
   })
 
+  describe('measured clearance bypasses', () => {
+    const covered = (over = {}) => commit({ coveringRecordShas: ['c'.repeat(40)], ...over })
+    const scoped = (over = {}) => record({
+      pass: { index: 1, total: 1, files: ['scripts/pre-push-gate-core.mjs'], endState: 'c'.repeat(40) },
+      ...over,
+    })
+
+    it('refuses same-vendor models, every co-author, and unknown authorship on the ordinary path', () => {
+      const fable = record({
+        model: 'Fable 5',
+        reviewerAuthorship: { status: 'agreement', claimedModel: 'Fable 5', actualModel: 'Fable 5' },
+      })
+      const secondAuthor = covered({ authorModels: ['Claude Opus 5', 'GPT-5.6 Sol'] })
+      const unknown = covered({ authorModels: ['Unrecognised Reviewer 9'] })
+      const empty = covered({ authorModels: [] })
+      for (const [pending, reading] of [
+        [covered(), fable],
+        [secondAuthor, record()],
+        [unknown, record()],
+        [empty, record()],
+      ]) {
+        const verdict = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [pending], records: [reading] })
+        expect(verdict.block).toBe(true)
+        expect(verdict.findings[0].kind).toBe('self-review')
+      }
+    })
+
+    it('does not let a same-sha scoped merge retire a scoped refusal', () => {
+      const refusal = scoped({ verdict: 'do-not-merge', at: 1_787_000_001_000 })
+      const rerecord = scoped({ verdict: 'merge', at: 1_787_000_002_000 })
+      const verdict = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [covered()],
+        records: [refusal, rerecord],
+      })
+      expect(verdict.block).toBe(true)
+      expect(verdict.findings[0].kind).toBe('do-not-merge')
+    })
+
+    it('keeps a file-scoped 1/3 incomplete and lets no pass-less sibling bypass it', () => {
+      const first = scoped({
+        pass: { index: 1, total: 3, files: ['scripts/pre-push-gate-core.mjs'], endState: 'c'.repeat(40) },
+      })
+      for (const rows of [[first], [first, record({ at: 1_787_000_002_000 })]]) {
+        const verdict = evaluateMechanismReview({
+          baseline: 'b',
+          head: 'h',
+          pendingCommits: [covered()],
+          records: rows,
+        })
+        expect(verdict.block).toBe(true)
+        expect(verdict.findings[0].kind).toBe('incomplete-passes')
+      }
+    })
+
+    it('refuses a record timestamped before the commit it claims to read', () => {
+      const verdict = evaluateMechanismReview({
+        baseline: 'b',
+        head: 'h',
+        pendingCommits: [covered({ at: 1_787_000_002_000 })],
+        records: [record({ at: 1_787_000_001_000 })],
+      })
+      expect(verdict.block).toBe(true)
+      expect(verdict.findings[0].kind).toBe('no-review')
+    })
+
+    it('keeps both spec examinations and blind-parallel folds outside code coverage', () => {
+      for (const reading of [
+        record({ specExamination: 'sound' }),
+        record({ mode: 'blind-parallel', mergedBy: 'Fable 5', accounting: RECEIPT }),
+      ]) {
+        const verdict = evaluateMechanismReview({ baseline: 'b', head: 'h', pendingCommits: [covered()], records: [reading] })
+        expect(verdict.block).toBe(true)
+        expect(verdict.findings[0].kind).toBe('no-review')
+      }
+    })
+  })
+
   it('REFUSES a review by the authoring model — and says so', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
@@ -684,7 +771,7 @@ describe('evaluateMechanismReview', () => {
     }
   })
 
-  it('REFUSES a mode-era row with no mode at all, and keeps the legacy rows clearing', () => {
+  it('REFUSES a row with no mode regardless of its timestamps', () => {
     // Presence, not value: an unknown mode may be a newer CLI's legitimate one
     // (pinned below under "the mode is required to WRITE a record") — but a
     // mode-era row with NONE, or with no timestamp to date it, is hand-made.
@@ -698,16 +785,14 @@ describe('evaluateMechanismReview', () => {
       })
       expect(v.block, JSON.stringify(over)).toBe(true)
     }
-    // A row genuinely older than the recorder's mode flag owes none — judged
-    // against a commit of its own era, since every cutoff reads the later of
-    // row and commit time.
+    // Neither the row nor commit clock selects a weaker parser.
     const legacy = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], at: MODE_REQUIRED_SINCE - 9000 })],
       records: [record({ mode: '', at: MODE_REQUIRED_SINCE - 5000 })],
     })
-    expect(legacy.block).toBe(false)
+    expect(legacy.block).toBe(true)
     // …and the SAME old row does not clear a commit made after the rule: a
     // record predating the commit it clears reviewed something else.
     const modernCommit = evaluateMechanismReview({
@@ -719,7 +804,7 @@ describe('evaluateMechanismReview', () => {
     expect(modernCommit.block).toBe(true)
   })
 
-  it('REFUSES a hand-edited row whose UNION was merged by an author of it', () => {
+  it('keeps a hand-edited blind union outside code-review coverage', () => {
     // The ledger is a tracked text file; the recorder's refusal of a self-merge
     // has to hold at the gate too, or an edited row walks straight past it
     // (four-eyes finding on point 634).
@@ -730,11 +815,10 @@ describe('evaluateMechanismReview', () => {
       records: [record({ mode: 'blind-parallel', mergedBy: 'Opus 5', accounting: RECEIPT })],
     })
     expect(v.block).toBe(true)
-    expect(v.findings[0].kind).toBe('self-review')
-    expect(formatMechanismReviewVerdict(v)).toMatch(/self-merge is where a finding disappears/)
+    expect(v.findings[0].kind).toBe('no-review')
   })
 
-  it('takes the same row once a third model merged it, or the fallback is recorded', () => {
+  it('does not turn even a valid third-model fold into a code review', () => {
     const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
     const third = evaluateMechanismReview({
       baseline: 'b',
@@ -742,7 +826,7 @@ describe('evaluateMechanismReview', () => {
       pendingCommits: pending,
       records: [record({ mode: 'blind-parallel', mergedBy: 'GPT-5.6 Sol', accounting: RECEIPT })],
     })
-    expect(third.block).toBe(false)
+    expect(third.block).toBe(true)
     const fallback = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
@@ -756,10 +840,10 @@ describe('evaluateMechanismReview', () => {
         }),
       ],
     })
-    expect(fallback.block).toBe(false)
+    expect(fallback.block).toBe(true)
   })
 
-  it('leaves the rows written BEFORE the rule landed alone, and no younger one', () => {
+  it('never treats a blind-parallel row as a code reading, whatever its date', () => {
     const pending = [commit({ coveringRecordShas: ['c'.repeat(40)] })]
     // A row from before MERGE_ACCOUNTING_SINCE carries neither field and stands —
     // for a commit of its own era; the cutoffs read the later of row and commit
@@ -770,7 +854,7 @@ describe('evaluateMechanismReview', () => {
       pendingCommits: [commit({ coveringRecordShas: ['c'.repeat(40)], at: MERGE_ACCOUNTING_SINCE - 2 })],
       records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE - 1 })],
     })
-    expect(legacy.block).toBe(false)
+    expect(legacy.block).toBe(true)
     // A row written since owes both — leaving the fields out is not a legacy row.
     for (const over of [
       {},
@@ -784,7 +868,7 @@ describe('evaluateMechanismReview', () => {
         records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, ...over })],
       })
       expect(v.block, JSON.stringify(over)).toBe(true)
-      expect(v.findings[0].kind).toBe('self-review')
+      expect(v.findings[0].kind).toBe('no-review')
     }
     expect(
       formatMechanismReviewVerdict(
@@ -795,7 +879,7 @@ describe('evaluateMechanismReview', () => {
           records: [record({ mode: 'blind-parallel', at: MERGE_ACCOUNTING_SINCE + 1, mergedBy: 'GPT-5.6 Sol' })],
         }),
       ),
-    ).toMatch(/no count of it/)
+    ).toMatch(/no review recorded/)
   })
 
   it('does NOT read a row with no timestamp as a legacy one', () => {
@@ -875,7 +959,7 @@ describe('evaluateMechanismReview', () => {
     expect(v.block).toBe(true)
   })
 
-  it('refuses a merge by a SECOND co-author of the commit', () => {
+  it('does not let a blind merge by a second co-author cover code', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
@@ -885,7 +969,7 @@ describe('evaluateMechanismReview', () => {
       records: [record({ mode: 'blind-parallel', mergedBy: 'Fable 5', accounting: RECEIPT })],
     })
     expect(v.block).toBe(true)
-    expect(formatMechanismReviewVerdict(v)).toMatch(/self-merge/)
+    expect(v.findings[0].kind).toBe('no-review')
   })
 
   it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
@@ -1021,12 +1105,19 @@ describe('evaluateMechanismReview', () => {
     expect(v).toMatchObject({ block: false, clear: true, bootstrap: false })
   })
 
-  it('grandfathers everything that predates the baseline', () => {
-    // The twenty-odd guards already in the tree owe no retroactive review: with
-    // no baseline armed yet nothing is pending, and the wrapper then pins it at
-    // the current HEAD — model-guard's own mechanism, not a second one.
+  it('refuses a missing baseline instead of grandfathering at HEAD', () => {
     const v = evaluateMechanismReview({ baseline: null, head: 'h', pendingCommits: [commit()], records: [] })
-    expect(v).toMatchObject({ block: false, bootstrap: true })
+    expect(v).toMatchObject({ block: true, clear: false, bootstrap: false })
+    expect(v.findings[0].kind).toBe('missing-baseline')
+    expect(formatMechanismReviewVerdict(v)).toMatch(/baseline is missing/)
+  })
+
+  it('refuses the same missing-baseline bootstrap on main with an empty pending set', () => {
+    const head = 'a'.repeat(40)
+    const v = evaluateMechanismReview({ baseline: null, baselineMissing: true, head, pendingCommits: [], records: [] })
+    expect(v.block).toBe(true)
+    expect(v.clear).toBe(false)
+    expect(v.head).toBe(head)
   })
 
   it('reports EVERY offending commit, not just the first', () => {
@@ -1796,7 +1887,7 @@ describe('validateMode', () => {
 describe('validateRecord carries the mode', () => {
   const good = {
     sha: 'a'.repeat(40),
-    model: 'Fable 5',
+    model: 'GPT-5.6 Sol',
     verdict: 'merge',
     evidence: 'read the core and the wrapper against the spec',
     authoredBy: 'Claude Opus 5',
@@ -1811,7 +1902,7 @@ describe('validateRecord carries the mode', () => {
   /** A blind-parallel record names the third model AND carries the count. */
   const counted = {
     mode: 'blind-parallel',
-    mergedBy: 'GPT-5.6 Sol',
+    mergedBy: 'Fable 5',
     accounting: '7 A + 5 B entries → 9 union entries (6 merged, 4 only A, 2 only B): every input entry accounted for',
   }
 
@@ -1847,7 +1938,7 @@ describe('validateRecord carries the mode', () => {
   })
 
   it('refuses a merge by either of the two models that wrote the lists', () => {
-    for (const who of ['Fable 5', 'Claude Opus 5']) {
+    for (const who of ['GPT-5.6 Sol', 'Claude Opus 5']) {
       const v = validateRecord({ ...good, ...counted, mergedBy: who })
       expect(v.ok, who).toBe(false)
       expect(v.errors.join('\n')).toMatch(/may not merge them/i)
@@ -1882,8 +1973,8 @@ describe('validateRecord carries the mode', () => {
   })
 
   it('lets the recorded two-model fallback through, and refuses one naming no model', () => {
-    const fb = { ...good, ...counted, mergedBy: 'Fable 5' }
-    expect(validateRecord({ ...fb, mergeFallback: 'GPT-5.6 Sol was unreachable all session' }).ok).toBe(true)
+    const fb = { ...good, ...counted, mergedBy: 'Claude Opus 5' }
+    expect(validateRecord({ ...fb, mergeFallback: 'Fable 5 was unreachable all session' }).ok).toBe(true)
     expect(validateRecord({ ...fb, mergeFallback: 'nobody else was around' }).ok).toBe(false)
     expect(validateRecord({ ...fb, mergeFallback: 'none' }).ok).toBe(false)
   })
@@ -1917,18 +2008,15 @@ describe('validateRecord carries the mode', () => {
     for (const mode of MODES) {
       const v = validateRecord({ ...good, model: 'Claude Opus 5', mode })
       expect(v.ok).toBe(false)
-      expect(v.errors.join(' ')).toMatch(/SELF-REVIEW is refused/)
+      expect(v.errors.join(' ')).toMatch(/SAME-VENDOR REVIEW is refused/)
     }
   })
 })
 
-describe('the mode is required to WRITE a record, never to READ one', () => {
-  // The ledger is tracked in git and outlives the CLI that wrote it: 129 rows
-  // predate this flag. A gate that suddenly discounted them would report "no
-  // review recorded" for reviews that were performed and recorded.
+describe('the mode and reviewer identity are required on every clearance path', () => {
   const legacy = (over = {}) => ({
     sha: 'r'.repeat(40),
-    model: 'Fable 5',
+    model: 'GPT-5.6 Sol',
     verdict: 'merge',
     evidence: 'a verdict recorded before --mode existed',
     at: 1_710_000_000_000,
@@ -1943,24 +2031,24 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
     ...over,
   })
 
-  it('clears the gate on a row that carries no mode at all', () => {
+  it('refuses a row that carries no mode at all', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit()],
       records: [legacy()],
     })
-    expect(v.block, formatMechanismReviewVerdict(v)).toBe(false)
+    expect(v.block, formatMechanismReviewVerdict(v)).toBe(true)
   })
 
-  it('clears it just the same on a row that carries one', () => {
+  it('also requires reviewer identity evidence beside a valid mode', () => {
     const v = evaluateMechanismReview({
       baseline: 'b',
       head: 'h',
       pendingCommits: [commit()],
       records: [legacy({ mode: 'review' })],
     })
-    expect(v.block).toBe(false)
+    expect(v.block).toBe(true)
   })
 
   it('a wrong-SCALE timestamp cannot stand either — the ledger domain is milliseconds (round-5 pass 1)', () => {
@@ -2025,6 +2113,11 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
       verdict: 'merge',
       at: MERGE_ACCOUNTING_SINCE + 5000,
       carried: { from: 'a'.repeat(40) },
+      reviewerAuthorship: {
+        status: 'unverified',
+        claimedModel: 'GPT-5.6 Sol',
+        reason: 'external CLI reviewer',
+      },
     }
     for (const stamp of [{}, { carriedVerified: false }, { carriedVerified: 'yes' }]) {
       const v = evaluateMechanismReview({
@@ -2177,7 +2270,7 @@ describe('the mode is required to WRITE a record, never to READ one', () => {
       ],
     })
     expect(v.block).toBe(true)
-    expect(v.findings[0].kind).toBe('do-not-merge')
+    expect(v.findings[0].kind).toBe('malformed-record')
   })
 
   it('refuses an unknown mode whatever the row’s era — the recorder would never have written it', () => {
