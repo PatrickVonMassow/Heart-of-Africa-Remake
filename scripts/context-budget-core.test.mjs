@@ -44,8 +44,8 @@ describe('remainingBudgetDecision', () => {
       fits: true,
       kind: 'read',
       projectedCost: 10_956,
-      remainingBeforeCall: 11_000,
-      remainingAfterCall: 44,
+      remainingBeforeCall: 22_000,
+      remainingAfterCall: 11_044,
     })
   })
 
@@ -53,8 +53,8 @@ describe('remainingBudgetDecision', () => {
     expect(decide({ reading: reading(112_000) })).toMatchObject({
       state: 'insufficient',
       fits: false,
-      remainingBeforeCall: -1_000,
-      remainingAfterCall: -11_956,
+      remainingBeforeCall: 10_000,
+      remainingAfterCall: -956,
     })
   })
 
@@ -111,7 +111,7 @@ describe('remainingBudgetDecision', () => {
       toolName: 'Bash',
       toolInput: { command: 'rg needle file' },
     })
-    expect(CONTEXT_HANDOVER_RESERVE_TOKENS).toBe(39_000)
+    expect(CONTEXT_HANDOVER_RESERVE_TOKENS).toBe(28_000)
     expect(first).toMatchObject({ remainingBeforeCall: 2_000, remainingAfterCall: 0, fits: true })
   })
 

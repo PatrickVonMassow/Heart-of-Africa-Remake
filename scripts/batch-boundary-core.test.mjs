@@ -1207,7 +1207,7 @@ describe('commitSealedBoundary — the marker and ownership handover are one com
         return recordHandoverBudgetCompletion(
           { sessionId: SID, tokens: 150_001, cause: 'context', at: NOW },
           {
-            read: () => ({ v: 1, sessionId: SID, startTokens: 111_000, startedAt: NOW - 1 }),
+            read: () => ({ v: 1, sessionId: SID, startTokens: 122_000, startedAt: NOW - 1 }),
             makeDir: () => {},
             append: (_path, line) => records.push(JSON.parse(line)),
             say: (line) => said.push(line),

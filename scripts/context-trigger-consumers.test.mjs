@@ -16,8 +16,8 @@ import {
 import { gatherWatermark, triggerTokens } from './context-watermark.mjs'
 
 describe('the handover/ceiling consumer split', () => {
-  it('routes handover to the measured trigger and overshoot distance to the 150k ceiling', () => {
-    const trigger = 111_000
+  it('routes handover to the provisional trigger and overshoot distance to the 150k ceiling', () => {
+    const trigger = 122_000
     const ceiling = 150_000
     const aboveTriggerMargin = trigger + CONTEXT_MARGIN_TOKENS + 1
     const aboveCeilingMargin = ceiling + CONTEXT_MARGIN_TOKENS + 1

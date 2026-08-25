@@ -19,19 +19,15 @@
 export const CONTEXT_CEILING_TOKENS = 150_000
 
 /**
- * THE MECHANICALLY RESERVED HANDOVER CAP. Three clean handovers after the
- * dictated-card contradiction was removed measured 31,771, 35,119 and 38,531
- * tokens (mean 35,140; range 31,771–38,531; spread 6,760). The largest reading
- * is rounded UP to 39,000: a mean would knowingly reserve less than one clean
- * exit already spent. The boundary records any later crossing of this cap.
- */
-export const CONTEXT_HANDOVER_RESERVE_TOKENS = 39_000
-
-/**
  * THE HANDOVER THRESHOLD, in tokens of context — the mark at which a session
  * finishes its step and ENDS. It is DERIVED, not chosen: the largest mark at
- * which the capped handover still lands under the ceiling is
- * 150,000 − 39,000 = 111,000.
+ * which the ordinary case (the mark fires, the boundary is taken straight
+ * away) still lands under the ceiling is 150,000 − 27,336 = 122,664, rounded
+ * down to 122,000. The 27,336-token observation was contaminated by the old
+ * dictated-card contradiction, so it remains only the provisional point-743
+ * basis while this recorder gathers clean evidence. A calibration commit will
+ * follow once `.claude/handover-costs.jsonl` holds three real completions; it
+ * will round the largest clean reading UP, never use the mean.
  *
  * IT SITS CLOSE UNDER THE CEILING BY DESIGN (point 758, user 20.08.2026). It
  * used to be 110,000 and served TWO purposes at once — it ended the session AND
@@ -53,8 +49,16 @@ export const CONTEXT_HANDOVER_RESERVE_TOKENS = 39_000
  * INTERIM, not a result: point 747 recalibrates it from the recorded series once
  * the consumption-reducing points have landed.
  */
-export const CONTEXT_TRIGGER_TOKENS =
-  CONTEXT_CEILING_TOKENS - CONTEXT_HANDOVER_RESERVE_TOKENS
+export const CONTEXT_TRIGGER_TOKENS = 122_000
+
+/**
+ * THE HANDOVER RESERVE used by pre-call admission. Until the recorder has the
+ * first three clean completions named above, it stays derived from point 743's
+ * ceiling/trigger pair so the exit budget that pair withheld is never lent to
+ * ordinary calls.
+ */
+export const CONTEXT_HANDOVER_RESERVE_TOKENS =
+  CONTEXT_CEILING_TOKENS - CONTEXT_TRIGGER_TOKENS
 
 /**
  * THE FENCE MODES — the named, single-valued switch point 758 demands, so that a
