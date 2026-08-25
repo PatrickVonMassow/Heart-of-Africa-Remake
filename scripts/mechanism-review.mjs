@@ -57,7 +57,6 @@ import {
   validateRecord,
   resolveMergePolicy,
   VERDICTS,
-  VERIFIED_REVIEWER_SINCE,
 } from './mechanism-review-core.mjs'
 import { quotePassFile } from './review-material-core.mjs'
 import { currentFableState } from './fable-switch.mjs'

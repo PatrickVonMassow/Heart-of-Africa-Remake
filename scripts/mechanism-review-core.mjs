@@ -1505,7 +1505,6 @@ export function evaluateMechanismReview({
     if (!remainingFiles.length) continue
     commit = { ...commit, files: remainingFiles }
     const legacyContributionShape = (r) => Array.isArray(r?.pass?.commits)
-    const legacyCovering = covering.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
     const legacySound = sound.filter((r) => !fileClaim(r) && !legacyContributionShape(r))
 
     // A PASS CLEARS NOTHING ON ITS OWN (point 714). The material of a large range
