@@ -7,7 +7,6 @@
 //
 //   node scripts/board.mjs now    <point> "<status>"  # queue → current work
 //   node scripts/board.mjs status <point> "<text>"    # restate a now-card's status
-//   node scripts/board.mjs paused "<status>"           # report a self-pause on the now-card(s)
 //   node scripts/board.mjs title  <point> "<text>"    # retitle a now- OR queue card
 //   node scripts/board.mjs queue  <point> ["<text>"]  # current work → back to queue
 //   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
@@ -60,7 +59,6 @@ import {
   removeVdzk,
   resolveCardText,
   setCardStatus,
-  setBatchPauseStatus,
   setCardTitle,
   toClosingWork,
   toNoCurrentWork,
@@ -69,6 +67,7 @@ import {
   mergeDoneDuplicates,
 } from './board-core.mjs'
 import { runBoardEdit } from './board-edit-core.mjs'
+import { withDerivedState } from './board-state.mjs'
 import { recordDecisionCardKeep } from './decision-card-guard.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
@@ -154,6 +153,7 @@ function applyEdit(fn, done) {
     write: (html) => writeTextAtomic(BOARD, html),
     rotate: () => run(['scripts/board-archive-rotate.mjs']),
     publish: () => run([PUBLISH_SCRIPT]),
+    derive: (html) => withDerivedState(html),
     stdout: (line) => console.log(line),
     stderr: (line) => console.error(line),
   })
@@ -170,12 +170,16 @@ try {
     const at = berlinStamp()
     edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
   } else if (cmd === 'paused') {
-    const status = textOf(rest)
-    if (!status) throw new Error('usage: board.mjs paused "<status>"|--text-stdin')
-    const at = berlinStamp()
-    edit(
-      (html) => setBatchPauseStatus(html, status, at),
-      `the batch self-pause is reported on the current state card (Stand ${at}); no user-decision card was created`,
+    // THERE IS NOTHING TO COMMAND HERE ANY MORE (point 749). A pause used to be
+    // written — first as a user-decision card, then briefly onto the running
+    // point's own status line, which overwrote the status the reader needed. It
+    // is DERIVED now, from `.claude/batch-paused`, on every edit and every
+    // publish, so a paused batch shows up without being told and stops showing
+    // up when the marker goes.
+    throw new Error(
+      'board: the pause is not written, it is derived. Pause the batch itself — ' +
+        'node scripts/batch-pause.mjs "<Grund>" — and the board reports it on the next edit; ' +
+        'clearing the pause marker removes the card again with no board command at all.',
     )
   } else if (cmd === 'title') {
     // RETITLING HAD NO COMMAND AT ALL for a now-card (point 439), so the three

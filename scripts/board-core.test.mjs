@@ -55,7 +55,8 @@ import {
   refreshFooter,
   removeVdzk,
   setCardStatus,
-  setBatchPauseStatus,
+  applyDerivedStateCard,
+  stripDerivedStateCard,
   setCardTitle,
   toDone,
   doneCards,
@@ -101,22 +102,43 @@ describe('setCardStatus', () => {
   })
 })
 
-describe('setBatchPauseStatus', () => {
-  it('reports the pause on every running now-card', () => {
-    const cards = [361, 362]
-      .map((point) => board(point).replace(/^<main>\n?/, '').replace(/<\/main>\s*$/, ''))
-      .join('\n')
-    const two = `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n${cards}\n</details>\n<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>\n</main>`
-    const out = setBatchPauseStatus(two, 'PAUSIERT: Diagnose läuft.', '14:49')
-    expect(out.match(/PAUSIERT: Diagnose läuft\./g)).toHaveLength(2)
-    expect(out.match(/Stand 14:49/g)).toHaveLength(2)
+describe('applyDerivedStateCard — the machine reports state instead of asking', () => {
+  const derived = { title: 'Batch pausiert', body: 'Umgebungsausfall. Nächster Versuch 25.08.2026, 15:10.' }
+  const running = () => fullBoard({ now: nowEntry(361, 'Etwas', '10:00 · ~12:00'), vdzk: vdzkEntry('Eine echte Frage') })
+
+  it('stands BESIDE a running point card instead of overwriting its status', () => {
+    const out = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    expect(out).toContain('Batch pausiert')
+    expect(out).toContain('data-state="derived"')
+    // The point's own status survives — the reader still learns what is running.
+    expect(out).toContain('läuft')
+    expect(out.match(/<details class="now"/g)).toHaveLength(2)
   })
 
-  it('restates an existing unnumbered state card without creating a question', () => {
-    const idle = '<main><details class="now" data-state="idle"><summary><span class="t">Gerade keine laufende Arbeit</span></summary><div class="body"><p>alt</p></div></details></main>'
-    const out = setBatchPauseStatus(idle, 'Batch pausiert; die Sitzung diagnostiziert die Ursache.', '14:49')
-    expect(out).toContain('Batch pausiert; die Sitzung diagnostiziert die Ursache.')
-    expect(out).not.toContain('Von dir zu klären')
+  it('DISAPPEARS again when there is no state to report — no hand edit needed', () => {
+    const paused = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const cleared = applyDerivedStateCard(paused, null, { stamp: '15:20' })
+    expect(cleared).not.toContain('Batch pausiert')
+    expect(cleared).not.toContain('data-state="derived"')
+    expect(cleared.match(/<details class="now"/g)).toHaveLength(1)
+  })
+
+  it('is idempotent: two derivations leave ONE card, restamped', () => {
+    const once = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const twice = applyDerivedStateCard(once, derived, { stamp: '14:52' })
+    expect(twice.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(twice).toContain('Stand 14:52')
+  })
+
+  it('never puts the state under "Von dir zu klären"', () => {
+    const out = applyDerivedStateCard(running(), derived, { stamp: '14:49' })
+    const vdzk = out.slice(out.indexOf('Von dir zu klären'))
+    expect(vdzk).not.toContain('Batch pausiert')
+  })
+
+  it('leaves a NUMBERED card wearing the marker alone — a marker authorises no deletion', () => {
+    const impostor = running().replace('<details class="now">', '<details class="now" data-state="derived">')
+    expect(stripDerivedStateCard(impostor)).toContain('361')
   })
 })
 
