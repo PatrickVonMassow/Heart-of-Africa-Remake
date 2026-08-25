@@ -63,6 +63,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.08. früh | Die Vorschau widersprach dem Tor: `guard-preflight` meldete den Mechanismus-Wächter als blockierend, während der Wächter selbst die Spanne gegen das Rundenbudget maß, eine Lesbarkeitslücke urteilte und den Zug durchließ — eine geplante 64-Pässe-Runde über 13,8 M Zeichen, die niemand verlangt (Punkt 873) |
 | 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
 | 26.08. | Der einzige ungeordnete Punkt der Sitzungseröffnung war eine Dublette: derselbe Vorschau-gegen-Tor-Widerspruch stand seit zwei Tagen als Punkt 873, 273 Positionen tiefer — gefunden wieder nur durch die Bündelpflicht, nicht beim Anlegen (§3.168-Nachtrag, Punkt 923 in 873 gefaltet) |
+| 26.08. | Das Push-Tor wies viermal denselben Push ab und druckte die Entlastung mit: kein benannter Fehlschlag, ein Läufer, der nicht fertig wurde — derselbe Befehl von Hand war in 164 s mit 13 778 grünen Fällen durch (§3.182, Punkt 924) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1354,7 +1355,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 00:50 · Quellen-Fingerprint: `0cd2048c1c2d…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 01:39 · Quellen-Fingerprint: `da15dab937ec…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1392,7 +1393,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is NOT the default lane because its volume is the scarcest; difficulty is no reason for it either (since 18.08.2026 hard cases go straight to Sol), and review is cross-vendor, not Fable-by-default | 4 | hoch | — (Regel/Memory) | ◐ Regel |
-| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 24 | hoch | findings-guard.mjs | ✔ Mechanismus |
+| Findings recorded by a session that could not write the work order — carry each into TASKS.md, then mark it drained | 25 | hoch | findings-guard.mjs | ✔ Mechanismus |
 | A recurring lookup gets a script; never pull raw transcripts, listings, or logs into context to answer it | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Past the 150k context watermark, FINISH the step and hand over — never start a suite, an agent or a point after it; the user raised the cost twice (13.08. and 17.08.2026) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | User 18.08.2026: hard, complex, error-prone and HIGH-criticality points are AUTHORED by GPT-5.6 Sol directly — Opus 5 authors only what is left, and Fable authors only a point that tags its lane or one the router escalates | 4 | hoch | — (Regel/Memory) | ◐ Regel |
@@ -1455,8 +1456,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 0cd2048c1c2dc782303151173bda38fcc21eaadec3045f6dddc19019eb602193 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-25T22:50:02.667Z -->
+<!-- RETRO-FINGERPRINT: da15dab937ec32c348ad92b6f872a3082c1d73f52fc2be987d62cfcf420d508b -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-25T23:39:08.083Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3669,3 +3670,31 @@ korrigieren oder entfernen, auf dem Protokoll" —, für die es keinen Befehl gi
 Handeditieren des Ledgers ist genau das, was sie anprangert. Ein Tor, dessen einziger
 Ausgang die Handlung ist, die es verbietet, ist kein Tor, sondern eine Wand. Gebucht als
 Punkt 921.
+
+### 3.182 Das Tor stellte die Diagnose selbst — und urteilte gegen sie
+
+In der Nacht zum 26.08.2026 wies das Tor vor dem Push viermal denselben Push von `main`
+ab. Der Inhalt waren drei Commits an der Auftragsliste und an der Retrospektive; die
+gemeldete Ursache war `test:unit`. Bemerkenswert ist nicht das Rot, sondern der Text, den
+das Tor dabei druckte: 417 Dateien, 13 779 Fälle, **kein einziger benannter Fehlschlag**,
+und dazu die Einordnung in eigenen Worten — beobachtet wurde „ein Läufer, der nicht fertig
+wurde, kein Test, der fehlschlug", mit dem `[vitest-worker]: Timeout calling
+"onTaskUpdate"` als genau dieser Signatur, und „die Maschine mag belastet sein".
+Anschließend blockierte es trotzdem, weil seine Regel zwei Rot als abschließend behandelt.
+
+Der Gegenbeweis kostete einen einzigen Befehl. Derselbe `npm run test:unit`, im selben
+Baum, auf derselben Maschine, gestartet während der parallele Autorenlauf acht
+Vitest-Prozesse hielt: 164,48 Sekunden, 417 von 417 Dateien, 13 778 grün, einer
+übersprungen, Exit 0. Der Push ging danach unverändert durch. Der Baum war also nie rot,
+und „Last" allein erklärt es auch nicht — die Aufrufe des Tores erreichen eine Zeitgrenze,
+die derselbe Aufruf über das Paketskript nicht erreicht.
+
+**Lehre:** Ein Mechanismus, der die Unterscheidung zwischen *nicht fertig geworden* und
+*fehlgeschlagen* selbst treffen kann — und sie hier sogar ausdruckt —, darf sie im Urteil
+nicht wieder wegwerfen. Ein Lauf, der keinen fehlschlagenden Test nennt, ist **ungemessen**,
+nicht rot; er gehört wiederholt, nicht gezählt. Punkt 296 sagt, Last erzeuge falsche Rote
+und nie falsche Grüne — das Tor wendet die erste Hälfte an und ignoriert die zweite, und
+macht damit aus einer Umgebungsstörung eine Verweigerung, die der Bedienende nur umgehen
+kann, indem er von Hand beweist, was das Tor gerade bestreitet. Prüffrage für jedes Tor:
+*Nennt mein Rot einen Gegenstand — einen Test, eine Datei, eine Zeile? Wenn nicht, worüber
+urteile ich dann?* Gebucht als Punkt 924.

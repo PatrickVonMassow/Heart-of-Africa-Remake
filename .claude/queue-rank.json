@@ -721,9 +721,9 @@
       "origin": "machine",
       "place": "last"
     },
-    "923": {
-      "at": "2026-08-25T22:49:59.839Z",
-      "why": "The false red is one command to see through and the Stop path allows the turn, so it costs opening turns rather than work — last is right.",
+    "924": {
+      "at": "2026-08-25T23:39:04.937Z",
+      "why": "Es kostet Zugzeit, nicht Arbeit — der Handlauf beweist den Baum gruen und der Push geht danach durch; last is right.",
       "origin": "machine",
       "place": "last"
     }
@@ -769,7 +769,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T22:49:59.846Z",
+    "at": "2026-08-25T23:39:04.944Z",
     "points": [
       174,
       184,
@@ -1059,7 +1059,7 @@
       919,
       920,
       922,
-      923
+      924
     ]
   }
 }
