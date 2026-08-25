@@ -70,6 +70,10 @@
 //      otherwise-refused call. This already-wired all-tools PostToolUse hook is
 //      where that call's actual result exists, so it appends the correlated,
 //      bounded result record without adding another settings entry.
+// (11) THE HANDOVER ATTRIBUTION (point 752): while an attribution run is active,
+//      checkpoint each outgoing bookkeeping call and the successor's mechanical
+//      ramp through its first work-bearing call. It is owner-only, pause-aware,
+//      silent and fail-open.
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
@@ -84,6 +88,7 @@ import { observeOwnerLoops } from './handover-repair-loop.mjs'
 import { emitActivity } from './batch-activity-journal.mjs'
 import { ACTIVITY_EVENTS } from './batch-activity-journal-core.mjs'
 import { recordContextPermitResult } from './context-fence-permit.mjs'
+import { observeHandoverAttributionCall } from './handover-attribution.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -131,6 +136,17 @@ try {
   }
 } catch {
   /* no lock dir / unreadable — nothing to do */
+}
+
+// (11) Boundary attribution rides this existing all-tools hook: outgoing calls
+// are observed only after --prepare, and another owning session is the only one
+// that can open the successor ramp. Pauses and non-owners stand down. Silent and
+// fail-open so measurement can never become a new boundary gate.
+try {
+  const attributionPaused = existsSync(repoPath('.claude', 'batch-paused'))
+  observeHandoverAttributionCall(data, { ownsBatch: ownsBatch && !attributionPaused, now: Date.now(), say: () => {} })
+} catch {
+  /* telemetry never breaks a completed tool call */
 }
 
 // A PostToolUse transition is foreground evidence only when both ends are

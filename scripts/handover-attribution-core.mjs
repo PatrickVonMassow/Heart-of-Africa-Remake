@@ -31,6 +31,7 @@ function firstRecord({ boundaryId, sessionId, tokens, at, cause, point, transcri
     side: 'exit',
     stage: 'exit.boundary-demanded',
     ordinal: 1,
+    recordId: `${boundaryId}:1`,
     at,
     elapsedMs: 0,
     tokens: reading,
@@ -97,6 +98,7 @@ export function addHandoverAttributionCheckpoint({
   at = Date.now(),
   transcript = '',
   readingRequired = true,
+  baseline = false,
   status = null,
   destination,
   metadata = null,
@@ -116,6 +118,8 @@ export function addHandoverAttributionCheckpoint({
     if (currentTokens === null) {
       reading = 'missing'
       missingReading = 'stage-token-reading'
+    } else if (baseline) {
+      reading = 'baseline'
     } else if (previousTokens === null) {
       reading = 'missing'
       missingReading = 'stage-token-baseline'
@@ -137,6 +141,7 @@ export function addHandoverAttributionCheckpoint({
     side,
     stage: name,
     ordinal,
+    recordId: `${state.boundaryId}:${ordinal}`,
     at: measuredAt,
     elapsedMs: Math.max(0, measuredAt - timestamp(state.lastAt)),
     tokens: currentTokens,

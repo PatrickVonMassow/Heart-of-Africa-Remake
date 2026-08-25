@@ -192,6 +192,8 @@
 | `guard-registration-guard.mjs` | Wrapper for the guard-registration check (pre-commit). | — |
 | `guide-brevity-core.mjs` | Pure decision core of the guide-brevity guard. | — |
 | `guide-brevity-guard.mjs` | Stop hook: the beginner's guide may not grow back into a project chronicle. | — |
+| `handover-attribution-core.mjs` | Pure state machine for token- and elapsed-time attribution across one handover. | — |
+| `handover-attribution.mjs` | Fail-open runtime recorder for the outgoing boundary and successor ramp. | — |
 | `handover-budget-core.mjs` | Pure arithmetic for the measured handover cap: first refusal to committed boundary. | — |
 | `handover-budget.mjs` | Fail-open runtime evidence for the measured handover cap and its overruns. | — |
 | `handover-card-contract.mjs` | The one valid handover-card answer when the work order has no open point. | — |

@@ -66,6 +66,10 @@ import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
 import { recordHandoverBudgetCompletion } from './handover-budget.mjs'
+import {
+  noteHandoverAttributionCommit,
+  noteHandoverAttributionPrepare,
+} from './handover-attribution.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -761,6 +765,15 @@ if (isMain) {
             board: standingCards({ cause: BOUNDARY_CAUSES.CONTEXT, destination: handover.destination }),
           }),
         )
+        noteHandoverAttributionPrepare({
+          sessionId: sid,
+          tokens: wm.tokens,
+          at: Date.now(),
+          cause: BOUNDARY_CAUSES.CONTEXT,
+          point: null,
+          transcript: wm.transcript ?? '',
+          destination: handover.destination,
+        })
         console.log(
           `PREPARED (nothing recorded yet): the context measures ${wm.tokens} tokens against the ` +
             `${wm.watermark} watermark, the launcher is armed` +
@@ -807,13 +820,22 @@ if (isMain) {
         transferred = commitSealedBoundary({
           transfer,
           handover: () => (handoverResult = handoverAndRequest({ sid, point: null })),
-          complete: () => recordHandoverBudgetCompletion({
-            sessionId: sid,
-            tokens: wm.tokens,
-            cause: BOUNDARY_CAUSES.CONTEXT,
-            point: null,
-            transcript: wm.transcript ?? '',
-          }),
+          complete: (committedMarker) => {
+            recordHandoverBudgetCompletion({
+              sessionId: sid,
+              tokens: wm.tokens,
+              cause: BOUNDARY_CAUSES.CONTEXT,
+              point: null,
+              transcript: wm.transcript ?? '',
+            })
+            noteHandoverAttributionCommit({
+              sessionId: sid,
+              tokens: wm.tokens,
+              at: committedMarker.at,
+              transcript: wm.transcript ?? '',
+              destination: handover.destination,
+            })
+          },
           marker: {
             v: 2,
             phase: BOUNDARY_PHASES.COMMITTED,
@@ -957,6 +979,15 @@ if (isMain) {
           board: standingCards({ cause: BOUNDARY_CAUSES.POINT, destination: handover.destination }),
         }),
       )
+      noteHandoverAttributionPrepare({
+        sessionId: sid,
+        tokens: contextTokens,
+        at: Date.now(),
+        cause: BOUNDARY_CAUSES.POINT,
+        point,
+        transcript: wmPoint.transcript ?? '',
+        destination: handover.destination,
+      })
       console.log(
         (phaseFlag === null
           ? `NOTE: the one-shot form is retired (point 675) — this call ran --prepare ${point} instead, and ` +
@@ -1013,13 +1044,22 @@ if (isMain) {
       transferred = commitSealedBoundary({
         transfer,
         handover: () => (handoverResult = handoverAndRequest({ sid, point })),
-        complete: () => recordHandoverBudgetCompletion({
-          sessionId: sid,
-          tokens: contextTokens,
-          cause: BOUNDARY_CAUSES.POINT,
-          point,
-          transcript: wmPoint.transcript ?? '',
-        }),
+        complete: (committedMarker) => {
+          recordHandoverBudgetCompletion({
+            sessionId: sid,
+            tokens: contextTokens,
+            cause: BOUNDARY_CAUSES.POINT,
+            point,
+            transcript: wmPoint.transcript ?? '',
+          })
+          noteHandoverAttributionCommit({
+            sessionId: sid,
+            tokens: contextTokens,
+            at: committedMarker.at,
+            transcript: wmPoint.transcript ?? '',
+            destination: handover.destination,
+          })
+        },
         marker: {
           v: 2,
           phase: BOUNDARY_PHASES.COMMITTED,
