@@ -424,6 +424,32 @@ export function nextFence({ fenceState, priorFence } = {}) {
   return Math.max(cur, prior !== null && prior > 0 ? Math.floor(prior) : 0) + 1
 }
 
+/**
+ * MAY THIS FENCE CLAIM BE RECORDED? PURE.
+ *
+ * A fence is an ordering condition, not a label. An explicitly proposed number
+ * at or below either durable source of the high-water mark is stale and must be
+ * refused, not silently promoted and attributed to the claimant. With no
+ * explicit proposal the owner of the serialized grant door receives the next
+ * number. The I/O half re-reads the file while holding that door before calling
+ * this decision, so the returned number cannot race an intervening grant.
+ */
+export function fenceClaimDecision({ fenceState, priorFence, requestedFence } = {}) {
+  const current = normaliseFence(fenceState).fence
+  const prior = num(priorFence)
+  const highWater = Math.max(current, prior !== null && prior > 0 ? Math.floor(prior) : 0)
+  const explicit = requestedFence !== undefined
+  const requested = num(requestedFence)
+  if (explicit && (!Number.isSafeInteger(requested) || requested <= highWater)) {
+    return { accept: false, reason: 'stale-fence', fence: null, highWater }
+  }
+  const fence = explicit ? requested : highWater + 1
+  if (!Number.isSafeInteger(fence) || fence <= highWater) {
+    return { accept: false, reason: 'fence-exhausted', fence: null, highWater }
+  }
+  return { accept: true, reason: 'accepted', fence, highWater }
+}
+
 /** The fence file as it reads after granting `fence` to `sessionId`. PURE.
  *  Max-wins: a grant can never lower the mark, even if a caller passes an old
  *  number. */

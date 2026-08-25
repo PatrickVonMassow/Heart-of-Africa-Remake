@@ -202,7 +202,10 @@ describe('formatViolations', () => {
 })
 
 describe('guide-brevity ownership', () => {
-  const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(4000)}\n`
+  // DERIVED from the ceiling, never a literal: this fixture exists to be over budget, and a
+  // literal that merely happened to clear the ceiling of the day turns into an under-budget
+  // document the moment the budget ratchets, which is what happened on 25.08.2026.
+  const overBudget = doc(entry('Zu lang', 2)) + `${'zusatz '.repeat(LIMITS.maxWords + 100)}\n`
 
   it('stands down when another live session owns the batch', () => {
     const gathered = gatherGuideBrevityInputs({

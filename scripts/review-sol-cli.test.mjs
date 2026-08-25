@@ -68,6 +68,9 @@ const SCRIPT_FILES = [
   'main-checkout-core.mjs',
   'repo-paths.mjs',
   'is-main.mjs',
+  // …and the tracked-file probe the recorder asks before it lets a blind half
+  // name its own author (point 834).
+  'git-tracked.mjs',
   // The share switch the command asks BEFORE it spends an allowance (point 654), and
   // the atomic write it persists a setting with. The fixture leaves the setting unset,
   // so every case below runs at `default` — reviews to Sol, as before.
@@ -474,7 +477,15 @@ beforeAll(() => {
       evidence: 'read the complete shared file after its first change',
       mode: 'review',
       pass: { index: 1, total: 1, files: ['shared.txt'], commits: [historicalReviewSha] },
-      at: 1_787_000_000_000,
+      at: Date.now(),
+      // The fixture commits are created at test time, which is inside the
+      // commit-era reviewer rule, so the row carries what that rule demands of
+      // an OpenAI reviewer: an explicit unverified claim with its reason.
+      reviewerAuthorship: {
+        status: 'unverified',
+        claimedModel: 'GPT-5.6 Sol',
+        reason: 'external CLI reviewer, no harness transcript',
+      },
     })}\n`,
   )
 })

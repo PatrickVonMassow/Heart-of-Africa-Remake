@@ -8,6 +8,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   attachCoverage,
+  BASELINE_RECOVERY_ANCHOR,
   baselineFor,
   bootstrapBase,
   mechanismLogCommand,
@@ -15,6 +16,7 @@ import {
   rangeFilesCommand,
 } from './mechanism-review-guard.mjs'
 import { reviewGapRange } from './mechanism-review-guard-gap-core.mjs'
+import { evaluateMechanismReview, formatMechanismReviewVerdict } from './mechanism-review-core.mjs'
 
 describe('baselineFor', () => {
   const state = { baselines: { main: 'aaa', 'feat/x': 'bbb' } }
@@ -37,26 +39,36 @@ describe('baselineFor', () => {
 })
 
 describe('bootstrapBase', () => {
-  it('QUOTES the revision — cmd.exe eats a bare ^ and the gate then armed at HEAD', () => {
-    // The regression, exactly: `main^{commit}` reached git as `main{commit}`,
-    // every lookup failed, and the fallback below silently grandfathered a whole
-    // branch. Asserting the argument pins it without needing a repository.
+  it('recovers only from the immutable tracked anchor, quoted for cmd.exe', () => {
     const asked = []
     const head = 'headsha'
     expect(
       bootstrapBase(head, (rev) => {
         asked.push(rev)
-        throw new Error('no such ref')
-      }),
-    ).toBe(head)
-    expect(asked[0]).toContain('"main^{commit}"')
-    expect(asked[1]).toContain('"origin/main^{commit}"')
+        return BASELINE_RECOVERY_ANCHOR
+      }, () => true),
+    ).toBe(BASELINE_RECOVERY_ANCHOR)
+    expect(asked).toEqual([`--verify --quiet "${BASELINE_RECOVERY_ANCHOR}^{commit}"`])
   })
 
-  it('falls back to HEAD when no integration branch resolves', () => {
-    // The grandfathering the point asks for: a checkout with no main to fork
-    // from owes nothing for its history.
-    expect(bootstrapBase('headsha', () => '')).toBe('headsha')
+  it('never falls back to HEAD when the anchor is absent', () => {
+    expect(bootstrapBase('headsha', () => '')).toBe(null)
+  })
+
+  it('refuses an unreachable anchor and names the merge that makes recovery possible', () => {
+    const head = 'headsha'
+    const baseline = bootstrapBase(head, () => BASELINE_RECOVERY_ANCHOR, () => false)
+    expect(baseline).toBe(null)
+
+    const verdict = evaluateMechanismReview({
+      baseline,
+      baselineMissing: true,
+      head,
+      pendingCommits: [],
+      records: [],
+    })
+    expect(verdict).toMatchObject({ block: true, clear: false })
+    expect(formatMechanismReviewVerdict(verdict)).toContain('merge origin/main into this branch')
   })
 })
 

@@ -54,7 +54,7 @@ import {
   sealedBoundaryDeny,
 } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
-import { evaluate, isWorktreeCheckout } from './board-first-core.mjs'
+import { evaluate, isWorktreeCheckout, ownershipStandDownDecision } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
@@ -342,7 +342,40 @@ try {
     /* fail-OPEN: an unreadable branch or process identity never traps a call */
   }
 
-  if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)
+  // OWNERSHIP IS RE-CHECKED BEFORE EVERY MUTATION (point 897). The old line here
+  // simply exited this guard when another live owner appeared. That stood the
+  // board duty down but let the tool call itself run, so a session dispossessed
+  // after SessionStart kept building, editing and eventually landing beside its
+  // successor. Reads still stand down silently; paused batches and isolated
+  // delegated worktrees retain the same exemption they have in every guard.
+  try {
+    const otherOwner = heldByOtherLiveOwner(payload.session_id || '')
+    if (otherOwner) {
+      const ownership = ownershipStandDownDecision({
+        heldByOtherLiveOwner: true,
+        paused: existsSync(PAUSE),
+        worktree: isWorktreeCheckout(REPO_ROOT),
+        ownerSession: readOwnerLock()?.sessionId ?? '',
+        toolName: payload.tool_name,
+        command: input0.command,
+        filePath: input0.file_path ?? input0.notebook_path,
+      })
+      if (ownership.block) {
+        process.stdout.write(
+          JSON.stringify({
+            hookSpecificOutput: {
+              hookEventName: 'PreToolUse',
+              permissionDecision: 'deny',
+              permissionDecisionReason: ownership.reason,
+            },
+          }),
+        )
+      }
+      process.exit(0)
+    }
+  } catch {
+    /* fail-OPEN: an ownership probe error must never invent a new owner */
+  }
 
   // A DELEGATED AGENT HAS NO BOARD DUTY (point 440). It runs from its own
   // worktree under .claude/worktrees/, which is the one thing the inherited

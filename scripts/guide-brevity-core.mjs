@@ -68,8 +68,73 @@
 // that, with zero slack. No existing claim was dropped to fit it. Not escalated
 // to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
 // this written justification is the last step.
+// Raised on 24.08.2026 by ONE genuinely new tip, measured at +8 lines / +89 words net:
+// two of your own runs on one project, where the second never learns it took over. It is a
+// beginner-reachable trap the moment anything restarts the tool automatically — a schedule, a
+// watchdog, a keep-going automation — and the guide had no entry for it: the concurrency
+// meta-rule speaks about parallel HELPERS a session hands out, not about two sessions of the
+// tool itself. Measured on this project the same day: two CI handovers for different refs
+// started two sessions, both worked the same work-order point for five minutes, and the losing
+// one found out only because a guard preview happened to say so (retrospective §3.173, point 897).
+// SHORTEN-BEFORE-RAISE was applied to the tip itself, not to its neighbours: as first written it
+// cost +11 lines / +129 words and broke the per-entry risk budget at 6 lines; cutting the risk
+// half to the required 4 lines paid back 3 lines and 40 words. No neighbouring entry was
+// tightened, because none of them carries this direction to fold into — the nearest, the
+// concurrency meta-rule, states the opposite case and keeps its own claim intact. No existing
+// claim was dropped. The long-form telling stays in the retrospective, where it belongs.
+// Not escalated to the user, under his general withdrawal of ask-before-raising of 10.08.2026;
+// this written justification is the last step.
+// Raised on 24.08.2026 by ONE genuinely new tip, measured at +6 lines / +56 words net:
+// a REFUSAL whose own stated remedy leaves you worse off than the block did. Measured on this
+// project the same day: a Stop guard read a fact about the whole repository out of whichever
+// checkout its process happened to stand in, refused a session that had done nothing wrong, and
+// told it to register the dashboard — which, followed literally in that checkout, would have
+// written a second registration where the dashboard does not even exist (point 898, third
+// sibling). SHORTEN-BEFORE-RAISE was applied twice. First the tip's other half — "reads a
+// project-wide fact in the wrong place" — was FOLDED into the existing "Der Test hing an seiner
+// Umgebung" entry, which already carries that direction for tests; it now names guards too and
+// its prompt carries both, at no extra entry. Then the remaining tip was cut from four risk lines
+// to two, because the failure needs no telling: who follows the remedy is worse off. As first
+// drafted the whole addition cost +8 lines / +89 words; folding and cutting paid back 2 lines and
+// 33 words, and the ceilings move by exactly what is left, with zero slack. No existing claim was
+// dropped. The long-form telling stays in the retrospective and in the work order, where it
+// belongs. Not escalated to the user, under his general withdrawal of ask-before-raising of
+// 10.08.2026; this written justification is the last step.
+//
+// RAISED AGAIN 25.08.2026, +4 lines / +62 words, for the half the guide was missing about gates.
+// Measured that day: a gate reads its evidence from a trail only ONE of several legitimate working
+// paths leaves behind, so the other path can never clear it however thoroughly it worked — and
+// because such a gate bites after the work is done, it then blocks everything that follows (point
+// 903, retrospective §3.153, second fall). SHORTEN-BEFORE-RAISE was applied: the lesson was first
+// drafted as its own entry at +10 lines / +122 words and was instead FOLDED into the existing
+// "Die KI repariert den Wächter, den sie gerade gebaut hat" entry, which already carries the
+// direction for a gate that blocks you; it now names both halves and its prompt carries both, at
+// no extra entry. That paid back 6 lines and 60 words, and the ceilings move by exactly what is
+// left, with zero slack. No existing claim was dropped, and the long form stays in the
+// retrospective and the work order.
+// 25.08.2026: the mirror of the arrival lesson went in — a tool that reports a FAILED push
+// and calls its work "only local" while the content is already on the remote, measured on the
+// daemon control-plane branch (retrospective §3.174, point 906). SHORTEN-BEFORE-RAISE was
+// applied: drafted as its own entry at +8 lines / +84 words, it was instead FOLDED INTO the
+// existing "Erfolgreich heisst nicht angekommen" entry, whose two halves are one lesson about
+// judging the target state rather than the attempt; the merged entry names both directions and
+// its prompt carries both. That paid back 5 lines and 53 words, and the ceilings move by exactly
+// what is left, with zero slack. No existing claim was dropped.
+// RAISED AGAIN 25.08.2026, +6 lines / +82 words, for the two gate lessons of that morning
+// (retrospective §3.175 and §3.176, points 909 and 910). First: a gate can be correctly built and
+// judge correctly and still be documentation, because NO path the project actually walks runs it —
+// `test-types` sat red on main for a week while CI and the landing gate both reported green, since
+// neither executes it. Second: the diagnosis of such a fault can share the fault's own assumption —
+// a guard resolving its board path against the working directory it inherits confirms the wrong
+// answer when you run it by hand from the same place, which cost three turns before the condition
+// was compared from two roots side by side. SHORTEN-BEFORE-RAISE was applied to both: drafted as
+// two new entries at +20 lines / +231 words, they were instead FOLDED into "Gebaut — und nie in
+// Betrieb genommen" (which already carries built-but-not-in-operation) and into "Test und Waechter
+// hingen an ihrer Umgebung" (which already carries the accidental working directory). That paid
+// back 14 lines and 149 words at no extra entry, and the ceilings move by exactly what is left,
+// with zero slack. No existing claim was dropped, and the long form stays in the retrospective.
 export const LIMITS = {
-  maxLines: 444,
+  maxLines: 471,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -206,7 +271,18 @@ export const LIMITS = {
   // that only rephrased its own headline, three times over). The guide measures
   // 444 / 3929 afterwards, so the word ceiling RATCHETS DOWN by 58 to exactly
   // that. The line ceiling stays 444 because the file does.
-  maxWords: 3929,
+  // 24.08.2026, the freshness-is-not-liveness pitfall: the lesson out of the
+  // dead authoring run went in, and six neighbouring entries paid for it by
+  // losing the clauses whose detail already stands in the retrospective. The
+  // guide measures 444 / 3926 afterwards, so the word ceiling RATCHETS DOWN by
+  // three more. The line ceiling stays 444 because the file does.
+  // 24.08.2026, later: the retry-healed red and the non-converging review round
+  // went in — one as a sentence on the existing retry prompt, one as its own
+  // pitfall — and nine neighbouring entries paid for both by dropping clauses the
+  // retrospective already carries in full (§3.171, §3.172). The guide measures
+  // 444 / 3893 afterwards, so the word ceiling RATCHETS DOWN by 33 more. The line
+  // ceiling stays 444 because the file does.
+  maxWords: 4213,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

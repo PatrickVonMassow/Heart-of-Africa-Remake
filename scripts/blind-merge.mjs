@@ -25,6 +25,7 @@ import { readFileSync } from 'node:fs'
 import { isMainModule } from './is-main.mjs'
 import { currentFableState } from './fable-switch.mjs'
 import { mergeFallbackReason, mergePromptFraming, mergerModel } from './fable-switch-core.mjs'
+import { canonicalTreePath, isTrackedInGit } from './git-tracked.mjs'
 import { sameModel } from './mechanism-review-core.mjs'
 import { checkAuthorshipFile } from './authorship-check-io.mjs'
 import { authorshipRefusesPermission, formatAuthorship } from './authorship-check-core.mjs'
@@ -136,12 +137,105 @@ if (isMainModule(import.meta.url)) {
     } = parsed.values
     const fableState = currentFableState()
     if (!fableState.ok) throw new Error(fableState.problem)
-    const expectedMerger = mergerModel(fableState)
-    const a = parseListText('A', readText(pathA))
-    const b = parseListText('B', readText(pathB))
-    // The flag wins over the file, and the line form has only the flag.
-    if (modelA) a.model = modelA
-    if (modelB) b.model = modelB
+    const rawA = readText(pathA)
+    const rawB = readText(pathB)
+    const a = parseListText('A', rawA)
+    const b = parseListText('B', rawB)
+    // A TRACKED HALF NAMES ITS OWN AUTHOR AND THE FLAG MAY NOT OVERRULE IT. The flag
+    // exists for the line form, which carries no model field; letting it rewrite a
+    // tracked file's author would hand back exactly the hole the tracked check closes
+    // — point at the real half, then rename its author (four-eyes review, point 834).
+    // THE BYTES PARSED ABOVE ARE THE ONES THAT MUST BE COMMITTED, so they are
+    // what the check is asked about — not a second read that could differ from
+    // it (cross-vendor review of point 889). The caller's spelling is converted
+    // to the canonical tree path DELIBERATELY, because the tracked check
+    // refuses non-canonical input by contract, and the canonical form is what
+    // the printed record command carries into the ledger (round 9).
+    const canonA = canonicalTreePath(pathA)
+    const canonB = canonicalTreePath(pathB)
+    const trackedA = Boolean(canonA) && isTrackedInGit(canonA, { content: rawA })
+    const trackedB = Boolean(canonB) && isTrackedInGit(canonB, { content: rawB })
+    const overruled = []
+    /** Which halves carry their author IN THE COMMITTED FILE — the only form the
+     *  count below may believe; a flag is a claim wearing whatever name the
+     *  caller typed. */
+    const modelFromFile = { A: false, B: false }
+    for (const [name, list, flag, tracked] of [
+      ['a', a, modelA, trackedA],
+      ['b', b, modelB, trackedB],
+    ]) {
+      const stated = String(list.model ?? '').trim()
+      modelFromFile[name.toUpperCase()] = tracked && Boolean(stated)
+      if (flag && tracked && stated && !sameModel(flag, stated)) {
+        overruled.push(
+          `--model-${name} "${flag}" contradicts the tracked half, which says "${stated}" — ` +
+            'a tracked half names its own author and the flag cannot rename it',
+        )
+      } else if (flag && !(tracked && stated)) {
+        // A family-equivalent flag may not overwrite the committed spelling
+        // either: sameModel treats a versionless "Sol" as every Sol, so writing
+        // "GPT-6 Sol" over a committed "Sol" would shift which exact model the
+        // merger is checked against (cross-vendor re-review of point 889). The
+        // committed bytes stand; the flag only fills silence.
+        list.model = flag
+      }
+    }
+    if (overruled.length) {
+      console.error('blind-merge: refusing to rename a tracked half\'s author.\n')
+      for (const e of overruled) console.error(`  · ${e}`)
+      process.exit(1)
+    }
+    // AFTER the authors are known, never before: the merger is the model that wrote
+    // NEITHER half. ONLY TRACKED HALVES DECIDE — an untracked path is
+    // caller-written, so its author field settles nothing — but each tracked
+    // half decides ON ITS OWN: a known author EXCLUDES that model from the
+    // merge even when the sibling half is untracked. Requiring BOTH to be
+    // tracked discarded the one authorship that WAS known, and with one
+    // tracked half written by the switch-selected model the merge went to
+    // that very author under a printed "it wrote neither half".
+    // ONE SLOT PER HALF, BLANK WHERE THE AUTHOR IS UNKNOWN. The blanks carry the
+    // shape of the question and may not be dropped before it is asked: a filtered
+    // list of two unknown halves is an EMPTY array, which mergePromptFraming reads
+    // as "this caller does not supply authors at all" — the older switch-only
+    // reading — and with Fable ON that returned no framing for the case where the
+    // merger's own half is most likely among the unknowns (cross-vendor review of
+    // point 889). mergerModel ignores blank slots on its own.
+    // A slot is filled ONLY from a committed model field: tracking alone let a
+    // --model flag on a tracked line-form half — a claim — steer the selection
+    // and suppress the framing (re-review round 4).
+    const slots = [
+      modelFromFile.A ? String(a.model ?? '').trim() : '',
+      modelFromFile.B ? String(b.model ?? '').trim() : '',
+    ]
+    const deciding = slots.filter(Boolean)
+    const bothKnown = deciding.length === 2
+    const expectedMerger = mergerModel(fableState, deciding)
+    // WHETHER THE SELECTION IS A THIRD MODEL OR THE FALLBACK, because the two owe
+    // opposite sentences. Where every roster model wrote a half, selection keeps the
+    // switch's answer and that model DID write one — saying "it wrote neither half"
+    // there states a false condition instead of naming the recorded fallback
+    // (four-eyes finding 3 on this change). With PARTIAL knowledge the merger
+    // provably wrote no KNOWN half, and "wrote neither half" is exactly what
+    // an untracked half cannot prove — the sentence says so instead.
+    // WHETHER A CLAIMED AUTHOR IS THE MERGER — the same question validateMerger
+    // asks below, asked of the same names, so the printed sentence and the
+    // recorded fallback cannot disagree with the verdict. A claim is weaker
+    // evidence than a tracked half, which is why it may not SELECT the merger;
+    // for the opposite direction it is conservative to believe it, because
+    // believing it records a fallback where refusing it would hide one.
+    //
+    // What it is NOT is a fact about the switch. The partial-knowledge branch
+    // used to read "or Fable is off" as "the merger wrote a half", so with one
+    // half unnamed and Fable OFF the command printed "it wrote a half itself"
+    // and attached a two-model fallback to a merger that no author, known or
+    // claimed, matches (cross-vendor review of point 889).
+    const claimedAuthors = [a.model, b.model].map((m) => String(m ?? '').trim()).filter(Boolean)
+    const mergerWroteAHalf = claimedAuthors.some((author) => sameModel(expectedMerger, author))
+    const mergerBecause = mergerWroteAHalf
+      ? 'it wrote a half itself — the recorded two-model fallback'
+      : bothKnown
+        ? 'it wrote neither half'
+        : 'it wrote no KNOWN half — an untracked half has no provable author, so this is the switch reading, not proof'
 
     const authorship = {
       A: checkAuthorshipFile({
@@ -192,8 +286,8 @@ if (isMainModule(import.meta.url)) {
             `      ${p.b}: ${y?.file ?? ''} — ${y?.defect ?? ''}`,
         )
       }
-      console.log(`\nMERGING MODEL — ${expectedMerger} (from node scripts/fable-switch.mjs --status)`)
-      const framing = mergePromptFraming(fableState)
+      console.log(`\nMERGING MODEL — ${expectedMerger} (${mergerBecause}; node scripts/fable-switch.mjs --status)`)
+      const framing = mergePromptFraming(fableState, slots)
       if (framing) console.log(`\n${framing}`)
       console.log(
         '\nThese pairs are a RANKING, not the merge: read BOTH lists in full and pair anything\n' +
@@ -206,21 +300,90 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    const rawU = readJson(pathU)
+    // THE COUNT IS ONLY RECORDABLE FROM TRACKED HALVES (cross-vendor re-review
+    // of point 889): the union form is the step whose printed record command
+    // feeds the ledger, and validateMerger below judges the merger against
+    // a.model and b.model. For an untracked half those names are the CALLER'S
+    // CLAIM — `--model-b "Fable 5"` on a half Sol actually wrote clears Sol as
+    // merger with no fallback recorded. The prompt form keeps working with
+    // claims (plus the owed framing); the count refuses them, exactly as
+    // mechanism-review.mjs refuses to record a fold whose halves it cannot
+    // prove. README.md's filing rule makes this the normal order anyway: the
+    // halves are committed before the union is counted.
+    const rawUText = readText(pathU)
+    const canonU = canonicalTreePath(pathU)
+    const trackedU = Boolean(canonU) && isTrackedInGit(canonU, { content: rawUText })
+    const unproven = [
+      ['A', pathA, trackedA],
+      ['B', pathB, trackedB],
+    ].filter(([name, , tracked]) => !tracked || !modelFromFile[name])
+    if (unproven.length) {
+      console.error('blind-merge: the count decides who may merge, so it reads only PROVEN halves.\n')
+      for (const [name, path, tracked] of unproven) {
+        console.error(
+          !tracked
+            ? `  ✗ list ${name} (${path}) is not a tracked, clean repository artefact — its author ` +
+                'field is whatever the caller wrote, and the merger may not be judged against a claim'
+            : `  ✗ list ${name} (${path}) is tracked but carries no model field of its own — ` +
+                'a --model flag is a claim, and the merger may not be judged against a claim',
+        )
+      }
+      console.error(
+        '\nFile both halves under docs/four-eyes/ — JSON, each with its model field, in the same commit ' +
+          'as the union (docs/four-eyes/README.md) — then count.',
+      )
+      process.exit(1)
+    }
+    if (!trackedU) {
+      // The union is the record's third artefact: uncommitted, the exact folded
+      // result can change or vanish after a green count, and the ledger row the
+      // printed command writes could never be re-derived (cross-vendor
+      // re-review of point 889 — the same-commit filing rule, enforced where
+      // the record is produced).
+      console.error(
+        `blind-merge: the union (${pathU}) is not a tracked, clean repository artefact — ` +
+          'file it in the same commit as the halves (docs/four-eyes/README.md), then count.',
+      )
+      process.exit(1)
+    }
+    const rawU = JSON.parse(rawUText)
     // The union may name its own merger; the flag wins, and whichever is used is
     // the one validated AND the one printed below (four-eyes review: the printed
     // record command used to echo an empty --merged-by for the union-only form).
-    const declared = mergedBy || (Array.isArray(rawU) ? '' : (rawU?.mergedBy ?? ''))
-    const switchFallback = [a.model, b.model].some((author) => sameModel(expectedMerger, author))
-      ? mergeFallbackReason(fableState)
-      : ''
+    const unionMergedBy = Array.isArray(rawU) ? '' : String(rawU?.mergedBy ?? '').trim()
+    if (mergedBy && unionMergedBy && !sameModel(mergedBy, unionMergedBy)) {
+      // The committed union names its own merger; a flag naming another model is
+      // either a typo or an attempt to write a ledger command that contradicts
+      // the artefact it points at (re-review round 4). Both are refused.
+      console.error(
+        `blind-merge: --merged-by "${mergedBy}" contradicts the committed union, which says ` +
+          `"${unionMergedBy}" merged it — the union names its own merger and the flag cannot rename it.`,
+      )
+      process.exit(1)
+    }
+    if (!unionMergedBy) {
+      // A union that names no owner cannot corroborate any fold; the verification
+      // path refuses such a row, so the count refuses to print its command.
+      console.error(
+        `blind-merge: the union (${pathU}) names no "mergedBy" — the committed union must say who ` +
+          'folded it, or the record it feeds could never be re-derived.',
+      )
+      process.exit(1)
+    }
+    // THE ARTEFACT IS AUTHORITATIVE: the committed union's spelling is what is
+    // judged, and the flag is only a cross-check against it. Preferring the
+    // flag let a family-wide name bridge two different models — committed
+    // "GPT-6 Sol" plus "--merged-by Sol" passed both comparisons while the
+    // record then named the current Sol (re-review round 5).
+    const declared = unionMergedBy || mergedBy
+    const switchFallback = mergerWroteAHalf ? mergeFallbackReason(fableState) : ''
     const mergerReason = fallback || switchFallback
     const merger = validateMerger({ mergedBy: expectedMerger, authors: [a.model, b.model], fallback: mergerReason })
     if (declared && !sameModel(declared, expectedMerger)) {
       merger.ok = false
       merger.errors.push(
-        `merger "${declared}" contradicts the Fable switch: ${expectedMerger} owns this merge ` +
-          '(node scripts/fable-switch.mjs --status)',
+        `merger "${declared}" is not the one this stage owes: ${expectedMerger} owns this merge, ` +
+          `${mergerBecause} (node scripts/fable-switch.mjs --status)`,
       )
     }
     if (fallback && fallback !== switchFallback) {
@@ -259,8 +422,12 @@ if (isMainModule(import.meta.url)) {
         `${reviewerAt ? `    --model-at "${reviewerAt}"` : ''}` +
         `${reviewerTranscript ? ` --model-transcript "${reviewerTranscript}"` : ''}` +
         `${reviewerAt || reviewerTranscript ? ' \\\n' : ''}` +
-        `    --verdict merge --mode blind-parallel --merged-by "${expectedMerger}"` +
+        `    --verdict merge --mode blind-parallel --merged-by "${declared || expectedMerger}"` +
         `${merger.fallback ? ` --merge-fallback "${mergerReason}"` : ''} \\\n` +
+        // THE THREE FILES TRAVEL INTO THE RECORD: without them the recorder
+        // falls back to the trailer proxy and the ledger row binds to nothing
+        // (cross-vendor re-review of point 889).
+        `    --union "${canonU}" --list-a "${canonA}" --list-b "${canonB}" \\\n` +
         `    --accounting "${summaryLine(result)}" --evidence "<what the stage found>"`,
     )
     process.exit(0)

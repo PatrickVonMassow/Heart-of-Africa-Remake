@@ -349,6 +349,51 @@ describe('the immediate successor decision — one door for every transport', ()
     })
   })
 
+  it('a terminal handoff for a different ref does not start beside the live current session', () => {
+    const liveWriter = {
+      pid: 4242,
+      startedAt: NOW - 60_000,
+      batchWriterAt: NOW - 1_000,
+      generation: 17,
+      authorityState: 'active',
+    }
+    const ciWait = {
+      visible: true,
+      pending: false,
+      terminal: true,
+      wakeToken: 'wake-feature',
+      identity: 'origin/feat/other:feature-sha:CI:43',
+      result: { state: 'success', verdict: 'green' },
+    }
+    const decision = start({
+      trigger: {
+        kind: SUCCESSOR_TRIGGERS.CI_TERMINAL,
+        terminal: true,
+        wakeToken: ciWait.wakeToken,
+        result: ciWait.result,
+      },
+      ciWait,
+      lock: {
+        sessionId: 'current-session',
+        kind: 'session',
+        fence: 17,
+        handedOver: true,
+        sourceRef: 'origin/main:main-sha',
+      },
+      assessment: { alive: false, reason: 'handed-over' },
+      batchWriters: { 'current-session': liveWriter },
+      fenceState: { fence: 17, holder: 'current-session' },
+      probePid: () => ({ exists: true, startedAt: liveWriter.startedAt }),
+    })
+
+    expect(decision).toMatchObject({
+      start: false,
+      code: 'owner-live',
+      evidence: { veto: { sessionId: 'current-session', currentFence: true } },
+    })
+    expect(decision.reason).toContain('authoritative batch-writer process')
+  })
+
   it.each([
     ['child exit', SUCCESSOR_TRIGGERS.CHILD_EXIT],
     ['crash', SUCCESSOR_TRIGGERS.CRASH],

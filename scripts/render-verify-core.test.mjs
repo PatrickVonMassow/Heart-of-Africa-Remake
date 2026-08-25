@@ -1202,6 +1202,14 @@ describe('the shipped charge ledger', () => {
     expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
   })
 
+  // The entry excuses the assertion that was MEASURED, never the walker it was
+  // measured on (cross-vendor review of c33b031, finding 2). A different check
+  // under the same label is a red nobody has measured, and it must stay a red.
+  it('leaves another check under the same goat label uncharged', () => {
+    const neighbour = red('settlement walker (goat): stays out of the compound fence (point 413)')
+    expect(chargeFor(neighbour, { suite: 'polish', backend: 'webgpu' })).toBeNull()
+  })
+
   it('charges only the measured children composition and leaves every other red uncovered', () => {
     const child = (detail) => ({
       ...red('no child walks without getting anywhere'),

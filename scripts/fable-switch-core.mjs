@@ -8,6 +8,7 @@ export const SWITCH_COMMAND = 'node scripts/fable-switch.mjs'
 export const STATE_FILE_NAME = 'fable-switch.json'
 export const FABLE_MODEL = 'Fable 5'
 export const SOL_MODEL = 'GPT-5.6 Sol'
+export const CLAUDE_MODEL = 'Claude Opus 5'
 export const OPUS_MODEL = 'Opus 5'
 export const OPUS_FALLBACK_MODEL = 'Opus 4.8'
 export const OPUS_MODEL_ID = 'claude-opus-5[1m]'
@@ -129,15 +130,118 @@ export function servingPolicyLine(value) {
 }
 
 /** The model that folds a blind-parallel union. */
-export function mergerModel(value) {
-  return fableIsOn(value) ? FABLE_MODEL : SOL_MODEL
+/** The named authors of the two halves, blanks dropped. */
+function authorList(authors) {
+  return (Array.isArray(authors) ? authors : [authors]).map((a) => String(a ?? '').trim()).filter(Boolean)
 }
 
-/** Additional framing owed when Sol merges material that includes Sol's own half. */
-export function mergePromptFraming(value) {
-  return fableIsOn(value)
-    ? ''
-    : 'DECORRELATED MERGE FRAMING: reconstruct the union from the two numbered evidence lists and their invariants; do not reuse the framing, ordering, or categories of Sol\'s own half.'
+/**
+ * Model identity, family plus version — the same reading `mechanism-review-core.sameModel`
+ * uses. It is duplicated rather than imported because this module is the switch's pure
+ * policy core and importing the review core would make the two circular.
+ */
+function sameModelName(a, b) {
+  const parse = (value) => {
+    const text = String(value ?? '').toLowerCase()
+    const family = text.match(/\b(sol|gpt|fable|opus|claude|sonnet|haiku)\b/g) ?? []
+    if (!family.length) return null
+    // "GPT-5.6 Sol" and "Claude Opus 5" both name a vendor word and a model word; the
+    // LAST recognised word is the model, which is what the roster entries are keyed on.
+    // A name carrying MODEL WORDS OF BOTH VENDORS — "Fable / GPT-5.6 Sol" — is not
+    // resolved to either: first-match made it Sol, and mergerModel then offered
+    // Fable as untainted although the marker names Fable (re-review round 6). Such
+    // a name matches EVERY model it actually MENTIONS — and only those (round 7:
+    // a wildcard also disqualified models the name never named).
+    // A name mentioning MORE THAN ONE model word — cross-vendor OR same-vendor
+    // ("Fable 5 / Claude Opus 5") — matches every model it actually mentions,
+    // each with its own version. Reducing a compound to one key let a forged
+    // author marker leave a NAMED co-model looking untainted, and erasing the
+    // versions disqualified models the name never named (re-review rounds 6-9).
+    const modelWords = family.map((w) => (w === 'gpt' ? 'sol' : w)).filter((w) => ['sol', 'fable', 'opus', 'sonnet', 'haiku'].includes(w))
+    const keys = [...new Set(modelWords)]
+    const versionsOf = (key) => {
+      const words = key === 'sol' ? ['sol', 'gpt'] : [key]
+      const found = []
+      for (const w of words) {
+        for (const m of text.matchAll(new RegExp(`\\b${w}[\\s-]*(\\d+(?:\\.\\d+)?)`, 'g'))) found.push(m[1])
+      }
+      return [...new Set(found)]
+    }
+    // A name repeating ONE family with SEVERAL versions — "GPT-6 Sol / GPT-5.6
+    // Sol" — mentions each of those models; collapsing to the first version let
+    // the other one pass as untainted (re-review round 10).
+    if (keys.length === 1) {
+      const versions = versionsOf(keys[0])
+      if (versions.length > 1) {
+        return { entries: versions.map((version) => ({ key: keys[0], version })) }
+      }
+    }
+    if (keys.length > 1) {
+      return { entries: keys.map((key) => ({ key, version: versionsOf(key)[0] ?? '' })) }
+    }
+    const key = family.includes('sol') ? 'sol' : family.includes('fable') ? 'fable' : family[family.length - 1]
+    // THE VERSION IS NOT ALWAYS ATTACHED TO THE KEY WORD (four-eyes finding 1 on this
+    // change): "GPT-5.6 Sol" carries its version on the VENDOR word, so keying the
+    // search on "sol" found no digits and made every Sol version compare equal —
+    // "GPT-5.6 Sol" and "GPT-6 Sol" were one model. The version is therefore the first
+    // one any recognised word carries, wherever in the name it sits.
+    const version = [...text.matchAll(/\b(?:sol|gpt|fable|opus|claude|sonnet|haiku)[\s-]*(\d+(?:\.\d+)?)/g)]
+      .map((m) => m[1])
+      .find(Boolean)
+    return { key, version: version ?? '' }
+  }
+  const x = parse(a)
+  const y = parse(b)
+  if (!x || !y) return false
+  const entriesOf = (p) => (p.entries ? p.entries : [{ key: p.key, version: p.version }])
+  return entriesOf(x).some((ex) =>
+    entriesOf(y).some(
+      (ey) => ex.key === ey.key && (!ex.version || !ey.version || ex.version === ey.version),
+    ),
+  )
+}
+
+export function mergerModel(value, authors = []) {
+  const on = fableIsOn(value)
+  // THE RULE IS "THE MODEL THAT WROTE NEITHER HALF" (CLAUDE.md §6), and for a long
+  // time this function could not express it: it answered Fable-or-Sol, so with Fable
+  // switched off the only merger it would ever name was Sol. Measured on the 13.08.2026
+  // stage recovered under docs/four-eyes/: half A is Fable's and half B is Sol's, and
+  // this function insisted that Sol — an author — owned the merge, while Claude, which
+  // wrote neither half, was refused. That inverts the one rule the merge step exists to
+  // enforce. The roster is therefore consulted against the actual authors, and the
+  // switch keeps its authority over exactly one thing: whether Fable may be spent.
+  const roster = on ? [FABLE_MODEL, SOL_MODEL, CLAUDE_MODEL] : [SOL_MODEL, CLAUDE_MODEL]
+  const wrote = (model) => authorList(authors).some((author) => sameModelName(model, author))
+  const untainted = roster.find((model) => !wrote(model))
+  // None left means only two models existed for three roles — the caller then owes the
+  // recorded two-model fallback, so the previous answer is kept for it to judge.
+  return untainted ?? (on ? FABLE_MODEL : SOL_MODEL)
+}
+
+/** Additional framing owed when the merging model merges its own blind half. */
+export function mergePromptFraming(value, authors = []) {
+  const merger = mergerModel(value, authors)
+  const slots = Array.isArray(authors) ? authors : authors == null ? [] : [authors]
+  // ABSENCE OF EVIDENCE IS NOT EVIDENCE OF ABSENCE, and the safe reading is ONE
+  // rule rather than a special case for silence. The framing is owed unless both
+  // halves are named AND neither name is the merger's: an unnamed half could be
+  // the merger's own, so it is treated as though it were.
+  //
+  // The earlier version had a third state — nothing supplied at all — which fell
+  // back to the switch-only reading and, with Fable ON, returned no framing.
+  // Cross-vendor review of point 889 measured what that costs: the caller filtered
+  // its blank slots away, two unknown halves arrived as an empty array, and the
+  // least safe case got the answer meant for a caller that was not asking about
+  // authors. The caller no longer filters, and this no longer has a branch that
+  // reads silence as safety.
+  const named = slots.filter((author) => String(author ?? '').trim())
+  const selfMerge = named.length < 2 || named.some((author) => sameModelName(merger, author))
+  if (!selfMerge) return ''
+  return (
+    'DECORRELATED MERGE FRAMING: reconstruct the union from the two numbered evidence lists ' +
+    `and their invariants; do not reuse the framing, ordering, or categories of ${merger}'s own half.`
+  )
 }
 
 /** The canonical, ledger-safe reason Sol may merge its own blind half while OFF. */

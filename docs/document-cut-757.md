@@ -89,7 +89,7 @@ ceiling is only confirmed against the counter that enforces it.
 | document | landed | ceiling | headroom |
 | --- | --- | --- | --- |
 | `CLAUDE.md` | 193 lines / 1,331 words / 9,712 B | 193 / 1,332 | **0 lines**, 1 word |
-| `MEMORY.md` | 47 lines / 728 words / 5,781 B | 47 / 728 | **0 lines**, 0 words |
+| `MEMORY.md` | 49 lines / 768 words / 6,076 B | 49 / 768 | **0 lines**, 0 words |
 | global `CLAUDE.md` | 6 lines / 33 words / 236 B | 6 / 36 | **0 lines**, 3 words |
 
 They hold, but two of them hold with nothing to spare, and that is the finding
@@ -97,10 +97,14 @@ this confirmation produced. The ceilings were set from figures taken BEFORE the
 merge — the code comments in `scripts/doc-budget-core.mjs` still said MEMORY.md
 had landed at 45 lines / 700 words and the global stub at five lines, where the
 landed files measure 46 / 710 and six. Those comments are corrected in the same
-commit as this table. The ceilings themselves are NOT raised here: `MEMORY.md`
-is designed to gain one index line per new memory, and at zero word headroom the
-next one blocks the guard, so the budget needs a decision rather than a quiet
-widening. That is filed as its own work-order point.
+commit as this table. The ceilings themselves were NOT raised in THAT commit:
+`MEMORY.md` is designed to gain one index line per new memory, and at zero word
+headroom the next one blocks the guard, so the budget needed a decision rather
+than a quiet widening. That was filed as its own work-order point. The decision
+has since been taken repeatedly, in the open — see the raises recorded below and
+in the code comment beside the budget: a raise is allowed only by the MEASURED
+size of a genuinely new topic, and it is written down with the topic that bought
+it, which is what keeps it from being a quiet widening.
 
 THREE OF THESE ROWS HAVE SINCE MOVED, and the table follows the LIVING file rather
 than freezing the merge-day reading, because the unit case measures what the
@@ -109,10 +113,15 @@ later session executed the ruled cut of the time-tracking entry and wrote others
 and the count moved twice within the hour. On 21.08.2026 it moved again: a new
 memory took the file one line and twenty words over both ceilings, and the room
 was made rather than the wall — two hooks about the same GitHub credential were
-merged into one entry and two more were tightened. The row above is the reading
-after that cut, not the merge-day one, and it shows what the pressure looks like
-from close up: one word of headroom, for a file designed to gain a line per
-memory.
+merged into one entry and two more were tightened. On 23.08.2026 one new standing order of the user took it a
+line further, and on 24.08.2026 two more topics did — a lesson about drills that
+recreate the step they claim to prove, and the user's ruling that a point which
+stops converging is split rather than iterated. Each raise moved both ceilings by
+exactly the measured hook it bought, with the reason beside it in the code.
+The row above is the reading after the newest of those, not the merge-day one,
+and it shows what the pressure looks like from close up: zero headroom, for a
+file designed to gain a line per memory. The next raise should cut a retired
+entry rather than widen again.
 On 22.08.2026 `CLAUDE.md` moved for the first time since the merge: the
 four-eyes cut of point 768 rewrote the file, and the cross-vendor review of that
 cut put one rule back that had left the file without an enforcer ("Keep branches

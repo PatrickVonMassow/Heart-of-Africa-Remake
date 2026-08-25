@@ -5,6 +5,7 @@
 // by the author of its final change. Intermediate versions are named as
 // superseded, and paths whose final state equals the base are dropped.
 import { sameModel } from './mechanism-review-core.mjs'
+import { passComposition } from './review-material-core.mjs'
 
 export const REVIEWER_CANDIDATES = Object.freeze(['GPT-5.6 Sol', 'Opus 5', 'Fable 5', 'Opus 4.8'])
 export const UNREVIEWABLE_NARROWING_REMEDY =
@@ -353,9 +354,27 @@ export function outstandingFiles({
   recordUsable = () => true,
 } = {}) {
   const state = endStateArtefacts({ commits, endStateFiles })
+  // File-scoped rows still form one numbered split. A sha with any incomplete
+  // composition contributes no per-file clearance; otherwise status would say
+  // pass 1/3 settled its file while the Stop gate correctly remained blocked.
+  const scopedBySha = new Map()
+  for (const record of records ?? []) {
+    if (!record?.pass || Array.isArray(record.pass.commits)) continue
+    const key = String(record.sha ?? '')
+    if (!scopedBySha.has(key)) scopedBySha.set(key, [])
+    scopedBySha.get(key).push(record)
+  }
+  const incompleteSplitShas = new Set()
+  for (const [key, rows] of scopedBySha) {
+    const expected = uniq(rows.flatMap((row) => (Array.isArray(row?.pass?.files) ? row.pass.files : [])))
+    if (passComposition(rows, { expect: expected }).some((group) => !group.complete)) {
+      incompleteSplitShas.add(key)
+    }
+  }
   const latest = new Map()
   const invalidatedCoverage = []
   for (const record of records ?? []) {
+    if (incompleteSplitShas.has(String(record?.sha ?? ''))) continue
     const files = Array.isArray(record?.pass?.files) ? record.pass.files.map(String) : []
     if (!files.length) continue
     const historicalCommits = Array.isArray(record?.pass?.commits)
@@ -409,9 +428,20 @@ export function outstandingFiles({
   const covered = new Set()
   const refusals = []
   for (const [key, readings] of latest) {
-    const read = newestReading(readings)
-    if (String(read.record.verdict) === 'do-not-merge') refusals.push({ artefact: read.artefact, record: read.record })
-    else covered.add(key)
+    const clearing = readings.filter((reading) => String(reading.record.verdict) !== 'do-not-merge')
+    const open = readings.filter((reading) =>
+      String(reading.record.verdict) === 'do-not-merge' &&
+      !clearing.some((answer) =>
+        Number(answer.record.at) > Number(reading.record.at) &&
+        String(answer.record.sha) !== String(reading.record.sha) &&
+        contained(answer.record, reading.record.sha),
+      ))
+    if (open.length) {
+      const read = newestReading(open)
+      refusals.push({ artefact: read.artefact, record: read.record })
+    } else if (clearing.length) {
+      covered.add(key)
+    }
   }
   const outstanding = state.artefacts.filter((artefact) => !covered.has(artefact.file))
   const owedFiles = new Set(outstanding.map((artefact) => artefact.file))

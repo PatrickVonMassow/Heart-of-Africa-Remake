@@ -117,8 +117,20 @@ export const DOC_BUDGETS = [
     // cut to the entry ceiling first. The word ceiling moves by exactly that
     // line to the 47 / 728 fit; the line ceiling already held the one-line
     // headroom the 757 table records, which this line now spends.
-    maxLines: 47,
-    maxWords: 728,
+    // RAISED on 24.08.2026 by ONE genuinely new lesson, measured on a drill that
+    // had been green for days while never calling the step it claimed to prove —
+    // a class no surviving entry carried. Its hook measures 20 words on this
+    // tokenizer, cut from 22 before it was counted, and the ceilings move by
+    // exactly that one line to the 48 / 748 fit.
+    // RAISED AGAIN the same day by ONE genuinely new STANDING ORDER of the user:
+    // a large point that stops converging is split into smaller ones, general
+    // procedure, no confirmation needed. Its hook measures 20 words on this
+    // tokenizer, and the ceilings move by exactly that line to the 49 / 768 fit.
+    // Two raises in one day is the ratchet working, not failing: each bought a
+    // new topic, neither a longer telling of an old one — but the next raise
+    // should cut a retired entry instead.
+    maxLines: 49,
+    maxWords: 768,
     maxEntryWords: 22,
     // Fifteen words: an index of one-hook lines, where a whole new entry is ~20 words —
     // so the slack cannot hide one, and re-wording an existing hook is free.

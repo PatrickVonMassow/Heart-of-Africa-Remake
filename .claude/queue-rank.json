@@ -256,8 +256,8 @@
       "place": "last"
     },
     "749": {
-      "at": "2026-08-22T16:44:06.971Z",
-      "why": "User 22.08.2026 18:41: pull forward, place after 720",
+      "at": "2026-08-25T11:48:52.032Z",
+      "why": "The user repeated the ruling a third time on 25.08.2026, 13:44 (after 19.08. 18:59 and 24.08. 07:54): internal machine incidents may never reach him as decision cards, and this point is the mechanism that stops them.",
       "origin": "user",
       "place": "ahead"
     },
@@ -468,12 +468,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "834": {
-      "at": "2026-08-22T10:35:33.222Z",
-      "why": "The user ordered it forward on 22.08.2026 after a second authoring run died with its session; each further lane death costs about 1.5 h and its whole token spend.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "836": {
       "at": "2026-08-22T12:10:43.694Z",
       "why": "Machine-filed from its own run; the user's 20.08.2026 ruling keeps such a point behind the release",
@@ -533,12 +527,6 @@
       "why": "Es ist ein Wächter, der weniger misst als sein eigener Satz — kein Produktverhalten, keine verlorene Arbeit, und die Anleitung nutzt heute keinen der vier Wege; es kann hinter der Veröffentlichung stehen.",
       "origin": "machine",
       "place": "last"
-    },
-    "848": {
-      "at": "2026-08-23T03:24:17.063Z",
-      "why": "User ruling 23.08.2026, 05:25 in chat: seat 848 directly after 834.",
-      "origin": "user",
-      "place": "ahead"
     },
     "849": {
       "at": "2026-08-23T03:41:54.860Z",
@@ -612,11 +600,137 @@
       "origin": "machine",
       "place": "last"
     },
-    "874": {
-      "at": "2026-08-24T03:45:06.345Z",
-      "why": "Die Lebendmessung irrt in Richtung 'tote Bahn lebt' und verbietet dem Nachfolger ausdruecklich den Neustart — waehrend des Release-Laufs wuerde ein gestorbener Autorenlauf als arbeitend gemeldet, und der Zweig, den sie repariert, steht ohnehin vorn",
+    "875": {
+      "at": "2026-08-24T06:26:44.960Z",
+      "why": "An environment fault stops every commit, but the switch file is repaired without one — it waits behind the fences that protect main.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "876": {
+      "at": "2026-08-24T06:26:45.034Z",
+      "why": "It clears a dead enforcer, which is severe, but no enforcer is known to be dead today — it waits behind the two fences that are demonstrably open.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "877": {
+      "at": "2026-08-24T06:26:45.113Z",
+      "why": "It misorders the release queue in both directions and loses no work; 883 is its other half and waits with it.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "878": {
+      "at": "2026-08-24T06:26:45.188Z",
+      "why": "It needs a lock collision inside a thirty-second window to bite, and the CI failure still arrives by mail from the workflow itself.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "881": {
+      "at": "2026-08-24T06:26:45.274Z",
+      "why": "The fence defaults to observe and refuses nothing; it must be settled before its arming point lands, not before the queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "882": {
+      "at": "2026-08-24T06:26:45.350Z",
+      "why": "It only bites for a document somebody deleted or mis-keyed, and the guard reports every document it did measure.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "883": {
+      "at": "2026-08-24T06:26:45.423Z",
+      "why": "The other half of 877; both are queue ordering, which costs attention rather than work.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "884": {
+      "at": "2026-08-24T06:26:45.501Z",
+      "why": "One fuse dated at point 1000 and one half-covered assertion — nothing bites at 884.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "885": {
+      "at": "2026-08-24T07:11:06.028Z",
+      "why": "It loses the user's own words with no trace on either layer, and it fires whenever the owner delegates — which is the standing instruction, so every remaining point before the release widens the window.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "898": {
+      "at": "2026-08-24T14:37:17.169Z",
+      "why": "Maschinell abgelegter Befund mittlerer Dringlichkeit — steht hinter dem Release, weil er weder den Stapel anhaelt noch eine Spur blockiert",
+      "origin": "machine",
+      "place": "last"
+    },
+    "902": {
+      "at": "2026-08-25T00:02:37.526Z",
+      "why": "Prozesshygiene mit niedriger Kritikalität: der Eintrag ändert nur Regeltext und einen Auditeintrag, blockiert nichts und hat keinen Vorläufer, der ihn nach vorn zieht",
+      "origin": "machine",
+      "place": "last"
+    },
+    "904": {
+      "at": "2026-08-25T00:23:39.794Z",
+      "why": "Letzter Platz ist richtig: die drei Befunde liegen in bereits gelandetem Code, blockieren keine offene Spur und keinen Release-Schritt",
+      "origin": "machine",
+      "place": "last"
+    },
+    "905": {
+      "at": "2026-08-25T01:13:13.978Z",
+      "why": "Reine Effizienzbereinigung ohne Korrektheitsverlust; sie kann erst nach 903 gearbeitet werden, dessen Code sie ändert — hinten ist der richtige Platz",
+      "origin": "machine",
+      "place": "last"
+    },
+    "906": {
+      "at": "2026-08-25T02:50:59.229Z",
+      "why": "Machine-filed, loses no work: the run stays blind for its remainder but its commits survive, so it waits behind the release like the other reporting defects of its class",
+      "origin": "machine",
+      "place": "last"
+    },
+    "908": {
+      "at": "2026-08-25T07:23:10.638Z",
+      "why": "Last is right: 849 repairs the neighbouring class in the same detector reading, so a fix written before it would be rewritten by it; the tax is recurring but costs no work and blocks nothing.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "909": {
+      "at": "2026-08-25T08:53:59.782Z",
+      "why": "Der Fehler versteckt drei Testtyp-Fehler, keinen Spielfehler — nichts blockiert daran, also bleibt er hinter der gesetzten Reihenfolge.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "910": {
+      "at": "2026-08-25T08:53:59.860Z",
+      "why": "Kostet Zuege, keine Arbeit: der Umweg ueber den Hauptbaum steht als Regel und traegt, bis der Waechter repariert ist.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "911": {
+      "at": "2026-08-25T08:53:59.941Z",
+      "why": "Die Messung ist heute richtig; das Risiko ist Drift, und keine offene Arbeit haengt daran.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "912": {
+      "at": "2026-08-25T09:31:29.682Z",
+      "why": "Letzter Platz ist richtig: maschinell gefunden, nichts haengt daran, und der Nachbar-Drillpunkt 911 steht unmittelbar davor — zusammen abzuarbeiten ist billiger als getrennt.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "913": {
+      "at": "2026-08-25T11:09:32.237Z",
+      "why": "It reddens npm run test:unit, the gate every landing and the release closing itself must run, and a retry is SUSPECT under CLAUDE.md 7.2 — so the release cannot be closed past it, only through it.",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "914": {
+      "at": "2026-08-25T11:44:32.511Z",
+      "why": "It stands behind the release: the four-eyes gate still works — the reviewer refuses honestly rather than clearing blind — and the range that hits it is the oversized one, not every review.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "915": {
+      "at": "2026-08-25T11:55:55.327Z",
+      "why": "It stands behind the release: the gate still closes on an honest route — the bounded 1/1 scope — and only a range planned into several authorship groups meets the refusal.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -664,7 +778,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-24T03:45:06.354Z",
+    "at": "2026-08-25T12:09:42.931Z",
     "points": [
       174,
       184,
@@ -728,7 +842,6 @@
       463,
       464,
       465,
-      466,
       467,
       468,
       471,
@@ -903,7 +1016,6 @@
       831,
       832,
       833,
-      834,
       836,
       837,
       838,
@@ -914,7 +1026,6 @@
       844,
       845,
       847,
-      848,
       849,
       850,
       851,
@@ -929,7 +1040,35 @@
       871,
       872,
       873,
-      874
+      875,
+      876,
+      877,
+      878,
+      881,
+      882,
+      883,
+      884,
+      885,
+      886,
+      887,
+      888,
+      896,
+      898,
+      899,
+      900,
+      901,
+      902,
+      904,
+      905,
+      906,
+      908,
+      909,
+      910,
+      911,
+      912,
+      913,
+      914,
+      915
     ]
   }
 }

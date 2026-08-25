@@ -151,7 +151,12 @@ export const RED_CHARGES = [
     suite: 'polish',
     backend: 'webgpu',
     kind: 'check',
-    match: /settlement walker \(goat\)/i,
+    // SCOPED TO THE MEASURED ASSERTION, not to the walker's label (cross-vendor
+    // review of c33b031, finding 2). The label prefix alone matched every future
+    // check trackFeet could emit under that name, so a NEW goat red would have
+    // been charged away by an entry that never measured it. Only the planted-foot
+    // assertion of point 300 was measured, and only it is excused.
+    match: /settlement walker \(goat\): the planted foot holds its ground spot/i,
     why:
       'Measured 07.08.2026: the stance check reds in BOTH WebGPU runs (20 stance intervals, ' +
       'worst foot travel 0.967) and passes on WebGL 2 (0.337). The original reading — a software ' +

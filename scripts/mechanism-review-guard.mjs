@@ -14,10 +14,9 @@
 // error never traps the session. It stands down while .claude/batch-paused exists
 // and for a session that does not own the batch lock.
 //
-// GRANDFATHERING: the baseline is per branch and self-arms at the current HEAD on
-// its first run, exactly as model-guard does with its timestamp. The twenty-odd
-// guards that predate this gate therefore owe nothing; the point is the next
-// mechanism, not a review debt for the existing ones.
+// RECOVERY: the baseline is per branch local state. Its absence blocks once and
+// seeds a fixed tracked-history anchor; it never self-arms at HEAD, because on
+// main that would forgive every outstanding review in one empty-range turn.
 //
 // How the gate clears:
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
@@ -33,13 +32,14 @@ import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readRecords, verifyCarried } from './mechanism-review.mjs'
 import {
+  attestsToCodeReading,
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
   mechanismPathsIn,
   modelFromTrailers,
   modelsFromTrailers,
-  mergeProblem,
   reviewRecordWellFormed,
+  reviewIdentityProblem,
 } from './mechanism-review-core.mjs'
 import {
   commitsForFiles,
@@ -60,6 +60,11 @@ const PAUSE = repoPath('.claude/batch-paused')
  *  it is deliberately NOT tracked: a shared file would conflict on every branch,
  *  while the ledger that must travel — the reviews — is the tracked one. */
 export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
+
+/** The reviewed source revision immediately before fail-closed recovery. Unlike
+ * a timestamp or ledger field, reachability from this immutable commit is not a
+ * value the recording hand can edit. */
+export const BASELINE_RECOVERY_ANCHOR = '28293f97ce0149a9936593733763fd20e62b13e7'
 
 // The record/field sentinels and the header shape of the one `git log` this
 // guard runs now live with the parser that owns them, in
@@ -128,30 +133,25 @@ export function baselineFor(state, branch) {
 }
 
 /**
- * Where a tree with NO baseline at all starts judging. The baseline file is
- * local bookkeeping, so a fresh clone or a fresh worktree has none — and arming
- * at HEAD would grandfather whatever mechanism work is already on the branch
- * (four-eyes review, 27.07.2026). The fork point from the integration branch is
- * the honest answer: everything on main is genuinely old, everything this branch
- * added is genuinely new. Falls back to HEAD where no such branch resolves,
- * which is the grandfathering the point asks for.
+ * Recover a missing local baseline from one immutable, tracked history point.
+ * There is deliberately no HEAD or main fallback: on main both resolve to HEAD,
+ * producing an empty range and silently forgiving all existing debt.
  */
-export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
-  for (const ref of ['main', 'origin/main']) {
-    try {
-      // The revision MUST stay quoted: execSync goes through cmd.exe on Windows,
-      // where `^` is the escape character — unquoted, git received `main{commit}`
-      // and the fallback to HEAD silently grandfathered the branch's own work.
-      // render-verify-guard carries the same note from the same bite.
-      const base = revParse(`--verify --quiet "${ref}^{commit}"`)
-      if (!base) continue
-      const fork = execSync(`git merge-base "${base}" "${head}"`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
-      if (fork) return fork
-    } catch {
-      /* no such branch here — try the next, then fall back to HEAD */
-    }
+export function bootstrapBase(
+  head,
+  revParse = (r) => git(`rev-parse ${r}`),
+  isAncestor = (base, tip) => {
+    execFileSync('git', ['merge-base', '--is-ancestor', base, tip], { windowsHide: true, cwd: REPO_ROOT })
+    return true
+  },
+) {
+  try {
+    const base = revParse(`--verify --quiet "${BASELINE_RECOVERY_ANCHOR}^{commit}"`)
+    if (!base || isAncestor(base, head) !== true) return null
+    return base
+  } catch {
+    return null
   }
-  return head
 }
 
 /** The current scripts/ listing — needed for the "a core beside a guard" rule. */
@@ -296,7 +296,23 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   }
   const state = readBaselineState()
   const stored = baselineFor(state, branch)
+  const baselineMissing = !stored
   const baseline = stored || bootstrapBase(head)
+
+  if (!baseline) {
+    return {
+      applicable: true,
+      head,
+      branch,
+      baseline: null,
+      baselineMissing: true,
+      rangeBase: null,
+      inputs: { baseline: null, baselineMissing: true, head, pendingCommits: [], records: [], sessionId },
+      commits: [],
+      debt: { outstanding: [], invalidatedCoverage: [] },
+      authorshipPlan: { groups: [], unreviewable: [] },
+    }
+  }
 
   // Diff from merge-base, never the raw baseline: on a feature branch the
   // baseline sits on main, and a two-dot diff would re-show main's own (already
@@ -336,6 +352,20 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
       // is then judged for real — a recovery that reported "clear" without
       // looking would be the same silent pass in a new place.
       effective = bootstrapBase(head)
+      if (!effective) {
+        return {
+          applicable: true,
+          head,
+          branch,
+          baseline: null,
+          baselineMissing: true,
+          rangeBase: null,
+          inputs: { baseline: null, baselineMissing: true, head, pendingCommits: [], records: [], sessionId },
+          commits: [],
+          debt: { outstanding: [], invalidatedCoverage: [] },
+          authorshipPlan: { groups: [], unreviewable: [] },
+        }
+      }
       base = effective
       rangeBase = null
       try {
@@ -391,7 +421,10 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     commits,
     endStateFiles,
     records,
-    recordUsable: (record, commit) => reviewRecordWellFormed(record) && !mergeProblem(record, commit),
+    recordUsable: (record, commit) =>
+      reviewRecordWellFormed(record, { commitAt: commit?.at }) &&
+      attestsToCodeReading(record) &&
+      !reviewIdentityProblem(record.model, commit),
   })
   const authorshipPlan = planAuthorshipGroups({
     commits: commitsForFiles(debt.outstanding),
@@ -409,6 +442,7 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     rangeBase,
     inputs: {
       baseline: effective,
+      baselineMissing,
       head,
       pendingCommits,
       records,
@@ -509,6 +543,13 @@ if (isMainModule(import.meta.url)) {
     }
 
     const verdict = evaluateMechanismReview(gathered.inputs)
+
+    // Recovery is a two-turn operation: this turn reports and refuses the
+    // missing evidence; a non-status Stop invocation may seed only the immutable
+    // anchor, never HEAD. The next turn then judges the full anchor..HEAD range.
+    if (!status && gathered.baselineMissing && gathered.baseline) {
+      writeBaseline(gathered.branch, gathered.baseline)
+    }
 
     if (verdict.deferred) {
       // Leave the baseline behind the pending mechanism range: that range is
