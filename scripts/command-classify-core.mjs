@@ -228,6 +228,7 @@ export function parseSegments(command) {
   const src = String(command ?? '')
   const out = []
   let current = null
+  let pipeFeedsNext = false
   const flush = () => {
     if (current && (current.words.length || current.redirects.length)) out.push(current)
     current = null
@@ -237,9 +238,15 @@ export function parseSegments(command) {
     const t = tokens[k]
     if (t.type === 'sep') {
       flush()
+      if (t.text === '|' || t.text === '|&') pipeFeedsNext = true
+      else if (t.text !== '\n') pipeFeedsNext = false
       continue
     }
-    if (!current) current = { start: t.start, end: t.end, words: [], redirects: [], raw: '' }
+    if (!current) {
+      current = { start: t.start, end: t.end, words: [], redirects: [], raw: '' }
+      if (pipeFeedsNext) current.stdinSource = 'pipe'
+      pipeFeedsNext = false
+    }
     current.end = t.end
     if (t.type === 'word') {
       current.words.push({ text: t.text, sub: t.sub ?? '', quoted: t.quoted, quoteAt: t.quoteAt ?? -1 })
@@ -392,6 +399,81 @@ function argsOf(seg) {
 }
 
 const hasFlag = (args, flags) => args.some((a) => flags.some((f) => a.text === f || a.text.startsWith(`${f}=`)))
+
+/** Does a shell argument list select a `-c`/`--command` payload? */
+function hasShellCommandArgument(args) {
+  return args.some((a) => {
+    if (SHELL_COMMAND_FLAGS.test(a.text)) return true
+    const q = Number(a.quoteAt ?? -1)
+    return q > 0 && SHELL_COMMAND_FLAGS.test(a.text.slice(0, q))
+  })
+}
+
+/** Shell invocation modes that execute stdin instead of a named script. */
+function shellExecutesStdin(args) {
+  if (hasShellCommandArgument(args)) return false
+  let forced = false
+  const valueFlags = new Set(['-O', '-o', '--init-file', '--rcfile'])
+  for (let i = 0; i < args.length; i++) {
+    const text = args[i].text
+    if (text === '-') return true
+    if (text === '--') return forced || !args[i + 1] || args[i + 1].text === '-'
+    if (text.startsWith('-')) {
+      if (/^-[^-]*s/.test(text)) forced = true
+      if (!text.includes('=') && valueFlags.has(text)) i++
+      continue
+    }
+    // Under `-s` this word supplies $0; otherwise it names the script file.
+    return forced
+  }
+  return true
+}
+
+/** Node invocation modes that execute stdin instead of `-e` or a named file. */
+function nodeExecutesStdin(args) {
+  const valueFlags = new Set(['-e', '--eval', '-p', '--print', '-r', '--require', '--import', '--loader'])
+  for (let i = 0; i < args.length; i++) {
+    const text = args[i].text
+    if (/^(?:-[epc]|--(?:eval|print|check)(?:=|$))/.test(text)) return false
+    if (text === '-') return true
+    if (text === '--') return !args[i + 1] || args[i + 1].text === '-'
+    if (text.startsWith('-')) {
+      if (!text.includes('=') && valueFlags.has(text)) i++
+      continue
+    }
+    return false
+  }
+  return true
+}
+
+/** Python invocation modes that execute stdin instead of `-c`, `-m`, or a file. */
+function pythonExecutesStdin(args) {
+  for (let i = 0; i < args.length; i++) {
+    const text = args[i].text
+    if (text === '-c' || text === '-m') return false
+    if (text === '-') return true
+    if (text === '--') return !args[i + 1] || args[i + 1].text === '-'
+    if (text.startsWith('-')) {
+      if (['-W', '-X'].includes(text)) i++
+      continue
+    }
+    return false
+  }
+  return true
+}
+
+/** Does this segment feed opaque executable text to an interpreter? */
+function executesAttachedStdin(seg) {
+  const attached = seg.stdinSource === 'pipe' || seg.redirects.some((r) => r.op === '<<' || r.op === '<<-' || r.op === '<<<')
+  if (!attached) return false
+  const head = commandHead(seg)
+  const args = argsOf(seg)
+  if (hasFlag(args, ['--help', '--version'])) return false
+  if (head === 'sh' || head === 'bash' || head === 'zsh') return shellExecutesStdin(args)
+  if (head === 'node') return nodeExecutesStdin(args)
+  if (/^python(?:\d+(?:\.\d+)*)?$/.test(head)) return pythonExecutesStdin(args)
+  return false
+}
 
 // ── The wrappers that HIDE a command ─────────────────────────────────────────
 //
@@ -619,6 +701,12 @@ function directIntentOfParsed(seg) {
   if (redirectWrites(seg.redirects)) return 'write'
   const head = commandHead(seg)
   if (!head) return 'read'
+  // Here-document bodies deliberately are not lexed as commands, and a pipe's
+  // producer may emit code only at runtime. When an interpreter executes that
+  // opaque stdin, its effects cannot be decided here, so the fence takes the
+  // safe side. Explicit `-c` payloads and named script files keep their normal
+  // classification because stdin is data (or unused) in those modes.
+  if (executesAttachedStdin(seg)) return 'write'
   // A script whose job is mutation stays a write under EVERY flag. In
   // particular, land-point.mjs does not implement a help/version exit path;
   // those words are merely ignored arguments before it merges and pushes.

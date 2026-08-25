@@ -218,6 +218,59 @@ describe('direct segment intent', () => {
   })
 })
 
+describe('interpreters that execute code from stdin', () => {
+  it('takes the safe side for shell code supplied by a here-document or pipe', () => {
+    expect(isMutatingSegment(['bash <<EOF', 'git push', 'EOF'].join('\n'))).toBe(true)
+    expect(isMutatingSegment("echo 'git push' | bash")).toBe(true)
+    expect(isMutatingSegment('printf "git status\\n" | sh')).toBe(true)
+  })
+
+  it('takes the same side for node and python stdin-code modes', () => {
+    expect(isMutatingSegment('printf "process.exit()" | node -')).toBe(true)
+    expect(isMutatingSegment('printf "process.exit()" | node')).toBe(true)
+    expect(isMutatingSegment(['python - <<PY', 'print("ok")', 'PY'].join('\n'))).toBe(true)
+    expect(isMutatingSegment('printf "print(1)" | python3')).toBe(true)
+  })
+
+  it('takes the safe side for interpreter code supplied by a here-string', () => {
+    expect(isMutatingSegment('bash <<< "git push"')).toBe(true)
+    expect(isMutatingSegment('sh <<< "git push"')).toBe(true)
+    expect(isMutatingSegment('zsh <<<"git push"')).toBe(true)
+    expect(isMutatingSegment('node - <<< "x"')).toBe(true)
+    expect(isMutatingSegment('python3 <<< "import os"')).toBe(true)
+  })
+
+  it('preserves non-interpreters and explicit shell commands fed by a here-string', () => {
+    expect(isMutatingSegment('cat <<< "git push"')).toBe(false)
+    expect(isMutatingSegment('grep push <<< "text"')).toBe(false)
+    expect(isMutatingSegment("sh -c 'git status' <<< \"x\"")).toBe(false)
+  })
+
+  it('keeps explicit commands, named scripts, and non-interpreters at their existing intent', () => {
+    expect(isMutatingSegment("sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment("echo input | sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment("echo input | node -pe 'input'")).toBe(false)
+    expect(isMutatingSegment('echo input | python -c "print(1)"')).toBe(false)
+    expect(isMutatingSegment('printf input | bash scripts/report.sh')).toBe(false)
+    expect(isMutatingSegment(['node scripts/report.mjs <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment(['python report.py <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment('git log | grep push')).toBe(false)
+    expect(isMutatingSegment(['cat <<EOF', 'git push', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment('printf input | node --help')).toBe(false)
+  })
+
+  it('distinguishes a pipe (including a continued one) from boolean OR', () => {
+    expect(isMutatingSegment('printf code |\n  zsh')).toBe(true)
+    expect(isMutatingSegment('printf code || zsh')).toBe(false)
+  })
+
+  it('does not change a bare interpreter without attached stdin', () => {
+    expect(isMutatingSegment('bash')).toBe(false)
+    expect(isMutatingSegment('node -')).toBe(false)
+    expect(isMutatingSegment('python -')).toBe(false)
+  })
+})
+
 describe('gh — the action decides', () => {
   const reads = ['gh pr view 12', 'gh run list', 'gh api repos/o/r/commits', 'gh release list']
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
