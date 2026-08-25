@@ -36,7 +36,7 @@ const consumedDir = () => resolve(spoolDir(), 'consumed')
 const memoryDir = () => resolve(repo, 'memory')
 const carrierPath = () => resolve(memoryDir(), 'findings-carrier.md')
 
-const runHook = (sessionId = OWNER) =>
+const runHook = (sessionId = OWNER, transcriptPath = resolve(claudeDir(), 'projects', 'owner.jsonl')) =>
   spawnSync(process.execPath, [resolve(repo, 'scripts', 'lock-heartbeat-hook.mjs')], {
     windowsHide: true,
     encoding: 'utf8',
@@ -44,6 +44,7 @@ const runHook = (sessionId = OWNER) =>
     env: { ...process.env, HOA_REPO_ROOT: repo, FINDINGS_MEMORY_DIR: memoryDir() },
     input: JSON.stringify({
       session_id: sessionId,
+      transcript_path: transcriptPath,
       hook_event_name: 'PostToolUse',
       tool_name: 'Read',
       tool_input: { file_path: 'x.ts' },
@@ -109,6 +110,14 @@ describe('the user message at the next tool call', () => {
   it('stands down for a session that does not own the batch, consuming nothing', () => {
     spool(message())
     const r = runHook('somebody-else')
+    expect(r.status).toBe(0)
+    expect(r.stdout).toBe('')
+    expect(pendingFiles()).toEqual(['n1.json'])
+  })
+
+  it('stands down for a subagent carrying the owner session id, consuming nothing', () => {
+    const transcript = resolve(claudeDir(), 'projects', 'owner', 'subagents', 'agent-a.jsonl')
+    const r = runHook(OWNER, transcript)
     expect(r.status).toBe(0)
     expect(r.stdout).toBe('')
     expect(pendingFiles()).toEqual(['n1.json'])

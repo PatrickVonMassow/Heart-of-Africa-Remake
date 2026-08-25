@@ -205,6 +205,24 @@ describe('THE HOOK DUTY: deliverPendingMessages', () => {
     expect(readPending(dir)).toHaveLength(1)
   })
 
+  it('leaves a subagent-refused message pending for the defer sweep', () => {
+    const dir = join(tmp(), 'spool')
+    const receivedAt = NOW - 4 * 60 * 1000
+    spoolMessage(msg({ receivedAt }), dir)
+
+    expect(
+      deliverPendingMessages({
+        dir,
+        ownsBatch: true,
+        hookInput: { transcript_path: '/projects/owner/subagents/agent-a.jsonl' },
+      }),
+    ).toBe('')
+    const pending = readPending(dir)
+    expect(pending).toHaveLength(1)
+    expect(readConsumed(dir)).toEqual([])
+    expect(sweepPlan({ pending, now: NOW }).overdue.map((m) => m.id)).toEqual(['m1'])
+  })
+
   it('delivers and consumes while the owning batch is paused', () => {
     const dir = join(tmp(), 'spool')
     spoolMessage(msg(), dir)

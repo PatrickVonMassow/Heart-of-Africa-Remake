@@ -197,6 +197,7 @@ export function deliverPendingMessages({
   dir = SPOOL_DIR,
   ownsBatch = false,
   paused = false,
+  hookInput = null,
   max = MAX_PER_CALL,
   carrierFile = carrierPath(),
   bellStatePath = CARRIER_BELL_STATE_PATH,
@@ -207,7 +208,17 @@ export function deliverPendingMessages({
     // instruction that may diagnose, redirect or lift the pause.
     if (!ownsBatch) return ''
 
-    const plan = deliveryDecision({ ownsBatch, paused, pending: existsSync(dir) ? readPending(dir) : [], max })
+    const plan = deliveryDecision({
+      ownsBatch,
+      paused,
+      pending: existsSync(dir) ? readPending(dir) : [],
+      max,
+      hookInput,
+    })
+    // A subagent carries its parent's owner session id, but its hook stdout is
+    // neither persisted nor injected. It may touch neither chat nor the
+    // findings reminder state; the owner's own next hook remains responsible.
+    if (plan.reason === 'subagent-hook') return ''
     const claimed = []
     for (const m of plan.deliver) {
       const taken = claimMessage(m.file, dir)

@@ -237,7 +237,7 @@ const paused = (() => {
 })()
 let spoke = false
 try {
-  const out = deliverPendingMessages({ ownsBatch, paused })
+  const out = deliverPendingMessages({ ownsBatch, paused, hookInput: data })
   if (out) {
     process.stdout.write(out)
     spoke = true
