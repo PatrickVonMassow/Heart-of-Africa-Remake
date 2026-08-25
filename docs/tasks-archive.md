@@ -23536,3 +23536,74 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   handed over. The template gets a transferable-work variant that NAMES the adopted branch, or
   that sentence is dropped whenever `--adopt` has something to adopt. Same failure class as the
   two contradicting gates above: a printed sequence that does not survive its own facts.
+
+- [x] 752. The handover's exit and ramp are unattributed, so its acceleration is guesswork
+  (measured 19.08.2026, 20:35, over 43 handovers since 18.08.: sources `.claude/boundary.log`
+  HANDOVER markers, `.claude/autostart.log` spawns, commit timestamps, deduplicated by session
+  id within 60 min). Marker → launcher spawns successor: median 0.0 min, p90 0.1, max 65.
+  Spawn → successor's first commit: median 6.3, p90 14.9, max 91. Last commit old → first
+  commit new: median 12.7, p90 47.8, max 100; of that the outgoing session's tail median 6.1,
+  p90 11.8. The mechanism is not the delay — the spawn follows the marker in under a second.
+  What costs is the sequence of model turns on both sides: the exit (now-card back to the
+  queue, board publish, handover card, carrier drain, `--prepare`, `--commit`) and the ramp
+  (board-first duties, adopting in-flight work, reading the queue, cutting and reading the
+  brief). WHAT THAT MEASUREMENT CANNOT DO, and why this point starts with attribution (GPT-5.6
+  Sol, audit 19.08.2026, findings A7/A14/A17/A18/A19): it reports elapsed MINUTES and therefore
+  cannot price tokens, cannot show that the six exit steps dominate, and uses "first commit" as
+  a proxy for productive work, which reading, analysis and uncommitted implementation all
+  precede. The 60-minute deduplication also suppressed the very retry burst under study, and of
+  the 29- and 65-minute outliers roughly 25 and 35 minutes stay undecomposed. So the numbers
+  establish that a gap EXISTS and roughly how large it is, not what it is made of. Handover
+  cost and context ceiling multiply: a lower trigger means more handovers, and each pays the
+  startup load of a fresh session before its first useful turn.
+  FINAL STATE, in two stages, because building the levers before the attribution would spend
+  the session's scarcest budget on a guess:
+  1. THE BOUNDARY PATH IS ATTRIBUTED IN TOKENS, PER STEP, not in minutes. Point 744 already
+     measures the exit as one number; this splits that number: every stage of
+     `--prepare`/`--commit` and the successor's first turn up to its first work-bearing call
+     carries its own reading, so "which step dominates" is settled by evidence. Elapsed time is
+     recorded BESIDE it, never instead of it: idle stretches (the claiming reservation, the
+     launcher's tick cadence) are real throughput loss that no token count shows, and they are
+     reported separately so neither hides the other.
+  2. ONLY WHAT THE ATTRIBUTION SHOWS DOMINANT IS THEN BUILT. The candidates, each with the
+     bound that makes it safe:
+     a. ONE EXIT COMMAND (`batch-boundary.mjs --leave`) driving the bookkeeping the way
+        `land-point.mjs` drives the landing — one verdict per step, stopping at the first red.
+        It is IDEMPOTENT AND RESUMABLE: each step records its own completion, a re-run
+        continues where it stopped, and no board edit or carrier drain is ever performed twice.
+        It PRESERVES THE TWO-PHASE INVARIANT rather than collapsing it: `--prepare` still
+        proves fresh bookkeeping, `--commit` remains the LAST repository action, and a guard
+        that demands remedial work between them still gets its chance. Fail-open like the rest
+        of the boundary: it COMPLETES even when it overruns its cap, and records the overrun.
+     b. THE LAUNCHER DOES MECHANICAL RAMP WORK ONLY WHERE THE DESTINATION IS ALREADY DECIDED.
+        An honoured claim redirects a handover to a claiming window
+        (`resolveBoundaryDestination`), so nothing — focus, board card, adoption — is
+        pre-assigned while that redirect is still possible; where it is not, the launcher
+        discharges the board-first duties before the model's first turn.
+     c. THE BRIEF TRAVELS IN THE SPAWN PROMPT ONLY WITH A FRESHNESS CHECK. It names the
+        revision it was cut from, and the successor REGENERATES instead of trusting it when
+        head, queue rank or claim moved in between. This shifts the brief's token cost rather
+        than removing it, which is the honest claim.
+     d. RETRY IS BOUNDED WITH A DEFINED TERMINAL BEHAVIOUR. After the second failed boundary
+        attempt the session stops retrying: it completes the handover fail-open, records the
+        overrun and alerts. It never loops (the 18 markers in four minutes) and never strands
+        the batch. Where point 751 already removes a cause of that loop, this is folded into
+        751 rather than duplicated.
+  3. SCOPE, STATED SO IT IS NOT MISCOUNTED: these are THROUGHPUT measures, not ceiling safety.
+     The ceiling is held by point 597 (capped tool inputs and outputs) and point 745 (the
+     prospective budget asked before the call). Nothing here may be subtracted from the trigger
+     arithmetic of 743, and no turn-count saving may be treated as a token bound — one uncapped
+     40,000-token response crosses the ceiling however few turns it took.
+  VERIFIABLE: Vitest over the per-step attribution record (a fixture boundary run yields one
+  reading per stage, and a missing reading is reported rather than silently absent); a case that
+  `--leave` re-run after an interrupted step completes without repeating the finished ones; a
+  case that it still completes when a step overruns, WITH the overrun recorded; a case that no
+  pre-assignment happens while a claim can still be honoured; a case that a stale brief is
+  regenerated; and a case that the retry bound terminates in a completed handover rather than a
+  loop.
+  Criticality: medium — every change touches the handover path, where fail-open is the rule;
+  the attribution stage itself is low risk and is what the rest is decided from.
+  RANK: after the ceiling programme (743, 742, 744, 597, 745, 746, 747), i.e. directly
+  following 747. The ceiling mechanisms bound the damage, this one buys throughput, and its own
+  first stage depends on 744's corrected exit path.
+  Bundle: Session- & Repo-Hygiene.
