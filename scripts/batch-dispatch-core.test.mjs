@@ -4,7 +4,7 @@ import { authorizeQueue, dispatchDecision, updateReasonInterval } from './batch-
 const sha = 'a'.repeat(40)
 const job = (point, dependencies = [], extra = {}) => ({
   pointId: String(point), attemptId: `attempt-${point}`, branch: `feat/${point}-work`,
-  worktree: `/worktrees/${point}`, baseSha: sha, adapter: 'author-sol', dependencies, ...extra,
+  worktree: `/worktrees/${point}`, baseSha: sha, adapter: 'sol', dependencies, ...extra,
 })
 
 describe('bounded authorized dispatch', () => {

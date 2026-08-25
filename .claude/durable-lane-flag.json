@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "boundaryMode": "checkpointed-handover",
+  "adapters": ["sol"],
+  "changedBy": "point-676-staged-rollout"
+}

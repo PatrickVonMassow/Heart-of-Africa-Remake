@@ -65,7 +65,7 @@ export function dispatchDecision({
   landedPoints = [],
   cap = DAEMON_POOL_CAP,
   reviewBacklogLimit = DEFAULT_REVIEW_BACKLOG_LIMIT,
-  adapters = ['author-sol'],
+  adapters = ['sol'],
   resources = { ok: true },
   durable = { ok: true },
 } = {}) {

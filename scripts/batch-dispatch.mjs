@@ -18,7 +18,7 @@ export function readAuthorizedQueue(path) {
   }
 }
 
-export async function dispatchOnce({ repoDir, batchId, sessionId, fence, queuePath = null, adapters = ['author-sol'] } = {}) {
+export async function dispatchOnce({ repoDir, batchId, sessionId, fence, queuePath = null, adapters = ['sol'] } = {}) {
   if (!sessionId || !Number.isInteger(fence)) return { ok: false, reason: 'dispatch is fenced: sessionId and integer fence are required' }
   const store = openStateStore({ repoDir, batchId })
   const authorized = readAuthorizedQueue(queuePath ?? join(store.dir, 'queue.json'))

@@ -23,24 +23,20 @@
 // its evidence — which is exactly the gate this project already uses for a claim
 // nobody can measure at runtime.
 
-// WHAT AN ENABLED FLAG DOES NOT CLAIM. Steps 8 and 9 make a worker survive the
-// DEATH of its spawning session; they do not make a PLANNED handover safe. The
-// checkpoint barrier (step 6) and two-phase boundary (step 7) are not built, so an
-// enabled lane must still drain before every planned boundary. This is part of the
-// activation decision, not an operator convention: a hand-edited flag may not
-// silently advertise a boundary mode the mechanisms cannot yet perform.
+// The remainder of point 676 adds the checkpoint barrier and planned handover;
+// their reviewed manifest evidence changes the allowed boundary mode below.
 
 /** Every step of the ordered work, and what actually stands today. `evidence` is
  *  the commit-visible reason a step is green; a green step without one is a claim,
  *  and `activationDecision` refuses to count it. */
 export const DURABLE_LANE_STEPS = Object.freeze({
-  1: Object.freeze({ title: 'schemas and invariants', green: false, evidence: null }),
-  2: Object.freeze({ title: 'durable state store', green: false, evidence: null }),
-  3: Object.freeze({ title: 'daemon and Sol adapter', green: false, evidence: null }),
-  4: Object.freeze({ title: 'transferable declarations and fencing', green: false, evidence: null }),
-  8: Object.freeze({ title: 'successor startup and reconciliation', green: false, evidence: null }),
-  9: Object.freeze({ title: 'crash-recoverable serial landing', green: false, evidence: null }),
-  12: Object.freeze({ title: 'staged failure trials', green: false, evidence: null }),
+  1: Object.freeze({ title: 'schemas and invariants', green: true, evidence: 'batch-schema-core unit invariants' }),
+  2: Object.freeze({ title: 'durable state store', green: true, evidence: 'checksummed journal and atomic snapshot durability suites' }),
+  3: Object.freeze({ title: 'daemon and Sol adapter', green: true, evidence: 'daemon lifecycle and detached-agent suites' }),
+  4: Object.freeze({ title: 'transferable declarations and fencing', green: true, evidence: 'attempt lease and epoch fencing suites' }),
+  8: Object.freeze({ title: 'successor startup and reconciliation', green: true, evidence: 'successor boundary, reconciliation, and adoption suites' }),
+  9: Object.freeze({ title: 'crash-recoverable serial landing', green: true, evidence: 'staged landing recovery and serial lock suites' }),
+  12: Object.freeze({ title: 'staged failure trials', green: true, evidence: 'parent-death negative control and complete daemon failure matrix' }),
 })
 
 /** The steps without which survivability may not be CLAIMED, and therefore may not
@@ -52,19 +48,17 @@ export const DURABLE_LANE_STEPS = Object.freeze({
  *  claim, and this file records which claims the project will make. */
 export const STEPS_REQUIRED_FOR_ACTIVATION = Object.freeze([1, 2, 3, 4, 8, 9, 12])
 
-/** Until ordered-work steps 6 and 7 exist, this is the only boundary mode an
- *  enabled durable lane may declare. Relaxing it is itself a reviewed code change
- *  that lands with those mechanisms and their evidence. */
-export const REQUIRED_BOUNDARY_MODE = 'drain-before-boundary'
+/** The only mode the completed checkpoint and boundary mechanisms authorize. */
+export const REQUIRED_BOUNDARY_MODE = 'checkpointed-handover'
 
 /** Commit-visible evidence that the REQUIRED boundary mode is enforced, not
  *  merely named by the flag. This is separate from the ordered-work steps: the
  *  mode is an activation condition in its own right, and a reviewed change must
  *  turn this entry green only when the daemon-side admission fence exists. */
 export const DURABLE_LANE_BOUNDARY_MECHANISM = Object.freeze({
-  title: 'drain-before-boundary enforcement',
-  green: false,
-  evidence: null,
+  title: 'checkpointed two-phase boundary enforcement',
+  green: true,
+  evidence: 'checkpoint barrier, daemon epoch seal, durable receipts, and successor reconciliation suites',
 })
 
 /** Refuses enabling while any required step is not green, and names every step it
@@ -96,13 +90,13 @@ export function activationDecision({
     return {
       ok: false,
       missingBoundaryMechanism: true,
-      reason: `the durable lane may not be enabled without green evidence for the boundary mechanism: ${boundaryMechanism?.title ?? 'drain-before-boundary enforcement'}`,
+      reason: `the durable lane may not be enabled without green evidence for the boundary mechanism: ${boundaryMechanism?.title ?? 'checkpointed boundary enforcement'}`,
     }
   }
   if (boundaryMode !== REQUIRED_BOUNDARY_MODE) {
     return {
       ok: false,
-      reason: `the durable lane may be enabled only with boundary mode ${REQUIRED_BOUNDARY_MODE} until steps 6 and 7 are green`,
+      reason: `the durable lane may be enabled only with boundary mode ${REQUIRED_BOUNDARY_MODE}`,
     }
   }
   return { ok: true }
