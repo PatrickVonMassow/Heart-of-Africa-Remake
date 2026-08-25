@@ -256,8 +256,8 @@
       "place": "last"
     },
     "749": {
-      "at": "2026-08-22T16:44:06.971Z",
-      "why": "User 22.08.2026 18:41: pull forward, place after 720",
+      "at": "2026-08-25T11:48:52.032Z",
+      "why": "The user repeated the ruling a third time on 25.08.2026, 13:44 (after 19.08. 18:59 and 24.08. 07:54): internal machine incidents may never reach him as decision cards, and this point is the mechanism that stops them.",
       "origin": "user",
       "place": "ahead"
     },
@@ -733,50 +733,6 @@
       "place": "last"
     }
   },
-  "boundary": {
-    "at": "2026-08-21T00:55:14.962Z",
-    "points": [
-      336,
-      515,
-      553,
-      581,
-      595,
-      596,
-      598,
-      633,
-      659,
-      660,
-      663,
-      686,
-      687,
-      688,
-      689,
-      690,
-      691,
-      692,
-      708,
-      713,
-      715,
-      719,
-      733,
-      734,
-      735,
-      736,
-      738,
-      739,
-      744,
-      746,
-      747,
-      749,
-      750,
-      752,
-      759,
-      760,
-      762,
-      764
-    ],
-    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
-  },
   "settled": {
     "at": "2026-08-25T11:44:32.520Z",
     "points": [
@@ -1070,5 +1026,49 @@
       913,
       914
     ]
+  },
+  "boundary": {
+    "at": "2026-08-21T00:55:14.962Z",
+    "points": [
+      336,
+      515,
+      553,
+      581,
+      595,
+      596,
+      598,
+      633,
+      659,
+      660,
+      663,
+      686,
+      687,
+      688,
+      689,
+      690,
+      691,
+      692,
+      708,
+      713,
+      715,
+      719,
+      733,
+      734,
+      735,
+      736,
+      738,
+      739,
+      744,
+      746,
+      747,
+      749,
+      750,
+      752,
+      759,
+      760,
+      762,
+      764
+    ],
+    "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   }
 }
