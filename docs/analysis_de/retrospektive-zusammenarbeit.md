@@ -3404,3 +3404,55 @@ Checkpoints eingeführt hat, fehlt eine Ebene darüber noch.
 
 Prüffrage: *Wenn dieser Lauf seine eigene Veröffentlichung überholt — kommt er allein zurück, und
 sagt sein Bericht, was wirklich fehlt?* Gebucht als Punkt 906.
+
+### 3.175 Das Tor, das niemand fährt, ist kein Tor
+
+Am 25.08.2026 stellte sich beim Landen von Punkt 834 heraus, dass die Typprüfung der Tests auf dem
+Hauptstand seit einer Woche rot war. Drei Fehler, der älteste vom 17.08.: ein echter Typfehler in
+einer Fauna-Testdatei und zwei Importe von `.mjs`-Skripten, für die die Testkonfiguration keine
+Deklarationen zulässt. Nichts davon war versteckt, und niemand hatte es gesehen.
+
+Der Grund ist die eigentliche Beobachtung, und er hat nichts mit den drei Fehlern zu tun.
+`test-types` läuft **nur** im lokalen Prüfläufer. Die CI führt es nicht aus — also meldete die CI
+die ganze Woche grün, auf jedem einzelnen Push. Das Landetor führt es ebenfalls nicht aus — also
+hat es kein einziges Landen aufgehalten. Das Tor existierte, war korrekt gebaut, urteilte richtig,
+und wurde von keinem Weg berührt, den der Batch tatsächlich geht. Eine Woche ist nicht die
+Reaktionszeit auf ein rotes Tor, sondern die Zeit, bis jemand zufällig danebentritt.
+
+Das ist die Umkehrung von §3.15: Dort war das Bild falsch und der Test grün. Hier ist der Test
+ehrlich rot — nur fragt ihn niemand. Beide Male trägt die Grün-Meldung dieselbe falsche Zusage, und
+beide Male ist die Absicherung gegen das Falsche gerichtet. Ein Tor braucht nicht nur ein Urteil,
+sondern einen Weg, auf dem es gefällt wird; sonst ist es Dokumentation.
+
+Prüffrage: *Für jedes Tor, auf das wir uns berufen — welcher Weg fährt es, und wann ist es dort
+zuletzt rot gewesen?* Ein Tor, das noch nie etwas aufgehalten hat, ist entweder überflüssig oder
+nicht angeschlossen. Gebucht als Punkt 909.
+
+### 3.176 Der Wächter verlangt eine Reparatur, die er selbst nicht gelten lässt
+
+Am selben Tag verweigerte der Dashboard-Wächter dreimal hintereinander den Zug-Abschluss mit
+„BATCH DASHBOARD NOT REGISTERED" und nannte dazu die Reparatur: veröffentlichen, Fokus setzen,
+`--synced` laufen lassen. Diese drei Befehle liefen — und meldeten jedes Mal Erfolg. Der Wächter,
+von Hand aufgerufen, beendete sich danach still mit Null. Jede verfügbare Auskunft sagte
+„registriert", und der Haken lehnte weiter ab.
+
+Die Ursache war die Arbeitsverzeichnis-Frage, die niemand stellt: Die Stop-Haken erben das
+Arbeitsverzeichnis der Sitzung, und der Wächter löst den Dashboard-Pfad gegen die Wurzel auf, aus
+der er gerade läuft. Die Sitzung stand in einem Arbeitsbaum — dem **Normalfall** unseres
+Zweig-Verfahrens —, und dort liegt keine Dashboard-Datei. Also lief bei jedem Zug-Ende die Kopie
+im Arbeitsbaum, fand nichts und blockierte, während `--synced` im Hauptbaum eine Markierung schrieb,
+die diese Kopie nie liest. Sichtbar wurde es erst, als der Wächter mit identischer Eingabe aus
+beiden Wurzeln nebeneinander laufen gelassen wurde: Null und still aus dem einen, Blockade aus dem
+anderen.
+
+Die Klasse ist nicht „Wächter hat Fehler", sondern eine schärfere: **Eine Diagnose, die dieselbe
+falsche Annahme teilt wie der Fehler, bestätigt ihn statt ihn zu finden.** Der Wächter von Hand
+aufgerufen ist kein unabhängiger Zeuge — er erbt das Arbeitsverzeichnis, das gerade das Problem
+ist. Deshalb kosteten drei Züge nichts, und der vierte, der die Bedingung aus zwei Wurzeln
+verglich, kostete einen. Dazu kommt die Härte der Fehlermeldung: Sie schickt in eine Reparatur, die
+in dieser Lage nachweislich nicht wirken kann, und wer ihr folgt, hält sich für nicht sorgfältig
+genug statt für falsch informiert.
+
+Prüffrage: *Kann meine Diagnose diesen Fehler überhaupt sehen — oder steht sie in derselben
+Annahme wie er?* Wo eine Prüfung grün meldet, obwohl der Haken ablehnt, ist die Prüfung verdächtig,
+nicht der Haken. Gebucht als Punkt 910.
