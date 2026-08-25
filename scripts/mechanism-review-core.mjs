@@ -1476,11 +1476,36 @@ export function evaluateMechanismReview({
       return passComposition(rows, { expect: expected })
     })
     const incompleteScoped = scopedSplits.filter((split) => !split.complete)
+    const incompleteScopedShas = new Set(incompleteScoped.map((split) => String(split.sha)))
+    // FILE DEBT IS MEASURED AGAINST THE CURRENT END STATE, not against the
+    // numbering of every range plan that once contained that file. A complete
+    // scoped reading at another covering sha therefore settles the files it
+    // names even when an older range split remains incomplete for other files.
+    // This is the same rule outstandingFiles uses for the status/next-pass
+    // plan. A sha carrying any incomplete composition contributes nothing,
+    // while a bounded 1/1 is itself a complete file-scoped reading.
+    const completeScoped = [
+      ...scoped
+        .filter((r) =>
+          Number(r?.pass?.index) === 1 &&
+          Number(r?.pass?.total) === 1 &&
+          !incompleteScopedShas.has(String(r?.sha ?? '')))
+        .map((r) => ({ sha: String(r.sha ?? ''), files: r.pass.files.map(String), records: [r] })),
+      ...scopedSplits.filter((split) => split.complete && !incompleteScopedShas.has(String(split.sha))),
+    ]
     const scopedWholeReviews = sound.filter((r) => !fileClaim(r) && !r?.pass)
     const standingScoped = incompleteScoped.filter(
-      (split) => !scopedWholeReviews.some(
-        (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
-      ),
+      (split) => {
+        const wholeRangeAnswer = scopedWholeReviews.some(
+          (answer) => Number(answer.at) > Math.max(...split.records.map((r) => Number(r.at))) && descendsFrom(answer, split),
+        )
+        const endStateAnswer = completeScoped.some(
+          (answer) =>
+            String(answer.sha) !== String(split.sha) &&
+            (commit.files ?? []).every((file) => answer.files.map(String).includes(String(file))),
+        )
+        return !wholeRangeAnswer && !endStateAnswer
+      },
     )
     if (standingScoped.length) {
       const worst = standingScoped.reduce((a, b) =>
@@ -1753,6 +1778,8 @@ export function formatMechanismReviewVerdict(verdict, { authorshipPlan = null } 
             `record — missing pass ${(p.missing ?? []).join(', ')}`,
           '      A pass covers the files it named; the range is cleared when every pass is recorded:',
           `      node scripts/review-sol.mjs --sha ${short(c.sha)} --brief "<what to judge>" --pass ${(p.missing ?? [])[0] ?? 1}`,
+          '      File debt is measured against the CURRENT END-STATE FILE: a complete scoped',
+          '      review at another covering sha also settles each current file that it names.',
         )
       }
       // COUNTING THE PASSES IS NOT COUNTING THE FILES. Passes that are all on

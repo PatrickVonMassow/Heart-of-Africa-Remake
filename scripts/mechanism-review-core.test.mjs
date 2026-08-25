@@ -732,6 +732,57 @@ describe('evaluateMechanismReview', () => {
       }
     })
 
+    it('lets the complete 8d69529 scope settle current files from an older incomplete split', () => {
+      const oldSha = 'a3a04322e3fc9fa9dfb139e10815484c5f453083'
+      const reviewedSha = '8d69529674a1c7d6827e38a46769d4915226e486'
+      const oldSplit = scoped({
+        sha: oldSha,
+        pass: {
+          index: 1,
+          total: 2,
+          files: ['scripts/doc-budget-core.mjs', 'scripts/guard-hooks.test.mjs'],
+          endState: oldSha,
+        },
+        at: 1_787_551_772_590,
+      })
+      const completeScope = scoped({
+        sha: reviewedSha,
+        pass: {
+          index: 1,
+          total: 1,
+          files: ['TASKS.md', 'docs/analysis_de/retrospektive-zusammenarbeit.md', 'docs/document-cut-757.md', 'scripts/doc-budget-core.mjs'],
+          endState: reviewedSha,
+        },
+        at: 1_787_689_347_342,
+      })
+      const fivePending = Array.from({ length: 5 }, (_, index) => covered({
+        sha: String(index + 1).repeat(40),
+        files: ['scripts/doc-budget-core.mjs'],
+        coveringRecordShas: [oldSha, reviewedSha],
+      }))
+
+      const verdict = evaluateMechanismReview({
+        baseline: 'b',
+        head: reviewedSha,
+        pendingCommits: fivePending,
+        records: [oldSplit, completeScope],
+      })
+      expect(verdict.block).toBe(false)
+
+      const wrongFile = {
+        ...completeScope,
+        pass: { ...completeScope.pass, files: ['docs/document-cut-757.md'] },
+      }
+      const stillOwed = evaluateMechanismReview({
+        baseline: 'b',
+        head: reviewedSha,
+        pendingCommits: [fivePending[0]],
+        records: [oldSplit, wrongFile],
+      })
+      expect(stillOwed.findings[0].kind).toBe('incomplete-passes')
+      expect(formatMechanismReviewVerdict(stillOwed)).toContain('CURRENT END-STATE FILE')
+    })
+
     it('refuses a record timestamped before the commit it claims to read', () => {
       const verdict = evaluateMechanismReview({
         baseline: 'b',
