@@ -12011,6 +12011,19 @@ to land than a mechanism that needs a review.
   yields a full report with `mayAct: false`, while an ACTING request under the same lock still
   stands down; plus a case that a worktree whose point is archived and whose branch is not an
   ancestor of `main` is reported as a leftover, and one whose point is still open is not.
+  MEASURED AGAIN 25.08.2026, at the landing of point 885 — and it names the likely cause of the
+  whole pile: `land-point.mjs` refused to remove `/workspace/hoa/.claude/worktrees/point-885` and
+  its branch, reporting "not a direct `agent-<id>` child of `.claude/worktrees/` — the harness did
+  not create it". The worktree was standing on exactly the branch that had just been merged. Both
+  had to be removed by hand with `scripts/worktree-cleanup.mjs` and `git branch -d/--delete`.
+  Seven of the ten survivors are named `point-<N>` or `point-<N>-<slug>`, so a session that does
+  not happen to name its worktree the way the harness would have gets no cleanup at all — while
+  CLAUDE.md §6 states that the merge ends the branch and names no condition on its name. The
+  guard's own load probe then counts every survivor as a live agent worktree, which is why the
+  batch doctor keeps calling a red `test:unit` inconclusive on an otherwise idle host.
+  ALSO IN FINAL STATE: cleanup removes the worktree standing on the merged branch whatever it is
+  called, and refuses only what is genuinely not this point's — the detached baseline checkouts
+  under `local/verify-baseline/` stay untouched.
   Criticality: med — no player-visible defect, but it is the one command that answers whether
   closed work is really in `main`.
   Bundle: Modell & Wächter.
