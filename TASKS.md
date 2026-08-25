@@ -11535,16 +11535,29 @@ to land than a mechanism that needs a review.
   sources, so the preflight can block where the guard allows for any cause, and its remedy text is
   chosen from the source it did not consult. 849 is worked first; this point is what remains after
   it and must not be worked beside it, because both edit the same liveness reading.
+  THE CLASS IS NOT SPECIFIC TO THAT GUARD, measured a second time 25.08.2026 on `main` at
+  `bfe8dbc5` while landing point 834: `guard-preflight --for merge` and `--for answer` both render
+  `mechanism-review-guard would-block: FOUR-EYES GATE ON MECHANISMS — UNREVIEWABLE`, while that
+  guard's OWN run path — its hook invocation with the session id on stdin — exits 0, because the
+  run path honours the assembly gap (16,384,795 characters of outstanding material against a
+  200,000-character round budget, so the demand is SUSPENDED for material) and the preflight gather
+  does not. Same shape, different guard, and the same practical cost: the preflight names a
+  remediation — assemble a cross-vendor review of the whole range — that provably cannot be
+  performed and that the guard does not actually demand. So the repair belongs to the SHARED
+  judgment, not to the one liveness probe.
   WHY IT MATTERS: the named remediation cannot clear the condition it is offered for. Only the
   ageing-out of the stale liveness window clears it, and a session that believes the advice pays a
   full unit/build/lint gate — measured ~140 s — for every repetition. A preflight that disagrees
   with its own guard also teaches sessions to discount it, which is the opposite of what it is for.
-  FINAL STATE: both paths judge the alert from ONE source, so the preflight verdict and the guard
-  verdict cannot disagree. Where a live parallel detection is genuinely a reason to block, the
-  preflight names THAT cause and its actual remedy instead of the doctor gate.
+  FINAL STATE: a guard's preflight verdict and its own run verdict come from ONE judgment, so they
+  cannot disagree — for the parallel-session alert and for the mechanism-review assembly gap alike.
+  Where a live parallel detection is genuinely a reason to block, the preflight names THAT cause
+  and its actual remedy instead of the doctor gate.
   VERIFIABLE: unit cases over the gather — a handled alert plus a live `detectParallel` hit yields
-  the same verdict as the guard's own path; a genuinely unhandled alert still blocks; and the
-  block text for a live-parallel cause names that cause rather than the doctor gate.
+  the same verdict as the guard's own path; a genuinely unhandled alert still blocks; the block
+  text for a live-parallel cause names that cause rather than the doctor gate; and a
+  mechanism-review range whose material cannot be assembled preflights as clean, exactly as the
+  guard's own path judges it.
   Criticality: low — no product behaviour; the cost is repeated full gates and a preflight whose
   verdicts a session learns to ignore.
   Bundle: Session- & Repo-Hygiene.
