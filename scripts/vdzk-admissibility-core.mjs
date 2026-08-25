@@ -37,7 +37,7 @@ export function namesOptions(text) {
   if (/\bentweder\b[\s\S]{0,400}\boder\b/i.test(prose)) return true
   // A lettered or numbered pair, each item on its own line — the shape a script
   // writing a genuine choice reaches for.
-  const bullets = prose.match(/^\s*(?:[(\[]?[a-d][)\].]|[1-4][).]|[-*•])\s+\S/gim) ?? []
+  const bullets = prose.match(/^\s*(?:[([]?[a-d][)\].]|[1-4][).]|[-*•])\s+\S/gim) ?? []
   if (bullets.length >= 2) return true
   // "… A oder B?" — the alternative inside the question itself.
   return /\boder\b[^.!?]*\?/i.test(prose)

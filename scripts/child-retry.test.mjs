@@ -3,7 +3,7 @@
 // edges cannot turn a correct decision into a wrong one, and that a broken
 // environment degrades instead of throwing.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { POINT_TOKEN_CAP } from './child-retry-core.mjs'
