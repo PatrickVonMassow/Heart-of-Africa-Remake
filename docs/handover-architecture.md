@@ -322,7 +322,9 @@ ends the process is the runtime's default rather than a policy the drill wrote f
 `codex` would survive a broken stdout is not ours to decide, and that is the argument for removing
 the pipe rather than for handling the error. The drill also refuses to conclude anything when the
 two shapes behave alike, which is what it did when an earlier harness sent the kill to the wrong
-process group.
+process group — and it names the pipe only for a death whose own log recorded the EPIPE: a pipes
+worker dead of an unrelated cause beside an escaped files worker is reported as unattributable,
+never as the proven mechanism.
 
 That correction matters, because the two bindings the first draft blamed are not lifetime
 bindings at all:
@@ -941,11 +943,16 @@ what records the outcome.
 **Adoption is proven by an OPERATION, never by a reading.** A fresh session that merely finds and
 labels the daemon and worker records proves nothing: checkpointing, cancellation, supervision or
 landing may all be broken behind a correct-looking list. The drill therefore requires, after the
-kill: the daemon still running under its recorded pid and start time; the worker still running and
-its branch carrying a NEW pushed SHA that did not exist at the moment of the kill; a fresh session
-acquiring the lock, presenting the new fence, and getting a new checkpoint request ACKNOWLEDGED by
-that daemon; and one post-adoption lifecycle operation completing — a cancellation that preserves
-the branch, or a landing.
+kill: the daemon still running under the pid and start time its durable record carried BEFORE the
+kill; the worker still running as the SAME process the lease named at spawn — pid and start time
+pinned across the kill, because continued pushes alone cannot tell a survivor from a replacement —
+and its branch carrying a NEW pushed SHA that did not exist at the moment of the kill; a fresh
+session acquiring the lock through the real acquisition path and DISCOVERING the daemon where a
+real successor does — reconciliation reading the record from durable state and writing the lock
+copy from it, with nothing handed over from the dead session but the stale credentials the fence
+probes must see refused; presenting the new fence and getting a new checkpoint request
+ACKNOWLEDGED by that daemon; and one post-adoption lifecycle operation completing — a cancellation
+that preserves the branch, or a landing.
 
 It runs as `node scripts/batch-daemon.mjs drill --scenario parent-death` and is a precondition of
 activation itself — the steps-8-and-9 slice the flag's interlock waits for — not a later trial.
