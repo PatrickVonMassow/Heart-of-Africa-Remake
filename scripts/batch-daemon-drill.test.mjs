@@ -15,7 +15,7 @@ import { startDaemon } from './batch-daemon.mjs'
 // the same run, so the drill itself is exercised exactly once.
 const exec = promisify(execFile)
 const drillCli = (...flags) =>
-  exec(process.execPath, ['scripts/batch-daemon.mjs', 'drill', ...flags], { maxBuffer: 16 * 1024 * 1024 }).then(
+  exec(process.execPath, ['scripts/batch-daemon.mjs', 'drill', ...flags], { maxBuffer: 16 * 1024 * 1024, windowsHide: true }).then(
     (r) => ({ ...r, code: 0 }),
     (err) => ({ stdout: err.stdout ?? '', stderr: err.stderr ?? '', code: err.code ?? -1 }),
   )
