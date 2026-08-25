@@ -102,6 +102,14 @@ put it is the mistake this line exists to stop.
   from before the boundary is well formed and from after it is not; plus a case over the guard
   showing the named commits no longer report UNREVIEWABLE for that reason; plus `npm run
   test:unit`, lint, build.
+  MEASURED WHILE FILING IT, so the successor does not repeat the probe: ten distinct malformed
+  rows stand behind the refusal (`042ffbf`, `5ce597c`, `65022b1`, `7db99ea`, `80b96e6`,
+  `c3f5ad8`, `e0ebcff`, `e1d242a`, `ece3757`, `f999250`, `fe20777`), and beside them one debt of
+  a different kind that this point also owes an answer: five commits report "the review was split
+  into 2 passes over the FILE SET and only 1 are on record". A COMPLETE scoped one-round review
+  recorded on 25.08.2026 for `8d69529` (GPT-5.6 Sol, verdict merge, all four end-state files)
+  did NOT clear that entry, so a scoped 1/1 record and a recorded 2-pass split do not meet — say
+  which of the two the file debt is measured against, and make the other one say so.
   Criticality: high — it blocks the batch at the turn end and its stated repair invites hand
   edits of the very ledger that carries the four-eyes evidence.
   Bundle: Session- & Repo-Hygiene.
