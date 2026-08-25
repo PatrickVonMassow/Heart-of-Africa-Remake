@@ -209,6 +209,15 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   wird an **einer** Stelle gelesen — wahr wegen des Codes, nie wegen des Checkouts. Grün bei dir
   und rot im Haken? Lass die Bedingung aus **beiden** Wurzeln laufen."
 
+- **Die Absage nennt einen Ausweg, den niemand gehen kann.** Der Wächter sperrt zu Recht oder zu
+  Unrecht — sicher ist nur, dass sein Reparaturvorschlag noch nie ausgeführt wurde. Er verlangt
+  dann einen Schritt, der längst getan ist, oder einen, den der Lesende gar nicht ausführen darf.
+  → *Prompt:* „Zu jedem neuen Wächter: **geh den Ausweg, den seine Meldung nennt, einmal wirklich**
+  — im auslösenden Zustand, nicht im gesunden. Zwei Zusatzfragen: Gilt der Weg auch für **den, der
+  die Meldung liest** (ein delegierter Agent hat andere Rechte als du)? Und nennt die Absage den
+  Grund, den sie **gemessen** hat, statt eine Handlung zu empfehlen, die der Aufrufer schon
+  ausgeführt hat?“
+
 - **Messung und Vorschau verunreinigt.** Halbfertiges gilt als ‚fertig'.
   → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
   miss auf einer ruhigen Maschine."
@@ -467,4 +476,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 4b6ff196397a6ebcc3fb7cd289d263f8913bfaa955e46c5ec1b964d32d0f143c -->
+<!-- GUIDE-FINGERPRINT: 881f092c7e323182be9b85a0dea910d91ddec78b5e0a9dc9dbc211f7085d464f -->
