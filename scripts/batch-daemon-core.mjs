@@ -17,6 +17,48 @@ import {
 } from './batch-schema-core.mjs'
 
 // ---------------------------------------------------------------------------
+// 0. ADMISSION — close first, then observe the workers that remain
+// ---------------------------------------------------------------------------
+
+export const OPEN_ADMISSION = Object.freeze({ open: true, reason: null })
+
+/** Closes the daemon's spawn door as state, before a boundary counts workers.
+ *  The reason is part of the durable command so every later refusal says which
+ *  boundary closed it. There is deliberately no reopen transition: a fresh
+ *  admission epoch belongs to the later boundary mechanism, not this seam. */
+export function closeAdmission({ admission = OPEN_ADMISSION, reason = null } = {}) {
+  if (admission?.open === false) {
+    return { ok: false, reason: `worker admission is already closed: ${admission.reason}` }
+  }
+  if (typeof reason !== 'string' || !reason.trim()) {
+    return { ok: false, reason: 'closing worker admission requires a journalled reason' }
+  }
+  return { ok: true, admission: Object.freeze({ open: false, reason: reason.trim() }) }
+}
+
+/** Rebuilds the admission fence from journalled commands. A compensation
+ *  cancels only its matching close; any other uncompensated close still holds.
+ *  Malformed close evidence fails closed — durable bytes saying the door was
+ *  closed may never be replayed as an open door merely because their reason is
+ *  unreadable. */
+export function admissionFromJournal(entries = []) {
+  const closures = new Map()
+  for (const [index, entry] of entries.entries()) {
+    if (entry?.kind !== 'command' || entry.quarantine) continue
+    if (entry.name === 'close-admission') {
+      const key = typeof entry.key === 'string' && entry.key ? entry.key : `unkeyed-close-at-${entry.seq ?? index}`
+      const reason = typeof entry.payload?.reason === 'string' && entry.payload.reason.trim()
+        ? entry.payload.reason.trim()
+        : 'the journalled close-admission reason is unreadable'
+      closures.set(key, { open: false, reason })
+    } else if (entry.name === 'close-admission:compensated' && typeof entry.key === 'string' && entry.key.endsWith(':comp')) {
+      closures.delete(entry.key.slice(0, -':comp'.length))
+    }
+  }
+  return [...closures.values()].at(-1) ?? OPEN_ADMISSION
+}
+
+// ---------------------------------------------------------------------------
 // 1. THE GLOBAL CAP (union M9)
 // ---------------------------------------------------------------------------
 
@@ -51,7 +93,13 @@ export function unknownStateAttempts(attempts = []) {
   })
 }
 
-export function mayStartAttempt({ attempts = [], cap = DAEMON_POOL_CAP } = {}) {
+export function mayStartAttempt({ attempts = [], cap = DAEMON_POOL_CAP, admission = OPEN_ADMISSION } = {}) {
+  if (admission?.open !== true) {
+    const reason = typeof admission?.reason === 'string' && admission.reason.trim()
+      ? admission.reason.trim()
+      : 'the admission closure carries no readable reason'
+    return { ok: false, reason: `worker admission is closed: ${reason}; no new worker may start` }
+  }
   const active = activeAttemptCount(attempts)
   if (active >= cap) {
     const unknown = unknownStateAttempts(attempts).length
