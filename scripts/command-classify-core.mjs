@@ -411,7 +411,7 @@ function hasShellCommandArgument(args) {
 
 /** Shell invocation modes that execute stdin instead of a named script. */
 function shellExecutesStdin(args) {
-  if (hasShellCommandArgument(args) || hasFlag(args, ['--help', '--version'])) return false
+  if (hasShellCommandArgument(args)) return false
   let forced = false
   const valueFlags = new Set(['-O', '-o', '--init-file', '--rcfile'])
   for (let i = 0; i < args.length; i++) {
@@ -434,7 +434,7 @@ function nodeExecutesStdin(args) {
   const valueFlags = new Set(['-e', '--eval', '-p', '--print', '-r', '--require', '--import', '--loader'])
   for (let i = 0; i < args.length; i++) {
     const text = args[i].text
-    if (/^(?:-[epc]|--(?:eval|print|check))(?:=|$)/.test(text)) return false
+    if (/^(?:-[epc]|--(?:eval|print|check)(?:=|$))/.test(text)) return false
     if (text === '-') return true
     if (text === '--') return !args[i + 1] || args[i + 1].text === '-'
     if (text.startsWith('-')) {
@@ -468,6 +468,7 @@ function executesAttachedStdin(seg) {
   if (!attached) return false
   const head = commandHead(seg)
   const args = argsOf(seg)
+  if (hasFlag(args, ['--help', '--version'])) return false
   if (head === 'sh' || head === 'bash' || head === 'zsh') return shellExecutesStdin(args)
   if (head === 'node') return nodeExecutesStdin(args)
   if (/^python(?:\d+(?:\.\d+)*)?$/.test(head)) return pythonExecutesStdin(args)

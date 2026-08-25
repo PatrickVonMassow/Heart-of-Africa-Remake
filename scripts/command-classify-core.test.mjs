@@ -235,11 +235,14 @@ describe('interpreters that execute code from stdin', () => {
   it('keeps explicit commands, named scripts, and non-interpreters at their existing intent', () => {
     expect(isMutatingSegment("sh -c 'git status'")).toBe(false)
     expect(isMutatingSegment("echo input | sh -c 'git status'")).toBe(false)
+    expect(isMutatingSegment("echo input | node -pe 'input'")).toBe(false)
+    expect(isMutatingSegment('echo input | python -c "print(1)"')).toBe(false)
     expect(isMutatingSegment('printf input | bash scripts/report.sh')).toBe(false)
     expect(isMutatingSegment(['node scripts/report.mjs <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
     expect(isMutatingSegment(['python report.py <<EOF', 'input', 'EOF'].join('\n'))).toBe(false)
     expect(isMutatingSegment('git log | grep push')).toBe(false)
     expect(isMutatingSegment(['cat <<EOF', 'git push', 'EOF'].join('\n'))).toBe(false)
+    expect(isMutatingSegment('printf input | node --help')).toBe(false)
   })
 
   it('distinguishes a pipe (including a continued one) from boolean OR', () => {
