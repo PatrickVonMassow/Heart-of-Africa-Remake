@@ -141,7 +141,7 @@ const repeatedFlag = (args) => {
  * its promised card is the worse half-written state. */
 function recordDecisionCard(card) {
   try {
-    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', card.title, card.body], {
+    execFileSync(process.execPath, ['scripts/board.mjs', 'vdzk-add', '--automated', card.title, card.body], {
       cwd: repoPath('.'),
       encoding: 'utf8',
       windowsHide: true,

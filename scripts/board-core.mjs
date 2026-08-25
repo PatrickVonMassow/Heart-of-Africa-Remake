@@ -12,6 +12,9 @@ import { namesFollowOnWork } from './handover-card-contract.mjs'
 // The derived state card's vocabulary lives beside the derivation itself, so the
 // renderer here and the module that decides WHAT to report cannot drift apart.
 import { AUTOMATIC_DECISION_TITLE, DERIVED_STATE_KIND, PAUSED_TITLE } from './board-state-core.mjs'
+// The admissibility rule for a card written by a script, kept beside the guard's
+// own notion of "this asks the user" rather than restated here.
+import { judgeAutomatedCard } from './vdzk-admissibility-core.mjs'
 
 export { namesFollowOnWork }
 
@@ -1366,7 +1369,15 @@ export function parseClosingArgs(rest) {
  * name a command. The card carries a TITLE ONLY in its collapsed header, per the
  * board's binding structure, and the body says what is to be decided.
  */
-export function addVdzk(html, title, text) {
+export function addVdzk(html, title, text, { automated = false } = {}) {
+  // AN AUTOMATED CALLER IS HELD TO THE RULE, NOT REMINDED OF IT (point 749). A
+  // script has no judgement to apply, so the board asks for the two things that
+  // make a card a decision — it asks, and it names the options — and refuses
+  // anything else with the place its information does belong.
+  if (automated) {
+    const verdict = judgeAutomatedCard({ title, body: text })
+    if (!verdict.ok) throw new Error(verdict.reason)
+  }
   // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
   // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
   // a paste of it is the LIKELY first call — and an unescaped `<` produces a card

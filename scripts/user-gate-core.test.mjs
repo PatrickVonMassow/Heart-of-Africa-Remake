@@ -401,7 +401,9 @@ describe('advisory decision record and legacy migration', () => {
     expect(card.body).toContain('Entscheidung: use blue')
     expect(card.body).toContain('Evidenz: the existing tokens use blue')
     expect(card.body).toContain('Folge: the point continues')
-    expect(card.body).toContain('Exakte Veto-Aktion: reply Veto blue and revert commit abc')
+    expect(card.body).toContain('exakte Veto-Aktion: reply Veto blue and revert commit abc')
+    // Point 749: the card must NAME the user's options, or the board API refuses it.
+    expect(card.body).toContain('Deine Möglichkeiten')
   })
 
   it('prepares both marker and card only for an advisory question', () => {
@@ -417,7 +419,7 @@ describe('advisory decision record and legacy migration', () => {
     const prepared = prepareAdvisoryDecision(source, 20, fields)
     expect(prepared).toMatchObject({ ok: true, question: fields.question })
     expect(prepared.text).toContain('SELF-DECIDED(2026-08-23; use blue)')
-    expect(prepared.card.body).toContain('Exakte Veto-Aktion')
+    expect(prepared.card.body).toContain('exakte Veto-Aktion')
 
     const trueConfirmation = prepareAdvisoryDecision(source, 20, { ...fields, question: confirmation })
     expect(trueConfirmation).toMatchObject({ ok: false, text: source, card: null })

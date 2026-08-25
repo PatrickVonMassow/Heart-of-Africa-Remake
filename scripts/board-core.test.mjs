@@ -498,6 +498,26 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     expect(cards[0].body).toContain('&amp;')
   })
 
+  it('REFUSES an automated status report and names the section it belongs in (point 749)', () => {
+    const b = fullBoard({ vdzk: '' })
+    const report = 'Der Batch hat sich selbst pausiert, weil ein Alarm fünfmal unbeantwortet blieb.'
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/not a user decision/)
+    expect(() => addVdzk(b, 'Batch pausiert', report, { automated: true })).toThrow(/Woran ich gerade arbeite/)
+    // A session's own judgement is not second-guessed — the flag is what a SCRIPT
+    // declares about itself, and `decision-card-guard` holds sessions to the rule.
+    expect(addVdzk(b, 'Batch pausiert', report)).toContain('Batch pausiert')
+  })
+
+  it('admits an automated card that names a choice and its options', () => {
+    const out = addVdzk(
+      fullBoard({ vdzk: '' }),
+      'Rasterung der Höhenkarte',
+      'Deine Möglichkeiten: die Entscheidung stehen lassen, oder sie zurücknehmen — antworte „Veto Rasterung".',
+      { automated: true },
+    )
+    expect(out).toContain('Rasterung der Höhenkarte')
+  })
+
   it('refuses a card with no title or no question — an empty card asks nothing', () => {
     const b = fullBoard({ vdzk: '' })
     expect(() => addVdzk(b, '', 'Die Frage.')).toThrow(/needs a title/)

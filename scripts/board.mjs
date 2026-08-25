@@ -14,7 +14,8 @@
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
 //   node scripts/board.mjs closing <point> "<reason>"  # …still owed: its closing duties
-//   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
+//   node scripts/board.mjs vdzk-add ["--automated"] "<title>" "<question>"
+//                                                     # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs vdzk-keep "<title>" [...] # message did not answer it
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
@@ -296,11 +297,16 @@ try {
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
     // turn whose reply asks for a decision with no card standing for it, and this
     // is the command its remedy names.
-    const [title, ...words] = rest
+    // A SCRIPT DECLARES ITSELF WITH --automated (point 749). Four of them used to
+    // file status reports here; the flag routes the card through the
+    // admissibility rule, which refuses anything that is not a named choice and
+    // says where batch state belongs instead.
+    const automated = rest.includes('--automated')
+    const [title, ...words] = rest.filter((arg) => arg !== '--automated')
     if (!title || (words.length === 0 && !stdinText.trim())) {
-      throw new Error('usage: board.mjs vdzk-add "<title>" "<question>"|--text-stdin')
+      throw new Error('usage: board.mjs vdzk-add [--automated] "<title>" "<question>"|--text-stdin')
     }
-    edit((html) => addVdzk(html, title, textOf(words)), `open question added: ${title}`)
+    edit((html) => addVdzk(html, title, textOf(words), { automated }), `open question added: ${title}`)
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
@@ -352,7 +358,7 @@ try {
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'none "<reason>" | closing <point> ["--title <Betreff>"] "<reason>" | ' +
-        'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
+        'vdzk-add [--automated] "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'vdzk-keep "<title>" [...] [--why "<reason>"] | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,

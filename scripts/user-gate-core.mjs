@@ -613,9 +613,15 @@ export function advisoryDecisionCard(point, { decision = '', evidence = '', cons
     ok: true,
     error: '',
     title: `Entscheidungsprotokoll: Punkt ${Number(point)} läuft weiter`,
+    // THE CARD NAMES THE CHOICE, not only the record (point 749). "Von dir zu
+    // klären" holds decisions the user can make, and the board API now refuses an
+    // automated card that leaves him nothing to answer — a self-decided point
+    // gives him exactly two, and the second one needs its exact action spelled
+    // out or the veto is not actually reachable.
     body:
       `Entscheidung: ${fields.decision}. Evidenz: ${fields.evidence}. ` +
-      `Folge: ${fields.consequence}. Exakte Veto-Aktion: ${fields.vetoAction}.`,
+      `Folge: ${fields.consequence}. Deine Möglichkeiten: die Entscheidung stehen lassen, ` +
+      `oder sie zurücknehmen — exakte Veto-Aktion: ${fields.vetoAction}.`,
   }
 }
 
