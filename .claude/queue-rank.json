@@ -701,6 +701,12 @@
       "why": "Reine Effizienzbereinigung ohne Korrektheitsverlust; sie kann erst nach 903 gearbeitet werden, dessen Code sie ändert — hinten ist der richtige Platz",
       "origin": "machine",
       "place": "last"
+    },
+    "906": {
+      "at": "2026-08-25T02:50:59.229Z",
+      "why": "Machine-filed, loses no work: the run stays blind for its remainder but its commits survive, so it waits behind the release like the other reporting defects of its class",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -748,7 +754,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T02:39:19.892Z",
+    "at": "2026-08-25T02:50:59.237Z",
     "points": [
       174,
       184,
@@ -1033,7 +1039,8 @@
       901,
       902,
       904,
-      905
+      905,
+      906
     ]
   }
 }
