@@ -719,6 +719,12 @@
       "why": "Die Messung ist heute richtig; das Risiko ist Drift, und keine offene Arbeit haengt daran.",
       "origin": "machine",
       "place": "last"
+    },
+    "912": {
+      "at": "2026-08-25T09:31:29.682Z",
+      "why": "Letzter Platz ist richtig: maschinell gefunden, nichts haengt daran, und der Nachbar-Drillpunkt 911 steht unmittelbar davor — zusammen abzuarbeiten ist billiger als getrennt.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -766,7 +772,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T08:53:59.950Z",
+    "at": "2026-08-25T09:31:29.691Z",
     "points": [
       174,
       184,
@@ -1054,7 +1060,8 @@
       908,
       909,
       910,
-      911
+      911,
+      912
     ]
   }
 }
