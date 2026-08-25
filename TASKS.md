@@ -11254,6 +11254,13 @@ to land than a mechanism that needs a review.
   `.claude/mechanism-reviews.jsonl`, `TASKS.md` and `docs/tasks-archive.md` each exceed the budget
   alone, so no split can cover the range; `scripts/mechanism-review-guard-gap-core.mjs` is the single
   wording of that ruling and preflight does not consult it.
+  RECURRED 25.08.2026 at `df540a3f` and again 26.08.2026 at `a2d9d0c2`, both times in the same tree
+  seconds apart: the preflight row still reads "would-block: UNREVIEWABLE" while the guard's own Stop
+  path rules the gap and lets the turn end. It was filed a SECOND time, as point 923, because nothing
+  compared the new finding against the open set; 923 is folded into this point, and its demand is
+  carried here — parity must cover the FINDING KIND as well as the block/allow decision, or the
+  preflight row must state in its own words which extra condition it judges that the Stop path does
+  not, so a difference reads as a stated difference rather than a contradiction.
   WHAT IT COSTS: preflight is the batch's advertised pre-action oracle — CLAUDE.md §7.2 sends every
   governed action through it. Acting on its verdict, this session planned a 64-pass review round over
   13.8 M characters that the real gate does not demand, and only caught it by running the guard by
