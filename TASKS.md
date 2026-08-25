@@ -12234,3 +12234,30 @@ to land than a mechanism that needs a review.
   Criticality: medium — no product behaviour, but it leaks live processes and makes the
   doctor's consistency verdict untrue in the one place the batch relies on it.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 914. A multi-pass review's diffstat is pass-scoped while its manifest swears it is
+  whole-range, so the reviewer cannot place the material in its range. MEASURED 25.08.2026 by
+  GPT-5.6 Sol's pass 1/2 over point 907's range (`ca6b81f..1af4456`): the reviewer refused to
+  conclude because "the diffstat lists only the ledger — not the two scripts declared absent by
+  design", so the material could not establish that the four shas it carried belong to the stated
+  range. It is right. `formatPassManifest` (`scripts/review-material-core.mjs:111-112`) writes
+  "The DIFFSTAT below describes the WHOLE range for context: it names files this pass deliberately
+  omits", and `assemblePass` (`scripts/review-sol.mjs:529-534`) repeats the promise in its own
+  comment — but the range it is handed is `gatherRange(sha, base, group.files)`
+  (`scripts/review-sol.mjs:405`), whose stat is `git diff --stat <range> -- <group files>`
+  (`scripts/review-sol.mjs:325`). The diffstat is therefore scoped to the AUTHORSHIP GROUP and
+  never to the range.
+  WHAT IT COSTS: this is the same class the manifest exists to close, one level down. Its own
+  comment (`scripts/review-material-core.mjs:78-96`) records that three of four passes were
+  refused a conclusion because the material lied about its own shape; the file list was then made
+  honest and the diffstat beside it was not. Every multi-pass cross-vendor review is affected —
+  that is the four-eyes gate on every range too large for one round — and the reviewer's refusal
+  reads as a defect of the reviewed work rather than of the material.
+  FINAL STATE: the material's diffstat is the whole range's, or the manifest states the scope the
+  diffstat actually has. One statement, and the two cannot drift apart again.
+  VERIFIABLE: a unit case over a two-group plan that asserts the shipped DIFFSTAT names every
+  changed file of the range — or, if the scoped stat is kept, that the manifest sentence names
+  that scope; `npm run test:unit`, lint, build.
+  Criticality: high — it is the material the four-eyes gate judges on, and a reviewer that cannot
+  place its material either refuses honest work or clears what it could not read.
+  Bundle: Modell & Wächter.

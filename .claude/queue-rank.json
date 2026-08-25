@@ -725,6 +725,12 @@
       "why": "It reddens npm run test:unit, the gate every landing and the release closing itself must run, and a retry is SUSPECT under CLAUDE.md 7.2 — so the release cannot be closed past it, only through it.",
       "origin": "machine",
       "place": "ahead"
+    },
+    "914": {
+      "at": "2026-08-25T11:44:32.511Z",
+      "why": "It stands behind the release: the four-eyes gate still works — the reviewer refuses honestly rather than clearing blind — and the range that hits it is the oversized one, not every review.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -772,7 +778,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T11:09:32.247Z",
+    "at": "2026-08-25T11:44:32.520Z",
     "points": [
       174,
       184,
@@ -1061,7 +1067,8 @@
       910,
       911,
       912,
-      913
+      913,
+      914
     ]
   }
 }
