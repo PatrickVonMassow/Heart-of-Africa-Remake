@@ -77,31 +77,6 @@ then point 633 (the closing run), then point 174 (the tag). A newly appended poi
 kind is MOVED to the front in the same turn that files it; leaving it where append-and-defer
 put it is the mistake this line exists to stop.
 
-- [ ] 907. An interpreter fed from a here-document or a pipe hides its writes from the main-write
-  fence. MEASURED 25.08.2026 on `feat/879-help-and-git-write-fence` at `d853edbb`, against the live
-  module: `isMutatingSegment('bash <<EOF\ngit push\nEOF')` is `false`, and so is
-  `isMutatingSegment("echo 'git push' | bash")`. Point 879 was right to stop lexing here-document
-  BODIES as commands — that over-block cost real turns on quoted board and chat text, and its own
-  header at `command-classify-core.mjs:22` forbids it — but the same step opens the interpreter
-  case: any head that EXECUTES ITS STANDARD INPUT (`bash`, `sh`, `zsh`, `node -`, `python -`) turns
-  text the classifier deliberately skipped back into commands it never sees. The pipe half is older
-  than 879 and equally unblocked, so this is ONE gap with two mouths rather than a regression that
-  point introduced.
-  WHAT IT COSTS: `command-classify-core.mjs` answers "does this call write" for the lockless-main
-  fence, the board gate and the context fence at once, so a session holding no batch lock can move
-  `refs/heads/main` by handing the push to an interpreter instead of running it — the same class
-  point 879 closed for `--help` and the ref-moving git subcommands, reached by a different door.
-  FINAL STATE: a head whose stdin is executable code counts as a WRITE whenever it receives a
-  here-document or a pipe, on the same reasoning `MUTATING_SCRIPTS` already uses — what an
-  interpreter will do with input is not decidable from outside, so the fence takes the safe side.
-  A bare interpreter with no stdin attached, and one reading a NAMED script file, keep whatever
-  they classify as today; the change is about input the classifier cannot read.
-  VERIFIABLE: unit cases in both directions over the measured strings above — `bash <<EOF … git
-  push … EOF`, `echo 'git push' | bash`, `sh -c 'git status'`, a pipe into a non-interpreter such
-  as `git log | grep push`, and a here-document into `cat`, which must stay a read.
-  Criticality: high — a lockless session may move main.
-  Bundle: Session- & Repo-Hygiene.
-
 - [ ] 880. The four-eyes duty can be cleared without an independent review, six measured ways.
   MEASURED 24.08.2026 by the cross-vendor review of `1862687` and `e0ebcff` (both recorded
   `do-not-merge`), each route executed against `evaluateMechanismReview`/`validateRecord`:
