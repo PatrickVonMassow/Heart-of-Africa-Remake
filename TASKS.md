@@ -12146,3 +12146,25 @@ to land than a mechanism that needs a review.
   Criticality: high — it is the lease that keeps two writers apart, and a lease nobody can hand back
   is one that only expiry ends.
   Bundle: unbundled (batch autonomy).
+
+- [ ] 905. The Git-only point-file fallback re-lists every merge on main once per review row.
+  MEASURED 25.08.2026 on `main` at `6715d078`, by the cross-vendor review of point 903.
+  `scripts/criticality-review-guard.mjs:measurePointFilesWithoutCommission` runs the full
+  `git log --first-parent --merges --reverse HEAD` — 354 merges on main today — and, on a miss, the
+  `for-each-ref` lane listing as well, ONCE PER uncommissioned review row, because
+  `attachPointFileSets` calls it per row with no shared state. The criticality gate's Stop-hook run
+  went from 0.22 s to 0.65 s with the two HIGH points ticked at that HEAD (~22 rows), and the same
+  routine over all 829 uncommissioned ledger rows costs 16.2 s — roughly 20 ms per invocation,
+  dominated by re-reading the merge list. The cost is (ticked HIGH points × their review rows) ×
+  main's merge count, and the merge count only grows; a stretch where the gate blocks several
+  self-authored HIGH points at once pays it on EVERY turn end. This is not a correctness defect: the
+  measurement point 903 introduced is right, and the blocking condition it was written for is
+  genuinely fixed.
+  FINAL STATE: the landing listing and the lane-ref listing are read ONCE per assessment and passed
+  into the per-row measurement, so the guard's cost stops scaling with the number of review rows.
+  VERIFIABLE: unit cases over the wrapper — measuring several rows of the same point issues the
+  landing listing once, not once per row, and the file sets measured are identical to those the
+  per-row route produced; the guard's `--status` on a repository with the ledger's uncommissioned
+  rows stays under the runtime it had before the listing was hoisted.
+  Criticality: low — it costs time on every turn end, it loses nothing.
+  Bundle: Modell & Wächter.
