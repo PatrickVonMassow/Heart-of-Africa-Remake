@@ -65,12 +65,15 @@ describe('live handover attribution', () => {
       },
     )
     observeRamp('git status --short --branch', 8_000, 7_000)
-    observeRamp('node scripts/point-brief.mjs 753', 10_000, 8_000)
-    observeRamp('npm run test:unit', 11_500, 9_000)
+    observeRamp('node scripts/focus.mjs show', 9_000, 8_000)
+    observeRamp('node scripts/batch-doctor.mjs --repair', 10_000, 9_000)
+    observeRamp('node scripts/point-brief.mjs 753', 11_000, 10_000)
+    observeRamp('npm run test:unit', 12_500, 11_000)
 
     expect(memory.lines.map((line) => line.stage)).toEqual([
       'exit.boundary-demanded', 'exit.prepare', 'exit.board-card', 'exit.board-publish', 'exit.commit',
-      'idle.launcher', 'ramp.session-start', 'ramp.orientation', 'ramp.brief', 'ramp.first-work-call',
+      'idle.launcher', 'ramp.session-start', 'ramp.orientation', 'ramp.board-first', 'ramp.repair',
+      'ramp.brief', 'ramp.first-work-call',
     ])
     expect(new Set(memory.lines.map((line) => line.recordId)).size).toBe(memory.lines.length)
     expect(memory.lines.find((line) => line.stage === 'idle.launcher')).toMatchObject({

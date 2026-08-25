@@ -4,6 +4,7 @@ import {
   addHandoverAttributionCheckpoint,
   beginHandoverAttribution,
   exitStageForCall,
+  rampCallBearsWork,
   rampStageForCall,
 } from './handover-attribution-core.mjs'
 
@@ -90,12 +91,41 @@ describe('successor ramp classification', () => {
   it.each([
     ['node scripts/batch-in-flight.mjs --adopt', '', 'ramp.adoption'],
     ['node scripts/board-first-guard.mjs --status', '', 'ramp.board-first'],
+    ['node scripts/focus.mjs show', '', 'ramp.board-first'],
     ['node scripts/point-brief.mjs 752', '', 'ramp.brief'],
     ['rg -n "^- \\[ \\]" TASKS.md', '', 'ramp.queue'],
+    ['node scripts/queue-rank.mjs', '', 'ramp.queue'],
+    ['node scripts/finding.mjs --drain', '', 'ramp.queue'],
+    ['node scripts/guard-preflight.mjs --for answer --session next', '', 'ramp.preflight'],
+    ['node scripts/batch-doctor.mjs --repair', '', 'ramp.repair'],
+    ['node scripts/ci-status-guard.mjs', '', 'ramp.ci-status'],
+    ['node scripts/batch-boundary.mjs --status', '', 'ramp.boundary-status'],
     ['git status --short --branch', '', 'ramp.orientation'],
     ['', '/workspace/hoa/TASKS.md', 'ramp.queue'],
-    ['npm run test:unit', '', 'ramp.first-work-call'],
+    ['node scripts/new-ramp-duty.mjs --status', '', 'ramp.mechanical-call'],
   ])('classifies command %s and path %s as %s', (command, filePath, stage) => {
-    expect(rampStageForCall({ command, filePath })).toBe(stage)
+    expect(rampStageForCall({ toolName: 'Bash', command, filePath })).toBe(stage)
+  })
+
+  it.each([
+    [{ toolName: 'Bash', command: 'npm run build' }],
+    [{ toolName: 'Bash', command: 'npm run test:unit' }],
+    [{ toolName: 'Bash', command: 'node scripts/verify/world.mjs' }],
+    [{ toolName: 'Bash', command: 'git commit -m done' }],
+    [{ toolName: 'Edit', filePath: '/workspace/hoa/src/App.tsx' }],
+    [{ toolName: 'Write', filePath: 'scripts/new-helper.mjs' }],
+    [{ toolName: 'Agent' }],
+  ])('ends the ramp only on positive work evidence: %o', (call) => {
+    expect(rampCallBearsWork(call)).toBe(true)
+    expect(rampStageForCall(call)).toBe('ramp.first-work-call')
+  })
+
+  it.each([
+    { toolName: 'Bash', command: 'rg "npm run test:unit" scripts' },
+    { toolName: 'Read', filePath: 'scripts/example.mjs' },
+    { toolName: 'Bash', command: 'node scripts/new-ramp-duty.mjs --status' },
+  ])('does not infer work from mentions or an unknown process call: %o', (call) => {
+    expect(rampCallBearsWork(call)).toBe(false)
+    expect(rampStageForCall(call)).toBe('ramp.mechanical-call')
   })
 })

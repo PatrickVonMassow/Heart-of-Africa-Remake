@@ -1,4 +1,11 @@
 // Pure state machine for token- and elapsed-time attribution across one handover.
+import {
+  expandSegments,
+  gitSubcommand,
+  headAndArgs,
+  segmentInvokesPathWhere,
+  segmentInvokesScript,
+} from './command-classify-core.mjs'
 
 export const HANDOVER_ATTRIBUTION_V = 1
 
@@ -170,6 +177,47 @@ const commandOf = (call = {}) => String(call.command ?? call.toolInput?.command 
 const pathOf = (call = {}) =>
   String(call.filePath ?? call.toolInput?.file_path ?? call.toolInput?.notebook_path ?? '').replace(/\\/g, '/').toLowerCase()
 
+const FILE_WORK_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+const WORK_SCRIPT = /^(?:build|lint|test(?::.*)?|typecheck(?::.*)?)$/
+const WORK_BINS = new Set(['vitest', 'playwright', 'tsc', 'vite', 'oxlint'])
+
+function packageCommandStartsWork(head, args) {
+  const words = args.map((arg) => arg.text).filter((word) => word && word !== '--' && !word.startsWith('-'))
+  if (head === 'npm' || head === 'pnpm') {
+    const runAt = words.findIndex((word) => word === 'run' || word === 'run-script')
+    if (runAt >= 0) return WORK_SCRIPT.test(words[runAt + 1] ?? '')
+    return ['test', 't', 'tst'].includes(words[0] ?? '')
+  }
+  if (head === 'yarn') {
+    const script = words[0] === 'run' ? words[1] : words[0]
+    return WORK_SCRIPT.test(script ?? '')
+  }
+  if (head === 'npx') return WORK_BINS.has(words[0] ?? '')
+  return WORK_BINS.has(head)
+}
+
+/** Positive evidence that this call begins repository work rather than ramp mechanics. PURE. */
+export function rampCallBearsWork(call = {}) {
+  const tool = String(call.toolName ?? call.name ?? '').trim()
+  const path = pathOf(call)
+  if (FILE_WORK_TOOLS.has(tool) && /(?:^|\/)(?:src|scripts)\//.test(path)) return true
+  if (tool === 'Agent' || tool === 'Task') return true
+  if (tool !== 'Bash' && tool !== 'PowerShell') return false
+  try {
+    return expandSegments(commandOf(call)).some((segment) => {
+      if (gitSubcommand(segment) === 'commit') return true
+      const { head, args } = headAndArgs(segment)
+      if (packageCommandStartsWork(head, args)) return true
+      if (segmentInvokesPathWhere(segment, (candidate) => /(?:^|\/)scripts\/verify\/[^/]+\.mjs$/.test(candidate))) {
+        return true
+      }
+      return segmentInvokesScript(segment, ['author-sol.mjs', 'author-fable.mjs', 'review-sol.mjs', 'ask-sol.mjs'])
+    })
+  } catch {
+    return false
+  }
+}
+
 /** Which outgoing bookkeeping step did a completed tool call carry? PURE. */
 export function exitStageForCall(call = {}) {
   const command = commandOf(call)
@@ -186,13 +234,22 @@ export function exitStageForCall(call = {}) {
 export function rampStageForCall(call = {}) {
   const command = commandOf(call)
   const path = pathOf(call)
+  if (rampCallBearsWork(call)) return 'ramp.first-work-call'
   if (/batch-in-flight\.mjs\b/.test(command)) return 'ramp.adoption'
-  if (/(?:board-first|board-publish|dashboard|board)\S*\.mjs\b/.test(command)) return 'ramp.board-first'
+  if (/(?:board-first|board-publish|dashboard|board|focus)\S*\.mjs\b/.test(command)) return 'ramp.board-first'
   if (/point-brief\.mjs\b/.test(command) || /point-brief/.test(path)) return 'ramp.brief'
-  if (/\btasks\.md\b|docs\/tasks-archive\.md/.test(command) || /\/(?:tasks\.md|tasks-archive\.md)$/.test(path)) return 'ramp.queue'
+  if (
+    /(?:queue-rank|finding)\.mjs\b/.test(command) ||
+    /\btasks\.md\b|docs\/tasks-archive\.md/.test(command) ||
+    /\/(?:tasks\.md|tasks-archive\.md)$/.test(path)
+  ) return 'ramp.queue'
+  if (/guard-preflight\.mjs\b/.test(command)) return 'ramp.preflight'
+  if (/batch-doctor\.mjs\b/.test(command)) return 'ramp.repair'
+  if (/ci-status-guard\.mjs\b/.test(command)) return 'ramp.ci-status'
+  if (/batch-boundary\.mjs\s+--status\b/.test(command)) return 'ramp.boundary-status'
   if (
     /(?:^|(?:&&|\|\||;)\s*)git\s+(?:status|branch|rev-parse)\b/.test(command) ||
     /worktree-bootstrap\.mjs\b/.test(command)
   ) return 'ramp.orientation'
-  return 'ramp.first-work-call'
+  return 'ramp.mechanical-call'
 }
