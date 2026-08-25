@@ -57,6 +57,16 @@ export const STEPS_REQUIRED_FOR_ACTIVATION = Object.freeze([1, 2, 3, 4, 8, 9, 12
  *  that lands with those mechanisms and their evidence. */
 export const REQUIRED_BOUNDARY_MODE = 'drain-before-boundary'
 
+/** Commit-visible evidence that the REQUIRED boundary mode is enforced, not
+ *  merely named by the flag. This is separate from the ordered-work steps: the
+ *  mode is an activation condition in its own right, and a reviewed change must
+ *  turn this entry green only when the daemon-side admission fence exists. */
+export const DURABLE_LANE_BOUNDARY_MECHANISM = Object.freeze({
+  title: 'drain-before-boundary enforcement',
+  green: false,
+  evidence: null,
+})
+
 /** Refuses enabling while any required step is not green, and names every step it
  *  is waiting for rather than the first one — an operator who fixes one at a time
  *  learns nothing from a refusal that moves. */
@@ -64,6 +74,7 @@ export function activationDecision({
   steps = DURABLE_LANE_STEPS,
   required = STEPS_REQUIRED_FOR_ACTIVATION,
   boundaryMode = null,
+  boundaryMechanism = DURABLE_LANE_BOUNDARY_MECHANISM,
 } = {}) {
   // AFFIRMATIVE, the same rule the liveness probes follow: `green` must BE `true`,
   // not merely truthy, and evidence must be a real string — a manifest that says
@@ -77,6 +88,17 @@ export function activationDecision({
     const named = missing.map((n) => `${n} (${steps[n]?.title ?? 'unknown step'})`).join(', ')
     return { ok: false, missing, reason: `the durable lane may not be enabled while these steps are not green: ${named}` }
   }
+  if (
+    boundaryMechanism?.green !== true ||
+    typeof boundaryMechanism?.evidence !== 'string' ||
+    !boundaryMechanism.evidence.trim()
+  ) {
+    return {
+      ok: false,
+      missingBoundaryMechanism: true,
+      reason: `the durable lane may not be enabled without green evidence for the boundary mechanism: ${boundaryMechanism?.title ?? 'drain-before-boundary enforcement'}`,
+    }
+  }
   if (boundaryMode !== REQUIRED_BOUNDARY_MODE) {
     return {
       ok: false,
@@ -89,11 +111,15 @@ export function activationDecision({
 /** The one question the flag answers. A daemon may be started only when the flag is
  *  on AND the interlock allows the flag to be on — the second condition is checked
  *  again here, so a hand-edited flag file cannot open the door the interlock closed. */
-export function mayStartDaemon({ flag = null, steps = DURABLE_LANE_STEPS } = {}) {
+export function mayStartDaemon({
+  flag = null,
+  steps = DURABLE_LANE_STEPS,
+  boundaryMechanism = DURABLE_LANE_BOUNDARY_MECHANISM,
+} = {}) {
   // A flag file is hand-editable, so only the affirmative value counts: anything
   // that is not exactly `true` — including a truthy 1 or 'yes' — reads as off.
   if (flag?.enabled !== true) return { ok: false, reason: 'the durable lane is off; today\'s authoring path runs unchanged' }
-  const interlock = activationDecision({ steps, boundaryMode: flag.boundaryMode })
+  const interlock = activationDecision({ steps, boundaryMode: flag.boundaryMode, boundaryMechanism })
   if (!interlock.ok) return { ok: false, reason: interlock.reason, missing: interlock.missing }
   return { ok: true }
 }
@@ -105,6 +131,7 @@ export function flagChange({
   flag = null,
   enable = false,
   steps = DURABLE_LANE_STEPS,
+  boundaryMechanism = DURABLE_LANE_BOUNDARY_MECHANISM,
   boundaryMode = flag?.boundaryMode ?? null,
   at = null,
   by = null,
@@ -112,7 +139,7 @@ export function flagChange({
   // Anything that is not the affirmative `true` DISABLES: turning off is the safe
   // direction, so a malformed request lands there rather than at the gated one.
   if (enable !== true) return { ok: true, flag: { enabled: false, changedAt: at, changedBy: by } }
-  const interlock = activationDecision({ steps, boundaryMode })
+  const interlock = activationDecision({ steps, boundaryMode, boundaryMechanism })
   if (!interlock.ok) return { ok: false, reason: interlock.reason, missing: interlock.missing }
   return { ok: true, flag: { ...flag, enabled: true, boundaryMode, changedAt: at, changedBy: by } }
 }
