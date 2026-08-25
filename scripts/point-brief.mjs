@@ -60,6 +60,48 @@ function gitRevision() {
 }
 
 /**
+ * THE IMPLEMENTATION DIFF, when there already is one (point 598, correction
+ * 23.08.2026). A brief is normally cut BEFORE any code exists, and then the only
+ * honest source for its iteration check set is the paths the specification
+ * itself names. But a brief is also REGENERATED — after a sync, after a review,
+ * whenever the work order moved — and by then the branch carries the real thing.
+ * The real diff beats a prospective list, so it is read here and handed in; an
+ * empty answer (a clean tree on `main`) leaves the prospective path intact.
+ *
+ * Committed work is measured from the fork point, so `main`'s own traffic never
+ * enters the set; uncommitted work is added because it is just as much part of
+ * what will be verified. Every git call is guarded: no git, no diff, no block —
+ * never a broken brief.
+ */
+function currentDiffPaths() {
+  const git = (...args) =>
+    spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+  // NOT trimmed at the front: `--porcelain` encodes the state in the first two
+  // COLUMNS, and ` M path` loses a character to a left trim.
+  const lines = (res) => (res.status === 0 ? res.stdout.split('\n').map((l) => l.replace(/\s+$/, '')).filter(Boolean) : [])
+  try {
+    let committed = []
+    for (const base of ['origin/main', 'main']) {
+      const fork = git('merge-base', 'HEAD', base)
+      if (fork.status !== 0) continue
+      committed = lines(git('diff', '--name-only', `${fork.stdout.trim()}..HEAD`))
+      break
+    }
+    // `--porcelain` prefixes a two-column status and may write `old -> new`; the
+    // NEW name is the one that exists to be verified.
+    const working = lines(git('status', '--porcelain')).map((l) => {
+      const path = l.slice(3).trim()  // two status columns and their separator
+
+      const arrow = path.lastIndexOf(' -> ')
+      return (arrow >= 0 ? path.slice(arrow + 4) : path).replace(/^"|"$/g, '')
+    })
+    return [...new Set([...committed, ...working])]
+  } catch {
+    return []
+  }
+}
+
+/**
  * THE TREE HALF OF THE ORIENTATION (point 598). Called by buildBrief with the
  * paths the spec named and the suites its mapping resolved to; everything here
  * is read at generation time, so nothing in the block can be stale.
@@ -173,6 +215,7 @@ try {
     number,
     revision: gitRevision(),
     readTree,
+    diffPaths: currentDiffPaths(),
     // Which vendor the read-only work goes to right now (point 654). READ, never
     // assumed: the brief tells the agent what the switch actually says.
     // The whole STATE, not just the setting: a fallback must reach the brief AS a

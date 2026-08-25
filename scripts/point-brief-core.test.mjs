@@ -1134,6 +1134,59 @@ describe('the orientation block', () => {
     expect(orientationBlock({})).toEqual([])
     expect(orientationBlock({ check: { byRule: [], unmapped: [] } })).toEqual([])
   })
+
+  // THE 23.08.2026 CORRECTIONS. The block used to head its suites "THE CHECK
+  // THAT PROVES IT", which is the one thing they are NOT: sections are the rung
+  // an agent repairs on, and point 595 says the proof is the whole suite.
+  it('offers the suites as an ITERATION set and never as the acceptance', () => {
+    const text = orientationBlock({ files, dirs, check, sections: { world: ['rivers', 'coast'] } }).join('\n')
+    expect(text).toMatch(/THE ITERATION CHECK SET/)
+    expect(text).not.toMatch(/THE CHECK THAT PROVES IT/)
+    expect(text).toMatch(/never the acceptance/)
+    expect(text).toMatch(/THE FINAL PROOF IS SEPARATE AND WHOLE-SUITE/)
+    expect(text).toMatch(/world — unfiltered/)
+    expect(text).toMatch(/recorded PARTIAL/)
+  })
+
+  it('names suite/--section PAIRS, one per suite, since a multi-suite diff has no single pair', () => {
+    const twoSuites = {
+      byRule: [
+        { rule: '`src/world/`', suites: ['world', 'enrichments'], paths: ['src/world/rivers.ts'] },
+      ],
+      unmapped: [],
+    }
+    const text = orientationBlock({
+      files,
+      dirs,
+      check: twoSuites,
+      sections: { world: ['rivers'], enrichments: ['huts'] },
+    }).join('\n')
+    expect(text).toContain('npm test -- world --section=<one of>')
+    expect(text).toContain('npm test -- enrichments --section=<one of>')
+    expect(text).toMatch(/world, enrichments — unfiltered/)
+  })
+
+  it('says so when a planned suite has no sections, rather than leaving a silent gap', () => {
+    const text = orientationBlock({ files, dirs, check, sections: {} }).join('\n')
+    expect(text).toMatch(/world declares no sections/)
+    expect(text).toContain('npm test -- world')
+  })
+
+  it('states WHERE the set came from, and caps a long unmapped list', () => {
+    const many = Array.from({ length: 20 }, (_, i) => `src/other/f${i}.bin`)
+    const spec = orientationBlock({ files, dirs, check }).join('\n')
+    expect(spec).toMatch(/PROSPECTIVE paths the spec names/)
+    const diff = orientationBlock({
+      files,
+      dirs,
+      check: { byRule: check.byRule, unmapped: many },
+      checkSource: 'diff',
+    }).join('\n')
+    expect(diff).toMatch(/from YOUR CURRENT DIFF/)
+    expect(diff).toContain('src/other/f0.bin')
+    expect(diff).not.toContain('src/other/f19.bin')
+    expect(diff).toMatch(/\(\+8 more\)/)
+  })
 })
 
 describe('the orientation inside a brief', () => {
@@ -1178,6 +1231,26 @@ describe('the orientation inside a brief', () => {
     })
     expect(brief).not.toContain('--- ORIENTATION')
     expect(brief).toContain('AN OPEN POINT')
+  })
+
+  // TIMING (23.08.2026): a first cut has no diff to read and must say "prospective";
+  // a regenerated brief has one, and the diff is what will actually be verified.
+  it('derives its check set from the DIFF once one exists, and from the spec before that', () => {
+    const withoutDiff = buildBrief({ ...args, tasksText: tasks, number: 400, readTree: () => ({}) })
+    expect(withoutDiff.check.byRule[0].paths).toEqual(['src/world/rivers.ts'])
+    expect(withoutDiff.brief).toMatch(/PROSPECTIVE paths the spec names/)
+
+    const withDiff = buildBrief({
+      ...args,
+      tasksText: tasks,
+      number: 400,
+      readTree: () => ({}),
+      diffPaths: ['src/world/coast.ts', 'design.md'],
+    })
+    expect(withDiff.check.byRule[0].paths).toEqual(['src/world/coast.ts'])
+    expect(withDiff.brief).toMatch(/from YOUR CURRENT DIFF/)
+    // The path LIST still orients in the SPEC — only the check set follows the diff.
+    expect(withDiff.namedPaths).toEqual(['src/world/rivers.ts'])
   })
 
   it('stands AFTER the spec, where "where to look" first means something', () => {
