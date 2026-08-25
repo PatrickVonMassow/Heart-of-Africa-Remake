@@ -12,7 +12,11 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { CONTEXT_CEILING_TOKENS, CONTEXT_TRIGGER_TOKENS } from './context-watermark-core.mjs'
+import {
+  CONTEXT_CEILING_TOKENS,
+  CONTEXT_HANDOVER_RESERVE_TOKENS,
+  CONTEXT_TRIGGER_TOKENS,
+} from './context-watermark-core.mjs'
 import { contextLedgerPath } from './context-budget.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
@@ -165,7 +169,10 @@ describe('context-fence-guard, ARMED (spawned)', () => {
   it('intercepts the measured fixture command through the real PreToolUse wrapper', () => {
     const apiCall = REPLAY.calls.find((entry) => entry.sourceCall === 36)
     const [first, refused] = apiCall.operations
-    writeTranscript(apiCall.tokens)
+    // Keep the real two-operation shape, but place it at the new measured
+    // reserve's ledger edge: the first call fits and its pending debit makes
+    // the second one fail against the same stale reading.
+    writeTranscript(CONTEXT_CEILING_TOKENS - CONTEXT_HANDOVER_RESERVE_TOKENS - 3_000)
 
     expect(callGuard(first.toolName, first.toolInput).stdout.trim()).toBe('')
     const result = callGuard(refused.toolName, refused.toolInput)
