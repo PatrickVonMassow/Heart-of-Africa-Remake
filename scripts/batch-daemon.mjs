@@ -1131,7 +1131,17 @@ async function main() {
   const repoDir = resolve(args.repo ?? REPO_ROOT)
   if (args._ === 'serve') return serve({ ...args, repo: repoDir })
   if (args._ === 'start') {
-    const started = await startDaemon({ repoDir, batchId: args.batch, drill: args.drill === true })
+    // THE FLAG IS FORWARDED, or the documented refusal never happens: `start
+    // --neuter-epoch` parsed the flag and dropped it, so it silently started a
+    // NORMAL daemon — neither startDaemon's refusal nor serve's fired, and only
+    // a direct function call ever exercised the outside-drill interlock
+    // (round-15 review).
+    const started = await startDaemon({
+      repoDir,
+      batchId: args.batch,
+      drill: args.drill === true,
+      neuterEpoch: args['neuter-epoch'] === true,
+    })
     if (!started.ok) {
       console.error(`start refused: ${started.reason}`)
       process.exit(1)

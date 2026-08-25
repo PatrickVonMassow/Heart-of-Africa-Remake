@@ -40,36 +40,43 @@ const BATCH = 'parent-death-drill'
 const FENCE_BEFORE = 7
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** The refusal reasons `validateMutation` produces for STALENESS, KEYED BY THE
- *  CREDENTIAL each one proves — and nothing else, so every pattern is anchored
- *  at BOTH ends: an unanchored substring match accepted any reply that merely
- *  CONTAINED one of the phrases ("internal error while checking stale fence", a
- *  compensation wrapping the session reason) as proof of enforcement
- *  (cross-vendor review of point 834, H3). The tail anchor is `(?![\s\S])`, not
- *  `$`: JavaScript's `$` also matches BEFORE a final line terminator, so a
- *  reason ending in a newline violated "and nothing else" and still passed
- *  (round-14 review, P2).
- *
- *  KEYED, because one refusal must never stand in for the other — see
- *  `staleProbeRefused`. Kept beside that judge, its only consumer. */
-export const STALE_REFUSAL = {
-  session: /^the lock names another session(?![\s\S])/,
-  fence: /^stale fence: presented \d+, the lock carries \d+(?![\s\S])/,
+/** THE EXACT reason `validateMutation` emits for the staleness described by
+ *  `expectation` — or null when that expectation does not describe a stale
+ *  credential at all. Built from the REAL fence values the drill minted, not
+ *  matched by pattern: the anchored regex it replaces accepted
+ *  `stale fence: presented <any>, the lock carries <any>`, so a daemon
+ *  validating against the WRONG epoch could answer with a stale-SHAPED reason
+ *  carrying unrelated, equal or leading-zero numbers and satisfy the check
+ *  (round-15 review). An exact string cannot be satisfied by the wrong numbers,
+ *  and it also ends the anchoring question for good — the round-14 finding that
+ *  `$` matches before a final newline cannot recur against `===`. */
+export function expectedStaleRefusal(expectation) {
+  const { kind, presented, carried } = expectation ?? {}
+  if (kind === 'session') return 'the lock names another session'
+  if (kind !== 'fence') return null
+  // A fence is stale only if it DIFFERS from the one the lock carries; equal
+  // values describe a valid presentation, which validateMutation never refuses
+  // for staleness, so no expected reason exists.
+  if (!Number.isInteger(presented) || !Number.isInteger(carried) || presented === carried) return null
+  return `stale fence: presented ${presented}, the lock carries ${carried}`
 }
 
 /** What each probe's ONE stale credential is called in its verdict. */
 const CREDENTIAL = { session: 'the session identity', fence: 'the fence' }
 
 /**
- * JUDGES a stale probe's reply: passed only when the daemon REFUSED FOR THE
- * STALENESS OF `kind` — the ONE credential that probe presents stale.
+ * JUDGES a stale probe's reply: passed only when the daemon REFUSED with the
+ * EXACT reason the ONE stale credential that probe presents must produce.
  *
- * THE KIND IS LOAD-BEARING, and this signature is the round-14 repair (P1).
+ * THE EXPECTATION IS LOAD-BEARING, twice over.
  * `validateMutation` checks the session id BEFORE the fence, so a probe that
  * presents BOTH credentials stale is refused on the fence alone by a daemon
- * that never looks at session ids — and an either-refusal judge passed it.
- * Requiring the kind-specific reason makes each probe prove its own credential:
- * a fence refusal can no longer answer for the session probe, nor the reverse.
+ * that never looks at session ids — and an either-refusal judge passed it
+ * (round-14). Each probe therefore presents exactly one stale credential and
+ * names it here, so a fence refusal can no longer answer for the session probe
+ * nor the reverse.
+ * And the fence expectation carries the REAL numbers, so a refusal quoting an
+ * epoch this drill never minted is not evidence either (round-15).
  *
  * Pure and exported so the judge itself is testable against the daemon this
  * drill must catch — one that accepts the dead credentials. A probe that was
@@ -77,13 +84,17 @@ const CREDENTIAL = { session: 'the session identity', fence: 'the fence' }
  * OTHER reason (a timeout, a socket error, a different validation failure)
  * proves nothing and is refused as evidence too.
  */
-export function staleProbeRefused(reply, kind) {
-  const pattern = STALE_REFUSAL[kind]
-  if (!pattern) return { ok: false, why: `no such staleness kind: ${String(kind)}` }
-  if (reply?.ok === true) return { ok: false, why: `accepted — the daemon does not enforce ${CREDENTIAL[kind]}` }
+export function staleProbeRefused(reply, expectation) {
+  const expected = expectedStaleRefusal(expectation)
+  if (expected === null) return { ok: false, why: `no staleness is described by ${JSON.stringify(expectation ?? null)}` }
+  const credential = CREDENTIAL[expectation.kind]
+  if (reply?.ok === true) return { ok: false, why: `accepted — the daemon does not enforce ${credential}` }
   const reason = reply?.reason ?? ''
-  if (!pattern.test(reason)) {
-    return { ok: false, why: `failed, but not for the staleness of ${CREDENTIAL[kind]}: ${reason || '(no reason)'}` }
+  if (reason !== expected) {
+    return {
+      ok: false,
+      why: `failed, but not for the staleness of ${credential}: expected ${JSON.stringify(expected)}, got ${reason ? JSON.stringify(reason) : '(no reason)'}`,
+    }
   }
   return { ok: true, why: `refusal reason: ${reason}` }
 }
@@ -263,6 +274,15 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
     await sleep(500)
     check('the parent group is dead', probePid(parent.pid)?.exists !== true)
 
+    // THE BASELINE FOR POST-DEATH WORK IS TAKEN HERE, after the death is
+    // CONFIRMED — not from the pre-kill sample. A push that landed between that
+    // earlier sample and the delivery of SIGKILL was work done while the parent
+    // still lived, and counting it as post-kill progress let the check below go
+    // green over a worker that did nothing after the death (round-15 review).
+    // Read fresh from origin: anything past this value was pushed by a process
+    // that outlived its parent.
+    const shaAtDeath = git(['rev-parse', 'feat/drill'], originDir)
+
     const daemonProbe = probePid(recordBefore.pid)
     check(
       'the daemon survived under its recorded pid and start time',
@@ -278,8 +298,12 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
       JSON.stringify(readJsonIfAny(store.daemonRecordPath)),
     )
 
-    const shaAfterKill = await waitForNewSha({ originDir, since: shaBeforeKill, timeoutMs: 20_000 })
-    check('the worker pushed a SHA that did not exist at the kill', Boolean(shaAfterKill) && shaAfterKill !== shaBeforeKill)
+    const shaAfterKill = await waitForNewSha({ originDir, since: shaAtDeath, timeoutMs: 20_000 })
+    check(
+      'the worker pushed a SHA that did not exist when the parent died',
+      Boolean(shaAfterKill) && shaAfterKill !== shaAtDeath,
+      `at death ${shaAtDeath}, after ${shaAfterKill}`,
+    )
     // Checked AFTER the post-kill push was observed: the process at the lease's
     // pid still carries the lease's start time, so the worker that pushed is
     // the one spawned before the kill — continued output from a replacement
@@ -390,7 +414,7 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
         // The DEAD session id under the CURRENT fence: only the session check can refuse this.
         request: { cmd: 'request-checkpoint', sessionId: 'doomed-session', fence: newFence, payload: { batchId: BATCH, requestId: 'stale-cp-1', waitMs: 2000 } },
       }),
-      'session',
+      { kind: 'session' },
     )
     check("the dead session's id is REFUSED after the takeover, under the LIVE fence", staleSession.ok, staleSession.why)
     const staleFence = staleProbeRefused(
@@ -400,7 +424,9 @@ async function parentDeathScenario({ keep, neuterEpoch = false }) {
         // The SUPERSEDED fence under the LIVE session id: only the fence check can refuse this.
         request: { cmd: 'request-checkpoint', sessionId: successorSid, fence: deadFence, payload: { batchId: BATCH, requestId: 'stale-cp-2', waitMs: 2000 } },
       }),
-      'fence',
+      // The REAL numbers: the fence this probe presents, and the one the lock
+      // actually carries after the takeover.
+      { kind: 'fence', presented: deadFence, carried: newFence },
     )
     check('the superseded fence is REFUSED even under the live session id', staleFence.ok, staleFence.why)
 
