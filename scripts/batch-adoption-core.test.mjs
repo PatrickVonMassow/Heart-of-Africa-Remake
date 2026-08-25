@@ -139,7 +139,7 @@ describe('laneBoundaryVerdict', () => {
     expect(laneBoundaryVerdict({ durable: d, agreement: recycledPid }).verdict).toBe('block')
     // An agreement from an older shape, with no process named at all, proves
     // nothing about the holder either.
-    const { pid, pidStartedAt, ...lanelessProcess } = laneOf(d)
+    const lanelessProcess = { batchId: d.batchId, pointId: d.pointId, attemptId: d.attemptId }
     expect(laneBoundaryVerdict({ durable: d, agreement: { verdict: 'live', alerts: [], lane: lanelessProcess } }).verdict).toBe('block')
   })
 
