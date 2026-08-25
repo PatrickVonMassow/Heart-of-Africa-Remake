@@ -148,9 +148,17 @@ export function mayRefill({ lanes = [] } = {}) {
  * boundary"; an equal fence is the old coordinator, never a successor. */
 export function successorBoundaryVerdict({ marker = null, batchId = null, lock = null, sealedFence = null } = {}) {
   if (!marker) {
-    return Number.isInteger(sealedFence) && sealedFence > 0
-      ? { ok: false, quarantine: true, reason: `boundary marker deletion: daemon state records sealed fence ${sealedFence} but no marker stands` }
-      : { ok: false, quarantine: true, reason: 'no committed durable boundary marker identifies the handover' }
+    if (Number.isInteger(sealedFence) && sealedFence > 0) {
+      return { ok: false, quarantine: true, reason: `boundary marker deletion: daemon state records sealed fence ${sealedFence} but no marker stands` }
+    }
+    // No seal means no planned boundary ever committed. This is the crash path
+    // point 834 proves: the new lock fence plus full lane reconciliation is the
+    // authority, and inventing a marker requirement here would make the worker
+    // survive its parent only to become permanently unadoptable.
+    if (lock?.sessionId && Number.isInteger(lock.fence) && lock.fence > 0) {
+      return { ok: true, mode: 'crash-recovery', markerFence: null, successorFence: lock.fence, requestId: null }
+    }
+    return { ok: false, quarantine: true, reason: 'no committed boundary marker or live successor lock identifies the takeover' }
   }
   if (marker.kind !== 'durable-batch-boundary' || marker.phase !== 'committed' || marker.batchId !== batchId || !Number.isInteger(marker.fence)) {
     return { ok: false, quarantine: true, reason: 'the durable boundary marker is malformed or belongs to another batch' }
