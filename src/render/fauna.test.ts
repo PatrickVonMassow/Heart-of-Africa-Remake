@@ -5,7 +5,7 @@
 // per-animal spawn scale shrinks them.
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three/webgpu'
-import { judgeStanceSlip } from '../../scripts/verify/stanceSlip.mjs'
+import { judgeStanceSlip, type StanceSlipSample } from '../../scripts/verify/stanceSlip.mjs'
 import {
   buildAntelope,
   buildAntelopeCalf,
@@ -761,7 +761,7 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
     const radius = 1.2
     const stanceTravel = GOAT.stride * GAIT_DUTY * 0.98
     let contact = null as ReturnType<typeof footPlantPose>['contact']
-    let firstBody = { x: 0, z: 0, yaw: 0 }
+    let firstBody = { x: 0, y: 0, z: 0, yaw: 0 }
     let lastBody = firstBody
 
     for (let k = 0; k <= 80; k++) {
@@ -930,8 +930,8 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
     let dist = 0
     let contact: ReturnType<typeof footPlantPose>['contact'] = null
     let releases = 0
-    const fixed: Array<Record<string, unknown>> = []
-    const defect: Array<Record<string, unknown>> = []
+    const fixed: Array<Record<string, StanceSlipSample>> = []
+    const defect: Array<Record<string, StanceSlipSample>> = []
     for (let k = 0; k < 900; k++) {
       if (k > 0 && k % 45 === 0) heading += (k % 90 === 0 ? 1 : -1) * 1.9
       const dx = step * Math.sin(heading)
