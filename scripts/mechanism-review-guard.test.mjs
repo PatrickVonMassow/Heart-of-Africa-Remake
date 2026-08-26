@@ -12,6 +12,7 @@ import {
   BASELINE_RECOVERY_ANCHOR,
   baselineFor,
   bootstrapBase,
+  measureReviewGap,
   mechanismLogCommand,
   parseMechanismLog,
   rangeFilesCommand,
@@ -415,5 +416,87 @@ describe('attachCoverage', () => {
       }),
     ).toEqual([])
     expect(asked).toEqual([])
+  })
+})
+
+describe('measureReviewGap', () => {
+  // The gap clause is the guard's only way out of an unassemblable range. Point
+  // 947 measured that a throw from review-sol.mjs's SIZING planner used to leave
+  // the ruling null and the guard blocking — no gap, no runnable review, session
+  // trapped. These cases drive the real helper the guard calls.
+  const gapRange = { base: 'b'.repeat(40), head: 'h'.repeat(40) }
+  const assessorSpy = (seen) => async (args) => {
+    seen.push(args)
+    return { gap: true, reason: 'range does not fit' }
+  }
+
+  it('still rules on the gap when the sizing planner throws', async () => {
+    const seen = []
+    const { gap, sizedPlan } = await measureReviewGap({
+      gapRange,
+      sha: gapRange.head,
+      base: gapRange.base,
+      commits: [{ sha: 'c'.repeat(40) }],
+      standingRecords: 1,
+      loadPlanner: () => {
+        throw new Error('review-sol.mjs is broken')
+      },
+      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
+    })
+    expect(gap).toEqual({ gap: true, reason: 'range does not fit' })
+    expect(sizedPlan).toBe(null)
+    // The assessment runs UNSLICED rather than not at all.
+    expect(seen[0].sizedPlan).toBe(null)
+    expect(seen[0].standingRecords).toBe(1)
+  })
+
+  it('passes the sized plan through when the planner works', async () => {
+    const seen = []
+    const plan = { passes: [{ index: 1 }] }
+    const { gap, sizedPlan } = await measureReviewGap({
+      gapRange,
+      sha: gapRange.head,
+      base: gapRange.base,
+      commits: [],
+      standingRecords: 0,
+      loadPlanner: async () => ({ buildAuthorshipPassPlan: () => plan }),
+      loadAssessor: async () => ({ assessReviewGap: assessorSpy(seen) }),
+    })
+    expect(sizedPlan).toBe(plan)
+    expect(seen[0].sizedPlan).toBe(plan)
+    expect(gap.gap).toBe(true)
+  })
+
+  it('rules NO gap when the ASSESSMENT itself fails — an unmeasured claim never waives the gate', async () => {
+    const { gap } = await measureReviewGap({
+      gapRange,
+      sha: gapRange.head,
+      base: gapRange.base,
+      commits: [],
+      standingRecords: 0,
+      loadPlanner: async () => ({ buildAuthorshipPassPlan: () => ({}) }),
+      loadAssessor: () => {
+        throw new Error('gap module is broken')
+      },
+    })
+    expect(gap).toBe(null)
+  })
+
+  it('measures nothing at all when the range is not blocked', async () => {
+    let touched = false
+    expect(
+      await measureReviewGap({
+        gapRange: null,
+        loadPlanner: () => {
+          touched = true
+          return {}
+        },
+        loadAssessor: () => {
+          touched = true
+          return {}
+        },
+      }),
+    ).toEqual({ gap: null, sizedPlan: null })
+    expect(touched).toBe(false)
   })
 })

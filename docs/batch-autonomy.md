@@ -114,6 +114,17 @@ named owner. Only S-12 is allowed to stop the whole batch.
 | S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-sol.mjs --model` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
 | S-27 | Owner and its only watcher are both absent or wedged. | **Closed by double safety:** `HoA-Batch-Emergency` is an hourly SYSTEM timer outside those sessions; the watchdog checks/re-registers it, while it starts the authenticated primary task. |
 
+One further stop path was measured while cross-reading the range rather than by
+the sweep, and it belongs to the same class. `mechanism-review-guard.mjs` built
+the sized review plan inside the SAME `try` that assessed the review gap, so a
+throw out of `review-sol.mjs`'s planner left the ruling null and the guard
+blocked — a broken planner turned a suspendable range into a hard block with no
+runnable review, which is exactly what the gap clause exists to prevent. The two
+steps are now separate: `measureReviewGap` sizes the plan in its own `try` and
+degrades to the UNSLICED measurement when that fails, while only a failing
+assessment still rules no gap. The general rule this instance carries: a
+refinement of a measurement may never be able to remove the measurement.
+
 #### Double safety: the independent emergency lane
 
 `scripts/batch-emergency.mjs` runs hourly from `HoA-Batch-Emergency`, offset from
