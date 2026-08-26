@@ -12258,3 +12258,31 @@ to land than a mechanism that needs a review.
   and it sits in the mechanism that publishes every handover.
   Bundle: Chat & Tafel. It edits the same board projection as 930, 936 and 937 and must not run
   beside them.
+
+- [ ] 942. The criticality gate's second way out has no command that writes it (measured 26.08.2026
+  while clearing point 935's gate). `criticality-review-guard-core.mjs` reads an append-only ledger
+  row of kind `review-findings-filed` — the receipt that transfers every finding of a refused review
+  to open work-order points — and the refusal message names it as one of two durable answers. Nothing
+  in `scripts/` writes that row: `grep -rn findingPoints scripts/*.mjs` finds only the reader and the
+  test fixtures. `mechanism-review.mjs --record` cannot produce it (it writes a verdict row), and
+  `criticality-review-guard.mjs --record-unavailable` writes the OTHER kind and says so. So a session
+  whose refusal is honestly filed must hand-append JSON to a tracked ledger — which is exactly the
+  hand-edited audit record every guard here exists to abolish — or stay blocked. It was hand-appended
+  once today, with both receipts naming point 940; that is the evidence, not a precedent.
+  Same class as point 937: a documented way out that no command can take.
+  FINAL STATE:
+  - THE RECEIPT HAS A COMMAND, beside the one that records a verdict and the one that records an
+    unavailable reviewer, and the refusal message prints it filled in — point, sha, model, the
+    review's own timestamp, and the point numbers that now carry the findings.
+  - IT REFUSES WHAT THE READER REFUSES, at the moment of writing rather than at the next gate: a
+    receipt naming no point, a closed point, or a review that does not exist is rejected with the
+    reason, so the ledger cannot take a row the gate will not honour.
+  - THE HAND-APPENDED ROWS OF 26.08.2026 ARE VALIDATED by the new command's own reader and left in
+    place if they pass; a receipt is history and is not rewritten.
+  VERIFIABLE: Vitest over the writer — a valid receipt round-trips through the gate's reader and
+  clears its refusal; each of the three invalid shapes is refused with its own reason; and the two
+  rows written by hand today pass. Plus a grep-level assertion that the refusal message names a
+  command that exists.
+  Criticality: medium-high — it is a gate on every high-criticality landing whose only reachable
+  answer today is a hand-edited ledger, and a hand-edited audit record is worth less than no gate.
+  Bundle: Modell & Wächter.

@@ -780,6 +780,12 @@
       "why": "Der Nutzer hat den Punkt am 26.08.2026 im Brett-Chat gemeldet und ausdruecklich 'direkt als naechstes erledigen' gesagt.",
       "origin": "user",
       "place": "ahead"
+    },
+    "942": {
+      "at": "2026-08-26T11:11:20.225Z",
+      "why": "Es blockiert nur, wenn ein hoch eingestufter Punkt ein offenes Do-not-merge traegt; heute ist der Weg von Hand gangbar und dokumentiert, deshalb steht es hinter der Auslieferung.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -820,7 +826,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T10:53:41.513Z",
+    "at": "2026-08-26T11:11:20.232Z",
     "points": [
       174,
       184,
@@ -1120,7 +1126,8 @@
       938,
       939,
       940,
-      941
+      941,
+      942
     ]
   }
 }
