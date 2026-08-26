@@ -330,7 +330,10 @@ export const LIMITS = {
   // eighteen.
   // 26.08.2026: the folded fixture-derivation clause above measures 4196, so the word ceiling
   // follows the measurement UP by thirty-four — the raise the same entry justifies, no headroom.
-  maxWords: 4250,
+  // 26.08.2026, evening: the mutually-wedging-recovery lesson was folded INTO the standstill
+  // pitfall and the fixture-derivation clause moved fully to the retrospective (§3.190 carries
+  // it), so the ceiling follows the measurement DOWN by five words — a tightening, no raise.
+  maxWords: 4245,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
