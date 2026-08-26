@@ -475,14 +475,20 @@ describe('derived now-section membership', () => {
   // that this writer emits and its own authentication then refuses.
   it('gives the state card stamp one shape, at the writer and at the reader', () => {
     const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft weiter.' }
-    // A stamp that is not a clock time never reaches the markup…
+    // A stamp that is not a clock time never reaches the markup — asserted on
+    // what the meta field IS, not on the absence of one raw spelling: a writer
+    // that merely ESCAPED the hostile stamp would still have embedded it and
+    // still have passed a substring check (the closing pass of this case).
+    const metaOf = (html) => (html.match(/<span class="meta">([\s\S]*?)<\/span>/) ?? [])[1]
     const smuggledStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, {
       stamp: 'Punkt &#57;&#51;&#53;',
     })
-    expect(smuggledStamp).not.toContain('&#57;')
+    expect(metaOf(smuggledStamp)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(smuggledStamp).not.toMatch(/Punkt (&|&amp;)#57;/)
     // …and markup in the stamp neither ships nor breaks the card's own reading.
     const markupStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '<b>12:34</b>' })
-    expect(markupStamp).not.toContain('<b>12:34</b>')
+    expect(metaOf(markupStamp)).toMatch(/^\d{1,2}:\d{2}$/)
+    expect(markupStamp).not.toMatch(/(<|&lt;)b(>|&gt;)12:34/)
     // Both are still the machine's card: the render keeps them and adds the
     // zero claim beside them, and the comparison then agrees.
     for (const board of [smuggledStamp, markupStamp]) {
