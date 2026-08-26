@@ -575,6 +575,7 @@ if (isMainModule(import.meta.url)) {
     // the measurement alone, never on what a verdict's prose said; the count of
     // standing refusals travels into the report from the STRUCTURED findings.
     let gap = null
+    let sizedGapPlan = null
     const gapRange = reviewGapRange({
       blocked: verdict.block,
       base: gathered.rangeBase,
@@ -582,10 +583,17 @@ if (isMainModule(import.meta.url)) {
     })
     if (gapRange) {
       try {
+        const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
+        sizedGapPlan = buildAuthorshipPassPlan({
+          sha: gathered.head,
+          base: gathered.rangeBase,
+          commits: commitsForFiles(gathered.debt?.outstanding),
+        })
         const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
         gap = await assessReviewGap({
           ...gapRange,
           standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
+          sizedPlan: sizedGapPlan,
         })
       } catch {
         /* no ruling — the block below stands */
@@ -594,7 +602,7 @@ if (isMainModule(import.meta.url)) {
     const outcome = guardOutcome({ blocked: verdict.block, gap })
 
     if (status) {
-      let statusPlan = null
+      let statusPlan = sizedGapPlan
       if (gathered.rangeBase && gathered.head && (gathered.debt?.outstanding ?? []).length) {
         try {
           // Use the SAME authorship-then-size planner that prints the runnable
@@ -605,12 +613,14 @@ if (isMainModule(import.meta.url)) {
           // keeps stable per commit so a recorded pass number never shifts. The
           // two differ by construction: on 18.08.2026 the owed debt was one round
           // here while review-sol still listed it as four of its fifteen passes.
-          const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
-          statusPlan = buildAuthorshipPassPlan({
-            sha: gathered.head,
-            base: gathered.rangeBase,
-            commits: commitsForFiles(gathered.debt.outstanding),
-          })
+          if (!statusPlan) {
+            const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
+            statusPlan = buildAuthorshipPassPlan({
+              sha: gathered.head,
+              base: gathered.rangeBase,
+              commits: commitsForFiles(gathered.debt.outstanding),
+            })
+          }
         } catch {
           /* the status names an unavailable plan instead of inventing a count */
         }

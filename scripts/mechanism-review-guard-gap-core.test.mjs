@@ -602,6 +602,26 @@ describe('assessReviewGap — the wrapper cannot waive on its own failure (round
     expect(d.gap).toBe(false)
     expect(d.reason).toBe('splits')
   })
+
+  it('uses the gate’s authorship-sized plan instead of inventing an unsliced gap', async () => {
+    const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
+    const d = await assessReviewGap({
+      baseline: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+      run: bigRun,
+      sizedPlan: {
+        fits: false,
+        passes: [{}, {}],
+        uncoverable: [],
+        unreviewable: [],
+        statTruncated: false,
+        budget: REVIEW_GAP_BUDGET_CHARS,
+      },
+      loadTool: () => Promise.reject(new Error('the unsliced planner must not rule')),
+    })
+    expect(d.gap).toBe(false)
+    expect(d.reason).toBe('splits')
+  })
 })
 
 describe('formatCriticalityGap', () => {

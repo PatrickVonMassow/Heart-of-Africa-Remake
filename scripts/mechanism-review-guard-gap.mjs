@@ -170,6 +170,7 @@ export async function assessReviewGap({
   baseline,
   head,
   standingRecords = 0,
+  sizedPlan = null,
   // Injectable for the unit layer only — production callers pass neither.
   run = runGitArgs,
   loadTool = () => import('./review-material-core.mjs'),
@@ -183,9 +184,33 @@ export async function assessReviewGap({
   }
 
   let planner = null
+  // The gate's real plan cuts by independent reviewer BEFORE it cuts by size.
+  // Prefer that measured plan when the caller has it: feeding all vendors into
+  // one plan makes the whole-range diffstat recur in every hypothetical pass
+  // and can report an impossible gap beside fully runnable authorship slices.
+  if (
+    sizedPlan &&
+    Array.isArray(sizedPlan.passes) &&
+    Array.isArray(sizedPlan.uncoverable) &&
+    typeof sizedPlan.statTruncated === 'boolean'
+  ) {
+    const maxPasses = Number(sizedPlan.maxPassTotal) || 256
+    const hasRoute = sizedPlan.passes.length > 0 || (sizedPlan.unreviewable ?? []).length > 0
+    planner = {
+      available: true,
+      fits: sizedPlan.fits === true,
+      covers:
+        !sizedPlan.statTruncated &&
+        sizedPlan.uncoverable.length === 0 &&
+        hasRoute &&
+        sizedPlan.passes.length <= maxPasses,
+      uncoverable: sizedPlan.uncoverable.map((u) => u.path),
+      budget: sizedPlan.budget,
+    }
+  }
   // A PROVEN OVERSIZE PLANS NOTHING: the parts were never read whole, so no
   // splitter can be consulted — the core rules on the floor alone.
-  if (measured && !measured.oversizeProven) {
+  if (!planner && measured && !measured.oversizeProven) {
     // A SPLITTER THAT CANNOT LOAD IS A MEASUREMENT FAILURE, whatever the
     // failure (second landing round, pass 4): the gate chain requires the
     // module, so absence and breakage rule alike — 'unmeasured', which blocks.
