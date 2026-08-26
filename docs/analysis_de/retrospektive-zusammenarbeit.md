@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 11:54 · Quellen-Fingerprint: `2b8e95a05b72…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 12:21 · Quellen-Fingerprint: `d7eb83e6d733…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1485,8 +1485,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 102 Prozess-/Meta-TASKS-Punkte (davon 43 offen).
 
-<!-- RETRO-FINGERPRINT: 2b8e95a05b72d263ca1179ed54633d6e7277d62f13b5238ce3b6809e77089b60 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T09:54:40.678Z -->
+<!-- RETRO-FINGERPRINT: d7eb83e6d733411ac9ac55bf55eaab782bef8d7d0364dd3a73eb8653e9dc0d37 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T10:21:52.915Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3905,3 +3905,22 @@ Karte liest niemand die Sektion mehr, in der die eine wirklich offene Entscheidu
 **Lehre:** Eine Entscheidung, die die Maschine für sich selbst trifft, nennt die Messung, die sie
 stützen oder widerlegen würde, und verfällt, sobald diese Messung vorliegt und sauber ist. Das
 Veto des Nutzers bleibt der zweite Weg, nie der einzige.
+
+### 3.189 Die Zuordnung stirbt mit ihrem Punkt — das Rot überlebt sie
+
+Damit eine bekannte Fehlermeldung ein Tor nicht ewig blockiert, darf sie einem **offenen** Punkt
+zugeordnet werden; ist der Punkt abgehakt, verfällt die Zuordnung. Das ist richtig konstruiert:
+Eine Ausnahme, die ihren Anlass überlebt, wird zur Dauerausnahme. Am 26.08.2026 zeigte sich die
+Kehrseite. Drei aufgezeichnete Prüfläufe tragen dieselbe rote Prüfung, und diese Prüfung ist die
+lebende Zeugin eines Punktes, der längst abgehakt ist. Also gehört das Rot niemandem — es kann
+nicht zugeordnet werden, weil die Regel einen offenen Punkt verlangt, und es verschwindet nicht,
+weil es aufgezeichnet ist.
+
+Das ist kein Buchhaltungsproblem. Eine abgehakte Regressionsprüfung, die wieder rot wird, sagt
+genau eine von zwei Sachen: Die Regression ist zurück, oder die Prüfung passt nicht mehr zu der
+Umgebung, in der sie jetzt läuft. Beides ist wichtig, beides ist Arbeit — und der Zustand
+»niemandem zugeordnet« sieht aus wie Schlamperei, obwohl er die Meldung ist.
+
+**Lehre:** Wenn eine Zuordnung mit ihrem Besitzer verfällt, braucht das, was sie erklärt hat, in
+demselben Moment einen neuen Besitzer oder eine gemessene Abmeldung. Ein Zeuge, der seinen Fall
+überlebt, sagt weiter aus; wer ihn nicht anhört, hat nicht abgeschlossen, sondern weggehört.
