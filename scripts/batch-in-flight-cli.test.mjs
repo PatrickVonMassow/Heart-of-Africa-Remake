@@ -166,6 +166,47 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
     expect(events.at(-1)).toMatchObject({ point: 697 })
   })
 
+  // Ninth cross-vendor round: with a strand recorded but UNNUMBERED, the
+  // question used to fall through to the next point-bearing item — and a pid
+  // carries the OWNER's point, so the delegate's finish event was stamped with
+  // the owner's number after all. A declaration written by an older revision
+  // (or adopted from one) is exactly that shape.
+  it('answers null for an unnumbered strand instead of falling back to the pid point', () => {
+    writeFileSync(
+      inFlightPath(),
+      JSON.stringify({
+        sessionId: OWNER,
+        at: Date.now(),
+        waitingOn: 'legacy declaration',
+        pid: process.pid,
+        evidence: [
+          { kind: 'pid', pid: process.pid, point: 713, phase: 'authoring' },
+          { kind: 'branch', ref: 'refs/heads/topic/live', point: null, phase: 'authoring' },
+        ],
+      }),
+    )
+
+    const result = spawnSync(process.execPath, [CLI, '--clear'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        HOA_REPO_ROOT: root,
+        HOA_ALERT_ESCALATION: 'off',
+        HOA_ACTIVITY_JOURNAL_PATH: journalPath(),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+
+    expect(result.status, result.stderr).toBe(0)
+    const events = readFileSync(journalPath(), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    expect(events.at(-1)).toMatchObject({ event: 'delegated-finish' })
+    expect(events.at(-1).point).toBe(null)
+  })
+
   it('refuses a declared point that the named branch contradicts, and writes nothing', () => {
     const result = runIn({}, '--point', '713', '--branch', 'refs/heads/feat/999-work')
 
