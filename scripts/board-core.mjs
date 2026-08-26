@@ -208,6 +208,8 @@ const CARD_HEADER_LEFT_CLASS = 'card-header-left'
 const CARD_HEADER_LEFT_PREFIX_SOURCE = `(?:<span class="${CARD_HEADER_LEFT_CLASS}">\\s*)?`
 const CARD_NUMBER_SOURCE = (pointSource) =>
   `${CARD_HEADER_LEFT_PREFIX_SOURCE}<span class="num">\\s*${pointSource}\\s*<\\/span>`
+const CARD_TITLE_HEAD_SOURCE = (pointSource) =>
+  `${CARD_NUMBER_SOURCE(pointSource)}\\s*(?:${CRITICALITY_BADGE_SOURCE})?(?:<\\/span>\\s*)?<span class="t">`
 const CARD_HEADER_LEFT_SOURCE =
   `<span class="${CARD_HEADER_LEFT_CLASS}">\\s*(<span class="num">\\s*\\d+\\s*<\\/span>)\\s*` +
   `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
@@ -423,12 +425,8 @@ export function dropStrayNowCards(html) {
  * the finders cannot disagree about what "numbered" means.
  */
 export function summaryPoint(summary) {
-  const text = unwrapCardHeaderGroups(summary)
-  const chip = text.match(
-    new RegExp(
-      `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
-    ),
-  )
+  const text = String(summary ?? '')
+  const chip = text.match(new RegExp(`^\\s*${CARD_TITLE_HEAD_SOURCE('(\\d+)')}`))
   if (chip) return { chip: chip[1], legacy: null }
   const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
   return { chip: null, legacy: legacy ? legacy[1] : null }
@@ -1970,11 +1968,7 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(
-    new RegExp(
-      `<span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">${TITLE_TEXT}</span>`,
-    ),
-  )
+  const chip = doc.match(new RegExp(`${CARD_TITLE_HEAD_SOURCE(point)}${TITLE_TEXT}</span>`))
   const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
@@ -2209,7 +2203,7 @@ export function setCardTitle(html, point, title) {
   // gate reads as a false closing marker.
   const now = nowSectionSlice(html, { whenMissing: 'document' })
   const closingMarked = new RegExp(
-    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
+    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?${CARD_NUMBER_SOURCE(point)}`,
   ).test(now.text)
   // A CLOSING SHAPE IS THE CLOSING STATE (four-eyes review, 12.08.2026). Writing
   // that title onto an ordinary card would produce the unmarked closing card the
@@ -2224,8 +2218,7 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*` +
-      `(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">)` +
+    `(<details class="now"[^>]*>\\s*<summary>\\s*${CARD_TITLE_HEAD_SOURCE(point)})` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(now.text)) {
@@ -2248,8 +2241,7 @@ export function setCardTitle(html, point, title) {
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(
-    `(<summary><span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?` +
-      `<span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+    `(<summary>${CARD_TITLE_HEAD_SOURCE(point)})(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   try {
     const { from, end } = sectionBounds(html, 'queue')
