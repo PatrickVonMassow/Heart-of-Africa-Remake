@@ -8,11 +8,25 @@
 // lion — and a hyena — triggers that predator's attack, plus the console-error
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { sectionGate } from './sections.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+
+// SECTIONS (points 566/595). One block per predator: each pins its own animal on
+// the player and waits for that attack, so repairing one no longer replays the
+// other's ten-second contact window. The names are read out of THIS FILE by
+// scripts/verify/sections.mjs, so an unknown one is refused with the list of the
+// real ones — and the run is stamped PARTIAL, never suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The tag goes AFTER the ' — ' separator: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -42,82 +56,103 @@ await page.evaluate(() => {
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1200)
 
-// --- Touching a lion triggers a lion attack (user request / design.md §14) ---
-await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8)) // savanna
-await page.waitForFunction(() => window.__lionHunt && window.__lionHunt.state, null, { timeout: 20000 }).catch(() => {})
-await page.waitForTimeout(600)
-const lionTouch = await page.evaluate(async () => {
-  const store = window.__game
-  store.setState({ eventCooldown: 0, defeat: null, victory: false })
-  store.getState().debugAddEquipment('rifle') // rifle in pack → rarely fatal
-  const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
-  const attacksBefore = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
-  // Drop the active lion right on top of the player so the frame loop detects
-  // contact; keep it pinned each tick since it moves while chasing.
-  const deadline = Date.now() + 10000
-  return await new Promise((res) => {
-    const iv = setInterval(() => {
-      const g = store.getState()
-      const pos = g.pos
-      const s = window.__lionHunt?.state
-      if (s) {
-        s.predator = 'lion' // only the lion attacks on contact (design.md §14)
-        s.mode = 'chase'
-        s.timer = 5
-        s.px = pos.x; s.pz = pos.z
-        s.lx = pos.x; s.lz = pos.z
-      }
-      const attacksNow = g.journal.filter((e) => key(e) === 'journal.titles.attack').length
-      const died = g.defeat === 'death'
-      if (attacksNow > attacksBefore || died) {
-        clearInterval(iv)
-        res({ triggered: true, died, cooldown: g.eventCooldown })
-      } else if (Date.now() > deadline) {
-        clearInterval(iv)
-        res({ triggered: false, died, cooldown: g.eventCooldown })
-      }
-    }, 80)
-  })
-})
-check(
-  'touching a lion triggers a lion attack',
-  lionTouch.triggered && lionTouch.cooldown > 0,
-  JSON.stringify(lionTouch),
-)
+// SHARED STAGING (point 566): the savanna, where the wandering predators mount.
+// Both blocks below need it, so it is a helper they each call rather than one
+// inheriting it from the other — jumping twice costs a second, a block that
+// cannot run alone costs a browser run to discover.
+const stageSavanna = async () => {
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8)) // savanna
+  await page.waitForFunction(() => window.__lionHunt && window.__lionHunt.state, null, { timeout: 20000 }).catch(() => {})
+  await page.waitForTimeout(600)
+}
 
-// Point 9: every wandering predator attacks on contact, not only the lion.
-// Pin a hyena on the player and confirm the attack fires (its journal entry).
-const hyenaTouch = await page.evaluate(async () => {
-  const store = window.__game
-  store.setState({ eventCooldown: 0, defeat: null, victory: false })
-  store.getState().debugAddEquipment('rifle')
-  const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
-  const before = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
-  const deadline = Date.now() + 10000
-  return await new Promise((res) => {
-    const iv = setInterval(() => {
-      const g = store.getState()
-      const pos = g.pos
-      const s = window.__lionHunt?.state
-      if (s) {
-        s.predator = 'hyena'
-        s.mode = 'chase'; s.timer = 5
-        s.px = pos.x; s.pz = pos.z; s.lx = pos.x; s.lz = pos.z
-      }
-      const now = g.journal.filter((e) => key(e) === 'journal.titles.attack').length
-      if (now > before || g.defeat === 'death') {
-        clearInterval(iv)
-        res({ triggered: true, cooldown: g.eventCooldown })
-      } else if (Date.now() > deadline) {
-        clearInterval(iv)
-        res({ triggered: false, cooldown: g.eventCooldown })
-      }
-    }, 80)
+// --- Touching a lion triggers a lion attack (user request / design.md §14) ---
+if (section('lion-contact')) {
+  await stageSavanna()
+  const lionTouch = await page.evaluate(async () => {
+    const store = window.__game
+    store.setState({ eventCooldown: 0, defeat: null, victory: false })
+    store.getState().debugAddEquipment('rifle') // rifle in pack → rarely fatal
+    const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
+    const attacksBefore = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
+    // Drop the active lion right on top of the player so the frame loop detects
+    // contact; keep it pinned each tick since it moves while chasing.
+    const deadline = Date.now() + 10000
+    return await new Promise((res) => {
+      const iv = setInterval(() => {
+        const g = store.getState()
+        const pos = g.pos
+        const s = window.__lionHunt?.state
+        if (s) {
+          s.predator = 'lion' // only the lion attacks on contact (design.md §14)
+          s.mode = 'chase'
+          s.timer = 5
+          s.px = pos.x; s.pz = pos.z
+          s.lx = pos.x; s.lz = pos.z
+        }
+        const attacksNow = g.journal.filter((e) => key(e) === 'journal.titles.attack').length
+        const died = g.defeat === 'death'
+        if (attacksNow > attacksBefore || died) {
+          clearInterval(iv)
+          res({ triggered: true, died, cooldown: g.eventCooldown })
+        } else if (Date.now() > deadline) {
+          clearInterval(iv)
+          res({ triggered: false, died, cooldown: g.eventCooldown })
+        }
+      }, 80)
+    })
   })
-})
-check('touching a hyena triggers a hyena attack (non-lion predator)', hyenaTouch.triggered && hyenaTouch.cooldown > 0, JSON.stringify(hyenaTouch))
+  check(
+    'touching a lion triggers a lion attack',
+    lionTouch.triggered && lionTouch.cooldown > 0,
+    JSON.stringify(lionTouch),
+  )
+}
+
+if (section('hyena-contact')) {
+  await stageSavanna()
+  // Point 9: every wandering predator attacks on contact, not only the lion.
+  // Pin a hyena on the player and confirm the attack fires (its journal entry).
+  const hyenaTouch = await page.evaluate(async () => {
+    const store = window.__game
+    store.setState({ eventCooldown: 0, defeat: null, victory: false })
+    store.getState().debugAddEquipment('rifle')
+    const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
+    const before = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
+    const deadline = Date.now() + 10000
+    return await new Promise((res) => {
+      const iv = setInterval(() => {
+        const g = store.getState()
+        const pos = g.pos
+        const s = window.__lionHunt?.state
+        if (s) {
+          s.predator = 'hyena'
+          s.mode = 'chase'; s.timer = 5
+          s.px = pos.x; s.pz = pos.z; s.lx = pos.x; s.lz = pos.z
+        }
+        const now = g.journal.filter((e) => key(e) === 'journal.titles.attack').length
+        if (now > before || g.defeat === 'death') {
+          clearInterval(iv)
+          res({ triggered: true, cooldown: g.eventCooldown })
+        } else if (Date.now() > deadline) {
+          clearInterval(iv)
+          res({ triggered: false, cooldown: g.eventCooldown })
+        }
+      }, 80)
+    })
+  })
+  check('touching a hyena triggers a hyena attack (non-lion predator)', hyenaTouch.triggered && hyenaTouch.cooldown > 0, JSON.stringify(hyenaTouch))
+}
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)
