@@ -144,6 +144,12 @@ export const LIMITS = {
   // took a different branch each time. It was FOLDED into "Grüner Test, falsches Bild", which
   // already carries the green-over-a-proxy defect, rather than opening a sixth neighbour — two
   // lines and thirty-four words for a defect class that costs a full review round each time.
+  // THE BASELINE IS 6ee80b8a, not the previous commit — the tip arrived as a standalone block in
+  // 7a699b0a and was folded down in 52bf0d68, so those two commits are ONE change and only their
+  // sum is the +2/+34 this raise records. Sol's four-eyes review of 52bf0d68 alone read a net
+  // SHRINK and called the raise inconsistent, correctly for the range it was given; the range was
+  // the reviewer's brief, not the code. Split a change like this again and give the reviewer the
+  // whole span, because a ratchet can only be judged against the state before the change began.
   maxLines: 467,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
