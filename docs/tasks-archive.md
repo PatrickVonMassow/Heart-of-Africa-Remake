@@ -23756,3 +23756,76 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2) per step, not once at the end.
   Criticality: high — it owns the batch's dominant cost and every lane's durability, and a defect
   here loses work rather than merely slowing it.
+
+- [x] 595. The verification ladder (point 572's measure 5). While a render point is still
+  being FIXED, only the cheapest covering suite runs, on the everyday WebGPU lane; the
+  full proof — both backends where they can differ, LARGE where the change warrants it —
+  runs exactly ONCE, on the EXACT MERGE CANDIDATE — `main` merged into the branch, the tree
+  that will land — with the recorded `git HEAD` of that run as the evidence that the verified
+  tree IS the merged one. Nothing enforces or measures that today. The expensive browser
+  suites abort at the FIRST failure during that iteration (a red run is never credited
+  anyway) and run to completion only for the final proof. The rule is a brief building block
+  for render points, so it is applied rather than remembered.
+  A RED IS A RED. No "critical versus cosmetic" class is introduced to decide what may be
+  aborted on — the classification buys nothing here, because an iteration run is not credited
+  either way, and it would open the door to waving a red through.
+  THE SHARED FINAL RUN IS ALREADY DECIDED, and this point must not be read as contradicting
+  it: `docs/work-packages.md` settled that several FINISHED per-point branches may be merged
+  together and ONE regression run over the merged result — "the only sizeable saving left".
+  What that shared run may replace is the repeated full REGRESSION. The both-backend PICTURE
+  proof stays on the branch, BEFORE the merge, exactly as it is today; merging first to
+  verify afterwards cost about thirty turns of a block-loop on 24.07.2026.
+  THE UNIT LAYER HAS THE SAME LADDER: `vitest --changed` or a path filter and
+  `tsc --incremental` are legal WHILE REPAIRING, and an incremental green is never an
+  acceptance — the full fast gate stays the proof. One rule covering both layers, not two
+  half-rules.
+  MEASURED TARGET: verification is 47.0 % of the weighted spend and 37.4 % of the machine
+  hours, the ten costliest points hold 64.4 % of all point-assigned verification tokens,
+  and eight of ten recorded `enrichments` runs failed while still writing all 37 frames at
+  951–1029 s each.
+  THE LADDER'S CHEAPEST RUNG ALREADY EXISTS AND IS UNUSED (user question 09.08.2026: "Und
+  die neuen Möglichkeiten für differenziertes Testen durch 566 werden auch inzwischen bei
+  den Feature- und Bugtests eingesetzt?"). Point 566 built `--section=<name>`, and
+  `enrichments` declares nine of them; the resolver, the PARTIAL marking and the refusal to
+  count a partial run as coverage all work. CHECKED 09.08.2026: nothing routes anyone to
+  it. It appears in `scripts/verify/README.md` and in `tiers.mjs`, in no delegation brief,
+  in no agent prompt and in no rule text — the three agents commissioned that same evening
+  were not told about it either — and the recorded render-verify runs contain no partial
+  run at all. So the ladder's bottom rung is not a thing to invent here; it is a built
+  tool to PUT IN THE PATH. This point therefore also: (a) makes `--section` the stated
+  iteration rung for a render point in the delegation brief's building block, so an agent
+  reaches for it before replaying a whole pass; (b) SECTIONS the remaining render suites,
+  which 566 deferred ("enrichments first, then the other render suites"); and (c) states
+  in the same building block that the final proof is whole-suite, so the cheap rung can
+  never be mistaken for the acceptance.
+  WORK FOR 595–598 ALREADY STANDS ON A BRANCH (11.08.2026). A session that died left
+  `feat/595-598-verification-ladder-brief` PUSHED at 0d555552 — four commits plus a merge of
+  `origin/main`, covering all four points — with its worktree
+  `.claude/worktrees/agent-a7b6ba2cc654e6411` still in the tree. It was never reported,
+  verified or landed. Whoever takes these points STARTS FROM THAT BRANCH and verifies it
+  against the specs here; rebuilding from scratch throws away finished work. Cleaning that
+  worktree away before the branch has been judged is what point 629 exists to prevent.
+  Criticality: medium — it reorders the proof but must not dilute it; the both-backend
+  picture proof stays exactly as binding as it is today.
+  BRANCH STATE, RE-MEASURED 23.08.2026 (the 17.08. paragraph it replaces is stale): the branch
+  `feat/595-598-verification-ladder-brief` (tip 85eaa47c) DELIVERS this point and is now ~1615
+  commits behind main — but that number overstates the conflict badly. NONE of the nine
+  re-sectioned suites (events, gamepad, handwriting, health, invariants, report, touch, voice,
+  world) and not `scripts/point-brief.mjs` carry a single main commit since the branch tip. Only
+  two files moved: `scripts/point-brief-core.mjs` (e5737113, sentence-case titles) and
+  `scripts/verify/README.md` (2bac561f, 79b6e4f1, f6c92b65, 35b9f00a). SO: merge main, resolve
+  those two surgically, then read the real diff — do NOT rebuild the suites.
+  THE OWED BOTH-BACKEND PICTURE PROOF NOW RUNS IN A DIFFERENT ENVIRONMENT than the one the
+  17.08. paragraph assumed, and it must be produced under this one: headless EGL routing
+  (fed2fe84), GPU backend probing at bring-up (35b9f00a), a hard failure before app startup when
+  a backend is absent (f6c92b65), bounded verify-run digests (64691b29) and the re-exec-ed
+  default verify launch (764f477b). Those four post-branch README changes must survive the
+  README merge.
+  THE NAME IS NOT THE SCOPE: point 597 has LANDED since and is archived — a taker must not
+  redo it — and open point 596 must not be pulled into this landing.
+  THE ABORT-AT-FIRST-FAILURE SENTENCE IS A RULE FOR AGENTS, NOT A MECHANISM (decided
+  25.08.2026 from the delegated author's escalation): the opening sentence says the expensive
+  browser suites abort at the FIRST failure during iteration, but the scope list (a)/(b)/(c)
+  does not carry it and no shared check helper spans the suites — each defines its own `check`,
+  so enforcing it would be a cross-suite build. It ships as ladder text. If it is ever wanted as
+  a mechanism, it needs its own point, because that is what it costs.
