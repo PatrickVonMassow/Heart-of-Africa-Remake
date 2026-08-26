@@ -111,6 +111,7 @@ import { ownerActivityDecision } from './batch-ownership-core.mjs'
 import { acknowledgeCiWait } from './ci-status-guard.mjs'
 import { modelHandoffSpawn } from './model-handoff-core.mjs'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { emergencyHandoffPrompt } from './batch-emergency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -1689,7 +1690,8 @@ try {
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
   const fableState = currentFableState()
   if (!fableState.ok) throw new Error(fableState.problem)
-  const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix)
+  const emergency = emergencyHandoffPrompt(readJson(join(REPO, 'local', 'batch-emergency-state.json')))
+  const prompt = modelHandoff?.prompt ?? (RESUME_PROMPT + ciTerminalPrompt(ciWaitAssessment) + suffix + emergency)
   child = spawn(exe, buildSpawnArgs({ prompt, fableState, ...(modelHandoff?.model ? { model: modelHandoff.model, fallbackModel: modelHandoff.fallbackModel } : {}) }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
   // ASYNCHRONOUSLY, so without this handler the one failure class the resolver

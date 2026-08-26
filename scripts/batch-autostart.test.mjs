@@ -89,6 +89,7 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/modelHandoffSpawn\(readJson\(C\('model-guard-handoff\.json'\)\), now\)/)
     expect(code).toMatch(/model:\s*modelHandoff\.model, fallbackModel:\s*modelHandoff\.fallbackModel/)
     expect(code).toMatch(/const prompt = modelHandoff\?\.prompt/)
+    expect(code).toMatch(/emergencyHandoffPrompt\(readJson\(join\(REPO, 'local', 'batch-emergency-state\.json'\)\)\)/)
   })
 
   it('never builds a spawn environment in CODE — the core owns that policy', () => {

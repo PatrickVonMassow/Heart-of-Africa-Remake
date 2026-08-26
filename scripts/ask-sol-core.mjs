@@ -18,9 +18,60 @@
 // Side-effect free: the process spawn, the material gathering and the printing belong to
 // scripts/ask-sol.mjs. Pinned by ask-sol-core.test.mjs.
 
-import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
+import { FABLE_MODEL, FABLE_MODEL_ID, OPUS_MODEL, OPUS_MODEL_ID } from './fable-switch-core.mjs'
+import { blindReviewerAdmission, charStripped, MATERIAL_BUDGET_CHARS, rawFieldValue, SOL_MODEL_ID, SOL_MODEL_NAME, stripDecoration, SOL_REASONING_EFFORT } from './review-sol-core.mjs'
 
 export { MATERIAL_BUDGET_CHARS, SOL_MODEL_NAME, SOL_REASONING_EFFORT }
+
+/** Every read-only model this command can address. The served model must agree
+ *  with this descriptor before any output is attributed to it. */
+export const ASK_MODELS = Object.freeze({
+  sol: Object.freeze({ key: 'sol', name: SOL_MODEL_NAME, id: SOL_MODEL_ID, runtime: 'codex', effort: SOL_REASONING_EFFORT }),
+  fable: Object.freeze({ key: 'fable', name: FABLE_MODEL, id: FABLE_MODEL_ID, runtime: 'claude', effort: 'high' }),
+  opus: Object.freeze({ key: 'opus', name: OPUS_MODEL, id: OPUS_MODEL_ID, runtime: 'claude', effort: 'high' }),
+})
+
+/** A supported model descriptor, or null. Sol remains the compatibility default. */
+export function resolveAskModel(value = 'sol') {
+  const key = String(value ?? '').trim().toLowerCase() || 'sol'
+  return ASK_MODELS[key] ?? null
+}
+
+/** Read Claude Code's result JSON and prove which model produced the TOP-LEVEL
+ * answer. Current Claude Code also reports a small Haiku classifier call in
+ * modelUsage; the answer model is the row whose token counters equal `usage`,
+ * not every auxiliary model the CLI happened to consult. */
+export function parseClaudeAskOutput(text, expected = {}) {
+  let value
+  try {
+    value = JSON.parse(String(text ?? '').trim())
+  } catch (error) {
+    return { ok: false, result: '', models: [], error: `Claude returned no readable result JSON: ${error.message}` }
+  }
+  const usage = value?.usage ?? {}
+  const rows = Object.entries(value?.modelUsage ?? {})
+  const normal = (name) => String(name ?? '').toLowerCase().replace(/\[.*?\]/g, '').replace(/[^a-z0-9]+/g, '-')
+  const wanted = rows.find(([name, row]) =>
+    (normal(name) === normal(expected.id) || normal(row?.canonicalModel) === normal(expected.id)) &&
+    Number(row?.inputTokens) === Number(usage.input_tokens) &&
+    Number(row?.outputTokens) === Number(usage.output_tokens) &&
+    Number(row?.cacheReadInputTokens ?? 0) === Number(usage.cache_read_input_tokens ?? 0) &&
+    Number(row?.cacheCreationInputTokens ?? 0) === Number(usage.cache_creation_input_tokens ?? 0),
+  )
+  const models = rows.map(([name]) => name)
+  if (!wanted) {
+    return {
+      ok: false,
+      result: typeof value?.result === 'string' ? value.result : '',
+      models,
+      error: `Claude's top-level answer was not attributed to ${expected.name ?? expected.id}; usage named ${models.join(', ') || 'no model'}`,
+    }
+  }
+  if (typeof value?.result !== 'string') {
+    return { ok: false, result: '', models, error: 'Claude returned no text result' }
+  }
+  return { ok: true, result: value.result, models, answerModel: wanted[0], error: '' }
+}
 
 /** The kinds of work this command carries. All of them are pure text. */
 export const KINDS = Object.freeze(['diagnose', 'audit', 'enumerate', 'explain'])
@@ -71,12 +122,12 @@ export function entryPrefix(kind) {
  * not be told to fetch anything), and a part marked TRUNCATED must be reported as such
  * rather than guessed past.
  */
-export function buildAskPrompt({ kind = '', brief = '' } = {}) {
+export function buildAskPrompt({ kind = '', brief = '', modelName = SOL_MODEL_NAME } = {}) {
   const k = normaliseKind(kind)
   if (!k) throw new Error(`ask-sol: not a kind: ${kind}`)
   const shape = ANSWER_SHAPES[k]
   const lines = [
-    `You are doing READ-ONLY work for this repository as ${SOL_MODEL_NAME}. You were chosen`,
+    `You are doing READ-ONLY work for this repository as ${modelName}. You were chosen`,
     'because you are a DIFFERENT model from the one that wrote the material: your value is the',
     'errors and the readings the author cannot see, so judge what is attached and do not assume',
     'it is correct.',
@@ -373,20 +424,21 @@ export function parseAnswer({ kind = '', text = '' } = {}) {
  * The exit code beside it (3, as on the review path) is what lets a script tell "Sol
  * answered" from "Sol did not" without reading prose.
  */
-export function formatUnavailable({ kind = '', cause = '', setting = '' } = {}) {
+export function formatUnavailable({ kind = '', cause = '', setting = '', modelName = SOL_MODEL_NAME } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
+  const handoff = modelName === SOL_MODEL_NAME ? 'Do it in the Claude chain' : 'Hand it to another eligible lane'
   return [
-    `ask-sol: ${SOL_MODEL_NAME} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
-    `  The ${k} is NOT done. Do it in the Claude chain — nothing here may be recorded as ${SOL_MODEL_NAME}'s work.`,
+    `ask-sol: ${modelName} did NOT answer this ${k}: ${cause || 'no cause was reported'}.`,
+    `  The ${k} is NOT done. ${handoff} — nothing here may be recorded as ${modelName}'s work.`,
     ...(setting === 'claude-only' ? ['  (The share switch is at `claude-only`; `node scripts/sol-share.mjs --more` sends this kind to Sol again.)'] : []),
   ].join('\n')
 }
 
 /** The whole answer as the command prints it: the shape first, the reader's summary last. */
-export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0 } = {}) {
+export function formatAnswerReport({ kind = '', parsed = {}, elapsedMs = 0, modelName = SOL_MODEL_NAME, effort = SOL_REASONING_EFFORT } = {}) {
   const k = normaliseKind(kind) ?? String(kind ?? '')
   const seconds = Number.isFinite(Number(elapsedMs)) ? Math.round(Number(elapsedMs) / 1000) : 0
-  const head = `ask-sol: ${SOL_MODEL_NAME} (effort ${SOL_REASONING_EFFORT}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
+  const head = `ask-sol: ${modelName} (effort ${effort}) answered the ${k} in ${seconds}s — ${parsed.summary ?? ''}`
   if (k === 'diagnose') return [head, `  CAUSE:    ${parsed.answer?.cause ?? ''}`, `  EVIDENCE: ${parsed.answer?.evidence ?? ''}`].join('\n')
   if (k === 'audit' || k === 'enumerate') {
     return [head, ...(parsed.answer?.entries ?? []).map((e) => `  ${e.id} | ${e.file} | ${e.text}`)].join('\n')

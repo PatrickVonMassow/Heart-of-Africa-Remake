@@ -133,6 +133,41 @@ export function baselineFor(state, branch) {
   return map[branch] ?? map.main ?? state?.baseline ?? null
 }
 
+// The gap measurement, in the TWO independent steps it actually has. The sized
+// plan only REFINES the measurement, so it gets its own try: before this split
+// a throw out of review-sol.mjs's planner left `gap` null and the guard BLOCKED
+// — a broken planner turned a suspendable range into a hard block with no
+// runnable review, which is the very trap the gap clause exists to prevent
+// (measured 26.08.2026, point 947). A missing plan now degrades to the unsliced
+// measurement; only a failing ASSESSMENT rules no gap, because an unmeasured
+// claim must never waive the gate.
+export async function measureReviewGap({
+  gapRange,
+  sha,
+  base,
+  commits,
+  standingRecords,
+  loadPlanner = () => import('./review-sol.mjs'),
+  loadAssessor = () => import('./mechanism-review-guard-gap.mjs'),
+}) {
+  if (!gapRange) return { gap: null, sizedPlan: null }
+  let sizedPlan = null
+  try {
+    const { buildAuthorshipPassPlan } = await loadPlanner()
+    sizedPlan = buildAuthorshipPassPlan({ sha, base, commits })
+  } catch {
+    /* unsliced measurement — the assessment below still runs */
+  }
+  let gap = null
+  try {
+    const { assessReviewGap } = await loadAssessor()
+    gap = await assessReviewGap({ ...gapRange, standingRecords, sizedPlan })
+  } catch {
+    /* no ruling — the caller's block stands */
+  }
+  return { gap, sizedPlan }
+}
+
 /**
  * Recover a missing local baseline from one immutable, tracked history point.
  * There is deliberately no HEAD or main fallback: on main both resolve to HEAD,
@@ -574,31 +609,18 @@ if (isMainModule(import.meta.url)) {
     // cannot deliver (the trap's second door, measured 18.08.2026) — keyed on
     // the measurement alone, never on what a verdict's prose said; the count of
     // standing refusals travels into the report from the STRUCTURED findings.
-    let gap = null
-    let sizedGapPlan = null
     const gapRange = reviewGapRange({
       blocked: verdict.block,
       base: gathered.rangeBase,
       head: gathered.head,
     })
-    if (gapRange) {
-      try {
-        const { buildAuthorshipPassPlan } = await import('./review-sol.mjs')
-        sizedGapPlan = buildAuthorshipPassPlan({
-          sha: gathered.head,
-          base: gathered.rangeBase,
-          commits: commitsForFiles(gathered.debt?.outstanding),
-        })
-        const { assessReviewGap } = await import('./mechanism-review-guard-gap.mjs')
-        gap = await assessReviewGap({
-          ...gapRange,
-          standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
-          sizedPlan: sizedGapPlan,
-        })
-      } catch {
-        /* no ruling — the block below stands */
-      }
-    }
+    const { gap, sizedPlan: sizedGapPlan } = await measureReviewGap({
+      gapRange,
+      sha: gathered.head,
+      base: gathered.rangeBase,
+      commits: commitsForFiles(gathered.debt?.outstanding),
+      standingRecords: (verdict.findings ?? []).filter((f) => f.kind === 'do-not-merge').length,
+    })
     const outcome = guardOutcome({ blocked: verdict.block, gap })
 
     if (status) {

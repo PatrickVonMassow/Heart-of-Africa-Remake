@@ -18,9 +18,18 @@ import {
   formatUnavailable,
   normaliseKind,
   parseAnswer,
+  parseClaudeAskOutput,
+  resolveAskModel,
 } from './ask-sol-core.mjs'
 
 describe('the kinds', () => {
+  it('addresses every model the blind-merger switch can select', () => {
+    expect(resolveAskModel()).toMatchObject({ key: 'sol', runtime: 'codex', name: 'GPT-5.6 Sol' })
+    expect(resolveAskModel('fable')).toMatchObject({ runtime: 'claude', name: 'Fable 5', id: 'claude-fable-5' })
+    expect(resolveAskModel('opus')).toMatchObject({ runtime: 'claude', name: 'Opus 5' })
+    expect(resolveAskModel('sonnet')).toBeNull()
+  })
+
   it('are the four read-only ones, each with a task and an answer shape', () => {
     expect(KINDS).toEqual(['diagnose', 'audit', 'enumerate', 'explain'])
     for (const kind of KINDS) {
@@ -38,6 +47,39 @@ describe('the kinds', () => {
   })
 })
 
+describe('Claude answer attribution', () => {
+  const response = (answerModel = 'claude-fable-5') => JSON.stringify({
+    result: 'the folded answer',
+    usage: { input_tokens: 7, output_tokens: 4, cache_read_input_tokens: 0, cache_creation_input_tokens: 90 },
+    modelUsage: {
+      'claude-haiku-4-5-20251001': { inputTokens: 800, outputTokens: 12, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 },
+      [answerModel]: { inputTokens: 7, outputTokens: 4, cacheReadInputTokens: 0, cacheCreationInputTokens: 90, canonicalModel: answerModel },
+    },
+  })
+
+  it('accepts the selected answer model while recording an auxiliary classifier', () => {
+    expect(parseClaudeAskOutput(response(), resolveAskModel('fable'))).toMatchObject({
+      ok: true,
+      result: 'the folded answer',
+      answerModel: 'claude-fable-5',
+      models: ['claude-haiku-4-5-20251001', 'claude-fable-5'],
+    })
+  })
+
+  it('refuses substitution even when the requested model appears as auxiliary usage', () => {
+    const value = JSON.parse(response('claude-opus-5'))
+    value.modelUsage['claude-fable-5'] = { inputTokens: 100, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable'))).toMatchObject({ ok: false })
+  })
+
+  it('refuses unreadable output and a non-text result', () => {
+    expect(parseClaudeAskOutput('no json', resolveAskModel('fable')).ok).toBe(false)
+    const value = JSON.parse(response())
+    value.result = { plan: 'not the answer' }
+    expect(parseClaudeAskOutput(JSON.stringify(value), resolveAskModel('fable')).error).toMatch(/no text result/)
+  })
+})
+
 describe('the prompt', () => {
   it('states the task, the question and that the material is ATTACHED, never fetched', () => {
     const p = buildAskPrompt({ kind: 'diagnose', brief: 'why did the place suite go red?' })
@@ -48,6 +90,12 @@ describe('the prompt', () => {
     expect(p).toMatch(/TRUNCATED/)
     expect(p).toMatch(/CAUSE:/)
     expect(p).toMatch(/EVIDENCE:/)
+  })
+
+  it('names the selected read-only model in the prompt', () => {
+    expect(buildAskPrompt({ kind: 'explain', brief: 'fold these', modelName: 'Fable 5' })).toContain(
+      'READ-ONLY work for this repository as Fable 5',
+    )
   })
 
   it('tells an ENUMERATE it is a divergent half that a third model will merge by id', () => {
@@ -65,6 +113,17 @@ describe('the prompt', () => {
 
   it('names a missing question rather than inventing one', () => {
     expect(buildAskPrompt({ kind: 'audit', brief: '' })).toMatch(/none given/)
+  })
+})
+
+describe('model-specific reports', () => {
+  it('never labels a Fable refusal or answer as Sol', () => {
+    expect(formatUnavailable({ kind: 'explain', cause: 'substituted', modelName: 'Fable 5' })).toMatch(
+      /Fable 5 did NOT answer/,
+    )
+    expect(formatAnswerReport({ kind: 'explain', parsed: { summary: 'folded' }, modelName: 'Fable 5', effort: 'high' })).toMatch(
+      /Fable 5 \(effort high\) answered/,
+    )
   })
 })
 

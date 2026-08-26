@@ -70,6 +70,87 @@ not permission to fold their implementation into this policy-only point.
 | G5 | The closing guard blocks release tags until its machine-recorded checklist is complete; the runbook separately requires explicit approval for the tag/public release (`scripts/closing-guard-core.mjs`, `docs/batch-owner-runbook.md`). | **Retained confirm gate.** Prepare and verify everything, then wait only at the exact version/`poc` tag and public-deploy act. | **In place:** closing points 174/633 and the runbook. |
 | G6 | The board runbook requires explicit approval before changing the public four-section contract (`docs/batch-owner-runbook.md`). | **Retained confirm gate.** This changes the user's outward-facing control surface. Routine card additions, decision records, text corrections, and publishes inside the existing contract are durably authorized and continue. | **In place:** runbook policy. |
 
+### Blind standstill sweep and composition check (26.08.2026, point 947)
+
+The divergent sweep was genuinely independent: Opus 5 produced 23 entries in
+`docs/four-eyes/947-blind-a-opus5.json`, GPT-5.6 Sol produced 18 in
+`docs/four-eyes/947-blind-b-sol.json`, and the switch-selected third model,
+Fable 5, folded the complete lists into `947-union.json`. The accounting receipt
+is **23 A + 18 B → 27 union entries; all 41 inputs accounted for**. The fold was
+reachable through `ask-sol.mjs --model fable`: a read-only, tool-less ask that
+proves the top-level answer model and refuses substitution.
+
+Each row below is one union entry. “Containment” means the independent emergency
+lane restores work even before the narrow repair lands; it does not erase the
+named owner. Only S-12 is allowed to stop the whole batch.
+
+| Fold | Standstill state | Fix or classification |
+|---|---|---|
+| S-01 | A non-converging queue head blocks later workable points. | **In place:** child retry requeues spent non-critical work; the emergency hard handoff records a commission override for the next candidate and leaves the stuck point for a later diagnosed retry. |
+| S-02 | Owner cwd is a point worktree and state splits from main (944). | **Direct fix:** every launcher/session path canonicalizes cwd to main; owned by point 944. Emergency containment restarts through the main-root Scheduled Task. |
+| S-03 | Dead owner plus live delegate is read as a foreign-writer refusal (945). | **Direct fix:** distinguish and adopt the delegate; owned by point 945. Hard recovery terminates every exact recorded batch-process incarnation before restarting. |
+| S-04 | Refused starts consume runaway budget and repeat pause/refusal forever (945). | **Direct fix:** count only actual starts and escalate repeating refusals outward; owned by point 945. The independent timer does not consume that ladder. |
+| S-05 | The idle-board closing escape writes state the projection cannot represent (937). | **Direct fix:** preserve a guard-visible closing state and allow its exact recovery mutation; owned by point 937. |
+| S-06 | Landing closes the point before board/cleanup can accept the state. | **Direct fix:** cleanup before the board transition, or accept the just-closed focus atomically; the landing recovery must remain idempotent. Emergency containment repairs recoverable leftovers before restart. |
+| S-07 | CI is red although its job never started, so in-job retry is unreachable (953). | **Direct fix:** classify zero-step/null-conclusion as infrastructure and trigger external rerun or defer only the affected point; owned by point 953. |
+| S-08 | A red shared `test-types` baseline rejects every point before its own suites (948). | **Direct fix:** route immediately to baseline repair or isolate the known baseline red so unaffected points remain commissionable; owned by point 948. |
+| S-09 | The criticality refusal's ledger exit has no writer (942). | **Direct fix:** a supported command writes and validates that exact row; owned by point 942. The generalized read-only ask also closes the same unreachable-lane class for blind folds. |
+| S-10 | Two guards mutually forbid each other's only satisfying mutation. | **Composition rule:** every new hard guard names a guard-permitted repair/deferral transition and is reviewed pairwise against all mutation guards. Independent containment runs outside session hooks. |
+| S-11 | A dead process's lock/claim remains authoritative. | **In place:** singleton acquisition probes the process incarnation and reclaims a dead/reused owner; hard recovery also revokes the exact fence before termination. |
+| S-12 | No policy-acceptable serving model is available anywhere in the allowed chain. | **INSURMOUNTABLE:** no point is executable by policy. Keep clocked provider probes; stop only while every allowed route remains unavailable. A transient failure is not this class. |
+| S-13 | Boundary/resume consumes its restart event without establishing progress. | **In place:** failed handoffs are journalled and ordinary clocks repeat; the hourly emergency task is an independent unconsumed clock and repeats until progress changes. |
+| S-14 | A machine pause inherits the indefinite immunity of a user stop. | **In place:** machine pauses are clocked and capped; only typed `user-stop` is indefinite. Emergency also stands down on the pause marker. |
+| S-15 | A required render backend cannot run on the current host. | **Direct fix:** classify the backend as an environment deferral with evidence and continue non-dependent work; never wait on an unreachable local condition. |
+| S-16 | Missing queue cards and board-first refusal form a mutual board-write block. | **In place:** `board-queue.mjs import/set` is the sanctioned missing-card writer and board mutation ordering keeps that exit reachable. |
+| S-17 | Lane/coupling exclusions leave open points but no named candidate. | **Direct fix:** compute the exclusion set, name the first non-excluded point, or emit a standstill event. The emergency workable set ignores dead in-flight claims. |
+| S-18 | A required finding cannot reach its normal tracked carrier. | **Direct fix:** provide a durable fallback sink outside guarded writers and replay it later. Emergency intents/outcomes demonstrate the required atomic-local-sink shape. |
+| S-19 | A live-but-wedged owner suppresses the responder because liveness is mistaken for progress. | **In place:** the emergency decision uses bounded advancing intervals, never process presence, and acts after the measured hour. |
+| S-20 | An abandoned claim suppresses launch for its whole lease. | **In place:** claim assessment expires inactive claims; emergency containment remains independent of the claimant session. |
+| S-21 | Unrelated artefact writes renew a dead in-flight declaration. | **Direct fix:** bind renewal to the declared process/work identity rather than branch/log movement; the emergency progress classifier admits only bounded work intervals. |
+| S-22 | Cleanup removes a worktree beneath a live delegate. | **In place:** cleanup refuses a live process and names its pid; hard recovery first proves and terminates exact process incarnations, then lets doctor perform recoverable cleanup. |
+| S-23 | Individual mechanism inventory misses pair-only wedges, including 944+945. | **Closed here:** this composition table is mandatory input for future hard guards; S-02/S-03 and S-05/S-06/S-25 preserve the measured pairs separately. |
+| S-24 | Dead-owner in-flight records leave every point busy. | **Direct fix:** exclude/reclaim expired records before candidate selection. Emergency independently computes logical workable points with dead in-flight records omitted. |
+| S-25 | Board-first guard forbids the failed landing's remaining cleanup. | **Direct fix:** narrowly permit the authenticated landing-recovery mutation; owned with S-05 by point 937. |
+| S-26 | One selected author model fails although another allowed model is available. | **In place for blind folds:** `ask-sol.mjs --model` reaches every merger roster model under the recorded switches. Author routing must likewise advance through the allowed serving route instead of global refusal. |
+| S-27 | Owner and its only watcher are both absent or wedged. | **Closed by double safety:** `HoA-Batch-Emergency` is an hourly SYSTEM timer outside those sessions; the watchdog checks/re-registers it, while it starts the authenticated primary task. |
+
+One further stop path was measured while cross-reading the range rather than by
+the sweep, and it belongs to the same class. `mechanism-review-guard.mjs` built
+the sized review plan inside the SAME `try` that assessed the review gap, so a
+throw out of `review-sol.mjs`'s planner left the ruling null and the guard
+blocked — a broken planner turned a suspendable range into a hard block with no
+runnable review, which is exactly what the gap clause exists to prevent. The two
+steps are now separate: `measureReviewGap` sizes the plan in its own `try` and
+degrades to the UNSLICED measurement when that fails, while only a failing
+assessment still rules no gap. The general rule this instance carries: a
+refinement of a measurement may never be able to remove the measurement.
+
+#### Double safety: the independent emergency lane
+
+`scripts/batch-emergency.mjs` runs hourly from `HoA-Batch-Emergency`, offset from
+the 15-minute primary/watchdog ticks. It stands down for `.claude/batch-paused`,
+an empty workable queue, recent measured progress, or a reasoned future clock in
+`local/batch-emergency-veto.json`. Every strike writes an atomic intent before
+acting and an outcome afterward to `local/batch-emergency-state.json`, with the
+append history in `local/batch-emergency-strikes.jsonl`; both records print the
+exact `--veto … --until …` route.
+
+The first hour-without-progress strike is soft: doctor repair followed by a
+normal restart. A hard strike is legal only when that recorded strike exists and
+the last-progress boundary is unchanged. It revokes the exact owner fence,
+terminates only pid incarnations proved by the lock/batch-writer registry, runs
+doctor repair only after all those terminations succeed, and restarts the
+interactive primary Scheduled Task (not an unauthenticated Claude under SYSTEM).
+Wholesale worktree deletion was rejected: the repository doctor already knows
+which cleanup is recoverable, while blind deletion is how uncommitted work was
+lost on 11.08.2026.
+
+`scripts/batch-emergency-drill.mjs` is the Urlaubsfestigkeit proof. It calls the
+real `runEmergency`, creates a real wedged owner process, measures the soft strike
+failing to restore progress, then observes the hard strike terminate it and make
+the restart call without human input. Its unit wrapper asserts two restart
+attempts and four durable intent/outcome records.
+
 ### Follow-up point boundaries
 
 The five code points above are filed in the work order as points 864-868, in the
@@ -1821,7 +1902,7 @@ anyway; the batch simply resumes when they next log in. Making that resume
 the three things the setup script below arms — see *The boot path, and a second
 task that watches the first*.
 
-### The boot path, and a second task that watches the first (30.07.2026, point 447)
+### The boot path, its mutual watch, and an independent emergency timer (point 447/947)
 
 Measured state of `HoA-Batch-Autostart` on the Windows host: ONE time trigger
 every 15 minutes, `StartWhenAvailable` on, no battery or idle limit,
@@ -1845,13 +1926,17 @@ the machine; `-PauseUpdatesDays <1..35>` is the pre-departure pause. What it arm
   runs `windows-task-watch.mjs --check primary`. The 7-minute offset is what keeps
   the two from ticking in the same second, where each would read a peer that has
   not yet recorded the run it is starting;
-- an export of both task definitions to the git-ignored `local/windows-tasks/`,
+- the independent **`HoA-Batch-Emergency`** task: at STARTUP, delayed 12 minutes
+  and then hourly as SYSTEM. It calls `batch-emergency.mjs`; the watchdog's
+  second action checks and repairs this timer too;
+- an export of all three task definitions to the git-ignored `local/windows-tasks/`,
   which is what a re-registration reads;
 - the restart behaviour: no forced restart while a user is signed in, and
   automatic restart sign-on ENABLED — that signed-in (if locked) session is what
   the Interactive primary task needs to exist at all.
 
-So neither task is a single point of failure: each checks that the other exists,
+So neither ordinary task is a single point of failure, and the last-resort timer
+is checked by the watchdog: the peers verify that the named task exists,
 is enabled and ran recently, and applies the SMALLEST repair — re-register from
 the exported XML, enable, or start. A peer that RAN and returned non-zero is
 reported, never restarted: the scheduling works and the payload failed, and
@@ -1874,7 +1959,7 @@ container with no Task Scheduler and no PowerShell at all, and
 `windows-task-watch.mjs` is a no-op that exits 0 there. **The first elevated run
 on the Windows host, and its printed change list, are the acceptance evidence.**
 Check it any time with `node scripts/windows-task-watch.mjs --check primary
---dry-run`; the readiness command (point 448) reports both tasks with their
+--dry-run` and `--check emergency`; the readiness command reports the tasks with their
 triggers and last result.
 
 ## Dashboard currency (enforced, not reminded)
@@ -3023,11 +3108,12 @@ impossible, not skipping the inspection.
 - **Stop the launcher**: on Linux `node scripts/batch-launcher.mjs --stop` (start
   it again with `--start`, read it with `--status`); on Windows
   `schtasks /delete /tn HoA-Batch-Autostart /f` AND the same for
-  `HoA-Batch-Watchdog`, which otherwise re-registers the primary within a tick
+  `HoA-Batch-Watchdog` and `HoA-Batch-Emergency`, which otherwise restore each other
   (point 447) — or simply pause, which stands the watchdog down too. Either way
   the batch stops being resurrected and the point boundary is refused — which is
   correct: nothing would restart it.
-- **Logs**: `.claude/autostart.log` (gitignored) records every launcher decision.
+- **Logs**: `.claude/autostart.log` records launcher decisions;
+  `local/batch-emergency-strikes.jsonl` records every fallback strike. Both are gitignored.
 - **Chat**: pair a phone with `node scripts/chat-secret.mjs --init`; the launcher
   polls it on every tick. `--rotate` un-pairs every device. Turning it off is
   deleting `.claude/chat-secret` — an unpaired machine simply never polls.
