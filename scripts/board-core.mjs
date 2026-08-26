@@ -1230,7 +1230,8 @@ function doneBounds(html) {
 }
 
 /** An Erledigt card, matched inside the section alone. */
-const DONE_CARD_RE = /<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+const DONE_CARD_RE =
+  /<details>\s*<summary>(?:<span class="card-header-left">\s*)?<span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
 
 /** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
 export function doneEntries(html) {
