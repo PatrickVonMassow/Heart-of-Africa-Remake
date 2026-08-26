@@ -64,6 +64,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.08. morgens | Der übernommene Autorenlauf war seit zwei Minuten tot, und die Probe, die im Batch über Leben und Tod eines Agenten entscheidet, verbot in Großbuchstaben, ihn zu ersetzen: Sie schaut die pid ihrer eigenen Deklaration nie an und lässt den frischen Zweigstand die Prozessprüfung überstimmen — den hinterlässt aber gerade ein soeben gestorbener Lauf (§3.170, Punkt 874) |
 | 26.08. | Der einzige ungeordnete Punkt der Sitzungseröffnung war eine Dublette: derselbe Vorschau-gegen-Tor-Widerspruch stand seit zwei Tagen als Punkt 873, 273 Positionen tiefer — gefunden wieder nur durch die Bündelpflicht, nicht beim Anlegen (§3.168-Nachtrag, Punkt 923 in 873 gefaltet) |
 | 26.08. | Das Push-Tor wies viermal denselben Push ab und druckte die Entlastung mit: kein benannter Fehlschlag, ein Läufer, der nicht fertig wurde — derselbe Befehl von Hand war in 164 s mit 13 778 grünen Fällen durch (§3.182, Punkt 924) |
+| 26.08. nachts | Zweimal grün über einer Attrappe, die das echte Board nur nachgebaut statt gelesen hat: Das Kritikalitäts-Stylesheet landete im Kommentar der Refresh-Routine, und die auf Zuruf nachgereichte Regressionsprüfung ließ genau die eine `<meta>`-Zeile weg, die den gemeinten Anker im echten Board verfehlen lässt — Runde zwei verschob und löschte dabei die BOM der Datei (§3.184, Punkt 844) |
 | 24.08. mittags | Der delegierte Autor schrieb drei Commits um, die er bereits veroeffentlicht hatte: Sein Abschluss-Push scheiterte als non-fast-forward, und sein eigener Bericht meldete die fertige Arbeit als „nur lokal“ — obwohl die Baeume beider Seiten byte-identisch waren und sich nur eine Leerzeile im Commit-Text unterschied. Wer dem Bericht glaubt, sucht verlorene Arbeit, die nie verloren war; wer ihn ignoriert, uebersieht den echten Fall. Dieselbe Stunde zeigte die Kehrseite von der Gegenseite: Ein Tor-Lauf im Arbeitsbaum wurde rot, weil die pruefende Sitzung selbst waehrenddessen auf main committete — kein Test schlug fehl, nur der Teardown benannte die Ref-Bewegung |
 | 11.08. abends | Der VS-Code-Neustart nimmt den Devcontainer mit — die Batch-Sitzung und sechs Agenten sterben, nachdem ich das Gegenteil zugesichert hatte (§3.111); die Rechte-Rückfragen kamen weiter, weil `defaultMode` eine fortgesetzte Sitzung gar nicht mehr erreicht (§3.3) |
 
@@ -1355,7 +1356,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 03:26 · Quellen-Fingerprint: `7428be098bfc…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 04:31 · Quellen-Fingerprint: `359574d45a06…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1456,8 +1457,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 101 Prozess-/Meta-TASKS-Punkte (davon 42 offen).
 
-<!-- RETRO-FINGERPRINT: 7428be098bfc3b36f38351f010f43ad722763d4de0435caa7bc17738fb3aabac -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T01:26:43.982Z -->
+<!-- RETRO-FINGERPRINT: 359574d45a06bad825574032dc882072a0daecfc959907e2ed47bba8907a3f22 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T02:31:11.615Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3743,3 +3744,37 @@ fehlenden Teil still weg, statt laut zu scheitern.
 **Lehre:** Eine billige Sprosse ist nur dann billig, wenn eine teure sie regelmäßig einholt.
 Und ein Artefakt, das der Nutzer nach draußen trägt, darf unvollständig nicht ausliefern:
 Wo ein Teil fehlt, ist Schweigen die schlimmste Antwort. Gebucht als Punkt 926 und 927.
+
+### 3.184 Zweimal grün über einer Attrappe, die es nur nachgebaut statt gelesen hat
+
+Punkt 844 hängt ein Kritikalitäts-Abzeichen in jeden Kartenkopf des Boards. Der Autor lieferte
+423 grüne Testdateien — und das Stylesheet landete auf dem echten Board mitten in einem
+JavaScript-Kommentar der Refresh-Routine. Der Grund: Die Datei hat keinen `</head>`, also griff
+der Rückfall auf das erste `<main`, und das erste `<main` im Board steht nicht im Dokument,
+sondern im Kommentar eines Skripts, das über `<main>` spricht. Ergebnis: 208 ungestylte
+Abzeichen und ein zerlegtes Inline-Skript.
+
+Interessant ist nicht dieser Fehler, sondern der zweite. Der Review benannte die Ursache
+ausdrücklich — »nicht der Code hat den Fall verfehlt, sondern die Fixture« — und verlangte eine
+Regressionsprüfung in der Gestalt des echten Boards. Die Nachbesserung kam prompt, mit genau so
+einer Prüfung. Sie war wieder falsch: Der neue Anker verlangt `<title>` unmittelbar gefolgt von
+`<style>`, und im echten Board steht dazwischen ein `<meta name="viewport">`. Die neue Fixture
+ließ genau diese eine Zeile weg. Also lief der Test durch den gemeinten Zweig, während das echte
+Board weiter in den Rückfall fiel — diesmal ohne Skript-Schaden, dafür mit verschobener und im
+zweiten Durchlauf **gelöschter** BOM, weil `\s` in ECMAScript auch U+FEFF matcht.
+
+Das ist verwandt mit §3.89, aber nicht dasselbe. Dort war die Attrappe **kleiner** als die
+Wirklichkeit, eine Mengengrenze fiel heraus. Hier hat sie die **falsche Gestalt**, und zwar
+zweimal hintereinander, obwohl die Wirklichkeit die ganze Zeit als Datei im Repository lag und
+mit einem `head -c 300` zu lesen gewesen wäre. Eine aus dem Gedächtnis nachgebaute Fixture prüft
+nicht das Artefakt, sondern die Vorstellung, die der Autor davon hat — und sie prüft sie
+zuverlässig grün, weil beide aus derselben Quelle stammen. Der Aufruf »nimm die echte Gestalt«
+reicht dagegen nicht: Er wurde befolgt und traf trotzdem daneben, weil auch der zweite Nachbau
+wieder aus dem Kopf kam.
+
+**Lehre:** Wo eine Prüfung gegen ein Artefakt läuft, das im Repository liegt, wird die Fixture
+aus dieser Datei **abgeleitet**, nicht nachgebaut — und wo das aus guten Gründen nicht geht,
+gehört mindestens eine Zusicherung dazu, die den Rückfall selbst verbietet, statt nur den
+gemeinten Zweig zu bestätigen. Zwei Zusicherungen hätten beide Runden sofort erledigt:
+Idempotenz über der echten Datei und Byte-Erhalt ihres Kopfes. Beide sind billiger als eine
+Review-Runde, und beide messen die Wirklichkeit statt der Absicht.

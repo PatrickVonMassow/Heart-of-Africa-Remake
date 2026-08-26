@@ -18,23 +18,11 @@
       "origin": "user",
       "place": "ahead"
     },
-    "595": {
-      "at": "2026-08-21T16:05:59.750Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), second rule: a feature branch already stands, so it is cleared rather than left to fall further behind main. feat/595-598-verification-ladder-brief delivers it.",
-      "origin": "user",
-      "place": "ahead"
-    },
     "596": {
       "at": "2026-08-21T16:06:01.515Z",
       "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174): queued directly behind 174. It makes a running tail visible; the tail points it targets are render work that follows the release.",
       "origin": "user",
       "place": "last"
-    },
-    "598": {
-      "at": "2026-08-21T16:05:59.831Z",
-      "why": "User ruling 21.08.2026 (only the communication mechanic, then 633 and the release 174), second rule: the same branch feat/595-598-verification-ladder-brief delivers it, so both are cleared together.",
-      "origin": "user",
-      "place": "ahead"
     },
     "643": {
       "at": "2026-08-11T15:00:17.845Z",
@@ -746,9 +734,7 @@
       336,
       553,
       581,
-      595,
       596,
-      598,
       633,
       659,
       660,
@@ -781,7 +767,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T01:26:40.719Z",
+    "at": "2026-08-26T02:27:02.960Z",
     "points": [
       174,
       184,
@@ -892,9 +878,7 @@
       575,
       581,
       591,
-      595,
       596,
-      598,
       599,
       602,
       603,

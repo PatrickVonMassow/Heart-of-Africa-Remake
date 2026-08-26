@@ -240,6 +240,19 @@ put it is the mistake this line exists to stop.
   - THE GUARD SAYS WHICH IT IS. Today it reports "unexplained red" for a run that has no
     explanation to give, which sends the reader hunting for a defect that was never captured. An
     incomplete recording must be named as one, distinct from a red nobody has explained yet.
+  - THE DISPOSITION MUST REACH RUNS ALREADY RECORDED (measured 26.08.2026). A ledger entry is
+    applied when a run is RECORDED, not when it is judged: `red.point` is written onto the stored
+    red, and `runVerdict` only reads it back. Extending `RED_CHARGES` therefore reclassifies
+    NOTHING that is already in `.claude/render-verify-state.json`, so for a window that is already
+    red the only exits left are fixing the cause — which merely moves the window — and the hand
+    `--defer`. A crashed run is worse still: `runVerdict` returns `charges: []` for
+    `crashed === true`, so it can carry no charge at any time. This point's own VERIFIABLE below
+    promises that the 17.08. runs stop blocking WITHOUT a deferral, and that promise cannot be
+    kept by better recording alone — the disposition has to be applicable retroactively to runs
+    already on disk. Counted that day across the 40 recorded runs: 22 distinct unaccounted reds,
+    all from 13.-19.08.2026, of which the whole `webgpu/settings` console storm cascades from one
+    root that point 514 owns ("is invalid due to a previous error" verbatim), two are this point's
+    own cap lines, and eight are crashes that no ledger can ever take.
   VERIFIABLE: Vitest over the pure decision — a run whose result lines hit the cap is classified
   as an incomplete recording and not as an unexplained red; a genuinely unexplained red still
   blocks; a closed incomplete recording no longer blocks a later render edit. Plus the real proof:
