@@ -5,6 +5,7 @@ import {
   EMERGENCY_THRESHOLD_MS,
   activeVeto,
   emergencyDecision,
+  emergencyHandoffPrompt,
   latestProgressAt,
   strikeRecord,
 } from './batch-emergency-core.mjs'
@@ -75,5 +76,15 @@ describe('the independent emergency decision', () => {
       id: 's1', phase: 'intent', action: 'soft-recover', progressAt, workablePoints: [947],
     })
     expect(strikeRecord({ id: 's1', decision, at: NOW }).veto).toMatch(/--veto.*--until/)
+  })
+
+  it('hands a hard-wedge successor to the next workable point with a recorded override', () => {
+    const prompt = emergencyHandoffPrompt({
+      pending: { phase: 'intent', action: 'hard-recover', workablePoints: [947, 948, 949] },
+    })
+    expect(prompt).toMatch(/point 947 made no progress/)
+    expect(prompt).toMatch(/commission-guard\.mjs --override 948/)
+    expect(prompt).toMatch(/then work point 948/)
+    expect(emergencyHandoffPrompt({ lastOutcome: {} })).toBe('')
   })
 })

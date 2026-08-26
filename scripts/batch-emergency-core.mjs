@@ -84,3 +84,23 @@ export function strikeRecord({ id, decision, at = Date.now(), phase = 'intent', 
     veto: 'node scripts/batch-emergency.mjs --veto "<reason>" --until <ISO>',
   }
 }
+
+/** The successor-facing half of deferral. The emergency intent exists before
+ * autostart runs, so the fresh session can skip a point that already survived a
+ * soft recovery instead of reopening the same queue head forever. */
+export function emergencyHandoffPrompt(state = {}) {
+  const intent = state?.pending
+  if (intent?.phase !== 'intent' || intent?.action !== 'hard-recover') return ''
+  const points = (intent.workablePoints ?? []).map(Number).filter((point) => Number.isInteger(point) && point > 0)
+  if (!points.length) return ''
+  const [stuck, next] = points
+  if (!next) {
+    return `\n\nEMERGENCY RECOVERY: point ${stuck} made no progress after the recorded soft recovery and no other workable point exists. Diagnose and repair it; do not silently wait.`
+  }
+  return (
+    `\n\nEMERGENCY RECOVERY: point ${stuck} made no progress after the recorded soft recovery. ` +
+    `Defer it in favour of workable point ${next}: first record the visible queue exception with ` +
+    `\`node scripts/commission-guard.mjs --override ${next} --reason "emergency deferral: point ${stuck} remained stalled after soft recovery"\`, ` +
+    `then work point ${next}. Leave point ${stuck} for a later diagnosed retry; do not reopen it in this recovery session.`
+  )
+}
