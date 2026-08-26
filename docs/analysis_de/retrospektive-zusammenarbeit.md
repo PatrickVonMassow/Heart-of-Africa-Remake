@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 12:53 · Quellen-Fingerprint: `7fac4aad707c…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 17:19 · Quellen-Fingerprint: `811618dac6ab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1439,7 +1439,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | never stretch a scoped user remark into a standing instruction or cite it as one | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 4 | hoch | — (Regel/Memory) | ◐ Regel |
+| User order 23.08.2026: a lasting standstill must NEVER happen — self-recovery over alerting, no stop that waits on a user card; decide by own judgment and record the decision in the board state section, never as a decision card (vetoed three times) | 5 | hoch | — (Regel/Memory) | ◐ Regel |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | point-proof-guard.mjs | ✔ Mechanismus |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -1483,10 +1483,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | clear-claim-guard.mjs | ✔ Mechanismus |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 103 Prozess-/Meta-TASKS-Punkte (davon 44 offen).
+Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 105 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: 7fac4aad707c6d50be947ab495110a9b486dca98637f39b092898fd0edc43ad9 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T10:53:41.692Z -->
+<!-- RETRO-FINGERPRINT: 811618dac6abfb638932a1297f6dddadb71fad9abadbff3d51c3d90c8c247d94 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T15:19:36.999Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
@@ -3943,3 +3943,25 @@ besteht. Die Umkehrung stand im Kommentar, nicht im Code.
 **Lehre:** Eine Prüfung auf »genau diese Gestalt« ist erst dann eine, wenn ihre Fälle aus dem
 Erzeuger stammen und mutiert werden. Wer die negativen Fälle von Hand erfindet, prüft die eigene
 Vorstellung vom Fremdkörper — und das ist wieder die Ausschlussliste, die man loswerden wollte.
+
+### 3.191 Die Rettungsmechanismen verklemmten einander
+
+Am 26.08.2026 stand die Batch zwei Stunden still, obwohl nichts kaputt war: Die fertige,
+gepushte Arbeit des Delegaten lag bereit, und dreihundert Punkte waren offen. Der Besitzer war
+gestorben — vom Launcher fehlerhaft in einen Arbeitsbaum gestartet, wo die Board-Buchhaltung
+sich spaltete. Danach griffen die Rettungsmechanismen und blockierten sich gegenseitig: Die
+Schutzregel für laufende Delegaten wertete dessen planmäßiges Weiterschreiben als fremden
+lebenden Schreiber und verweigerte jede Wiederbelebung, während der Wachhund dieselben
+verweigerten Ticks als »Start ohne Fortschritt« zählte — und bei drei die Runaway-Pause zog.
+Nach Ablauf der Pause dieselbe Schleife, erneut Pause. Erst der Nutzer bemerkte den Stillstand.
+
+Jeder Mechanismus tat für sich das Richtige: Der Schutz schützte, der Zähler zählte, die Pause
+pausierte. Falsch war die Komposition — keiner kannte den Zustand, den der andere gerade
+herstellte, und der Zähler maß Verweigerungen, als wären es Fehlschläge.
+
+**Lehre:** Rettungsmechanismen brauchen eine Prüfung ihrer KOMPOSITION: Für jedes Paar die
+Frage, ob der eine den Zustand erzeugen kann, in dem der andere dauerhaft verweigert — und ein
+Zähler darf nur zählen, was tatsächlich versucht wurde. Weil diese Prüfung nie vollständig ist,
+gehört darunter eine unabhängige zweite Sicherung auf eigenem Zeitgeber, die nur eine Frage
+stellt: Steht die Batch, obwohl arbeitbare Punkte da sind — und alle Rettung versagt hat? Dann
+räumt sie auf und startet neu (Nutzer-Auftrag vom 26.08.2026, gefilet als Punkt 947).
