@@ -3943,3 +3943,25 @@ besteht. Die Umkehrung stand im Kommentar, nicht im Code.
 **Lehre:** Eine Prüfung auf »genau diese Gestalt« ist erst dann eine, wenn ihre Fälle aus dem
 Erzeuger stammen und mutiert werden. Wer die negativen Fälle von Hand erfindet, prüft die eigene
 Vorstellung vom Fremdkörper — und das ist wieder die Ausschlussliste, die man loswerden wollte.
+
+### 3.191 Die Rettungsmechanismen verklemmten einander
+
+Am 26.08.2026 stand die Batch zwei Stunden still, obwohl nichts kaputt war: Die fertige,
+gepushte Arbeit des Delegaten lag bereit, und dreihundert Punkte waren offen. Der Besitzer war
+gestorben — vom Launcher fehlerhaft in einen Arbeitsbaum gestartet, wo die Board-Buchhaltung
+sich spaltete. Danach griffen die Rettungsmechanismen und blockierten sich gegenseitig: Die
+Schutzregel für laufende Delegaten wertete dessen planmäßiges Weiterschreiben als fremden
+lebenden Schreiber und verweigerte jede Wiederbelebung, während der Wachhund dieselben
+verweigerten Ticks als »Start ohne Fortschritt« zählte — und bei drei die Runaway-Pause zog.
+Nach Ablauf der Pause dieselbe Schleife, erneut Pause. Erst der Nutzer bemerkte den Stillstand.
+
+Jeder Mechanismus tat für sich das Richtige: Der Schutz schützte, der Zähler zählte, die Pause
+pausierte. Falsch war die Komposition — keiner kannte den Zustand, den der andere gerade
+herstellte, und der Zähler maß Verweigerungen, als wären es Fehlschläge.
+
+**Lehre:** Rettungsmechanismen brauchen eine Prüfung ihrer KOMPOSITION: Für jedes Paar die
+Frage, ob der eine den Zustand erzeugen kann, in dem der andere dauerhaft verweigert — und ein
+Zähler darf nur zählen, was tatsächlich versucht wurde. Weil diese Prüfung nie vollständig ist,
+gehört darunter eine unabhängige zweite Sicherung auf eigenem Zeitgeber, die nur eine Frage
+stellt: Steht die Batch, obwohl arbeitbare Punkte da sind — und alle Rettung versagt hat? Dann
+räumt sie auf und startet neu (Nutzer-Auftrag vom 26.08.2026, gefilet als Punkt 947).

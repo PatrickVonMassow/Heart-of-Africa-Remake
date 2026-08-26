@@ -198,6 +198,14 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bleib **nie mit einer Rückfrage stehen**: Annahme treffen, festhalten, weitergehen."
 
+- **Die Rettungsmechanismen verklemmen einander.** Jeder tut für sich das Richtige — der Schutz
+  schützt, der Zähler zählt — und zusammen halten sie den Lauf stundenlang an, obwohl nichts
+  kaputt ist.
+  → *Prompt:* „Prüfe deine Rettungsmechanismen **paarweise**: Kann einer den Zustand erzeugen, in
+  dem ein anderer dauerhaft verweigert? Ein Zähler zählt nur, was **versucht** wurde. Und darunter
+  liegt eine **unabhängige zweite Sicherung** auf eigenem Zeitgeber: Steht alles und alle Rettung
+  hat versagt — aufräumen, neu starten, protokollieren."
+
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Zielgruppensprache — Symptom zuerst, fürs
   Handy lesbar — und halte Format und Sprache auf **allen** Ausgaben ein."
@@ -470,4 +478,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 7fac4aad707c6d50be947ab495110a9b486dca98637f39b092898fd0edc43ad9 -->
+<!-- GUIDE-FINGERPRINT: 811618dac6abfb638932a1297f6dddadb71fad9abadbff3d51c3d90c8c247d94 -->

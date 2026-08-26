@@ -786,6 +786,36 @@
       "why": "Es blockiert nur, wenn ein hoch eingestufter Punkt ein offenes Do-not-merge traegt; heute ist der Weg von Hand gangbar und dokumentiert, deshalb steht es hinter der Auslieferung.",
       "origin": "machine",
       "place": "last"
+    },
+    "943": {
+      "at": "2026-08-26T15:10:49.225Z",
+      "why": "It blocks every session exit today and grows with each landing; the two DO-NOT-MERGE findings sit in shipped guard code",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "944": {
+      "at": "2026-08-26T15:10:49.314Z",
+      "why": "It kills owner sessions mid-flight; every launcher spawn until the fix risks repeating the 26.08. standstill",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "945": {
+      "at": "2026-08-26T15:10:49.400Z",
+      "why": "It wedges every resurrection beside a live delegate; recurs on the next owner death, which happens weekly",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "946": {
+      "at": "2026-08-26T15:10:49.488Z",
+      "why": "Enforcement half of the user's 26.08. no-standstill order; every parked question until then can stall the batch again",
+      "origin": "machine",
+      "place": "ahead"
+    },
+    "947": {
+      "at": "2026-08-26T15:10:49.134Z",
+      "why": "User order 26.08.2026 ~17:05: queue it directly behind 935 (now landed, so at the queue front) — the batch must never stop again",
+      "origin": "user",
+      "place": "ahead"
     }
   },
   "boundary": {
@@ -826,7 +856,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T11:11:20.232Z",
+    "at": "2026-08-26T15:10:49.498Z",
     "points": [
       174,
       184,
@@ -1127,7 +1157,12 @@
       939,
       940,
       941,
-      942
+      942,
+      943,
+      944,
+      945,
+      946,
+      947
     ]
   }
 }
