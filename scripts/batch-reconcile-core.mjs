@@ -143,6 +143,35 @@ export function mayRefill({ lanes = [] } = {}) {
   return { ok: true }
 }
 
+/** The successor proves it is on the other side of the committed boundary.
+ * A journalled daemon seal with no marker is marker deletion, never "no
+ * boundary"; an equal fence is the old coordinator, never a successor. */
+export function successorBoundaryVerdict({ marker = null, batchId = null, lock = null, sealedFence = null } = {}) {
+  if (!marker) {
+    if (Number.isInteger(sealedFence) && sealedFence > 0) {
+      return { ok: false, quarantine: true, reason: `boundary marker deletion: daemon state records sealed fence ${sealedFence} but no marker stands` }
+    }
+    // No seal means no planned boundary ever committed. This is the crash path
+    // point 834 proves: the new lock fence plus full lane reconciliation is the
+    // authority, and inventing a marker requirement here would make the worker
+    // survive its parent only to become permanently unadoptable.
+    if (lock?.sessionId && Number.isInteger(lock.fence) && lock.fence > 0) {
+      return { ok: true, mode: 'crash-recovery', markerFence: null, successorFence: lock.fence, requestId: null }
+    }
+    return { ok: false, quarantine: true, reason: 'no committed boundary marker or live successor lock identifies the takeover' }
+  }
+  if (marker.kind !== 'durable-batch-boundary' || marker.phase !== 'committed' || marker.batchId !== batchId || !Number.isInteger(marker.fence)) {
+    return { ok: false, quarantine: true, reason: 'the durable boundary marker is malformed or belongs to another batch' }
+  }
+  if (!lock?.sessionId || !Number.isInteger(lock.fence) || lock.fence <= marker.fence) {
+    return { ok: false, quarantine: true, reason: `the successor lock fence must be strictly above boundary fence ${marker.fence}` }
+  }
+  if (sealedFence !== marker.fence) {
+    return { ok: false, quarantine: true, reason: `the daemon seal (${String(sealedFence)}) does not match boundary fence ${marker.fence}` }
+  }
+  return { ok: true, markerFence: marker.fence, successorFence: lock.fence, requestId: marker.requestId }
+}
+
 // ---------------------------------------------------------------------------
 // 2. THE UNVERIFIED PUBLICATION TAIL (mechanism 2, with the corrected third
 //    outcome: ABANDONED only from an UNMOVED ref)

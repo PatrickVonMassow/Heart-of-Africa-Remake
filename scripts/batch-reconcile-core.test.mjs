@@ -16,6 +16,7 @@ import {
   reconcileExitRed,
   registryVerdict,
   resolvePublicationIntent,
+  successorBoundaryVerdict,
 } from './batch-reconcile-core.mjs'
 
 const OID_A = 'a'.repeat(40)
@@ -318,5 +319,28 @@ describe('the landing slice of step 9', () => {
     expect(landingAllowsBoundary({ stage: null }).ok).toBe(true)
     expect(landingAllowsBoundary({ stage: 'landed' }).ok).toBe(true)
     expect(landingAllowsBoundary({ stage: 'gates' }).ok).toBe(false)
+  })
+})
+
+describe('successor boundary reconciliation', () => {
+  const marker = { kind: 'durable-batch-boundary', phase: 'committed', batchId: 'b', fence: 7, requestId: 'boundary-7' }
+
+  it('requires a strictly newer coordinator fence and the matching daemon seal', () => {
+    expect(successorBoundaryVerdict({ marker, batchId: 'b', lock: { sessionId: 'new', fence: 8 }, sealedFence: 7 })).toEqual({
+      ok: true, markerFence: 7, successorFence: 8, requestId: 'boundary-7',
+    })
+    expect(successorBoundaryVerdict({ marker, batchId: 'b', lock: { sessionId: 'old', fence: 7 }, sealedFence: 7 }).ok).toBe(false)
+    expect(successorBoundaryVerdict({ marker, batchId: 'b', lock: { sessionId: 'new', fence: 8 }, sealedFence: 6 }).ok).toBe(false)
+  })
+
+  it('quarantines marker deletion when the daemon journal proves a seal', () => {
+    const verdict = successorBoundaryVerdict({ marker: null, batchId: 'b', lock: { sessionId: 'new', fence: 8 }, sealedFence: 7 })
+    expect(verdict).toMatchObject({ ok: false, quarantine: true })
+    expect(verdict.reason).toMatch(/marker deletion/)
+  })
+
+  it('quarantines malformed and cross-batch markers', () => {
+    expect(successorBoundaryVerdict({ marker: { ...marker, batchId: 'elsewhere' }, batchId: 'b', lock: { sessionId: 'new', fence: 8 }, sealedFence: 7 }).ok).toBe(false)
+    expect(successorBoundaryVerdict({ marker: { ...marker, phase: 'prepared' }, batchId: 'b', lock: { sessionId: 'new', fence: 8 }, sealedFence: 7 }).ok).toBe(false)
   })
 })

@@ -70,6 +70,7 @@ import {
   noteHandoverAttributionCommit,
   noteHandoverAttributionPrepare,
 } from './handover-attribution.mjs'
+import { commitDurableBoundary, prepareDurableBoundary } from './batch-boundary-plane.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -639,12 +640,24 @@ if (isMain) {
   const argv = process.argv.slice(2)
   const arg = argv[0]
   const sid = readOwnerLock()?.sessionId ?? ''
+  const ownerLock = readOwnerLock()
+  const durableBatchIndex = argv.indexOf('--batch')
+  const durableBatchId = durableBatchIndex >= 0 ? argv[durableBatchIndex + 1] : null
   const fail = (msg) => {
     console.error(msg)
     process.exit(1)
   }
 
-  if (arg === '--clear') {
+  if (durableBatchId && (arg === '--prepare' || arg === '--commit')) {
+    if (!sid || !Number.isInteger(ownerLock?.fence)) {
+      fail('a durable batch boundary requires the live batch-lock owner and its fence; nothing recorded')
+    }
+    const result = arg === '--prepare'
+      ? await prepareDurableBoundary({ repoDir: repoPath('.'), batchId: durableBatchId, sessionId: sid, fence: ownerLock.fence })
+      : await commitDurableBoundary({ repoDir: repoPath('.'), batchId: durableBatchId, sessionId: sid, fence: ownerLock.fence })
+    if (!result.ok) fail(`durable boundary ${arg.slice(2)} refused: ${result.reason ?? (result.refusals ?? []).join('; ')}`)
+    console.log(JSON.stringify(result, null, 2))
+  } else if (arg === '--clear') {
     // The prepare receipt goes with the marker: a withdrawn boundary is re-TAKEN
     // from the first phase, bookkeeping included, not committed on the strength
     // of an attempt the session deliberately abandoned.
