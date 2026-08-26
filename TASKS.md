@@ -12290,6 +12290,15 @@ to land than a mechanism that needs a review.
   - THE POST-LANDING CLEANUP PASSES THE GATE. Removing the local branch, the remote branch and the
     worktree belongs in the list of calls the point-470 gate lets through as part of the session
     end; today it names only `batch-boundary`, `focus`, `board-publish` and the work-order tick.
+  - THE LANDING DOES NOT WEDGE ITSELF. Measured again on 26.08.2026 at point 941: `land-point` ran
+    merge, gate, tick, archive and push, then failed at its `board` step, because the publish
+    refused a focus that named 941 — the point its own tick had just closed. The repair,
+    `board.mjs done 941 --none`, archived the card and put the idle statement back up, at which
+    point `board-first-guard` blocked everything that was left, `land-point`'s cleanup step
+    included. So either the cleanup step runs BEFORE the board step, or the board step tolerates
+    the point it has just closed; the point decides which and says why. Net effect on the day: the
+    branch, the remote branch and the worktree of point 941 stayed standing, and only
+    `branch-hygiene-guard` noticed.
   VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
   publish step that removes an ordinary numbered card for the same point; and over the gate — the
   three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
@@ -12386,3 +12395,136 @@ to land than a mechanism that needs a review.
   Criticality: medium-high — it is a gate on every high-criticality landing whose only reachable
   answer today is a hand-edited ledger, and a hand-edited audit record is worth less than no gate.
   Bundle: Modell & Wächter.
+
+- [ ] 948. A red vitest type-check reached `main` and blocked every tier for every point (measured
+  26.08.2026, 17:39, on `main` fe9ee0dc). `tsc -p tsconfig.vitest.json` failed with three errors:
+  two implicit-any `.mjs` imports in `fableEscalationDoc.test.ts` and `fauna.test.ts`, and one
+  `FootPlantBodyPose` call missing `y`. The verify tier stops at `test-types`, so NO point could
+  reach its suites until 928faee1 repaired it. The repair is landed; the CLASS is not. The open
+  question is how the landing gates of the points that introduced those imports and that call
+  reported green — either they never ran the vitest tier, or the type-check was skipped for them.
+  FINAL STATE:
+  - THE GATE'S OWN RECORD ANSWERS IT. For each of the three offending commits it is established
+    from the recorded run whether `test-types` ran, was skipped, or was never reached, and the
+    finding names which of the three it was. A gate whose record cannot answer that question is
+    itself the defect.
+  - THE HOLE THAT LET IT THROUGH IS CLOSED, wherever the answer puts it: a tier that reports green
+    while `test-types` did not run, a landing that accepts such a record, or a skip path that no
+    longer has a reason to exist.
+  VERIFIABLE: Vitest over the tier's own reporting — a run in which `test-types` did not execute
+  cannot produce a green verdict, and the record it writes names the omission. Plus the historical
+  proof: the three commits are classified from their stored records, not from a re-run.
+  Criticality: high — it is a repository-wide stop, it hit every point at once, and the mechanism
+  that should have caught it reported green.
+  Bundle: Testinfrastruktur.
+
+- [ ] 949. A module that resolves repository paths from `import.meta.url` sends a fixture's reads
+  and writes back into the live checkout (measured 26.08.2026, 17:57). `scripts/verify/run-record.mjs`
+  derived its log directory from the module's own location, so the fixture repository that
+  `scripts/dashboard-reminder-hook.test.mjs` builds — `HOA_REPO_ROOT` plus cwd both in a temp dir —
+  still saw the LIVE verify run. Both of that test's cases were therefore red in every tier run
+  since 1e4a25b9 (22.08.2026) and green standalone; a red that appears only inside the gate is the
+  hardest kind to see. Repaired in 6e30025f for that one module. The CLASS is the point: every
+  module that resolves repository paths from `import.meta.url` instead of `repo-paths.mjs` can do
+  the same thing, and a fixture that reads live state is a test that proves nothing.
+  FINAL STATE:
+  - THE SWEEP IS DONE AND NAMED: every `scripts/` module that derives a repository path from
+    `import.meta.url` is enumerated, and each is either moved onto `repo-paths.mjs` or carries a
+    written reason why its own location is the honest source.
+  - IT CANNOT COME BACK: a guard refuses a new repository-path resolution from `import.meta.url` in
+    the paths the sweep cleared, and names `repo-paths.mjs` in the refusal.
+  VERIFIABLE: Vitest — a fixture repository built in a temp dir sees ONLY its own state for each
+  swept module (the negative control being the pre-6e30025f behaviour, which must fail the case);
+  and the guard refuses a planted `import.meta.url` path resolution in a cleared file.
+  Criticality: high — it silently converts fixtures into readers of live state, and it hid two red
+  cases inside the gate for four days.
+  Bundle: Testinfrastruktur.
+
+- [ ] 950. A documentation cut and the guard that parses that documentation must land in one commit
+  (measured 26.08.2026, 18:16). a3a04322 (21.08.2026) cut `CLAUDE.md` §7.1 down to number plus
+  title and made the shared numbering the reference. `scripts/verify/docs.mjs` kept looking for the
+  removed `Detail:` / `Evidence:` pointer lines and reported all six pointer rules red in every
+  SMALL and LARGE run since. Repaired in 9501a7f4 by judging the companion documents by their
+  numbering. The doc-consistency suite is exactly the mechanism that should have REFUSED the cut,
+  and instead it broke on it.
+  FINAL STATE:
+  - THE REMAINING PARSERS ARE ENUMERATED: every guard and suite that parses a shape of `CLAUDE.md`,
+    `design.md` or the work-order preamble is listed with the shape it expects, and each expectation
+    is checked against the document as it stands today.
+  - A CUT THAT ORPHANS A PARSER IS REFUSED at the commit that makes it, naming the parser and the
+    shape it still expects — so the pair lands together or not at all.
+  VERIFIABLE: Vitest — a planted cut that removes a parsed shape is refused with the parser named,
+  and the same cut accompanied by the parser's update passes; plus the historical case, where
+  a3a04322's tree is refused and 9501a7f4's is accepted.
+  Criticality: medium-high — it left six documentation rules red in every browser tier for five
+  days, and the guard that broke is the one that exists to prevent exactly this.
+  Bundle: Dokumentation.
+
+- [ ] 951. Three verification suites navigated into a 90 MB CDN download, and one of them died
+  saying nothing at all (measured 26.08.2026, 18:25, with a request probe). `flow`, `world` and
+  `preview` navigate with `waitUntil: 'networkidle'` while `speech.ts` pre-warms the Kokoro model at
+  game start; the only request still open at the 30 s timeout was the model body on
+  `us.aws.cdn.hf.co`. `flow` died UNCLASSIFIED — no FAIL line at all — in both attempts of every
+  run, so its red said nothing about the code. `handwriting.mjs` had already met and documented the
+  same cause; the remedy, consuming the cache `voice.mjs` records, is now in all four. TWO THREADS
+  STAY OPEN, and they are this point:
+  FINAL STATE:
+  - THE CACHE ACTUALLY SERVES. `voice` reported `hits:0 misses:12` against a cache marked COMPLETE
+    on 04.08.2026; in strict mode a complete cache must serve, so the recorded keys are established
+    against the assets the app really requests, and either the keys or the recording are corrected.
+    The measured result is `hits:12 misses:0`, or a written reason why a miss is legitimate.
+  - A SUITE THAT REPORTS ZERO CHECKS IS A LOUDER VERDICT THAN ONE THAT FAILS A CHECK. An
+    unclassified death is reported as its own kind, distinct from a failure, and it never passes as
+    a plain red whose cause is left to the reader.
+  VERIFIABLE: the `voice` run's own hit/miss counters against the COMPLETE cache; and Vitest over
+  the verdict layer — a suite that completes zero checks produces the unclassified verdict with its
+  own text, while a suite that fails one check keeps the ordinary failure verdict.
+  Criticality: medium-high — it cost three suites their meaning and one of them reported nothing at
+  all, which is the worst thing a verification lane can do.
+  Bundle: Testinfrastruktur.
+
+- [ ] 952. The board-layout suite measures a COPY of the board stylesheet, so the pressure it calls
+  its proof can go away without the suite noticing (measured 26.08.2026, 18:42, on the suite point
+  941 delivered). `scripts/verify/board-layout.mjs` renders a hand-written fixture whose
+  `BOARD_STYLE` duplicates the published board's base rules; only the wrap itself comes from
+  board-core's injected `CRITICALITY_STYLE`, which is imported and therefore real. The fixture's own
+  comment calls the nowrap rules "the pressure that exposed the defect" — but if those rules change
+  in the board template, the suite keeps measuring the OLD pressure and stays green over a board
+  that no longer has the defect's precondition, or that has grown a new one.
+  FINAL STATE: the suite reads the base rules from the same source the board writes them from, so
+  the fixture cannot drift from the published page. Where a rule genuinely cannot be imported, the
+  duplication is named in the file with the reason and a check that the two still agree.
+  VERIFIABLE: Vitest or the suite itself — a change to the board template's base rules is visible in
+  the fixture without editing the fixture, proven by mutating the template in a temp tree and
+  measuring that the rendered fixture follows; and the 941 wrap case still passes.
+  Criticality: medium — the suite is green today and its subject is correct today; the defect is
+  that it would stay green after the subject moved.
+  Bundle: Chat & Tafel.
+
+- [ ] 953. A red CI run whose job never STARTED is unclassified, and it blocks the turn end until a
+  human re-runs it (measured 26.08.2026). Pages deploy run 32986502898 (`main`, 15:58 UTC)
+  concluded `failure` with its build job stuck queued forever — conclusion `null`, zero steps, no
+  runner ever picked it up, deploy skipped. The cause is provably outside the repository: the
+  GitHub incident from 15:11 UTC (Actions degraded availability, database primary failover, upstream
+  Vitess; Pages degraded), confirmed by the user from githubstatus.com; three further runs
+  (15:04-15:38 UTC) sat queued for over an hour in the same window. Point 711's deploy retry cannot
+  reach this BY DESIGN — its retry lives inside the deploy job's steps, and a job that never starts
+  has no steps; the 711 archive entry already records this class as a residual reachable only by a
+  job-level re-run.
+  FINAL STATE:
+  - THE SIGNATURE IS CLASSIFIED: run failure plus a failing job with conclusion `null` or
+    `startup_failure` and empty steps is recognised as never-started and treated as an environment
+    transient under the fail-soft invariant, not as a product defect.
+  - ONE BOUNDED JOB-LEVEL RE-RUN IS DISPATCHED automatically (`gh run rerun --failed`, or the
+    `runs/<id>/rerun-failed-jobs` API). The Batch watchdog workflow and `ci-status-guard`'s remedy
+    path are the candidate homes; the point decides which and names why.
+  - `ci-status-guard` WAITS on the dispatched re-run instead of hard-blocking the turn end on the
+    transient red.
+  SECONDARY, one look before anything is built: why the Pages concurrency group left superseded
+  deploy runs queued for over an hour instead of cancelling them — possibly incident-side API lag.
+  VERIFIABLE: Vitest as a pure decision over run/job JSON fixtures — the never-started signature is
+  classified as environment, a genuine step failure is still a product red, and a run whose job
+  merely queues briefly is neither; plus the guard's wait path over a dispatched re-run fixture.
+  Criticality: medium-high — it stops the batch on an outage nobody in the repository can fix, and
+  the stop needs a human to clear.
+  Bundle: Urlaubsfestigkeit. It is a stop-the-batch path and belongs to 947's sweep.
