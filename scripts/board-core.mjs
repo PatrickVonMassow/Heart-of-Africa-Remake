@@ -201,8 +201,28 @@ const CRITICALITY_BADGE_RE =
 const CRITICALITY_BADGE_SOURCE =
   '<span\\s+class="criticality(?:\\s+criticality-(?:low|med|high))?"[^>]*>[\\s\\S]*?<\\/span>\\s*'
 const CRITICALITY_STYLE_ID = 'board-criticality-style'
+const CARD_HEADER_LEFT_CLASS = 'card-header-left'
+// A published board persists this visual wrapper around every numeric chip.
+// Raw card readers must match it in place: flattening a copy would invalidate
+// the source offsets used by archive and section slicing consumers.
+const CARD_HEADER_LEFT_PREFIX_SOURCE = `(?:<span class="${CARD_HEADER_LEFT_CLASS}">\\s*)?`
+const CARD_NUMBER_SOURCE = (pointSource) =>
+  `${CARD_HEADER_LEFT_PREFIX_SOURCE}<span class="num">\\s*${pointSource}\\s*<\\/span>`
+const CARD_TITLE_HEAD_SOURCE = (pointSource) =>
+  `${CARD_NUMBER_SOURCE(pointSource)}\\s*(?:${CRITICALITY_BADGE_SOURCE})?(?:<\\/span>\\s*)?<span class="t">`
+const CARD_HEADER_LEFT_SOURCE =
+  `<span class="${CARD_HEADER_LEFT_CLASS}">\\s*(<span class="num">\\s*\\d+\\s*<\\/span>)\\s*` +
+  `(?:${CRITICALITY_BADGE_SOURCE})?<\\/span>`
 const CRITICALITY_STYLE = `<style id="${CRITICALITY_STYLE_ID}">
-.criticality{flex-shrink:0;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
+.card-header-left{display:inline-flex;flex:0 1 auto;flex-wrap:wrap;align-items:baseline;gap:2px 9px;min-width:0;max-width:100%}
+details:not(.sect)>summary:has(>.right){flex-wrap:wrap;min-width:0;max-width:100%}
+details:not(.sect)>summary>.t{flex:1 1 12rem;min-width:0;max-width:100%;overflow-wrap:anywhere}
+details:not(.sect)>summary:has(>.right)::after{content:none}
+details:not(.sect)>summary>.right{display:inline-flex;align-items:baseline;flex:0 1 auto;flex-wrap:nowrap;min-width:0;max-width:100%;white-space:normal}
+details:not(.sect)>summary>.right .meta{min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+details:not(.sect)>summary>.right::after{content:"▸";flex:0 0 auto;margin-left:6px}
+details:not(.sect)[open]>summary>.right::after{content:"▾"}
+.criticality{flex:0 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere;border:1px solid currentColor;border-radius:999px;padding:.08em .48em;font-size:.72em;font-weight:700;line-height:1.35}
 .criticality-low{background:#dcebd9;color:#24511f}.criticality-med{background:#f3e4ad;color:#684e00}.criticality-high{background:#f3d1cb;color:#7a2115}
 </style>`
 
@@ -210,6 +230,16 @@ const criticalityBadge = (level) =>
   level && CRITICALITY_LABELS[level]
     ? `<span class="criticality criticality-${level}">${CRITICALITY_LABELS[level]}</span>`
     : ''
+
+/**
+ * Flatten the derived visual group before a card editor applies its strict,
+ * head-anchored transformations. The published board groups number + badge so
+ * flex wrapping cannot split them into different columns; the editing grammar
+ * deliberately continues to use its older, simple number/title sequence.
+ */
+export function unwrapCardHeaderGroups(html) {
+  return String(html ?? '').replace(new RegExp(CARD_HEADER_LEFT_SOURCE, 'g'), '$1')
+}
 
 /**
  * Derive every numbered card's criticality badge from the work order.
@@ -224,17 +254,17 @@ export function renderCardCriticalities(html, tasksText) {
   const levels = new Map(
     parsePointBlocks(tasksText).map((point) => [String(point.n), criticalityOf(point.body).level]),
   )
-  let badges = 0
+  let groups = 0
   let out = String(html ?? '').replace(/<summary>([\s\S]*?)<\/summary>/g, (whole, summary) => {
-    const { chip } = summaryPoint(summary)
+    const flat = unwrapCardHeaderGroups(summary)
+    const { chip } = summaryPoint(flat)
     if (chip == null) return whole
-    const clean = summary.replace(CRITICALITY_BADGE_RE, '')
+    const clean = flat.replace(CRITICALITY_BADGE_RE, '')
     const badge = criticalityBadge(levels.get(chip))
-    if (!badge) return `<summary>${clean}</summary>`
-    badges += 1
+    groups += 1
     return `<summary>${clean.replace(
       new RegExp(`^(\\s*<span class="num">\\s*${chip}\\s*</span>)`),
-      `$1${badge}`,
+      `<span class="${CARD_HEADER_LEFT_CLASS}">$1${badge}</span>`,
     )}</summary>`
   })
 
@@ -246,7 +276,7 @@ export function renderCardCriticalities(html, tasksText) {
     'g',
   )
   out = out.replace(styleRe, '')
-  if (!badges) return out
+  if (!groups) return out
   if (out.includes('</head>')) return out.replace('</head>', `${CRITICALITY_STYLE}\n</head>`)
   // The live headless board starts with BOM, title, metadata and its own
   // stylesheet. That stylesheet's first `</style>` is an unambiguous landmark
@@ -396,11 +426,7 @@ export function dropStrayNowCards(html) {
  */
 export function summaryPoint(summary) {
   const text = String(summary ?? '')
-  const chip = text.match(
-    new RegExp(
-      `^\\s*<span class="num">\\s*(\\d+)\\s*</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">`,
-    ),
-  )
+  const chip = text.match(new RegExp(`^\\s*${CARD_TITLE_HEAD_SOURCE('(\\d+)')}`))
   if (chip) return { chip: chip[1], legacy: null }
   const legacy = text.match(new RegExp(`^\\s*<span class="t">\\s*(\\d+)\\s*${DASH}`))
   return { chip: null, legacy: legacy ? legacy[1] : null }
@@ -415,7 +441,7 @@ export function stripPointPrefix(title, point) {
 
 /** The queue card for `point`, or null. Exported so the caller can check first. */
 export function queueCard(html, point) {
-  const re = new RegExp(`<details>\\s*<summary><span class="num">${point}</span>[\\s\\S]*?</details>\\s*`)
+  const re = new RegExp(`<details>\\s*<summary>${CARD_NUMBER_SOURCE(point)}[\\s\\S]*?</details>\\s*`)
   const m = String(html ?? '').match(re)
   return m ? m[0] : null
 }
@@ -549,7 +575,7 @@ function sectionBounds(html, key) {
  * unreplaceable in the first place.
  */
 const NOW_HEAD = (point) =>
-  `<details class="now"[^>]*>\\s*<summary>\\s*(?:<span class="num">\\s*${point}\\s*</span>|<span class="t">\\s*${point}\\s*${DASH})`
+  `<details class="now"[^>]*>\\s*<summary>\\s*(?:${CARD_NUMBER_SOURCE(point)}|<span class="t">\\s*${point}\\s*${DASH})`
 
 /** The current-work card for `point`, or null. Searched in its own section. */
 export function nowCard(html, point) {
@@ -1208,7 +1234,8 @@ function doneBounds(html) {
 }
 
 /** An Erledigt card, matched inside the section alone. */
-const DONE_CARD_RE = /<details>\s*<summary><span class="num">\s*(\d+)\s*<\/span>[\s\S]*?<\/details>\n?/g
+const DONE_CARD_RE =
+  new RegExp(`<details>\\s*<summary>${CARD_NUMBER_SOURCE('(\\d+)')}[\\s\\S]*?<\\/details>\\n?`, 'g')
 
 /** Every Erledigt card as `{ point, text, at }`, in document order (newest first). */
 export function doneEntries(html) {
@@ -1941,11 +1968,7 @@ export function toClosingWork(html, point, { subject, reason, stamp = berlinStam
  */
 export function pointSubject(html, point) {
   const doc = String(html ?? '')
-  const chip = doc.match(
-    new RegExp(
-      `<span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">${TITLE_TEXT}</span>`,
-    ),
-  )
+  const chip = doc.match(new RegExp(`${CARD_TITLE_HEAD_SOURCE(point)}${TITLE_TEXT}</span>`))
   const legacy = chip ? null : doc.match(new RegExp(`<span class="t">${point}\\s*${DASH}\\s*${TITLE_TEXT}</span>`))
   const text = stripClosingStage((chip ?? legacy ?? [])[1])
   return text || null
@@ -2129,6 +2152,7 @@ export function removeVdzk(html, fragment) {
  */
 export function setCardStatus(html, point, text, stamp = berlinStamp()) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   if (!text || !String(text).trim()) throw new Error('board: refusing to write an empty status')
   // BOUNDED TO ITS OWN CARD (four-eyes review, 12.08.2026). The run to the body
@@ -2156,6 +2180,7 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
  */
 export function setCardTitle(html, point, title) {
   if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  html = unwrapCardHeaderGroups(html)
   if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
   const text = String(title ?? '').trim()
   if (!text) throw new Error('board: refusing to write an empty title')
@@ -2178,7 +2203,7 @@ export function setCardTitle(html, point, title) {
   // gate reads as a false closing marker.
   const now = nowSectionSlice(html, { whenMissing: 'document' })
   const closingMarked = new RegExp(
-    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?<span class="num">\\s*${point}\\s*</span>`,
+    `<details class="now"[^>]*data-state="closing"[^>]*>\\s*<summary>[\\s\\S]*?${CARD_NUMBER_SOURCE(point)}`,
   ).test(now.text)
   // A CLOSING SHAPE IS THE CLOSING STATE (four-eyes review, 12.08.2026). Writing
   // that title onto an ordinary card would produce the unmarked closing card the
@@ -2193,8 +2218,7 @@ export function setCardTitle(html, point, title) {
   }
   const bare = escapeCardTitle(closingMarked ? closingCardTitle(stripPointPrefix(text, point)) : stripPointPrefix(text, point))
   const chipRe = new RegExp(
-    `(<details class="now"[^>]*>\\s*<summary>\\s*<span class="num">\\s*${point}\\s*</span>\\s*` +
-      `(?:${CRITICALITY_BADGE_SOURCE})?<span class="t">)` +
+    `(<details class="now"[^>]*>\\s*<summary>\\s*${CARD_TITLE_HEAD_SOURCE(point)})` +
       `(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   if (chipRe.test(now.text)) {
@@ -2217,8 +2241,7 @@ export function setCardTitle(html, point, title) {
   // command reports success either way. The Erledigt section is history; a
   // retitle there is a hand edit's business, not this command's.
   const queueRe = new RegExp(
-    `(<summary><span class="num">${point}</span>\\s*(?:${CRITICALITY_BADGE_SOURCE})?` +
-      `<span class="t">)(?:(?!</span>)[\\s\\S])*(</span>)`,
+    `(<summary>${CARD_TITLE_HEAD_SOURCE(point)})(?:(?!</span>)[\\s\\S])*(</span>)`,
   )
   try {
     const { from, end } = sectionBounds(html, 'queue')

@@ -3,10 +3,9 @@
 // The number chip has existed in the Warteschlange since the board did, and the
 // user reads that section on a phone every day — so its phone rendering is
 // proven by use. What is NEW is a chip inside a `<details class="now">` summary,
-// and the risk that carries is a layout one: a card whose chip is squeezed out,
-// wrapped onto its own line, or hidden by a rule written for the current-work
-// section would put the number back out of the reader's sight, which is exactly
-// the defect this point ends.
+// and the risk that carries is a layout one: a card whose chip is squeezed out
+// or hidden by a rule written for the current-work section would put the number
+// back out of the reader's sight, which is exactly the defect this point ends.
 //
 // WHY NOT A BROWSER. The board's stylesheet lives in `.batch-dashboard.html`,
 // which is git-ignored — the board is one living file, never checked out — so a
@@ -60,9 +59,9 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
   it('gives the now-card the SAME summary structure as the queue card', () => {
     const promoted = render(toNow(board(), 655, 'Läuft.', { stamp: '09:00' }))
     const nowShape = summaryShape(promoted, 'details.now')
-    expect(nowShape[0]).toBe('span.num')
-    expect(nowShape[1]).toBe('span.criticality criticality-high')
-    expect(nowShape[2]).toBe('span.t')
+    expect(nowShape[0]).toBe('span.card-header-left')
+    expect(nowShape[1]).toBe('span.t')
+    expect(nowShape[2]).toBe('span.right')
     // Element for element the shape the phone already renders every day.
     expect(nowShape).toEqual(summaryShape(render(board()), 'details.sect:nth-of-type(3) details'))
   })
@@ -71,7 +70,8 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
     const promoted = render(toNow(board(), 655, 'Läuft.', { stamp: '09:00' }))
     const dom = new JSDOM(`<!doctype html><html><body>${promoted}</body></html>`)
     const summary = dom.window.document.querySelector('details.now > summary')
-    expect(summary.querySelector('span.num').textContent.trim()).toBe('655')
+    expect(summary.querySelector('.card-header-left > span.num').textContent.trim()).toBe('655')
+    expect(summary.querySelector('.card-header-left > span.criticality').textContent.trim()).toBe('hoch')
     expect(summary.querySelector('span.t').textContent.trim()).toBe('Jede Karte nennt ihren Punkt')
     // The chip is not repeated inside the title — the reader must not read the
     // number twice on one line.
@@ -105,24 +105,26 @@ describe('the numbered chip renders on a now-card as it does in the queue', () =
         /display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?![.\d])/,
       )
     }
-    // …and the summary is the flex row that puts chip and title side by side,
-    // with the chip refusing to shrink.
+    // …and the base summary remains the flex row that puts the groups in order.
+    // The derived stylesheet opts card summaries into wrapping and keeps number
+    // plus criticality inside one left-hand flex group.
     const summaryRule = (css.match(/\bsummary\{([^}]*)\}/) ?? [])[1] ?? ''
     expect(summaryRule).toContain('display:flex')
     expect(summaryRule).toContain('flex-wrap:nowrap')
     expect((css.match(/\.num\{([^}]*)\}/) ?? [])[1] ?? '').toContain('flex-shrink:0')
-    // The phone break must not reach the chip at all.
+    const derived = (readFileSync(BOARD_FILE, 'utf8').match(/<style id="board-criticality-style">([\s\S]*?)<\/style>/) ?? [])[1] ?? ''
+    expect(derived).toContain('details:not(.sect)>summary:has(>.right){flex-wrap:wrap')
+    expect(derived).toContain('.card-header-left{display:inline-flex')
+    expect(derived).toContain('min-width:0;max-width:100%')
+    // The phone rule must not hide or reorder the left group.
     const phone = (css.match(new RegExp(`@media\\(max-width:(\\d+)px\\)\\{([^}]*\\}[^{]*)*`)) ?? [])[0] ?? ''
     expect(Number((phone.match(/max-width:(\d+)px/) ?? [])[1] ?? 0)).toBeGreaterThan(PHONE_WIDTH)
     expect(phone).not.toContain('.num')
-    // AND NO RULE SCOPED TO THE CURRENT-WORK SECTION MAY RELAY IT (four-eyes
-    // review, 12.08.2026): the DOM comparison above cannot see an ancestor rule
-    // like `.now summary{flex-wrap:wrap}`, which would push the chip onto its own
-    // line only inside the section this point is about.
+    // No rule scoped only to current work may change the shared grouping.
     for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!/\.now\b/.test(selector) || !/summary|\.t\b/.test(selector)) continue
       expect(body, `${selector.trim()} relays the current-work summary`).not.toMatch(
-        /flex-wrap\s*:\s*wrap|display\s*:\s*(block|grid)|flex-direction\s*:\s*column/,
+        /display\s*:\s*(block|grid)|flex-direction\s*:\s*column/,
       )
     }
   })

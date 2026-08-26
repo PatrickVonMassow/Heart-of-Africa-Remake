@@ -74,8 +74,9 @@ npm test -- build lint  # just the build + lint preflight
 ```
 
 `npm test` exits non-zero if any stage fails or a suite logs a browser console
-error. The Playwright suites are: `docs` (README/CLAUDE.md consistency),
-`world`, `i18n`, `flow`, `health`, `events`, `collision`, `handwriting`,
+error. The verification suites are: `docs` (README/CLAUDE.md consistency),
+`board-layout` (the narrow batch-board card-header geometry), `world`, `i18n`,
+`flow`, `health`, `events`, `collision`, `handwriting`,
 `polish`, `gamepad`, `touch`, `voice`, `settings`, `enrichments`,
 `invariants`, `benchmark`, and `preview` (the production build). Each maps to
 the CLAUDE.md §7.1 criteria named in its

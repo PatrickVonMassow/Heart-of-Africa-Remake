@@ -60,6 +60,7 @@ import {
   stripDerivedStateCard,
   setCardTitle,
   toDone,
+  doneEntries,
   doneCards,
   doneStart,
   earliestStart,
@@ -71,6 +72,7 @@ import {
   NOW_EMPTY_STATE_MARKUP,
   NOW_EMPTY_STATE_TEXT,
   projectNowForPublish,
+  renderCardCriticalities,
 } from './board-core.mjs'
 
 // A minimal document WITH the section heading: since the sixth cross-review
@@ -973,6 +975,32 @@ describe('toDone — current work into the archive', () => {
     expect(again).toContain('<span class="meta">10:07 · 13:30</span>')
     expect(again).toContain('<p>Zweite Runde.</p>')
     expect(again).not.toContain('<p>Erste Runde.</p>')
+  })
+
+  it('replaces an archive card after publishing grouped its header', () => {
+    const source = fullBoard({
+      now: nowEntry(365, 'Der Preis eines Punktes', '12:00 · ~14:30'),
+      done: queueEntry(365, 'Vorige Runde', '08:00 · 09:00'),
+    })
+    const grouped = renderCardCriticalities(
+      source,
+      '- [x] 365. Der Preis eines Punktes\n  Criticality: high — reviewed.',
+    )
+    const entries = doneEntries(grouped)
+    const doneHead = '<summary><h2>Erledigt</h2></summary>'
+    const section = grouped.slice(grouped.indexOf(doneHead) + doneHead.length)
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0].text).toContain('<span class="card-header-left"><span class="num">365</span>')
+    // `at` remains an offset into the grouped source section; parsing through
+    // an unwrapped copy would make every slicing consumer edit the wrong bytes.
+    expect(section.slice(entries[0].at, entries[0].at + entries[0].text.length)).toBe(entries[0].text)
+
+    const out = toDone(grouped, 365, { text: 'Zweite Runde.', end: '16:45' })
+    expect(doneCards(out, 365)).toHaveLength(1)
+    expect(out).toContain('<span class="meta">08:00 · 16:45</span>')
+    expect(out).toContain('<p>Zweite Runde.</p>')
+    expect(out).not.toContain('<p>Warum das ansteht.</p>')
   })
 
   it('refuses an empty archive body rather than filing a blank card', () => {

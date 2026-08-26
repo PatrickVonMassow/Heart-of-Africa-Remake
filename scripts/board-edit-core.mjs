@@ -3,7 +3,13 @@
 // touching the real board or its live branch.
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
-import { dropStrayNowCards, normaliseLineEndings, renderCardCriticalities, upgradeNowCards } from './board-core.mjs'
+import {
+  dropStrayNowCards,
+  normaliseLineEndings,
+  renderCardCriticalities,
+  unwrapCardHeaderGroups,
+  upgradeNowCards,
+} from './board-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 
 const firstLine = (text) => String(text ?? '').trim().split('\n')[0]
@@ -40,7 +46,7 @@ export function runBoardEdit({
   stdout = () => {},
   stderr = () => {},
 } = {}) {
-  const swept = dropStrayNowCards(normaliseLineEndings(html))
+  const swept = dropStrayNowCards(unwrapCardHeaderGroups(normaliseLineEndings(html)))
   const edited = dropStrayNowCards(
     renderCardCriticalities(
       derive(upgradeNowCards(normaliseLineEndings(transform(swept.html)))),
