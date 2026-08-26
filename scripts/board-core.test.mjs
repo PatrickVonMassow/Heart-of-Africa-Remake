@@ -16,6 +16,7 @@ import {
 } from './dashboard-guard-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
+import { PAUSED_TITLE } from './board-state-core.mjs'
 import {
   CLOSING_WORK_TITLE,
   ERLEDIGT_ANCHOR,
@@ -268,6 +269,30 @@ describe('derived now-section membership', () => {
     // The one sanctioned unnumbered card is still no stray.
     expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + handover }), [700]))
       .toMatchObject({ ok: true, strayCards: 0 })
+  })
+
+  // Eighth cross-vendor round: the stray rule exempted only the idle claim and
+  // anything WEARING the handover marker, so it rejected this module's own
+  // derived state card — unnumbered by design and documented to stand beside
+  // running work — while letting a hand-marked card buy the exemption.
+  it('exempts the derived state card and demands the handover card really be one', () => {
+    const board = applyDerivedStateCard(
+      fullBoard({ now: nowEntry(700, 'A', '20:07') }),
+      { title: PAUSED_TITLE, body: 'Der Stapel ist pausiert.' },
+      { stamp: '20:10' },
+    )
+    expect(compareNowProjection(board, [700])).toMatchObject({ ok: true, strayCards: 0 })
+    expect(() => reconcileNowProjection(board, [700], { stamp: '20:10' })).not.toThrow()
+
+    const marked =
+      '<details class="now" data-state="handover">\n  <summary><span class="num">700</span>' +
+      '<span class="t">Getarnt</span></summary>\n  <div class="body"><p>Text.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + marked }), [700]).ok).toBe(false)
+    const empty =
+      '<details class="now" data-state="handover">\n  <summary><span class="t">Leer</span></summary>\n' +
+      '  <div class="body"></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + empty }), [700]))
+      .toMatchObject({ ok: false, strayCards: 1 })
   })
 
   // Sixth cross-vendor round: the reorder ran over the SURVIVING cards alone,

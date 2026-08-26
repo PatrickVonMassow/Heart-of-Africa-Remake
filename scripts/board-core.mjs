@@ -657,7 +657,8 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null 
     const handoverCards = unnumbered.filter((card) => isHandoverCard(card.html)).length
     // Every unnumbered card that is neither the idle claim nor the ONE sanctioned
     // handover card (sixth cross-vendor round).
-    const strayCards = unnumberedCards - idleCards - Math.min(handoverCards, 1)
+    const derivedCards = unnumbered.filter((card) => isTrulyDerivedCard(card.html)).length
+    const strayCards = unnumberedCards - idleCards - derivedCards - Math.min(handoverCards, 1)
     // Verified zero has TWO honest forms (second cross-vendor review): the one
     // authored idle card carrying the written handover reason, or — when nobody
     // wrote one — exactly the one parser-distinct empty element. Never both,
@@ -789,8 +790,16 @@ export function reconcileNowProjection(
   // needs the number it lacks, and the handover card is the idle form refused
   // above — so this is a hand edit, and it is said out loud rather than
   // silently carried or silently dropped.
+  // THE DERIVED STATE CARD IS NOT A STRAY (eighth cross-vendor round): this
+  // module renders it itself, it is unnumbered by design, and it is documented
+  // to stand BESIDE running work — a paused batch still has a running point.
+  // Refusing it here would have broken every pause and automatic-decision
+  // projection.
   const stray = unnumbered.filter(
-    (card) => !isTrulyStateCard(card.html, 'idle') && !isHandoverCard(card.html),
+    (card) =>
+      !isTrulyStateCard(card.html, 'idle') &&
+      !isTrulyDerivedCard(card.html) &&
+      !isHandoverCard(card.html),
   )
   if (expected.length > 0 && stray.length > 0) {
     throw new Error(
@@ -1451,13 +1460,21 @@ const stateCardPattern = (kind) =>
  * Anything else keeps standing and the publish gate names it.
  */
 /**
- * The ONE unnumbered card that may stand beside derived numbered cards: the
- * session handover card (point 700's clause, answered by point 713). It is
- * sanctioned only there — a card that is neither this nor the idle claim is a
- * stray, and both the render and the comparison say so.
+ * The session handover card — one of the two unnumbered cards that may stand
+ * beside derived numbered ones (point 700's clause, answered by point 713).
+ *
+ * THE MARKER ALONE IS NOT THE PROOF (eighth cross-vendor round), here as
+ * everywhere else in this file: a marker is hand-writable, so a card wearing
+ * it must also HAVE the shape — no point chip, and a body that actually says
+ * something. Otherwise any hand-marked card would buy itself the exemption
+ * that the stray rule exists to deny.
  */
 function isHandoverCard(card) {
-  return /<details class="now"[^>]*data-state="handover"[^>]*>/.test(String(card ?? ''))
+  const text = String(card ?? '')
+  if (!/<details class="now"[^>]*data-state="handover"[^>]*>/.test(text)) return false
+  const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+  if (summaryPoint(summary).chip != null) return false
+  return cardBodyText(text).length > 0
 }
 
 function isTrulyStateCard(card, kind) {
