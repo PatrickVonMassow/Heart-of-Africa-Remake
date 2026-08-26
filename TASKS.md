@@ -12717,3 +12717,30 @@ to land than a mechanism that needs a review.
   is NOT caught splits one defect's evidence across two numbers, which is how a fix comes to stand
   on half its measurements.
   Bundle: Session- & Repo-Hygiene.
+
+- [ ] 961. The `commit-msg` hook checks two properties of a message and not its SHAPE, so a body
+  written without the blank line after the subject lands as a 400-character subject (MEASURED
+  27.08.2026 01:55 on `main`: `be148161` carries a 372-character subject and `e31fec7b` a
+  460-character one, both because the heredoc that wrote them omitted the empty line git uses to
+  separate subject from body — `git log -1 --format=%b` returns only the trailer on both). The hook
+  (`scripts/git-hooks/commit-msg`) asks `commit-scope-guard` about `[skip ci]`/`Rescue:` and
+  `model-trailer-gate` about the authoring model; nothing looks at the first line. The two commits
+  are on the remote, and rewriting published `main` history to repair a subject line would cost
+  more than the defect, so they stay as the measurement.
+  WHAT IT ACTUALLY BREAKS: every `--oneline` reading — the retrospective's source table, the board's
+  commit listings, `land-point`'s report, the standstill report's first-parent walk — renders one
+  commit as a paragraph, and the body that should have carried the reasoning is not a body at all,
+  so `%b` consumers see only the trailer.
+  FINAL STATE: the hook refuses a message whose subject exceeds a stated ceiling, and it names the
+  missing blank line as the likely cause when the message has no body at all — the failure this
+  point measured is not "a long subject" in the abstract but "a body glued to the subject", and the
+  refusal that does not say so sends the author trimming words instead of adding a newline. The
+  ceiling is written down where the other message rules are, and a genuinely long single-line
+  subject with no body is refused the same way; nothing is silently truncated or rewritten.
+  VERIFIABLE: Vitest over the message check — the two measured messages are refused with the
+  blank-line diagnosis, a normal subject-plus-body message passes, a subject just under and just
+  over the ceiling decide opposite ways, and a message the other two gates already refuse is not
+  double-reported.
+  Criticality: low — nothing is corrupted and no gate is bypassed, but it damages every log the
+  project reads about itself, and it is one line of shell to prevent.
+  Bundle: Session- & Repo-Hygiene.
