@@ -29,6 +29,25 @@ const readJsonStrict = (path, { exists = existsSync, read = readFileSync } = {})
   }
 }
 
+/**
+ * The focus record's point, or the error a record states but cannot mean.
+ *
+ * `focus.mjs set` writes either a positive integer or an explicit `null` (the
+ * "-" focus, for non-point work), so anything else in that field is corruption.
+ * Reading it as "no focus" made a malformed record indistinguishable from the
+ * two genuinely absent sources, which silently retired the focus half of the
+ * projection invariant while the fail-closed publish still passed — the exact
+ * fail-open this boundary exists to prevent (ninth cross-vendor round, pass 1).
+ */
+const readFocusPoint = (value) => {
+  const point = value?.point
+  if (point === null || point === undefined) return { point: null, error: null }
+  if (!Number.isInteger(point) || point <= 0) {
+    return { point: null, error: `the focus record names ${JSON.stringify(point)}, which is no point number` }
+  }
+  return { point, error: null }
+}
+
 /** Resolve the branch a legacy worktree evidence item already names. */
 const worktreeRefFromGit = (path) => {
   try {
@@ -57,14 +76,15 @@ export function gatherActiveWorkSource({
     }
     const declaration = readJsonStrict(declarationPath, { exists, read })
     const focus = readJsonStrict(focusPath, { exists, read })
-    const sourceErrors = [declaration.error, focus.error].filter(Boolean)
+    const focusPoint = readFocusPoint(focus.value)
+    const sourceErrors = [declaration.error, focus.error, focusPoint.error].filter(Boolean)
     if (sourceErrors.length) {
       return { ok: false, points: [], focusPoint: null, errors: sourceErrors.map((error) => `active-work source: ${error}`) }
     }
     return normalizeActiveWork({
       readable: true,
       declaration: declaration.value,
-      focusPoint: Number.isInteger(focus.value?.point) ? focus.value.point : null,
+      focusPoint: focusPoint.point,
       openPoints: openPointNumbers(tasksText),
       worktreeRef,
       checkpointContradicted: declaration.value?.transfer?.checkpoints?.some((checkpoint) => checkpoint?.contradicted === true),

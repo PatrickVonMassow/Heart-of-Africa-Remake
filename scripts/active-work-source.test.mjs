@@ -76,6 +76,26 @@ describe('active-work source I/O boundary', () => {
       .toMatchObject({ ok: false, points: [] })
   })
 
+  // Ninth cross-vendor round, pass 1: a focus record naming "700" instead of
+  // 700 reached normalization as "no focus at all" — byte for byte the answer
+  // the two genuinely ABSENT sources give — so the focus half of the projection
+  // invariant (focusUnrepresented/focusMisplaced) quietly stopped being checked
+  // while the fail-closed publish preflight still passed. `focus.mjs set` writes
+  // a positive integer or an explicit null, and nothing else may read as zero.
+  it('refuses a focus point the record states but cannot mean, and keeps the explicit none', () => {
+    const withFocus = (text) =>
+      gatherActiveWorkSource({ tasksText: TASKS, declarationPath: 'd', focusPath: 'f', ...files({ f: text }) })
+    for (const malformed of ['{"point":"700"}', '{"point":0}', '{"point":-1}', '{"point":7.5}', '{"point":true}']) {
+      const result = withFocus(malformed)
+      expect(result.ok).toBe(false)
+      expect(result.focusPoint).toBe(null)
+      expect(result.errors.join(' ')).toMatch(/is no point number/)
+    }
+    // The two shapes `focus.mjs set` really writes stay readable.
+    expect(withFocus('{"point":null,"note":"non-point work"}')).toMatchObject({ ok: true, focusPoint: null })
+    expect(withFocus('{"point":700}')).toMatchObject({ ok: true, focusPoint: 700, points: [700] })
+  })
+
   it('does not treat deferred work as open and fails unknown on a closed strand', () => {
     expect(openPointNumbers(TASKS)).toEqual(new Set([697, 700, 711]))
     const io = files({ d: JSON.stringify({ evidence: [{ point: 712 }] }) })

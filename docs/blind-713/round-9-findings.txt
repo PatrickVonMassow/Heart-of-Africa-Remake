@@ -148,3 +148,30 @@ Work-order point 929 names it verbatim, together with the "writes nothing" case 
   rendered into the wrong section satisfied it and the assertion leaned on `comparison.ok`
   for the one thing it was meant to prove independently. Both checks are scoped to the
   current-work section.
+
+## Pass 1 — the documents and the active-work source — one answered, one declined
+
+ANSWERED:
+
+- [P1] `gatherActiveWorkSource` read a focus record naming `"700"` — or `0`, `-1`, `7.5`,
+  `true` — as "no focus at all", which is byte for byte the answer the two genuinely ABSENT
+  sources give. A corrupt record therefore became a VERIFIED zero: the focus half of the
+  projection invariant (`focusUnrepresented`, `focusMisplaced`) quietly stopped being checked
+  while the fail-closed publish preflight still passed. `focus.mjs set` writes exactly two
+  shapes — a positive integer, or an explicit `null` for the "-" focus — so the boundary now
+  accepts those two and reports anything else as a source error, which is what "present but
+  unreadable" already meant everywhere else in this file. Regression in
+  `scripts/active-work-source.test.mjs`, proven to fail without the fix.
+
+DECLINED, with the reason recorded rather than averaged:
+
+- [P2] "`openPointNumbers` treats `DEFERRED` anywhere in a task's header as lifecycle
+  metadata; it should recognize only the designated defer marker." DECLINED: `\bDEFERRED\b`
+  ON THE HEADER LINE *is* the designated marker of this work order, and this module holds the
+  seventh identical copy of that predicate — `batch-in-flight-core.mjs` (`openPointSpecs`),
+  `batch-progress-guard.mjs`, `batch-resume-hook.mjs`, `dashboard-guard-core.mjs`,
+  `dashboard-sync-core.mjs` and `dashboard-integrity-guard-core.mjs` all test the same thing
+  the same way. There is no other marker to recognise, and narrowing THIS reading alone would
+  make the board's active set disagree with the batch's own open set — the board would then
+  demand a card for a point the resume hook refuses to work. The match is already confined to
+  the `- [ ] N.` header, so a `DEFERRED` in a point's BODY does not reach it.
