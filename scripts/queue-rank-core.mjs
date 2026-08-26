@@ -217,10 +217,20 @@ function clauseAfter(text, at) {
  *
  * Grammar matters in both directions. A denial attached to the phrase removes
  * it; a precondition describing what happens without a fix does not. Questions
- * and hypothetical clauses are mentions rather than assertions and therefore
- * cannot keep an already-recorded front placement alive. This remains a narrow
- * English cue reader, but every accepted cue excuses a point, so ambiguous
- * question/conditional shapes err toward demanding the explicit high tag.
+ * and hypothetical clauses are mentions rather than assertions.
+ *
+ * THE RESIDUAL, STATED EXACTLY (cross-vendor review, 26.08.2026). The next
+ * sentence-ending `?` is the only information this narrow cue reader has, so an
+ * ASSERTION followed by a question in the same sentence — "It blocks the
+ * release — is that acceptable?" — is misread as a mention. The direction is a
+ * false NOT-HIGH: without a recorded front decision the gate still refuses the
+ * point (as `not-high`, instead of the `unrecorded` reason the true reading
+ * would produce); with a recorded front decision it invalidates that decision
+ * and makes the point move behind the release unless its body carries the
+ * explicit `Criticality: high` tag. The missing information is grammatical
+ * scope: punctuation alone cannot say whether the question governs the earlier
+ * assertion. That conservative cost is accepted because an ambiguous reading
+ * demands evidence rather than excusing a machine-filed point.
  */
 export function statesHighUrgency(body) {
   const raw = String(body ?? '')
