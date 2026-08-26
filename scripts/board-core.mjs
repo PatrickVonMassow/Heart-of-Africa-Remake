@@ -705,10 +705,18 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // preflight blessed it as a faithful projection. Beside active work the
     // section is exactly the derived cards; the render refuses the same state,
     // so the two halves cannot disagree about it.
+    // AND THE DERIVED STATE CARD IS EXEMPT HERE TOO (point 935, measured on the
+    // live board): the exemption existed only in the branch below, so a machine
+    // decision or a pause standing while nothing ran made the section
+    // unpublishable — in the exact state every session ends in. The card is
+    // rendered by this module from state kept elsewhere, carries no authored
+    // text and claims nothing about what is running, which is the same reason
+    // it may stand beside active work.
+    const claimCards = unnumberedCards - derivedCards
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
-          ? emptyStateCount !== 0 || unnumberedCards !== 1
-          : emptyStateCount !== 1 || unnumberedCards > 0)
+          ? emptyStateCount !== 0 || claimCards !== 1
+          : emptyStateCount !== 1 || claimCards > 0)
       : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length
@@ -802,7 +810,14 @@ export function reconcileNowProjection(
   const conflicts = [...counts].filter(([, count]) => count > 1).map(([point]) => point)
   if (conflicts.length) throw new Error(`board: conflicting current-work copies for point(s) ${conflicts.join(', ')}`)
   const unnumbered = cards.filter((card) => card.point == null)
-  if (expected.length === 0 && unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle'))) {
+  // …and the derived state card is not one of them (point 935): it is exempt
+  // beside active work for reasons that hold just as well beside none, and
+  // refusing it here made the board unpublishable at every session boundary
+  // where a machine decision or a pause still stood.
+  if (
+    expected.length === 0 &&
+    unnumbered.some((card) => !isTrulyStateCard(card.html, 'idle') && !isTrulyDerivedCard(card.html))
+  ) {
     throw new Error('board: refusing to replace an authored unnumbered non-idle card with the empty-state element')
   }
   // The idle card claims "nothing is running". BESIDE numbered cards that is
@@ -918,7 +933,15 @@ export function reconcileNowProjection(
   // review): the idle card `done --none` puts up carries the handover reason
   // the reader opens the board for, so it survives the render byte for byte.
   // The generic empty element is only the fallback when nobody wrote anything.
-  if (expected.length === 0) remainder = remainder || NOW_EMPTY_STATE_MARKUP
+  if (expected.length === 0) {
+    // THE ZERO CLAIM IS MADE EVEN WHEN THE DERIVED CARD FILLS THE SECTION
+    // (point 935): the remainder was only tested for emptiness, so a standing
+    // machine decision suppressed the empty element and the comparison then
+    // found no zero claim at all. "Nothing is running" and "this is what the
+    // machine decided" are two statements, and the reader is owed both.
+    const claims = unnumbered.some((card) => isTrulyStateCard(card.html, 'idle'))
+    if (!claims) remainder = remainder ? `${remainder}\n${NOW_EMPTY_STATE_MARKUP}` : NOW_EMPTY_STATE_MARKUP
+  }
   else remainder = `${ordered.map((card) => card.html).join('')}${remainder ? `\n${remainder}` : ''}`.trimEnd()
   const projected = source.slice(0, now.from) + `\n${remainder}\n` + source.slice(now.end).replace(/^\n/, '')
   return stripProjectedQueueCards(projected, expected)

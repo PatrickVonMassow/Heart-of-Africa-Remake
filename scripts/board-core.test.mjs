@@ -16,7 +16,7 @@ import {
 } from './dashboard-guard-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
-import { PAUSED_TITLE } from './board-state-core.mjs'
+import { AUTOMATIC_DECISION_TITLE, PAUSED_TITLE } from './board-state-core.mjs'
 import {
   CLOSING_WORK_TITLE,
   ERLEDIGT_ANCHOR,
@@ -275,6 +275,52 @@ describe('derived now-section membership', () => {
   // anything WEARING the handover marker, so it rejected this module's own
   // derived state card — unnumbered by design and documented to stand beside
   // running work — while letting a hand-marked card buy the exemption.
+  // Point 935, measured on the live board twenty minutes after the derived
+  // now-section landed: the exemption above existed ONLY beside active work, so
+  // a standing machine decision made the section unpublishable in the exact
+  // state every session ends in — the render refused the card, the empty
+  // element was then never inserted because the card filled the remainder, and
+  // the comparison demanded a single unnumbered card.
+  it('lets the derived state card stand while nothing runs, and still makes the zero claim', () => {
+    const idleReason =
+      `<details class="now" data-state="idle">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Ich übergebe an eine frische Sitzung.</p></div>\n</details>\n'
+    const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft trotz der Meldung weiter.' }
+
+    // (a) Beside the authored idle claim: both stand, nothing is rewritten.
+    const withIdle = applyDerivedStateCard(fullBoard({ now: idleReason }), decision, { stamp: '10:17' })
+    expect(compareNowProjection(withIdle, [])).toMatchObject({ ok: true, idleCards: 1, emptyStateCount: 0 })
+    const renderedIdle = reconcileNowProjection(withIdle, [], { stamp: '10:17' })
+    expect(renderedIdle).toContain('Ich übergebe an eine frische Sitzung.')
+    expect(renderedIdle).toContain('data-state="derived"')
+    expect(compareNowProjection(renderedIdle, []).ok).toBe(true)
+
+    // (b) ALONE: the card must not swallow the zero claim — the empty element
+    // is inserted beside it, so "nothing is running" is still said out loud.
+    const alone = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' })
+    const renderedAlone = reconcileNowProjection(alone, [], { stamp: '10:17' })
+    expect(renderedAlone).toContain(NOW_EMPTY_STATE_TEXT)
+    expect(renderedAlone).toContain('data-state="derived"')
+    expect(compareNowProjection(renderedAlone, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+
+    // (c) THE EXEMPTION DOES NOT WIDEN: a hand-written unnumbered card, and one
+    // wearing the reserved title WITHOUT the marker, still refuse with nothing
+    // running — the ninth round's hardening is untouched.
+    const handWritten =
+      '<details class="now">\n  <summary><span class="t">Von Hand</span></summary>\n' +
+      '  <div class="body"><p>Text.</p></div>\n</details>\n'
+    expect(compareNowProjection(fullBoard({ now: handWritten }), []).ok).toBe(false)
+    expect(() => reconcileNowProjection(fullBoard({ now: handWritten }), [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+    const impostor = handWritten.replace('<span class="t">Von Hand</span>', `<span class="t">${AUTOMATIC_DECISION_TITLE}</span>`)
+    expect(compareNowProjection(fullBoard({ now: impostor }), []).ok).toBe(false)
+    expect(() => reconcileNowProjection(fullBoard({ now: impostor }), [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+  })
+
   it('exempts the derived state card and demands the handover card really be one', () => {
     const board = applyDerivedStateCard(
       fullBoard({ now: nowEntry(700, 'A', '20:07') }),
