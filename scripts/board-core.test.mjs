@@ -378,16 +378,23 @@ describe('derived now-section membership', () => {
 
   // Ninth cross-vendor round: an unclosed now-section quietly swallowed the
   // rest of the document — a fail-open under a preflight that must fail closed.
-  // (The bare `<details class="sect">` token inside authored prose ended the
-  // section early by the same route; the recogniser removes that class, and it
-  // has no assertable difference on today's board, so it gets no test that
-  // would stay green either way.)
+  // The section end is COUNTED now, so a card's own closer cannot pass for the
+  // wrapper's: the second case keeps one card and removes only the wrapper's
+  // close, which the `lastIndexOf('</details>')` reading accepted.
   it('refuses a now-section that is never closed instead of swallowing the rest', () => {
     const damaged =
       `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
       `${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
-    expect(() => reconcileNowProjection(damaged, [700])).toThrow(/not closed before the next section/)
+    expect(() => reconcileNowProjection(damaged, [700])).toThrow(/is never closed/)
     expect(compareNowProjection(damaged, [700]).ok).toBe(false)
+
+    // …and a CARD's closer is not the wrapper's: the section holds one card and
+    // its own close is gone, which the last-closer reading blessed.
+    const cardButNoClose =
+      `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+      `${nowEntry(700, 'A', '20:07')}${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+    expect(() => reconcileNowProjection(cardButNoClose, [700])).toThrow(/is never closed/)
+    expect(compareNowProjection(cardButNoClose, [700]).ok).toBe(false)
   })
 
   // Ninth cross-vendor round: the render puts the focused strand first, but the

@@ -513,29 +513,31 @@ function sectionBounds(html, key) {
     throw new Error(`board: the ${key} section heading appears ${hits.length} times — refusing to guess the section`)
   }
   const from = hits[0] + head.length
-  // THE NEXT SECTION IS RECOGNISED, NOT ASSUMED (ninth cross-vendor round): the
-  // bare `<details class="sect">` token can stand inside authored card prose,
-  // and looking for the token alone let that text end the section early — the
-  // render then edited a region that was not the section. A real section opener
-  // carries its own `<summary><h2>`, which is what is searched for here. And a
-  // section that is NOT closed before the next one begins is structural damage:
+  // THE SECTION ENDS AT ITS OWN CLOSER, COUNTED (ninth cross-vendor round).
+  // Two cheaper answers were tried and both fail open: the next
+  // `<details class="sect">` token can stand inside authored prose, and the
+  // last `</details>` before it is just as likely to be a CARD's closer as the
+  // wrapper's. Counting the nesting is the only reading that cannot be fooled
+  // by what a card says, and a wrapper that never closes is structural damage —
   // swallowing the rest of the document instead was the fail-open under a
   // preflight that must fail closed.
-  const opener = /<details class="sect"[^>]*>\s*<summary>\s*<h2/g
-  opener.lastIndex = from
-  const nextSect = opener.exec(text)?.index ?? -1
-  if (nextSect < 0) return { from, end: text.length }
-  // The wrapper's own closer, preferring the newline-led spelling the board
-  // writes; a section whose last child ends on the same line closes just as
-  // validly, and demanding the newline turned that into false damage.
-  const led = text.lastIndexOf('\n</details>', nextSect)
-  const end = led >= from ? led : text.lastIndexOf('</details>', nextSect)
-  if (end < from) {
+  const tag = /<details\b[^>]*>|<\/details\s*>/g
+  tag.lastIndex = from
+  let depth = 1
+  let close = -1
+  for (let m = tag.exec(text); m; m = tag.exec(text)) {
+    depth += m[0].startsWith('</') ? -1 : 1
+    if (depth === 0) {
+      close = m.index
+      break
+    }
+  }
+  if (close < 0) {
     throw new Error(
-      `board: the ${key} section is not closed before the next section begins — ` +
-        'structural damage, refusing to guess the section',
+      `board: the ${key} section is never closed — structural damage, refusing to guess the section`,
     )
   }
+  const end = text[close - 1] === '\n' ? close - 1 : close
   return { from, end }
 }
 

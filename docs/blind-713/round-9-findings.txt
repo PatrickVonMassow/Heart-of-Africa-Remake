@@ -57,3 +57,20 @@ DECLINED, with the reason recorded rather than averaged:
   `stripProjectedQueueCards`): not a loss. `buildQueueSection` rewrites the WHOLE queue
   section from the work order on every publish — "Because the whole section is rewritten
   here…" — so a queue card holds no authored text to preserve.
+
+## Pass 4, confirming round — one answered, one declined
+
+ANSWERED: the unclosed-section check read the LAST `</details>` before the next section, so
+a card's own closer passed for the wrapper's, and the `nextSect < 0` branch returned the
+whole remaining document without verifying closure at all. The section end is COUNTED now —
+`<details>` in, `</details>` out, from the heading — which is the only reading a card's prose
+cannot fool; a wrapper that never closes refuses. The regression keeps one card and removes
+only the wrapper's close, which the previous reading blessed.
+
+DECLINED: "`pointsInSection`'s `catch { return [] }` reads structural failure in `queue` or
+`vdzk` as 'contains no points', so a damaged queue section hides a cross-section conflict
+from the fail-closed preflight." This is already filed, verbatim, as work-order point 929:
+"STRUCTURAL DAMAGE REFUSES INSTEAD OF ANSWERING 'NOTHING THERE'. `pointsInSection` and
+`stripProjectedQueueCards` answer a missing or duplicated heading with an empty result,
+which is fail-open under a preflight that must fail closed." The eighth round measured it
+and the owner filed it OUTSIDE this point's final state precisely so 713 could converge.
