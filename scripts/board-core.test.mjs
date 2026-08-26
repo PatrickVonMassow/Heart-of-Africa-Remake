@@ -449,16 +449,50 @@ describe('derived now-section membership', () => {
       `${NO_CURRENT_WORK_TITLE}</span><!-- <span class="num">935</span> -->` +
       '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
       '  <div class="body"><p>Ich übergebe.</p></div>\n</details>\n'
-    expect(compareNowProjection(fullBoard({ now: commented }), []))
-      .toMatchObject({ ok: true, idleCards: 1 })
+    const commentedBoard = fullBoard({ now: commented })
+    expect(compareNowProjection(commentedBoard, [])).toMatchObject({ ok: true, idleCards: 1 })
+    // BOTH halves, and the card survives byte for byte — "retire a card" is a
+    // thing the RENDER does, so comparing alone cannot pin it (the final pass).
+    const commentedRendered = reconcileNowProjection(commentedBoard, [], { stamp: '10:17' })
+    expect(commentedRendered).toBe(commentedBoard)
+    expect(commentedRendered).toContain('Ich übergebe.')
 
     const dataClass =
       '<details class="now" data-state="handover">\n  <summary><span class="t">Übergabe</span>' +
       `<span data-class="t">2026 ${'\u2014'} Übergabe</span>` +
       '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
       '  <div class="body"><p>Weiter mit Punkt 734.</p></div>\n</details>\n'
-    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + dataClass }), [700]))
-      .toMatchObject({ ok: true, strayCards: 0 })
+    const dataClassBoard = fullBoard({ now: nowEntry(700, 'A', '20:07') + dataClass })
+    expect(compareNowProjection(dataClassBoard, [700])).toMatchObject({ ok: true, strayCards: 0 })
+    const dataClassRendered = reconcileNowProjection(dataClassBoard, [700], { stamp: '20:10' })
+    expect(dataClassRendered).toContain('Weiter mit Punkt 734.')
+    expect(dataClassRendered).toContain('data-state="handover"')
+  })
+
+  // The final pass of the same review, on the positive predicate: the meta
+  // field went into the markup uninterpolated, so a caller-supplied stamp could
+  // carry entity-encoded digits a browser renders as a point number — or markup
+  // that this writer emits and its own authentication then refuses.
+  it('gives the state card stamp one shape, at the writer and at the reader', () => {
+    const decision = { title: AUTOMATIC_DECISION_TITLE, body: 'Der Batch läuft weiter.' }
+    // A stamp that is not a clock time never reaches the markup…
+    const smuggledStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, {
+      stamp: 'Punkt &#57;&#51;&#53;',
+    })
+    expect(smuggledStamp).not.toContain('&#57;')
+    // …and markup in the stamp neither ships nor breaks the card's own reading.
+    const markupStamp = applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '<b>12:34</b>' })
+    expect(markupStamp).not.toContain('<b>12:34</b>')
+    // Both are still the machine's card: the render keeps them and adds the
+    // zero claim beside them, and the comparison then agrees.
+    for (const board of [smuggledStamp, markupStamp]) {
+      const rendered = reconcileNowProjection(board, [], { stamp: '10:17' })
+      expect(rendered).toContain('data-state="derived"')
+      expect(compareNowProjection(rendered, [])).toMatchObject({ ok: true, emptyStateCount: 1 })
+    }
+    // An ordinary stamp is kept exactly as given.
+    expect(applyDerivedStateCard(fullBoard({ now: '' }), decision, { stamp: '10:17' }))
+      .toContain('<span class="meta">10:17</span>')
   })
 
   it('exempts the derived state card and demands the handover card really be one', () => {

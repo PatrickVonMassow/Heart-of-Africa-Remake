@@ -1482,6 +1482,13 @@ const derivedCardPattern = () =>
  */
 const escapeForRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
+/** A card's meta field carries a clock time and nothing else. */
+const STAMP_SHAPE = /^\d{1,2}:\d{2}$/
+const cardStamp = (stamp) => {
+  const value = String(stamp ?? '').trim()
+  return STAMP_SHAPE.test(value) ? value : berlinStamp()
+}
+
 /**
  * The summary `applyDerivedStateCard` writes — and nothing else.
  *
@@ -1501,7 +1508,7 @@ const escapeForRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, 
  */
 const DERIVED_SUMMARY = new RegExp(
   `^<span class="t">(?:${escapeForRegExp(PAUSED_TITLE)}|${escapeForRegExp(AUTOMATIC_DECISION_TITLE)})</span>` +
-    '<span class="right"><span class="meta">[^<>]*</span></span>$',
+    '<span class="right"><span class="meta">\\d{1,2}:\\d{2}</span></span>$',
 )
 
 function isTrulyDerivedCard(card) {
@@ -1536,11 +1543,17 @@ export function stripDerivedStateCard(html) {
 export function applyDerivedStateCard(html, derived, { stamp = berlinStamp() } = {}) {
   const stripped = stripDerivedStateCard(html)
   if (!derived || !String(derived.body ?? '').trim()) return stripped
+  // THE STAMP IS A CLOCK TIME OR IT IS THE CLOCK'S (final round of the review):
+  // the meta field went into the markup uninterpolated, so a caller-supplied
+  // `stamp` could carry entity-encoded digits a browser renders as a point
+  // number — or markup that this writer emits and its own authentication then
+  // refuses. One shape, written and read.
+  const at = cardStamp(stamp)
   const card =
     `<details class="now"${STATE_ATTR(DERIVED_STATE_KIND)}>\n  <summary>` +
     `<span class="t">${escapeCardTitle(derived.title)}</span>` +
-    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n${renderCardBody(derived.body, { stamp })}\n  </div>\n</details>\n`
+    `<span class="right"><span class="meta">${at}</span></span></summary>\n` +
+    `  <div class="body">\n${renderCardBody(derived.body, { stamp: at })}\n  </div>\n</details>\n`
   return insertAsFirstNowCard(stripped, card)
 }
 
