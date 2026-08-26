@@ -168,6 +168,15 @@ put it is the mistake this line exists to stop.
   blind merges, nothing else. The ledger shows no dip either (54 verdicts on 20.08., 62 on 21.08.,
   44 on 22.08.). The backlog is mostly UNANSWERED rather than unreviewed, reaching back to at least
   10.08. and surfaced by the guard's 26.08. measurement.
+  TICKET MAP, measured 26.08.2026, because this point overlaps points that already exist: `c3f5ad8`
+  belongs to the closed point 789 and `92cbc0e` to the closed point 864, while `aeedceb` is a revert
+  landed straight on main with no point of its own — all three are on origin/main, so this backlog is
+  precisely LANDED AND TICKED work whose reviews stand unanswered. The two DO-NOT-MERGE finding sets
+  are ALSO already filed as their own OPEN points — 876 (guard-health reads absence and measurement
+  failure as one state) and 877 (the urgency parser's negation and question findings) — and point 837
+  inventories the wider four-eyes debt of the same range. Reconcile that overlap when this point is
+  worked: what this point's leg 1 fixed is what 876 and 877 describe, so they close with it or are
+  re-cut, and neither is worked twice.
   VERIFIABLE: `mechanism-review-guard --status` reports zero unreviewed backlog contributions.
   Criticality: high — until it clears, every landing session drags the same block.
   Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
