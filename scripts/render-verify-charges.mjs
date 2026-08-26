@@ -235,6 +235,60 @@ export const RED_CHARGES = [
       'owns it until the cause — an unsettled jump or a real placement change — is named.',
   },
   {
+    point: 627,
+    suite: 'world',
+    backend: 'webgpu',
+    kind: 'check',
+    match: /11-worldmodel-khartoum-confluence/i,
+    why:
+      'Measured 26.08.2026 on main at f178ea6d, on a quiet machine, four runs across two ' +
+      'sittings: the Khartoum frame reds with the SAME wording as the falls frame of 11.08. — ' +
+      '"its subject is not in the rendered picture: off the left and bottom edge of the frame" — ' +
+      'twice including the suite own retry, while the six other landmark frames pass and the same ' +
+      'suite on WebGL 2 passes all seven in the same sitting. The signature has ROTATED from one ' +
+      'landmark to another, which decides the second of the two causes point 627 had to choose ' +
+      'between, and it stays 627 until the unsettled jump is fixed at its cause.',
+  },
+  {
+    point: 938,
+    suite: 'enrichments',
+    backend: 'webgpu',
+    kind: 'check',
+    match: /streamed dressing does not grow over a session at a fixed anchor/i,
+    why:
+      'Measured 26.08.2026: five recorded webgpu/enrichments runs of 17.08.2026 carry this check ' +
+      'red with point=null, because the check names point 278 and 278 is TICKED — a charge dies ' +
+      'with its point, so the red had no owner it could be charged to. Point 938 was opened for ' +
+      'exactly this red and is the owner until it settles whether the check or the dressing is ' +
+      'stale.',
+  },
+  {
+    point: 939,
+    suite: 'startup',
+    backend: 'webgpu',
+    kind: 'console',
+    match: /Outdated Optimize Dep/i,
+    why:
+      'Measured 26.08.2026: the webgpu/startup run of 19.08.2026 12:09:17 carries this one console ' +
+      'red — Vite re-bundling its dependency optimizer in the middle of the run, an environment ' +
+      'transient by CLAUDE.md own classification and not a product defect, captured by the ' +
+      'recorder as an ordinary console red. Point 939 was opened for exactly this red and owns it ' +
+      'until the lane is made immune or the text is classified as environment.',
+  },
+  {
+    point: 514,
+    suite: 'enrichments',
+    backend: 'webgpu',
+    kind: 'check',
+    match: /72-water-victoria-falls/i,
+    why:
+      'Measured 26.08.2026 on the recorded state: the webgpu/enrichments run of 17.08.2026 08:25 ' +
+      'carries this frame red unaccounted. Point 514 already names this exact frame missing its ' +
+      'subject on the WebGPU compatibility lane while the WebGL 2 run of the same suite minutes ' +
+      'apart did not, and its final state — the wait after a jump polling the camera arrival ' +
+      'instead of counting milliseconds — is the cause this red has; it is 514 until that lands.',
+  },
+  {
     point: 603,
     suite: 'settings',
     backend: 'webgl',

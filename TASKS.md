@@ -8643,6 +8643,17 @@ to land than a mechanism that needs a review.
   other landmarks (Khartoum, Lake Victoria, Kilimanjaro, the Congo mouth, Cape Town, Lake
   Chad) pass in the same run, so it is not the shutter and not the projection: those refuse
   correctly, which is why this was caught at all.
+  MEASURED AGAIN 26.08.2026 on `main` at f178ea6d, and it decides the question above: the
+  SAME failure, word for word — "its subject is not in the rendered picture: off the left and
+  bottom edge of the frame" — now reds on `11-worldmodel-khartoum-confluence` instead, twice
+  including the suite's own retry, in two separate sittings, the second on a quiet machine.
+  The other six landmarks pass, and `world` on WebGL 2 writes all seven green in the same
+  sitting. Khartoum was one of the six that PASSED on 11.08., so this is not a placement
+  change at one site: the signature ROTATES between landmarks, which is the second of the two
+  causes this point had to choose between. It is therefore an unsettled jump, and the fix is
+  the one point 514 already states for its own instance — the wait after a jump POLLS the
+  camera having arrived rather than counting milliseconds. Both frames are charged to this
+  point in `scripts/render-verify-charges.mjs`, each scoped to `world`/WebGPU.
   FINAL STATE: the cause is NAMED with evidence — the jump to (-17.9, 25.9) not settling
   before the shutter opens, a camera clamp at that latitude, or a real placement change —
   and fixed at that cause. If it is timing, the frame waits on the STATE the jump reaches,
