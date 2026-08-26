@@ -12569,3 +12569,29 @@ to land than a mechanism that needs a review.
   Criticality: medium — the suite is green today and its subject is correct today; the defect is
   that it would stay green after the subject moved.
   Bundle: Chat & Tafel.
+
+- [ ] 954. The board header's outer groups still never break, so a phone squeezes the title while
+  the number and the time stamps keep their full width (user report 26.08.2026, 19:54, phone Chrome
+  at ~412 CSS px and desktop Firefox; confirmed by direct question at 20:03). Point 941 set out to
+  end exactly that picture — "Auch die linke und die rechte Spalte sollen umbrechen können" — and
+  its acceptance holds as written: measured tonight against the LIVE board content (board branch
+  fetched 19:57, rendered in headless system Chrome at 412 px and 610 px) the 941 style block is
+  present and active, nothing overflows and no horizontal scroll appears. The gap is in the
+  mechanism. `details:not(.sect)>summary>.right` is `flex-wrap: nowrap`, so the time group can never
+  break INSIDE itself; it only drops as one whole block onto the next flex line, which happens only
+  at the rare width where it no longer fits beside the title's 12rem minimum (card 943 tonight).
+  `.card-header-left` may wrap, but as a `flex: 0 1 auto` item in a wrapping row it is never
+  squeezed below its one-line base width at any realistic viewport, so the badge never moves under
+  its number. Net effect on a phone: a narrow title column beside two fixed groups with dead space
+  under them.
+  FINAL STATE: at narrow widths the outer groups actually yield. The right group stacks its stamps
+  (the `nowrap` goes; each individual stamp stays unsplittable) and gives up its slot on the first
+  header line before the title is squeezed below a readable width; the left group's badge may sit
+  under its number at the same pressure.
+  VERIFIABLE: the browser suite measures the VISIBLE break — the right group occupying more than one
+  line, or sitting beneath the title — at a phone width with a card carrying two time stamps, and it
+  measures it on the REAL published stylesheet rather than a fixture copy, so this point is worked
+  after 952 or takes that fix with it.
+  Criticality: medium — the board is readable today; what fails is the phone picture the request
+  asked for.
+  Bundle: Chat & Tafel.
