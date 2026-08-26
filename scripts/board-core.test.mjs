@@ -293,10 +293,16 @@ describe('derived now-section membership', () => {
     // about the section it is supposed to stand in, and leaning on
     // `compareNowProjection` for placement would let one changed path vouch
     // for the other.
+    // …and the slice ENDS AT THE SECTION'S OWN CLOSER (the confirming pass of
+    // this case): cutting at the next section's opening tag left everything
+    // between the two inside the slice, so an element inserted BETWEEN sections
+    // satisfied an assertion that claims to prove it is inside this one.
     const nowSectionOf = (html) => {
       const from = html.indexOf('Woran ich gerade arbeite')
       const next = html.indexOf('<details class="sect"', from + 1)
-      return html.slice(from, next < 0 ? undefined : next)
+      const scope = html.slice(from, next < 0 ? undefined : next)
+      const close = scope.lastIndexOf('</details>')
+      return close < 0 ? scope : scope.slice(0, close)
     }
 
     // (a) Beside the authored idle claim: both stand, and NOTHING is rewritten
@@ -349,30 +355,50 @@ describe('derived now-section membership', () => {
   // every derived card without bounding the count let a STACK of them cancel
   // the zero claim out.
   it('authenticates the derived card by the whole summary, and tolerates only one of it', () => {
-    const derivedCard = (summaryExtra = '') =>
+    const derivedCard = (summaryExtra = '', body = 'Der Batch läuft weiter.') =>
       '<details class="now" data-state="derived">\n  <summary><span class="t">' +
       `${AUTOMATIC_DECISION_TITLE}</span>${summaryExtra}` +
       '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
-      '  <div class="body"><p>Der Batch läuft weiter.</p></div>\n</details>\n'
+      `  <div class="body"><p>${body}</p></div>\n</details>\n`
 
-    // (a) A NON-LEADING chip is still a chip: the card is not the machine's.
-    const smuggled = derivedCard('<span class="num">935</span>')
-    const board = fullBoard({ now: smuggled })
-    expect(compareNowProjection(board, []).ok).toBe(false)
-    expect(() => reconcileNowProjection(board, [], { stamp: '10:17' })).toThrow(
-      /authored unnumbered non-idle card/,
+    // (a) A NON-LEADING chip is still a chip: the card is not the machine's —
+    // and the reading is of MARKUP, not of one spelling of it, so an ordinary
+    // attribute or a second class token does not walk past it.
+    const chipShapes = [
+      '<span class="num">935</span>',
+      '<span class="num" aria-label="Punkt">935</span>',
+      '<span class="chip num">935</span>',
+      `<span class="t">935 ${'\u2014'} Getarnt</span>`,
+    ]
+    let smuggled = ''
+    for (const shape of chipShapes) {
+      smuggled = derivedCard(shape)
+      const board = fullBoard({ now: smuggled })
+      expect(compareNowProjection(board, []).ok).toBe(false)
+      expect(() => reconcileNowProjection(board, [], { stamp: '10:17' })).toThrow(
+        /authored unnumbered non-idle card/,
+      )
+    }
+    // …and it is not laundered into the section beside real work either —
+    // BOTH halves say so, not only the comparison (the confirming pass of this
+    // case: a render that accepted it there would have stayed green).
+    const beside = fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled })
+    expect(compareNowProjection(beside, [700])).toMatchObject({ ok: false, strayCards: 1 })
+    expect(() => reconcileNowProjection(beside, [700], { stamp: '20:10' })).toThrow(
+      /unnumbered current-work card/,
     )
-    // …and it is not laundered into the section beside real work either.
-    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled }), [700]))
-      .toMatchObject({ ok: false, strayCards: 1 })
 
     // (b) TWO genuine derived cards are damaged machine state, not two facts.
-    const stacked = fullBoard({ now: derivedCard() + derivedCard() })
+    // THE TWO ARE DISTINGUISHABLE ON PURPOSE (the confirming pass of this case):
+    // byte-identical cards cannot tell keeping the FIRST from keeping the last.
+    const stacked = fullBoard({ now: derivedCard('', 'Die erste Entscheidung.') + derivedCard('', 'Die zweite.') })
     expect(compareNowProjection(stacked, [])).toMatchObject({ ok: false, duplicateDerived: true })
     // The render normalises the stack away — the card holds nothing of its own —
     // and what it leaves behind is the state the comparison accepts.
     const normalised = reconcileNowProjection(stacked, [], { stamp: '10:17' })
     expect(normalised.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(normalised).toContain('Die erste Entscheidung.')
+    expect(normalised).not.toContain('Die zweite.')
     expect(compareNowProjection(normalised, [])).toMatchObject({ ok: true, duplicateDerived: false })
     // The same stack beside active work is refused rather than blessed.
     expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + derivedCard() + derivedCard() }), [700]))

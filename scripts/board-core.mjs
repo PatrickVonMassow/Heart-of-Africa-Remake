@@ -1576,8 +1576,22 @@ const stateCardPattern = (kind) =>
  * scanned the whole section; the three state predicates now agree with it.
  */
 const summaryCarriesPoint = (summary) => {
-  const { chip, legacy } = summaryPoint(summary)
-  return chip != null || legacy != null || /class="num">\s*\d/.test(String(summary ?? ''))
+  const text = String(summary ?? '')
+  const { chip, legacy } = summaryPoint(text)
+  if (chip != null || legacy != null) return true
+  // …AND THE FALLBACK READS MARKUP, NOT ONE SPELLING OF IT (the confirming pass
+  // of the same review): an exact `class="num">` only recognises the attribute
+  // when it sits immediately before the `>`, so an ordinary
+  // `<span class="num" aria-label="Punkt">935</span>` walked straight past it.
+  // Each opening span is read for its class TOKENS and the text that directly
+  // follows it, which also survives nesting.
+  for (const [, attrs, body] of text.matchAll(/<span\b([^>]*)>\s*([^<]*)/g)) {
+    const tokens = (((attrs.match(/\bclass\s*=\s*"([^"]*)"/) ?? [])[1]) ?? '').split(/\s+/).filter(Boolean)
+    if (tokens.includes('num') && /^\d+$/.test(body.trim())) return true
+    // The legacy "651 — Titel" spelling counts wherever it stands, not only first.
+    if (tokens.includes('t') && new RegExp(`^\\s*\\d+\\s*${DASH}`).test(body)) return true
+  }
+  return false
 }
 
 function isHandoverCard(card) {
