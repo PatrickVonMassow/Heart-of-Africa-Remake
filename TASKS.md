@@ -286,6 +286,37 @@ put it is the mistake this line exists to stop.
   into a formality.
   Bundle: Session- & Repo-Hygiene.
 
+- [ ] 958. The independent emergency lane reads a session's own tool calls as batch progress, so a
+  BUSY wedge never reaches it. MEASURED 27.08.2026 while cross-reading the lane point 947 built:
+  `scripts/batch-emergency-core.mjs` puts `ACTIVITY_CLASSES.FOREGROUND` into `ADVANCING_CLASSES`,
+  and `latestProgressAt` takes the latest END of any advancing interval. By the standstill
+  classifier's own definition an interval is FOREGROUND on nothing more than a timestamped
+  session-linked tool call. So an owner wedged in a BUSY loop — a poll loop, a guard refusal it
+  keeps retrying, an agent re-reading the same files — keeps emitting foreground intervals, the
+  progress boundary keeps moving, and `emergencyDecision` never reaches its one-hour threshold. The
+  lane therefore covers the QUIET wedge only, while `docs/batch-autonomy.md` S-19 claims it covers
+  the live-but-wedged owner because it "uses bounded advancing intervals, never process presence".
+  That claim is true about process presence and false about tool activity, and the busy shape is
+  measured in this repository: the poll-loop rule of 28.07.2026 records a chain of 437 answers for
+  one word.
+  FINAL STATE:
+  - PROGRESS FOR THIS DECISION IS BATCH PROGRESS, not session activity: a first-parent commit on
+    `main`, a landed point, a committed boundary, a delegated branch that moved. Foreground tool
+    activity may at most soften a strike; it may never reset the clock on its own.
+  - THE DOCUMENT SAYS WHICH OF THE TWO IT MEASURES. `docs/batch-autonomy.md` S-19 is corrected in
+    the same commit, because its present wording is what makes the gap invisible.
+  - THE QUIET CASE IS NOT LOST. A wedge with no activity at all must still strike exactly as it
+    does today; the change may only ADD the busy case.
+  VERIFIABLE: Vitest over `emergencyDecision` — a timeline of unbroken FOREGROUND intervals with no
+  batch-level advance for longer than the threshold still strikes; a real batch advance inside the
+  threshold still stands the lane down; and the existing quiet-wedge cases stay green. Plus the
+  chaos drill extended to the busy shape: a wedged owner that keeps making tool calls is recovered
+  without human action.
+  Criticality: high — it is the hole in the double safety the user ordered on 26.08.2026, and the
+  busy wedge is the shape this batch has actually produced.
+  Bundle: Urlaubsfestigkeit. It changes the same decision core as 947's lane, so it does not run
+  beside another point touching `scripts/batch-emergency-core.mjs`.
+
 - [ ] 581. The settlement boundary is too faint, and its slider is already at the ceiling
   (user 09.08.2026, F6 report `local/bugreports/DorfgrenzeSchlechtErkennbar.zip`: "Die
   Dorfgrenze ist zu schlecht erkennbar. Der Kontrast muss höher sein"). MEASURED from his
@@ -12343,13 +12374,27 @@ to land than a mechanism that needs a review.
     pushes before it dictates the card — but then it must say so.
   - THE REFUSAL SAYS that a bundled call is judged segment by segment, so the reader does not
     lose a round trip discovering it.
+  A FOURTH INSTANCE, measured live 27.08.2026 00:04-00:07 while landing point 947, settles what the
+  escape is worth: `board.mjs closing 947` REPORTED SUCCESS — "the board gate lets those duties
+  through" — and wrote the card to `.claude/dashboard-state.json`, but the now-projection dropped it
+  because 947 was no longer open, so `.batch-dashboard.html` kept rendering
+  `<p class="now-empty" data-state="idle">` and the very next `git branch -D` was refused with the
+  identical message. Repeating the command does not help: the write succeeds every time and the
+  projection discards it every time. Even `node scripts/land-point.mjs --help` was refused, because
+  the gate judges the segment and not what the segment would do. The session was then wedged between
+  `board-first-guard`, which forbade the cleanup, and `branch-hygiene-guard`, which forbade the turn
+  end until the cleanup had happened — union entry S-10 in `docs/batch-autonomy.md`, reached through
+  S-05. The only way out was to declare an UNRELATED open point as current work, which is a false
+  claim on the board the user reads. That is the cost this point removes.
   VERIFIABLE: Vitest over the projection — a closing card for a just-ticked point survives the
   publish step that removes an ordinary numbered card for the same point; and over the gate — the
   three cleanup calls are permitted while the idle card stands, an unrelated state-changing call is
   still refused. Plus the real proof: the sequence that failed three times on 26.08. runs through
   in one go.
-  Criticality: medium — it leaves merged branches alive behind every landing and pushes the work
-  onto a backstop guard, and it makes a documented way out of a documented state a dead letter.
+  Criticality: high — raised 27.08.2026 after the fourth instance wedged a session outright: the
+  documented escape is a dead letter, the two guards forbid each other's only satisfying mutation,
+  and the only exit left was a false board claim. It also leaves merged branches alive behind every
+  landing and pushes that work onto a backstop guard.
   Bundle: Chat & Tafel. It touches the same board projection as 930 and 935 and must not run
   beside them.
 
