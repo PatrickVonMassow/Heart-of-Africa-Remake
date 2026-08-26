@@ -16,7 +16,7 @@ const statePath = join(dir, 'state.json')
 const logPath = join(dir, 'strikes.jsonl')
 const now = Date.now()
 const progressAt = now - 2 * EMERGENCY_THRESHOLD_MS
-const sleeper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+const sleeper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true })
 
 const reportAt = (end) => ({
   window: { start: progressAt - 1, end },
