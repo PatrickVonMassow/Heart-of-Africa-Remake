@@ -1384,7 +1384,7 @@ Punktgrenze. Gebucht als Punkt 916.
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 26.08.2026, 19:41 · Quellen-Fingerprint: `400d62f8c3b1…`
+Zuletzt aktualisiert: Mittwoch, 26.08.2026, 20:39 · Quellen-Fingerprint: `2b7e0b93e399…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1485,8 +1485,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 91 Feedback-/Projekt-Memories · 57 Guard-/Hook-Skripte · 6 Revert-/Reapply-Commits · 106 Prozess-/Meta-TASKS-Punkte (davon 46 offen).
 
-<!-- RETRO-FINGERPRINT: 400d62f8c3b17509dd1bda4bff67952e81330b136e2af3e3bd431b284f319736 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-26T17:41:47.728Z -->
+<!-- RETRO-FINGERPRINT: 2b7e0b93e3999468caec365ea17abf6e74a8a5493a37fb2075edb62029058c0c -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-26T18:39:46.828Z -->
 <!-- AUTO-GENERATED:END -->
 
 ### 3.111 Ein Erfolg ist kein Beweis für den Weg, auf dem er zustande kam
