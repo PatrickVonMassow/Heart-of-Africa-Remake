@@ -35,6 +35,12 @@ export const PRIMARY_TASK_NAME = 'HoA-Batch-Autostart'
  *  is logged on. Its only job is that the primary keeps existing and running. */
 export const WATCHDOG_TASK_NAME = 'HoA-Batch-Watchdog'
 
+/** The independent hourly total-wedge fallback. */
+export const EMERGENCY_TASK_NAME = 'HoA-Batch-Emergency'
+export const EMERGENCY_INTERVAL_MINUTES = 60
+export const EMERGENCY_OFFSET_MINUTES = 12
+export const EMERGENCY_SCRIPT_PATH = 'scripts/batch-emergency.mjs'
+
 /** The repeat cadence both tasks use, in minutes — the primary's measured one. */
 export const TASK_INTERVAL_MINUTES = 15
 
@@ -64,7 +70,7 @@ export const WATCH_SCRIPT_PATH = 'scripts/windows-task-watch.mjs'
 export const OK_TASK_RESULTS = new Set([0, 0x41300, 0x41301, 0x41303])
 
 /** The role names the watch CLI accepts, mapped to the task each one names. */
-export const TASK_NAMES = { primary: PRIMARY_TASK_NAME, watchdog: WATCHDOG_TASK_NAME }
+export const TASK_NAMES = { primary: PRIMARY_TASK_NAME, watchdog: WATCHDOG_TASK_NAME, emergency: EMERGENCY_TASK_NAME }
 
 /** The task a role name means. Unknown roles answer null — the CLI turns that
  *  into usage text rather than probing a task nobody named. */

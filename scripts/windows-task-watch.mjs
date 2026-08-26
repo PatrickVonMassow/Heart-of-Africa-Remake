@@ -114,7 +114,7 @@ export function watchPeer(
 }
 
 const USAGE = [
-  `usage: node ${WATCH_SCRIPT_PATH} --check primary|watchdog [--dry-run] [--json]`,
+  `usage: node ${WATCH_SCRIPT_PATH} --check primary|watchdog|emergency [--dry-run] [--json]`,
   '',
   '  --check <role>  the PEER to check (the watchdog checks the primary, and back)',
   '  --dry-run       report the verdict without changing anything',

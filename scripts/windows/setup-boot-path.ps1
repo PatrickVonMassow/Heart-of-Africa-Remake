@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Arms the Windows boot path of the batch: an at-logon resume, a second
-    scheduled task that watches the first (and back), and the update settings
+    scheduled task that watches the first (and back), an independent hourly
+    emergency lane, and the update settings
     that keep a restart from parking the machine on a locked screen.
 
 .DESCRIPTION
@@ -30,7 +31,10 @@
       (d) Exports both task definitions to local\windows-tasks\, which is what a
           re-registration reads. Git-ignored: they belong to this machine.
 
-      (e) The pre-departure update settings: no forced restart while a user is
+      (e) Registers HoA-Batch-Emergency on its own hourly SYSTEM timer. It calls
+          batch-emergency.mjs, and the watchdog independently repairs this task.
+
+      (f) The pre-departure update settings: no forced restart while a user is
           logged on, and automatic restart sign-on ENABLED so an update restart
           returns to a signed-in (if locked) session in which the interactive
           primary task can run. With -PauseUpdatesDays it also pauses Windows
@@ -64,10 +68,14 @@ $ErrorActionPreference = 'Stop'
 # --- the watch script and the readiness check read; a Vitest case pins them.
 $PrimaryTaskName        = 'HoA-Batch-Autostart'
 $WatchdogTaskName       = 'HoA-Batch-Watchdog'
+$EmergencyTaskName      = 'HoA-Batch-Emergency'
 $TaskIntervalMinutes    = 15
 $WatchdogOffsetMinutes  = 7
+$EmergencyIntervalMinutes = 60
+$EmergencyOffsetMinutes = 12
 $DefinitionDir          = 'local\windows-tasks'
 $WatchScript            = 'scripts\windows-task-watch.mjs'
+$EmergencyScript        = 'scripts\batch-emergency.mjs'
 
 $script:Changes = @()
 function Write-Change([string]$text) { $script:Changes += $text; Write-Host "  CHANGED  $text" -ForegroundColor Yellow }
@@ -96,8 +104,13 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $WatchPath = Join-Path $RepoRoot $WatchScript
+$EmergencyPath = Join-Path $RepoRoot $EmergencyScript
 if (-not (Test-Path $WatchPath)) {
     Write-Host "Cannot find $WatchScript under $RepoRoot — is this the repository checkout?" -ForegroundColor Red
+    exit 2
+}
+if (-not (Test-Path $EmergencyPath)) {
+    Write-Host "Cannot find $EmergencyScript under $RepoRoot — is this the repository checkout?" -ForegroundColor Red
     exit 2
 }
 
@@ -117,6 +130,8 @@ Write-Host ''
 
 $WatchWatchdogArgs = '"{0}" --check watchdog' -f $WatchPath
 $WatchPrimaryArgs  = '"{0}" --check primary'  -f $WatchPath
+$WatchEmergencyArgs = '"{0}" --check emergency' -f $WatchPath
+$EmergencyArgs = '"{0}"' -f $EmergencyPath
 
 # --- (a) + (b) the primary task ------------------------------------------
 
@@ -163,11 +178,12 @@ if ($watchdog) {
     # IDEMPOTENCY: re-register only when the definition actually differs. The
     # four properties below are the ones this script sets; anything else the user
     # tuned by hand is left alone.
-    $actionOk    = @($watchdog.Actions)  | Where-Object { "$(Get-Prop $_ 'Arguments')" -match '--check\s+primary' }
+    $primaryActionOk = @($watchdog.Actions) | Where-Object { "$(Get-Prop $_ 'Arguments')" -match '--check\s+primary' }
+    $emergencyActionOk = @($watchdog.Actions) | Where-Object { "$(Get-Prop $_ 'Arguments')" -match '--check\s+emergency' }
     $bootOk      = @($watchdog.Triggers) | Where-Object { "$(Get-Prop (Get-Prop $_ 'CimClass') 'CimClassName')" -match 'Boot' }
     $repeatOk    = @($watchdog.Triggers) | Where-Object { "$(Get-Prop (Get-Prop $_ 'Repetition') 'Interval')" -eq ('PT{0}M' -f $TaskIntervalMinutes) }
     $systemOk    = "$(Get-Prop (Get-Prop $watchdog 'Principal') 'UserId')" -match 'SYSTEM'
-    $wanted = -not ($actionOk -and $bootOk -and $repeatOk -and $systemOk)
+    $wanted = -not ($primaryActionOk -and $emergencyActionOk -and $bootOk -and $repeatOk -and $systemOk)
 } else {
     $wanted = $true
 }
@@ -184,7 +200,10 @@ if (-not $wanted) {
     $repeatSource = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $TaskIntervalMinutes)
     $trigger.Repetition = $repeatSource.Repetition
 
-    $action = New-ScheduledTaskAction -Execute $NodePath -Argument $WatchPrimaryArgs -WorkingDirectory $RepoRoot
+    $actions = @(
+        (New-ScheduledTaskAction -Execute $NodePath -Argument $WatchPrimaryArgs -WorkingDirectory $RepoRoot),
+        (New-ScheduledTaskAction -Execute $NodePath -Argument $WatchEmergencyArgs -WorkingDirectory $RepoRoot)
+    )
     $principalDef = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     $settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
@@ -199,12 +218,46 @@ if (-not $wanted) {
     } else {
         Register-ScheduledTask -TaskName $WatchdogTaskName `
             -Description 'Watches HoA-Batch-Autostart: re-registers, enables or starts it when it is gone, disabled or silent (repo: scripts/windows-task-watch.mjs).' `
-            -Trigger $trigger -Action $action -Principal $principalDef -Settings $settings -Force | Out-Null
+            -Trigger $trigger -Action $actions -Principal $principalDef -Settings $settings -Force | Out-Null
         Write-Change 'watchdog task registered (at startup, +7 min, every 15 min, as SYSTEM)'
     }
 }
 
-# --- (d) export both definitions -----------------------------------------
+# --- (d) the independent emergency task ---------------------------------
+
+Write-Host ''
+Write-Host "$EmergencyTaskName"
+$emergency = Get-ScheduledTask -TaskName $EmergencyTaskName -ErrorAction SilentlyContinue
+$emergencyWanted = $true
+if ($emergency) {
+    $emergencyActionOk = @($emergency.Actions) | Where-Object { "$(Get-Prop $_ 'Arguments')" -match 'batch-emergency\.mjs' }
+    $emergencyBootOk = @($emergency.Triggers) | Where-Object { "$(Get-Prop (Get-Prop $_ 'CimClass') 'CimClassName')" -match 'Boot' }
+    $emergencyRepeatOk = @($emergency.Triggers) | Where-Object { "$(Get-Prop (Get-Prop $_ 'Repetition') 'Interval')" -eq ('PT{0}M' -f $EmergencyIntervalMinutes) }
+    $emergencySystemOk = "$(Get-Prop (Get-Prop $emergency 'Principal') 'UserId')" -match 'SYSTEM'
+    $emergencyWanted = -not ($emergencyActionOk -and $emergencyBootOk -and $emergencyRepeatOk -and $emergencySystemOk)
+}
+if (-not $emergencyWanted) {
+    Write-Same 'emergency task registered with an independent hourly SYSTEM timer'
+} else {
+    $emergencyTrigger = New-ScheduledTaskTrigger -AtStartup
+    $emergencyTrigger.Delay = 'PT{0}M' -f $EmergencyOffsetMinutes
+    $emergencyRepeat = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $EmergencyIntervalMinutes)
+    $emergencyTrigger.Repetition = $emergencyRepeat.Repetition
+    $emergencyAction = New-ScheduledTaskAction -Execute $NodePath -Argument $EmergencyArgs -WorkingDirectory $RepoRoot
+    $emergencyPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    $emergencySettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
+    $emergencySettings.Hidden = $true
+    if ($DryRun) {
+        Write-Change 'emergency task would be registered (at startup, +12 min, hourly, as SYSTEM)'
+    } else {
+        Register-ScheduledTask -TaskName $EmergencyTaskName `
+            -Description 'Independent last-resort batch recovery: detects an hour without progress, records the strike, repairs and restarts (repo: scripts/batch-emergency.mjs).' `
+            -Trigger $emergencyTrigger -Action $emergencyAction -Principal $emergencyPrincipal -Settings $emergencySettings -Force | Out-Null
+        Write-Change 'emergency task registered (at startup, +12 min, hourly, as SYSTEM)'
+    }
+}
+
+# --- (e) export all definitions ------------------------------------------
 
 Write-Host ''
 Write-Host 'exported definitions'
@@ -213,7 +266,7 @@ if (-not (Test-Path $definitionRoot)) {
     if ($DryRun) { Write-Change "$DefinitionDir would be created" }
     else { New-Item -ItemType Directory -Path $definitionRoot -Force | Out-Null; Write-Change "$DefinitionDir created" }
 }
-foreach ($name in @($PrimaryTaskName, $WatchdogTaskName)) {
+foreach ($name in @($PrimaryTaskName, $WatchdogTaskName, $EmergencyTaskName)) {
     $target = Join-Path $definitionRoot "$name.xml"
     $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     if (-not $task) { Write-Fail "$name — no such task, nothing to export"; continue }
@@ -234,7 +287,7 @@ foreach ($name in @($PrimaryTaskName, $WatchdogTaskName)) {
     }
 }
 
-# --- (e) the update settings ---------------------------------------------
+# --- (f) the update settings ---------------------------------------------
 
 Write-Host ''
 Write-Host 'Windows Update / restart behaviour'
