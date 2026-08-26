@@ -16,13 +16,21 @@ const declaration = () => JSON.parse(readFileSync(inFlightPath(), 'utf8'))
 // Every evidence item names its work-order point since point 713 — the board
 // derives its now-cards from that mapping — so the fixture declares one; these
 // cases are about the durable flags, not about the tagging rule.
-const run = (...args) =>
-  spawnSync(process.execPath, [CLI, '--waiting-on', 'durable worker', '--point', '895', ...args], {
+const journalPath = () => join(root, 'activity-journal.jsonl')
+const runIn = (env, ...args) =>
+  spawnSync(process.execPath, [CLI, '--waiting-on', 'durable worker', ...args], {
     encoding: 'utf8',
-    env: { ...process.env, HOA_REPO_ROOT: root, HOA_ALERT_ESCALATION: 'off' },
+    env: {
+      ...process.env,
+      HOA_REPO_ROOT: root,
+      HOA_ALERT_ESCALATION: 'off',
+      HOA_ACTIVITY_JOURNAL_PATH: journalPath(),
+      ...env,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   })
+const run = (...args) => runIn({}, '--point', '895', ...args)
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'hoa-batch-in-flight-cli-'))
@@ -96,6 +104,44 @@ describe('batch-in-flight — durable adoption CLI flags', () => {
 
     expect(result.status).toBe(1)
     expect(result.stderr).toContain('a durable block is all-or-nothing; missing: pointId, attemptId')
+    expect(result.stderr).toContain('Nothing recorded.')
+    expect(existsSync(inFlightPath())).toBe(false)
+  })
+
+  // Sixth cross-vendor round: the delegated activity event re-derived its point
+  // from the ref instead of reading the one the declaration records, so a
+  // branch whose name carries no number emitted `point: null` and a name with
+  // misleading digits emitted the wrong one.
+  it('emits the delegated start under the RECORDED point, not one re-read from the ref', () => {
+    // The branch has to be REAL and fresh: the declaration refuses evidence it
+    // cannot probe, which is a different rule from the one under test here.
+    const git = (...argv) =>
+      spawnSync('git', ['-C', root, ...argv], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    git('init', '-q', '--initial-branch=main')
+    writeFileSync(join(root, 'work.txt'), 'delegated work\n')
+    git('add', 'work.txt')
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'work')
+    // A branch OTHER than the checkout's own: its own branch is refused as
+    // evidence that can never go quiet, which is a different rule again.
+    git('branch', 'topic/live')
+
+    const result = runIn({}, '--point', '713', '--branch', 'refs/heads/topic/live')
+
+    expect(result.status, result.stderr).toBe(0)
+    expect(declaration().evidence[0]).toMatchObject({ kind: 'branch', point: 713 })
+    const events = readFileSync(journalPath(), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    expect(events.length).toBeGreaterThan(0)
+    expect(events.at(-1)).toMatchObject({ point: 713 })
+  })
+
+  it('refuses a declared point that the named branch contradicts, and writes nothing', () => {
+    const result = runIn({}, '--point', '713', '--branch', 'refs/heads/feat/999-work')
+
+    expect(result.status).toBe(1)
+    expect(result.stderr).toMatch(/declared point 713 .* names point 999 .* disagree/)
     expect(result.stderr).toContain('Nothing recorded.')
     expect(existsSync(inFlightPath())).toBe(false)
   })

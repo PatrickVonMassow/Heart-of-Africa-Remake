@@ -217,6 +217,30 @@ describe('normalizeActiveWork — the board\'s structured point source', () => {
       .toMatchObject({ point: 700, phase: 'verification' })
   })
 
+  // Sixth cross-vendor round: the branch name used to outvote an EXPLICIT
+  // --point, so `--point 713 --branch feat/999-work` recorded 999 while the
+  // CLI's own message told the caller to declare the point first.
+  it('lets a DECLARED point win over the branch name and refuses the contradiction', () => {
+    // A name that derives nothing takes the declared point rather than none.
+    expect(
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/topic/live' }, { currentPoint: 713, declared: true }),
+    ).toMatchObject({ point: 713 })
+    // A name that derives a DIFFERENT point is the contradiction, and it is
+    // refused rather than silently recorded either way round.
+    expect(() =>
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/feat/999-work' }, { currentPoint: 713, declared: true }),
+    ).toThrow(/declared point 713 .* names point 999 .* disagree/)
+    // The same pair WITHOUT a declaration is the multi-strand case, not a
+    // contradiction: the focus names this session, the branch names its strand.
+    expect(
+      tagEvidencePoint({ kind: 'branch', ref: 'refs/heads/feat/697-a' }, { currentPoint: 713 }),
+    ).toMatchObject({ point: 697 })
+    // A declared point also stamps evidence whose name says nothing.
+    expect(
+      tagEvidencePoint({ kind: 'log', path: '/w/run.log' }, { currentPoint: 713, declared: true, phase: 'verification' }),
+    ).toMatchObject({ point: 713, phase: 'verification' })
+  })
+
   it.each([
     ['unreadable source', { readable: false }],
     ['untagged evidence with no derivable point', { declaration: { evidence: [{ kind: 'branch', ref: 'main' }] } }],
