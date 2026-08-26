@@ -341,6 +341,44 @@ describe('derived now-section membership', () => {
     )
   })
 
+  // Point 935's own reviewer, on the repair above: the exemption authenticated
+  // the card with `summaryPoint`, which reads only a CANONICAL LEADING chip —
+  // so a derived-marked card carrying its number further along the summary
+  // passed as unnumbered, and beside an empty expected set that publishes a
+  // visible point chip under the claim that nothing is running. And subtracting
+  // every derived card without bounding the count let a STACK of them cancel
+  // the zero claim out.
+  it('authenticates the derived card by the whole summary, and tolerates only one of it', () => {
+    const derivedCard = (summaryExtra = '') =>
+      '<details class="now" data-state="derived">\n  <summary><span class="t">' +
+      `${AUTOMATIC_DECISION_TITLE}</span>${summaryExtra}` +
+      '<span class="right"><span class="meta">10:17</span></span></summary>\n' +
+      '  <div class="body"><p>Der Batch läuft weiter.</p></div>\n</details>\n'
+
+    // (a) A NON-LEADING chip is still a chip: the card is not the machine's.
+    const smuggled = derivedCard('<span class="num">935</span>')
+    const board = fullBoard({ now: smuggled })
+    expect(compareNowProjection(board, []).ok).toBe(false)
+    expect(() => reconcileNowProjection(board, [], { stamp: '10:17' })).toThrow(
+      /authored unnumbered non-idle card/,
+    )
+    // …and it is not laundered into the section beside real work either.
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + smuggled }), [700]))
+      .toMatchObject({ ok: false, strayCards: 1 })
+
+    // (b) TWO genuine derived cards are damaged machine state, not two facts.
+    const stacked = fullBoard({ now: derivedCard() + derivedCard() })
+    expect(compareNowProjection(stacked, [])).toMatchObject({ ok: false, duplicateDerived: true })
+    // The render normalises the stack away — the card holds nothing of its own —
+    // and what it leaves behind is the state the comparison accepts.
+    const normalised = reconcileNowProjection(stacked, [], { stamp: '10:17' })
+    expect(normalised.match(/data-state="derived"/g)).toHaveLength(1)
+    expect(compareNowProjection(normalised, [])).toMatchObject({ ok: true, duplicateDerived: false })
+    // The same stack beside active work is refused rather than blessed.
+    expect(compareNowProjection(fullBoard({ now: nowEntry(700, 'A', '20:07') + derivedCard() + derivedCard() }), [700]))
+      .toMatchObject({ ok: false, duplicateDerived: true })
+  })
+
   it('exempts the derived state card and demands the handover card really be one', () => {
     const board = applyDerivedStateCard(
       fullBoard({ now: nowEntry(700, 'A', '20:07') }),

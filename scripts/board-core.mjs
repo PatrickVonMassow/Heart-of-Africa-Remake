@@ -713,6 +713,11 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
     // text and claims nothing about what is running, which is the same reason
     // it may stand beside active work.
     const claimCards = unnumberedCards - derivedCards
+    // …and there is at most ONE of them (point 935's review): subtracting every
+    // derived card without bounding the count let a stack of them cancel the
+    // zero claim out, so damaged machine state was blessed instead of refused.
+    // This module renders exactly one; a second is never something it wrote.
+    const duplicateDerived = derivedCards > 1
     const emptyStateWrong = expected.length === 0
       ? (idleCards === 1
           ? emptyStateCount !== 0 || claimCards !== 1
@@ -720,7 +725,8 @@ export function compareNowProjection(html, expectedPoints, { knownPoints = null,
       : emptyStateCount > 0 || idleCards > 0 || strayCards > 0
     return {
       ok: !missing.length && !extra.length && !duplicates.length && !unknown.length && !crossSection.length
-        && !emptyStateWrong && !focusUnrepresented && !focusMisplaced,
+        && !emptyStateWrong && !duplicateDerived && !focusUnrepresented && !focusMisplaced,
+      duplicateDerived,
       focusPoint: focusChecked ? focused : null,
       focusUnrepresented,
       focusMisplaced,
@@ -917,11 +923,21 @@ export function reconcileNowProjection(
   const ordered = displayOrder.map((point) => ({ point, html: survivorMap.get(point) ?? stubs.get(point) }))
 
   const now = { ...bounds, text: source.slice(bounds.from, bounds.end) }
+  let derivedKept = 0
   let remainder = now.text
     .replace(/<details class="now"[^>]*>[\s\S]*?<\/details>\s*/g, (card) => {
       const summary = (card.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
       const { chip, legacy } = summaryPoint(summary)
       if (chip != null || legacy != null) return ''
+      // ONE derived state card, never a stack (point 935's review). This module
+      // renders it and it holds no information of its own — `stripDerivedStateCard`
+      // is documented safe to call unconditionally for exactly that reason — so a
+      // duplicate is damaged machine state that is normalised away rather than
+      // carried. The comparison refuses the stack it would otherwise have blessed.
+      if (isTrulyDerivedCard(card)) {
+        derivedKept += 1
+        return derivedKept > 1 ? '' : card
+      }
       // Active work ENDS the idle state: a lone idle card is replaced by the
       // derived cards (the beside-numbered contradiction threw above).
       if (expected.length > 0 && isTrulyStateCard(card, 'idle')) return ''
@@ -972,6 +988,7 @@ export function projectNowForPublish(html, activeWork, { knownPoints = null, sta
         : '',
       comparison.focusUnrepresented ? `the focus names point ${comparison.focusPoint}, which has no card` : '',
       comparison.focusMisplaced ? `the focused point ${comparison.focusPoint} does not stand first` : '',
+      comparison.duplicateDerived ? 'more than one derived state card stands in the section' : '',
     ].filter(Boolean)
     throw new Error(`now-section exact-set preflight failed: ${facts.join('; ') || comparison.error || 'state mismatch'}`)
   }
@@ -1473,7 +1490,7 @@ function isTrulyDerivedCard(card) {
   if (!new RegExp(`<details class="now"[^>]*data-state="${DERIVED_STATE_KIND}"[^>]*>`).test(text)) return false
   const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
-  if (summaryPoint(summary).chip != null) return false
+  if (summaryCarriesPoint(summary)) return false
   return title === PAUSED_TITLE || title === AUTOMATIC_DECISION_TITLE
 }
 
@@ -1546,18 +1563,35 @@ const stateCardPattern = (kind) =>
  * something. Otherwise any hand-marked card would buy itself the exemption
  * that the stray rule exists to deny.
  */
+/**
+ * Does this summary carry a point number ANYWHERE?
+ *
+ * `summaryPoint` reads the CANONICAL leading chip, which is the right reading
+ * when the question is "which point is this card's" — and the WRONG one when
+ * the question is "is this card unnumbered" (point 935's review). A card marked
+ * `data-state="derived"`, wearing a reserved title and carrying
+ * `<span class="num">935</span>` further along its summary, passed as
+ * unnumbered — and with an empty expected set that publishes a visible point
+ * chip under the claim that nothing is running. `parseNowCardPoints` has always
+ * scanned the whole section; the three state predicates now agree with it.
+ */
+const summaryCarriesPoint = (summary) => {
+  const { chip, legacy } = summaryPoint(summary)
+  return chip != null || legacy != null || /class="num">\s*\d/.test(String(summary ?? ''))
+}
+
 function isHandoverCard(card) {
   const text = String(card ?? '')
   if (!/<details class="now"[^>]*data-state="handover"[^>]*>/.test(text)) return false
   const summary = (text.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
-  if (summaryPoint(summary).chip != null) return false
+  if (summaryCarriesPoint(summary)) return false
   return cardBodyText(text).length > 0
 }
 
 function isTrulyStateCard(card, kind) {
   const summary = (String(card).match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
   const title = ((summary.match(new RegExp(`<span class="t">${TITLE_TEXT}</span>`)) ?? [])[1] ?? '').trim()
-  const numbered = summaryPoint(summary).chip != null
+  const numbered = summaryCarriesPoint(summary)
   if (kind === 'idle') return title === NO_CURRENT_WORK_TITLE && !numbered
   // THE LEGACY TITLE ONLY COUNTS ON AN UNNUMBERED CARD (four-eyes review,
   // 12.08.2026). That card never had a number; a NUMBERED card wearing the old
