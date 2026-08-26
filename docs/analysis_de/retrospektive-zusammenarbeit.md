@@ -1377,6 +1377,27 @@ Die Antwort ist nicht ein weicheres Tor, sondern ein früheres: Eine Zeile, die 
 so geschrieben hätte, muss beim **Schreiben** auffallen, nicht Wochen später an einer fremden
 Punktgrenze. Gebucht als Punkt 916.
 
+**Die Reinheitsprüfung kann Nachbararbeit nicht von Verunreinigung unterscheiden.**
+Gemessen am 26.08.2026, als zum ersten Mal zwei delegierte Autorenbahnen gleichzeitig
+liefen: Die Schlussprüfung des Testlaufs wacht zu Recht darüber, dass die Tests das
+echte Repository nicht anfassen — sie fällt den ganzen Lauf, sobald sich während des
+Laufs eine Referenz bewegt hat. Nur bewegt sich bei paralleler Arbeit ständig eine:
+Die delegierten Autoren committen auf ihren eigenen Zweigen alle paar Minuten, weil
+genau das ihre Arbeit rettbar macht. Damit ist praktisch jeder Lauf rot, den der
+Besitzer neben einer laufenden Bahn macht — und jedes Push-Tor dazu. Der einzelne
+Wiederholungslauf des Tors hat den Abend zweimal gerettet und ist genau deshalb keine
+Antwort: Er kostet eine volle Suite und meldet sich selbst als verdächtig. Die Prüfung
+braucht den Begriff „gehört zu mir“: der eigene Arbeitsstand ja, ein fremder erklärter
+Zweig nein. Gebucht als Punkt 955.
+
+**„Freigabe mit Auflagen" merkt sich die Auflage nicht.** Ebenfalls am 26.08.2026
+gefunden, beim Lesen des Prüfregisters: Ein Urteil `merge-with-fixes` erfüllt das
+Vier-Augen-Tor — die benannte Auflage selbst schuldet danach niemand mehr. Ein solcher
+Fall stand seit Wochen offen, ohne dass ein Wächter ihn sehen konnte, denn aus Sicht
+des Registers ist der Beitrag geprüft. Das ist die stillste Art, eine eingebaute
+Prüfung zu verlieren: nicht durch Umgehung, sondern dadurch, dass die halbe Zusage
+keinen Träger hat. Gebucht als Punkt 956.
+
 <!-- AUTO-GENERATED:START -->
 <!-- Dieser Abschnitt wird maschinell von scripts/retro-refresh.mjs gepflegt.
      NICHT von Hand editieren — der naechste Refresh ueberschreibt ihn.

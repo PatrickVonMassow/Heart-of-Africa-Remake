@@ -432,20 +432,6 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
   → *Prompt:* „Eine Entscheidung, die du selbst triffst, nennt die **Messung**, die sie stützen
   oder widerlegen würde, und **verfällt**, sobald diese Messung sauber vorliegt."
 
-- **Die Reinheitsprüfung kann Nachbararbeit nicht von Verunreinigung unterscheiden.** Der Prüflauf
-  wacht zu Recht darüber, dass die Tests das echte Projekt nicht anfassen — nur sieht er auch jeden
-  Commit, den ein zweiter Helfer nebenan legitim macht, und färbt sich rot. Sobald du parallel
-  arbeiten lässt, ist damit fast jeder Lauf rot, ohne dass etwas kaputt wäre.
-  → *Prompt:* „Sag deiner Reinheitsprüfung, **was zu ihr gehört**: der eigene Arbeitsstand. Fremde
-  Zweige, an denen erklärtermaßen jemand anderes arbeitet, sind kein Befund — alles andere bleibt
-  laut."
-
-- **„Freigabe mit Auflagen" merkt sich die Auflage nicht.** Die Gegenlesung sagt „darf rein, aber
-  repariere X" — das Tor gilt als bestanden, die Arbeit geht weiter, und X schuldet danach niemand
-  mehr. Es ist die stillste Art, eine Prüfung zu verlieren, die man eingebaut hat.
-  → *Prompt:* „Ein Urteil mit Auflagen erzeugt eine **offene Schuld**, die dein Wächter so lange
-  meldet, bis ein späterer Commit sie nachweislich beantwortet. Ohne Nachweis bleibt sie offen."
-
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -484,4 +470,4 @@ Die Ursache findest du durch **Zerlegen**, nicht durch Wiederholen.
 
 Sie ersetzt die Fallstricke oben nicht.
 
-<!-- GUIDE-FINGERPRINT: 2b7e0b93e3999468caec365ea17abf6e74a8a5493a37fb2075edb62029058c0c -->
+<!-- GUIDE-FINGERPRINT: 400d62f8c3b17509dd1bda4bff67952e81330b136e2af3e3bd431b284f319736 -->

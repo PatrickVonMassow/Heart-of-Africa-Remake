@@ -161,6 +161,13 @@ put it is the mistake this line exists to stop.
   - The missing second pass of `92cbc0e` is run and recorded.
   - Every remaining backlog entry has a recorded valid review, or a recorded retirement reason the
     guard honours; the count is re-measured at start (it grows) and reported at close.
+  MEASURED 26.08.2026, answering the user's question whether this backlog is what the Fable switch
+  being off (20.08. 17:34 – 22.08. 16:26) left behind: it is not. Review is cross-vendor — Sol reads
+  Anthropic work and Opus reads Sol work — so the switch removed no reviewer; Fable is only the
+  weaker same-vendor fallback, and its trace in the off window is a recorded merger fallback on
+  blind merges, nothing else. The ledger shows no dip either (54 verdicts on 20.08., 62 on 21.08.,
+  44 on 22.08.). The backlog is mostly UNANSWERED rather than unreviewed, reaching back to at least
+  10.08. and surfaced by the guard's 26.08. measurement.
   VERIFIABLE: `mechanism-review-guard --status` reports zero unreviewed backlog contributions.
   Criticality: high — until it clears, every landing session drags the same block.
   Bundle: Modell & Wächter. It performs reviews and fixes on already-landed guard code; it edits
