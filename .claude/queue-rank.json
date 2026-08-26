@@ -829,12 +829,6 @@
       "origin": "machine",
       "place": "last"
     },
-    "953": {
-      "at": "2026-08-26T17:21:33.850Z",
-      "why": "It is a LIVE stop-the-batch path, not a latent one: it blocks the turn end today and only a human re-run clears it, which is the exact thing the user's standing order of 26.08.2026 forbids — and point 947, which the user placed at the front, names this class as part of its sweep.",
-      "origin": "machine",
-      "place": "ahead"
-    },
     "954": {
       "at": "2026-08-26T18:37:44.563Z",
       "why": "Behind 952 by its own text: the suite that must measure the visible break reads a copy of the stylesheet until 952 fixes it, and the board is readable today — nothing before the release waits on this.",
@@ -864,6 +858,24 @@
       "why": "It is the measured hole in the double safety the user ordered on 26.08.2026 as point 947 — the emergency lane cannot see a busy wedge, so the very state the order forbids can still stand until the release",
       "origin": "machine",
       "place": "ahead"
+    },
+    "959": {
+      "at": "2026-08-26T23:56:43.522Z",
+      "why": "It is board reporting truth, not a stop-the-batch path, so it stays behind the guard wedges at the front of the queue.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "960": {
+      "at": "2026-08-26T23:56:43.600Z",
+      "why": "It saves an authoring round per finding but blocks nothing; the wedges ahead of it stop the batch outright.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "961": {
+      "at": "2026-08-26T23:56:43.680Z",
+      "why": "Low criticality and one line of shell to fix; nothing ahead of it waits on this.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -904,7 +916,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T22:39:56.633Z",
+    "at": "2026-08-26T23:56:43.687Z",
     "points": [
       174,
       184,
@@ -1213,12 +1225,14 @@
       950,
       951,
       952,
-      953,
       954,
       955,
       956,
       957,
-      958
+      958,
+      959,
+      960,
+      961
     ]
   }
 }
