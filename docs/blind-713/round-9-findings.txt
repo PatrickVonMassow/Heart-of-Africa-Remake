@@ -221,3 +221,27 @@ they still carry.
 - [P3] The `parseNowCardPoint` fallback in `dashboard-guard.mjs --synced` is unreachable:
   both parsers read the same bounded section, so an empty set implies a null first point.
   Removed, and with it the import that only served it.
+
+## The round is closed
+
+The confirming round over the answering commit came back MERGE on both halves and on both
+sides of the vendor line: the source and the declaration core (`c411a38` — every focus shape
+walked through, the fail-closed contract intact, both comments matching their functions), and
+the two guard wrappers (`11a442d` — the validated reuse preserves the integer-or-null contract
+and the Stop fail-open, the removed fallback was unreachable, the publish refusal paths
+unchanged). The documents and the recorded verdicts were read separately and cleared (`ff77b8b`).
+
+WHAT THIS ROUND ACTUALLY COST AND BOUGHT, so the tenth does not have to guess: nine passes plus
+three confirming rounds found ONE defect class twice — a value that is present but unusable read
+as a value that is absent, first for an evidence item without an attributable point, then for a
+focus record naming something that is not a point number, and then a second, lenient copy of that
+same reading two lines below the strict one. Everything else the round raised was either already
+filed (points 929, 930) or a reading of this point's own final state that the point had to decide
+rather than average.
+
+LIVE PROOF at the end of the round, against the real board and the real declaration rather than a
+fixture: the source answers `{ok:true, points:[713], focusPoint:713}`, the published board agrees,
+removing the numbered 713 card makes the comparison answer `missing:[713]` with
+`focusUnrepresented` instead of passing, and the render puts the card back as a visible stub. That
+is the 17.08.2026 defect — a section that stood empty while three strands ran — caught and
+repaired by the mechanism this point builds.
