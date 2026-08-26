@@ -751,9 +751,15 @@
       "origin": "machine",
       "place": "last"
     },
-    "935": {
-      "at": "2026-08-26T08:39:57.862Z",
-      "why": "Der Punkt steht bereits ueber --ahead vor dem Release; seine Blockposition am Ende des Arbeitsauftrags ist richtig, weil er noch in dieser Sitzung gebaut und gelandet wird.",
+    "936": {
+      "at": "2026-08-26T09:48:58.751Z",
+      "why": "Der Zustand ist gemessen widerlegt und die Karte kostet nur Aufmerksamkeit, keine Korrektheit — sie darf hinter der laufenden Brett- und Render-Arbeit stehen.",
+      "origin": "machine",
+      "place": "last"
+    },
+    "937": {
+      "at": "2026-08-26T09:48:58.834Z",
+      "why": "Das Aufraeumen nach der Landung hat mit branch-hygiene-guard eine Rueckfallebene, deshalb steht der Punkt hinter der laufenden Arbeit, aber vor den bewusst zurueckgestellten Altpunkten.",
       "origin": "machine",
       "place": "last"
     }
@@ -796,7 +802,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-26T08:39:57.869Z",
+    "at": "2026-08-26T09:48:58.843Z",
     "points": [
       174,
       184,
@@ -1091,7 +1097,8 @@
       932,
       933,
       934,
-      935
+      936,
+      937
     ]
   }
 }
