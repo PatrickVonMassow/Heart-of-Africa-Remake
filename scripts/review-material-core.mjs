@@ -130,7 +130,9 @@ export function formatPassManifest(plan, pass) {
   }
   if ((plan?.uncoverable ?? []).length) {
     lines.push('BEYOND THE REACH OF ANY PASS — no round can hold these; NO pass covers them:')
-    for (const u of plan.uncoverable) lines.push(`  · ${quotePassFile(u.path)}`)
+    for (const u of plan.uncoverable) {
+      lines.push(`  · ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'}`)
+    }
   }
   if (unavailable.length) {
     lines.push('UNAVAILABLE TO THE REVIEWER CHAIN — this pass does not cover these files:')
@@ -873,7 +875,15 @@ export function planPasses({ stat = '', patch = '', files = [], budget = MATERIA
       const oversized = frame + sectionLen > room
       const undeliverable = oversized || sectionLen === 0
       if (undeliverable) {
-        uncoverable.push({ path: entry.path, patchChars: sectionLen, contentChars: entry.content.length })
+        uncoverable.push({
+          path: entry.path,
+          patchChars: sectionLen,
+          contentChars: entry.content.length,
+          reason: sectionLen === 0
+            ? 'the measured range contains no complete diff section for this path'
+            : `its complete diff plus required frame needs ${frame + sectionLen} characters, ` +
+              `but one round has ${room} available after shared material`,
+        })
         continue
       }
       // An alias whose section the CURRENT pass already carries costs it no
@@ -1076,7 +1086,8 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
       lines.push(
         '  BEYOND REACH — no round can hold these, not even their diff alone:',
         ...plan.uncoverable.map(
-          (u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`,
+          (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
+            `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
         ),
       )
     }
@@ -1102,7 +1113,10 @@ export function formatBudgetNotice(plan, { sha = '', command = 'node scripts/rev
   if (plan.uncoverable.length) {
     lines.push(
       '  BEYOND REACH — no round can hold these, not even their diff alone:',
-      ...plan.uncoverable.map((u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+      ...plan.uncoverable.map(
+        (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
+          `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
+      ),
       '  They are covered by NO pass. Split the change itself, or review them by another means',
       '  and say so — a record that names them would be claiming a reading nobody did.',
     )
@@ -1195,7 +1209,10 @@ function passLines(shortfall, plan) {
     lines.push(
       '  BEYOND REACH — no pass can hold these, not even their diff alone, so no record may',
       '  name them at all:',
-      ...beyond.map((u) => `    ${quotePassFile(u.path)} (diff ${u.patchChars}, content ${u.contentChars} characters)`),
+      ...beyond.map(
+        (u) => `    ${quotePassFile(u.path)} — ${u.reason || 'no round can carry its complete diff'} ` +
+          `(diff ${u.patchChars}, content ${u.contentChars} characters)`,
+      ),
     )
   }
   return lines

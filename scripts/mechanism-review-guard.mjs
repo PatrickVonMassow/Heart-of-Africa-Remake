@@ -48,6 +48,7 @@ import {
   outstandingFiles,
   parseRangeLog as parseWholeRangeLog,
   planAuthorshipGroups,
+  reviewEndStateFiles,
   summarizeReviewDebt,
 } from './mechanism-review-range-core.mjs'
 import { quotePassFile, unquoteGitPath } from './review-material-core.mjs'
@@ -390,7 +391,9 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
   // the blob-identity stamp is the wrapper's, never the ledger's own word.
   let endStateFiles = null
   try {
-    endStateFiles = gitRawFile(rangeFilesCommand(base, head)).split('\0').filter(Boolean)
+    endStateFiles = reviewEndStateFiles(
+      gitRawFile(rangeFilesCommand(base, head)).split('\0').filter(Boolean),
+    )
   } catch {
     // An unmeasured end state can only demand more below; it never drops a path.
   }
@@ -411,7 +414,9 @@ export function gatherMechanismReviewInputs({ sessionId = '', guardDuty = gather
     // a DIFFERENT file set on a branch whose baseline is no ancestor —
     // main-only changes leak in, identical branch changes vanish — so the
     // completeness demand and the detection would talk about different ranges.
-    rangeFiles: (sha) => gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
+    rangeFiles: (sha) => reviewEndStateFiles(
+      gitRawFile(rangeFilesCommand(base, sha)).split('\0').filter(Boolean),
+    ),
   }))
 
   // A scoped pass advances the end-state files it actually read. The remaining
@@ -636,6 +641,11 @@ if (isMainModule(import.meta.url)) {
           `  ${group.vendor ?? 'authored'} end-state files → ` +
             `${group.reviewer ? `${group.reviewerVendor} reviewer ${group.reviewer}` : `UNREVIEWABLE — ${group.unreviewableReason}`}: ` +
             `${group.files.map((f) => quotePassFile(f)).join(', ')}`,
+        )
+      }
+      for (const item of statusPlan?.uncoverable ?? []) {
+        console.log(
+          `  UNRUNNABLE end-state file ${quotePassFile(item.path)} — ${item.reason || 'no round can carry its complete diff'}`,
         )
       }
       if ((gathered.debt?.invalidatedCoverage ?? []).length) {

@@ -7,6 +7,8 @@ import {
   eligibleReviewer,
   outstandingFiles,
   planAuthorshipGroups,
+  REVIEW_END_STATE_EXCLUSIONS,
+  reviewEndStateFiles,
   summarizeReviewDebt,
   vendorOf,
 } from './mechanism-review-range-core.mjs'
@@ -16,6 +18,34 @@ const sha = (letter) => letter.repeat(40)
 const commit = (id, authorModel, files) => ({ sha: sha(id), authorModel, files })
 
 describe('authorship-cut mechanism review planning', () => {
+  it('owes no pass for a range touching only the two work-order documents', () => {
+    const files = ['TASKS.md', 'docs/tasks-archive.md']
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', files)],
+      endStateFiles: files,
+    })
+    expect(reviewEndStateFiles(files)).toEqual([])
+    expect(plan.groups).toEqual([])
+    expect(plan.artefacts).toEqual([])
+    expect(plan.dropped).toEqual(
+      files.map((file) => expect.objectContaining({ file, reason: REVIEW_END_STATE_EXCLUSIONS[file] })),
+    )
+  })
+
+  it('still owes the mechanism beside an excluded work-order document', () => {
+    const mechanism = 'scripts/four-eyes-guard.mjs'
+    const plan = planAuthorshipGroups({
+      commits: [commit('a', 'GPT-5.6 Sol', ['TASKS.md', mechanism])],
+      endStateFiles: ['TASKS.md', mechanism],
+    })
+    expect(plan.groups).toEqual([
+      expect.objectContaining({ files: [mechanism], reviewer: 'Opus 5' }),
+    ])
+    expect(plan.dropped).toEqual([
+      expect.objectContaining({ file: 'TASKS.md', reason: REVIEW_END_STATE_EXCLUSIONS['TASKS.md'] }),
+    ])
+  })
+
   it('groups single-vendor files and names an other-vendor reviewer', () => {
     const plan = planAuthorshipGroups({
       commits: [
