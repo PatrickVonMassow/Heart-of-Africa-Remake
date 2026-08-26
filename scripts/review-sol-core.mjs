@@ -1,6 +1,6 @@
 // Pure decision core of the CROSS-VENDOR four-eyes review (work-order point 624).
 //
-// rule:model-policy@1758947b
+// rule:model-policy@840f3e46
 // WHY IT EXISTS: our Claude reviewers are one house, with similar
 // training, therefore CORRELATED blind spots, which is exactly what the
 // four-eyes rule is bought against (CLAUDE.md §6). A model from a different

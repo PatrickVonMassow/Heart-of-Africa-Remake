@@ -83,12 +83,6 @@
       "why": "Small evidence-plumbing fix; it belongs with the other verification-chain hardening rather than ahead of the release fixes",
       "place": "last"
     },
-    "676": {
-      "at": "2026-08-25T17:30:18.150Z",
-      "why": "Nutzer-Entscheidung 25.08.2026, 19:14: 918+676 direkt hinter 752 einreihen (Chat, nach Sol-Audit)",
-      "origin": "user",
-      "place": "ahead"
-    },
     "677": {
       "at": "2026-08-13T17:13:15.449Z",
       "why": "Haengt nur den Aufrufer, nicht das Projekt, und hat mit '< /dev/null' einen sofort verfuegbaren Umweg — vor dem Release gehen die Release-Punkte vor",
@@ -726,6 +720,12 @@
       "why": "Es kostet Zugzeit, nicht Arbeit — der Handlauf beweist den Baum gruen und der Push geht danach durch; last is right.",
       "origin": "machine",
       "place": "last"
+    },
+    "925": {
+      "at": "2026-08-26T00:37:45.177Z",
+      "why": "Die dauerhafte Lane bleibt bis zu diesem Punkt abgeschaltet und blockiert nichts; Kommunikationsmechanik, Abschluss und Tag gehen vor.",
+      "origin": "machine",
+      "place": "last"
     }
   },
   "boundary": {
@@ -769,7 +769,7 @@
     "why": "The order standing in front of the release today is the arrangement that predates this rule; the four machine-filed points that had ranked themselves there were moved behind 174 first"
   },
   "settled": {
-    "at": "2026-08-25T23:39:04.944Z",
+    "at": "2026-08-26T00:37:45.183Z",
     "points": [
       174,
       184,
@@ -922,7 +922,6 @@
       665,
       668,
       670,
-      676,
       677,
       678,
       680,
@@ -1059,7 +1058,8 @@
       919,
       920,
       922,
-      924
+      924,
+      925
     ]
   }
 }
